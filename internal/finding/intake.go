@@ -15,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
-	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -26,6 +25,8 @@ import (
 // evaluate, answer or find again. Everything about the reporter stays
 // optional, because a claim arriving anonymously is an ordinary claim.
 type Claimed struct {
+	// Title is an optional line naming the claim.
+	Title   string
 	Summary string
 	Told    Told
 }
@@ -137,20 +138,21 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 	if err := mayHandle(subject, productID); err != nil {
 		return nil, err
 	}
-	summary := strings.TrimSpace(in.Summary)
-	if summary == "" {
-		return nil, ErrNothingClaimed
-	}
 	// The same submission policy a justification goes through. It is rendered
 	// as markdown where it is read back, and it quotes somebody outside this
 	// deployment, which is the case the policy exists for: raw HTML refused,
 	// link schemes limited, and a bound on how long a rendered field may be.
-	if err := markdown.Check(summary); err != nil {
+	summary, err := claimed(in.Summary)
+	if err != nil {
+		return nil, err
+	}
+	title, err := titled(in.Title)
+	if err != nil {
 		return nil, err
 	}
 
 	var row *FlawReport
-	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		now := s.now().UTC().Truncate(time.Microsecond)
 		// Read inside, because a retry runs against a database where a
 		// product may have been renamed, and a reference minted from a name
@@ -167,7 +169,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 		// back into the model, and a retry would re-insert a model already
 		// carrying the rolled-back attempt's key.
 		row = &FlawReport{
-			Reference: reference, ProductID: productID, Summary: summary,
+			Reference: reference, Title: title, ProductID: productID, Summary: summary,
 			ReportedBy: strings.TrimSpace(in.Told.ReportedBy),
 			Contact:    strings.TrimSpace(in.Told.Contact),
 			Credit:     strings.TrimSpace(in.Told.Credit),
@@ -175,8 +177,13 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 			FoundHere:  in.Told.FoundHere,
 			RecordedBy: subject.ID, RecordedAt: now,
 		}
-		_, err = tx.NewInsert().Model(row).Exec(ctx)
-		return err
+		if _, err = tx.NewInsert().Model(row).Exec(ctx); err != nil {
+			return err
+		}
+		// Placed by the first standing rule for reports whose team may hold
+		// it, in the same transaction, so a report never sits unheld between
+		// arriving and the next sweep.
+		return routeReport(ctx, tx, row, now)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("record what arrived: %w", err)
@@ -243,25 +250,6 @@ func (s *Store) ReportsIn(ctx context.Context, subject access.Subject,
 		return nil, 0, fmt.Errorf("read a product's reports: %w", err)
 	}
 	return rows, int(total), nil
-}
-
-// AcknowledgeReport records that somebody answered the reporter of one
-// report, by the name the report is reached by.
-//
-// The same act as acknowledging an issue's report, reached the other way: a
-// claim nobody has judged has no issue to be reached through, and it is the
-// one most in need of an answer.
-func (s *Store) AcknowledgeReport(ctx context.Context, subject access.Subject,
-	productID int64, reference string) error {
-
-	if err := mayWorkReference(subject, productID); err != nil {
-		return err
-	}
-	row, err := s.ReportBy(ctx, subject, productID, reference)
-	if err != nil {
-		return err
-	}
-	return s.answered(ctx, subject, row.ID)
 }
 
 // JudgeAsIssue says what a claim turned out to be, and records who said so.

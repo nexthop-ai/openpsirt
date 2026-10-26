@@ -40,6 +40,9 @@ type FlawReport struct {
 	// quotes back to a reporter. Drawn rather than counted, for the reason a
 	// recorded flaw's identifier is.
 	Reference string `bun:"reference,notnull"`
+	// Title is a line naming the claim, as somebody here wrote it. Optional,
+	// because the claim is what is evaluated and answered.
+	Title string `bun:"title"`
 	// ProductID is the product it was reported against, which is what decides
 	// who may read it. An issue's identity spans its aliases, so the same
 	// issue appears in other products as soon as a shared name is recorded,
@@ -70,9 +73,7 @@ type FlawReport struct {
 	// FoundHere is a flaw somebody here found rather than one somebody
 	// outside sent. It carries no disclosure date and nobody is owed an
 	// answer.
-	FoundHere      bool       `bun:"found_here,notnull"`
-	AcknowledgedAt *time.Time `bun:"acknowledged_at"`
-	AcknowledgedBy *int64     `bun:"acknowledged_by"`
+	FoundHere bool `bun:"found_here,notnull"`
 	// EvaluatedAt and EvaluatedBy are when somebody judged the claim, and
 	// who. The person who transcribes a mail is not the person who decides
 	// what it is worth, and a record that cannot tell them apart evidences
@@ -85,6 +86,16 @@ type FlawReport struct {
 	// under one is neither accepted nor ruled on again until it is
 	// withdrawn.
 	RulingID *int64 `bun:"ruling_id"`
+	// AssignedTo is the party holding it: a person, or a team whose queue it
+	// sits in. Absent is a report nobody holds.
+	AssignedTo *int64     `bun:"assigned_to"`
+	AssignedAt *time.Time `bun:"assigned_at"`
+}
+
+// Editable reports whether nobody has judged the report and no ruling holds
+// it: the state in which what it says may be edited.
+func (r *FlawReport) Editable() bool {
+	return r.VulnerabilityID == nil && r.RulingID == nil && r.EvaluatedAt == nil
 }
 
 // Told is what somebody types in about where a flaw came from.
@@ -165,75 +176,11 @@ func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
 	return nil, nil
 }
 
-// Acknowledge records that somebody answered the reporter.
-//
-// It records that it happened rather than doing it: what actually reaches a
-// researcher is a mail somebody sends, from an address they already have.
-// Recording it is what turns "somebody probably replied" into a date the
-// timeline can be evidenced from, and what clears the condition an
-// unacknowledged report opens.
-//
-// Acknowledging twice keeps the first date. When somebody was answered is a
-// fact about the past, and the second person to press it did not change it.
-func (s *Store) Acknowledge(ctx context.Context, subject access.Subject,
-	vulnerabilityID int64) error {
-
-	// Against the product it was reported against, like reading it. Clearing
-	// the condition in one product's queue from another product's rights is
-	// the same hole seen from the write side.
-	//
-	// The issue's reports are one per product at most once issues merge. The
-	// one answered is the first unanswered one the subject may handle, and
-	// otherwise the first they may handle, which keeps its date. Somebody
-	// handling both products' reports answers each in turn.
-	var rows []FlawReport
-	if err := s.db.NewSelect().Model(&rows).
-		Where(FiledUnder(filed.Issue), vulnerabilityID).
-		OrderExpr(`"id"`).Scan(ctx); err != nil {
-		return fmt.Errorf("read who told us: %w", err)
-	}
-	var handled *FlawReport
-	var refused error
-	for i := range rows {
-		if mayReadReports(subject, rows[i].ProductID) != nil {
-			continue
-		}
-		// Answering is working the report, which reading it does not grant.
-		if err := mayHandle(subject, rows[i].ProductID); err != nil {
-			if refused == nil {
-				refused = err
-			}
-			continue
-		}
-		if rows[i].AcknowledgedAt == nil {
-			return s.answered(ctx, subject, rows[i].ID)
-		}
-		if handled == nil {
-			handled = &rows[i]
-		}
-	}
-	switch {
-	case handled != nil:
-		return s.answered(ctx, subject, handled.ID)
-	case refused != nil:
-		return refused
-	}
-	return ErrNoSuchReport
-}
-
-// answered writes the acknowledgment against one report.
-func (s *Store) answered(ctx context.Context, subject access.Subject, reportID int64) error {
-	now := s.now().UTC().Truncate(time.Microsecond)
-	if _, err := s.db.NewUpdate().Model((*FlawReport)(nil)).
-		Set(`"acknowledged_at" = ?`, now).
-		Set(`"acknowledged_by" = ?`, subject.ID).
-		Where(`"id" = ?`, reportID).
-		Where(`"acknowledged_at" IS NULL`).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("record that they were answered: %w", err)
-	}
-	return nil
-}
+// nothingSent is whether nothing has been sent to the reporter of the report
+// under "fr". The first message sent is the acknowledgement, so this is the
+// unanswered condition.
+const nothingSent = `NOT EXISTS (SELECT 1 FROM "report_message" AS "rm"
+	WHERE "rm"."flaw_report_id" = "fr"."id" AND "rm"."direction" = '` + string(Sent) + `')`
 
 // Unanswered is one report nobody has acknowledged, with where it sits.
 type Unanswered struct {
@@ -311,7 +258,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`MIN("fr"."reported_by") AS "reported_by"`).
 		ColumnExpr(`MIN("fr"."received_on") AS "received_on"`).
 		ColumnExpr(access.WithheldCountAs(`"f"."visibility"`, "undisclosed")).
-		Where(`"fr"."acknowledged_at" IS NULL`).
+		Where(nothingSent).
 		// A flaw found here has nobody outside to answer.
 		Where(`"fr"."found_here" = ?`, false).
 		Where(`"f"."closed_at" IS NULL`).
@@ -363,7 +310,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(`"fr"."reported_by" AS "reported_by"`).
 		ColumnExpr(`"fr"."received_on" AS "received_on"`).
-		Where(`"fr"."acknowledged_at" IS NULL`).
+		Where(nothingSent).
 		Where(`"fr"."found_here" = ?`, false).
 		Where(`"fr"."vulnerability_id" IS NULL`).
 		Scan(ctx, &rows)

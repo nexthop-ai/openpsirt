@@ -60,6 +60,7 @@ var called = map[Kind]string{
 	BroughtIn:             "You have been brought into a case",
 	Disclosed:             "An issue you hold was disclosed",
 	Unanswered:            "A vulnerability report has not been answered",
+	ReportMessage:         "A reporter wrote about a report you hold",
 	InventoryMoved:        "A build's contents changed sharply",
 	AnalysisDropped:       "An analyzer run dropped sharply",
 	AnalysisNotComparable: "An analyzer run could not be compared",

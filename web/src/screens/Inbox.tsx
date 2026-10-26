@@ -132,6 +132,7 @@ function Reports({ product, works }: { product: string; works: boolean }) {
               </th>
               <th>Report</th>
               <th>From</th>
+              <th>Held by</th>
               <th>Arrived</th>
               <th>Answered</th>
               <th>Status</th>
@@ -153,10 +154,11 @@ function Reports({ product, works }: { product: string; works: boolean }) {
                       />
                     )}
                   </td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <Link className="id" to={to}>
+                  <td>
+                    <Link className="id" style={{ whiteSpace: "nowrap" }} to={to}>
                       {row.reference}
                     </Link>
+                    {row.title && <span className="hint"> · {row.title}</span>}
                   </td>
                   <td>
                     {row.found_here ? (
@@ -166,6 +168,11 @@ function Reports({ product, works }: { product: string; works: boolean }) {
                     ) : (
                       row.reported_by || <span className="hint">—</span>
                     )}
+                  </td>
+                  <td className="hint">
+                    {row.assigned_to
+                      ? `${row.assigned_to_name || row.assigned_to}${row.assigned_team ? " (team)" : ""}`
+                      : "—"}
                   </td>
                   <td className="hint">{row.received || on(row.recorded_at)}</td>
                   <td className="hint">

@@ -100,6 +100,10 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		"analysis_location": analysisV0110(t),
 		"lead_rule":         leadV0110(t), "rule_rating": leadV0110(t), "rule_family": leadV0110(t),
 		"document_upload": documentUploadV0110(t),
+		"flaw_report":     flawReportV0110(t), "flaw_report_revision": flawReportV0110(t),
+		"report_note": flawReportV0110(t), "report_note_revision": flawReportV0110(t),
+		"report_message": flawReportV0110(t), "report_assignment": flawReportV0110(t),
+		"routing_rule": routingRuleV0110(t),
 	} {
 		made, indexes, err := pick(declared, table)
 		if err != nil {

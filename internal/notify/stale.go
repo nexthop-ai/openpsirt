@@ -663,7 +663,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 		holds := Holds{
 			About: identify(fmt.Sprintf("unanswered %d", row.VulnerabilityID)),
 			Body: fmt.Sprintf("%s reported %s in %s%s and has not been answered. "+
-				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
+				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Identifier, row.Product, when),
 			Link:    weblink.ProductFindings(row.Product, row.Identifier),
@@ -679,7 +679,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 		if row.VulnerabilityID == 0 {
 			holds.About = identify(fmt.Sprintf("unanswered report %d", row.ReportID))
 			holds.Body = fmt.Sprintf("%s sent %s in %s%s and has not been answered. "+
-				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
+				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Reference, row.Product, when)
 			holds.Link = weblink.InboxReport(row.Product, row.Reference)

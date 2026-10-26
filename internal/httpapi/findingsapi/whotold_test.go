@@ -47,8 +47,16 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 			Credit       string `json:"credit"`
 			Received     string `json:"received"`
 			Acknowledged string `json:"acknowledged"`
+			Product      string `json:"product"`
+			Reference    string `json:"reference"`
+			Summary      string `json:"summary"`
 		}
 		httpapitest.Read(t, r, "private-triage", at, &told)
+		// A flaw recorded by hand carries its summary as the claim, so no
+		// report says nothing.
+		if told.Summary == "" {
+			t.Error("a flaw recorded by hand wrote a report with nothing claimed")
+		}
 		if told.ReportedBy != "A. Researcher" || told.Contact != "a@example.org" {
 			t.Errorf("who told us reads as %+v", told)
 		}
@@ -90,9 +98,11 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 			t.Errorf("somebody who may not read the flaw was told about it: %v", told)
 		}
 
-		// Answering clears it, and is dated.
+		// The first message sent clears it, and is dated. It is recorded on
+		// the report, under the product it was reported against.
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			at+"/acknowledgement", ""); got.Code != http.StatusNoContent {
+			"/v1/products/"+told.Product+"/reports/"+told.Reference+"/messages",
+			`{"direction":"sent","body":"Thank you, we are looking."}`); got.Code != http.StatusCreated {
 			t.Fatalf("acknowledging answered %d: %s", got.Code, got.Body.String())
 		}
 		httpapitest.Read(t, r, "private-triage", at, &told)
@@ -193,7 +203,14 @@ func TestWhoToldUsNeedsTheRightItSaysItNeeds(t *testing.T) {
 		}
 		// Answering the reporter is working the report, which reading it does
 		// not grant.
-		if refused := httpapitest.AsPerson(t, r, "private", http.MethodPost, at+"/acknowledgement", ""); refused.Code != http.StatusForbidden {
+		var told struct {
+			Product   string `json:"product"`
+			Reference string `json:"reference"`
+		}
+		httpapitest.Read(t, r, "private-triage", at, &told)
+		if refused := httpapitest.AsPerson(t, r, "private", http.MethodPost,
+			"/v1/products/"+told.Product+"/reports/"+told.Reference+"/messages",
+			`{"direction":"sent","body":"Thanks."}`); refused.Code != http.StatusForbidden {
 			t.Errorf("a reader answered the reporter: %d", refused.Code)
 		}
 	})

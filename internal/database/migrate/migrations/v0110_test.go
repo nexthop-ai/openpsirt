@@ -121,3 +121,59 @@ func kindOf(db *database.DB) string {
 	}
 	return "VARCHAR(16)"
 }
+
+// A v0.10.0 report's acknowledgement becomes the first message sent to its
+// reporter, dated the day it was recorded, by whoever recorded it, and a
+// report nobody answered has no correspondence.
+func TestAnAcknowledgementBecomesTheFirstMessageSent(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		declared, err := world.Declare(ctx, db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorded := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+		answered := time.Date(2026, 10, 3, 23, 30, 0, 0, time.UTC)
+		report := func(reference string, acknowledged *time.Time) {
+			t.Helper()
+			var by *int64
+			if acknowledged != nil {
+				by = &declared.Person.ID
+			}
+			if _, err := db.DB.NewRaw(`INSERT INTO "flaw_report"
+				("reference", "product_id", "summary", "recorded_by", "recorded_at",
+				 "acknowledged_at", "acknowledged_by", "found_here")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				reference, declared.Product.ID, "A claim.", declared.Person.ID, recorded,
+				acknowledged, by, false).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		report("SONIC-R-2026-111111", &answered)
+		report("SONIC-R-2026-222222", nil)
+		dbtest.MigrateTo(t, db, v0110)
+
+		var rows []struct {
+			Reference string    `bun:"reference"`
+			Direction string    `bun:"direction"`
+			Dated     time.Time `bun:"dated"`
+			LoggedBy  int64     `bun:"logged_by"`
+		}
+		if err := db.DB.NewRaw(`SELECT "fr"."reference", "rm"."direction", "rm"."dated", "rm"."logged_by"
+			FROM "report_message" AS "rm" JOIN "flaw_report" AS "fr" ON "fr"."id" = "rm"."flaw_report_id"`).
+			Scan(ctx, &rows); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("the upgrade wrote %d messages, want the one acknowledgement: %+v", len(rows), rows)
+		}
+		got := rows[0]
+		if got.Reference != "SONIC-R-2026-111111" || got.Direction != "sent" ||
+			got.Dated.Format(time.DateOnly) != "2026-10-03" || got.LoggedBy != declared.Person.ID {
+			t.Errorf("the acknowledgement became %+v", got)
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}

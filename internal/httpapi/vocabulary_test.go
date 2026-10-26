@@ -187,6 +187,8 @@ func statedVocabularies() map[string][]string {
 		"reference kinds":                words(finding.ReferenceKinds()),
 		"assessment states":              finding.AssessmentStates(),
 		"ruling states":                  words(finding.RulingStates()),
+		"message directions":             words(finding.Directions()),
+		"acts on a report":               words(finding.ReportActs()),
 		"platforms":                      notify.Platforms(),
 		"notification kinds":             words(notify.Kinds()),
 		"destination kinds":              append(words(notify.Kinds()), notify.Everything),

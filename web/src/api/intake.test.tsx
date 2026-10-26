@@ -4,8 +4,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   useAcceptReport,
-  useAcknowledgeReport,
   useApproveRuling,
+  useEditReport,
+  useLogMessage,
+  useNoteOnReport,
   useRecordReport,
   useRule,
   useWithdrawRuling,
@@ -35,7 +37,14 @@ const EVERY_REPORT_KEY = [
 describe("an act on a report, once it lands", () => {
   it.each([
     ["filing one", "POST", () => useRecordReport("sonic"), { summary: "A socket answers." }],
-    ["acknowledging one", "POST", () => useAcknowledgeReport("sonic", "R-1"), undefined],
+    [
+      "recording a message",
+      "POST",
+      () => useLogMessage("sonic", "R-1"),
+      { direction: "sent", body: "Thanks." },
+    ],
+    ["editing one", "PUT", () => useEditReport("sonic", "R-1"), { summary: "A socket answers." }],
+    ["noting on one", "POST", () => useNoteOnReport("sonic", "R-1"), "Seen before."],
     ["accepting one as an issue", "PUT", () => useAcceptReport("sonic", "R-1"), "CVE-2026-1"],
     ["proposing a ruling", "POST", () => useRule("sonic"), { reports: ["R-1"], outcome: "spam" }],
     ["approving a ruling", "POST", () => useApproveRuling("sonic"), 4],

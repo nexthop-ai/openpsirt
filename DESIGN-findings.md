@@ -744,15 +744,16 @@ contact address is published rather than at some volume of them.
 | Rule | Reason |
 |---|---|
 | A report exists without an issue | Whether a claim is a flaw is a judgment somebody makes afterwards, and the record has to stand before it is made |
-| It carries what was claimed | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. The issue's own description carries the claim once there is one |
+| It carries what was claimed, and an empty claim is refused | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. Refused at recording and at every edit. A report written in the same act as a flaw recorded by hand carries the flaw's summary as its claim |
+| It may carry a title | One line naming the claim, which a list of reports is read by. Optional, because a claim arriving as a mail has a subject at best |
 | Everything about the reporter is optional | A claim arriving anonymously is an ordinary claim, and a flaw found by whoever is typing has no reporter at all. A form demanding one asks them to invent an answer |
 | A report says whether it was found here | The one fact that separates a flaw somebody here found from a claim that arrived. It decides the disclosure date and whether an answer is owed, and nothing else: the same fields, the same judgment and the same rulings apply to both |
 | One row per issue, not per finding | A flaw recorded against four builds is one report from one person, and four copies of their address is four places for it to be wrong |
-| **It records the product it was reported against, and that is who may read it** | Read with the right every read of a report asks, reading undisclosed work in that product, on the issue as on the report itself: one reporter has one rule. Answering them is working the report and asks for triage there. An issue's identity spans its aliases, so the moment a CVE is recorded the same issue is open in every product a scan reports it in. Keyed on the issue alone, the reporter's name, address and received date were readable by anybody holding triage rights in any of those — and acknowledging from one of them cleared the unanswered condition out of another product's queue. The unanswered list stops fanning one letter out across every product the name reaches |
-| An issue merged from issues reported in two products answers each product with its own report | Each name carried its own report. The one a reader reads and answers is the first received that they may read, so the second product reads and acknowledges its reporter, and acknowledging what nobody here may read is refused as no such report |
+| **It records the product it was reported against, and that is who may read it** | Read with the right every read of a report asks, reading undisclosed work in that product, on the issue as on the report itself: one reporter has one rule. Writing to them is working the report and asks for triage there. An issue's identity spans its aliases, so once a CVE is recorded the same issue is open in every product a scan reports it in; keyed on the product, the reporter's name, address and received date stay with the product they wrote to, and a message recorded in one product answers nobody in another |
+| An issue merged from issues reported in two products answers each product with its own report | Each name carried its own report. The one a reader reads and writes to is the first received that they may read, and a message on what nobody here may read is refused as no such report |
 | Credit preference is kept apart from the name reported under | "Anonymous" is a real answer, and so is a handle that is not the name on the mail |
 | The received date is what the embargo runs from (REQ-37) | A report that arrived a fortnight before anybody typed it in no longer puts this clock behind the reporter's. It falls back to when the record was made, and a date nobody can read is treated as one nobody gave. A report found here starts no embargo |
-| The acknowledged date records that somebody answered, rather than answering | What reaches a researcher is a mail from an address somebody already has. Acknowledging twice keeps the first date, and the condition it raises fires at once rather than after a period |
+| The acknowledgement is the first message recorded as sent to the reporter | Its day is the acknowledged date, and whoever recorded it is who acknowledged. It is derived from the correspondence rather than stored beside it, so the two cannot disagree. The unanswered condition fires at once rather than after a period, and clears when one is recorded |
 | What was claimed goes through the submission policy typed text does | It is rendered as markdown where it is read back and it quotes somebody outside this deployment, which is the case the policy exists for (REQ-67) |
 
 A public intake form is out of scope. This is the inside half.
@@ -781,11 +782,33 @@ cannot tell them apart evidences none of them.
 | Recorded | Written by |
 |---|---|
 | Who wrote it down, and when | Recording the report |
-| Who answered the reporter, and when | Acknowledging it |
+| Who answered the reporter, and when | Recording the first message sent to them |
 | Who judged the claim, and when | Accepting it as an issue, or a ruling taking effect. On a ruling, the proposer and the moment they proposed it |
 
 A flaw recorded without a report already here is written down and judged in one
 act, because whoever typed it in said what the flaw is as they did.
+
+### The case
+
+A report is worked as a case: edited while it is open, written to and from,
+noted on, handed to somebody, and judged. Every act is kept and readable.
+
+| Part | Rule |
+|---|---|
+| Edits | The title, the claim and what is known of the reporter change while the report is open: not judged, and no ruling waiting over it. Every version an edit replaces is kept with who replaced it and when, numbered from one, and version one is the report as recorded. An edit that changes nothing keeps nothing |
+| Edits once judged | Refused. A judgment is of particular words, as an approval is (REQ-28); the claim a ruling or an acceptance answered is the one on record |
+| Correspondence | A message is recorded with its direction, sent or received, the day it carries and what it said, which may reference files attached to the report. Nothing is sent from this deployment: a message is recorded after somebody sent it, from an address they already have |
+| Message days | Today where none is given. More than a day ahead of today is refused, since a day in the future records a message nobody has sent. A message is never edited or removed, because it is evidence of what the reporter was told |
+| Correspondence on a flaw found here | Refused. Nobody outside sent it, so there is nobody to write to |
+| Notes | Markdown written by somebody who works the report, editable by its author, with every earlier wording kept. A name mentioned is told only where that person reads the product's reports; a name nobody reading reports holds is returned unnotified, worded alike whether or not the person exists (§ Report visibility) |
+| Notes and messages after judgment | Accepted. The conversation with a reporter outlasts the judgment of their claim, and both stay readable from the issue it became, under the report rule |
+| Assignment | A report is held by one person or routed to one team's queue, as a finding is (`DESIGN-access.md` § Assignment). Given to a person only where they read the product's reports, and to a team only where one member does. Taking one nobody holds, or handing back your own, needs the right to work it; giving one away needs the assigner right as well |
+| Assignment once judged | Refused. Its work goes on as the issue it became, or ended with its ruling. A report under a waiting ruling is still open and may be handed over |
+| Held lists | Open reports by holder: one person with their teams' queues, one team's queue, or nobody. Narrowed to the products where the reader reads reports, and to one of them when asked. A team's queue is not in the list of reports nobody holds |
+| Routing | A routing rule may place a product's reports instead of findings, naming no package and no place since a report sits at neither. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when the rule is added. First match wins, as for findings |
+| Hand-over | Releasing a person's work and an administrator's hand-over move their open reports with their findings |
+| Notices | The person given a report is told, where that is not whoever gave it. A message received is told to the person holding the report. A mention in a note is told to the person named. Each is undisclosed work, so nothing leaving the deployment names the report. No one watches a report; the holder is the one person told |
+| History | Every act, oldest first: recorded, edited, noted, a note edited, a message sent or received, assigned or handed back with the rule that routed it, a file attached, a ruling proposed, in force or withdrawn, and accepted as an issue. Assembled from the rows that hold each act rather than stored twice |
 
 ### Judgment
 
@@ -832,8 +855,8 @@ decided the claim is safe to repeat. This is the **report rule**.
 
 | Act | Asks for |
 |---|---|
-| Reading a report, listing a product's reports, reading what arrived with one, reading a ruling and the duplicates on an issue | The right to read work nobody has announced in that product |
-| Recording a report, answering it, judging it, attaching to it, proposing or withdrawing a ruling | The right to triage work nobody has announced there |
+| Reading a report, listing a product's reports, reading what arrived with one, its earlier versions, its correspondence, its notes and its history, reading a ruling and the duplicates on an issue, and listing reports by who holds them | The right to read work nobody has announced in that product |
+| Recording a report, editing it, recording a message, writing or editing a note, taking or handing over one, judging it, attaching to it, proposing or withdrawing a ruling | The right to triage work nobody has announced there |
 | Agreeing to somebody else's ruling | The approver capability or that triage right, over the right to read |
 
 Reading and working are apart because somebody who reads every embargoed issue
@@ -928,7 +951,7 @@ readable says nothing about whether what a stranger sent is.
 #### The unanswered condition
 
 A ruling answers what a claim is. It does not answer the reporter. A rejected
-report nobody acknowledged is still raised as unanswered. A report found here
+report with no message sent is still raised as unanswered. A report found here
 is never raised: there is nobody outside to answer.
 
 ## Scoring

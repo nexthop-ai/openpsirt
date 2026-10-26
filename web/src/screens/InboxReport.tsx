@@ -5,33 +5,50 @@ import { mayOf, useWho } from "../app/session";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  editReportNote,
+  reportNoteHistory,
   uploadReportFile,
   useAcceptReport,
-  useAcknowledgeReport,
+  useAssignReport,
+  useEditReport,
+  useLogMessage,
+  useMessages,
+  useNoteOnReport,
   useReport,
   useReportFiles,
+  useReportHistory,
+  useReportNotes,
+  useRevisions,
   useRuling,
+  type Message,
+  type Report,
+  type ReportEvent,
 } from "../api/intake";
+import { notYours } from "../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dropzone } from "../ui/Dropzone";
+import { Editor, forget } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
+import { Holder } from "../ui/Holder";
 import { Loading } from "../ui/Loading";
 import { Markdown } from "../ui/Markdown";
 import { notACredential } from "../ui/noautofill";
-import { on } from "../ui/when";
-import { standing } from "./inbox";
+import { EditPiece, Thread } from "../ui/Thread";
+import { at, on } from "../ui/when";
+import { dispositionSaid, standing } from "./inbox";
 import { RuleForm, RulingCard } from "./InboxRuling";
 import { Attached } from "../ui/Attached";
 import { inboxAt, issueAt, reportFlawAt } from "../app/routes";
 
-// One report: what was claimed, who sent it, whether they were answered, what
-// arrived with it, and what it was judged to be.
+// One report as a case: what was claimed and what it said before an edit, who
+// holds it, what was written to and from the reporter, the notes on it, what
+// arrived with it, what it was judged to be, and every act on it.
 export function InboxReport() {
   const { product = "", reference = "" } = useParams();
   const report = useReport(product, reference);
   const ruling = useRuling(product, report.data?.ruling);
-  const acknowledge = useAcknowledgeReport(product, reference);
-  const works = !!mayOf(useWho().data, product)?.may_hide;
+  const who = useWho().data;
+  const works = !!mayOf(who, product)?.may_hide;
 
   if (report.isPending) return <Loading />;
   if (report.isError)
@@ -39,11 +56,16 @@ export function InboxReport() {
   const it = report.data;
   const stands = standing(it);
   const inbox = inboxAt(product);
+  const open = !it.disposition;
+  const mine = (writtenBy: string) => writtenBy === who?.identity;
 
   return (
     <div>
       <div className="screen-head">
-        <h2 className="id">{it.reference}</h2>
+        <h2>
+          <span className="id">{it.reference}</span>
+          {it.title && <> · {it.title}</>}
+        </h2>
         <p>
           <Link to={inbox}>Inbox</Link> ·{" "}
           <span className={`state ${stands.tone}`}>{stands.said}</span>
@@ -58,53 +80,15 @@ export function InboxReport() {
         </p>
       </div>
 
-      <div className="card">
-        <h3>Claim</h3>
-        {it.summary ? (
-          <Markdown source={it.summary} className="reading" />
-        ) : (
-          <p className="hint">Recorded with the issue. Its description carries the claim.</p>
-        )}
-        <p className="hint" style={{ marginTop: 8 }}>
-          {it.found_here
-            ? `Found here${it.reported_by ? ` by ${it.reported_by}` : ""}`
-            : it.reported_by || "Anonymous"}
-          {it.contact && (
-            <>
-              {" "}
-              · <span className="id">{it.contact}</span>
-            </>
-          )}
-          {it.credit && <> · credit as {it.credit}</>}
-          {it.received && <> · arrived {it.received}</>} · recorded by{" "}
-          {it.recorded_by_name || it.recorded_by}, {on(it.recorded_at)}
-        </p>
-        {/* Nobody outside sent a flaw found here, so nobody is owed an
-            answer. */}
-        {it.found_here ? null : it.acknowledged ? (
-          <p className="hint">
-            Answered {on(it.acknowledged)}
-            {it.acknowledged_by && <> by {it.acknowledged_by_name || it.acknowledged_by}</>}
-          </p>
-        ) : (
-          <div className="alert" style={{ margin: "6px 0 0" }}>
-            <strong>Not answered.</strong>
-            <span>Send them a note, then record it here.</span>
-            <button
-              hidden={!works}
-              type="button"
-              className="btn"
-              style={{ marginLeft: "auto" }}
-              disabled={acknowledge.isPending}
-              onClick={() => acknowledge.mutate()}
-            >
-              Mark as answered
-            </button>
-          </div>
-        )}
-        {acknowledge.error != null && (
-          <Failed error={acknowledge.error} what="That was not recorded." />
-        )}
+      <Claim report={it} works={works} />
+
+      <Held report={it} works={works && open} />
+
+      <Correspondence report={it} works={works} />
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <h3>Notes</h3>
+        <ReportNotes product={product} reference={reference} mine={mine} works={works} />
       </div>
 
       <Files product={product} reference={reference} works={works} />
@@ -138,8 +122,531 @@ export function InboxReport() {
           <p className="hint">Not judged yet.</p>
         )}
       </div>
+
+      <History product={product} reference={reference} />
     </div>
   );
+}
+
+// What was claimed, with the form that changes it while the report is open.
+// The original stays on screen once anything was edited: what somebody first
+// sent is what a dispute about the claim comes back to.
+function Claim({ report: it, works }: { report: Report; works: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const edits = it.edits ?? 0;
+  return (
+    <div className="card">
+      <h3>Claim</h3>
+      {editing ? (
+        <EditClaim report={it} onDone={() => setEditing(false)} />
+      ) : (
+        <>
+          {it.summary ? (
+            <Markdown source={it.summary} className="reading" />
+          ) : (
+            <p className="hint">Recorded with the issue. Its description carries the claim.</p>
+          )}
+          <p className="hint" style={{ marginTop: 8 }}>
+            {it.found_here
+              ? `Found here${it.reported_by ? ` by ${it.reported_by}` : ""}`
+              : it.reported_by || "Anonymous"}
+            {it.contact && (
+              <>
+                {" "}
+                · <span className="id">{it.contact}</span>
+              </>
+            )}
+            {it.credit && <> · credit as {it.credit}</>}
+            {it.received && <> · arrived {it.received}</>} · recorded by{" "}
+            {it.recorded_by_name || it.recorded_by}, {on(it.recorded_at)}
+          </p>
+          {works && it.editable && (
+            <div className="actions">
+              <button type="button" className="btn quiet" onClick={() => setEditing(true)}>
+                Edit
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {edits > 0 && <Original product={it.product} reference={it.reference} edits={edits} />}
+    </div>
+  );
+}
+
+// The claim as recorded, and the versions between it and now behind a toggle.
+function Original({
+  product,
+  reference,
+  edits,
+}: {
+  product: string;
+  reference: string;
+  edits: number;
+}) {
+  const [all, setAll] = useState(false);
+  const revisions = useRevisions(product, reference);
+  if (revisions.isPending) return <Loading />;
+  if (revisions.isError)
+    return <Failed error={revisions.error} what="The earlier versions could not be read." />;
+  const rows = revisions.data.items ?? [];
+  const first = rows[0];
+  if (!first) return null;
+  const shown = all ? rows : [first];
+  return (
+    <div className="earlier" style={{ marginTop: 12 }}>
+      {shown.map((row) => (
+        <div key={row.version}>
+          <span className="hint">
+            {row.version === 1 ? "Original" : `Version ${row.version}`}
+            {row.title && <> · {row.title}</>} · replaced {at(row.replaced_at)} by{" "}
+            {row.replaced_by_name || row.replaced_by}
+          </span>
+          <Markdown source={row.summary ?? ""} />
+          {(row.reported_by || row.contact || row.credit || row.received) && (
+            <p className="hint">
+              {[
+                row.reported_by,
+                row.contact,
+                row.credit && `credit as ${row.credit}`,
+                row.received && `arrived ${row.received}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+        </div>
+      ))}
+      {edits > 1 && (
+        <button type="button" className="linkish" onClick={() => setAll(!all)}>
+          {all ? "Original only" : `All ${edits} earlier versions`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EditClaim({ report: it, onDone }: { report: Report; onDone: () => void }) {
+  const [title, setTitle] = useState(it.title ?? "");
+  const [summary, setSummary] = useState(it.summary ?? "");
+  const [reportedBy, setReportedBy] = useState(it.reported_by ?? "");
+  const [contact, setContact] = useState(it.contact ?? "");
+  const [credit, setCredit] = useState(it.credit ?? "");
+  const [received, setReceived] = useState(it.received ?? "");
+  const edit = useEditReport(it.product, it.reference);
+  const about = { product: it.product, reference: it.reference };
+  return (
+    <>
+      <div className="field">
+        <label htmlFor="report-title">Title</label>
+        <input
+          {...notACredential}
+          id="report-title"
+          type="text"
+          maxLength={191}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+      </div>
+      <div className="field">
+        <label>Claim</label>
+        <Editor value={summary} onChange={setSummary} rows={8} label="Claim" attachTo={about} />
+      </div>
+      <div className="field">
+        <label htmlFor="report-from">{it.found_here ? "Found by" : "From"}</label>
+        <input
+          {...notACredential}
+          id="report-from"
+          type="text"
+          value={reportedBy}
+          onChange={(event) => setReportedBy(event.target.value)}
+        />
+      </div>
+      {!it.found_here && (
+        <>
+          <div className="field">
+            <label htmlFor="report-contact">Contact</label>
+            <input
+              {...notACredential}
+              id="report-contact"
+              type="text"
+              value={contact}
+              onChange={(event) => setContact(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="report-credit">Credit as</label>
+            <input
+              {...notACredential}
+              id="report-credit"
+              type="text"
+              value={credit}
+              onChange={(event) => setCredit(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="report-received">Arrived</label>
+            <input
+              id="report-received"
+              type="date"
+              value={received}
+              onChange={(event) => setReceived(event.target.value)}
+            />
+          </div>
+        </>
+      )}
+      {edit.error != null && <Failed error={edit.error} what="That was not saved." />}
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          disabled={summary.trim() === "" || edit.isPending}
+          onClick={() =>
+            edit.mutate(
+              {
+                title: title.trim(),
+                summary,
+                reported_by: reportedBy.trim(),
+                contact: contact.trim(),
+                credit: credit.trim(),
+                received,
+              },
+              { onSuccess: onDone },
+            )
+          }
+        >
+          Save
+        </button>
+        <button type="button" className="btn quiet" onClick={onDone}>
+          Cancel
+        </button>
+        <span className="consequence">The earlier version is kept</span>
+      </div>
+    </>
+  );
+}
+
+// Who is working the report. Offered while it is open: once judged, its work
+// goes on as the issue it became or ended with its ruling.
+function Held({ report: it, works }: { report: Report; works: boolean }) {
+  const assign = useAssignReport(it.product, it.reference);
+  const holder = it.assigned_to ? { identity: it.assigned_to, name: it.assigned_to_name } : null;
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <h3>Assigned to</h3>
+      {works ? (
+        <div className="assignee">
+          <div style={{ minWidth: 220 }}>
+            <Holder
+              product={it.product}
+              undisclosed
+              value={holder}
+              disabled={assign.isPending}
+              onPick={(held) =>
+                assign.mutate(
+                  held === null
+                    ? { person: "" }
+                    : held.kind === "team"
+                      ? { team: held.identity }
+                      : { person: held.identity },
+                )
+              }
+            />
+          </div>
+          {it.assigned_team && <span className="hint">Team queue</span>}
+          {assign.isPending && <span className="hint">Saving…</span>}
+        </div>
+      ) : (
+        <p className="hint">
+          {holder ? (
+            <>
+              {holder.name || holder.identity}
+              {it.assigned_team && " · team"}
+            </>
+          ) : (
+            "No one"
+          )}
+        </p>
+      )}
+      {assign.error != null && <Failed error={assign.error} what="That could not be recorded." />}
+    </div>
+  );
+}
+
+// What was written to the reporter and what they wrote back. Recorded here
+// and sent from wherever it was sent: nothing leaves this deployment. The
+// first message sent is the acknowledgement. A flaw found here has nobody to
+// write to.
+export function Correspondence({
+  report: it,
+  works,
+  within,
+}: {
+  report: Report;
+  works: boolean;
+  // Drawn inside another card, as the issue it became draws it.
+  within?: boolean;
+}) {
+  const messages = useMessages(it.product, it.reference);
+  if (it.found_here) return null;
+  const rows = messages.data?.items ?? [];
+  return (
+    <div className={within ? undefined : "card"} style={{ marginTop: 14 }}>
+      {within ? <h4 style={{ margin: "0 0 6px" }}>Correspondence</h4> : <h3>Correspondence</h3>}
+      {it.acknowledged ? (
+        <p className="hint">
+          Acknowledged {on(it.acknowledged)}
+          {it.acknowledged_by && <> by {it.acknowledged_by_name || it.acknowledged_by}</>}
+        </p>
+      ) : (
+        <div className="alert" style={{ margin: "0 0 10px" }}>
+          <strong>Not answered.</strong>
+          <span>The first message sent is the acknowledgement.</span>
+        </div>
+      )}
+      {messages.isError && !notYours(messages.error) && (
+        <Failed error={messages.error} what="The correspondence could not be read." />
+      )}
+      {messages.isPending ? (
+        <Loading />
+      ) : rows.length === 0 ? (
+        <p className="hint">None recorded.</p>
+      ) : (
+        <div className="thread">
+          {rows.map((each) => (
+            <Said key={each.id} message={each} />
+          ))}
+        </div>
+      )}
+      {works && <LogMessage report={it} />}
+    </div>
+  );
+}
+
+function Said({ message }: { message: Message }) {
+  const sent = message.direction === "sent";
+  return (
+    <div className="said2">
+      <span className="avatar" aria-hidden>
+        {sent ? "→" : "←"}
+      </span>
+      <div>
+        <div className="meta">
+          <b>{sent ? "Sent" : "Received"}</b>
+          <span className="when">{message.dated}</span>
+          <span className="hint">
+            logged by {message.logged_by_name || message.logged_by}, {at(message.logged_at)}
+          </span>
+        </div>
+        {message.body && (
+          <div className="bubble">
+            <Markdown source={message.body} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LogMessage({ report: it }: { report: Report }) {
+  const draftKey = `report-message:${it.product}:${it.reference}`;
+  const [direction, setDirection] = useState<"sent" | "received">("sent");
+  const [dated, setDated] = useState("");
+  const [text, setText] = useState("");
+  const log = useLogMessage(it.product, it.reference);
+  return (
+    <div style={{ marginTop: 14, maxWidth: "78ch" }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className="field">
+          <label htmlFor="message-direction">Message</label>
+          <select
+            id="message-direction"
+            value={direction}
+            onChange={(event) => setDirection(event.target.value as "sent" | "received")}
+          >
+            <option value="sent">Sent to them</option>
+            <option value="received">Received from them</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="message-dated" title="Today, if left empty">
+            On
+          </label>
+          <input
+            id="message-dated"
+            type="date"
+            value={dated}
+            onChange={(event) => setDated(event.target.value)}
+          />
+        </div>
+      </div>
+      <Editor
+        value={text}
+        onChange={setText}
+        draftKey={draftKey}
+        rows={5}
+        label="Message"
+        placeholder="What was written"
+        attachTo={{ product: it.product, reference: it.reference }}
+      />
+      {log.error != null && <Failed error={log.error} what="That was not recorded." />}
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          disabled={!text.trim() || log.isPending}
+          onClick={() =>
+            log.mutate(
+              { direction, body: text, ...(dated ? { dated } : {}) },
+              {
+                onSuccess: () => {
+                  forget(draftKey);
+                  setText("");
+                  setDated("");
+                },
+              },
+            )
+          }
+        >
+          Record
+        </button>
+        <span className="consequence">Sends nothing</span>
+      </div>
+    </div>
+  );
+}
+
+// Notes on a report, which only its readers see and which stay with it
+// whatever it is judged to be. Somebody who reads reports and does not work
+// them reads the thread without a composer.
+export function ReportNotes({
+  product,
+  reference,
+  mine,
+  works,
+}: {
+  product: string;
+  reference: string;
+  mine: (who: string) => boolean;
+  works: boolean;
+}) {
+  const notes = useReportNotes(product, reference);
+  const note = useNoteOnReport(product, reference);
+  const about = { product, reference };
+  const unread = notes.isError && !notYours(notes.error);
+  const items = notes.data?.items ?? [];
+  const failed = unread ? <Failed error={notes.error} what="The notes could not be read." /> : null;
+  if (!works) {
+    if (failed) return failed;
+    return items.length === 0 ? (
+      <p className="hint">None.</p>
+    ) : (
+      <div className="thread">
+        {items.map((each) => (
+          <div key={each.id} className="said2">
+            <div>
+              <div className="meta">
+                <b>{each.written_by_name || each.written_by}</b>
+                <span className="when">{at(each.written_at)}</span>
+              </div>
+              <div className="bubble">
+                <Markdown source={each.body ?? ""} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <Thread
+      items={items}
+      mine={mine}
+      about={about}
+      undisclosed
+      word="Note"
+      consequence="Seen only by readers of reports"
+      placeholder="Something whoever works this report should know."
+      draftKey={`report-note:${product}:${reference}`}
+      // silent-read: a write's answer, whose failure the thread draws from `adding`.
+      notNotified={note.data?.not_notified ?? []}
+      unread={failed}
+      adding={note}
+      onAdd={(body, done) => note.mutate(body, { onSuccess: done })}
+      edit={(piece, done) => (
+        <EditPiece
+          id={piece.id ?? 0}
+          was={piece.body ?? ""}
+          label="Note"
+          useEdit={editReportNote(product, reference)}
+          about={about}
+          undisclosed
+          onDone={done}
+        />
+      )}
+      useHistory={reportNoteHistory(product, reference)}
+    />
+  );
+}
+
+// Every act on the report, oldest first.
+function History({ product, reference }: { product: string; reference: string }) {
+  const history = useReportHistory(product, reference);
+  const rows = history.data?.items ?? [];
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <h3>History</h3>
+      {history.isPending ? (
+        <Loading />
+      ) : history.isError ? (
+        <Failed error={history.error} what="The history could not be read." />
+      ) : (
+        <ul className="plain">
+          {rows.map((row, index) => (
+            <li key={index}>
+              <span className="hint">{at(row.at)}</span> {actSaid(row)}
+              {row.by && <span className="hint"> · {row.by_name || row.by}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// One act, in the words its line says it in.
+export function actSaid(row: ReportEvent): string {
+  const to = row.to ? `${row.to_name || row.to}${row.to_team ? " (team)" : ""}` : "";
+  switch (row.act) {
+    case "recorded":
+      return "Recorded";
+    case "edited":
+      return `Edited, version ${row.version ?? ""} kept`;
+    case "noted":
+      return "Note added";
+    case "note-edited":
+      return "Note edited";
+    case "sent":
+      return `Message sent${row.dated ? ` on ${row.dated}` : ""}`;
+    case "received":
+      return `Message received${row.dated ? ` on ${row.dated}` : ""}`;
+    case "assigned":
+      return row.rule ? `Routed to ${to} by a routing rule` : `Assigned to ${to}`;
+    case "handed-back":
+      return "Unassigned";
+    case "attached":
+      return `Attached ${row.filename ?? "a file"}`;
+    case "ruling-proposed":
+      return `Ruling proposed: ${dispositionSaid(row.disposition)}`;
+    case "ruling-settled":
+      return `Ruling in force: ${dispositionSaid(row.disposition)}`;
+    case "ruling-withdrawn":
+      return `Ruling withdrawn: ${dispositionSaid(row.disposition)}`;
+    case "accepted":
+      return `Accepted as ${row.issue ?? "an issue"}`;
+    default:
+      return row.act;
+  }
 }
 
 // The three ways to answer a claim: it is a new flaw, it is an issue already

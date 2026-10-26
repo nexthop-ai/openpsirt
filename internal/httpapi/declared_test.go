@@ -38,6 +38,7 @@ var standIn = map[string]string{
 	"id": "1", "place": "1", "batch": "1", "team": "1", "scan": "1",
 	"run": "1", "document": "1", "token": "1", "tag": "one",
 	"reference": "MINE-R-2026-100000", "ruling": "1", "version": "1", "fix": "1",
+	"note": "1",
 }
 
 func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T) {

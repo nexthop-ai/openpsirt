@@ -598,14 +598,11 @@ func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
 		}
 		// And they cannot answer the reporter either: to them there is no
 		// report to answer.
-		if err := f.store.Acknowledge(ctx, stranger, issue); !errors.Is(err, finding.ErrNoSuchReport) {
+		sent := finding.Logged{Direction: finding.Sent, Body: "Thank you, we are looking."}
+		if _, _, err := f.store.LogMessage(ctx, stranger, f.productID, told.Reference, sent); !errors.Is(err, finding.ErrNoSuchReport) {
 			t.Errorf("answering a report somebody cannot read was told %v, want no such report", err)
 		}
-		again, err := f.store.ReportFor(ctx, who, issue)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if again.AcknowledgedAt != nil {
+		if answered(t, f, told.ID) {
 			t.Error("somebody who cannot read the report cleared its condition")
 		}
 
@@ -613,15 +610,24 @@ func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
 		// words, and nothing is recorded.
 		reader := access.NewPerson(3, "reader", false,
 			map[int64][]access.Role{f.productID: {access.PublicTriage, access.PrivateRead}}, 0)
-		if err := f.store.Acknowledge(ctx, reader, issue); !errors.Is(err, access.ErrDenied) {
+		if _, _, err := f.store.LogMessage(ctx, reader, f.productID, told.Reference, sent); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a reader answering the reporter was told %v, want a refusal", err)
 		}
-		if again, err = f.store.ReportFor(ctx, who, issue); err != nil {
-			t.Fatal(err)
-		} else if again.AcknowledgedAt != nil {
+		if answered(t, f, told.ID) {
 			t.Error("somebody who may only read the report cleared its condition")
 		}
 	})
+}
+
+// answered reports whether anything was sent on a report.
+func answered(t *testing.T, f *fixture, reportID int64) bool {
+	t.Helper()
+	sent, err := finding.Acknowledgements(t.Context(), f.db.DB, []int64{reportID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ok := sent[reportID]
+	return ok
 }
 
 func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
@@ -836,27 +842,31 @@ func TestEachProductAnswersItsOwnReportUnderAMergedIssue(t *testing.T) {
 		if told == nil || told.Contact != "second@example.org" {
 			t.Fatalf("the second product reads %+v, want its own report", told)
 		}
-		if err := f.store.Acknowledge(ctx, there, kept); err != nil {
+		sent := finding.Logged{Direction: finding.Sent, Body: "Thank you, we are looking."}
+		if _, _, err := f.store.LogMessage(ctx, there, other, told.Reference, sent); err != nil {
 			t.Fatal(err)
 		}
-		if told, err = f.store.ReportFor(ctx, there, kept); err != nil {
-			t.Fatal(err)
-		} else if told.AcknowledgedAt == nil {
+		if !answered(t, f, told.ID) {
 			t.Error("the second product answered its reporter and nothing was recorded")
 		}
 
-		// Somebody handling both products' reports answers the one still
-		// unanswered, which here is the first product's.
-		if err := f.store.Acknowledge(ctx, both, kept); err != nil {
-			t.Fatal(err)
-		}
+		// The first product's report is its own to answer, and stays
+		// unanswered until somebody there does.
 		mine := access.NewPerson(person.ID, "somebody@example.com", false, map[int64][]access.Role{
 			f.productID: {access.PublicTriage, access.PrivateTriage},
 		}, 0)
-		if told, err = f.store.ReportFor(ctx, mine, kept); err != nil {
+		ours, err := f.store.ReportFor(ctx, mine, kept)
+		if err != nil {
 			t.Fatal(err)
-		} else if told == nil || told.Contact != "first@example.org" || told.AcknowledgedAt == nil {
-			t.Errorf("somebody handling both products answered and the first product's report reads %+v", told)
+		}
+		if ours == nil || ours.Contact != "first@example.org" || answered(t, f, ours.ID) {
+			t.Fatalf("the first product's report reads %+v, want its own and unanswered", ours)
+		}
+		if _, _, err := f.store.LogMessage(ctx, both, f.productID, ours.Reference, sent); err != nil {
+			t.Fatal(err)
+		}
+		if !answered(t, f, ours.ID) {
+			t.Error("somebody handling both products answered the first and nothing was recorded")
 		}
 	})
 }

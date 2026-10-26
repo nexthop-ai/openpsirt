@@ -46,6 +46,7 @@ func Register(api huma.API, in core.Deps) {
 	// The record of who told us, and the names an issue goes by.
 	registerWhoTold(api, in)
 	registerIntake(api, in)
+	registerReportCase(api, in)
 	// One issue, everywhere it sits, across products.
 	registerIssue(api, in)
 	// The tree seen upward, for somebody narrowed to their own work.

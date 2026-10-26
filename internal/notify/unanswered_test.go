@@ -103,13 +103,23 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 			t.Errorf("somebody who may read but not triage was told %d things", n)
 		}
 
-		// Answering it clears the condition, with nobody dismissing anything.
-		if _, err := db.DB.NewUpdate().Model((*finding.FlawReport)(nil)).
-			Set(`"acknowledged_at" = ?`, time.Now().UTC().Truncate(time.Microsecond)).
-			Set(`"acknowledged_by" = ?`, answers.ID).
-			Where(`"id" = ?`, report.ID).Exec(ctx); err != nil {
-			t.Fatal(err)
+		// A message received answers nobody, and the condition stays.
+		logged := func(direction finding.Direction) {
+			t.Helper()
+			if _, err := db.DB.NewInsert().Model(&finding.ReportMessage{
+				FlawReportID: report.ID, Direction: direction,
+				Dated: time.Now().UTC().Truncate(24 * time.Hour), Body: "A message.",
+				LoggedBy: answers.ID, LoggedAt: time.Now().UTC().Truncate(time.Microsecond),
+			}).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
 		}
+		logged(finding.Received)
+		if _, cleared, err := watch.Once(ctx); err != nil || cleared != 0 {
+			t.Errorf("a message received cleared %d conditions (err %v), want none", cleared, err)
+		}
+		// The first message sent clears it, with nobody dismissing anything.
+		logged(finding.Sent)
 		if _, cleared, err := watch.Once(ctx); err != nil || cleared != 1 {
 			t.Errorf("answering the letter cleared %d conditions (err %v), want 1",
 				cleared, err)

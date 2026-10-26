@@ -3,7 +3,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { Editor, forget, mentioning } from "./Editor";
+import { Editor, forget, mentioning, type Attaching } from "./Editor";
 import { Failed } from "./Failed";
 import { Loading } from "./Loading";
 import { Markdown } from "./Markdown";
@@ -60,7 +60,7 @@ export function Thread({
   // A piece written by whoever is reading. The identity alone: a
   // display name anybody can be given would make ownership turn on a label.
   mine: (writtenBy: string) => boolean;
-  about: { product: string; vulnerability: string };
+  about: Attaching;
   undisclosed?: boolean;
   // Whether the thing discussed is internal material: a lead's, until its flaw is disclosed.
   internal?: boolean;
@@ -261,7 +261,7 @@ export function EditPiece({
     isPending: boolean;
   };
   onDone: () => void;
-  about: { product: string; vulnerability: string };
+  about: Attaching;
   undisclosed?: boolean;
   internal?: boolean;
 }) {

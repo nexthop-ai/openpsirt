@@ -61,6 +61,12 @@ export function mentioning(
 // asks it.
 type Visibility = "public" | "private" | "internal";
 
+// What a file is attached to: an issue, or a vulnerability report. A report's
+// files are held on the report the moment they arrive, and read under its
+// rule.
+export type Attaching =
+  { product: string; vulnerability: string } | { product: string; reference: string };
+
 export function Editor({
   value,
   onChange,
@@ -83,10 +89,11 @@ export function Editor({
   // The product mentions are offered from. Omitted where there is none in
   // hand, in which case nothing is offered rather than everybody.
   mentions?: { product: string; visibility?: Visibility };
-  // The issue a file would be attached to. Omitted where there is none in
-  // hand, and then no attach control is offered — a control that could not
-  // say what it was attaching to would be one that guessed.
-  attachTo?: { product: string; vulnerability: string };
+  // The issue or the vulnerability report a file would be attached to.
+  // Omitted where there is none in hand, and then no attach control is
+  // offered — a control that could not say what it was attaching to would be
+  // one that guessed.
+  attachTo?: Attaching;
 }) {
   const [showing, setShowing] = useState<"write" | "preview">("write");
   const [typing, setTyping] = useState<string | null>(null);
@@ -216,12 +223,22 @@ export function Editor({
     try {
       const form = new FormData();
       form.append("file", file);
-      const answered = await api.POST("/v1/products/{product}/issues/{vulnerability}/attachments", {
-        params: { path: attachTo },
-        body: form as never,
-        bodySerializer: (body: unknown) => body as FormData,
-      });
-      const stored = unwrap(answered);
+      const stored =
+        "reference" in attachTo
+          ? unwrap(
+              await api.POST("/v1/products/{product}/reports/{reference}/attachments", {
+                params: { path: attachTo },
+                body: form as never,
+                bodySerializer: (body: unknown) => body as FormData,
+              }),
+            )
+          : unwrap(
+              await api.POST("/v1/products/{product}/issues/{vulnerability}/attachments", {
+                params: { path: attachTo },
+                body: form as never,
+                bodySerializer: (body: unknown) => body as FormData,
+              }),
+            );
       const written = stored.inline
         ? `![${stored.filename}](${stored.reference})`
         : `[${stored.filename}](${stored.reference})`;

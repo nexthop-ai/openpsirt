@@ -39,8 +39,11 @@ type Routing struct {
 	// the key that matters — one rule naming a source package catches every
 	// binary package of it, wherever they sit. Beneath matches a place in the
 	// tree. At least one is required.
-	Upstream  string     `bun:"upstream"`
-	Beneath   string     `bun:"beneath"`
+	Upstream string `bun:"upstream"`
+	Beneath  string `bun:"beneath"`
+	// Reports is a rule placing the product's vulnerability reports rather
+	// than findings. It names neither key: a report sits at no component.
+	Reports   bool       `bun:"reports,notnull"`
 	CreatedBy int64      `bun:"created_by,notnull"`
 	CreatedAt time.Time  `bun:"created_at,notnull"`
 	RetiredAt *time.Time `bun:"retired_at"`
@@ -84,6 +87,14 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 			return nil, err
 		}
 	}
+	return s.insertRule(ctx, by, productID, teamID, name, upstream, beneath, false)
+}
+
+// insertRule writes a rule at the end of the product's list, once its writer
+// and its keys have been accepted.
+func (s *Store) insertRule(ctx context.Context, by access.Subject, productID, teamID int64,
+	name, upstream, beneath string, reports bool) (*Routing, error) {
+
 	var rule *Routing
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		createdAt := s.now().UTC().Truncate(time.Microsecond)
@@ -93,7 +104,7 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 		// of that attempt's answers.
 		rule = &Routing{
 			ProductID: productID, TeamID: teamID, Name: strings.TrimSpace(name),
-			Upstream: graph.Folded(upstream), Beneath: graph.Folded(beneath),
+			Upstream: graph.Folded(upstream), Beneath: graph.Folded(beneath), Reports: reports,
 			CreatedBy: by.ID, CreatedAt: createdAt,
 		}
 		// Scanned into a value rather than read through a cursor. A cursor
@@ -230,7 +241,11 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 		// has left to write. The room the last rule lost to a human assignment
 		// is not the next rule's, or first-match-wins is undone for that batch
 		// and work the earlier rule claimed goes to a later one.
-		read, n, err := s.applyOne(ctx, productID, rule, party, cap-seen)
+		applying := s.applyOne
+		if rule.Reports {
+			applying = s.applyReportRule
+		}
+		read, n, err := applying(ctx, productID, rule, party, cap-seen)
 		if errors.Is(err, ErrTooBroad) {
 			outgrown = append(outgrown, rule.ID)
 			continue

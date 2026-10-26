@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -20,18 +21,26 @@ import (
 // ReportBody is what somebody told us, and what became of it.
 type ReportBody struct {
 	Reference  string `json:"reference" doc:"The name this report is reached by"`
-	Summary    string `json:"summary,omitempty" doc:"What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it"`
+	Product    string `json:"product" doc:"The product it was reported against, by name. The notes and correspondence of a report are read under it"`
+	Title      string `json:"title,omitempty" doc:"A line naming the claim"`
+	Summary    string `json:"summary,omitempty" doc:"What was claimed, as markdown, as it stands now"`
 	ReportedBy string `json:"reported_by,omitempty"`
 	Contact    string `json:"contact,omitempty"`
 	Credit     string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
 	Received   string `json:"received,omitempty" doc:"The day it arrived, which the embargo is counted from"`
-	FoundHere  bool   `json:"found_here" doc:"Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer"`
-	// Acknowledged is when somebody answered them, and by whom. Absent is the
-	// state an unacknowledged report is in: prompt acknowledgment is the part
-	// of coordinated disclosure a reporter actually judges.
-	Acknowledged       string `json:"acknowledged,omitempty"`
-	AcknowledgedBy     string `json:"acknowledged_by,omitempty" doc:"The person who answered them, by sign-in identity"`
+	FoundHere  bool   `json:"found_here" doc:"Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date, nobody is owed an answer, and it has no correspondence"`
+	// Edits and Editable are how often what it says was changed, and whether
+	// it may still be.
+	Edits    int  `json:"edits,omitempty" doc:"How many times what it says was edited. The earlier versions, the original first, are read from its revisions"`
+	Editable bool `json:"editable" doc:"Whether its title, claim and reporter may still be edited: nobody has judged it and no ruling holds it"`
+	// Acknowledged is the day of the first message sent to the reporter,
+	// which is the acknowledgement. Absent is a report nothing has been sent
+	// on.
+	Acknowledged       string `json:"acknowledged,omitempty" doc:"The day of the first message sent to the reporter, which is the acknowledgement"`
+	AcknowledgedBy     string `json:"acknowledged_by,omitempty" doc:"The person who recorded that message, by sign-in identity"`
 	AcknowledgedByName string `json:"acknowledged_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	core.HolderBody
+	AssignedAt string `json:"assigned_at,omitempty" doc:"When it went to whoever holds it"`
 	// Issue is what the claim turned out to be, where somebody has said, with
 	// when they said it and who they were. Absent is a claim nobody has
 	// judged, which is the state every report arrives in.
@@ -51,8 +60,8 @@ type ReportBody struct {
 	RecordedAt     string                  `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
 }
 
-// registerWhoTold is the record of who told us, and the act of saying we
-// answered them.
+// registerWhoTold is the record of who told us, and the other names an issue
+// goes by.
 func registerWhoTold(api huma.API, in core.Deps) {
 	const path = "/v1/products/{product}/issues/{vulnerability}/report"
 
@@ -61,6 +70,8 @@ func registerWhoTold(api huma.API, in core.Deps) {
 		Summary: "Show who reported a flaw",
 		Description: "Who reported it, how to reach them, when it arrived, when somebody " +
 			"answered them, and how they wish to be credited.\n\n" +
+			"Its notes and correspondence are read from the report itself, under the product " +
+			"`product` names, by whoever may read that product's reports.\n\n" +
 			"The received date is what the embargo runs from: a report arriving " +
 			"on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the " +
 			"one the reporter has a publication scheduled against, and they are the party who " +
@@ -91,40 +102,6 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "who told us could not be read", err)
 		}
 		return &struct{ Body ReportBody }{Body: body}, nil
-	})
-
-	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "acknowledge-report", Method: http.MethodPost,
-		Path:    path + "/acknowledgement",
-		Summary: "Record that the reporter was answered",
-		Description: "Records that somebody replied to whoever reported this, and when.\n\n" +
-			"It records that it happened rather than doing it. What reaches a researcher " +
-			"is a mail somebody sends from an address they already have; recording it is what " +
-			"turns \"somebody probably replied\" into a date the timeline can be evidenced " +
-			"from, and what clears the condition an unanswered report opens.\n\n" +
-			"Acknowledging twice keeps the first date: when somebody was answered is a fact " +
-			"about the past, and the second person to press it did not change it.",
-		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
-		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
-	}) (*struct{}, error) {
-		subject, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
-		if err != nil {
-			return nil, err
-		}
-		store := finding.NewStore(in.DB.DB)
-		told, err := store.ReportFor(ctx, subject, issue)
-		if err != nil {
-			return nil, core.WentWrong(in.Logger, "who told us could not be read", err)
-		}
-		if told == nil {
-			return nil, huma.Error404NotFound("nobody is recorded as having reported this")
-		}
-		if err := store.Acknowledge(ctx, subject, issue); err != nil {
-			return nil, core.Refused(in.Logger, err, "that could not be recorded")
-		}
-		return &struct{}{}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -267,28 +244,44 @@ func reportBody(ctx context.Context, in core.Deps, told finding.FlawReport) (Rep
 	return bodies[0], nil
 }
 
-// reportBodies renders a page of reports, naming the people and the issues
-// they refer to in one read each.
+// reportBodies renders a page of reports, naming the people, the products and
+// the issues they refer to in one read each.
 //
-// Two reads for the page rather than two per row: a page of fifty reports is
+// One read each for the page rather than per row: a page of fifty reports is
 // a hundred round trips asked one at a time, and the names are the same
 // handful of people over and over.
 func reportBodies(ctx context.Context, in core.Deps, rows []finding.FlawReport) (
 	[]ReportBody, error) {
 
+	ids := make([]int64, 0, len(rows))
 	people := make([]int64, 0, len(rows))
 	issues := make([]int64, 0, len(rows))
+	products := make([]int64, 0, len(rows))
+	parties := make([]int64, 0, len(rows))
 	for _, row := range rows {
+		ids = append(ids, row.ID)
 		people = append(people, row.RecordedBy)
-		if row.AcknowledgedBy != nil {
-			people = append(people, *row.AcknowledgedBy)
-		}
+		products = append(products, row.ProductID)
 		if row.EvaluatedBy != nil {
 			people = append(people, *row.EvaluatedBy)
 		}
 		if row.VulnerabilityID != nil {
 			issues = append(issues, *row.VulnerabilityID)
 		}
+		if row.AssignedTo != nil {
+			parties = append(parties, *row.AssignedTo)
+		}
+	}
+	acknowledged, err := finding.Acknowledgements(ctx, in.DB.DB, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, sent := range acknowledged {
+		people = append(people, sent.LoggedBy)
+	}
+	edits, err := finding.RevisionCounts(ctx, in.DB.DB, ids)
+	if err != nil {
+		return nil, err
 	}
 	rulings, err := finding.NewStore(in.DB.DB).RulingsOf(ctx, rows)
 	if err != nil {
@@ -307,23 +300,38 @@ func reportBodies(ctx context.Context, in core.Deps, rows []finding.FlawReport) 
 	if err != nil {
 		return nil, err
 	}
+	called, err := in.Catalog(in.DB.DB).ProductsCalled(ctx, products)
+	if err != nil {
+		return nil, err
+	}
+	holders, err := access.NewStore(in.DB.DB).WhoHolds(ctx, parties)
+	if err != nil {
+		return nil, err
+	}
 
 	out := make([]ReportBody, 0, len(rows))
 	for _, row := range rows {
 		body := ReportBody{
-			Reference: row.Reference, Summary: row.Summary,
+			Reference: row.Reference, Product: called[row.ProductID],
+			Title: row.Title, Summary: row.Summary,
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
-			FoundHere:  row.FoundHere,
+			FoundHere: row.FoundHere, Edits: edits[row.ID], Editable: row.Editable(),
 			RecordedBy: who.Identity(row.RecordedBy), RecordedByName: who.Label(row.RecordedBy),
 			RecordedAt: core.Stamp(row.RecordedAt),
 		}
 		if row.ReceivedOn != nil {
 			body.Received = row.ReceivedOn.UTC().Format(time.DateOnly)
 		}
-		body.Acknowledged = core.StampAt(row.AcknowledgedAt)
-		if row.AcknowledgedBy != nil {
-			body.AcknowledgedBy = who.Identity(*row.AcknowledgedBy)
-			body.AcknowledgedByName = who.Label(*row.AcknowledgedBy)
+		if sent, ok := acknowledged[row.ID]; ok {
+			body.Acknowledged = sent.Dated.UTC().Format(time.DateOnly)
+			body.AcknowledgedBy = who.Identity(sent.LoggedBy)
+			body.AcknowledgedByName = who.Label(sent.LoggedBy)
+		}
+		if row.AssignedTo != nil {
+			if held, ok := holders[*row.AssignedTo]; ok {
+				body.HolderBody = core.HolderOf(held)
+				body.AssignedAt = core.StampAt(row.AssignedAt)
+			}
 		}
 		if row.VulnerabilityID != nil {
 			body.Issue = identifiers[*row.VulnerabilityID]

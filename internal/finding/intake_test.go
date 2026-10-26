@@ -152,9 +152,22 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 			if held == access.PrivateRead {
 				want = access.ErrDenied
 			}
-			if err := f.store.AcknowledgeReport(t.Context(), stranger, f.productID,
-				row.Reference); !errors.Is(err, want) {
+			if _, _, err := f.store.LogMessage(t.Context(), stranger, f.productID,
+				row.Reference, finding.Logged{Direction: finding.Sent, Body: "Thanks."}); !errors.Is(err, want) {
 				t.Errorf("%s answering a claim was answered %v, want %v", held, err, want)
+			}
+			if _, err := f.store.Revise(t.Context(), stranger, f.productID,
+				row.Reference, finding.Rewritten{Summary: "Changed."}); !errors.Is(err, want) {
+				t.Errorf("%s editing a claim was answered %v, want %v", held, err, want)
+			}
+			if _, _, err := f.store.NoteOnReport(t.Context(), stranger, f.productID,
+				row.Reference, "A note."); !errors.Is(err, want) {
+				t.Errorf("%s noting on a claim was answered %v, want %v", held, err, want)
+			}
+			mine := stranger.Party()
+			if _, err := f.store.AssignReport(t.Context(), stranger, f.productID,
+				row.Reference, &mine, nil); !errors.Is(err, want) {
+				t.Errorf("%s taking a claim was answered %v, want %v", held, err, want)
 			}
 			if _, err := f.store.JudgeAsIssue(t.Context(), stranger, f.productID,
 				row.Reference, 1); !errors.Is(err, want) {
@@ -309,7 +322,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 	})
 }
 
-func TestAnsweringAClaimKeepsTheFirstDate(t *testing.T) {
+func TestTheFirstMessageSentIsTheAcknowledgement(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), who, f.productID,
@@ -317,30 +330,28 @@ func TestAnsweringAClaimKeepsTheFirstDate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.AcknowledgeReport(t.Context(), who, f.productID,
-			row.Reference); err != nil {
-			t.Fatal(err)
+		log := func(direction finding.Direction, day string) {
+			t.Helper()
+			if _, _, err := f.store.LogMessage(t.Context(), who, f.productID, row.Reference,
+				finding.Logged{Direction: direction, Dated: day, Body: "A message."}); err != nil {
+				t.Fatal(err)
+			}
 		}
-		first, err := f.store.ReportBy(t.Context(), who, f.productID, row.Reference)
+		// A message received answers nobody.
+		log(finding.Received, "2026-09-02")
+		if answered(t, f, row.ID) {
+			t.Fatal("a message received was read as the acknowledgement")
+		}
+		log(finding.Sent, "2026-09-05")
+		// Logged later and dated earlier: the acknowledgement is the first
+		// sent by the day it carries.
+		log(finding.Sent, "2026-09-03")
+		sent, err := finding.Acknowledgements(t.Context(), f.db.DB, []int64{row.ID})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if first.AcknowledgedAt == nil || first.AcknowledgedBy == nil {
-			t.Fatal("acknowledging recorded neither a moment nor a person")
-		}
-		if err := f.store.AcknowledgeReport(t.Context(), who, f.productID,
-			row.Reference); err != nil {
-			t.Fatal(err)
-		}
-		again, err := f.store.ReportBy(t.Context(), who, f.productID, row.Reference)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// When somebody was answered is a fact about the past, and the second
-		// person to press it did not change it.
-		if !again.AcknowledgedAt.Equal(*first.AcknowledgedAt) {
-			t.Errorf("answering twice moved the date from %v to %v",
-				first.AcknowledgedAt, again.AcknowledgedAt)
+		if got := sent[row.ID].Dated.Format(time.DateOnly); got != "2026-09-03" {
+			t.Errorf("the acknowledgement is dated %s, want the earliest message sent", got)
 		}
 	})
 }

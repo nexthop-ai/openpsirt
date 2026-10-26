@@ -81,7 +81,9 @@ true is cleared, and running the same pass twice changes nothing.
 | Work sitting in a team queue | condition | Per team and product, with a count |
 | Somebody away still holding work | condition | Below |
 | A VEX publisher revising a cited statement | condition | Below |
-| A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges |
+| A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges. Clears when the first message sent to the reporter is recorded, which is the acknowledgement |
+| A report given to you | event | To the person a report is assigned to, where that is not whoever assigned it, and only where they read the product's reports. Never to a team. Undisclosed |
+| A reporter writing back | event | A message recorded as received on a report, to the person holding it. Undisclosed. Nobody watches a report, so a report nobody holds, or one in a team's queue, tells nobody |
 | An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
@@ -283,7 +285,7 @@ covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
 and reaches whoever may approve it under the report rule: the approver
 capability or triage of undisclosed work, over reading it, and never its
 proposer. A ruling answers what a claim is and not
-the reporter, so a rejected report nobody acknowledged is still raised as
+the reporter, so a rejected report with no message sent is still raised as
 unanswered.
 
 A report about an issue long closed is history rather than an unanswered

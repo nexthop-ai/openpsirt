@@ -19,6 +19,7 @@ func Register(api huma.API, in core.Deps) {
 	registerAssignment(api, in)
 	registerAssignMatching(api, in)
 	registerLeadAssigning(api, in)
+	registerReportAssignment(api, in)
 	registerBundles(api, in)
 	registerPendingUpgrades(api, in)
 	registerRouting(api, in)

@@ -254,6 +254,7 @@ yourself is still doing it.
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
+| A vulnerability report is assigned under the same three rows, at undisclosed work | A report is undisclosed whatever it claims (`DESIGN-findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
 
 ### Assignment by narrowing
 
@@ -483,6 +484,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | The preview names a sample of the components and counts all of them | A rule beneath a kernel matches hundreds of modules; the names are a sample to read and the total is its own count over the same narrowing |
 | How many one pass places is a setting | A bulk write is bounded and the bound belongs where an operator can move it: a pass too large holds a connection through the whole of it, and one too small leaves a fifty-thousand-finding product re-queuing twenty-five times. It was a constant in the sweeper and a second constant in the writer — two numbers for one bound — under a comment declining the decision without citing it |
 | The preview is narrowed like every other count (REQ-42, REQ-43) | Read unnarrowed, the gap between the preview and the same person's findings list is exactly the amount of undisclosed work. Somebody who may see nothing is told nothing rather than zero |
+| A rule may place vulnerability reports instead of findings | Such a rule names no package and no place, since a report sits at neither, and either key on it is refused. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when it is added. Its preview counts the product's open reports and those nobody holds, where the asker reads the product's reports and as zero elsewhere |
 | A rule places leads as well as findings | A lead is matched by the component it sits in, like any finding, and is one piece of work in the preview. A lead past its end of life is neither placed nor counted, because it is kept as it stands (`DESIGN-analysis.md` § End of life) |
 | A rule places work only at a visibility one member of its team reads | The rule a hand assignment to the team asks (§ Teams). It is asked of each place, so an undisclosed or internal place nobody on the team reads stays with nobody while the disclosed places beside it are placed, and is picked up from the unassigned list by somebody who reads it. A team of nobody is placed nothing |
 | The preview names no team, and counts what the asker reads | It takes the keys alone. Work at a visibility nobody on the team reads is counted and then not placed |
@@ -1232,7 +1234,7 @@ that is neither.
 | | |
 |---|---|
 | **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
-| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
+| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as editing a report, recording a message to or from its reporter, assigning it, or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because
 absorbing a route that should leave a row is the failure the walk exists to

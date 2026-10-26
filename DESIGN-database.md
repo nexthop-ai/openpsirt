@@ -106,7 +106,7 @@ Engine-specific code is confined to these places:
 | Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and is asked at start and after every scan. A server is asked once at start: PostgreSQL spells it `ANALYZE` with `SKIP_LOCKED` and the MySQL-protocol servers `ANALYZE TABLE` under a session bound on waiting for a lock, each table named from the catalog, which PostgreSQL keeps in one of its own and the others in the information schema. § Planner statistics has the measurement |
 | Reading the planner's estimate of a table in a test | Each engine keeps its estimates somewhere of its own: PostgreSQL in its catalog, MySQL and MariaDB in InnoDB's statistics tables, SQLite in a table of its own |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
-| A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops a uniqueness rule as a constraint where MySQL and MariaDB drop the index of that name, MySQL and MariaDB name the table an index is dropped from, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes and which columns a table already has |
+| A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops a uniqueness rule as a constraint where MySQL and MariaDB drop the index of that name, MySQL and MariaDB name the table an index is dropped from, PostgreSQL drops a foreign key as a constraint where MySQL and MariaDB drop it as a foreign key and refuse to drop a column one names, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes, which columns and which foreign keys a table already has |
 | When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone, and an index-only scan there reads the table for every page changed since the last vacuum. § Indexes has the measurement |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
@@ -528,6 +528,24 @@ Migration 44. No row moves. § Indexes says what each index serves,
 
 Each index takes 0.7 s to build on PostgreSQL over 1,159,943 findings, and
 is 21 to 29 MB beside a 306 MB table.
+
+### The v0.11.0 upgrade
+
+Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
+says what a report's case holds.
+
+| Table | Change | Every engine |
+|---|---|---|
+| `flaw_report` | Gains a title, who holds it and since when. Loses the acknowledged moment and who acknowledged | Each acknowledgement is first written as a message sent, dated the day it was recorded, by whoever recorded it, with no text. A report already holding a sent message is stepped over, so a start after one that stopped part way writes none twice. The index serving the unanswered list is dropped, then the foreign key naming who acknowledged on the server engines, then the columns. The holder's foreign key is added where the table does not hold it |
+| `flaw_report_revision` | A new table: what a report said before each edit | Made by the release's statement, and stepped over where it is already there |
+| `report_message` | A new table: the correspondence with a reporter | Made by the release's statement, and stepped over where it is already there |
+| `report_note`, `report_note_revision` | New tables: the notes on a report, and each earlier wording | Made by the release's statement, and stepped over where they are already there |
+| `report_assignment` | A new table: every change of who holds a report, with the rule that routed it | Made by the release's statement, and stepped over where it is already there |
+| `routing_rule` | Whether it places vulnerability reports, false for every rule | Added where the table stands, and stepped over where it is already there |
+
+| Check, on each of the four engines | What it holds |
+|---|---|
+| A v0.10.0 database holding an acknowledged report | Upgraded, with the acknowledgement read back as the first message sent, on its day and by the person who recorded it |
 
 ### Release records
 

@@ -517,6 +517,8 @@ export interface paths {
          * List assignment totals
          * @description Returns everyone holding open work you can see, with how much.
          *
+         *     `reports` counts the open vulnerability reports each holds, in the products where you read reports; somebody holding only reports is listed with no findings.
+         *
          *     Counted in pieces of work — an issue in a component in a product, or one static analysis lead — which is the unit the list behind each person is in. `places` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
          *
          *     The number worth watching is not how many findings exist but how many are waiting behind somebody: an idle account holding nothing is harmless, and work stuck behind a person who has gone is the problem — nothing tells this software that somebody has left.
@@ -2068,6 +2070,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/people/{identity}/assignments/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the vulnerability reports one person is working
+         * @description The open vulnerability reports somebody holds, theirs and their teams' queues, oldest first. Send `me` as the identity for your own.
+         *
+         *     An identity nobody holds answers an empty list, which is also what an identity somebody holds answers when none of their reports are yours to see.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products where you read reports.
+         */
+        get: operations["list-assigned-reports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/people/{identity}/deactivation": {
         parameters: {
             query?: never;
@@ -3351,6 +3377,8 @@ export interface paths {
          * Show who reported a flaw
          * @description Who reported it, how to reach them, when it arrived, when somebody answered them, and how they wish to be credited.
          *
+         *     Its notes and correspondence are read from the report itself, under the product `product` names, by whoever may read that product's reports.
+         *
          *     The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
          *
          *     Answers 404 where no report is the record of this issue — every issue a scan reported that nobody wrote in about — and to somebody who may not read the product's vulnerability reports.
@@ -3360,32 +3388,6 @@ export interface paths {
         get: operations["get-report"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/issues/{vulnerability}/report/acknowledgement": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record that the reporter was answered
-         * @description Records that somebody replied to whoever reported this, and when.
-         *
-         *     It records that it happened rather than doing it. What reaches a researcher is a mail somebody sends from an address they already have; recording it is what turns "somebody probably replied" into a date the timeline can be evidenced from, and what clears the condition an unanswered report opens.
-         *
-         *     Acknowledging twice keeps the first date: when somebody was answered is a fact about the past, and the second person to press it did not change it.
-         *
-         *     Requires: public-triage or private-triage on the product
-         */
-        post: operations["acknowledge-report"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3833,6 +3835,10 @@ export interface paths {
          *
          *     `found_here` marks a flaw somebody here found. Recorded as a flaw, it carries no disclosure date, and it is never listed as waiting for an answer.
          *
+         *     `title` is an optional line naming the claim, and is refused across lines.
+         *
+         *     Where a standing rule places this product's reports, the report goes to the first such rule's team that has a member who reads undisclosed work here.
+         *
          *     Requires: private-triage on the product
          */
         post: operations["record-report"];
@@ -3851,14 +3857,24 @@ export interface paths {
         };
         /**
          * Show a vulnerability report
-         * @description What was claimed, who claimed it, when it arrived, when somebody answered them, and what it turned out to be.
+         * @description What was claimed, who claimed it, when it arrived, when somebody answered them, who holds it, and what it turned out to be.
          *
          *     A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
          *
          *     Requires: private-read or private-triage on the product
          */
         get: operations["get-recorded-report"];
-        put?: never;
+        /**
+         * Edit a vulnerability report
+         * @description Replaces the title, the claim and what is recorded about the reporter. Every field is the whole new value, and one left empty is cleared, apart from `summary`, which is required.
+         *
+         *     What it said before is kept, and read back from its revisions, the original first. An edit that changes nothing keeps nothing.
+         *
+         *     Refused with 422 once the report has been judged, or while a ruling over it waits for a second person. A `received` day that cannot be read is refused rather than cleared.
+         *
+         *     Requires: private-triage on the product
+         */
+        put: operations["edit-report"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3866,7 +3882,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/reports/{reference}/acknowledgement": {
+    "/v1/products/{product}/reports/{reference}/assignment": {
         parameters: {
             query?: never;
             header?: never;
@@ -3874,18 +3890,20 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /**
-         * Record that a reporter was answered
-         * @description Records that somebody replied to whoever sent this, and when.
+         * Assign a vulnerability report to somebody
+         * @description Records who is working this report.
          *
-         *     It records that it happened rather than doing it. What reaches a researcher is a mail somebody sends from an address they already have; recording it is what turns "somebody probably replied" into a date the timeline can be evidenced from, and what clears the condition an unanswered report opens.
+         *     Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
          *
-         *     Acknowledging twice keeps the first date: when somebody was answered is a fact about the past, and the second person to press it did not change it.
+         *     A report is undisclosed, so a person is given one only where they read undisclosed work in the product, and a team only where one member does. A judged report is refused with 409: its work goes on as the issue it became, or ended with its ruling.
          *
-         *     Requires: private-triage on the product
+         *     The person given it is told, where that is not you.
+         *
+         *     Requires: private-triage on the product. Giving a report to somebody else also needs assigner. Taking one nobody holds, or handing back your own, does not.
          */
-        post: operations["acknowledge-recorded-report"];
+        put: operations["assign-report"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3928,6 +3946,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/reports/{reference}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what was done to a vulnerability report
+         * @description Every act on the report, oldest first: recording it, each edit, each note and change to one, each message logged, each change of holder, each ruling proposed, settled or withdrawn, its acceptance as an issue, and each file attached.
+         *
+         *     Requires: private-read or private-triage on the product
+         */
+        get: operations["list-report-history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/reports/{reference}/issue": {
         parameters: {
             query?: never;
@@ -3949,6 +3989,142 @@ export interface paths {
          *     Requires: private-triage on the product
          */
         put: operations["judge-report"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the correspondence on a vulnerability report
+         * @description Every message recorded as sent to or received from the reporter, in order of the day each carries. The first sent is the acknowledgement.
+         *
+         *     Requires: private-read or private-triage on the product
+         */
+        get: operations["list-report-messages"];
+        put?: never;
+        /**
+         * Record a message to or from a reporter
+         * @description Records a message somebody sent to the reporter or received from them, elsewhere. Nothing is sent from this deployment.
+         *
+         *     The first message recorded as sent is the acknowledgement: it clears the condition an unanswered report opens, and its day is the one the timeline evidences.
+         *
+         *     Recorded on a judged report as on an open one. Refused on a flaw found here, which has no reporter, and for a day more than one ahead of today.
+         *
+         *     A message received is told to whoever holds the report, where that is a person other than you.
+         *
+         *     The text is markdown and goes through the policy a report's claim does; a 422 names the line and the offending text. Attach a file that came with it to the report and refer to it here.
+         *
+         *     Requires: private-triage on the product
+         */
+        post: operations["log-report-message"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List notes on a vulnerability report
+         * @description The notes written on this report, oldest first, with who wrote each and when. A note is never sent to the reporter and records no judgment.
+         *
+         *     Requires: private-read or private-triage on the product
+         */
+        get: operations["list-report-notes"];
+        put?: never;
+        /**
+         * Add a note to a vulnerability report
+         * @description Adds a markdown note on this report, open or judged. It is never sent to the reporter.
+         *
+         *     A name written after an `@` is told, where that person may read this product's reports; the response lists the names that reached nobody.
+         *
+         *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+         *
+         *     Requires: private-triage on the product
+         */
+        post: operations["note-on-report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/notes/{note}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit a note on a vulnerability report
+         * @description Replaces the text of a note. Only its author may do this.
+         *
+         *     What it said before is kept, and read back from the note's history.
+         *
+         *     Requires: private-triage on the product. Only the author may edit a note.
+         */
+        put: operations["edit-report-note"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/notes/{note}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List earlier revisions of a note on a vulnerability report
+         * @description Every version of a note that has been replaced, oldest first. The note itself carries what it says now.
+         *
+         *     Requires: private-read or private-triage on the product
+         */
+        get: operations["get-report-note-history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List earlier versions of a vulnerability report
+         * @description Every version of the report an edit replaced, oldest first. The first is the report as it was recorded. A report never edited answers an empty list, and the report itself is then the original.
+         *
+         *     Requires: private-read or private-triage on the product
+         */
+        get: operations["list-report-revisions"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4013,6 +4189,8 @@ export interface paths {
          *
          *     It places work only at a visibility one member of the team reads. Undisclosed or internal work nobody on the team reads stays unassigned.
          *
+         *     Send `reports` and neither key for a rule placing the product's vulnerability reports nobody holds. A report is placed only where one member of the team reads undisclosed work here, and a report recorded later is placed as it is recorded.
+         *
          *     Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished. Where the queue is full the rule is not recorded and the answer is 503: send it again later.
          *
          *     Requires: assigner on the product. A rule hands work to somebody, continuously, on behalf of whoever wrote it.
@@ -4038,6 +4216,8 @@ export interface paths {
          *     `*` matches any run of characters in either key.
          *
          *     It does not account for the rules already there. First match wins, so what this catches is what it would place only where no earlier rule claimed it first.
+         *
+         *     Send `reports` instead of either key for a rule placing vulnerability reports: `work` is then the product's open reports and `unheld` those nobody holds, counted where you read the product's reports and zero elsewhere.
          *
          *     Requires: public-triage or private-triage or internal-triage on the product
          */
@@ -6438,6 +6618,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/teams/{team}/assignments/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the vulnerability reports in one team's queue
+         * @description The open vulnerability reports routed to a team, oldest first.
+         *
+         *     A team nobody declared answers an empty list, which is also what a team whose reports are not yours to see answers.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products where you read reports.
+         */
+        get: operations["list-team-assigned-reports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/teams/{team}/members/{identity}": {
         parameters: {
             query?: never;
@@ -6648,6 +6852,28 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-unassigned"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/unassigned/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List vulnerability reports nobody is working
+         * @description The open vulnerability reports nobody holds, across every product where you read reports, oldest first. Open is not yet judged; a report whose ruling waits for a second person is still open.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only the products where you read reports.
+         */
+        get: operations["list-unassigned-reports"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6958,6 +7184,8 @@ export interface components {
             /** @description A component name, matching it and everything under it */
             beneath?: string;
             name: string;
+            /** @description Whether it places vulnerability reports rather than findings. Refused with either key */
+            reports?: boolean;
             /** @description The team work lands on, by name */
             team: string;
             /** @description A source package name */
@@ -7406,6 +7634,18 @@ export interface components {
             /** @description Their sign-in identity, or empty for nobody */
             person?: string;
             /** @description A team to route the rows to instead, by name */
+            team?: string;
+        };
+        "Assign-reportRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Assign-reportRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Their sign-in identity, or empty for nobody */
+            person?: string;
+            /** @description A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it */
             team?: string;
         };
         AssignedMatchingBody: {
@@ -8107,6 +8347,8 @@ export interface components {
             reported_by?: string;
             /** @description What was claimed, in the words it was claimed in */
             summary: string;
+            /** @description A line naming the claim */
+            title?: string;
         };
         "Clear-exploited-hereRequest": {
             /**
@@ -8871,6 +9113,16 @@ export interface components {
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              * @example https://example.com/schemas/Edit-issue-noteRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The replacement text, in markdown */
+            body: string;
+        };
+        "Edit-report-noteRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Edit-report-noteRequest.json
              */
             readonly $schema?: string;
             /** @description The replacement text, in markdown */
@@ -9827,6 +10079,25 @@ export interface components {
             /** @description The role held before. Absent means they held none */
             was?: string;
         };
+        HeldReportBody: {
+            /** @description Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it */
+            assigned_team?: boolean;
+            /** @description Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is */
+            assigned_to?: string;
+            /** @description Their display name, where it differs from the name above */
+            assigned_to_name?: string;
+            /** @description The product it was reported against, by name */
+            product: string;
+            /** @description The day it arrived */
+            received?: string;
+            recorded_at: string;
+            /** @description The name the report is reached by */
+            reference: string;
+            reported_by?: string;
+            title?: string;
+            /** @description Whether a ruling over it is waiting for a second person */
+            waiting?: boolean;
+        };
         HolderBody: {
             /** @description The name used when handing work over */
             identity: string;
@@ -9858,6 +10129,11 @@ export interface components {
              * @description The number of findings those cover, across every build
              */
             places: number;
+            /**
+             * Format: int64
+             * @description Open vulnerability reports they hold, in products where you read reports
+             */
+            reports: number;
             /** @description This is a team's queue rather than one person's work */
             team?: boolean;
         };
@@ -10746,6 +11022,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyHeldReportBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyHeldReportBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["HeldReportBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyHolderBody: {
             /**
              * Format: uri
@@ -10831,6 +11118,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["MentionableBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyMessageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyMessageBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["MessageBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -10985,6 +11283,28 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ReportBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyReportEventBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyReportEventBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ReportEventBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyReportRevisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyReportRevisionBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ReportRevisionBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -11284,6 +11604,45 @@ export interface components {
             /** @description The name the merged issue was filed under */
             vulnerability: string;
         };
+        MessageBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MessageBody.json
+             */
+            readonly $schema?: string;
+            /** @description The message, as markdown. Absent on a message an upgrade carried over from an acknowledgement, which holds no text */
+            body?: string;
+            /** @description The day it was sent or received */
+            dated: string;
+            /** @enum {string} */
+            direction: "sent" | "received";
+            /** Format: int64 */
+            id: number;
+            /** @description When it was recorded */
+            logged_at: string;
+            /** @description The person who recorded it, by sign-in identity */
+            logged_by: string;
+            /** @description Their display name, where it differs from their identity */
+            logged_by_name?: string;
+        };
+        MessageLogBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MessageLogBody.json
+             */
+            readonly $schema?: string;
+            /** @description The message, pasted or summarized, as markdown. A file that came with it is attached to the report and referred to here */
+            body: string;
+            /** @description The day it was sent or received, as YYYY-MM-DD. Empty is today */
+            dated?: string;
+            /**
+             * @description Whether it was sent to the reporter or received from them
+             * @enum {string}
+             */
+            direction: "sent" | "received";
+        };
         Meta: {
             category: string;
             csaf_version: string;
@@ -11405,6 +11764,16 @@ export interface components {
             /** @description The text, in markdown */
             body: string;
         };
+        "Note-on-reportRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Note-on-reportRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The text, in markdown */
+            body: string;
+        };
         NoteBody: {
             /** @description What was written, in markdown */
             body: string;
@@ -11516,7 +11885,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -11663,7 +12032,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -12921,11 +13290,20 @@ export interface components {
              * @example https://example.com/schemas/ReportBody.json
              */
             readonly $schema?: string;
+            /** @description The day of the first message sent to the reporter, which is the acknowledgement */
             acknowledged?: string;
-            /** @description The person who answered them, by sign-in identity */
+            /** @description The person who recorded that message, by sign-in identity */
             acknowledged_by?: string;
             /** @description Their display name, where it differs from their identity */
             acknowledged_by_name?: string;
+            /** @description When it went to whoever holds it */
+            assigned_at?: string;
+            /** @description Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it */
+            assigned_team?: boolean;
+            /** @description Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is */
+            assigned_to?: string;
+            /** @description Their display name, where it differs from the name above */
+            assigned_to_name?: string;
             contact?: string;
             /** @description The credit they asked for in an advisory */
             credit?: string;
@@ -12936,16 +13314,25 @@ export interface components {
             disposition?: "accepted" | "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
             /** @description The issue a duplicate points at */
             duplicate_of?: string;
+            /** @description Whether its title, claim and reporter may still be edited: nobody has judged it and no ruling holds it */
+            editable: boolean;
+            /**
+             * Format: int64
+             * @description How many times what it says was edited. The earlier versions, the original first, are read from its revisions
+             */
+            edits?: number;
             /** @description When somebody said what it turned out to be */
             evaluated?: string;
             /** @description The person who said so, by sign-in identity */
             evaluated_by?: string;
             /** @description Their display name, where it differs from their identity */
             evaluated_by_name?: string;
-            /** @description Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer */
+            /** @description Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date, nobody is owed an answer, and it has no correspondence */
             found_here: boolean;
             /** @description The issue the claim turned out to be */
             issue?: string;
+            /** @description The product it was reported against, by name. The notes and correspondence of a report are read under it */
+            product: string;
             /** @description The day it arrived, which the embargo is counted from */
             received?: string;
             /** @description When it was written down, which is not when it arrived */
@@ -12962,13 +13349,73 @@ export interface components {
              * @description The ruling that answers it, waiting or in force
              */
             ruling?: number;
-            /** @description What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it */
+            /** @description What was claimed, as markdown, as it stands now */
             summary?: string;
+            /** @description A line naming the claim */
+            title?: string;
             /**
              * @description A disposition proposed and waiting for a second person
              * @enum {string}
              */
             waiting?: "out-of-scope" | "rejected";
+        };
+        ReportEditBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReportEditBody.json
+             */
+            readonly $schema?: string;
+            contact?: string;
+            /** @description The credit they asked for in an advisory */
+            credit?: string;
+            /** @description The day it arrived, as YYYY-MM-DD. Empty clears it */
+            received?: string;
+            reported_by?: string;
+            /** @description What was claimed, as markdown. Required */
+            summary: string;
+            /** @description A line naming the claim. Empty clears it */
+            title?: string;
+        };
+        ReportEventBody: {
+            /** @enum {string} */
+            act: "recorded" | "edited" | "noted" | "note-edited" | "sent" | "received" | "assigned" | "handed-back" | "attached" | "ruling-proposed" | "ruling-settled" | "ruling-withdrawn" | "accepted";
+            at: string;
+            /** @description The person who did it, by sign-in identity. Absent where a standing rule placed it, or an administrator's hand-over moved it */
+            by?: string;
+            /** @description Their display name, where it differs from their identity */
+            by_name?: string;
+            /** @description The day a message carries */
+            dated?: string;
+            /** @enum {string} */
+            disposition?: "accepted" | "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
+            /** @description The file attached */
+            filename?: string;
+            /** @description The issue it was accepted as */
+            issue?: string;
+            /**
+             * Format: int64
+             * @description The note written or changed
+             */
+            note?: number;
+            /**
+             * Format: int64
+             * @description The standing rule that placed it
+             */
+            rule?: number;
+            /** Format: int64 */
+            ruling?: number;
+            /** @description Who it went to, on an assignment: a person by sign-in identity, or a team by name */
+            to?: string;
+            /** @description Their display name, where it differs from the name above */
+            to_name?: string;
+            /** @description Whether it went to a team's queue */
+            to_team?: boolean;
+            /**
+             * Format: int64
+             * @description The version an edit replaced, or a note's earlier version
+             */
+            version?: number;
         };
         ReportIssueBody: {
             /**
@@ -12979,6 +13426,26 @@ export interface components {
             readonly $schema?: string;
             /** @description The issue it turned out to be, under any identifier it goes by */
             vulnerability: string;
+        };
+        ReportRevisionBody: {
+            contact?: string;
+            credit?: string;
+            received?: string;
+            /** @description The moment it stopped saying that */
+            replaced_at: string;
+            /** @description The person whose edit replaced it, by sign-in identity */
+            replaced_by: string;
+            /** @description Their display name, where it differs from their identity */
+            replaced_by_name?: string;
+            reported_by?: string;
+            /** @description What was claimed, as markdown */
+            summary?: string;
+            title?: string;
+            /**
+             * Format: int64
+             * @description The version number, counting from one. Version one is the report as it was recorded
+             */
+            version: number;
         };
         RepositoriesBody: {
             /**
@@ -13224,6 +13691,8 @@ export interface components {
              * @description Its position among the others. The first rule that matches places the work
              */
             order: number;
+            /** @description Whether it places the product's vulnerability reports rather than findings. A rule placing reports names no package and no place */
+            reports?: boolean;
             /** @description The team work lands on, by the name that addresses it */
             team: string;
             /** @description The team's display name, where it differs from its name */
@@ -17920,6 +18389,43 @@ export interface operations {
             };
         };
     };
+    "list-assigned-reports": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty */
+                product?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Their sign-in identity, or 'me' for your own */
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyHeldReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "deactivate-person": {
         parameters: {
             query?: never;
@@ -20263,36 +20769,6 @@ export interface operations {
             };
         };
     };
-    "acknowledge-report": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "list-lead-rules": {
         parameters: {
             query?: never;
@@ -21004,7 +21480,7 @@ export interface operations {
             };
         };
     };
-    "acknowledge-recorded-report": {
+    "edit-report": {
         parameters: {
             query?: never;
             header?: never;
@@ -21014,7 +21490,47 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportEditBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "assign-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Assign-reportRequest"];
+            };
+        };
         responses: {
             /** @description No Content */
             204: {
@@ -21105,6 +21621,38 @@ export interface operations {
             };
         };
     };
+    "list-report-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyReportEventBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "judge-report": {
         parameters: {
             query?: never;
@@ -21128,6 +21676,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-report-messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyMessageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "log-report-message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageLogBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-report-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyWrittenBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "note-on-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Note-on-reportRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteWritten"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "edit-report-note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+                note: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Edit-report-noteRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteWritten"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-report-note-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+                note: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyWasSaidBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-report-revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyReportRevisionBody"];
                 };
             };
             /** @description Error */
@@ -21278,6 +22064,8 @@ export interface operations {
                 upstream?: string;
                 /** @description A component name, with * for any run of characters */
                 beneath?: string;
+                /** @description Preview a rule placing vulnerability reports */
+                reports?: boolean;
             };
             header?: never;
             path: {
@@ -25028,6 +25816,43 @@ export interface operations {
             };
         };
     };
+    "list-team-assigned-reports": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty */
+                product?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The team's name */
+                team: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyHeldReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "add-to-team": {
         parameters: {
             query?: never;
@@ -25370,6 +26195,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnassignedPageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-unassigned-reports": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty */
+                product?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyHeldReportBody"];
                 };
             };
             /** @description Error */

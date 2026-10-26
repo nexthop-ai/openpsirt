@@ -22,6 +22,7 @@ func mappers(err error) map[string]error {
 		"recipient": recipient(err, func(err error) error {
 			return core.RefusedFinding(in, err)
 		}),
+		"refusedHolding": refusedHolding(in, err),
 	}
 }
 

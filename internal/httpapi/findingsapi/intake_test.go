@@ -76,7 +76,7 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 		}
 
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			at+"/acknowledgement", ""); got.Code != http.StatusNoContent {
+			at+"/messages", `{"direction":"sent","body":"Thank you, we are looking."}`); got.Code != http.StatusCreated {
 			t.Fatalf("acknowledging answered %d: %s", got.Code, got.Body.String())
 		}
 		httpapitest.Read(t, r, "private-triage", at, &one)
@@ -159,13 +159,29 @@ func TestAClaimNobodyHasJudgedIsReadWithPrivateReadAndWorkedWithPrivateTriage(t 
 			// Working one is refused in words, since they can open it, and
 			// before the reference is looked up.
 			{"private", http.MethodPost, "/v1/products/mine/reports", http.StatusForbidden},
-			{"private", http.MethodPost, at + "/acknowledgement", http.StatusForbidden},
+			{"private", http.MethodPost, at + "/messages", http.StatusForbidden},
+			{"private", http.MethodPut, at, http.StatusForbidden},
+			{"private", http.MethodPost, at + "/notes", http.StatusForbidden},
+			{"private", http.MethodPut, at + "/notes/1", http.StatusForbidden},
+			{"private", http.MethodPut, at + "/assignment", http.StatusForbidden},
+			{"private", http.MethodGet, at + "/messages", http.StatusOK},
+			{"private", http.MethodGet, at + "/notes", http.StatusOK},
+			{"private", http.MethodGet, at + "/revisions", http.StatusOK},
+			{"private", http.MethodGet, at + "/history", http.StatusOK},
 			{"private", http.MethodPut, at + "/issue", http.StatusForbidden},
 			{"triager", http.MethodGet, "/v1/products/mine/reports", http.StatusForbidden},
 			{"triager", http.MethodGet, at, http.StatusNotFound},
 			{"triager", http.MethodGet, at + "/attachments", http.StatusNotFound},
 			{"triager", http.MethodPost, "/v1/products/mine/reports", http.StatusForbidden},
-			{"triager", http.MethodPost, at + "/acknowledgement", http.StatusNotFound},
+			{"triager", http.MethodPost, at + "/messages", http.StatusNotFound},
+			{"triager", http.MethodPut, at, http.StatusNotFound},
+			{"triager", http.MethodPost, at + "/notes", http.StatusNotFound},
+			{"triager", http.MethodPut, at + "/notes/1", http.StatusNotFound},
+			{"triager", http.MethodPut, at + "/assignment", http.StatusNotFound},
+			{"triager", http.MethodGet, at + "/messages", http.StatusNotFound},
+			{"triager", http.MethodGet, at + "/notes", http.StatusNotFound},
+			{"triager", http.MethodGet, at + "/revisions", http.StatusNotFound},
+			{"triager", http.MethodGet, at + "/history", http.StatusNotFound},
 			{"triager", http.MethodPut, at + "/issue", http.StatusNotFound},
 			{"private-triage", http.MethodGet, "/v1/products/mine/reports", http.StatusOK},
 			{"private-triage", http.MethodGet, at, http.StatusOK},

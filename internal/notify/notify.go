@@ -67,7 +67,7 @@ func Kinds() []Kind {
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ApprovalWithdrawn, ClaimLapsed, MergeSuperseded, BroughtIn, Disclosed,
-		Unanswered,
+		Unanswered, ReportMessage,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
@@ -237,8 +237,11 @@ const (
 	// coordinated disclosure a reporter actually judges, and it is the
 	// step that costs nothing and is missed by being nobody's job — so it
 	// is raised from the moment a report is recorded rather than after a
-	// threshold, and clears when somebody records that they answered.
+	// threshold, and clears when the first message sent to the reporter is recorded.
 	Unanswered Kind = "unanswered-report"
+	// ReportMessage is a message from a reporter, logged on a report a person
+	// holds by somebody else. The reporter is waiting on the answer.
+	ReportMessage Kind = "report-message"
 
 	// The two conditions about the deployment rather than about anybody's
 	// work. Both are a report that has to come back empty, asked as a

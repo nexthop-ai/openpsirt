@@ -554,7 +554,10 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			VulnerabilityID: &vulnerabilityID,
 			// The product it was reported against, which is what decides
 			// who may read the reporter's name and address later.
-			ProductID:  productID,
+			ProductID: productID,
+			// What was claimed is the flaw's own summary, so no report is
+			// written with nothing claimed.
+			Summary:    strings.TrimSpace(in.Summary),
 			ReportedBy: strings.TrimSpace(told.ReportedBy),
 			Contact:    strings.TrimSpace(told.Contact),
 			Credit:     strings.TrimSpace(told.Credit),

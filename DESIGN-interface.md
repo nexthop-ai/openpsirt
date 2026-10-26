@@ -1221,6 +1221,7 @@ them is a different question.
 | Offering work to somebody is a question about one product | The findings list spans every product somebody can see when none is picked, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
 | **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
 | Nobody else holding anything in a product picked links that product's unassigned leads, for somebody who reads internal material there | The findings list the empty screen points at holds no lead |
+| A person's or team's list carries the vulnerability reports they hold below their findings, and the people tab lists the reports nobody holds | Drawn only where there are any, because most people read no reports. The people table counts each holder's open reports in a column of its own. The narrowing is the product picked |
 | A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 
 A screen for the standing rules (REQ-34), per product, shown as a numbered list
@@ -1228,6 +1229,9 @@ because the order *is* the precedence: the first rule that matches places the
 work, and a set with no visible order is a precedence nobody wrote down.
 
 The form says which of the two kinds does what before anybody fills it in.
+A rule places findings or vulnerability reports, chosen first; a rule placing
+reports takes no key, and its preview says how many open reports nobody holds
+it would place.
 Saving says the sweep has started, not that it has finished — one rule can place
 thousands of findings, so it is queued, and a reply claiming the work was done
 would be a reply about something that has not happened yet.
@@ -1439,9 +1443,10 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 |---|---|
 | The link appears only for somebody who may read reports | Reading undisclosed work in the product, which is what every read of a report asks. A link leading to a refusal is worse than none. The product page's link says how many rulings wait for approval there |
 | The rail carries it under the scope, for somebody who may read reports anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read reports in the one picked |
-| A reader of reports sees no control that writes | Recording, answering, accepting, attaching, proposing and withdrawing are working reports. Approve is offered where the reader may agree to a ruling, which the answer to what they may do reports as its own field |
+| A reader of reports sees no control that writes | Recording, editing, recording a message, writing a note, assigning, accepting, attaching, proposing and withdrawing are working reports. The notes and the correspondence are drawn for them without a composer. Approve is offered where the reader may agree to a ruling, which the answer to what they may do reports as its own field |
 | A claim somebody sent is called a vulnerability report wherever a person reads it | The rail has a Reports entry for the named reports, and a bare "report" beside it reads as one of those |
-| The claim and a ruling's reason offer no mentions | Nothing reads a mention in either. An autocomplete there names somebody who is never told |
+| The claim, a message and a ruling's reason offer no mentions | Nothing reads a mention in any of them. An autocomplete there names somebody who is never told |
+| A note on a report offers mentions of readers of undisclosed work in the product | The people a mention can reach. A name nobody reading reports holds is said to have reached nobody, without saying why, as on a finding's notes |
 | Two tabs: the reports, and the rulings waiting for approval | The second is where the waiting notice points. Its count is on the tab, because it is somebody else's turn and nothing else on the screen says so |
 | A report's status is one word, and a waiting ruling says so in it | "Rejected, waiting" reads differently from "Rejected", which is the whole of what the second person changes |
 | Only an open report can be selected | One under a ruling or accepted is refused by the server, and a checkbox that leads to a refusal is a control that always fails |
@@ -1451,10 +1456,18 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | A duplicate asks for the issue, and says a closed one is rejected instead | The server refuses a duplicate of an issue not open here; the hint says what to do before the refusal does |
 | A duplicate that starts a disclosure date says so under the issue: "This starts a disclosure date of *date* on *flaw*.", with "once somebody else agrees" where it brings a date in past the threshold | Asked of the server once typing pauses, so a partial identifier is not a lookup. Nothing is shown where the ruling would start none, which is also what an issue not found reads as |
 | Approve is not offered to the ruling's own proposer | The server tells them apart and says so on the ruling. Withdrawing is offered to whoever works reports, and reads "Withdraw" to the proposer, "Send back" to anybody else while it waits, and "Undo" once it is in force — one act under three names, each the word for that moment |
-| A report's page holds the claim, the answer to the reporter, the files and the judgment | In that order, which is the order they happen in. While nothing answers the report, the judgment offers recording it as a new flaw first, as a button, then accepting it as an issue a scan reported, then a ruling; the ruling itself once one does. A new flaw is what a real claim usually is |
-| A report found here says so, and is never shown as unanswered | Its From column reads "found here". Nobody outside sent it, so nobody is owed an answer and no control offers to record one |
+| A report's page holds the claim, who holds it, the correspondence, the notes, the files, the judgment and the history | In that order. The heading carries the reference and the title. While nothing answers the report, the judgment offers recording it as a new flaw first, as a button, then accepting it as an issue a scan reported, then a ruling; the ruling itself once one does. A new flaw is what a real claim usually is |
+| A report found here says so, and is never shown as unanswered | Its From column reads "found here". Nobody outside sent it, so it draws no correspondence card |
+| The claim card offers Edit while the report is open | The form holds the title, the claim and what is known of the reporter, and says the earlier version is kept. Not offered once judged or under a waiting ruling, where the server refuses |
+| An edited claim shows the original beneath it | The version recorded, with who replaced it and when. The versions between are behind a toggle naming how many there are |
+| The holder card is the holder picker, offered to somebody who works reports while the report is open | The picker a finding's page draws, asked for readers of undisclosed work. A team's queue says so. Once judged it names the last holder and offers nothing |
+| The correspondence card says whether the reporter was answered, and lists every message | "Not answered." with the line that the first message sent is the acknowledgement, until one is recorded; "Acknowledged" with its day and who recorded it after. Each message reads Sent or Received with its day and who logged it |
+| Recording a message says it sends nothing | Direction, day and the text, with a file attached into the text held on the report. The day is today where it is left empty |
+| The history card lists every act, oldest first | One line an act, with its moment and who did it. A report a routing rule placed says so |
+| The inbox rows carry the title beside the reference, and who holds each | A team carries the word team beside its name |
 | The Inbox's control for a new report opens the flaw entry form | With the product picked. One form for every report, so a flaw found here and one sent in are filed the same way |
-| Files are attached from the report's page and held at once | A report carries no text a reference could be written into |
+| Files are attached from the report's page and held at once | A file attached into the text of a message, a note or the claim is held on the report the same way, and listed with the rest |
+| The reporter card on an issue carries its report's correspondence and notes, and links the report | Read under the report rule, so absent for somebody who may not read reports. Writing to either is offered where the reader works reports |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
 | The record draws one card per claim | The issue, the outcome, the state in one word, what it is about or how many components, and how many places it covers, with the states counted where they differ. The issue opens the claim page, and "Findings there now" opens the findings list narrowed to the claim and the states asked for. `DESIGN-reporting.md` § Dismissals and scan coverage holds what is counted |
 | Rulings sit beside the record, over its products and period | A ruling is a judgment somebody could be asked to account for, and an auditor asks about a period. Beside the judgments rather than among them: a ruling is about a claim rather than a finding and takes none of their filters. Printed with them, without the controls |

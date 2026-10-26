@@ -32,6 +32,9 @@ export function AutoAssignment() {
   const [team, setTeam] = useState("");
   const [upstream, setUpstream] = useState("");
   const [beneath, setBeneath] = useState("");
+  // What the rule places: findings, keyed on where they sit, or the product's
+  // vulnerability reports, which sit nowhere and take no key.
+  const [reports, setReports] = useState(false);
 
   const [said, setSaid] = useState<string | null>(null);
 
@@ -98,19 +101,21 @@ export function AutoAssignment() {
   // The findings the keys as typed would catch, before anything is saved. A
   // rule that sweeps thousands of findings on a guess is only found out
   // afterwards, by which time they are on somebody's queue.
-  const asked = upstream.trim() !== "" || beneath.trim() !== "";
+  const asked = reports || upstream.trim() !== "" || beneath.trim() !== "";
   const catches = useQuery({
     enabled: product !== "" && asked,
-    queryKey: ["rule-preview", product, upstream.trim(), beneath.trim()],
+    queryKey: ["rule-preview", product, reports, upstream.trim(), beneath.trim()],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/routing-rules/preview", {
           params: {
             path: { product },
-            query: {
-              ...(upstream.trim() ? { upstream: upstream.trim() } : {}),
-              ...(beneath.trim() ? { beneath: beneath.trim() } : {}),
-            },
+            query: reports
+              ? { reports: true }
+              : {
+                  ...(upstream.trim() ? { upstream: upstream.trim() } : {}),
+                  ...(beneath.trim() ? { beneath: beneath.trim() } : {}),
+                },
           },
         }),
       ),
@@ -118,7 +123,7 @@ export function AutoAssignment() {
   // A rule matching nothing places nothing. The preview has always said so;
   // until this, saving it anyway was still allowed, and the resulting rule's
   // only symptom is work quietly never being placed.
-  const catchesNothing = asked && catches.isSuccess && (catches.data?.total ?? 0) === 0;
+  const catchesNothing = !reports && asked && catches.isSuccess && (catches.data?.total ?? 0) === 0;
   // With a source-package term matching no source package, what it does match
   // is often component names — and those name a source package of their own,
   // which is the thing the person meant. Read off the lookup that is already
@@ -148,12 +153,14 @@ export function AutoAssignment() {
       unwrap(
         await api.POST("/v1/products/{product}/routing-rules", {
           params: { path: { product } },
-          body: {
-            name,
-            team,
-            ...(upstream.trim() ? { upstream: upstream.trim() } : {}),
-            ...(beneath.trim() ? { beneath: beneath.trim() } : {}),
-          },
+          body: reports
+            ? { name, team, reports: true }
+            : {
+                name,
+                team,
+                ...(upstream.trim() ? { upstream: upstream.trim() } : {}),
+                ...(beneath.trim() ? { beneath: beneath.trim() } : {}),
+              },
         }),
       ),
     onSuccess: () => {
@@ -255,6 +262,7 @@ export function AutoAssignment() {
                       <td className="num">{rule.order}</td>
                       <td>{rule.name}</td>
                       <td className="hint">
+                        {rule.reports && "vulnerability reports"}
                         {rule.upstream && (
                           <>
                             source package <span className="id">{rule.upstream}</span>
@@ -325,24 +333,38 @@ export function AutoAssignment() {
                 </select>
                 <Unread of={teams} what="The teams could not be read." />
               </label>
-              <Key
-                id="rule-upstream"
-                label="Source package"
-                value={upstream}
-                onChange={setUpstream}
-                options={sources}
-                loading={bySource.isFetching}
-                placeholder="linux, or libcurl* for a set"
-              />
-              <Key
-                id="rule-beneath"
-                label="At or under"
-                value={beneath}
-                onChange={setBeneath}
-                options={names}
-                loading={byName.isFetching}
-                placeholder="a component, or busybox* for a set"
-              />
+              <label className="field">
+                <span>Places</span>
+                <select
+                  value={reports ? "reports" : "findings"}
+                  onChange={(event) => setReports(event.target.value === "reports")}
+                >
+                  <option value="findings">Findings</option>
+                  <option value="reports">Vulnerability reports</option>
+                </select>
+              </label>
+              {!reports && (
+                <>
+                  <Key
+                    id="rule-upstream"
+                    label="Source package"
+                    value={upstream}
+                    onChange={setUpstream}
+                    options={sources}
+                    loading={bySource.isFetching}
+                    placeholder="linux, or libcurl* for a set"
+                  />
+                  <Key
+                    id="rule-beneath"
+                    label="At or under"
+                    value={beneath}
+                    onChange={setBeneath}
+                    options={names}
+                    loading={byName.isFetching}
+                    placeholder="a component, or busybox* for a set"
+                  />
+                </>
+              )}
               <button
                 type="button"
                 className="btn"
@@ -350,7 +372,7 @@ export function AutoAssignment() {
                 disabled={
                   !name.trim() ||
                   !team ||
-                  (!upstream.trim() && !beneath.trim()) ||
+                  (!reports && !upstream.trim() && !beneath.trim()) ||
                   add.isPending ||
                   // The preview already worked out that this matches nothing.
                   // Saving it anyway records a rule whose only symptom is
@@ -379,6 +401,12 @@ export function AutoAssignment() {
                   />
                 ) : catches.isFetching ? (
                   <p className="said">Working out what that catches…</p>
+                ) : reports ? (
+                  <p className="said">
+                    Would place <b>{(catches.data?.unheld ?? 0).toLocaleString()}</b> of{" "}
+                    {(catches.data?.work ?? 0).toLocaleString()} open reports: the ones nobody
+                    holds, unless a rule above claims them.
+                  </p>
                 ) : (catches.data?.total ?? 0) === 0 ? (
                   <p className="said">
                     <b>Nothing is called that.</b>

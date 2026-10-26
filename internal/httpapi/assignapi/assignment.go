@@ -89,6 +89,7 @@ type HoldingBody struct {
 	Open    int `json:"open" doc:"Pieces of work assigned to them: an issue in a component in a product"`
 	Places  int `json:"places" doc:"The number of findings those cover, across every build"`
 	Overdue int `json:"overdue" doc:"The number of those pieces past their deadline"`
+	Reports int `json:"reports" doc:"Open vulnerability reports they hold, in products where you read reports"`
 }
 
 // registerAssignment registers the two halves of deciding who deals with
@@ -536,6 +537,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		OperationID: "list-holdings", Method: http.MethodGet, Path: "/v1/assignments",
 		Summary: "List assignment totals",
 		Description: "Returns everyone holding open work you can see, with how much.\n\n" +
+			"`reports` counts the open vulnerability reports each holds, in the products where " +
+			"you read reports; somebody holding only reports is listed with no findings.\n\n" +
 			"Counted in pieces of work — an issue in a component in a product, or one static " +
 			"analysis lead — which is the unit the list behind each person is in. `places` says how many findings those " +
 			"cover: one flaw in a kernel is one thing to answer and can be dozens of rows to " +
@@ -556,13 +559,28 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		held, err := finding.NewStore(in.DB.DB).HeldBy(ctx, subject, within)
+		findings := finding.NewStore(in.DB.DB)
+		held, err := findings.HeldBy(ctx, subject, within)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "who is holding what could not be read", err)
 		}
-		ids := make([]int64, 0, len(held))
+		// Reports beside findings, so a person holding only reports is
+		// listed with them.
+		reports, err := findings.ReportHoldings(ctx, subject, within)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "who is holding what could not be read", err)
+		}
+		ids := make([]int64, 0, len(held)+len(reports))
+		listed := map[int64]bool{}
 		for _, h := range held {
 			ids = append(ids, h.PartyID)
+			listed[h.PartyID] = true
+		}
+		for party := range reports {
+			if !listed[party] {
+				held = append(held, finding.Holding{PartyID: party})
+				ids = append(ids, party)
+			}
 		}
 		// Whoever holds it, which the screen does not have to know the kind of.
 		who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, ids)
@@ -577,6 +595,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 				Name:   core.LabelBeside(who[h.PartyID].Name, who[h.PartyID].Address),
 				Team:   who[h.PartyID].Team,
 				Open:   h.Open, Places: h.Places, Overdue: h.Overdue,
+				Reports: reports[h.PartyID],
 			})
 		}
 		return out, nil

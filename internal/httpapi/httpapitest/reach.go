@@ -54,6 +54,9 @@ func DeclaredBody(method, path, name string) io.Reader {
 	if method == http.MethodPut && strings.HasSuffix(path, "/issue") {
 		return strings.NewReader(`{"vulnerability": "CVE-2026-9999"}`)
 	}
+	if body := reportBody(method, path, name); body != nil {
+		return body
+	}
 	if method != http.MethodPost {
 		return nil
 	}
@@ -80,6 +83,26 @@ func DeclaredBody(method, path, name string) io.Reader {
 			`{"known_at": "2026-09-20T14:00:00Z", "grounds": "A customer sent captures."}`)
 	}
 	return strings.NewReader(`{"name": "` + name + `"}`)
+}
+
+// reportBody is a well-formed body for a write to one vulnerability report,
+// and nil for any other request.
+func reportBody(method, path, name string) io.Reader {
+	_, rest, inReport := strings.Cut(path, "/reports/")
+	if !inReport || (method != http.MethodPost && method != http.MethodPut) {
+		return nil
+	}
+	switch {
+	case strings.HasSuffix(rest, "/assignment"):
+		return strings.NewReader(`{}`)
+	case strings.HasSuffix(rest, "/messages"):
+		return strings.NewReader(`{"direction": "sent", "body": "` + name + `"}`)
+	case strings.Contains(rest, "/notes"):
+		return strings.NewReader(`{"body": "` + name + `"}`)
+	case method == http.MethodPut && !strings.Contains(rest, "/"):
+		return strings.NewReader(`{"summary": "` + name + `"}`)
+	}
+	return nil
 }
 
 // FromOurOwnPage makes a request look like one a browser made from a page this
