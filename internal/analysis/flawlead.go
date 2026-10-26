@@ -36,7 +36,7 @@ type flawLead struct {
 	ID                 int64      `bun:"id,pk,autoincrement"`
 	ProductID          int64      `bun:"product_id,notnull"`
 	VulnerabilityID    int64      `bun:"vulnerability_id,notnull"`
-	PlaceIdentity      string     `bun:"place_identity,notnull"`
+	PlaceIdentity      string     `bun:"occurrence_identity,notnull"`
 	SuggestedComponent string     `bun:"suggested_component,nullzero"`
 	SuggestedEcosystem string     `bun:"suggested_ecosystem,nullzero"`
 	SuggestedNamespace string     `bun:"suggested_namespace,nullzero"`
@@ -353,7 +353,7 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		ColumnExpr(`"vu"."identifier" AS "rule", "ar"."path", "ar"."start_line"`).
 		ColumnExpr(state+` AS "state"`, stateArgs...).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, row.PlaceIdentity).
+		Where(`"f"."occurrence_identity" = ?`, row.PlaceIdentity).
 		Where(reach.Full, reach.FullArgs...).
 		Where(kinds, kindArgs...).
 		OrderExpr(`CASE WHEN "f"."closed_at" IS NULL THEN 0 ELSE 1 END ASC, "f"."id" DESC`).
@@ -409,7 +409,7 @@ func notReproducedFor(ctx context.Context, db bun.IDB, reach finding.LeadReading
 		ColumnExpr(`"t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
 		ColumnExpr(`"si"."absent_run_id", "si"."fixed_run_id"`).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, placeIdentity).
 		Where(leads, leadArgs...).
 		Where(reach.Full, reach.FullArgs...).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "ef" WHERE "ef"."target_id" = "f"."target_id"

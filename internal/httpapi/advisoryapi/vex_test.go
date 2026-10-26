@@ -753,12 +753,12 @@ func TestAVEXDocumentSaysNothingFixedWhileAPlaceIsOpen(t *testing.T) {
 			SELECT '`+hash+`', "purl", "name", '5.10-2', '`+hash+`', "first_seen_at"
 			FROM "component" WHERE "name" = 'linux-image'`)
 		r.PatchedRows(t, `INSERT INTO "finding" ("target_id", "kind", "vulnerability_id",
-				"visibility", "component_id", "place_identity", "urgency",
+				"visibility", "component_id", "occurrence_identity", "urgency",
 				"urgency_exploited", "urgency_exploited_here", "urgency_shipped",
 				"opened_at")
 			SELECT "target_id", "kind", "vulnerability_id", "visibility",
 				(SELECT "id" FROM "component" WHERE "identity" = '`+hash+`'),
-				"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
+				"occurrence_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
 				"urgency_shipped", "opened_at"
 			FROM "finding" WHERE "closed_because" = 'patched'`)
 		if fixed := r.FixedIn(t); len(fixed) != 0 {

@@ -115,7 +115,7 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where(`"de"."claim_id" = ?`, claimID).Order("de.id ASC").Scan(ctx); err != nil {
+		Where(`"de"."decision_id" = ?`, claimID).Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what that claim covers: %w", err)
 	}
 	if len(rows) == 0 {
@@ -167,7 +167,7 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 
 	var agreements []Approval
 	if err := s.db.NewSelect().Model(&agreements).
-		Where(`"claim_id" = ?`, claimID).Scan(ctx); err != nil {
+		Where(`"decision_id" = ?`, claimID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
 	whole.Happened, whole.When, whole.By = became(rows,
@@ -228,7 +228,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		Findings  int `bun:"findings"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
 		Join(finding.DecisionIssue).
@@ -236,7 +236,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr("COUNT(DISTINCT "+finding.FoldedOn+`) AS "folds"`).
@@ -246,7 +246,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		// so the build itself is the one thing pulling it in.
 		ColumnExpr(`COALESCE(SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END), 0) AS "direct"`).
 		ColumnExpr(`COUNT(*) AS "findings"`).
-		Where(`"de"."claim_id" = ?`, claimID).
+		Where(`"de"."decision_id" = ?`, claimID).
 		// Live rows only: a row withdrawn or lapsed covers nothing, however
 		// well its versions still match.
 		Where(`"de"."live_key" IS NOT NULL`).
@@ -304,7 +304,7 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, claimID 
 		Variant string `bun:"variant"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every finding.
 		Join(`CROSS JOIN "finding" AS "f"`).
@@ -315,7 +315,7 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, claimID 
 		ColumnExpr(`"de"."state" AS "state"`).
 		ColumnExpr(`MIN("st"."display_name") AS "stream"`).
 		ColumnExpr(`MIN("va"."display_name") AS "variant"`).
-		Where(`"de"."claim_id" = ?`, claimID).
+		Where(`"de"."decision_id" = ?`, claimID).
 		Where(`"de"."state" IN (?, ?)`, Withdrawn, LapsedState).
 		Where(`"de"."ended_at" IS NOT NULL`).
 		Where(`"st"."product_id" = "de"."product_id"`).

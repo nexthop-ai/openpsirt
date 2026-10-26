@@ -14,7 +14,7 @@ import (
 func (f *fixture) builds(t *testing.T, claim int64) []int64 {
 	t.Helper()
 	var targets []int64
-	if err := f.db.DB.NewRaw(`SELECT "target_id" FROM "claim_build" WHERE "claim_id" = ?`,
+	if err := f.db.DB.NewRaw(`SELECT "target_id" FROM "decision_build" WHERE "decision_id" = ?`,
 		claim).Scan(t.Context(), &targets); err != nil {
 		t.Fatal(err)
 	}

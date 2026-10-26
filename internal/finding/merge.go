@@ -60,7 +60,7 @@ func FiledUnderAny(column filed.Column) string { return filed.UnderAny(column) }
 // a decision was filed under may since have merged into the one the finding
 // holds. Written as a join, so every engine reaches the decisions of a finding
 // through an index on each side.
-const Decisions = `"vulnerability" AS "dv" JOIN "decision" AS "de" ON "de"."vulnerability_id" = "dv"."id"`
+const Decisions = `"vulnerability" AS "dv" JOIN "decision_occurrence" AS "de" ON "de"."vulnerability_id" = "dv"."id"`
 
 // LiveKey is what a live decision is a claim about, hashed: the product, the
 // issue, the place, and both upstream versions it was made against — or the

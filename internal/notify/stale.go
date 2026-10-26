@@ -63,8 +63,8 @@ func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 	since := time.Now().UTC().Add(-after)
 
 	var rows []struct {
-		ClaimID     int64     `bun:"claim_id"`
-		DecisionID  int64     `bun:"decision_id"`
+		ClaimID     int64     `bun:"decision_id"`
+		DecisionID  int64     `bun:"decision_occurrence_id"`
 		ProductID   int64     `bun:"product_id"`
 		Product     string    `bun:"product"`
 		ProposedBy  int64     `bun:"proposed_by"`
@@ -74,7 +74,7 @@ func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		Internal    int       `bun:"internal_rows"`
 	}
 	err = claimRollup(w.db, "rows_written").
-		ColumnExpr(`MIN("de"."id") AS "decision_id"`).
+		ColumnExpr(`MIN("de"."id") AS "decision_occurrence_id"`).
 		ColumnExpr(`MIN("de"."proposed_at") AS "proposed_at"`).
 		Where(`"de"."state" = ?`, triage.Proposed).
 		Where(`"de"."needs_approval" = ?`, true).
@@ -218,7 +218,7 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 	since := time.Now().UTC().Add(-after)
 
 	var rows []struct {
-		ClaimID     int64     `bun:"claim_id"`
+		ClaimID     int64     `bun:"decision_id"`
 		ProductID   int64     `bun:"product_id"`
 		Product     string    `bun:"product"`
 		ProposedBy  int64     `bun:"proposed_by"`
@@ -284,18 +284,18 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 // any of this private" by alphabetical accident.
 func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
 	return db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "de"."vulnerability_id"`).
 		Where(`"vu"."kind" IN (?)`, bun.List(kind.IssuesOf(kind.Decisions.Kinds()...))).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
 		ColumnExpr(access.WithheldCountAs(`"de"."visibility"`, "private_rows")).
 		ColumnExpr(access.InternalCountAs(`"de"."visibility"`, "internal_rows")).
-		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."proposed_by"`)
+		GroupExpr(`"de"."decision_id", "de"."product_id", "de"."proposed_by"`)
 }
 
 // deferralsEnding is every standing deferral whose date is coming, against the
@@ -315,7 +315,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	standing, held := finding.InForce()
 
 	var rows []struct {
-		ClaimID     int64     `bun:"claim_id"`
+		ClaimID     int64     `bun:"decision_id"`
 		ProductID   int64     `bun:"product_id"`
 		Product     string    `bun:"product"`
 		ProposedBy  int64     `bun:"proposed_by"`
@@ -326,7 +326,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	}
 	err = claimRollup(w.db, "places").
 		// The argument, which is where the date lives.
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`MIN("cl"."deferred_until") AS "until"`).
 		// Standing only. A deferral that has been withdrawn or has lapsed is
 		// not one whose end anybody is waiting for — a lapsed one is already
@@ -437,7 +437,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		Where(`"tm"."retired_at" IS NULL`).
 		Where("NOT EXISTS (?)", w.db.NewSelect().
 			TableExpr(finding.Decisions).
-			Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+			Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 			ColumnExpr("1").
 			Where(finding.DecisionAt(`"st"."product_id"`)).
 			Where(`"de"."live_key" IS NOT NULL`).
@@ -577,18 +577,18 @@ func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[
 		ColumnExpr(`"tm"."display_name" AS "team_display"`).
 		ColumnExpr(`"tm"."name" AS "team_name"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		Where(kinds, kindArgs...).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."assigned_at" IS NOT NULL`).
 		Where(`"f"."assigned_at" <= ?`, since).
 		Where(`"tm"."retired_at" IS NULL`).
 		Where(`NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-			WHERE "lh"."product_id" = "st"."product_id" AND "lh"."place_identity" = "f"."place_identity")`).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dc"
+			WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`).
+		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."product_id" = "st"."product_id" AND "dc"."live_key" IS NOT NULL
 			AND ` + finding.DecisionFiledAt("dc", "f") + `)`).
-		GroupExpr(`"tm"."id", "tm"."display_name", "tm"."name", "st"."product_id", "f"."place_identity"`)
+		GroupExpr(`"tm"."id", "tm"."display_name", "tm"."name", "st"."product_id", "f"."occurrence_identity"`)
 
 	if err := w.db.NewSelect().
 		TableExpr(`(?) AS "q"`, work).

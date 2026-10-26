@@ -138,9 +138,9 @@ func (f *runFixture) claims(t *testing.T, proposer, approver access.Subject, at 
 // recorded is what a decision says about itself, read back as stored.
 type recorded struct {
 	ID              int64     `bun:"id"`
-	ClaimID         int64     `bun:"claim_id"`
+	ClaimID         int64     `bun:"decision_id"`
 	VulnerabilityID int64     `bun:"vulnerability_id"`
-	PlaceIdentity   string    `bun:"place_identity"`
+	PlaceIdentity   string    `bun:"occurrence_identity"`
 	State           string    `bun:"state"`
 	ProposedBy      int64     `bun:"proposed_by"`
 	ProposedAt      time.Time `bun:"proposed_at"`
@@ -149,8 +149,8 @@ type recorded struct {
 func (f *runFixture) decisionRows(t *testing.T) map[int64]recorded {
 	t.Helper()
 	var rows []recorded
-	if err := f.db.DB.NewSelect().TableExpr(`"decision" AS "de"`).
-		ColumnExpr(`"de"."id", "de"."claim_id", "de"."vulnerability_id", "de"."place_identity"`).
+	if err := f.db.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
+		ColumnExpr(`"de"."id", "de"."decision_id", "de"."vulnerability_id", "de"."occurrence_identity"`).
 		ColumnExpr(`"de"."state", "de"."proposed_by", "de"."proposed_at"`).
 		Scan(t.Context(), &rows); err != nil {
 		t.Fatal(err)

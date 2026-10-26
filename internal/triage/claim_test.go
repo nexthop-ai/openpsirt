@@ -986,7 +986,7 @@ func TestAnUndoReportsWhatReturnedToWaitingRatherThanWhatWasConsidered(t *testin
 		// undo's own condition is written for, and the only way to reach it.
 		var given triage.Approval
 		if err := f.db.DB.NewSelect().Model(&given).
-			Where(`"claim_id" = ?`, claimed.ClaimID).Scan(ctx); err != nil {
+			Where(`"decision_id" = ?`, claimed.ClaimID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		also := triage.Approval{

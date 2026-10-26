@@ -535,6 +535,40 @@ is 21 to 29 MB beside a 306 MB table.
 Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
 says what a report's case holds.
 
+It renames the triage records first, so the rest of it and the release's
+declarations are written against the new names.
+
+| v0.10.0 table | v0.11.0 table |
+|---|---|
+| `decision`, a decision's row at one place | `decision_occurrence` |
+| `decision_superseded` | `decision_occurrence_superseded` |
+| `claim` | `decision` |
+| `claim_revision`, `claim_approval`, `claim_comment`, `claim_comment_revision`, `claim_build` | `decision_revision`, `decision_approval`, `decision_comment`, `decision_comment_revision`, `decision_build` |
+
+| Column | v0.11.0 name |
+|---|---|
+| `claim_id`, on every table above and on `upgrade` | `decision_id` |
+| `decision_id`, on `decision_occurrence_superseded` | `decision_occurrence_id` |
+| `place_identity`, on `decision_occurrence` and `finding` | `occurrence_identity` |
+
+Every index and constraint named after a renamed table or column is renamed
+with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`, and
+`finding_place_idx` is `finding_occurrence_idx`. The tables v0.11.0 creates are
+declared under the new names, `decision_stamp` among them.
+
+| Rule | Why |
+|---|---|
+| A rename changes the catalog alone | No row is read or written and no index is built on the three servers, so its time does not grow with the rows |
+| A name moves only once its holder has moved | `decision` becomes `decision_occurrence` before `claim` becomes `decision`. PostgreSQL holds an index name once per schema, and MySQL and MariaDB a foreign key's |
+| Each rename waits 3 seconds at most for its table, logs what holds it, and tries again until it runs or the upgrade is stopped | Otherwise PostgreSQL and MySQL wait without bound behind a session reading the table, and every request queues behind the rename with nothing saying why |
+| What holds a table is read from the engine | PostgreSQL's granted locks on it; on MySQL and MariaDB its granted metadata locks where the server records them, and otherwise every other session on the database. MariaDB records none by default |
+| PostgreSQL renames inside the upgrade's one transaction | A failure leaves every name as it was. A rename that waited out its bound is undone to a savepoint and tried again, because a failed statement otherwise ends the transaction |
+| MySQL and MariaDB step over a rename already made, and log it | Each commits as it runs, so a start that stopped part way left some made. A table is stepped over where its new name is there, and anything else where its old name is gone |
+| MySQL and MariaDB rename a foreign key by declaring it again | Neither has a statement for it. It is dropped and declared under its new name in one statement, in place, with foreign keys unchecked so no row is read. The index the key had serves the new one, and is renamed with it where it bore the key's name |
+| SQLite builds a renamed index again | It has no statement renaming one, and SQLite is a development database |
+| SQLite keeps the constraint names v0.10.0 wrote | A constraint's name is part of a SQLite table's text, which only a rebuild rewrites, and SQLite reports none of them |
+| PostgreSQL names each renamed table's sequence after it | The sequence keeps its table's old name otherwise |
+
 | Table | Change | Every engine |
 |---|---|---|
 | `flaw_report` | Gains a title, who holds it and since when. Loses the acknowledged moment and who acknowledged | Each acknowledgement is first written as a message sent, dated the day it was recorded, by whoever recorded it, with no text. A report already holding a sent message is stepped over, so a start after one that stopped part way writes none twice. The index serving the unanswered list is dropped, then the foreign key naming who acknowledged on the server engines, then the columns. The holder's foreign key is added where the table does not hold it, whatever the columns say, since a stopped upgrade can leave the columns changed and the key not added |
@@ -547,6 +581,9 @@ says what a report's case holds.
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.10.0 database holding an acknowledged report | Upgraded, with the acknowledgement read back as the first message sent, on its day and by the person who recorded it |
+| A v0.10.0 database holding a claim with a row at a place, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
+| The same, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
+| A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
 
 ### Release records
 

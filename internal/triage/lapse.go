@@ -104,8 +104,8 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			// stop applying when the version moves. A bump does not make a
 			// wrong match right, and lapsing one would hand the same wrong
 			// match back at every point release.
-			Where(`NOT EXISTS (SELECT 1 FROM "claim" AS "lc"`+
-				` WHERE "lc"."id" = "de"."claim_id" AND "lc"."outcome" = ?)`, Mismatched).
+			Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "lc"`+
+				` WHERE "lc"."id" = "de"."decision_id" AND "lc"."outcome" = ?)`, Mismatched).
 			Where(`"de"."product_id" = (?)`, db.NewSelect().
 				ColumnExpr(`"st"."product_id"`).
 				TableExpr(`"target" AS "tg"`).
@@ -232,10 +232,10 @@ func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, places []strin
 		batch := places[start:min(start+database.BatchSize, len(places))]
 		var ids []int64
 		if err := tx.NewSelect().Model((*Decision)(nil)).
-			Join(`JOIN "claim" AS "lc" ON "lc"."id" = "de"."claim_id"`).
+			Join(`JOIN "decision" AS "lc" ON "lc"."id" = "de"."decision_id"`).
 			ColumnExpr(`"de"."id"`).
 			Where(`"de"."product_id" = ?`, productID).
-			Where(`"de"."place_identity" IN (?)`, bun.List(batch)).
+			Where(`"de"."occurrence_identity" IN (?)`, bun.List(batch)).
 			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 			Where(`"lc"."outcome" IN (?, ?)`, Dismissed, NotSecurity).
 			Scan(ctx, &ids); err != nil {

@@ -463,7 +463,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 	var rows []struct {
 		ProductID         int64  `bun:"product_id"`
 		VulnerabilityID   int64  `bun:"vulnerability_id"`
-		PlaceIdentity     string `bun:"place_identity"`
+		PlaceIdentity     string `bun:"occurrence_identity"`
 		Visibility        string `bun:"visibility"`
 		ComponentUpstream string `bun:"component_upstream"`
 		ConsumerUpstream  string `bun:"consumer_upstream"`
@@ -484,7 +484,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
@@ -505,10 +505,10 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Triage, "f")).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(at.VulnerabilityIDs)).
-		GroupExpr(`"st"."product_id", "f"."vulnerability_id", "f"."place_identity", "f"."visibility", ` +
+		GroupExpr(`"st"."product_id", "f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility", ` +
 			`"c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version", ` +
 			`"v"."severity", "ir"."severity", "v"."score_centi"`).
-		OrderExpr(`"f"."vulnerability_id", "f"."place_identity"`)
+		OrderExpr(`"f"."vulnerability_id", "f"."occurrence_identity"`)
 	if err := onlyDecidable(query, subject).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where these issues sit: %w", err)
 	}

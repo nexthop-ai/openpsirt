@@ -390,8 +390,8 @@ func (f *fixture) decision(t *testing.T, d decisionRow) {
 		d.ProposedAt = time.Now().UTC()
 	}
 	row := map[string]any{
-		"claim_id": d.Claim, "product_id": d.Product, "vulnerability_id": d.Issue,
-		"place_identity": d.Place, "visibility": d.Visibility, "state": d.State,
+		"decision_id": d.Claim, "product_id": d.Product, "vulnerability_id": d.Issue,
+		"occurrence_identity": d.Place, "visibility": d.Visibility, "state": d.State,
 		"needs_approval": !d.Unreviewed, "proposed_by": d.By, "proposed_at": d.ProposedAt,
 	}
 	if d.Component != nil {
@@ -411,7 +411,7 @@ func (f *fixture) decision(t *testing.T, d decisionRow) {
 	if d.Ended != nil {
 		row["ended_at"] = *d.Ended
 	}
-	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision"`).Exec(t.Context()); err != nil {
+	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision_occurrence"`).Exec(t.Context()); err != nil {
 		t.Fatalf("record a %s decision: %v", d.State, err)
 	}
 }

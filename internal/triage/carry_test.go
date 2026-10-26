@@ -467,7 +467,7 @@ func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
 		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
 
 		// The date arrives, moved here rather than waited for.
-		if _, err := f.db.DB.NewUpdate().Table("claim").
+		if _, err := f.db.DB.NewUpdate().Table("decision").
 			Set(`"deferred_until" = ?`, time.Now().UTC().Add(-time.Hour)).
 			Where(`"id" = ?`, ran.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -505,8 +505,8 @@ func TestACarriedClaimRecordsHowBadTheIssueIsNow(t *testing.T) {
 			t.Fatal(err)
 		}
 		var baseline *int
-		if err := f.db.DB.NewSelect().Table("decision").Column("severity_centi").
-			Where(`"place_identity" = ?`, agreed.PlaceIdentity).Where(`"id" <> ?`, agreed.ID).
+		if err := f.db.DB.NewSelect().Table("decision_occurrence").Column("severity_centi").
+			Where(`"occurrence_identity" = ?`, agreed.PlaceIdentity).Where(`"id" <> ?`, agreed.ID).
 			Scan(ctx, &baseline); err != nil {
 			t.Fatal(err)
 		}

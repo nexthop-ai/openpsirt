@@ -43,7 +43,7 @@ func (s *Store) leadWhere(ctx context.Context, targetID int64, placeIdentity str
 	var lead Finding
 	err := s.db.NewSelect().Model(&lead).
 		Where(`"f"."target_id" = ?`, targetID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, placeIdentity).
 		Where(reads, readArgs...).
 		Where(kinds, kindArgs...).
 		OrderExpr(`CASE WHEN "f"."closed_at" IS NULL THEN 0 ELSE 1 END ASC, "f"."id" DESC`).
@@ -101,7 +101,7 @@ func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID in
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 			ColumnExpr(`"f"."id", "f"."visibility", "si"."absent_run_id", "si"."series_id"`).
 			Where(`"f"."target_id" = ?`, targetID).
-			Where(`"f"."place_identity" = ?`, placeIdentity).
+			Where(`"f"."occurrence_identity" = ?`, placeIdentity).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(kinds, kindArgs...).
 			Limit(1).Scan(ctx, &lead)
@@ -184,7 +184,7 @@ func LeadInSupport(product, place string, at time.Time) (string, []any) {
 		JOIN "target" AS "lst" ON "lst"."id" = "lsf"."target_id"
 		JOIN "stream" AS "lss" ON "lss"."id" = "lst"."stream_id"
 		JOIN "product" AS "lsp" ON "lsp"."id" = "lss"."product_id"
-		WHERE "lss"."product_id" = ` + product + ` AND "lsf"."place_identity" = ` + place + ` AND ` + kinds
+		WHERE "lss"."product_id" = ` + product + ` AND "lsf"."occurrence_identity" = ` + place + ` AND ` + kinds
 	args := append(slices.Clone(kindArgs), kindArgs...)
 	args = append(args, pastArgs...)
 	return `(NOT EXISTS (` + seen + `) OR EXISTS (` + seen + ` AND NOT ` + past + `))`, args
@@ -201,7 +201,7 @@ func LeadEnded(ctx context.Context, db bun.IDB, productID int64, placeIdentity s
 		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
 		ColumnExpr(`DISTINCT "t"."stream_id"`).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, placeIdentity).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &streams); err != nil {
 		return fmt.Errorf("read the releases a lead was seen in: %w", err)
@@ -286,7 +286,7 @@ func (s *Store) assignLead(ctx context.Context, subject access.Subject, targetID
 		return 0, nil, err
 	}
 	handedOff, err := s.db.NewSelect().Model((*Handoff)(nil)).
-		Where(`"product_id" = ?`, productID).Where(`"place_identity" = ?`, placeIdentity).Exists(ctx)
+		Where(`"product_id" = ?`, productID).Where(`"occurrence_identity" = ?`, placeIdentity).Exists(ctx)
 	if err != nil {
 		return 0, nil, fmt.Errorf("read whether that lead was handed off: %w", err)
 	}
@@ -310,7 +310,7 @@ func (s *Store) assignLead(ctx context.Context, subject access.Subject, targetID
 	moved, err := s.moveWhere(ctx, s.db, subject, productID, to, dispatches,
 		func(q *bun.UpdateQuery) *bun.UpdateQuery {
 			kinds, kindArgs := kind.Leads.Where(`"kind"`)
-			return q.Where(kinds, kindArgs...).Where(`"place_identity" = ?`, placeIdentity)
+			return q.Where(kinds, kindArgs...).Where(`"occurrence_identity" = ?`, placeIdentity)
 		})
 	if err != nil {
 		return 0, nil, err
@@ -350,6 +350,6 @@ func oneLead(productID int64, placeIdentity string) func(*bun.SelectQuery) *bun.
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where(inThisProduct, productID).
 			Where(kinds, kindArgs...).
-			Where(`"place_identity" = ?`, placeIdentity)
+			Where(`"occurrence_identity" = ?`, placeIdentity)
 	}
 }

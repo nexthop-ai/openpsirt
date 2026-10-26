@@ -199,7 +199,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 
 	// Every place, fetched for the page of issues rather than one arbitrary
 	// place per issue. A decision is keyed on a place, so a claim built from
-	// MIN(place_identity) covers one consumer and leaves the rest open while
+	// MIN(occurrence_identity) covers one consumer and leaves the rest open while
 	// reporting that it covered them.
 	everywhere, err := s.placesOf(ctx, targetID, fold, issues, visible)
 	if err != nil {
@@ -236,7 +236,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 	}
 	var rows []struct {
 		VulnerabilityID   int64  `bun:"vulnerability_id"`
-		PlaceIdentity     string `bun:"place_identity"`
+		PlaceIdentity     string `bun:"occurrence_identity"`
 		Visibility        string `bun:"visibility"`
 		ComponentUpstream string `bun:"component_upstream"`
 		ConsumerUpstream  string `bun:"consumer_upstream"`
@@ -247,7 +247,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
@@ -257,7 +257,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility", "c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version"`).
+		GroupExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility", "c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where these sit: %w", err)

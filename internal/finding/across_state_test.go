@@ -228,9 +228,9 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 
 		checked := 0
 		fromDecision := regexp.MustCompile(`^SEARCH de USING `)
-		toFinding := regexp.MustCompile(`^SEARCH (f|f2) USING (COVERING )?INDEX finding_(place|vulnerability)_idx`)
+		toFinding := regexp.MustCompile(`^SEARCH (f|f2) USING (COVERING )?INDEX finding_(occurrence|vulnerability)_idx`)
 		for _, statement := range sent {
-			if !strings.Contains(statement, `"decision" AS "de"`) || !strings.Contains(statement, `AS "f2"`) {
+			if !strings.Contains(statement, `"decision_occurrence" AS "de"`) || !strings.Contains(statement, `AS "f2"`) {
 				continue
 			}
 			checked++

@@ -563,7 +563,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		// question asked in the one place every engine agrees on.
 		Join(`JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
 			AND `+inForce+` AND "de"."live_key" IS NOT NULL`, append([]any{productID}, held...)...).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(KeyMatches).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(`"c"."name" AS "component"`).

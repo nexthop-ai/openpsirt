@@ -121,8 +121,8 @@ func hidingNothing() []Outcome {
 // record's own question is: no approval row from anybody other than the
 // proposer, and none that has been taken back. A flag would report what
 // something asserted about itself.
-const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
-	` WHERE "ex"."claim_id" = "de"."claim_id" AND "ex"."withdrawn_at" IS NULL` +
+const standingAlone = `NOT EXISTS (SELECT 1 FROM "decision_approval" AS "ex"` +
+	` WHERE "ex"."decision_id" = "de"."decision_id" AND "ex"."withdrawn_at" IS NULL` +
 	` AND "ex"."approved_by" <> "de"."proposed_by")`
 
 // Scrutinize reports how the second-person rule is holding.
@@ -172,10 +172,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows    int    `bun:"written"`
 	}
 	err := narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where(`"cl"."outcome" NOT IN (?)`, bun.List(hidingNothing())).
 		Where(standing, held...).
@@ -205,13 +205,13 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
 		ColumnExpr(`"ap"."batch" AS "batch"`).
 		ColumnExpr(`"pe"."identity" AS "identity"`).
 		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where(`"ap"."batch" IS NOT NULL`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
@@ -241,13 +241,13 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows     int    `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pr" ON "pr"."id" = "de"."proposed_by"`).
 		Join(`JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`).
 		ColumnExpr(`"pr"."identity" AS "proposer"`).
 		ColumnExpr(`"ape"."identity" AS "approver"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		GroupExpr(`"pr"."identity", "ape"."identity"`).
@@ -262,8 +262,8 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// The whole the shares are taken of: the same rows the pairs count,
 	// ungrouped and uncut.
 	agreed, err := narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pr" ON "pr"."id" = "de"."proposed_by"`).
 		Join(`JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`).
 		Where(`"ap"."withdrawn_at" IS NULL`)).Count(ctx)
@@ -283,7 +283,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// stands — and it is still the first thing an auditor asks after a
 	// reorganization.
 	var lapsed []struct {
-		ClaimID    int64     `bun:"claim_id"`
+		ClaimID    int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
 		ApprovedAt time.Time `bun:"approved_at"`
 		Product    string    `bun:"product"`
@@ -291,12 +291,12 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Rows       int       `bun:"written"`
 	}
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
 		Join(`JOIN "product" AS "pd" ON "pd"."id" = "de"."product_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"pe"."identity" AS "identity"`).
 		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
 		ColumnExpr(`"pd"."name" AS "product"`).
@@ -323,7 +323,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// named in configuration.
 		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
 			` WHERE "ad"."id" = "ap"."approved_by" AND ("ad"."is_admin" = ? OR "ad"."is_bootstrap" = ?))`, true, true).
-		GroupExpr(`"de"."claim_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
+		GroupExpr(`"de"."decision_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(int64(room))).Scan(ctx, &lapsed)
 	if err != nil {
@@ -344,7 +344,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// covered with nobody acting — and nobody having agreed to the larger
 	// number.
 	var grew []struct {
-		ClaimID    int64     `bun:"claim_id"`
+		ClaimID    int64     `bun:"decision_id"`
 		Identity   string    `bun:"identity"`
 		ApprovedAt time.Time `bun:"approved_at"`
 		Outcome    string    `bun:"outcome"`
@@ -356,11 +356,11 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// cap applied to that. Capped taken off the oldest claims would leave a
 	// claim that grew after them out of every answer.
 	err = narrow(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"pe"."identity" AS "identity"`).
 		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
@@ -368,8 +368,8 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		Where(`"ap"."covered" IS NOT NULL`).
 		Where(standing, held...).
-		GroupExpr(`"de"."claim_id", "pe"."identity", "cl"."outcome"`).
-		OrderExpr(`"de"."claim_id", "pe"."identity"`)).Scan(ctx, &grew)
+		GroupExpr(`"de"."decision_id", "pe"."identity", "cl"."outcome"`).
+		OrderExpr(`"de"."decision_id", "pe"."identity"`)).Scan(ctx, &grew)
 	if err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
@@ -434,9 +434,9 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	}
 	var ids []int64
 	if err := readableBy(s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		ColumnExpr(`"de"."id"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
+		Where(`"de"."decision_id" IN (?)`, bun.List(claims)).
 		// Live rows only, as a claim's reach is counted: a row withdrawn or
 		// lapsed covers nothing, however well its versions still match.
 		Where(`"de"."live_key" IS NOT NULL`), subject, "de").
@@ -447,7 +447,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		return covered, nil
 	}
 	var rows []struct {
-		ClaimID int64 `bun:"claim_id"`
+		ClaimID int64 `bun:"decision_id"`
 		Covers  int   `bun:"covers"`
 	}
 	err := s.db.NewSelect().
@@ -457,8 +457,8 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`COUNT(*) AS "covers"`).
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -467,7 +467,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Apply(ofKinds(kind.Decisions, "f")).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		GroupExpr(`"de"."claim_id"`).
+		GroupExpr(`"de"."decision_id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("count what these cover: %w", err)
@@ -523,9 +523,9 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int,
 		Rows   int `bun:"written"`
 	}
 	err = s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr(`"cl"."outcome" IN (?)`, bun.List(closingUnconditionally())).

@@ -29,8 +29,8 @@ func confirmedLead(t *testing.T, r *httpapitest.Reach) (string, int64, int64) {
 		t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 	}
 	var claim int64
-	if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
-		Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+	if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."decision_id"`).
+		Where(`"de"."occurrence_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
 		t.Fatal(err)
 	}
 	return place, claim, r.TargetOf(t, httpapitest.SeededBuild)
@@ -40,8 +40,8 @@ func confirmedLead(t *testing.T, r *httpapitest.Reach) (string, int64, int64) {
 func claimStamp(t *testing.T, r *httpapitest.Reach, claim int64) int {
 	t.Helper()
 	var stamp int
-	if err := r.DB.DB.NewSelect().TableExpr(`"claim_stamp" AS "cs"`).
-		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."claim_id" = ?`, claim).Scan(t.Context(), &stamp); err != nil {
+	if err := r.DB.DB.NewSelect().TableExpr(`"decision_stamp" AS "cs"`).
+		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."decision_id" = ?`, claim).Scan(t.Context(), &stamp); err != nil {
 		t.Fatal(err)
 	}
 	return stamp
@@ -51,7 +51,7 @@ func claimStamp(t *testing.T, r *httpapitest.Reach, claim int64) int {
 func handedOff(t *testing.T, r *httpapitest.Reach, place string) bool {
 	t.Helper()
 	n, err := r.DB.DB.NewSelect().TableExpr(`"lead_handoff" AS "lh"`).
-		Where(`"lh"."place_identity" = ?`, place).Count(t.Context())
+		Where(`"lh"."occurrence_identity" = ?`, place).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestAHandOffRestampsTheClaimItRestsOn(t *testing.T) {
 func TestAHandOffLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, claim, target := confirmedLead(t, r)
-		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "claim", "claim_stamp", 3*time.Second, func() error {
+		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "decision", "decision_stamp", 3*time.Second, func() error {
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete,
 				fmt.Sprintf("/v1/decisions/%d", claim), ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("the withdrawal answered %d: %s", got.Code, got.Body)
@@ -121,7 +121,7 @@ func TestAHandOffLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T) {
 func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, claim, _ := confirmedLead(t, r)
-		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "claim_stamp", 3*time.Second, func() error {
+		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "decision_stamp", 3*time.Second, func() error {
 			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
 				`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 				return fmt.Errorf("the hand-off answered %d: %s", got.Code, got.Body)
@@ -143,8 +143,8 @@ func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 			t.Fatal("the hand-off did not land, so this checks nothing")
 		}
 		var live int
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`COUNT(*)`).
-			Where(`"de"."claim_id" = ?`, claim).Where(`"de"."live_key" IS NOT NULL`).
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`COUNT(*)`).
+			Where(`"de"."decision_id" = ?`, claim).Where(`"de"."live_key" IS NOT NULL`).
 			Scan(t.Context(), &live); err != nil {
 			t.Fatal(err)
 		}
@@ -180,12 +180,12 @@ func TestAnUndoneMoveLandingWhileADisclosureAppliesKeepsTheLeadInternal(t *testi
 		}
 		var held []string
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
-			Where(`"f"."place_identity" = ?`, place).Scan(t.Context(), &held); err != nil {
+			Where(`"f"."occurrence_identity" = ?`, place).Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
 		var claims []string
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."visibility"`).
-			Where(`"de"."place_identity" = ?`, place).Scan(t.Context(), &claims); err != nil {
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."visibility"`).
+			Where(`"de"."occurrence_identity" = ?`, place).Scan(t.Context(), &claims); err != nil {
 			t.Fatal(err)
 		}
 		if len(held) == 0 || len(claims) == 0 || slices.ContainsFunc(append(held, claims...), func(v string) bool { return v != "internal" }) {

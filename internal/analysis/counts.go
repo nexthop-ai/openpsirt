@@ -72,7 +72,7 @@ func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, pro
 	if err := db.NewSelect().
 		TableExpr(`(?) AS "l"`, leadFindings(db, subject, Scope{ProductID: productID}, visible)).
 		ColumnExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).
-		ColumnExpr(`COUNT(DISTINCT "l"."place_identity") AS "leads"`).
+		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity") AS "leads"`).
 		GroupExpr(`"l"."series_id", "l"."stands", "l"."awaits", "l"."covered"`).
 		Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("count the leads of product %d by series: %w", productID, err)

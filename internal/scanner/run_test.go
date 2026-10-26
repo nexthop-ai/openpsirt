@@ -479,13 +479,13 @@ func TestAScanRatingAnIssueWorseLapsesAClaimTheRatingBearsOn(t *testing.T) {
 		f.scan(t, libnl)
 		decided := f.decided(t)
 		// A claim a severity bears on, made against the rating the issue had.
-		if _, err := f.db.DB.NewUpdate().Table("claim").
+		if _, err := f.db.DB.NewUpdate().Table("decision").
 			Set(`"justification" = ?`, string(triage.CodeNotReachableByAdversary)).
-			Where(`"id" = (SELECT "claim_id" FROM "decision" WHERE "id" = ?)`, decided).
+			Where(`"id" = (SELECT "decision_id" FROM "decision_occurrence" WHERE "id" = ?)`, decided).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.db.DB.NewUpdate().Table("decision").
+		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"severity_centi" = ?`, 800).Where(`"id" = ?`, decided).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

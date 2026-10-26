@@ -327,7 +327,7 @@ func turnsOnSeverity(claim Claim) bool {
 func (s *Store) approvalToCarry(ctx context.Context, claimID, notBy int64) (*Approval, error) {
 	var found []Approval
 	if err := s.db.NewSelect().Model(&found).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, claimID).
 		Where(`"withdrawn_at" IS NULL`).
 		Where(`"approved_by" <> ?`, notBy).
 		Order("id DESC").Limit(1).Scan(ctx); err != nil {

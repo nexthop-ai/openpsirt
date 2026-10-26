@@ -71,7 +71,7 @@ func (w *sweep) approachingDisclosure(ctx context.Context, admins []int64) (map[
 // dismissed, because nothing here is an event.
 func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error) {
 	var rows []struct {
-		DecisionID      int64  `bun:"decision_id"`
+		DecisionID      int64  `bun:"decision_occurrence_id"`
 		ProductID       int64  `bun:"product_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Product         string `bun:"product"`
@@ -88,7 +88,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		// The issue the decision is read as, which is the one a reader finds
 		// where a merge put another name under it.
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
-		ColumnExpr(`MIN("de"."id") AS "decision_id"`).
+		ColumnExpr(`MIN("de"."id") AS "decision_occurrence_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).

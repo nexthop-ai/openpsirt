@@ -191,7 +191,7 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 	var row struct {
 		ProductID       int64  `bun:"product_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
-		PlaceIdentity   string `bun:"place_identity"`
+		PlaceIdentity   string `bun:"occurrence_identity"`
 		Visibility      string `bun:"visibility"`
 		Component       string `bun:"component_now"`
 		Consumer        string `bun:"consumer_now"`
@@ -206,12 +206,12 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
 	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The issue the decision is read as, which is the one the new line holds.
 		Join(finding.DecisionIssue).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
-		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
@@ -371,7 +371,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	}
 
 	var rows []struct {
-		DecisionID    int64  `bun:"decision_id"`
+		DecisionID    int64  `bun:"decision_occurrence_id"`
 		Vulnerability string `bun:"vulnerability"`
 		Component     string `bun:"component"`
 		Outcome       string `bun:"outcome"`
@@ -384,7 +384,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		RanOut        bool   `bun:"ran_out"`
 		// Carried so a postponement can be told how long it has already run.
 		VulnerabilityID int64  `bun:"vulnerability_id"`
-		PlaceIdentity   string `bun:"place_identity"`
+		PlaceIdentity   string `bun:"occurrence_identity"`
 		// Landing is the visibility the place has on the new line, which is
 		// what a carried judgment would be written at.
 		Landing string `bun:"landing"`
@@ -393,16 +393,16 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	gKinds, gKindArgs := kindsOf(kind.VersionCarry, "g")
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The issue each decision is read as, which is the one the new line holds.
 		Join(finding.DecisionIssue).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// The argument, which is where the outcome lives.
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		Join(`LEFT JOIN "claim_revision" AS "dr" ON "dr"."id" = "cl"."revision_id"`).
-		ColumnExpr(`"de"."id" AS "decision_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		Join(`LEFT JOIN "decision_revision" AS "dr" ON "dr"."id" = "cl"."revision_id"`).
+		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
-		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "was"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
@@ -537,10 +537,10 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 
 	var deferrals []Decision
 	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
-		Column("vulnerability_id", "place_identity", "proposed_at", "state", "ended_at").
+		Column("vulnerability_id", "occurrence_identity", "proposed_at", "state", "ended_at").
 		Where(`"de"."product_id" = ?`, productID).
 		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
-		Where(`"de"."place_identity" IN (?)`, bun.List(identities)).
+		Where(`"de"."occurrence_identity" IN (?)`, bun.List(identities)).
 		Where(`"claim"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones for the span they were in force, as the
 		// threshold counts them.

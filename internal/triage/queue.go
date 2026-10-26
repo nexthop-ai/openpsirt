@@ -132,9 +132,9 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 // every row of it, because acting on a claim acts on the whole argument.
 func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.SelectQuery {
 	q := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`MAX("de"."id") AS "newest"`).
-		GroupExpr(`"de"."claim_id"`)
+		GroupExpr(`"de"."decision_id"`)
 	q = waiting(q, filter.Reason, s.now())
 	if filter.Reason == FixDateMissed {
 		// A promise is missed only while a finding it covers is still open
@@ -166,10 +166,10 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 	if filter.Mine {
 		q = q.Where(`"de"."proposed_by" = ?`, subject.ID)
 	} else {
-		q = q.Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "own"
-			WHERE "own"."claim_id" = "de"."claim_id" AND "own"."proposed_by" = ?)`, subject.ID).
-			Where(`NOT EXISTS (SELECT 1 FROM "claim_revision" AS "wrote"
-			WHERE "wrote"."claim_id" = "de"."claim_id" AND "wrote"."written_by" = ?)`, subject.ID)
+		q = q.Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "own"
+			WHERE "own"."decision_id" = "de"."decision_id" AND "own"."proposed_by" = ?)`, subject.ID).
+			Where(`NOT EXISTS (SELECT 1 FROM "decision_revision" AS "wrote"
+			WHERE "wrote"."decision_id" = "de"."decision_id" AND "wrote"."written_by" = ?)`, subject.ID)
 	}
 	outOfReach, args := notApprovableWhere(subject, "other")
 	return s.reachableClaims(q, outOfReach, args)
@@ -192,9 +192,9 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 // row out of reach; the join it answers from an index.
 func (s *Store) reachableClaims(grouped *bun.SelectQuery, outOfReach string, args []any) *bun.SelectQuery {
 	return s.db.NewSelect().TableExpr(`(?) AS "waiting"`, grouped).
-		ColumnExpr(`"waiting"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"waiting"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"waiting"."newest" AS "newest"`).
-		Join(`LEFT JOIN "decision" AS "other" ON "other"."claim_id" = "waiting"."claim_id" AND (`+
+		Join(`LEFT JOIN "decision_occurrence" AS "other" ON "other"."decision_id" = "waiting"."decision_id" AND (`+
 			outOfReach+`)`, args...).
 		Where(`"other"."id" IS NULL`)
 }
@@ -278,8 +278,8 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 				Where(rating.EffectiveExpr+" IN (?)", bun.List(f.Severities)))
 	}
 	if len(f.Outcomes) > 0 {
-		q = q.Where(`"de"."claim_id" IN (?)`,
-			q.NewSelect().TableExpr(`"claim" AS "qc"`).Column("qc.id").
+		q = q.Where(`"de"."decision_id" IN (?)`,
+			q.NewSelect().TableExpr(`"decision" AS "qc"`).Column("qc.id").
 				Where(`"qc"."outcome" IN (?)`, bun.List(f.Outcomes)))
 	}
 	if release := typedname.Matching(f.Release); release != "" {
@@ -297,7 +297,7 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr("1").
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Where(finding.DecisionFiledAt("de", "f")).
@@ -434,12 +434,12 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueF
 // can match findings they may not.
 func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claims []int64) (map[int64][]string, error) {
 	var rows []struct {
-		ClaimID int64  `bun:"claim_id"`
+		ClaimID int64  `bun:"decision_id"`
 		Stream  string `bun:"stream"`
 		Variant string `bun:"variant"`
 	}
 	query := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
 		Join(finding.DecisionIssue).
@@ -447,17 +447,17 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		// Grouped on the names and shown in the spelling somebody declared:
 		// the list is text a person reads, and one build is one entry
 		// however it was spelled.
 		ColumnExpr(`MIN(`+catalog.ShownExpr("st")+`) AS "stream"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("va")+`) AS "variant"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
+		Where(`"de"."decision_id" IN (?)`, bun.List(claims)).
 		// Live rows only, as a claim's reach is counted.
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
@@ -465,8 +465,8 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
 	err := readableFindings(query, subject, "f", `"st"."product_id"`).
-		GroupExpr(`"de"."claim_id", "st"."name", "va"."name"`).
-		OrderExpr(`"de"."claim_id", "st"."name", "va"."name"`).
+		GroupExpr(`"de"."decision_id", "st"."name", "va"."name"`).
+		OrderExpr(`"de"."decision_id", "st"."name", "va"."name"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which builds these cover: %w", err)
@@ -493,9 +493,9 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	}
 
 	var heads []struct {
-		ClaimID         int64 `bun:"claim_id"`
+		ClaimID         int64 `bun:"decision_id"`
 		VulnerabilityID int64 `bun:"vulnerability_id"`
-		DecisionID      int64 `bun:"decision_id"`
+		DecisionID      int64 `bun:"decision_occurrence_id"`
 		// ProductID is which product the claim was made in. A rating
 		// belongs to a product, so an outlier is picked out against
 		// what *this* product rates these issues rather than against a
@@ -503,14 +503,14 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ProductID int64 `bun:"product_id"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(finding.DecisionIssue).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
-		ColumnExpr(`"de"."id" AS "decision_id"`).
+		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claimIDs)).
-		OrderExpr(`"de"."claim_id", "dv"."issue_id", "de"."id"`).
+		Where(`"de"."decision_id" IN (?)`, bun.List(claimIDs)).
+		OrderExpr(`"de"."decision_id", "dv"."issue_id", "de"."id"`).
 		Scan(ctx, &heads); err != nil {
 		return nil, fmt.Errorf("read what a bulk claim covers: %w", err)
 	}
@@ -591,32 +591,32 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	// issue is the ordinary case and the smallest stated version stands in
 	// otherwise.
 	var fixes []struct {
-		ClaimID         int64  `bun:"claim_id"`
+		ClaimID         int64  `bun:"decision_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		FixedIn         string `bun:"fixed_in"`
 	}
 	known := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision on the outside, as buildsCovered has it.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claimIDs)).
+		Where(`"de"."decision_id" IN (?)`, bun.List(claimIDs)).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
 		Where(`"f"."fixed_in" <> ''`)
 	if err := readableFindings(known, subject, "f", `"st"."product_id"`).
-		GroupExpr(`"de"."claim_id", "f"."vulnerability_id"`).
+		GroupExpr(`"de"."decision_id", "f"."vulnerability_id"`).
 		Scan(ctx, &fixes); err != nil {
 		return nil, fmt.Errorf("read which of these have a fix: %w", err)
 	}
@@ -786,12 +786,12 @@ func (s *Store) reasoningPerClaim(ctx context.Context, ids []int64) (map[int64]s
 		return map[int64]string{}, nil
 	}
 	var rows []struct {
-		ClaimID int64  `bun:"claim_id"`
+		ClaimID int64  `bun:"decision_id"`
 		Body    string `bun:"body"`
 	}
 	if err := s.db.NewSelect().Model((*Claim)(nil)).
-		Join(`JOIN "claim_revision" AS "dr" ON "dr"."id" = "cl"."revision_id"`).
-		ColumnExpr(`"cl"."id" AS "claim_id"`).
+		Join(`JOIN "decision_revision" AS "dr" ON "dr"."id" = "cl"."revision_id"`).
+		ColumnExpr(`"cl"."id" AS "decision_id"`).
 		ColumnExpr(`"dr"."body" AS "body"`).
 		Where(`"cl"."id" IN (?)`, bun.List(ids)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the reasoning: %w", err)
@@ -823,7 +823,7 @@ func (s *Store) everApproved(ctx context.Context, ids []int64) (map[int64]bool, 
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
-		Where(`"claim_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"decision_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what has been agreed to before: %w", err)
 	}
 	seen := make(map[int64]bool, len(approvals))
@@ -844,7 +844,7 @@ func waiting(query *bun.SelectQuery, reason QueueReason, now time.Time) *bun.Sel
 		// The date is on the claim. An EXISTS rather than a join, because
 		// this narrows a query that already groups over the decision.
 		return query.Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
-			Where(`EXISTS (SELECT 1 FROM "claim" AS "wc" WHERE "wc"."id" = "de"."claim_id"
+			Where(`EXISTS (SELECT 1 FROM "decision" AS "wc" WHERE "wc"."id" = "de"."decision_id"
 		AND "wc"."outcome" = ? AND "wc"."deferred_until" IS NOT NULL AND "wc"."deferred_until" <= ?)`,
 				Deferred, now)
 	case FixDateMissed:
@@ -852,7 +852,7 @@ func waiting(query *bun.SelectQuery, reason QueueReason, now time.Time) *bun.Sel
 		// finding after its date, so a passed date is the only sign it did not
 		// hold.
 		return query.Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
-			Where(`EXISTS (SELECT 1 FROM "claim" AS "wp" WHERE "wp"."id" = "de"."claim_id"
+			Where(`EXISTS (SELECT 1 FROM "decision" AS "wp" WHERE "wp"."id" = "de"."decision_id"
 		AND "wp"."outcome" IN (?) AND "wp"."committed_to" IS NOT NULL AND "wp"."committed_to" <= ?)`,
 				bun.List([]Outcome{UpgradeNeeded, PatchNeeded}), now)
 	default:

@@ -313,8 +313,8 @@ func madeOn(ctx context.Context, db bun.IDB, decisions []int64) (map[int64][]Bui
 	}
 	where, args := database.InAnyOf(`"de"."id"`, decisions)
 	err := db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_build" AS "cb" ON "cb"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_build" AS "cb" ON "cb"."decision_id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "t" ON "t"."id" = "cb"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).

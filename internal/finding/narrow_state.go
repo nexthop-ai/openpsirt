@@ -103,7 +103,7 @@ func DecisionAt(product string) string {
 // names. Anything else is a programming error, because it is placed in the
 // statement as written.
 func DecisionAtPlace(finding string) string {
-	return decidedPlaceIn(`"dv"."issue_id"`, `"de"."place_identity"`, finding)
+	return decidedPlaceIn(`"dv"."issue_id"`, `"de"."occurrence_identity"`, finding)
 }
 
 // DecisionFiledAt is DecisionAtPlace for a statement that reads a decision
@@ -117,14 +117,14 @@ func DecisionFiledAt(decision, finding string) string {
 	}
 	findingAlias(finding)
 	return SameIssue(`"`+finding+`"."vulnerability_id"`, `"`+decision+`"."vulnerability_id"`) +
-		` AND "` + decision + `"."place_identity" = "` + finding + `"."place_identity"`
+		` AND "` + decision + `"."occurrence_identity" = "` + finding + `"."occurrence_identity"`
 }
 
 // decidedPlaceIn is the issue and the place of a decision, under the columns
 // given, being the finding's.
 func decidedPlaceIn(issue, place, finding string) string {
 	findingAlias(finding)
-	return issue + ` = "` + finding + `"."vulnerability_id" AND ` + place + ` = "` + finding + `"."place_identity"`
+	return issue + ` = "` + finding + `"."vulnerability_id" AND ` + place + ` = "` + finding + `"."occurrence_identity"`
 }
 
 // findingAlias refuses a finding alias that no statement here gives one.

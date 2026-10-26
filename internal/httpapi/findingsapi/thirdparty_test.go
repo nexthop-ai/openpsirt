@@ -48,12 +48,12 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 
 		placeOf := map[string]string{}
 		var rows []struct {
-			Place string `bun:"place_identity"`
+			Place string `bun:"occurrence_identity"`
 			Path  string `bun:"path"`
 		}
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-			ColumnExpr(`"f"."place_identity", "ar"."path"`).
+			ColumnExpr(`"f"."occurrence_identity", "ar"."path"`).
 			Where(`"f"."kind" = ?`, kind.Analysis).Scan(t.Context(), &rows); err != nil {
 			t.Fatal(err)
 		}
@@ -189,7 +189,7 @@ func placeAt(t *testing.T, r *httpapitest.Reach, path string) string {
 	var place string
 	if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		ColumnExpr(`"f"."place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity"`).
 		Where(`"ar"."path" = ?`, path).Where(`"f"."kind" = ?`, kind.Analysis).
 		OrderExpr(`"f"."id" DESC`).Limit(1).Scan(t.Context(), &place); err != nil {
 		t.Fatal(err)

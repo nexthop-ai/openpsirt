@@ -24,7 +24,7 @@ type LeadCollaborator struct {
 
 	ID            int64  `bun:"id,pk,autoincrement"`
 	ProductID     int64  `bun:"product_id,notnull"`
-	PlaceIdentity string `bun:"place_identity,notnull"`
+	PlaceIdentity string `bun:"occurrence_identity,notnull"`
 	PersonID      int64  `bun:"person_id,notnull"`
 	AddedBy       int64  `bun:"added_by,notnull"`
 	AddedAt       time.Time
@@ -71,7 +71,7 @@ func (s *Store) RemoveFromLead(ctx context.Context, productID int64, placeIdenti
 		Set(`"removed_by" = ?`, by).
 		Set(`"live_person_id" = ?`, nil).
 		Where(`"product_id" = ?`, productID).
-		Where(`"place_identity" = ?`, placeIdentity).
+		Where(`"occurrence_identity" = ?`, placeIdentity).
 		Where(`"person_id" = ?`, personID).
 		Where(`"live_person_id" IS NOT NULL`).
 		Exec(ctx)
@@ -86,7 +86,7 @@ func (s *Store) LeadRows(ctx context.Context, productID int64, placeIdentity str
 	var rows []LeadCollaborator
 	err := s.db.NewSelect().Model(&rows).
 		Where(`"lc"."product_id" = ?`, productID).
-		Where(`"lc"."place_identity" = ?`, placeIdentity).
+		Where(`"lc"."occurrence_identity" = ?`, placeIdentity).
 		Where(`"lc"."live_person_id" IS NOT NULL`).
 		OrderExpr(`"lc"."added_at", "lc"."id"`).
 		Scan(ctx)
@@ -101,7 +101,7 @@ func (s *Store) LeadRows(ctx context.Context, productID int64, placeIdentity str
 func (s *Store) LeadsOf(ctx context.Context, personID int64) (map[int64][]string, error) {
 	var rows []LeadCollaborator
 	err := s.db.NewSelect().Model(&rows).
-		Column("lc.product_id", "lc.place_identity").
+		Column("lc.product_id", "lc.occurrence_identity").
 		Where(`"lc"."person_id" = ?`, personID).
 		Where(`"lc"."live_person_id" IS NOT NULL`).
 		Scan(ctx)
@@ -125,7 +125,7 @@ func (s *Store) onLead(ctx context.Context, productID int64, placeIdentity strin
 	on, err := s.db.NewSelect().Model((*LeadCollaborator)(nil)).
 		Column("lc.id").
 		Where(`"lc"."product_id" = ?`, productID).
-		Where(`"lc"."place_identity" = ?`, placeIdentity).
+		Where(`"lc"."occurrence_identity" = ?`, placeIdentity).
 		Where(`"lc"."person_id" = ?`, personID).
 		Where(`"lc"."live_person_id" IS NOT NULL`).
 		Exists(ctx)

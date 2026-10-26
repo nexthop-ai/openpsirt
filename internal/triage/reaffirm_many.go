@@ -133,7 +133,7 @@ func (s *Store) refuseOthersClaims(ctx context.Context, subject access.Subject,
 	claims []int64) error {
 
 	var rows []struct {
-		ClaimID         int64  `bun:"claim_id"`
+		ClaimID         int64  `bun:"decision_id"`
 		ProductID       int64  `bun:"product_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Visibility      string `bun:"visibility"`
@@ -141,17 +141,17 @@ func (s *Store) refuseOthersClaims(ctx context.Context, subject access.Subject,
 		Identifier      string `bun:"identifier"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(finding.DecisionIssue).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"de"."visibility" AS "visibility"`).
 		ColumnExpr(`"cl"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`"v"."identifier" AS "identifier"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
+		Where(`"de"."decision_id" IN (?)`, bun.List(claims)).
 		Where(`"de"."state" = ?`, LapsedState).
 		Apply(stillLatest).
 		Scan(ctx, &rows); err != nil {
@@ -316,7 +316,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	}
 	var lapsed []Decision
 	if err := stillLatest(s.db.NewSelect().Model(&lapsed).
-		Where(`"de"."claim_id" = ?`, previousClaimID).
+		Where(`"de"."decision_id" = ?`, previousClaimID).
 		Where(`"de"."state" = ?`, LapsedState)).
 		Order("de.id ASC").Scan(ctx); err != nil {
 		return reaffirmPlan{}, fmt.Errorf("read what lapsed under that claim: %w", err)
@@ -350,7 +350,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	// back, and re-making it carries an agreement onto what was withdrawn. A
 	// claim at leads past their end of life alone is refused below, in the
 	// words a decision there is refused in.
-	reaffirmable, err := s.lapsedOfYours(subject).Where(`"de"."claim_id" = ?`, previousClaimID).Exists(ctx)
+	reaffirmable, err := s.lapsedOfYours(subject).Where(`"de"."decision_id" = ?`, previousClaimID).Exists(ctx)
 	if err != nil {
 		return reaffirmPlan{}, fmt.Errorf("read whether that claim is yours to re-affirm: %w", err)
 	}
@@ -494,14 +494,14 @@ func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirme
 // versions, and one lapsing leaves the other its own. Rows of one claim are
 // one judgment and do not replace each other.
 func stillLatest(q *bun.SelectQuery) *bun.SelectQuery {
-	return q.Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "newer"` +
+	return q.Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "newer"` +
 		` WHERE "newer"."product_id" = "de"."product_id"` +
 		// Filed under either issue, where one merged into the other.
 		` AND EXISTS (SELECT 1 FROM "vulnerability" AS "sl"` +
 		` JOIN "vulnerability" AS "so" ON "so"."issue_id" = "sl"."issue_id"` +
 		` WHERE "sl"."id" = "newer"."vulnerability_id" AND "so"."id" = "de"."vulnerability_id")` +
-		` AND "newer"."place_identity" = "de"."place_identity"` +
-		` AND "newer"."claim_id" <> "de"."claim_id"` +
+		` AND "newer"."occurrence_identity" = "de"."occurrence_identity"` +
+		` AND "newer"."decision_id" <> "de"."decision_id"` +
 		` AND "newer"."proposed_at" >= "de"."ended_at")`)
 }
 
@@ -559,7 +559,7 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 		}
 		var rows []struct {
 			VulnerabilityID   int64  `bun:"vulnerability_id"`
-			PlaceIdentity     string `bun:"place_identity"`
+			PlaceIdentity     string `bun:"occurrence_identity"`
 			ComponentUpstream string `bun:"component_upstream"`
 			ConsumerUpstream  string `bun:"consumer_upstream"`
 			OnTag             int    `bun:"on_tag"`
@@ -572,7 +572,7 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-			ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+			ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 			ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
 			ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 			ColumnExpr(`MAX(CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
@@ -582,8 +582,8 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 			Apply(ofKinds(kind.Decisions, "f")).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(keysOf(issues))).
-			Where(`"f"."place_identity" IN (?)`, bun.List(wordsOf(identities))).
-			GroupExpr(`"f"."vulnerability_id", "f"."place_identity", "c"."upstream_version", "c"."version", `+
+			Where(`"f"."occurrence_identity" IN (?)`, bun.List(wordsOf(identities))).
+			GroupExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "c"."upstream_version", "c"."version", `+
 				`"uc"."upstream_version", "uc"."version"`).
 			Scan(ctx, &rows)
 		if err != nil {

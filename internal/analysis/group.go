@@ -81,7 +81,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	}
 	reach := finding.LeadReach(subject, productID)
 	var rows []struct {
-		Place string `bun:"place_identity"`
+		Place string `bun:"occurrence_identity"`
 		Rule  string `bun:"rule"`
 		Path  string `bun:"last_path"`
 		Line  *int   `bun:"last_line"`
@@ -92,7 +92,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 		Join(`JOIN "finding" AS "g" ON "g"."target_id" = "f"."target_id"`).
 		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "g"."vulnerability_id"`).
-		ColumnExpr(`"g"."place_identity", "vu"."identifier" AS "rule", "ag"."last_path", "ag"."last_line"`).
+		ColumnExpr(`"g"."occurrence_identity", "vu"."identifier" AS "rule", "ag"."last_path", "ag"."last_line"`).
 		ColumnExpr(`CASE WHEN "ag"."last_line" BETWEEN "ar"."last_line" - ? AND "ar"."last_line" + ? `+
 			`THEN 1 ELSE 0 END AS "same"`, groupLines, groupLines).
 		Where(`"f"."id" = ?`, leadID).
@@ -101,7 +101,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 		// beside the product's own visibilities, as the queue reads it.
 		Where(`("g"."visibility" IN (?) OR EXISTS (SELECT 1 FROM "finding" AS "f" WHERE "f"."id" = "g"."id" AND `+
 			reach.Included+`))`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
-		OrderExpr(`"same" DESC, "ag"."last_line" ASC, "g"."place_identity" ASC`).
+		OrderExpr(`"same" DESC, "ag"."last_line" ASC, "g"."occurrence_identity" ASC`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the leads lead %d may be one flaw with: %w", leadID, err)
 	}
@@ -115,7 +115,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 // Member is a lead one judgment about another lead also answers.
 type Member struct {
 	VulnerabilityID int64             `bun:"vulnerability_id"`
-	Place           string            `bun:"place_identity"`
+	Place           string            `bun:"occurrence_identity"`
 	Visibility      access.Visibility `bun:"visibility"`
 }
 
@@ -141,11 +141,11 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "finding" AS "g" ON "g"."id" = ?`, leadID).
 		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
-		ColumnExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility"`).
+		ColumnExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility"`).
 		Where(nearby(groupLines)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dc"
+		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionFiledAt("dc", "f")+`)`,
 			productID).
 		Where(`NOT `+ruled, productID).
@@ -162,10 +162,10 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 			return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fs"
 				JOIN "target" AS "ts" ON "ts"."id" = "fs"."target_id"
 				JOIN "stream" AS "ss" ON "ss"."id" = "ts"."stream_id"
-				WHERE "ss"."product_id" = ? AND "fs"."place_identity" = "f"."place_identity"
+				WHERE "ss"."product_id" = ? AND "fs"."occurrence_identity" = "f"."occurrence_identity"
 				  AND `+kinds+` AND "ts"."stream_id" NOT IN (?))`, args...)
 		}).
-		OrderExpr(`"f"."place_identity" ASC`).
+		OrderExpr(`"f"."occurrence_identity" ASC`).
 		Scan(ctx, &out); err != nil {
 		return nil, fmt.Errorf("read the leads one judgment about lead %d answers: %w", leadID, err)
 	}

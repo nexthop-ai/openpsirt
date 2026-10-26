@@ -208,7 +208,7 @@ func newestLead(ctx context.Context, db bun.IDB, subject access.Subject, product
 		ColumnExpr(`"f"."id", "f"."target_id", "f"."component_id", "ar"."path"`).
 		ColumnExpr(`"vu"."identifier" AS "rule", "si"."last_run_id", "si"."series_id"`).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, placeIdentity).
 		Where(reach.Full, reach.FullArgs...).
 		Where(kinds, kindArgs...).
 		OrderExpr(`"f"."id" DESC`).Limit(1).
@@ -245,9 +245,9 @@ type stampedClaim struct {
 func claimsAt(ctx context.Context, db bun.IDB, productID, findingID int64) ([]stampedClaim, error) {
 	var out []stampedClaim
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "decision" AS "dc" ON `+finding.DecisionFiledAt("dc", "f")).
-		Join(`JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"`).
-		Join(`LEFT JOIN "claim_stamp" AS "cst" ON "cst"."claim_id" = "sc"."id"`).
+		Join(`JOIN "decision_occurrence" AS "dc" ON `+finding.DecisionFiledAt("dc", "f")).
+		Join(`JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"`).
+		Join(`LEFT JOIN "decision_stamp" AS "cst" ON "cst"."decision_id" = "sc"."id"`).
 		ColumnExpr(`DISTINCT "sc"."id", COALESCE("cst"."stamp", 0) AS "stamp"`).
 		Where(`"f"."id" = ?`, findingID).
 		Where(`"dc"."product_id" = ?`, productID).
@@ -359,34 +359,34 @@ func togetherAt(ctx context.Context, db bun.IDB, productID int64, placeIdentity 
 	var others []string
 	if handed != nil {
 		if err := db.NewSelect().Model((*finding.Handoff)(nil)).
-			Column("lh.place_identity").
+			Column("lh.occurrence_identity").
 			Where(`"lh"."product_id" = ?`, productID).
 			Where(`"lh"."vulnerability_id" = ?`, handed.VulnerabilityID).
-			Where(`"lh"."place_identity" <> ?`, placeIdentity).
+			Where(`"lh"."occurrence_identity" <> ?`, placeIdentity).
 			OrderExpr(`"lh"."id" ASC`).
 			Scan(ctx, &others); err != nil {
 			return nil, fmt.Errorf("read the leads handed off as the flaw: %w", err)
 		}
 		return append([]string{placeIdentity}, others...), nil
 	}
-	if err := db.NewSelect().TableExpr(`"decision" AS "dc"`).
+	if err := db.NewSelect().TableExpr(`"decision_occurrence" AS "dc"`).
 		Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"`).
-		Join(`JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"`).
-		Join(`JOIN "decision" AS "od" ON "od"."claim_id" = "dc"."claim_id" AND "od"."product_id" = "dc"."product_id"`).
+		Join(`JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"`).
+		Join(`JOIN "decision_occurrence" AS "od" ON "od"."decision_id" = "dc"."decision_id" AND "od"."product_id" = "dc"."product_id"`).
 		Join(`JOIN "vulnerability" AS "ov" ON "ov"."id" = "od"."vulnerability_id"`).
-		ColumnExpr(`DISTINCT "od"."place_identity"`).
+		ColumnExpr(`DISTINCT "od"."occurrence_identity"`).
 		Where(`"dc"."product_id" = ?`, productID).
-		Where(`"dc"."place_identity" = ?`, placeIdentity).
+		Where(`"dc"."occurrence_identity" = ?`, placeIdentity).
 		Where(`"rv"."kind" = ?`, string(kind.Rule)).
 		Where(`"sc"."outcome" = ?`, string(Confirmed)).
 		Where(`"dc"."live_key" IS NOT NULL`).
 		Where(`("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL))`).
 		Where(`"ov"."kind" = ?`, string(kind.Rule)).
 		Where(`"od"."live_key" IS NOT NULL`).
-		Where(`"od"."place_identity" <> ?`, placeIdentity).
+		Where(`"od"."occurrence_identity" <> ?`, placeIdentity).
 		Where(`NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-			WHERE "lh"."product_id" = "od"."product_id" AND "lh"."place_identity" = "od"."place_identity")`).
-		OrderExpr(`"od"."place_identity" ASC`).
+			WHERE "lh"."product_id" = "od"."product_id" AND "lh"."occurrence_identity" = "od"."occurrence_identity")`).
+		OrderExpr(`"od"."occurrence_identity" ASC`).
 		Scan(ctx, &others); err != nil {
 		return nil, fmt.Errorf("read the leads confirmed with the lead: %w", err)
 	}
@@ -536,7 +536,7 @@ func seenIn(ctx context.Context, db bun.IDB, productID int64, placeIdentity stri
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		ColumnExpr(`DISTINCT "t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
 		Where(`"s"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, placeIdentity).
 		Where(kinds, kindArgs...).
 		OrderExpr(`"s"."name" ASC, "va"."name" ASC`).
 		Scan(ctx, &out); err != nil {
@@ -600,27 +600,27 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 		visible = access.Visible(subject, productID)
 	}
 	if len(visible) > 0 {
-		claims := `SELECT "dc"."claim_id" FROM "decision" AS "dc"
+		claims := `SELECT "dc"."decision_id" FROM "decision_occurrence" AS "dc"
 			JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"
-			WHERE "dc"."product_id" = ? AND "dc"."place_identity" IN (?) AND "rv"."kind" = ?
+			WHERE "dc"."product_id" = ? AND "dc"."occurrence_identity" IN (?) AND "rv"."kind" = ?
 			  AND "dc"."visibility" IN (?)`
 		claimArgs := []any{productID, bun.List(places), string(kind.Rule), bun.List(visible)}
 		var notes []struct {
 			PersonID  int64     `bun:"person_id"`
-			ClaimID   int64     `bun:"claim_id"`
+			ClaimID   int64     `bun:"decision_id"`
 			Comment   int       `bun:"comment"`
 			Body      string    `bun:"body"`
 			WrittenAt time.Time `bun:"written_at"`
 		}
 		if err := db.NewSelect().
-			TableExpr(`(SELECT "cr"."written_by" AS "person_id", "cr"."claim_id", 0 AS "comment", "cr"."body",
-					"cr"."written_at" FROM "claim_revision" AS "cr"
-				WHERE "cr"."claim_id" IN (`+claims+`)
-				UNION ALL SELECT "cm"."written_by" AS "person_id", "cm"."claim_id", 1 AS "comment", "cm"."body",
-					"cm"."written_at" FROM "claim_comment" AS "cm"
-				WHERE "cm"."claim_id" IN (`+claims+`)) AS "w"`, append(claimArgs, claimArgs...)...).
-			ColumnExpr(`"w"."person_id", "w"."claim_id", "w"."comment", "w"."body", "w"."written_at"`).
-			OrderExpr(`"w"."person_id" ASC, "w"."written_at" ASC, "w"."claim_id" ASC, "w"."comment" ASC`).
+			TableExpr(`(SELECT "cr"."written_by" AS "person_id", "cr"."decision_id", 0 AS "comment", "cr"."body",
+					"cr"."written_at" FROM "decision_revision" AS "cr"
+				WHERE "cr"."decision_id" IN (`+claims+`)
+				UNION ALL SELECT "cm"."written_by" AS "person_id", "cm"."decision_id", 1 AS "comment", "cm"."body",
+					"cm"."written_at" FROM "decision_comment" AS "cm"
+				WHERE "cm"."decision_id" IN (`+claims+`)) AS "w"`, append(claimArgs, claimArgs...)...).
+			ColumnExpr(`"w"."person_id", "w"."decision_id", "w"."comment", "w"."body", "w"."written_at"`).
+			OrderExpr(`"w"."person_id" ASC, "w"."written_at" ASC, "w"."decision_id" ASC, "w"."comment" ASC`).
 			Scan(ctx, &notes); err != nil {
 			return out, fmt.Errorf("read what was written about the lead: %w", err)
 		}
@@ -653,7 +653,7 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 			ColumnExpr(`COALESCE("`+alias+`"."path", '') AS "path", "`+alias+`"."`+message+`" AS "message_text"`).
 			ColumnExpr(`CASE WHEN "`+alias+`"."snippet" IS NULL THEN NULL ELSE TRUE END AS "snippet"`).
 			Where(`"s"."product_id" = ?`, productID).
-			Where(`"f"."place_identity" IN (?)`, bun.List(places)).
+			Where(`"f"."occurrence_identity" IN (?)`, bun.List(places)).
 			Where(kinds, kindArgs...)
 	}
 	for _, q := range []*bun.SelectQuery{from("analysis_result", "ar", "message_text"),
@@ -1044,7 +1044,7 @@ func LeadName(ctx context.Context, db bun.IDB, h *finding.Handoff) (string, erro
 			JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"
 			JOIN "target" AS "t" ON "t"."id" = "f"."target_id"
 			JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"
-			WHERE "s"."product_id" = "p"."id" AND "f"."place_identity" = ? AND `+kinds+`) AS "rule"`,
+			WHERE "s"."product_id" = "p"."id" AND "f"."occurrence_identity" = ? AND `+kinds+`) AS "rule"`,
 			append([]any{h.PlaceIdentity}, kindArgs...)...).
 		Where(`"p"."id" = ?`, h.ProductID).
 		Scan(ctx, &names); err != nil {

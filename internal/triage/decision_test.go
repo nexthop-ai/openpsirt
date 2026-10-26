@@ -444,7 +444,7 @@ func TestADeferralStopsStandingOnItsDate(t *testing.T) {
 			t.Fatal(err)
 		}
 		past := time.Now().UTC().Add(-time.Hour)
-		if _, err := f.db.DB.NewUpdate().Table("claim").
+		if _, err := f.db.DB.NewUpdate().Table("decision").
 			Set(`"deferred_until" = ?`, past).
 			Where(`"id" = ?`, ran.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)

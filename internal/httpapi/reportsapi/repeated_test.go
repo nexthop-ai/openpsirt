@@ -63,8 +63,8 @@ func TestAPlacePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
 			{first, now.AddDate(0, 0, -10), now.AddDate(0, 0, -6)},
 			{second, lastUntil.Add(-time.Duration(3.6 * 24 * float64(time.Hour))), time.Time{}},
 		} {
-			q := r.DB.DB.NewUpdate().Table("decision").
-				Set(`"proposed_at" = ?`, set.proposed).Where(`"claim_id" = ?`, set.claim)
+			q := r.DB.DB.NewUpdate().Table("decision_occurrence").
+				Set(`"proposed_at" = ?`, set.proposed).Where(`"decision_id" = ?`, set.claim)
 			if !set.ends.IsZero() {
 				q = q.Set(`"ended_at" = ?`, set.ends)
 			}

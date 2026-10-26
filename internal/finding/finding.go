@@ -270,7 +270,7 @@ type Finding struct {
 	// PlaceIdentity is the hashed pair of names. It is what a triage decision
 	// is keyed on, so it is stored rather than derived — a decision has to be
 	// findable without walking the graph of every variant it might reach.
-	PlaceIdentity string   `bun:"place_identity,notnull"`
+	PlaceIdentity string   `bun:"occurrence_identity,notnull"`
 	FixState      FixState `bun:"fix_state"`
 	FixedIn       string   `bun:"fixed_in"`
 	// FixedAt is when that version became available. How long a fix has

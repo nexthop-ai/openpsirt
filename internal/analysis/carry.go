@@ -129,10 +129,10 @@ func placesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, e
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var rows []struct {
 			ID    int64  `bun:"id"`
-			Place string `bun:"place_identity"`
+			Place string `bun:"occurrence_identity"`
 		}
 		if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr(`"f"."id", "f"."place_identity"`).
+			ColumnExpr(`"f"."id", "f"."occurrence_identity"`).
 			Where(`"f"."id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
 			return err
 		}
@@ -163,7 +163,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 	type held struct {
 		ID       int64      `bun:"id"`
 		Key      string     `bun:"match_key"`
-		Place    string     `bun:"place_identity"`
+		Place    string     `bun:"occurrence_identity"`
 		TargetID int64      `bun:"target_id"`
 		ClosedAt *time.Time `bun:"closed_at"`
 	}
@@ -176,7 +176,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 			TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-			ColumnExpr(`"f"."id", "ar"."match_key", "f"."place_identity", "f"."target_id"`).
+			ColumnExpr(`"f"."id", "ar"."match_key", "f"."occurrence_identity", "f"."target_id"`).
 			ColumnExpr(`"f"."closed_at"`).
 			Where(`"si"."series_id" = ?`, seriesID).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).

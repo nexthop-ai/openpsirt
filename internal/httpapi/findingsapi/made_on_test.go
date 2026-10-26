@@ -16,10 +16,10 @@ import (
 func madeOn(t *testing.T, r *httpapitest.Reach, claim int64) []string {
 	t.Helper()
 	var variants []string
-	if err := r.DB.DB.NewRaw(`SELECT "va"."name" FROM "claim_build" AS "cb"
+	if err := r.DB.DB.NewRaw(`SELECT "va"."name" FROM "decision_build" AS "cb"
 		JOIN "target" AS "t" ON "t"."id" = "cb"."target_id"
 		JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"
-		WHERE "cb"."claim_id" = ?`, claim).Scan(t.Context(), &variants); err != nil {
+		WHERE "cb"."decision_id" = ?`, claim).Scan(t.Context(), &variants); err != nil {
 		t.Fatal(err)
 	}
 	slices.Sort(variants)

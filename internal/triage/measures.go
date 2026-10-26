@@ -213,7 +213,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		// published word alone, a product that re-rated an issue measured its
 		// own turnaround under a severity nobody there uses.
 		Join(rating.For(rating.OnDecision)).
-		Join(`LEFT JOIN "claim_approval" AS "da" ON "da"."claim_id" = "de"."claim_id"
+		Join(`LEFT JOIN "decision_approval" AS "da" ON "da"."decision_id" = "de"."decision_id"
 			AND "da"."withdrawn_at" IS NULL`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
@@ -223,7 +223,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		// One observation per claim and band. A claim writes a row per
 		// place and is agreed to once, so counted per row one claim over
 		// four hundred places is four hundred waits for one agreement.
-		GroupExpr(`"de"."claim_id", ` + rating.EffectiveExpr).
+		GroupExpr(`"de"."decision_id", ` + rating.EffectiveExpr).
 		OrderExpr(`MIN("de"."proposed_at") DESC`).
 		Limit(measuredAtMost + 1)
 	if !since.IsZero() {
@@ -268,11 +268,11 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	// The claims that came back. Sending a claim back is the approver's other
 	// answer and nothing counted it, so a queue that is moving because claims
 	// are good and one that is moving because nobody reads them looked alike.
-	back := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
+	back := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 		// Counted per claim: sending a claim back marks every row of it, and
 		// approving with exceptions moves the rows it returns into a claim of
 		// their own, so the distinct claims are the send-backs.
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "number"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 		Where(`"de"."sent_back_at" IS NOT NULL`).
 		Where(`"de"."sent_back_at" < ?`, until)
 	if !since.IsZero() {
@@ -323,9 +323,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	// to the window it was argued in. Both count claims, as agreements do: a
 	// claim writes a row per place and is one piece of work.
 	if err := count(func() *bun.SelectQuery {
-		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
+		q := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 			ColumnExpr(`"de"."proposed_by" AS "person"`).
-			ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "number"`).
+			ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 			Where(`"de"."proposed_at" < ?`, until).
 			GroupExpr(`"de"."proposed_by"`)
 		return only.narrow(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"))
@@ -333,9 +333,9 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		return nil, err
 	}
 	if err := count(func() *bun.SelectQuery {
-		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
+		q := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 			ColumnExpr(`"de"."proposed_by" AS "person"`).
-			ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "number"`).
+			ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 			Where(`"de"."state" = ?`, Withdrawn).
 			Where(`"de"."proposed_at" < ?`, until).
 			GroupExpr(`"de"."proposed_by"`)
@@ -349,8 +349,8 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		// Counted distinctly, because the join is one approval to every row of
 		// the claim it was given for: an approver agreeing to one argument
 		// covering forty-four places did one piece of work, not forty-four.
-		q := s.db.NewSelect().TableExpr(`"claim_approval" AS "da"`).
-			Join(`JOIN "decision" AS "de" ON "de"."claim_id" = "da"."claim_id"`).
+		q := s.db.NewSelect().TableExpr(`"decision_approval" AS "da"`).
+			Join(`JOIN "decision_occurrence" AS "de" ON "de"."decision_id" = "da"."decision_id"`).
 			ColumnExpr(`"da"."approved_by" AS "person"`).
 			ColumnExpr(`COUNT(DISTINCT "da"."id") AS "number"`).
 			Where(`"da"."withdrawn_at" IS NULL`).

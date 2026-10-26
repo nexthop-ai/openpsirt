@@ -490,7 +490,7 @@ type Sitting struct {
 // holds — any place answers about the match, and disclosure is asked of all of
 // them — checkable without a database.
 type evidenceRow struct {
-	PlaceIdentity string     `bun:"place_identity"`
+	PlaceIdentity string     `bun:"occurrence_identity"`
 	Consumer      string     `bun:"consumer"`
 	ConsumerID    *int64     `bun:"consumer_id"`
 	Component     string     `bun:"component"`
@@ -534,7 +534,7 @@ type evidenceRow struct {
 // Ordered rather than aggregated, so that every column read through it names
 // the same row.
 var standingHere = `FROM ` + Decisions + `
-	JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+	JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 	WHERE ` + DecisionAt("?") + `
 	  AND "de"."live_key" IS NOT NULL
 	  AND ` + KeyMatches + `
@@ -569,7 +569,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// The supplier's statement answering this place on some routes, and
 		// the product it answers through.
 		Join(`LEFT JOIN "vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
 		// The package of the fold this place is. A fold covers every binary
@@ -604,7 +604,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// two independent minimums the two columns could name different rows,
 		// which is a claim identifier that belongs to another decision.
 		ColumnExpr(`(SELECT "de"."id" `+standingHere+`) AS "decision"`, productID).
-		ColumnExpr(`(SELECT "de"."claim_id" `+standingHere+`) AS "claim"`, productID).
+		ColumnExpr(`(SELECT "de"."decision_id" `+standingHere+`) AS "claim"`, productID).
 		ColumnExpr(`CASE WHEN "f"."suppressed_by" IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
 		ColumnExpr(`"f"."claimed_by" AS "claimed_by"`).
 		ColumnExpr(`COALESCE("sb"."publisher", '') AS "answered_by"`).

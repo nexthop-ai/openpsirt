@@ -518,7 +518,7 @@ func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map
 	var places []string
 	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var some []string
-		if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."place_identity"`).
+		if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
 			Where(`"f"."id" IN (?)`, bun.List(batch)).Scan(ctx, &some); err != nil {
 			return fmt.Errorf("read the places of leads paired probably: %w", err)
 		}

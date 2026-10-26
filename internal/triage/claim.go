@@ -29,7 +29,7 @@ import (
 // reads is the action — one argument, with its reach — and the queue,
 // approval, sending back and undoing all work on that rather than on rows.
 type Claim struct {
-	bun.BaseModel `bun:"table:claim,alias:cl"`
+	bun.BaseModel `bun:"table:decision,alias:cl"`
 
 	ID         int64     `bun:"id,pk,autoincrement"`
 	Kind       ClaimKind `bun:"kind,notnull"`
@@ -353,7 +353,7 @@ func (s *Store) extendable(ctx context.Context, subject access.Subject, from int
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read claim %d", from))
 	}
 	var rows []Decision
-	if err := s.db.NewSelect().Model(&rows).Where(`"claim_id" = ?`, from).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&rows).Where(`"decision_id" = ?`, from).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what that claim covers: %w", err)
 	}
 	if len(rows) == 0 {
@@ -595,10 +595,10 @@ func (s *Store) intoReturned(ctx context.Context, subject access.Subject, claim 
 		return nil, err
 	}
 	moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set(`"claim_id" = ?`, returned.ID).
+		Set(`"decision_id" = ?`, returned.ID).
 		Set(`"sent_back_at" = ?`, now).
 		Where(`"id" IN (?)`, bun.List(ids)).
-		Where(`"claim_id" = ?`, claim.ID).
+		Where(`"decision_id" = ?`, claim.ID).
 		Where(`"state" = ?`, Proposed).Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", doing, err)
@@ -664,7 +664,7 @@ func (s *Store) approveWhileRevised(ctx context.Context, claim Claim, ids []int6
 		Set(`"state" = ?`, Approved).
 		Where(`"id" IN (?)`, bun.List(ids)).
 		Where(`"state" = ?`, Proposed).
-		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE "ac"."id" = ? AND "ac"."revision_id" = ?)`,
+		Where(`EXISTS (SELECT 1 FROM "decision" AS "ac" WHERE "ac"."id" = ? AND "ac"."revision_id" = ?)`,
 			claim.ID, *claim.RevisionID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("%s: %w", doing, err)
@@ -947,7 +947,7 @@ func (s *Store) claimRowsAs(ctx context.Context, subject access.Subject, claimID
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where(`"de"."claim_id" = ?`, claimID).Order("de.id ASC").Scan(ctx); err != nil {
+		Where(`"de"."decision_id" = ?`, claimID).Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, nil, fmt.Errorf("read what that claim covers: %w", err)
 	}
 	if len(rows) == 0 {
@@ -986,12 +986,12 @@ func (s *Store) readableClaimRows(ctx context.Context, subject access.Subject, c
 // flaw's readers of a lead included in its case (orIncluded).
 func (s *Store) readsIncluded(ctx context.Context, subject access.Subject, decisionIDs []int64) (map[int64]bool, error) {
 	out := map[int64]bool{}
-	where, args := orIncluded(subject, "1 = 0", nil, `"de"."product_id"`, `"de"."visibility"`, `"de"."place_identity"`)
+	where, args := orIncluded(subject, "1 = 0", nil, `"de"."product_id"`, `"de"."visibility"`, `"de"."occurrence_identity"`)
 	if where == "1 = 0" || len(decisionIDs) == 0 {
 		return out, nil
 	}
 	var ids []int64
-	if err := s.db.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."id"`).
+	if err := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."id"`).
 		Where(`"de"."id" IN (?)`, bun.List(decisionIDs)).
 		Where(where, args...).
 		Scan(ctx, &ids); err != nil {
@@ -1026,12 +1026,12 @@ func (s *Store) handedOff(ctx context.Context, claimIDs []int64) (map[int64]bool
 	out := map[int64]bool{}
 	if err := database.IDsInBatches(ctx, claimIDs, func(ctx context.Context, batch []int64) error {
 		var some []int64
-		if err := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
+		if err := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 			Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "de"."vulnerability_id"`).
 			Join(`JOIN "lead_handoff" AS "lh" ON "lh"."product_id" = "de"."product_id"
-				AND "lh"."place_identity" = "de"."place_identity"`).
-			ColumnExpr(`DISTINCT "de"."claim_id"`).
-			Where(`"de"."claim_id" IN (?)`, bun.List(batch)).
+				AND "lh"."occurrence_identity" = "de"."occurrence_identity"`).
+			ColumnExpr(`DISTINCT "de"."decision_id"`).
+			Where(`"de"."decision_id" IN (?)`, bun.List(batch)).
 			Where(`"rv"."kind" = ?`, string(kind.Rule)).
 			Scan(ctx, &some); err != nil {
 			return err
@@ -1107,9 +1107,9 @@ func (s *Store) restampAll(ctx context.Context) error {
 
 // claimStamp is the stamp a claim's writers match on (Restamp).
 type claimStamp struct {
-	bun.BaseModel `bun:"table:claim_stamp,alias:cs"`
+	bun.BaseModel `bun:"table:decision_stamp,alias:cs"`
 
-	ClaimID int64 `bun:"claim_id,pk"`
+	ClaimID int64 `bun:"decision_id,pk"`
 	Stamp   int   `bun:"stamp,notnull"`
 }
 
@@ -1129,7 +1129,7 @@ func Restamp(ctx context.Context, db bun.IDB, claimID int64, read int) error {
 	doing := fmt.Sprintf("restamp claim %d", claimID)
 	result, err := db.NewUpdate().Model((*claimStamp)(nil)).
 		Set(`"stamp" = ?`, read+1).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, claimID).
 		Where(`"stamp" = ?`, read).
 		Exec(ctx)
 	if err != nil {
@@ -1162,7 +1162,7 @@ func (s *Store) stampsOf(ctx context.Context, claimIDs []int64) (map[int64]int, 
 	if err := database.IDsInBatches(ctx, claimIDs, func(ctx context.Context, batch []int64) error {
 		var rows []claimStamp
 		if err := s.db.NewSelect().Model(&rows).
-			Where(`"cs"."claim_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
+			Where(`"cs"."decision_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
 			return err
 		}
 		for _, row := range rows {

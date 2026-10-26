@@ -447,7 +447,7 @@ func TestWhatAnApprovalCoveredIsCountedAtTheVisibilityHeldInEachProduct(t *testi
 			t.Fatal(err)
 		}
 		var covered int
-		if err := f.db.NewRaw(`SELECT "covered" FROM "claim_approval" WHERE "claim_id" = ?`,
+		if err := f.db.NewRaw(`SELECT "covered" FROM "decision_approval" WHERE "decision_id" = ?`,
 			claim.ClaimID).Scan(ctx, &covered); err != nil {
 			t.Fatal(err)
 		}

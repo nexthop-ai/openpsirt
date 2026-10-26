@@ -15,8 +15,8 @@ import (
 func stampOf(t *testing.T, f *fixture, claimID int64) int {
 	t.Helper()
 	var stamp int
-	if err := f.db.DB.NewSelect().TableExpr(`"claim_stamp" AS "cs"`).
-		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."claim_id" = ?`, claimID).Scan(t.Context(), &stamp); err != nil {
+	if err := f.db.DB.NewSelect().TableExpr(`"decision_stamp" AS "cs"`).
+		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."decision_id" = ?`, claimID).Scan(t.Context(), &stamp); err != nil {
 		t.Fatal(err)
 	}
 	return stamp

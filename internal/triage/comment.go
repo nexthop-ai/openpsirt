@@ -27,10 +27,10 @@ import (
 // true" — is ordinary, and an approval that fell over each time somebody added
 // a note would teach people not to add notes.
 type Comment struct {
-	bun.BaseModel `bun:"table:claim_comment,alias:dc"`
+	bun.BaseModel `bun:"table:decision_comment,alias:dc"`
 
 	ID        int64     `bun:"id,pk,autoincrement"`
-	ClaimID   int64     `bun:"claim_id,notnull"`
+	ClaimID   int64     `bun:"decision_id,notnull"`
 	Body      string    `bun:"body,notnull"`
 	WrittenBy int64     `bun:"written_by,notnull"`
 	WrittenAt time.Time `bun:"written_at,notnull"`
@@ -48,7 +48,7 @@ type Comment struct {
 // including the current one: the comment row holds what it says now, and this
 // holds what it stopped saying, which is the part nothing else keeps.
 type WasSaid struct {
-	bun.BaseModel `bun:"table:claim_comment_revision,alias:dcr"`
+	bun.BaseModel `bun:"table:decision_comment_revision,alias:dcr"`
 
 	ID         int64     `bun:"id,pk,autoincrement"`
 	CommentID  int64     `bun:"comment_id,notnull"`
@@ -195,7 +195,7 @@ func (s *Store) Discussion(ctx context.Context, subject access.Subject, claimID 
 	}
 	var comments []Comment
 	if err := s.db.NewSelect().Model(&comments).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, claimID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the discussion: %w", err)
 	}

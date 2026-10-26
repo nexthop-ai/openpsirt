@@ -218,7 +218,7 @@ func FromRead(err error, absent error, reading string) error {
 // It exists so a rule the database enforces can be *explained* by the code. A
 // unique index is the right place to enforce "only one of these", because two
 // writers arriving together both walk through any check made before the write
-// — but "duplicate key value violates constraint decision_live_unique" is not
+// — but "duplicate key value violates constraint decision_occurrence_live_unique" is not
 // a sentence anybody should be shown.
 func IsDuplicate(err error) bool {
 	if err == nil {

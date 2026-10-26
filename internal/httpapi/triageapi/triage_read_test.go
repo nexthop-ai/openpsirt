@@ -364,7 +364,7 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := r.DB.DB.NewUpdate().Table("decision").
+		if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"visibility" = ?`, "private").
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -497,9 +497,9 @@ func TestStoredTextComesBackExactlyAsWritten(t *testing.T) {
 		hostile := "Fine, then <img src=x onerror=alert(1)> and " +
 			"[a link](javascript:alert(2))."
 		if _, err := r.DB.DB.NewUpdate().
-			Table("claim_revision").
+			Table("decision_revision").
 			Set(`"body" = ?`, hostile).
-			Where(`"claim_id" = (SELECT "claim_id" FROM "decision" WHERE "id" = ?)`, id).
+			Where(`"decision_id" = (SELECT "decision_id" FROM "decision_occurrence" WHERE "id" = ?)`, id).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -649,8 +649,8 @@ func TestABulkClaimCoversWhatTheClaimantCanSeeAndNoMore(t *testing.T) {
 
 		// And the undisclosed one is still open, waiting for somebody who can
 		// see it.
-		standing, err := r.DB.DB.NewSelect().Table("decision").
-			Where(`"place_identity" = ?`, rows[0].PlaceIdentity).
+		standing, err := r.DB.DB.NewSelect().Table("decision_occurrence").
+			Where(`"occurrence_identity" = ?`, rows[0].PlaceIdentity).
 			Where(`"live_key" IS NOT NULL`).Count(t.Context())
 		if err != nil {
 			t.Fatal(err)

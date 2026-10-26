@@ -164,7 +164,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	}
 
 	var rows []struct {
-		PlaceIdentity     string `bun:"place_identity"`
+		PlaceIdentity     string `bun:"occurrence_identity"`
 		TargetID          int64  `bun:"target_id"`
 		Stream            string `bun:"stream"`
 		StreamName        string `bun:"stream_name"`
@@ -184,7 +184,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"st"."name" AS "stream"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
@@ -196,10 +196,10 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(*) AS "places"`).
 		Where(`"st"."product_id" = ?`, at.ProductID).
 		Where(`"f"."vulnerability_id" = ?`, at.VulnerabilityID).
-		Where(`"f"."place_identity" IN (?)`, bun.List(identities)).
+		Where(`"f"."occurrence_identity" IN (?)`, bun.List(identities)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"f"."place_identity", "f"."target_id", "st"."name", "st"."display_name", "va"."name", "va"."display_name", `+
+		GroupExpr(`"f"."occurrence_identity", "f"."target_id", "st"."name", "st"."display_name", "va"."name", "va"."display_name", `+
 			`"c"."version", `+
 			ComponentUpstreamExpr+", "+ConsumerUpstreamExpr).
 		OrderExpr(`"st"."name", "va"."name", "c"."version"`).

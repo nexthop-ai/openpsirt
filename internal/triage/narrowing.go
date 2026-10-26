@@ -127,7 +127,7 @@ func readableWhere(subject access.Subject, column string) (string, []any) {
 	where, args := visibleCondition(subject, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
 		`"`+column+`"."vulnerability_id"`, readable, onCases)
 	return orIncluded(subject, where, args, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
-		`"`+column+`"."place_identity"`)
+		`"`+column+`"."occurrence_identity"`)
 }
 
 // readableFindings narrows a query that joins findings to the ones a subject
@@ -162,7 +162,7 @@ func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, p
 func readableFindingsOn(subject access.Subject, finding, product string) (string, []any) {
 	where, args := visibleCondition(subject, product, `"`+finding+`"."visibility"`, `"`+finding+`"."vulnerability_id"`,
 		readable, onCases)
-	return orIncluded(subject, where, args, product, `"`+finding+`"."visibility"`, `"`+finding+`"."place_identity"`)
+	return orIncluded(subject, where, args, product, `"`+finding+`"."visibility"`, `"`+finding+`"."occurrence_identity"`)
 }
 
 // orIncluded widens a reading narrowing by the leads included in an
@@ -205,7 +205,7 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 		return where, args
 	}
 	included := "(" + visibility + ` = ? AND EXISTS (SELECT 1 FROM "lead_handoff" AS "ilh"
-		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."place_identity" = ` + place + `
+		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."occurrence_identity" = ` + place + `
 		  AND "ilh"."moved_at" IS NOT NULL AND "ilh"."disclosed_at" IS NULL
 		  AND (` + strings.Join(audience, " OR ") + `)))`
 	args = append(append(append([]any{}, args...), access.Internal), audienceArgs...)
@@ -422,9 +422,9 @@ func (s *Store) partlyHidden(ctx context.Context, subject access.Subject,
 	}
 	out, args := notReadableWhere(subject, "dn")
 	var ids []int64
-	if err := s.db.NewSelect().TableExpr(`"decision" AS "dn"`).
-		ColumnExpr(`DISTINCT "dn"."claim_id"`).
-		Where(`"dn"."claim_id" IN (?)`, bun.List(claims)).
+	if err := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "dn"`).
+		ColumnExpr(`DISTINCT "dn"."decision_id"`).
+		Where(`"dn"."decision_id" IN (?)`, bun.List(claims)).
 		Where(out, args...).
 		Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which claims reach past what you may read: %w", err)

@@ -377,7 +377,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 		Where(kinds, kindArgs...).
 		Where(NotArguedAway).
 		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+`
-			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 			WHERE `+DecisionAt(`"st"."product_id"`)+`
 			  AND "de"."live_key" IS NOT NULL
 			  AND `+KeyMatches+`

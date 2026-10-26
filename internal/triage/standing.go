@@ -143,7 +143,7 @@ func (s *Store) groupByClaim(ctx context.Context, subject access.Subject, rows [
 		// the author's own remarks are answers rather than requests.
 		var comments []Comment
 		if err := s.db.NewSelect().Model(&comments).
-			Where(`"claim_id" IN (?)`, bun.List(sentBack)).
+			Where(`"decision_id" IN (?)`, bun.List(sentBack)).
 			// Bounded. What is wanted is the newest comment on each claim
 			// that is with its author, and this read every comment ever
 			// written on every one of them to take one each — a claim people
@@ -217,7 +217,7 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
 		Where(`"de"."product_id" = ?`, productID).
 		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
-		Where(`"de"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"de"."occurrence_identity" IN (?)`, bun.List(places)).
 		Where(`"de"."state" IN (?, ?)`, Withdrawn, LapsedState).
 		// Bounded, newest first. This is the whole history of what was
 		// decided at these places and then stopped applying, which on a
@@ -238,7 +238,7 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
-		Where(`"claim_id" IN (?)`, bun.List(claimsOf(rows))).
+		Where(`"decision_id" IN (?)`, bun.List(claimsOf(rows))).
 		Order("id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who agreed: %w", err)
 	}
@@ -285,7 +285,7 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
 		Where(`"de"."product_id" = ?`, productID).
 		Where("NOT ("+finding.FiledUnder(filed.DecisionIssue)+")", issueID).
-		Where(`"de"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"de"."occurrence_identity" IN (?)`, bun.List(places)).
 		Where(`"claim"."outcome" = ?`, NotApplicable).
 		Where(`"de"."state" = ?`, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).
@@ -315,17 +315,17 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	// statement, which answers one row per claim however many places each
 	// wrote.
 	var counted []struct {
-		ClaimID int64 `bun:"claim_id"`
+		ClaimID int64 `bun:"decision_id"`
 		Issues  int   `bun:"issues"`
 	}
 	if err := readableBy(s.db.NewSelect().Model((*Decision)(nil)), subject, "de").
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		// Counted as the issues the rows are read as, so two names a report
 		// merged are one issue.
 		Join(finding.DecisionIssue).
 		ColumnExpr(`COUNT(DISTINCT "dv"."issue_id") AS "issues"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(order)).
-		GroupExpr(`"de"."claim_id"`).
+		Where(`"de"."decision_id" IN (?)`, bun.List(order)).
+		GroupExpr(`"de"."decision_id"`).
 		Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read what those claims cover: %w", err)
 	}
@@ -392,7 +392,7 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
 		Where(`"de"."product_id" <> ?`, productID).
 		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
-		Where(`"de"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"de"."occurrence_identity" IN (?)`, bun.List(places)).
 		Where(`"de"."state" = ?`, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Order("de.id DESC").Limit(int64(database.InBulk.Most)).Scan(ctx); err != nil {
@@ -516,7 +516,7 @@ func (s *Store) standingApprovals(ctx context.Context, claimIDs []int64) (map[in
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
-		Where(`"claim_id" IN (?)`, bun.List(claimIDs)).
+		Where(`"decision_id" IN (?)`, bun.List(claimIDs)).
 		Where(`"withdrawn_at" IS NULL`).
 		Order("id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who agreed: %w", err)

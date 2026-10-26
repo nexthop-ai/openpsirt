@@ -49,7 +49,7 @@ type Upgrade struct {
 	// ClaimID is the claim that argued for it, where one did. A citation:
 	// editing the commitment is editing what somebody agreed to, so it goes
 	// through the act that withdraws the agreement.
-	ClaimID    *int64    `bun:"claim_id"`
+	ClaimID    *int64    `bun:"decision_id"`
 	DeclaredBy int64     `bun:"declared_by,notnull"`
 	DeclaredAt time.Time `bun:"declared_at,notnull"`
 }
@@ -87,10 +87,10 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		Where(inThisProduct, productID)
 	if claimID != nil {
 		remove = remove.WhereGroup(" AND ", func(q *bun.DeleteQuery) *bun.DeleteQuery {
-			return q.Where(`"claim_id" IS NULL`).WhereOr(`"claim_id" = ?`, *claimID)
+			return q.Where(`"decision_id" IS NULL`).WhereOr(`"decision_id" = ?`, *claimID)
 		})
 	} else {
-		remove = remove.Where(`"claim_id" IS NULL`)
+		remove = remove.Where(`"decision_id" IS NULL`)
 	}
 	if len(wanted) > 0 {
 		remove = remove.Where(`"target_id" NOT IN (?)`, bun.List(wanted))
@@ -362,7 +362,7 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 	if _, err := db.NewUpdate().Model((*Upgrade)(nil)).
 		Set(`"to_version" = ?`, to).
 		Set(`"committed_to" = ?`, by).
-		Set(`"claim_id" = ?`, claimID).
+		Set(`"decision_id" = ?`, claimID).
 		Where(`"fold_key" = ?`, fold).Where(`"target_id" = ?`, targetID).Exec(ctx); err != nil {
 		return fmt.Errorf("change what this release is moving to: %w", err)
 	}

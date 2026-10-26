@@ -16,7 +16,7 @@ import (
 
 // samePlace matches two rows compared by place identity, in either order, with
 // or without quotes around either side, capturing both aliases.
-var samePlace = regexp.MustCompile(`"?(\w+)"?\."?place_identity"?\s*=\s*"?(\w+)"?\."?place_identity\b`)
+var samePlace = regexp.MustCompile(`"?(\w+)"?\."?occurrence_identity"?\s*=\s*"?(\w+)"?\."?occurrence_identity\b`)
 
 // decidedIssue matches a finding's issue compared with the issue a decision is
 // read as, in either order.
@@ -102,11 +102,11 @@ func correlationsSpelledOut(name, source string) []correlation {
 
 func TestTheDetectorFindsACorrelationSpelledOut(t *testing.T) {
 	spelled := []string{
-		"AND de.place_identity = f.place_identity",
-		"AND f.place_identity = de.place_identity",
-		"AND f2.place_identity = de.place_identity",
-		`ON "pd".place_identity = f.place_identity`,
-		`AND "fc"."place_identity" = "de"."place_identity"`,
+		"AND de.occurrence_identity = f.occurrence_identity",
+		"AND f.occurrence_identity = de.occurrence_identity",
+		"AND f2.occurrence_identity = de.occurrence_identity",
+		`ON "pd".occurrence_identity = f.occurrence_identity`,
+		`AND "fc"."occurrence_identity" = "de"."occurrence_identity"`,
 		"AND dv.issue_id = f.vulnerability_id",
 		"WHERE fc.vulnerability_id = dv.issue_id",
 		`ON "pf"."vulnerability_id" = "dv"."issue_id"`,
@@ -122,7 +122,7 @@ func TestTheDetectorFindsACorrelationSpelledOut(t *testing.T) {
 		"ColumnExpr(`dv.issue_id AS \"vulnerability_id\"`)",
 		`JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`,
 		`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "ri"."issue_id"`,
-		`Where("de.place_identity IN (?)", bun.List(identities))`,
+		`Where("de.occurrence_identity IN (?)", bun.List(identities))`,
 	}
 	for _, line := range composed {
 		if got := correlationsSpelledOut("b.go", line); len(got) != 0 {

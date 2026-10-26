@@ -22,7 +22,7 @@ import (
 // waitingClaim is whether a claim at the place of the finding under "f", in
 // the product bound, waits for a second person. A lead somebody has already
 // judged is not work for the next person to take.
-var waitingClaim = `EXISTS (SELECT 1 FROM "decision" AS "dc"
+var waitingClaim = `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 	WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL
 	  AND ` + finding.DecisionFiledAt("dc", "f") + `
 	  AND "dc"."state" = '` + string(triage.Proposed) + `'
@@ -59,7 +59,7 @@ func LeadAssignees() []string { return []string{finding.HeldByNobody} }
 // QueueRow is one lead in a product: its place, and what the newest of its
 // findings in the scope says about it.
 type QueueRow struct {
-	Place    string    `bun:"place_identity"`
+	Place    string    `bun:"occurrence_identity"`
 	Rule     string    `bun:"rule"`
 	Path     string    `bun:"path"`
 	Line     *int      `bun:"start_line"`
@@ -165,7 +165,7 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		Leads   int   `bun:"leads"`
 	}
 	if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding()).
-		ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."place_identity") AS "leads"`).
+		ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."occurrence_identity") AS "leads"`).
 		GroupExpr(`"l"."stands", "l"."awaits", "l"."covered"`).
 		Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("count the leads of product %d: %w", scope.ProductID, err)
@@ -180,33 +180,33 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		}
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
-		ColumnExpr(`COUNT(DISTINCT "l"."place_identity")`).Scan(ctx, &out.Total); err != nil {
+		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &out.Total); err != nil {
 		return nil, fmt.Errorf("count the leads listed in product %d: %w", scope.ProductID, err)
 	}
 	if want == "" && len(ended) > 0 {
 		var all int
 		if err := queued(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
-			ColumnExpr(`COUNT(DISTINCT "l"."place_identity")`).Scan(ctx, &all); err != nil {
+			ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &all); err != nil {
 			return nil, fmt.Errorf("count the leads of product %d past their end of life: %w", scope.ProductID, err)
 		}
 		out.Ended = all - out.Total
 	}
 
 	var page []struct {
-		Place  string    `bun:"place_identity"`
+		Place  string    `bun:"occurrence_identity"`
 		Newest int64     `bun:"newest"`
 		Builds int       `bun:"builds"`
 		Opened time.Time `bun:"opened"`
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
-		ColumnExpr(`"l"."place_identity", MAX("l"."id") AS "newest"`).
+		ColumnExpr(`"l"."occurrence_identity", MAX("l"."id") AS "newest"`).
 		// Builds rather than rows: a lead fixed, seen again and fixed again
 		// on one build is two closed rows there.
 		ColumnExpr(`COUNT(DISTINCT "l"."target_id") AS "builds", MIN("l"."opened_at") AS "opened"`).
-		GroupExpr(`"l"."place_identity"`).
+		GroupExpr(`"l"."occurrence_identity"`).
 		OrderExpr(`MAX("l"."tier") DESC, MAX("l"."corroborated") DESC`).
 		OrderExpr(`MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
-		OrderExpr(`MIN("l"."opened_at") DESC, "l"."place_identity" ASC`).
+		OrderExpr(`MIN("l"."opened_at") DESC, "l"."occurrence_identity" ASC`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &page); err != nil {
 		return nil, fmt.Errorf("read the leads of product %d: %w", scope.ProductID, err)
@@ -227,7 +227,7 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"f"."place_identity", "vu"."identifier" AS "rule"`).
+		ColumnExpr(`"f"."occurrence_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
 		ColumnExpr(`"s"."name" AS "stream", "va"."name" AS "variant", "f"."assigned_to"`).
 		// A finding has one sighting, and its last run is the run the evidence
@@ -271,7 +271,7 @@ func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []acc
 		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
 		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
-		ColumnExpr(`"f"."id", "f"."place_identity", "f"."target_id", "f"."opened_at", "si"."series_id", "t"."stream_id"`).
+		ColumnExpr(`"f"."id", "f"."occurrence_identity", "f"."target_id", "f"."opened_at", "si"."series_id", "t"."stream_id"`).
 		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 		ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
 		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
@@ -281,7 +281,7 @@ func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []acc
 		ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
 		Where(`"s"."product_id" = ?`, scope.ProductID).
 		Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
-			WHERE "fo"."place_identity" = "f"."place_identity" AND "fo"."target_id" = "f"."target_id"
+			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."target_id" = "f"."target_id"
 			  AND "fo"."closed_at" IS NULL))`).
 		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		Where(kinds, kindArgs...)

@@ -36,15 +36,15 @@ func States() []State {
 // finding under "f", in the product bound: one somebody agreed to, or one
 // that waits on nobody and was not sent back. A claim waiting for a second
 // person answers nothing yet.
-var standingOutcome = `(SELECT MAX("sc"."outcome") FROM "decision" AS "dc"
-	JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"
+var standingOutcome = `(SELECT MAX("sc"."outcome") FROM "decision_occurrence" AS "dc"
+	JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"
 	WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL
 	  AND ` + finding.DecisionFiledAt("dc", "f") + `
 	  AND ("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL)))`
 
 // handedOff is whether the lead under "f" in the product bound was handed off.
 var handedOff = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-	WHERE "lh"."product_id" = ? AND "lh"."place_identity" = "f"."place_identity")`
+	WHERE "lh"."product_id" = ? AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // stateOf is the state of the finding under "f", whose sighting is under
 // "si", in the product bound, as an expression, with

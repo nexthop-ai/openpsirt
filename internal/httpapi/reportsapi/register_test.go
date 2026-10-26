@@ -211,11 +211,11 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 		// and this is about the shape of the row rather than about who may
 		// add one.
 		if _, err := r.DB.DB.NewRaw(
-			`INSERT INTO "claim_approval"
-				("claim_id", "revision_id", "approved_by", "approved_at")
-			 SELECT "claim_id", "revision_id", "approved_by", "approved_at"
-			 FROM "claim_approval"
-			 WHERE "claim_id" = (SELECT "claim_id" FROM "decision" WHERE "id" = ?)`,
+			`INSERT INTO "decision_approval"
+				("decision_id", "revision_id", "approved_by", "approved_at")
+			 SELECT "decision_id", "revision_id", "approved_by", "approved_at"
+			 FROM "decision_approval"
+			 WHERE "decision_id" = (SELECT "decision_id" FROM "decision_occurrence" WHERE "id" = ?)`,
 			ids[0]).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

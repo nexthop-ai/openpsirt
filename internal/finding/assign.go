@@ -811,20 +811,20 @@ type Owned struct {
 
 // leadPlace is the place of the finding under "f" where it is a lead, and
 // the empty string for any other kind.
-const leadPlace = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."place_identity" ELSE '' END`
+const leadPlace = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
 
 // notHandedOff is whether the finding under "f", in the product of the
 // stream under "st", is no lead handed off as a flaw. A handed-off lead is
 // closed work for its holder: its flaw is held and listed as itself.
 const notHandedOff = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
-	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."place_identity" = "f"."place_identity")`
+	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // notHandedOffIn is notHandedOff over the finding under "f" alone, in the
 // product its build is in, for a statement that joins no stream.
 const notHandedOffIn = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 	JOIN "stream" AS "hs" ON "hs"."product_id" = "lh"."product_id"
 	JOIN "target" AS "ht" ON "ht"."stream_id" = "hs"."id"
-	WHERE "ht"."id" = "f"."target_id" AND "lh"."place_identity" = "f"."place_identity")`
+	WHERE "ht"."id" = "f"."target_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // pieceOfWork is what one piece of work held is grouped by, over the finding
 // under "f" and its stream under "st": an issue in a component in a product,

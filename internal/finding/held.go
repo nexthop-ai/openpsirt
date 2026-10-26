@@ -22,7 +22,7 @@ type heldFinding struct {
 	VulnerabilityID    int64      `bun:"vulnerability_id"`
 	ComponentID        int64      `bun:"component_id"`
 	ConsumerID         *int64     `bun:"consumer_id"`
-	PlaceIdentity      string     `bun:"place_identity"`
+	PlaceIdentity      string     `bun:"occurrence_identity"`
 	FixState           FixState   `bun:"fix_state"`
 	FixedIn            string     `bun:"fixed_in"`
 	FixedAt            *time.Time `bun:"fixed_at"`

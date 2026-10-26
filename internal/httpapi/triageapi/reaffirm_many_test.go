@@ -108,11 +108,11 @@ func TestOneActReAffirmsSeveralLapsedClaims(t *testing.T) {
 			// Each keeps its own justification: the reason is shared and the
 			// argument is not.
 			var was, now string
-			if err := r.DB.DB.NewSelect().Table("claim").Column("justification").
+			if err := r.DB.DB.NewSelect().Table("decision").Column("justification").
 				Where(`"id" = ?`, one.PreviousClaimID).Scan(t.Context(), &was); err != nil {
 				t.Fatal(err)
 			}
-			if err := r.DB.DB.NewSelect().Table("claim").Column("justification").
+			if err := r.DB.DB.NewSelect().Table("decision").Column("justification").
 				Where(`"id" = ?`, one.ClaimID).Scan(t.Context(), &now); err != nil {
 				t.Fatal(err)
 			}
@@ -186,7 +186,7 @@ func TestReAffirmingManyRefusesAClaimSomebodyElseMade(t *testing.T) {
 		if !strings.Contains(body, "CVE-2026-CURL1") || !strings.Contains(body, "CVE-2026-CURL2") {
 			t.Errorf("the refusal does not name the issues: %s", body)
 		}
-		written, err := r.DB.DB.NewSelect().Table("decision").
+		written, err := r.DB.DB.NewSelect().Table("decision_occurrence").
 			Where(`"state" <> ?`, "lapsed").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -293,8 +293,8 @@ func TestAClaimLapsesWhenItsIssueIsRatedWorseHere(t *testing.T) {
 		states := map[int64]string{}
 		for _, claim := range []int64{unreachable, absent} {
 			var state string
-			if err := r.DB.DB.NewSelect().Table("decision").Column("state").
-				Where(`"claim_id" = ?`, claim).Limit(1).Scan(t.Context(), &state); err != nil {
+			if err := r.DB.DB.NewSelect().Table("decision_occurrence").Column("state").
+				Where(`"decision_id" = ?`, claim).Limit(1).Scan(t.Context(), &state); err != nil {
 				t.Fatal(err)
 			}
 			states[claim] = state
@@ -366,10 +366,10 @@ func TestALapsedClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testi
 		if err := json.Unmarshal(made.Body.Bytes(), &their); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := r.DB.DB.NewUpdate().Table("decision").
+		if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"state" = ?`, "lapsed").Set(`"ended_at" = ?`, time.Now().UTC()).
 			Set(`"live_key" = NULL`).
-			Where(`"claim_id" = ?`, their.ClaimID).Exec(ctx); err != nil {
+			Where(`"decision_id" = ?`, their.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -439,7 +439,7 @@ func TestReAffirmingAPromiseTakesNoCap(t *testing.T) {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 		var promise int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"claim" AS "cl"`).ColumnExpr(`"cl"."id"`).
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "cl"`).ColumnExpr(`"cl"."id"`).
 			Where(`"cl"."outcome" = ?`, "upgrade-needed").Limit(1).Scan(t.Context(), &promise); err != nil {
 			t.Fatal(err)
 		}
@@ -511,7 +511,7 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 		r.AgreedAt(t, place, `{"outcome":"deferred","deferred_until":"2030-01-01",`+
 			`"reasoning":"Held until the next point release."}`)
 		var previous int64
-		if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr(`MAX("id")`).
+		if err := r.DB.DB.NewSelect().Table("decision_occurrence").ColumnExpr(`MAX("id")`).
 			Scan(ctx, &previous); err != nil {
 			t.Fatal(err)
 		}

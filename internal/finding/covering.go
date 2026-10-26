@@ -119,9 +119,9 @@ func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility,
 			AND "de"."state" = 'approved'
 			AND "de"."live_key" IS NOT NULL
 			AND "de"."visibility" IN (?)
-			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "claim" AS "mc"
-				WHERE "mc"."id" = "de"."claim_id")`), productID, bun.List(visible)).
-		Join(`LEFT JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id" AND ` + coveringOutcomes(reader)).
+			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "decision" AS "mc"
+				WHERE "mc"."id" = "de"."decision_id")`), productID, bun.List(visible)).
+		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id" AND ` + coveringOutcomes(reader)).
 		ColumnExpr(`MIN("cl"."outcome") AS "outcome"`).
 		ColumnExpr(`MIN("de"."id") AS "decided_by"`).
 		Where(`"f"."closed_at" IS NULL`)
@@ -164,9 +164,9 @@ func WhollyAffected(q *bun.SelectQuery, productID int64, visible []access.Visibi
 			AND `+standing+`
 			AND "de"."live_key" IS NOT NULL
 			AND "de"."visibility" IN (?)
-			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "claim" AS "mc"
-				WHERE "mc"."id" = "de"."claim_id")`), bound...).
-		Join(`LEFT JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id" AND "cl"."outcome" IN (` +
+			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "decision" AS "mc"
+				WHERE "mc"."id" = "de"."decision_id")`), bound...).
+		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id" AND "cl"."outcome" IN (` +
 			strings.Join(quoted, ", ") + `)`).
 		ColumnExpr(`MIN("cl"."outcome") AS "least"`).
 		ColumnExpr(`MAX("cl"."outcome") AS "greatest"`).
@@ -213,8 +213,8 @@ func StatedBy(ctx context.Context, db bun.IDB, decisions []int64) (map[int64]Sta
 	}
 	where, args := database.InAnyOf(`"de"."id"`, decisions)
 	if err := db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"de"."id" AS "id"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		ColumnExpr(`COALESCE("cl"."justification", '') AS "justification"`).

@@ -22,10 +22,10 @@ import (
 // telling that build apart from the ones it was made on is what the record is
 // for.
 type MadeOn struct {
-	bun.BaseModel `bun:"table:claim_build,alias:cb"`
+	bun.BaseModel `bun:"table:decision_build,alias:cb"`
 
 	ID       int64 `bun:"id,pk,autoincrement"`
-	ClaimID  int64 `bun:"claim_id,notnull"`
+	ClaimID  int64 `bun:"decision_id,notnull"`
 	TargetID int64 `bun:"target_id,notnull"`
 }
 
@@ -70,7 +70,7 @@ func madeOnOf(ctx context.Context, db bun.IDB, claims []int64) (map[int64][]int6
 		return out, nil
 	}
 	var rows []MadeOn
-	where, args := database.InAnyOf(`"cb"."claim_id"`, claims)
+	where, args := database.InAnyOf(`"cb"."decision_id"`, claims)
 	if err := db.NewSelect().Model(&rows).Where(where, args...).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the builds a claim was made on: %w", err)
 	}

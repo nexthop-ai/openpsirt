@@ -127,8 +127,8 @@ func TestTheEffortTotalCountsPastThePage(t *testing.T) {
 		r.Claimed(t, "private-triage", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
 		// A judgment whose place no longer holds anything, which is a row of
 		// its own: the time went somewhere, whatever is there now.
-		if _, err := r.DB.DB.NewUpdate().Table("decision").
-			Set(`"place_identity" = ?`, "gone").
+		if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
+			Set(`"occurrence_identity" = ?`, "gone").
 			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-1000").Exec(ctx); err != nil {
 			t.Fatal(err)

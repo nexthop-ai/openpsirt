@@ -88,8 +88,8 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		ProductName   string     `bun:"product_name"`
 		Vulnerability string     `bun:"vulnerability"`
 		Severity      string     `bun:"severity"`
-		PlaceIdentity string     `bun:"place_identity"`
-		ClaimID       int64      `bun:"claim_id"`
+		PlaceIdentity string     `bun:"occurrence_identity"`
+		ClaimID       int64      `bun:"decision_id"`
 		ProposedAt    time.Time  `bun:"proposed_at"`
 		DeferredUntil time.Time  `bun:"deferred_until"`
 		State         State      `bun:"state"`
@@ -111,7 +111,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		// deferring holds.
 		Join(rating.For(rating.OnDecision)).
 		// The argument, which is where the outcome and the date live.
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		// Grouped on the product's identifier and the issue's, with the names
 		// carried along as labels. Only the product's name is unique, and it
 		// is not the one anybody reads, so two products a catalog displays
@@ -122,8 +122,8 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
-		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"de"."proposed_at" AS "proposed_at"`).
 		ColumnExpr(`"cl"."deferred_until" AS "deferred_until"`).
 		ColumnExpr(`"de"."state" AS "state"`).

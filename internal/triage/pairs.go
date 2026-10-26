@@ -55,12 +55,12 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 	// Ordering the two within the statement needs the lesser and greater of
 	// two values, which the four engines spell differently.
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`"ap"."approved_by" AS "approved_by"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
 		Where(`"de"."proposed_at" >= ?`, since).
@@ -74,10 +74,10 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 		Claims    int   `bun:"claims"`
 	}
 	err = s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision_approval" AS "ap" ON "ap"."decision_id" = "de"."decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
 		Where(`"de"."proposed_at" >= ?`, since).

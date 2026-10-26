@@ -147,7 +147,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 	err = placeColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
-		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, placeIdentity).
 		Where(Decidable).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
@@ -246,23 +246,23 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 
 	var rows []struct {
 		VulnerabilityID int64      `bun:"vulnerability_id"`
-		PlaceIdentity   string     `bun:"place_identity"`
+		PlaceIdentity   string     `bun:"occurrence_identity"`
 		DueAt           *time.Time `bun:"due_at"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
-		Where(`"f"."place_identity" IN (?)`, bun.List(identities)).
+		Where(`"f"."occurrence_identity" IN (?)`, bun.List(identities)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."due_at" IS NOT NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"f"."vulnerability_id", "f"."place_identity"`).
+		GroupExpr(`"f"."vulnerability_id", "f"."occurrence_identity"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the deadline this covers: %w", err)
 	}
@@ -377,7 +377,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		ComponentID     int64  `bun:"component_id"`
 		TargetID        int64  `bun:"target_id"`
-		PlaceIdentity   string `bun:"place_identity"`
+		PlaceIdentity   string `bun:"occurrence_identity"`
 		Consumer        string `bun:"consumer"`
 		FixedIn         string `bun:"fixed_in"`
 	}
@@ -386,7 +386,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
@@ -411,7 +411,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// fold it names in the builds asked about, so a source package named
 		// in two builds at two versions moves both.
 		Where(FoldedOn+` IN (?)`, bun.List(folds)).
-		OrderExpr(`"f"."vulnerability_id", "f"."component_id", "f"."target_id", "place_identity"`)
+		OrderExpr(`"f"."vulnerability_id", "f"."component_id", "f"."target_id", "occurrence_identity"`)
 	err = query.Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where that bump would reach: %w", err)
@@ -485,16 +485,16 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 
 	var rows []struct {
 		placeRow
-		PlaceIdentity string `bun:"place_identity"`
+		PlaceIdentity string `bun:"occurrence_identity"`
 		Consumer      string `bun:"consumer"`
 		FixedIn       string `bun:"fixed_in"`
 	}
 	err = placeColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
 		Apply(inFoldOf(targetID, vulnerabilityID, componentID, visible)).
-		OrderExpr(`consumer, "place_identity", component_upstream, consumer_upstream`).
+		OrderExpr(`consumer, "occurrence_identity", component_upstream, consumer_upstream`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where this sits: %w", err)

@@ -265,9 +265,9 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 		// Four weeks pass, moved here rather than waited for, and then it is
 		// taken back. Withdrawing needs nobody, so the whole loop is one
 		// person's.
-		if _, err := f.db.DB.NewUpdate().Table("decision").
+		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"proposed_at" = ?`, time.Now().UTC().Add(-28*24*time.Hour)).
-			Where(`"claim_id" = ?`, first.ClaimID).Exec(ctx); err != nil {
+			Where(`"decision_id" = ?`, first.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {

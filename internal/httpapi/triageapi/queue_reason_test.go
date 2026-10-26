@@ -51,7 +51,7 @@ func TestAMissedFixDateFileSaysWhichDateWasMissed(t *testing.T) {
 			t.Fatalf("recording a backport answered %d: %s", got.Code, got.Body.String())
 		}
 		missed := time.Now().UTC().AddDate(0, 0, -3).Truncate(24 * time.Hour)
-		if _, err := r.DB.DB.NewUpdate().Table("claim").
+		if _, err := r.DB.DB.NewUpdate().Table("decision").
 			Set(`"committed_to" = ?`, missed).
 			Where(`"outcome" = ?`, "patch-needed").Exec(t.Context()); err != nil {
 			t.Fatal(err)

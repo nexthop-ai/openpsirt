@@ -179,7 +179,7 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	whole.decidedIssues = f.placedIssues
 	population := whole.narrowRows(rows).
 		ColumnExpr(`"f"."id" AS "id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`)
 	for _, key := range keys {
 		population = population.ColumnExpr(key.expr+` AS "`+key.name+`"`, key.args...)

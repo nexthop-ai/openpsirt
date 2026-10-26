@@ -66,7 +66,7 @@ func TestALeadLeftInATeamsQueueIsToldToTheMembersWhoReadIt(t *testing.T) {
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
 			Set(`"assigned_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
-			Where(`"place_identity" = ?`, place).Exec(t.Context()); err != nil {
+			Where(`"occurrence_identity" = ?`, place).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		told := queueNotices(t, r, "internal-reader")

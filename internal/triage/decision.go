@@ -24,12 +24,12 @@ import (
 
 // Decision is one claim about one combination of code.
 type Decision struct {
-	bun.BaseModel `bun:"table:decision,alias:de"`
+	bun.BaseModel `bun:"table:decision_occurrence,alias:de"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
 	// ClaimID is the action this row was written by, which is what the
 	// queue lists and what an approver agrees to.
-	ClaimID int64 `bun:"claim_id,notnull"`
+	ClaimID int64 `bun:"decision_id,notnull"`
 	// FromStatement is the VEX statement this was started from, where one
 	// was. A citation and never an application: what a publisher said is
 	// not our judgment, and what this records is that somebody read it
@@ -38,7 +38,7 @@ type Decision struct {
 	FromStatement   *int64            `bun:"from_statement_id"`
 	ProductID       int64             `bun:"product_id,notnull"`
 	VulnerabilityID int64             `bun:"vulnerability_id,notnull"`
-	PlaceIdentity   string            `bun:"place_identity,notnull"`
+	PlaceIdentity   string            `bun:"occurrence_identity,notnull"`
 	Visibility      access.Visibility `bun:"visibility,notnull"`
 	// The versions the claim was made against. Absent where nothing states
 	// one, and absent for the consumer where the thing above is the product
@@ -88,7 +88,7 @@ type Decision struct {
 	// deliberate: plenty of readers want only where a judgment lands and when
 	// it stops applying, and a zero-valued argument standing in for one nobody
 	// fetched would read as an outcome nobody chose.
-	Claim *Claim `bun:"rel:belongs-to,join:claim_id=id"`
+	Claim *Claim `bun:"rel:belongs-to,join:decision_id=id"`
 }
 
 // Revision is one statement of the reasoning behind a claim.
@@ -97,10 +97,10 @@ type Decision struct {
 // argument. A copy per place is a copy that can be revised on its own, which
 // left forty-three rows saying the old thing under a claim that read as agreed.
 type Revision struct {
-	bun.BaseModel `bun:"table:claim_revision,alias:dr"`
+	bun.BaseModel `bun:"table:decision_revision,alias:dr"`
 
 	ID        int64     `bun:"id,pk,autoincrement"`
-	ClaimID   int64     `bun:"claim_id,notnull"`
+	ClaimID   int64     `bun:"decision_id,notnull"`
 	Ordinal   int64     `bun:"ordinal,notnull"`
 	Body      string    `bun:"body,notnull"`
 	WrittenBy int64     `bun:"written_by,notnull"`
@@ -109,10 +109,10 @@ type Revision struct {
 
 // Approval is a second person agreeing to one revision of a claim's reasoning.
 type Approval struct {
-	bun.BaseModel `bun:"table:claim_approval,alias:da"`
+	bun.BaseModel `bun:"table:decision_approval,alias:da"`
 
 	ID          int64      `bun:"id,pk,autoincrement"`
-	ClaimID     int64      `bun:"claim_id,notnull"`
+	ClaimID     int64      `bun:"decision_id,notnull"`
 	RevisionID  int64      `bun:"revision_id,notnull"`
 	ApprovedBy  int64      `bun:"approved_by,notnull"`
 	ApprovedAt  time.Time  `bun:"approved_at,notnull"`

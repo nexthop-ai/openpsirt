@@ -96,7 +96,7 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 			var rows []int64
 			q := tx.NewSelect().TableExpr(finding.Decisions).
 				ColumnExpr(`"de"."id"`).
-				Where(`"de"."claim_id" = ?`, group.ClaimID).
+				Where(`"de"."decision_id" = ?`, group.ClaimID).
 				Where(`"de"."product_id" = ?`, group.ProductID).
 				Where(`"de"."vulnerability_id" = ?`, group.VulnerabilityID).
 				Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
@@ -176,7 +176,7 @@ func coversSomething(q *bun.SelectQuery) *bun.SelectQuery {
 // ratedWorseGroup is the standing rows of one claim about one issue in one
 // product that share a baseline, with the rating in force there now.
 type ratedWorseGroup struct {
-	ClaimID         int64   `bun:"claim_id"`
+	ClaimID         int64   `bun:"decision_id"`
 	ProductID       int64   `bun:"product_id"`
 	VulnerabilityID int64   `bun:"vulnerability_id"`
 	Outcome         string  `bun:"outcome"`
@@ -193,11 +193,11 @@ type ratedWorseGroup struct {
 func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([]ratedWorseGroup, error) {
 	q := tx.NewSelect().
 		TableExpr(finding.Decisions).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		// Rated as the issue the decision is read as.
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		Join(rating.For(rating.OnDecision)).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
@@ -209,7 +209,7 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Apply(coversSomething).
-		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."vulnerability_id", "cl"."outcome", ` +
+		GroupExpr(`"de"."decision_id", "de"."product_id", "de"."vulnerability_id", "cl"."outcome", ` +
 			`"cl"."justification", "de"."severity_centi", "v"."severity", "ir"."severity", "v"."score_centi"`)
 	if where.ProductID > 0 {
 		q = q.Where(`"de"."product_id" = ?`, where.ProductID)

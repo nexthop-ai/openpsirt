@@ -37,7 +37,7 @@ const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)
 // later rows are of a kind the outer query already reads.
 const LatestAtItsPlace = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 	WHERE "lt"."target_id" = "f"."target_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
-	  AND "lt"."place_identity" = "f"."place_identity" AND "lt"."kind" = "f"."kind"
+	  AND "lt"."occurrence_identity" = "f"."occurrence_identity" AND "lt"."kind" = "f"."kind"
 	  AND "lt"."id" > "f"."id")`
 
 // Decidable says a finding `f` is one somebody may decide about: open, or
@@ -299,7 +299,7 @@ func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
 
 	var rows []struct {
 		VulnerabilityID int64  `bun:"vulnerability_id"`
-		PlaceIdentity   string `bun:"place_identity"`
+		PlaceIdentity   string `bun:"occurrence_identity"`
 		Component       string `bun:"component"`
 		Consumer        string `bun:"consumer"`
 		Outcome         string `bun:"outcome"`
@@ -308,9 +308,9 @@ func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
 	issues, ids := database.InAnyOf(`"dv"."issue_id"`, issueIDs)
 	q := db.NewSelect().
 		TableExpr(Decisions).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
-		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "component"`).
 		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).

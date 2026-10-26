@@ -384,8 +384,8 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 		// Every row stands, not the first of them. One agreement is an
 		// agreement to a claim's words, so it takes effect on all of them
 		// together or the act is half decided.
-		standing, err := r.DB.DB.NewSelect().Table("decision").
-			Where(`"claim_id" = ?`, restored.ClaimID).Where(`"state" = ?`, "approved").
+		standing, err := r.DB.DB.NewSelect().Table("decision_occurrence").
+			Where(`"decision_id" = ?`, restored.ClaimID).Where(`"state" = ?`, "approved").
 			Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -395,8 +395,8 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 				standing, len(restored.Decisions))
 		}
 		// And the agreement is recorded once, not once per row.
-		carried, err := r.DB.DB.NewSelect().Table("claim_approval").
-			Where(`"claim_id" = ?`, restored.ClaimID).Count(t.Context())
+		carried, err := r.DB.DB.NewSelect().Table("decision_approval").
+			Where(`"decision_id" = ?`, restored.ClaimID).Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}

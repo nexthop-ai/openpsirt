@@ -662,7 +662,7 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 		f.foundOnLibnl(t)
 		var scanned []string
 		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr(`"f"."place_identity"`).
+			ColumnExpr(`"f"."occurrence_identity"`).
 			Where(`"f"."target_id" = ?`, f.target).
 			Where(`"f"."kind" = ?`, finding.Vulnerable).
 			Scan(ctx, &scanned); err != nil {

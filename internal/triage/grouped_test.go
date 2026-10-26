@@ -37,8 +37,8 @@ func TestAGroupedClaimReadsItsPlacesInTheTransactionItWritesIn(t *testing.T) {
 			t.Fatal("the places were never asked for")
 		}
 		var rows []triage.Decision
-		if err := f.db.DB.NewSelect().Model(&rows).Where(`"claim_id" = ?`, decided.ClaimID).
-			Order("place_identity").Scan(ctx); err != nil {
+		if err := f.db.DB.NewSelect().Model(&rows).Where(`"decision_id" = ?`, decided.ClaimID).
+			Order("occurrence_identity").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if len(rows) != 2 || rows[0].PlaceIdentity != also.PlaceIdentity || rows[1].PlaceIdentity != first.Place.PlaceIdentity {

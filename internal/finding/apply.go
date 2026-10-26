@@ -999,7 +999,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		kinds, kindArgs := kind.Closure.Where(`"kind"`)
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
-				"place_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
+				"occurrence_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
 			// The range again outside the two arms: a membership test under OR
 			// is never a semi-join on PostgreSQL or MySQL, so without it the
 			// read walks every finding in the deployment.
@@ -1010,7 +1010,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.
 					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."component_id", "lf"."consumer_id"`)).
-					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."place_identity"`))
+					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."occurrence_identity"`))
 			}).
 			// Ascending, so the last row read at a place is its latest.
 			OrderExpr(`"id" ASC`).

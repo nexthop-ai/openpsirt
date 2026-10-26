@@ -170,9 +170,9 @@ func TestAClaimCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 		// does, and what is being pinned is the comparison rather than the
 		// route by which the two came apart.
 		if _, err := r.DB.DB.NewUpdate().
-			Table("claim_approval").
+			Table("decision_approval").
 			Set(`"covered" = ?`, len(ids)-1).
-			Where(`"claim_id" = ?`, claim).
+			Where(`"decision_id" = ?`, claim).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

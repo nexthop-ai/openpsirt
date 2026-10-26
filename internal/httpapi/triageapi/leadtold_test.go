@@ -36,8 +36,8 @@ func TestRowsOfALeadClaimSetAsideAreToldToAProposerWhoReadsOnlyInternalWork(t *t
 		decided := decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the length is checked by the caller"}`)
 		var aside int64
-		if err := r.DB.DB.NewSelect().Table("decision").Column("id").
-			Where(`"place_identity" = ?`, kin[0]).Where(`"claim_id" = ?`, decided.ClaimID).
+		if err := r.DB.DB.NewSelect().Table("decision_occurrence").Column("id").
+			Where(`"occurrence_identity" = ?`, kin[0]).Where(`"decision_id" = ?`, decided.ClaimID).
 			Scan(t.Context(), &aside); err != nil {
 			t.Fatal(err)
 		}

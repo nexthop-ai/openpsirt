@@ -92,7 +92,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			TableExpr(finding.Decisions).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 			// The argument, which is where an outcome lives.
-			Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+			Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 			// The judgment's subject, reached through the findings at the
 			// place — the same correlation the record's own component filter
 			// makes. A judgment about something since removed matches nothing and
@@ -125,17 +125,17 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
 		ColumnExpr(`COALESCE("pc"."name", '') AS "component"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "claims"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."id") AS "decisions"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."proposed_by") AS "people"`).
 		// The upgrades that came out of them, each counted as claims: the
 		// outcome is the claim's, and counting its rows would weigh a judgment
 		// by how far its component happens to fan out.
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."claim_id" END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."decision_id" END)`+
 			` AS "promised"`, bun.List([]Outcome{UpgradeNeeded, PatchNeeded})).
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."claim_id" END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."decision_id" END)`+
 			` AS "dismissed"`, bun.List(OutcomesDismissing())).
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" = ? THEN "de"."claim_id" END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" = ? THEN "de"."decision_id" END)`+
 			` AS "deferred"`, Deferred).
 		// How many rows the question has, counted over the grouped result
 		// and before the limit. A total taken off the page reads a list cut

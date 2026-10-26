@@ -22,7 +22,7 @@ func TestTheIssueDocumentCountsOnlyTheJudgmentsInForceAsStanding(t *testing.T) {
 	httpapitest.ReachOn(t, httpapitest.CastSeed.Alone, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
 		taken, _ := r.DecidedAt(t, place)
-		if _, err := r.DB.DB.NewUpdate().Table("decision").
+		if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"state" = ?`, "withdrawn").Set(`"live_key" = NULL`).
 			Set(`"ended_at" = ?`, time.Now().UTC()).
 			Where(`"id" = ?`, taken).Exec(t.Context()); err != nil {

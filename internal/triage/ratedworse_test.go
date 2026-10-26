@@ -265,7 +265,7 @@ func TestASiblingClaimAtAnotherVersionReplacesNothing(t *testing.T) {
 		if second.ID < first.ID {
 			t.Fatal("the sibling was not written after the claim it stands beside")
 		}
-		if _, err := f.db.DB.NewUpdate().Table("decision").
+		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"state" = ?`, triage.LapsedState).Set(`"ended_at" = ?`, time.Now().UTC()).
 			Set(`"live_key" = NULL`).Where(`"id" = ?`, first.ID).Exec(ctx); err != nil {
 			t.Fatal(err)

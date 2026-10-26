@@ -51,7 +51,7 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	query := s.db.NewSelect().Model(decision).Relation("Claim").
 		Where(`"de"."product_id" = ?`, at.ProductID).
 		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
-		Where(`"de"."place_identity" = ?`, at.PlaceIdentity).
+		Where(`"de"."occurrence_identity" = ?`, at.PlaceIdentity).
 		// Approved, or proposed and never needing agreement, and not one
 		// that was sent back — asked of the one spelling rather than written
 		// out here. A copy of it here is a copy the next rule can miss, and
@@ -121,7 +121,7 @@ func (s *Store) PreviouslyAt(ctx context.Context, subject access.Subject, at Pla
 	if err := readableBy(s.db.NewSelect().Model(&previous).Relation("Claim"), subject, "de").
 		Where(`"de"."product_id" = ?`, at.ProductID).
 		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
-		Where(`"de"."place_identity" = ?`, at.PlaceIdentity).
+		Where(`"de"."occurrence_identity" = ?`, at.PlaceIdentity).
 		Order("de.id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided here before: %w", err)
 	}
@@ -154,7 +154,7 @@ func (s *Store) Revisions(ctx context.Context, subject access.Subject, claimID i
 	}
 	var revisions []Revision
 	if err := s.db.NewSelect().Model(&revisions).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, claimID).
 		Order("ordinal ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the reasoning: %w", err)
 	}
@@ -169,7 +169,7 @@ func (s *Store) Approvals(ctx context.Context, subject access.Subject, claimID i
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
-		Where(`"claim_id" = ?`, claimID).
+		Where(`"decision_id" = ?`, claimID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who agreed: %w", err)
 	}
@@ -306,7 +306,7 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 	// the claim. An EXISTS rather than a join, so that counting the page and
 	// reading it narrow identically without one of them multiplying rows.
 	saying := func(q *bun.SelectQuery, clause string, values ...any) *bun.SelectQuery {
-		return q.Where(`EXISTS (SELECT 1 FROM "claim" AS "fc" WHERE "fc"."id" = "de"."claim_id" AND `+
+		return q.Where(`EXISTS (SELECT 1 FROM "decision" AS "fc" WHERE "fc"."id" = "de"."decision_id" AND `+
 			clause+`)`, values...)
 	}
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -329,7 +329,7 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 			// beside the OR, PostgreSQL probes the claim once for every
 			// decision in the product: 170 ms to count 133,000 decisions,
 			// against 22 ms with the set built once.
-			q = q.Where(`("de"."state" = ? OR "de"."claim_id" IN (SELECT "fc"."id" FROM "claim" AS "fc" `+
+			q = q.Where(`("de"."state" = ? OR "de"."decision_id" IN (SELECT "fc"."id" FROM "decision" AS "fc" `+
 				`WHERE "fc"."deferred_until" IS NOT NULL AND "fc"."deferred_until" <= ?))`,
 				LapsedState, s.now())
 		}

@@ -587,7 +587,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	// The argument, which is where the outcome and the promise live: one act
 	// is one argument, and the rows underneath say where it lands.
 	ranked := s.db.NewSelect().
-		TableExpr(`"claim" AS "cl"`).
+		TableExpr(`"decision" AS "cl"`).
 		ColumnExpr(`"cl"."id" AS "id"`).
 		ColumnExpr(promiseRank+` * ? + "cl"."id" AS "promise"`, promiseSpan).
 		Where(`"cl"."outcome" = ?`, OutcomeUpgradeNeeded)
@@ -596,13 +596,13 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	// issue and place, so a place under two promises is still one place.
 	promises := s.db.NewSelect().
 		TableExpr(Decisions).
-		Join(`JOIN (?) AS "rk" ON "rk"."id" = "de"."claim_id"`, ranked).
+		Join(`JOIN (?) AS "rk" ON "rk"."id" = "de"."decision_id"`, ranked).
 		ColumnExpr(`"dv"."issue_id" AS "issue_id"`).
-		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`MAX("rk"."promise") AS "promise"`).
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."live_key" IS NOT NULL`).
-		GroupExpr(`"dv"."issue_id", "de"."place_identity"`)
+		GroupExpr(`"dv"."issue_id", "de"."occurrence_identity"`)
 	folds, foldOf, foldArgs := held.folds(`"pf"."component_id"`)
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	perFix := s.db.NewSelect().
@@ -616,7 +616,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX("pd"."promise") AS "promise"`).
-		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd"."issue_id"`, `"pd"."place_identity"`, "f"), promises).
+		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd"."issue_id"`, `"pd"."occurrence_identity"`, "f"), promises).
 		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -853,7 +853,7 @@ func (s *Store) promisesNamed(ctx context.Context, standing map[foldIn]int64) (m
 		UpgradeTo   string     `bun:"upgrade_to"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`"claim" AS "cl"`).
+		TableExpr(`"decision" AS "cl"`).
 		ColumnExpr(`"cl"."id" AS "id"`).
 		ColumnExpr(`"cl"."committed_to" AS "committed_to"`).
 		ColumnExpr(`COALESCE("cl"."upgrade_to", '') AS "upgrade_to"`).

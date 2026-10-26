@@ -472,7 +472,7 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 			}
 		}
 		reads("a correction waiting beside an agreed claim", "not-applicable")
-		if _, err := f.db.DB.NewUpdate().Table("decision").Set(`"state" = ?`, "approved").
+		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").Set(`"state" = ?`, "approved").
 			Where(`"live_key" = ?`, "anywhere").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

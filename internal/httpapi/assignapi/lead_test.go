@@ -488,7 +488,7 @@ func handedOffHeld(t *testing.T, move bool) {
 				AssignedTo *int64 `bun:"assigned_to"`
 			}
 			if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).Column("assigned_to").
-				Where(`"place_identity" = ?`, place).Limit(1).Scan(t.Context(), &held); err != nil {
+				Where(`"occurrence_identity" = ?`, place).Limit(1).Scan(t.Context(), &held); err != nil {
 				t.Fatal(err)
 			}
 			return held.AssignedTo

@@ -44,7 +44,7 @@ func alsoOnV1(t *testing.T, r *httpapitest.Reach, place string) {
 	}
 	other := r.TargetOf(t, httpapitest.Build{Product: "mine", Stream: "v1", Variant: "broadcom"})
 	var lead finding.Finding
-	if err := r.DB.DB.NewSelect().Model(&lead).Where(`"f"."place_identity" = ?`, place).
+	if err := r.DB.DB.NewSelect().Model(&lead).Where(`"f"."occurrence_identity" = ?`, place).
 		Where(`"f"."closed_at" IS NULL`).Limit(1).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -58,8 +58,8 @@ func alsoOnV1(t *testing.T, r *httpapitest.Reach, place string) {
 func decisionsAt(t *testing.T, r *httpapitest.Reach, place string) int {
 	t.Helper()
 	var n int
-	if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr("COUNT(*)").
-		Where(`"place_identity" = ?`, place).Scan(t.Context(), &n); err != nil {
+	if err := r.DB.DB.NewSelect().Table("decision_occurrence").ColumnExpr("COUNT(*)").
+		Where(`"occurrence_identity" = ?`, place).Scan(t.Context(), &n); err != nil {
 		t.Fatal(err)
 	}
 	return n
@@ -192,9 +192,9 @@ func TestAReaffirmationRemakesAClaimOnlyAtLeadsStillInSupport(t *testing.T) {
 			t.Fatalf("the claim reached its kin %d times; want once, so this checks nothing", got)
 		}
 		lapsed := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
-		if _, err := r.DB.DB.NewUpdate().TableExpr(`"decision"`).
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"state" = ?`, triage.LapsedState).Set(`"live_key" = ?`, nil).Set(`"ended_at" = ?`, lapsed).
-			Where(`"claim_id" = ?`, decided.ClaimID).Exec(t.Context()); err != nil {
+			Where(`"decision_id" = ?`, decided.ClaimID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		// The leak is also on a release still in support, and its kin only on

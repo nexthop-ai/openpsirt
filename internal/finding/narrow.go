@@ -751,8 +751,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// A condition on a row: a place either held one of the claim's rows
 		// or did not, so a group keeps the places that did.
 		where, args := f.product()
-		held := `EXISTS (SELECT 1 FROM "decision" AS "dc"
-			WHERE "dc"."claim_id" = ?
+		held := `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
+			WHERE "dc"."decision_id" = ?
 			  AND "dc"."product_id" = ` + where + `
 			  AND ` + DecisionFiledAt("dc", "f")
 		asked := append([]any{f.Claim}, args...)

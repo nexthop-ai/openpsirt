@@ -79,7 +79,7 @@ func (f *fixture) datedPast(t *testing.T, ships *shipping, identity string,
 			t.Fatal(err)
 		}
 	}
-	if _, err := f.db.DB.NewUpdate().Table("claim").
+	if _, err := f.db.DB.NewUpdate().Table("decision").
 		Set(column+" = ?", past).
 		Where(`"id" = ?`, made.ClaimID).Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -247,7 +247,7 @@ func TestMovingAPromisedPatchIsGatedByTheDeadlineOfWhatItCovers(t *testing.T) {
 			t.Helper()
 			var rows []triage.Decision
 			if err := f.db.DB.NewSelect().Model(&rows).
-				Where(`"de"."claim_id" = ?`, patch.ClaimID).Scan(ctx); err != nil {
+				Where(`"de"."decision_id" = ?`, patch.ClaimID).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if len(rows) == 0 {
@@ -304,7 +304,7 @@ func TestAnExpiredDeferralWithARowTheReaderMayNotDecideIsNotOfferedToThem(t *tes
 			}
 			// A date already gone is refused when written, so it is moved
 			// into the past after.
-			if _, err := f.db.DB.NewUpdate().Table("claim").
+			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"deferred_until" = ?`, time.Now().UTC().Add(-time.Hour)).
 				Where(`"id" = ?`, recorded[0].ClaimID).Exec(ctx); err != nil {
 				t.Fatal(err)

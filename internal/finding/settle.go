@@ -21,7 +21,7 @@ type liveDecision struct {
 	ID              int64     `bun:"id"`
 	ProductID       int64     `bun:"product_id"`
 	VulnerabilityID int64     `bun:"vulnerability_id"`
-	Place           string    `bun:"place_identity"`
+	Place           string    `bun:"occurrence_identity"`
 	Component       *string   `bun:"component_upstream_version"`
 	Consumer        *string   `bun:"consumer_upstream_version"`
 	State           string    `bun:"state"`
@@ -47,12 +47,12 @@ func (d liveDecision) outranks(other liveDecision) bool {
 // SupersededDecision is a live decision a merge took out of force because another
 // live decision stood at the same place under the other name.
 type SupersededDecision struct {
-	bun.BaseModel `bun:"table:decision_superseded,alias:ds"`
+	bun.BaseModel `bun:"table:decision_occurrence_superseded,alias:ds"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
 	// DecisionID is the decision that lapsed and StandingID the one that stands
 	// in its place.
-	DecisionID int64 `bun:"decision_id,notnull"`
+	DecisionID int64 `bun:"decision_occurrence_id,notnull"`
 	StandingID int64 `bun:"standing_id,notnull"`
 	MergeID    int64 `bun:"merge_id,notnull"`
 	// Disagreed is whether the two said different things. A disagreement is
@@ -104,9 +104,9 @@ const (
 func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int64, now time.Time) error {
 	var live []liveDecision
 	if err := v.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
-		ColumnExpr(`"de"."id", "de"."product_id", "de"."vulnerability_id", "de"."place_identity"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		ColumnExpr(`"de"."id", "de"."product_id", "de"."vulnerability_id", "de"."occurrence_identity"`).
 		ColumnExpr(`"de"."component_upstream_version", "de"."consumer_upstream_version"`).
 		ColumnExpr(`"de"."state", "de"."proposed_at", "cl"."outcome"`).
 		Where(FiledUnder(filed.DecisionIssue), kept).
@@ -144,7 +144,7 @@ func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int
 		}
 		key := LiveKey(d.ProductID, kept, d.Place, orBlank(d.Component), orBlank(d.Consumer),
 			d.anyVersion())
-		if _, err := v.db.NewUpdate().TableExpr(`"decision"`).
+		if _, err := v.db.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"live_key" = ?`, key).
 			Where(`"id" = ?`, d.ID).Exec(ctx); err != nil {
 			return fmt.Errorf("hold decision %d under the issue it is read as: %w", d.ID, err)
@@ -208,7 +208,7 @@ func (v *Vulnerabilities) supersede(ctx context.Context, set []liveDecision, mer
 		if d.ID == winner.ID {
 			continue
 		}
-		if _, err := v.db.NewUpdate().TableExpr(`"decision"`).
+		if _, err := v.db.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"state" = ?`, "lapsed").
 			Set(`"ended_at" = ?`, now).
 			Set(`"live_key" = NULL`).

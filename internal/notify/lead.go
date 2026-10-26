@@ -116,7 +116,7 @@ func leadNamed(ctx context.Context, db bun.IDB, productID int64, place string) (
 		ColumnExpr(`"st"."name" AS "stream_name"`).
 		ColumnExpr(`"va"."name" AS "variant_name"`).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(`"f"."place_identity" = ?`, place).
+		Where(`"f"."occurrence_identity" = ?`, place).
 		Where(`"f"."kind" = ?`, kind.Analysis).
 		OrderExpr(`(CASE WHEN "f"."closed_at" IS NULL THEN 0 ELSE 1 END), "f"."id" DESC`).
 		Limit(1).

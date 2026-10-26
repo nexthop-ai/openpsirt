@@ -24,7 +24,7 @@ func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, decisions in
 	if err != nil {
 		t.Fatal(err)
 	}
-	decisions, err = f.db.DB.NewSelect().TableExpr(`"decision"`).
+	decisions, err = f.db.DB.NewSelect().TableExpr(`"decision_occurrence"`).
 		Where(`"vulnerability_id" = ?`, issue).
 		Where(`"visibility" = ?`, access.Private).Count(t.Context())
 	if err != nil {
@@ -69,7 +69,7 @@ func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.decided(t, who.ID, issue, places[0].PlaceIdentity, "proposed", "1.0", "")
-		if _, err := f.db.DB.NewUpdate().TableExpr(`"decision"`).
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"visibility" = ?`, access.Private).
 			Where(`"vulnerability_id" = ?`, issue).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -282,7 +282,7 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 		if err != nil || private != 1 {
 			t.Errorf("the other product's finding is undisclosed %d times (%v), want once", private, err)
 		}
-		private, err = f.db.DB.NewSelect().TableExpr(`"decision"`).
+		private, err = f.db.DB.NewSelect().TableExpr(`"decision_occurrence"`).
 			Where(`"product_id" = ?`, other).
 			Where(`"visibility" = ?`, access.Private).Count(ctx)
 		if err != nil || private != 1 {

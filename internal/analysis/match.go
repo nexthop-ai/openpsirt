@@ -333,9 +333,9 @@ func handedVisibility(ctx context.Context, db bun.IDB, productID int64, places [
 		batch := places[start:min(start+database.BatchSize, len(places))]
 		var rows []finding.Handoff
 		if err := db.NewSelect().Model(&rows).
-			Column("lh.place_identity", "lh.visibility").
+			Column("lh.occurrence_identity", "lh.visibility").
 			Where(`"lh"."product_id" = ?`, productID).
-			Where(`"lh"."place_identity" IN (?)`, bun.List(batch)).
+			Where(`"lh"."occurrence_identity" IN (?)`, bun.List(batch)).
 			Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read which of the leads were handed off: %w", err)
 		}

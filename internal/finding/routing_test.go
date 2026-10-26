@@ -637,7 +637,7 @@ func TestARulePreviewCountsEachLeadItWouldPlace(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		leadsAt(t, f)
 		leads, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			ColumnExpr(`DISTINCT "vulnerability_id", "place_identity"`).
+			ColumnExpr(`DISTINCT "vulnerability_id", "occurrence_identity"`).
 			Where(`"kind" = ?`, "analysis").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -704,7 +704,7 @@ func TestARoutingRulePlacesNoHandedOffLead(t *testing.T) {
 		// places of the vulnerabilities they were made from.
 		lead.PlaceIdentity = "lead-handed-off"
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set(`"place_identity" = ?`, lead.PlaceIdentity).Where(`"id" = ?`, lead.ID).Exec(ctx); err != nil {
+			Set(`"occurrence_identity" = ?`, lead.PlaceIdentity).Where(`"id" = ?`, lead.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		person, err := access.NewStore(f.db.DB).Ensure(ctx, "hander@example.com", "Hander", nil, nil)

@@ -63,7 +63,7 @@ func (s *matchedStatements) matching(prefix string) (count int, matched int64) {
 // place, for comparing two builds.
 type written struct {
 	Identifier       string     `bun:"identifier"`
-	PlaceIdentity    string     `bun:"place_identity"`
+	PlaceIdentity    string     `bun:"occurrence_identity"`
 	Urgency          int64      `bun:"urgency"`
 	Exploited        bool       `bun:"urgency_exploited"`
 	Shipped          bool       `bun:"urgency_shipped"`
@@ -88,7 +88,7 @@ func (f *fixture) writtenIn(t *testing.T, target int64) map[[2]string]written {
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		ColumnExpr(`"v"."identifier" AS "identifier"`).
-		ColumnExpr(`"f"."place_identity", "f"."urgency", "f"."urgency_exploited", "f"."urgency_shipped"`).
+		ColumnExpr(`"f"."occurrence_identity", "f"."urgency", "f"."urgency_exploited", "f"."urgency_shipped"`).
 		ColumnExpr(`"f"."fix_state", "f"."fixed_in", "f"."fixed_at", "f"."matched", "f"."matched_from"`).
 		ColumnExpr(`"f"."matched_in", "f"."matched_range", "f"."suppressed_by", "f"."stated_by", "f"."claimed_by"`).
 		ColumnExpr(`"f"."exploited_learned_at"`).

@@ -46,22 +46,22 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 			refusal     error
 			act         func(context.Context) error
 		}{
-			{"reading a claim whole", "claim", triage.ErrNotTheirs,
+			{"reading a claim whole", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Whole(ctx, f.triager, claimed.ClaimID)
 					return err
 				}},
-			{"reading a claim's revisions", "claim", triage.ErrNotTheirs,
+			{"reading a claim's revisions", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Revisions(ctx, f.triager, claimed.ClaimID)
 					return err
 				}},
-			{"reading a decision", "decision", triage.ErrNotTheirs,
+			{"reading a decision", "decision_occurrence", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, _, err := f.store.Read(ctx, f.triager, claimed.ID)
 					return err
 				}},
-			{"re-making a decision", "decision", triage.ErrNotTheirs,
+			{"re-making a decision", "decision_occurrence", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 						PreviousID: claimed.ID, Place: f.at(),
@@ -69,7 +69,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 					})
 					return err
 				}},
-			{"re-making a claim", "claim", triage.ErrNotTheirs,
+			{"re-making a claim", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.ReaffirmClaim(ctx, f.triager, triage.ReaffirmingClaim{
 						PreviousClaimID: claimed.ClaimID, Reasoning: "Still true.",
@@ -77,7 +77,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 					})
 					return err
 				}},
-			{"carrying a claim to another place", "claim", triage.ErrNotTheirs,
+			{"carrying a claim to another place", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Extend(ctx, f.triager, claimed.ClaimID, []triage.Proposal{{
 						Place: another, Outcome: triage.NotApplicable,
@@ -86,12 +86,12 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 					}})
 					return err
 				}},
-			{"changing a comment", "claim_comment", triage.ErrNotTheirs,
+			{"changing a comment", "decision_comment", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Reword(ctx, f.triager, said.ID, "Checked twice.")
 					return err
 				}},
-			{"reading what a comment said before", "claim_comment", triage.ErrNotTheirs,
+			{"reading what a comment said before", "decision_comment", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Earlier(ctx, f.triager, said.ID)
 					return err

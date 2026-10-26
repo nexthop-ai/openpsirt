@@ -279,7 +279,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 	standing, held := InForce()
 	answeredKinds, answeredArgs := kind.Statistics.Where(`"f2"."kind"`)
 	answered := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f2"`).
 		Where(DecisionAtPlace("f2")).

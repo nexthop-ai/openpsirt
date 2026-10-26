@@ -261,9 +261,9 @@ func TestALeadDismissalStandingWithNobodyAgreeingIsCountedWhateverItsFlagSays(t 
 				decided := decideLead(t, r, httpapitest.SeededLead(t, r), outcome)
 				// Standing, and cleared of the gate's flag, which is the write
 				// path got around.
-				if _, err := r.DB.DB.NewUpdate().Table("decision").
+				if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 					Set(`"state" = ?`, triage.Approved).Set(`"needs_approval" = ?`, false).
-					Where(`"claim_id" = ?`, decided.ClaimID).Exec(t.Context()); err != nil {
+					Where(`"decision_id" = ?`, decided.ClaimID).Exec(t.Context()); err != nil {
 					t.Fatal(err)
 				}
 				claims, rows, err := triage.NewStore(r.DB.DB).HiddenWithNobodyAgreeing(t.Context())

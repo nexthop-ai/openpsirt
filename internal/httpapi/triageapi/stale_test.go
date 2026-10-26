@@ -121,7 +121,7 @@ func TestADeferralIsSaidBeforeItEndsRatherThanAfter(t *testing.T) {
 		// Moved to inside the lead time. Written to the row rather than
 		// proposed again, because what is being tested is the sweep's reading
 		// of the date and not the form that sets it.
-		if _, err := r.DB.DB.NewUpdate().Table("claim").
+		if _, err := r.DB.DB.NewUpdate().Table("decision").
 			Set(`"deferred_until" = ?`, soon).
 			Where(`"id" = ?`, claim).Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -147,7 +147,7 @@ func TestADeferralIsSaidBeforeItEndsRatherThanAfter(t *testing.T) {
 		// Past its date it is not "ending" any more — it has ended, and the
 		// finding is back in the queue, which is a different thing to say.
 		gone := time.Now().UTC().AddDate(0, 0, -1).Format(time.DateOnly)
-		if _, err := r.DB.DB.NewUpdate().Table("claim").
+		if _, err := r.DB.DB.NewUpdate().Table("decision").
 			Set(`"deferred_until" = ?`, gone).
 			Where(`"id" = ?`, claim).Exec(t.Context()); err != nil {
 			t.Fatal(err)

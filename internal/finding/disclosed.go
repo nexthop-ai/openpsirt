@@ -192,7 +192,7 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 		Exec(ctx); err != nil {
 		return fmt.Errorf("disclose the findings: %w", err)
 	}
-	if _, err := db.NewUpdate().TableExpr(`"decision"`).
+	if _, err := db.NewUpdate().TableExpr(`"decision_occurrence"`).
 		Set(`"visibility" = ?`, access.Public).
 		Where(`"product_id" = ?`, productID).
 		// Every decision about the issue, including those filed under an

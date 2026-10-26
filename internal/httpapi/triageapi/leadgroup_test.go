@@ -275,13 +275,13 @@ func TestALeadOfAGroupNobodyMayReadIsNotDecided(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, kin := besideTheLeak(t, r, 4)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").Set(`"visibility" = 'private'`).
-			Where(`"place_identity" = ?`, kin[0]).Exec(t.Context()); err != nil {
+			Where(`"occurrence_identity" = ?`, kin[0]).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
 		var decided int
-		if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr("COUNT(*)").
-			Where(`"place_identity" = ?`, kin[0]).Scan(t.Context(), &decided); err != nil {
+		if err := r.DB.DB.NewSelect().Table("decision_occurrence").ColumnExpr("COUNT(*)").
+			Where(`"occurrence_identity" = ?`, kin[0]).Scan(t.Context(), &decided); err != nil {
 			t.Fatal(err)
 		}
 		if decided != 0 {
@@ -294,7 +294,7 @@ func TestALeadOfAGroupThatIsFixedIsNotDecided(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, kin := besideTheLeak(t, r, 4)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").Set(`"closed_at" = ?`, time.Now().UTC()).
-			Where(`"place_identity" = ?`, kin[0]).Exec(t.Context()); err != nil {
+			Where(`"occurrence_identity" = ?`, kin[0]).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
@@ -302,8 +302,8 @@ func TestALeadOfAGroupThatIsFixedIsNotDecided(t *testing.T) {
 			t.Errorf("the overflow fixed is %q; want it fixed still", got)
 		}
 		var decided int
-		if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr("COUNT(*)").
-			Where(`"place_identity" = ?`, kin[0]).Scan(t.Context(), &decided); err != nil {
+		if err := r.DB.DB.NewSelect().Table("decision_occurrence").ColumnExpr("COUNT(*)").
+			Where(`"occurrence_identity" = ?`, kin[0]).Scan(t.Context(), &decided); err != nil {
 			t.Fatal(err)
 		}
 		if decided != 0 {

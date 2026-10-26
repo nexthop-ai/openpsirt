@@ -102,7 +102,7 @@ func standsAs(product string, state decisionState) string {
 			JOIN "component" AS "c" ON "c"."id" = "f2"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f2"."consumer_id"
 			JOIN (` + Decisions + `) ON ` + DecisionAtPlace("f2") + `
-			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 			WHERE "f2"."id" = "f"."id"
 			  AND "de"."product_id" = ` + product + `
 			  AND ` + coversHere + state.condition + `)`
@@ -118,7 +118,7 @@ func standsAs(product string, state decisionState) string {
 // checks.
 func decidedAs(product string, state decisionState) string {
 	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM ` + Decisions + `
-			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 			WHERE ` + DecisionAt(product) + `
 			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`
 }
@@ -173,11 +173,11 @@ func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
 // names. The caller groups it.
 func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQuery {
 	return q.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(DecisionIssue).
 		Join(`CROSS JOIN `+source, args...).
 		Where(DecisionAtPlace("f2")).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(coversAsked)
 }
 

@@ -79,7 +79,7 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			// Withheld where either decision is: the one that stands is what
 			// the link opens, and the one that lapsed is what the message
 			// is about.
-			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de" `+
+			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "decision_occurrence" AS "de" `+
 				`WHERE "de"."id" IN (?, ?) AND "de"."visibility" <> ?) THEN 1 ELSE 0 END AS "private"`,
 				one.RecordID, one.StandingID, string(access.Public))
 		} else {

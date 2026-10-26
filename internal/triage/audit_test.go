@@ -182,14 +182,14 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 		var revision struct {
 			ID int64 `bun:"id"`
 		}
-		if err := f.db.DB.NewSelect().TableExpr(`"claim_revision" AS "dr"`).
-			ColumnExpr(`"dr"."id" AS "id"`).Where(`"dr"."claim_id" = ?`, claimed.ClaimID).
+		if err := f.db.DB.NewSelect().TableExpr(`"decision_revision" AS "dr"`).
+			ColumnExpr(`"dr"."id" AS "id"`).Where(`"dr"."decision_id" = ?`, claimed.ClaimID).
 			Order("dr.id DESC").Limit(1).Scan(ctx, &revision); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.db.DB.NewInsert().TableExpr(`"claim_approval"`).
+		if _, err := f.db.DB.NewInsert().TableExpr(`"decision_approval"`).
 			Model(&map[string]any{
-				"claim_id":    claimed.ClaimID,
+				"decision_id": claimed.ClaimID,
 				"revision_id": revision.ID,
 				"approved_by": f.proposer,
 				"approved_at": time.Now().UTC().Truncate(time.Microsecond),
@@ -430,7 +430,7 @@ func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.db.DB.NewUpdate().Table("claim").
+			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"deferred_until" = ?`, past).
 				Where(`"id" = ?`, made.ClaimID).Exec(ctx); err != nil {
 				t.Fatal(err)

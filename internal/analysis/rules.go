@@ -392,7 +392,7 @@ func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		Join(`JOIN "target" AS "t" ON "t"."stream_id" = "s"."id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."target_id" = "t"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		ColumnExpr(`"lr"."id", COUNT(DISTINCT "f"."place_identity") AS "leads"`).
+		ColumnExpr(`"lr"."id", COUNT(DISTINCT "f"."occurrence_identity") AS "leads"`).
 		Where(`"lr"."product_id" = ?`, productID).
 		Where(`"lr"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).

@@ -30,7 +30,7 @@ func TestAPromiseAcrossBuildsIsOnePromisesDateAndVersion(t *testing.T) {
 			by        time.Time
 		}{{"CVE-2026-1", "1.9", june}, {"CVE-2026-2", "1.10", march}} {
 			claim := claimSaying(t, f.db, somebody, "upgrade-needed")
-			if _, err := f.db.DB.NewUpdate().Table("claim").
+			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"committed_to" = ?`, one.by).Set(`"upgrade_to" = ?`, one.to).
 				Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
@@ -88,7 +88,7 @@ func TestThePromiseThatStandsNamesAVersionThenADateThenTheLatestThenTheLaterClai
 				promise := func(issue string, one said) {
 					t.Helper()
 					claim := claimSaying(t, f.db, somebody, "upgrade-needed")
-					if _, err := f.db.DB.NewUpdate().Table("claim").
+					if _, err := f.db.DB.NewUpdate().Table("decision").
 						Set(`"committed_to" = ?`, one.by).Set(`"upgrade_to" = ?`, one.to).
 						Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 						t.Fatal(err)
@@ -137,7 +137,7 @@ func TestAPlaceUnderTwoPromisesIsCountedOnce(t *testing.T) {
 		june := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
 		for _, version := range []string{libnl.Version, "3.6.0"} {
 			claim := claimSaying(t, f.db, somebody, "upgrade-needed")
-			if _, err := f.db.DB.NewUpdate().Table("claim").
+			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"committed_to" = ?`, june).Set(`"upgrade_to" = ?`, "3.9.0").
 				Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)

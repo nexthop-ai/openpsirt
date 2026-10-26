@@ -119,8 +119,8 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 
 	// The code moves under them, which is what a lapse is.
 	r.CurlMovedTo(t, "8.6.0")
-	lapsed, err := r.DB.DB.NewSelect().Table("decision").
-		Where(`"claim_id" = ?`, made.ClaimID).Where(`"state" = ?`, "lapsed").Count(ctx)
+	lapsed, err := r.DB.DB.NewSelect().Table("decision_occurrence").
+		Where(`"decision_id" = ?`, made.ClaimID).Where(`"state" = ?`, "lapsed").Count(ctx)
 	if err != nil || lapsed != 2 {
 		t.Fatalf("%d rows of the claim lapsed (err %v), want both", lapsed, err)
 	}
@@ -219,8 +219,8 @@ func (r *Reach) Rated(t *testing.T, severity string) int64 {
 func (r *Reach) StateOfClaim(t *testing.T, claim int64) string {
 	t.Helper()
 	var state string
-	if err := r.DB.DB.NewSelect().Table("decision").Column("state").
-		Where(`"claim_id" = ?`, claim).Limit(1).Scan(t.Context(), &state); err != nil {
+	if err := r.DB.DB.NewSelect().Table("decision_occurrence").Column("state").
+		Where(`"decision_id" = ?`, claim).Limit(1).Scan(t.Context(), &state); err != nil {
 		t.Fatal(err)
 	}
 	return state
@@ -308,9 +308,9 @@ func (r *Reach) StandsOn(t *testing.T, vulnerability string) (string, string) {
 // days is tested without waiting days.
 func (r *Reach) Aged(t *testing.T, claim int64, column string, when time.Time) {
 	t.Helper()
-	if _, err := r.DB.DB.NewUpdate().Table("decision").
+	if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 		Set(column+" = ?", when).
-		Where(`"claim_id" = ?`, claim).Exec(t.Context()); err != nil {
+		Where(`"decision_id" = ?`, claim).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }

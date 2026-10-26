@@ -162,7 +162,7 @@ func SeededLead(t *testing.T, r *Reach) string {
 	}
 	ApplyRun(t, r, time.Now().UTC().Add(-2*time.Hour), LeadRun(true))
 	var place string
-	if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."place_identity"`).
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
 		Where(`"f"."kind" = ?`, kind.Analysis).Scan(ctx, &place); err != nil {
 		t.Fatal(err)
 	}

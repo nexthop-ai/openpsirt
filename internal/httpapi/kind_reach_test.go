@@ -85,8 +85,8 @@ func TestAVersionMovingLapsesNoDecisionAboutALead(t *testing.T) {
 		asKind(t, r, "CVE-2026-CURL1", "analysis", "public")
 		r.CurlMovedTo(t, "8.6.0")
 		lapsed := func(claim int64) int {
-			n, err := r.DB.DB.NewSelect().Table("decision").
-				Where(`"claim_id" = ?`, claim).Where(`"state" = ?`, "lapsed").Count(t.Context())
+			n, err := r.DB.DB.NewSelect().Table("decision_occurrence").
+				Where(`"decision_id" = ?`, claim).Where(`"state" = ?`, "lapsed").Count(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -291,7 +291,7 @@ func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
 			t.Fatalf("the queue holds %d with one lead seeded, so this checks nothing", got)
 		}
 		for _, other := range []string{"vulnerability", "entered"} {
-			r.PatchedRows(t, `UPDATE "finding" SET "kind" = '`+other+`' WHERE "place_identity" = '`+place+`'`)
+			r.PatchedRows(t, `UPDATE "finding" SET "kind" = '`+other+`' WHERE "occurrence_identity" = '`+place+`'`)
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
 				t.Errorf("the evidence of a finding of kind %s answered %d: %s", other, got.Code, got.Body)
 			}

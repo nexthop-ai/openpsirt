@@ -38,7 +38,7 @@ func TestALeadOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 			}
 			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 				Set(`"kind" = ?`, "analysis").Set(`"visibility" = ?`, visibility).
-				Set(`"place_identity" = ?`, "lead-1").
+				Set(`"occurrence_identity" = ?`, "lead-1").
 				Where(`"id" = ?`, id).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}

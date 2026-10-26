@@ -303,7 +303,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		// triage store writes one: keyed on the version shipping here, live.
 		record := func(state string, needsApproval bool, outcome string, until *time.Time, version string) {
 			t.Helper()
-			if _, err := f.db.DB.NewDelete().Table("decision").
+			if _, err := f.db.DB.NewDelete().Table("decision_occurrence").
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -311,7 +311,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			// is one argument, and this row says where it lands.
 			claimID := claimSaying(t, f.db, somebody, outcome)
 			if until != nil {
-				if _, err := f.db.DB.NewUpdate().TableExpr("\"claim\"").
+				if _, err := f.db.DB.NewUpdate().TableExpr("\"decision\"").
 					Set(`"deferred_until" = ?`, until.UTC()).
 					Where(`"id" = ?`, claimID).Exec(ctx); err != nil {
 					t.Fatalf("record when it defers to: %v", err)
@@ -370,7 +370,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		// standing, and while it is returned nobody is relying on it.
 		sendBack := func() {
 			t.Helper()
-			if _, err := f.db.DB.NewUpdate().TableExpr("\"decision\"").
+			if _, err := f.db.DB.NewUpdate().TableExpr("\"decision_occurrence\"").
 				Set(`"sent_back_at" = ?`, time.Now().UTC()).
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatalf("send the claim back: %v", err)

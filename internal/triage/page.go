@@ -59,7 +59,7 @@ func (s *Store) pageClaims(ctx context.Context, subject access.Subject,
 		return out, err
 	}
 	rowsOf := readableBy(s.db.NewSelect().Model(&out.Rows).Relation("Claim").
-		Where(`"de"."claim_id" IN (?)`, bun.List(out.Order)), subject, "de")
+		Where(`"de"."decision_id" IN (?)`, bun.List(out.Order)), subject, "de")
 	if err := rowsOf.Order("de.id ASC").Scan(ctx); err != nil {
 		return out, fmt.Errorf("read %s: %w", what, err)
 	}
@@ -78,7 +78,7 @@ func (s *Store) claimsOn(ctx context.Context, claims func() *bun.SelectQuery,
 
 	var out claimPage
 	var page []struct {
-		ClaimID int64 `bun:"claim_id"`
+		ClaimID int64 `bun:"decision_id"`
 		Newest  int64 `bun:"newest"`
 		Total   int   `bun:"total"`
 	}
@@ -132,20 +132,20 @@ func (s *Store) claimSizes(ctx context.Context, subject access.Subject, ids []in
 	what string) (map[int64]claimSize, error) {
 
 	var counted []struct {
-		ClaimID   int64 `bun:"claim_id"`
+		ClaimID   int64 `bun:"decision_id"`
 		Earliest  int64 `bun:"earliest"`
 		Decisions int   `bun:"decisions"`
 		Issues    int   `bun:"issues"`
 		Places    int   `bun:"places"`
 	}
 	if err := readableBy(s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`MIN("de"."id") AS "earliest"`).
 		ColumnExpr(`COUNT(*) AS "decisions"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."vulnerability_id") AS "issues"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."place_identity") AS "places"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
-		GroupExpr(`"de"."claim_id"`), subject, "de").Scan(ctx, &counted); err != nil {
+		ColumnExpr(`COUNT(DISTINCT "de"."occurrence_identity") AS "places"`).
+		Where(`"de"."decision_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"de"."decision_id"`), subject, "de").Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read %s: %w", what, err)
 	}
 	if len(counted) == 0 {

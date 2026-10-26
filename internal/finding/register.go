@@ -260,7 +260,7 @@ type registerRow struct {
 	Component     string     `bun:"component"`
 	Version       string     `bun:"version"`
 	Purl          string     `bun:"purl"`
-	Place         string     `bun:"place_identity"`
+	Place         string     `bun:"occurrence_identity"`
 	Consumer      string     `bun:"consumer"`
 	Outcome       string     `bun:"outcome"`
 	Justification string     `bun:"justification"`
@@ -396,7 +396,7 @@ func (s *Store) registerJoins(productID int64,
 		// any issue read as the finding's.
 		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
 			AND `+onTheRecordHere, productID).
-		Join(`LEFT JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`)
+		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`)
 }
 
 // onTheRecordHere picks, among every decision row ever written at a place,
@@ -416,26 +416,26 @@ func (s *Store) registerJoins(productID int64,
 // the one the finding's own screen names: the correction in force, and
 // otherwise the oldest.
 var onTheRecordHere = `(("de"."live_key" IS NOT NULL AND ` + keyMatchesOn("de", outcomeOf("de")) + `
-	AND NOT EXISTS (SELECT 1 FROM "decision" AS "d3"
+	AND NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "d3"
 		JOIN "vulnerability" AS "d3v" ON "d3v"."id" = "d3"."vulnerability_id"
 		WHERE "d3"."product_id" = "de"."product_id"
 		  AND "d3v"."issue_id" = "dv"."issue_id"
-		  AND "d3"."place_identity" = "de"."place_identity"
+		  AND "d3"."occurrence_identity" = "de"."occurrence_identity"
 		  AND "d3"."live_key" IS NOT NULL
 		  AND ` + keyMatchesOn("d3", outcomeOf("d3")) + `
 		  AND (` + rankOf("d3") + ` < ` + rankOf("de") + `
 		    OR (` + rankOf("d3") + ` = ` + rankOf("de") + ` AND "d3"."id" < "de"."id"))))
-	OR ("de"."state" = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision" AS "d2"
+	OR ("de"."state" = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "d2"
 		JOIN "vulnerability" AS "d2v" ON "d2v"."id" = "d2"."vulnerability_id"
 		WHERE "d2"."product_id" = "de"."product_id"
 		  AND "d2v"."issue_id" = "dv"."issue_id"
-		  AND "d2"."place_identity" = "de"."place_identity"
+		  AND "d2"."occurrence_identity" = "de"."occurrence_identity"
 		  AND (("d2"."live_key" IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
 		    OR ("d2"."state" = 'lapsed' AND "d2"."id" > "de"."id")))))`
 
 // outcomeOf is the outcome of a decision's claim, as a scalar.
 func outcomeOf(decision string) string {
-	return `(SELECT "clr"."outcome" FROM "claim" AS "clr" WHERE "clr"."id" = "` + decision + `"."claim_id")`
+	return `(SELECT "clr"."outcome" FROM "decision" AS "clr" WHERE "clr"."id" = "` + decision + `"."decision_id")`
 }
 
 // rankOf orders the live decisions at one place the way the finding's screen
@@ -469,7 +469,7 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"c"."version" AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		// A decision counts where it is live or where it lapsed. Lapsed is
 		// what happened to it and is part of the record; a superseded one is
@@ -485,19 +485,19 @@ func (s *Store) registerQuery(productID int64,
 		// finding it belongs to on a page whose total counts findings, so the
 		// page holds fewer findings than it says and every later offset skips
 		// some of the register.
-		ColumnExpr(onTheRecord + `COALESCE((SELECT "p2"."identity" FROM "claim_approval" AS "da2"
+		ColumnExpr(onTheRecord + `COALESCE((SELECT "p2"."identity" FROM "decision_approval" AS "da2"
 			JOIN "person" AS "p2" ON "p2"."id" = "da2"."approved_by"
-			WHERE "da2"."claim_id" = "de"."claim_id" AND "da2"."withdrawn_at" IS NULL
+			WHERE "da2"."decision_id" = "de"."decision_id" AND "da2"."withdrawn_at" IS NULL
 			ORDER BY "da2"."approved_at", "da2"."id" LIMIT 1), '') ELSE '' END AS "approved_by"`).
-		ColumnExpr(onTheRecord + `(SELECT MIN("da3"."approved_at") FROM "claim_approval" AS "da3"
-			WHERE "da3"."claim_id" = "de"."claim_id" AND "da3"."withdrawn_at" IS NULL)
+		ColumnExpr(onTheRecord + `(SELECT MIN("da3"."approved_at") FROM "decision_approval" AS "da3"
+			WHERE "da3"."decision_id" = "de"."decision_id" AND "da3"."withdrawn_at" IS NULL)
 			ELSE NULL END AS "approved_at"`).
 		// And whether that agreement was carried rather than given. The same
 		// row the identity above comes from, ordered the same way, so the two
 		// cannot describe different approvals.
 		ColumnExpr(onTheRecord + `COALESCE((SELECT CASE WHEN "da4"."carried_from" IS NULL THEN 0 ELSE 1 END
-			FROM "claim_approval" AS "da4"
-			WHERE "da4"."claim_id" = "de"."claim_id" AND "da4"."withdrawn_at" IS NULL
+			FROM "decision_approval" AS "da4"
+			WHERE "da4"."decision_id" = "de"."decision_id" AND "da4"."withdrawn_at" IS NULL
 			ORDER BY "da4"."approved_at", "da4"."id" LIMIT 1), 0) ELSE 0 END AS "agreement_carried"`).
 		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
 		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
@@ -515,7 +515,7 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`COALESCE("sr"."justification", '') AS "stated_why"`).
 		ColumnExpr(WordsColumn + ` AS "stated_words"`).
 		ColumnExpr(`COALESCE("sr"."document", '') AS "stated_file"`).
-		OrderExpr(`"v"."identifier", "c"."name", "f"."place_identity"`)
+		OrderExpr(`"v"."identifier", "c"."name", "f"."occurrence_identity"`)
 }
 
 // onTheRecord opens the case expression each of the decision's own columns is

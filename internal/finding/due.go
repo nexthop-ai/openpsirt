@@ -282,7 +282,7 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 		args = append(args, outcome)
 	}
 	return `EXISTS (SELECT 1 FROM ` + Decisions + `
-		JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+		JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 		WHERE ` + DecisionAt(product) + `
 		  AND ` + KeyMatches + `
 		  AND ` + standing + `

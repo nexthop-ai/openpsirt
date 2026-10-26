@@ -573,7 +573,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 // over a finding under "f": its place. A piece of work is an issue at a
 // component, and a lead is one place under its analyzer's rule, so two
 // results of one rule in one component are two pieces of work.
-const leadPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."place_identity" ELSE '' END`
+const leadPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
 
 // leadsInSupport leaves out of a query over findings under "f" every lead past
 // its end of life: one every release of the product it was seen in is past
@@ -590,7 +590,7 @@ func (s *Store) leadsInSupport(ctx context.Context, q *bun.SelectQuery, productI
 	return q.Where(`("f"."kind" <> ? OR EXISTS (SELECT 1 FROM "finding" AS "fs"
 		JOIN "target" AS "ts" ON "ts"."id" = "fs"."target_id"
 		JOIN "stream" AS "ss" ON "ss"."id" = "ts"."stream_id"
-		WHERE "fs"."place_identity" = "f"."place_identity" AND "fs"."kind" = ?
+		WHERE "fs"."occurrence_identity" = "f"."occurrence_identity" AND "fs"."kind" = ?
 		  AND "ss"."product_id" = ? AND "ts"."stream_id" NOT IN (?)))`,
 		kind.Analysis, kind.Analysis, productID, bun.List(ended)), nil
 }

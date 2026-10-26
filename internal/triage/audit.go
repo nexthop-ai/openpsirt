@@ -164,8 +164,8 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 		}
 		if len(f.Outcomes) > 0 {
 			// Asked of the claim, which is where what a judgment says lives.
-			q = q.Where(`EXISTS (SELECT 1 FROM "claim" AS "oc"`+
-				` WHERE "oc"."id" = "de"."claim_id" AND "oc"."outcome" IN (?))`, bun.List(f.Outcomes))
+			q = q.Where(`EXISTS (SELECT 1 FROM "decision" AS "oc"`+
+				` WHERE "oc"."id" = "de"."decision_id" AND "oc"."outcome" IN (?))`, bun.List(f.Outcomes))
 		}
 		if len(f.States) > 0 {
 			q = q.Where(`"de"."state" IN (?)`, bun.List(f.States))
@@ -194,8 +194,8 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 		// tests the rule rather than reading back an assertion about
 		// it.
 		if f.Alone {
-			q = q.Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
-				` WHERE "ex"."claim_id" = "de"."claim_id" AND "ex"."withdrawn_at" IS NULL` +
+			q = q.Where(`NOT EXISTS (SELECT 1 FROM "decision_approval" AS "ex"` +
+				` WHERE "ex"."decision_id" = "de"."decision_id" AND "ex"."withdrawn_at" IS NULL` +
 				` AND "ex"."approved_by" <> "de"."proposed_by")`)
 		}
 		if f.Proposer != "" {
@@ -206,9 +206,9 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 		// back did not approve this, and answering otherwise would make the
 		// withdrawal invisible to the one report that exists to find it.
 		if f.Approver != "" {
-			q = q.Where(`EXISTS (SELECT 1 FROM "claim_approval" AS "ap"`+
+			q = q.Where(`EXISTS (SELECT 1 FROM "decision_approval" AS "ap"`+
 				` JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`+
-				` WHERE "ap"."claim_id" = "de"."claim_id" AND "ap"."withdrawn_at" IS NULL`+
+				` WHERE "ap"."decision_id" = "de"."decision_id" AND "ap"."withdrawn_at" IS NULL`+
 				` AND "ape"."identity" = ?)`, f.Approver)
 		}
 		q = aboutTheSamePlaces(q, subject, f)
@@ -323,8 +323,8 @@ func (s *Store) agreedAndNamed(ctx context.Context, claims, proposers []int64) (
 	var approvals []Approval
 	if len(claims) > 0 {
 		if err := s.db.NewSelect().Model(&approvals).
-			Where(`"claim_id" IN (?)`, bun.List(claims)).
-			Order("claim_id ASC", "id ASC").Scan(ctx); err != nil {
+			Where(`"decision_id" IN (?)`, bun.List(claims)).
+			Order("decision_id ASC", "id ASC").Scan(ctx); err != nil {
 			return nil, nil, fmt.Errorf("read who agreed: %w", err)
 		}
 	}
@@ -424,7 +424,7 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		keys = append(keys, decision.ID)
 	}
 	var rows []struct {
-		DecisionID  int64  `bun:"decision_id"`
+		DecisionID  int64  `bun:"decision_occurrence_id"`
 		Issue       string `bun:"issue"`
 		Component   string `bun:"component"`
 		Version     string `bun:"version"`
@@ -433,12 +433,12 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		ProductName string `bun:"product_name"`
 	}
 	earliest := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(finding.DecisionIssue).
 		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionAtPlace("f2")).
 		Join(`JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"`).
 		Join(`JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"`).
-		ColumnExpr(`"de"."id" AS "decision_id"`).
+		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`MIN("f2"."id") AS "finding_id"`).
 		Where(`"st2"."product_id" = "de"."product_id"`).
 		Apply(ofKinds(kind.Decisions, "f2")).
@@ -453,7 +453,7 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		ColumnExpr(`"earliest"."decision_id" AS "decision_id"`).
+		ColumnExpr(`"earliest"."decision_occurrence_id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"v"."identifier" AS "issue"`).
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"c"."version" AS "version"`).

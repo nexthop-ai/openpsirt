@@ -390,7 +390,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 
 		record := func(state string, live bool) {
 			t.Helper()
-			if _, err := f.db.DB.NewDelete().Table("decision").
+			if _, err := f.db.DB.NewDelete().Table("decision_occurrence").
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -557,11 +557,11 @@ func claimSaying(t *testing.T, db *database.DB, personID int64, outcome string) 
 			"kind": "finding", "proposed_by": personID, "proposed_at": time.Now().UTC(),
 			"outcome": outcome,
 		}).
-		TableExpr("\"claim\"").Exec(ctx); err != nil {
+		TableExpr("\"decision\"").Exec(ctx); err != nil {
 		t.Fatalf("record a claim: %v", err)
 	}
 	var id int64
-	if err := db.DB.NewSelect().TableExpr("\"claim\"").ColumnExpr(`MAX("id")`).Scan(ctx, &id); err != nil {
+	if err := db.DB.NewSelect().TableExpr("\"decision\"").ColumnExpr(`MAX("id")`).Scan(ctx, &id); err != nil {
 		t.Fatalf("read the claim back: %v", err)
 	}
 	return id
@@ -921,7 +921,7 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 
 		sentBack := func(productID int64, version string) {
 			t.Helper()
-			if _, err := f.db.DB.NewDelete().Table("decision").
+			if _, err := f.db.DB.NewDelete().Table("decision_occurrence").
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}

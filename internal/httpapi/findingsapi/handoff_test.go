@@ -124,8 +124,8 @@ func handedOffItems(t *testing.T, r *httpapitest.Reach, who string) []string {
 func claimAt(t *testing.T, r *httpapitest.Reach, place string) string {
 	t.Helper()
 	var claim int64
-	if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
-		Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+	if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."decision_id"`).
+		Where(`"de"."occurrence_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
 		t.Fatal(err)
 	}
 	return fmt.Sprintf("/v1/decisions/%d", claim)
@@ -280,7 +280,7 @@ func TestALaterSightingOfAnIncludedLeadOpensReadableByBothAudiences(t *testing.T
 		httpapitest.ApplyRun(t, r, now.Add(-30*time.Minute), httpapitest.LeadRun(true))
 		var held []string
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
-			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."place_identity" = ?`, place).
+			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."occurrence_identity" = ?`, place).
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
@@ -324,8 +324,8 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),
 			httpapitest.OtherToolRun("cppcheck", "overflow", "120", "src/c.c", 4))
 		var other string
-		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."place_identity"`).
-			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."place_identity" <> ?`, place).
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
+			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."occurrence_identity" <> ?`, place).
 			Scan(t.Context(), &other); err != nil {
 			t.Fatal(err)
 		}
@@ -413,8 +413,8 @@ func TestAHandedOffLeadsClaimIsNeitherRevisedNorWithdrawn(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, _ := httpapitest.HandedOffLead(t, r, false)
 		var claim int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
-			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."decision_id"`).
+			Where(`"de"."occurrence_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
 			t.Fatal(err)
 		}
 		at := fmt.Sprintf("/v1/decisions/%d", claim)
@@ -484,8 +484,8 @@ func TestAnUndoneBatchLeavesTheConfirmationAHandOffRestsOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		var state string
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."state"`).
-			Where(`"de"."claim_id" = ?`, decided.ClaimID).Scan(t.Context(), &state); err != nil {
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."state"`).
+			Where(`"de"."decision_id" = ?`, decided.ClaimID).Scan(t.Context(), &state); err != nil {
 			t.Fatal(err)
 		}
 		if undone.Undone != 0 || state != "approved" {
@@ -520,7 +520,7 @@ func TestAMoveLandingWhileARunAppliesReachesTheSightingTheRunOpened(t *testing.T
 		}
 		var held []string
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
-			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."place_identity" = ?`, place).
+			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."occurrence_identity" = ?`, place).
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
@@ -615,8 +615,8 @@ func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testin
 		}
 		claim := claimAt(t, r, place)
 		var decision int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."id"`).
-			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &decision); err != nil {
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).ColumnExpr(`"de"."id"`).
+			Where(`"de"."occurrence_identity" = ?`, place).Limit(1).Scan(t.Context(), &decision); err != nil {
 			t.Fatal(err)
 		}
 		decisionAt := fmt.Sprintf("/v1/decision-occurrences/%d", decision)

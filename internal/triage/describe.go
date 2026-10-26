@@ -48,8 +48,8 @@ type Described struct {
 
 // describedRow is one open finding a decision's row matches.
 type describedRow struct {
-	DecisionID  int64  `bun:"decision_id"`
-	ClaimID     int64  `bun:"claim_id"`
+	DecisionID  int64  `bun:"decision_occurrence_id"`
+	ClaimID     int64  `bun:"decision_id"`
 	Exact       int    `bun:"exact"`
 	TargetID    int64  `bun:"target_id"`
 	ProductID   int64  `bun:"product_id"`
@@ -95,7 +95,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	}
 	var rows []describedRow
 	err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision is on the outside of this join by construction, and
 		// the spelling is the instruction. CROSS JOIN ... WHERE is an inner
 		// join on every engine; on SQLite it also fixes the order, statistics
@@ -113,8 +113,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "product" AS "pr" ON "pr"."id" = "st"."product_id"`).
-		ColumnExpr(`"de"."id" AS "decision_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr("CASE WHEN "+finding.VersionsMatch+` THEN 1 ELSE 0 END AS "exact"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
@@ -235,29 +235,29 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	// lapsed, or which was keyed at another build's version, reported places
 	// it does not cover.
 	var covered []struct {
-		ClaimID     int64 `bun:"claim_id"`
+		ClaimID     int64 `bun:"decision_id"`
 		TargetID    int64 `bun:"target_id"`
 		Issue       int64 `bun:"vulnerability_id"`
 		ComponentID int64 `bun:"component_id"`
 		Decided     int   `bun:"decided"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
+		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision on the outside, as above.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."place_identity") AS "decided"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
+		ColumnExpr(`COUNT(DISTINCT "f"."occurrence_identity") AS "decided"`).
+		Where(`"de"."decision_id" IN (?)`, bun.List(claims)).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
@@ -266,7 +266,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		GroupExpr(`"de"."claim_id", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
+		GroupExpr(`"de"."decision_id", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &covered); err != nil {
 		return nil, fmt.Errorf("count what these claims cover: %w", err)
 	}

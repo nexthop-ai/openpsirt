@@ -15,7 +15,7 @@ import (
 func (f *fixture) rowsOf(t *testing.T, claimID int64) []triage.Decision {
 	t.Helper()
 	var rows []triage.Decision
-	if err := f.db.DB.NewSelect().Model(&rows).Where(`"de"."claim_id" = ?`, claimID).
+	if err := f.db.DB.NewSelect().Model(&rows).Where(`"de"."decision_id" = ?`, claimID).
 		Order("de.id ASC").Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestTheRecordCountsWhatStillAppliesAndDatesTheRowsItMatched(t *testing.T) {
 		rows := f.rowsOf(t, bulk.ClaimID)
 		f.ends(t, rows[0].ID, time.Now().UTC())
 		later := rows[0].ProposedAt.Add(72 * time.Hour)
-		if _, err := f.db.DB.NewUpdate().Table("claim").Set(`"proposed_at" = ?`, later).
+		if _, err := f.db.DB.NewUpdate().Table("decision").Set(`"proposed_at" = ?`, later).
 			Where(`"id" = ?`, bulk.ClaimID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

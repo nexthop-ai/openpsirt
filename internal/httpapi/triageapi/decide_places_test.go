@@ -29,7 +29,7 @@ func TestAJudgmentCoversThePlacesItNamesAndRefusesOneTheFindingIsNotAt(t *testin
 				strings.Join(places, `","`) + `"]}`
 		}
 		decisions := func() int {
-			n, err := r.DB.DB.NewSelect().Table("decision").Count(t.Context())
+			n, err := r.DB.DB.NewSelect().Table("decision_occurrence").Count(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}

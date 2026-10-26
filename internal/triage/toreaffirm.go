@@ -64,9 +64,9 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 
 	mine := func() *bun.SelectQuery {
 		q := s.yoursToReaffirm(subject).
-			ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+			ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 			ColumnExpr(`MAX("de"."id") AS "newest"`).
-			GroupExpr(`"de"."claim_id"`)
+			GroupExpr(`"de"."decision_id"`)
 		if productID > 0 {
 			q = q.Where(`"de"."product_id" = ?`, productID)
 		}
@@ -82,11 +82,11 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 
 	// The rows a re-affirmation re-makes, so a lead past its end of life is
 	// not counted.
-	inSupport, supportArgs := finding.LeadInSupport(`"de"."product_id"`, `"de"."place_identity"`, s.now())
+	inSupport, supportArgs := finding.LeadInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
 	var latest []int64
 	if err := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
 		ColumnExpr(`"de"."id"`).
-		Where(`"de"."claim_id" IN (?)`, bun.List(page.Order)).
+		Where(`"de"."decision_id" IN (?)`, bun.List(page.Order)).
 		Where(`"de"."state" = ?`, LapsedState)).
 		Where(inSupport, supportArgs...).
 		Scan(ctx, &latest); err != nil {
@@ -182,7 +182,7 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 // no other: re-affirming re-makes a claim at its other places, and refuses one
 // with none.
 func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
-	inSupport, args := finding.LeadInSupport(`"de"."product_id"`, `"de"."place_identity"`, s.now())
+	inSupport, args := finding.LeadInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
 	return s.lapsedOfYours(subject).Where(inSupport, args...)
 }
 
@@ -195,12 +195,12 @@ func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
 func (s *Store) lapsedOfYours(subject access.Subject) *bun.SelectQuery {
 	outOfReach, reachArgs := notDecidableWhere(subject, "dn")
 	q := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(`"cl"."proposed_by" = ?`, subject.ID).
 		Where(`"de"."state" = ?`, LapsedState)).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dw" WHERE "dw"."claim_id" = "de"."claim_id"`+
+		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dw" WHERE "dw"."decision_id" = "de"."decision_id"`+
 			` AND "dw"."state" = ?)`, Withdrawn).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dn" WHERE "dn"."claim_id" = "de"."claim_id"`+
+		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dn" WHERE "dn"."decision_id" = "de"."decision_id"`+
 			` AND "dn"."state" = ? AND `+outOfReach+`)`,
 			append([]any{LapsedState}, reachArgs...)...)
 	return decidableBy(q, subject, "de")
@@ -212,7 +212,7 @@ func (s *Store) Reaffirmable(ctx context.Context, subject access.Subject, claimI
 	if subject.Kind != access.Person {
 		return false, nil
 	}
-	found, err := s.yoursToReaffirm(subject).Where(`"de"."claim_id" = ?`, claimID).Exists(ctx)
+	found, err := s.yoursToReaffirm(subject).Where(`"de"."decision_id" = ?`, claimID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether this is yours to re-affirm: %w", err)
 	}

@@ -90,10 +90,10 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 	}
 	elsewhere := s.db.NewSelect().Model((*Decision)(nil)).
 		Join(finding.DecisionIssue).
-		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
-		ColumnExpr(`COUNT(DISTINCT "de"."place_identity") AS "places"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."occurrence_identity") AS "places"`).
 		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
 		Where(`"de"."state" = ?`, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).
@@ -114,7 +114,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 	// it at the versions the code holds now.
 	var open []struct {
 		ProductID int64  `bun:"product_id"`
-		Place     string `bun:"place_identity"`
+		Place     string `bun:"occurrence_identity"`
 		Issues    int    `bun:"issues"`
 	}
 	undecided := s.db.NewSelect().
@@ -124,11 +124,11 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
-		Where(`"f"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"f"."occurrence_identity" IN (?)`, bun.List(places)).
 		Where(`"st"."product_id" IN (?)`, bun.List(products)).
 		// The issue before the decision, and CROSS JOIN ... WHERE is what fixes
 		// that order on SQLite: the decision is then reached through its index
@@ -137,13 +137,13 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		// kernel place carrying 6,000 issues in a product holding 3,060
 		// decisions, against 0.016 s this way.
 		Where(`NOT EXISTS (SELECT 1 FROM "vulnerability" AS "dv"
-			CROSS JOIN "decision" AS "de"
-			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+			CROSS JOIN "decision_occurrence" AS "de"
+			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 			WHERE "de"."vulnerability_id" = "dv"."id"
 			  AND ` + finding.DecisionAt(`"st"."product_id"`) + `
 			  AND "de"."live_key" IS NOT NULL
 			  AND ` + finding.KeyMatches + `)`).
-		GroupExpr(`"st"."product_id", "f"."place_identity"`)
+		GroupExpr(`"st"."product_id", "f"."occurrence_identity"`)
 	if err := readableFindings(undecided, subject, "f", `"st"."product_id"`).
 		Scan(ctx, &open); err != nil {
 		return nil, fmt.Errorf("read what else is undecided there: %w", err)

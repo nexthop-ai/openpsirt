@@ -43,7 +43,7 @@ func TestTheDeploymentIsOfferedNothingToApproveOrDecide(t *testing.T) {
 	everything := access.Everything("a background pass")
 	db := bun.NewDB(&sql.DB{}, sqlitedialect.New())
 	for name, narrowed := range map[string]*bun.SelectQuery{
-		"approve": approvableBy(db.NewSelect().TableExpr(`"decision" AS "de"`), everything, "de"),
+		"approve": approvableBy(db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`), everything, "de"),
 		"decide":  onlyDecidable(db.NewSelect().TableExpr(`"finding" AS "f"`), everything),
 	} {
 		if rendered := narrowed.String(); !strings.Contains(rendered, "1 = 0") {

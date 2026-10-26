@@ -222,7 +222,7 @@ func TestAPromiseInAnotherProductDoesNotStandOverThisProductsBuild(t *testing.T)
 		promise := func(product int64, to, key string) {
 			t.Helper()
 			claim := claimSaying(t, f.db, somebody, "upgrade-needed")
-			if _, err := f.db.DB.NewUpdate().Table("claim").
+			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"committed_to" = ?`, time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)).
 				Set(`"upgrade_to" = ?`, to).Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
