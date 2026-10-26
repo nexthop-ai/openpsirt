@@ -320,8 +320,9 @@ holder who cannot open it.
 |---|---|
 | A role withdrawn on one product | Their work there they may no longer read: everything where it was their last role, and otherwise the undisclosed or internal work, and the vulnerability reports, the role let them read |
 | A role withdrawn across every product | The same, product by product |
-| A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went, because a trusted-header sign-in runs on every request |
-| A change of role mode | The same, for everybody holding work: the assigned roles set aside on the way into group-bound mode, or the derived ones cleared on the way out |
+| A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went or nothing was derived before, because a trusted-header sign-in runs on every request |
+| The first group-bound sign-in after a switch into group-bound mode | What the roles an administrator assigned let them hold and their groups do not let them read. Nothing derived before counts as every role taken away, so the question is asked against what the groups derive |
+| A switch out of group-bound mode | The same, for everybody holding work, judged against the assigned roles it restores |
 | Somebody taken off a team | The team's work no remaining member reads |
 | A team retired | Everything in its queue |
 | An account deactivated | Everything it held, everywhere, and its teams' work no remaining member reads |
@@ -337,6 +338,8 @@ holder who cannot open it.
 | Asked of whoever the write named, and of every team they are on | A team holds work only while a member reads it, so a member's reading going can strand the team's queue |
 | Inside the write that took the reading away | Done after it, a failure leaves the reading gone, the work with somebody who cannot open it, and no request that reaches the hand-back again. Deactivation hands back after its write commits, for the reason under § Somebody who has left |
 | Nobody is told | The same as any other work handed back (§ Assignment by narrowing) |
+| A switch into group-bound mode hands nothing back | What somebody reads there is what their groups derive, known only at their next sign-in. Judged at the switch, every assignment would read as unread and go back, including work their groups cover |
+| A switch out of group-bound mode hands back at once | Nothing derives a role after it, so the restored assignments are final and there is no later event to wait for |
 
 ## Statistics and the audit permission
 
@@ -994,7 +997,8 @@ lifetime. The deliberate case is handled at once by ending their sessions.
 | The mapping is the authorization | Somebody arriving for the first time in a mapped group is admitted and recorded then. The operator stated the mapping before anybody arrived. What is never true is somebody being admitted because a provider vouched for them and nothing else |
 | Switching modes is reversible | The first mapping marks assignments **inactive rather than deleting** them, and removing the last makes them active again. An inactive row grants nothing and is never counted as access — not in a query, not in a report, not in a review |
 | Derived grants are cleared on the way out | They are a cache of what a provider said at somebody's last sign-in |
-| A sign-in or a change of mode that takes reading away hands back the work it covered | Work held under a grant that no longer grants is in no list at all (§ Lost reading) |
+| A sign-in that takes reading away, and a switch out of group-bound mode, hand back the work they covered | Work held under a grant that no longer grants is in no list at all (§ Lost reading) |
+| A switch into group-bound mode hands back nothing, and each person's first sign-in after it hands back what their groups do not cover | Somebody whose groups cover their work keeps it (§ Lost reading) |
 | What makes a grant unique includes where it came from | An assignment set aside and a live derived grant for the same role on the same product can exist at once |
 | Granting a role and reading one are different shapes (REQ-61) | A grant is written with which product and which role, and read back with two more the writer cannot decide: whether it is in force, and whether an administrator assigned it or a group derived it. A request refused the right to grant a role would otherwise be answered with its own claim that the role was granted and in force |
 
@@ -1576,6 +1580,12 @@ notice the absence and say so.
   place as naming none, through the setting that is supposed to be the guard.
   An IPv4-mapped range is held as the IPv4 range it is, so `::ffff:0:0/96`,
   which matches every IPv4 client, is refused with `0.0.0.0/0`.
+- After a switch into group-bound mode, work assigned to somebody who never
+  signs in again stays with them until they do, they are deactivated, or it is
+  handed back by hand. Their set-aside roles grant nothing in the meantime, so
+  the work is in no list at all. A person whose groups derive no role is
+  asked about on every sign-in, which finds nothing to move once they hold
+  nothing.
 - A derived grant older than the token window stops granting through a token
   without any write, and a mapping removed from configuration leaves the
   grants it derived until each person's next sign-in. Neither hands work back

@@ -564,7 +564,11 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 
 	// What they held before is read first, so a sign-in that took a role
 	// away hands back what that leaves them unable to read. Asked only when
-	// something went: this runs on every request a proxy reports groups for.
+	// something went, or when nothing was derived before: this runs on every
+	// request a proxy reports groups for. Nothing derived before is the first
+	// sign-in since the switch into group-bound mode, which hands nothing back
+	// itself, so the work assigned roles let them hold is judged here against
+	// what their groups derive.
 	var before []Grant
 	if err := s.db.NewSelect().Model(&before).Column("product_id", "role").
 		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Scan(ctx); err != nil {
@@ -610,7 +614,7 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 			return fmt.Errorf("record what these groups grant across every product: %w", err)
 		}
 	}
-	taken := false
+	taken := len(before) == 0 && len(beforeEstate) == 0
 	for _, grant := range before {
 		taken = taken || !holds(roles[grant.ProductID], grant.Role)
 	}
@@ -635,6 +639,12 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 // cache of what a provider said at somebody's last sign-in, and keeping them
 // once nothing refreshes them would leave roles nobody assigned and nothing
 // will ever withdraw.
+//
+// The way in hands nothing back. What somebody may read there is what their
+// groups derive, which is known only at their next sign-in, and that sign-in
+// hands back what the groups do not cover. The way out hands back at once
+// what each person's restored assignments do not cover, because nothing
+// derives anything after it.
 func (s *Store) SwitchTo(ctx context.Context, mode Mode) error {
 	// Applied whole, because a sign-in that overlaps it would otherwise write
 	// derived grants back after they were cleared — leaving roles in a
@@ -716,8 +726,9 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 	default:
 		return refusal.Errorf("%q is not a way for roles to be assigned", mode)
 	}
-	// Either way somebody may read less: the assigned roles set aside, or
-	// the derived ones cleared.
+	if mode != Direct {
+		return nil
+	}
 	return s.handBackAfter(ctx, Narrowed{Everybody: true})
 }
 

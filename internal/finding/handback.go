@@ -28,8 +28,9 @@ func HandBack(ctx context.Context, db bun.IDB, narrowed access.Narrowed) error {
 // people and teams a write narrowed, and reports how much moved.
 //
 // Run inside the write that took the right away, whatever that write was: a
-// role withdrawn, a group mapping that stopped granting one, a change of role
-// mode, somebody taken off a team, a team retired, or somebody deactivated.
+// role withdrawn, a sign-in whose groups stopped granting one, a switch out of
+// group-bound mode, somebody taken off a team, a team retired, or somebody
+// deactivated.
 // The people named are asked about, and so is every team they are on, because
 // a team holds work only while a member reads it.
 //

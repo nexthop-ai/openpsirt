@@ -242,48 +242,148 @@ func TestASignInThatTakesARoleAwayHandsBackWhatItCovered(t *testing.T) {
 	})
 }
 
-// A change of role mode hands back what it leaves people unable to read:
-// assigned roles set aside on the way into group-bound mode, and derived
-// roles cleared on the way out.
-func TestAChangeOfRoleModeHandsBackWhatItSetAside(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		rights := access.NewStore(f.db.DB).HandingBack(finding.HandBack)
-		assigned := f.holder(t, "assigned@example.com", access.PublicTriage, access.PrivateTriage)
-		f.heldEverywhere(t, assigned.Party())
-		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
-			t.Fatal(err)
-		}
-		if got := f.stillHeld(t, assigned.Party()); len(got) != 0 {
-			t.Errorf("into group-bound mode, somebody whose roles were set aside holds %v", got)
-		}
-
-		var product string
-		if err := f.db.DB.NewSelect().Table("product").Column("name").
-			Where(`"id" = ?`, f.productID).Scan(ctx, &product); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := rights.ApplyMappings(ctx, []access.Mapping{
-			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
-		}); err != nil {
-			t.Fatal(err)
-		}
-		derived, err := rights.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "derived"},
-			[]string{"security"})
+// modeWorld gives two people accounts a sign-in recognizes and roles an
+// administrator assigned, with the work of heldEverywhere split between them:
+// the public finding and the internal lead with the first, the undisclosed
+// finding and the report with the second. Both start in direct mode.
+func (f *fixture) modeWorld(t *testing.T, rights *access.Store, groups []access.Mapping,
+	first, second []access.Role) (access.Subject, access.Subject) {
+	t.Helper()
+	ctx := t.Context()
+	if _, err := rights.ApplyMappings(ctx, groups); err != nil {
+		t.Fatal(err)
+	}
+	var people [2]access.Subject
+	for i, name := range []string{"first", "second"} {
+		subject, err := rights.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: name},
+			[]string{groups[0].Group})
 		if err != nil {
 			t.Fatal(err)
 		}
-		now := time.Now().UTC().Truncate(time.Second)
-		if _, err := f.db.DB.NewUpdate().Table("finding").
-			Set(`"assigned_to" = ?`, derived.Party()).Set(`"assigned_at" = ?`, now).
-			Where(`"closed_at" IS NULL`).Where(`"visibility" = ?`, access.Private).Exec(ctx); err != nil {
+		people[i] = subject
+	}
+	if err := rights.SwitchTo(ctx, access.Direct); err != nil {
+		t.Fatal(err)
+	}
+	for i, roles := range [][]access.Role{first, second} {
+		for _, role := range roles {
+			if err := rights.GrantRole(ctx, people[i].ID, f.productID, role); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	f.heldEverywhere(t, people[0].Party())
+	if _, err := f.db.DB.NewUpdate().Table("finding").
+		Set(`"assigned_to" = ?`, people[1].Party()).
+		Where(`"closed_at" IS NULL`).Where(`"visibility" = ?`, access.Private).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.DB.NewUpdate().Table("flaw_report").
+		Set(`"assigned_to" = ?`, people[1].Party()).
+		Where(`"assigned_to" = ?`, people[0].Party()).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return people[0], people[1]
+}
+
+func (f *fixture) productName(t *testing.T) string {
+	t.Helper()
+	var product string
+	if err := f.db.DB.NewSelect().Table("product").Column("name").
+		Where(`"id" = ?`, f.productID).Scan(t.Context(), &product); err != nil {
+		t.Fatal(err)
+	}
+	return product
+}
+
+// The way into group-bound mode hands nothing back, and each person's first
+// sign-in after it hands back what their groups do not let them read.
+// Somebody whose groups cover their work keeps it.
+func TestSwitchingIntoGroupBoundModeHandsBackAtEachFirstSignIn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		rights := access.NewStore(f.db.DB).HandingBack(finding.HandBack)
+		product := f.productName(t)
+		first, second := f.modeWorld(t, rights, []access.Mapping{
+			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
+			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
+			{Group: "analysts", Grants: string(access.InternalRead), Product: product},
+		},
+			[]access.Role{access.PublicTriage, access.InternalRead},
+			[]access.Role{access.PublicTriage, access.PrivateTriage})
+
+		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
 			t.Fatal(err)
 		}
+		for _, one := range []struct {
+			who  access.Subject
+			want []string
+		}{
+			{first, held("internal", "public")},
+			{second, held("private", "report")},
+		} {
+			if got := f.stillHeld(t, one.who.Party()); !slices.Equal(got, one.want) {
+				t.Errorf("into group-bound mode, before signing in, %s holds %v, want %v",
+					one.who.Identity, got, one.want)
+			}
+		}
+
+		for _, one := range []struct {
+			who    access.Subject
+			groups []string
+			want   []string
+		}{
+			{first, []string{"platform"}, held("public")},
+			{second, []string{"platform", "security"}, held("private", "report")},
+		} {
+			if _, err := rights.AdmitByGroups(ctx,
+				access.Arrival{ViaProxy: true, Username: one.who.Identity}, one.groups); err != nil {
+				t.Fatal(err)
+			}
+			if got := f.stillHeld(t, one.who.Party()); !slices.Equal(got, one.want) {
+				t.Errorf("first signed in through %v, %s holds %v, want %v",
+					one.groups, one.who.Identity, got, one.want)
+			}
+		}
+	})
+}
+
+// The way out of group-bound mode hands back at once what each person's
+// restored assignments do not let them read. Somebody whose assignments cover
+// their work keeps it.
+func TestSwitchingOutOfGroupBoundModeHandsBackWhatTheAssignedRolesDoNotCover(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		rights := access.NewStore(f.db.DB).HandingBack(finding.HandBack)
+		product := f.productName(t)
+		groups := []string{"platform", "security", "analysts"}
+		first, second := f.modeWorld(t, rights, []access.Mapping{
+			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
+			{Group: "security", Grants: string(access.PrivateTriage), Product: product},
+			{Group: "analysts", Grants: string(access.InternalRead), Product: product},
+		}, nil, []access.Role{access.PublicTriage, access.PrivateTriage})
+
+		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+		for _, who := range []access.Subject{first, second} {
+			if _, err := rights.AdmitByGroups(ctx,
+				access.Arrival{ViaProxy: true, Username: who.Identity}, groups); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := f.stillHeld(t, first.Party()); !slices.Equal(got, held("internal", "public")) {
+			t.Fatalf("signed in through every group, the first holds %v", got)
+		}
+
 		if err := rights.SwitchTo(ctx, access.Direct); err != nil {
 			t.Fatal(err)
 		}
-		if got := f.stillHeld(t, derived.Party()); len(got) != 0 {
-			t.Errorf("out of group-bound mode, somebody whose roles a group derived holds %v", got)
+		if got := f.stillHeld(t, first.Party()); len(got) != 0 {
+			t.Errorf("out of group-bound mode, somebody with no assigned role holds %v", got)
+		}
+		if got := f.stillHeld(t, second.Party()); !slices.Equal(got, held("private", "report")) {
+			t.Errorf("out of group-bound mode, somebody whose assigned roles cover their work holds %v", got)
 		}
 	})
 }

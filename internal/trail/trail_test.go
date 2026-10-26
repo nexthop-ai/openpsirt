@@ -4,6 +4,7 @@
 package trail_test
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/uptrace/bun"
 )
 
 // each is the seeded world per engine, with somebody to record changes
@@ -496,6 +498,34 @@ func TestConfigurationsGroupMappingsAreRecordedAgainstConfiguration(t *testing.T
 		if settings = of(trail.Setting); len(settings) != 2 ||
 			*settings[0].Became != string(access.Direct) {
 			t.Errorf("the switch back to direct was recorded as %+v", settings)
+		}
+	})
+}
+
+// A start that switches out of group-bound mode hands back through the hook
+// it is given, for everybody, and one that switches in hands nothing back:
+// each person's next sign-in does that.
+func TestAStartThatChangesTheRoleModeHandsBackOnlyOnTheWayOut(t *testing.T) {
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		ctx := t.Context()
+		w.DeclarePerson("admin@example.com", "Alex Admin", true)
+		var asked []access.Narrowed
+		handBack := func(_ context.Context, _ bun.IDB, narrowed access.Narrowed) error {
+			asked = append(asked, narrowed)
+			return nil
+		}
+		leads := access.Mapping{Group: "leads", Grants: string(access.Administers)}
+		if _, _, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads}, handBack); err != nil {
+			t.Fatal(err)
+		}
+		if len(asked) != 0 {
+			t.Errorf("the way into group-bound mode handed back for %+v", asked)
+		}
+		if _, _, err := trail.MapGroups(ctx, w.DB.DB, nil, handBack); err != nil {
+			t.Fatal(err)
+		}
+		if len(asked) != 1 || !asked[0].Everybody {
+			t.Errorf("the way out of group-bound mode handed back for %+v, want everybody once", asked)
 		}
 	})
 }
