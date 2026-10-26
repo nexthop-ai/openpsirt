@@ -547,8 +547,8 @@ threshold. The screen states which of the two questions is being asked.
 
 It exists to show that no dismissal sits in that population.
 Not-applicable, wrong match, will-not-fix and already-fixed all require
-approval, so that query should return nothing, and a row in it is a control
-that failed.
+approval, and so do a lead dismissed and a lead called no security issue, so
+that query should return nothing, and a row in it is a control that failed.
 
 That is why nobody has to open it to find out. The same question is asked as
 a condition and told to administrators when it stops answering nothing —
@@ -769,6 +769,12 @@ person has a standing agreement on. REQ-53 names it as the report that should
 come back empty, and the record's own empty state is already written as that
 answer rather than as an absence.
 
+| Rule | |
+|---|---|
+| It asks for every outcome that hides risk and stores no date, over every kind | The four dismissals of a vulnerability or a flaw, and a lead dismissed or called no security issue. Each always needs a second person |
+| The outcomes are the ones the server publishes as that class | A list typed in the interface would leave out an outcome the server adds, while the report said none stood alone |
+| A claim about a lead is listed and counted only for somebody who reads internal material in its product | It is internal, and the record narrows every row and count by the reader (REQ-42, REQ-43) |
+
 The standing corrections are the record with its other filters set: the wrong
 matches that apply now. Every other judgment lapses when the code moves, so
 each comes back round to somebody; a correction does not, and the only way to
@@ -805,6 +811,7 @@ was capped.
 
 | Rule | |
 |---|---|
+| Every section counts claims about vulnerabilities, flaws and leads, each where the reader may read it | A claim about a lead is internal, so it reaches only somebody who reads internal material in its product, in the counts as in the rows |
 | Growth is capped after it is found, most grown first | Whether a claim grew is known only once what it covers now is counted, so every standing agreement is examined. Capped before that, the oldest claims fill the page and a claim that grew after them is in no answer |
 | Ties are broken by claim, then by approver | A claim with two standing agreements is two rows of equal growth, and a cap between them is decided by the record rather than by the engine |
 | What a claim covers now is what its live rows reach | A row withdrawn or lapsed covers nothing, so a build holding its place again is not growth |

@@ -15,6 +15,22 @@ describe("the outcomes that close a question", () => {
     );
   });
 
+  // The exception report asks for every one of these. A lead's dismissal
+  // needs a second person as surely as a vulnerability's does, and a
+  // confirmation hides nothing.
+  it("that always need a second person hold a lead's dismissals beside a vulnerability's", () => {
+    expect([...classesOf(PUBLISHED).gated].sort()).toEqual(
+      [
+        "already-fixed",
+        "mismatched",
+        "not-applicable",
+        "wont-fix",
+        "dismissed",
+        "not-security",
+      ].sort(),
+    );
+  });
+
   it("leave out what is said about a lead", () => {
     const { dismisses } = classesOf(PUBLISHED);
     for (const each of ["dismissed", "not-security", "confirmed"]) {
@@ -78,6 +94,7 @@ describe("before the server has answered", () => {
     const classes = classesOf(undefined);
     expect(classes.known).toBe(false);
     expect(classes.dismissing).toEqual([]);
+    expect(classes.gated).toEqual([]);
     expect(classes.hidesRisk("deferred")).toBe(false);
   });
 });

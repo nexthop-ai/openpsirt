@@ -341,6 +341,7 @@ than about anybody's work.
 | Rule | Reason |
 |---|---|
 | The three that claim no further work is needed are counted whatever else is recorded about them | It does not apply, it will not be fixed, the fix is already here. Each closes the question and nothing re-opens it, so each needs a second person — and counting them unconditionally means a write path that got around the gate by clearing its own flag is still caught |
+| A lead dismissed or called no security issue counts where the gate asked for a second person | The gate asks for one on every such claim. Unlike the three above, a lead claim cleared of its flag is not counted, and the exception report still lists it to an internal reader (`DESIGN-reporting.md` § Pages of the catalog's own) |
 | A deferral or a promise to act counts where the gate asked for a second person | Both hide risk and both are approved conditionally, on where the date sits against the deadline already set. A short deferral standing alone is the rule working; one past the threshold needed agreement as surely as a dismissal did, and asking which outcome it was saw none of them |
 | The gate's verdict is read, never a caller's | A proposal's own answer is re-worked against the policy in force when the write lands, so nothing a caller asserts reaches the record |
 | Whether somebody agreed is asked of the record | No approval from anybody other than the proposer, and none taken back. A flag there would be the row's own account of itself, and the failure this exists to find is a row the write path should never have produced |

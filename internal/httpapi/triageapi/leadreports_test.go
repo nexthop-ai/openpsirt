@@ -208,3 +208,47 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 		}
 	})
 }
+
+// exceptionReport is the record asked what the exception report asks it:
+// every outcome that always needs a second person, standing on one.
+const exceptionReport = "/v1/audit/claims?alone=true&outcome=not-applicable&outcome=mismatched" +
+	"&outcome=wont-fix&outcome=already-fixed&outcome=dismissed&outcome=not-security"
+
+// The exception report covers every kind. A lead dismissed with no second
+// person agreeing is in it for a reader of internal material, and in it for
+// nobody else, the count included.
+func TestTheExceptionReportListsALeadDismissalNobodyAgreedToOnlyToInternalReaders(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		decided := decideLead(t, r, place,
+			`{"outcome":"not-security","reasoning":"a crash in a tool that exits"}`)
+		type record struct {
+			Items []struct {
+				Claim   int64  `json:"claim"`
+				Outcome string `json:"outcome"`
+			} `json:"items"`
+			Total int `json:"total"`
+		}
+		var got record
+		httpapitest.Read(t, r, "internal-reader", exceptionReport, &got)
+		if got.Total != 1 || len(got.Items) != 1 || got.Items[0].Claim != decided.ClaimID {
+			t.Fatalf("an internal reader's exception report is %+v; want the lead's claim alone", got)
+		}
+		for _, who := range []string{"private", "reader", "embargo-reader"} {
+			var other record
+			httpapitest.Read(t, r, who, exceptionReport, &other)
+			if other.Total != 0 || len(other.Items) != 0 {
+				t.Errorf("%s's exception report is %+v; want nothing of a lead", who, other)
+			}
+		}
+		// Agreed to by a second person, it leaves.
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
+		}
+		httpapitest.Read(t, r, "internal-reader", exceptionReport, &got)
+		if got.Total != 0 {
+			t.Errorf("a lead's dismissal two people made is still in the exception report: %+v", got)
+		}
+	})
+}
