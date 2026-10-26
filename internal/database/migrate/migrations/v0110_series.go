@@ -80,16 +80,13 @@ func seriesV0110(t *columnTypes) []string {
 			-- The inventory the run was read against: the build's newest
 			-- read inventory when the run was applied.
 			"scan_id"        ` + t.refNull + ` NULL,
-			-- Whether this run was the series' first comparable run in the
-			-- product, whose results nobody is asked to triage.
-			"baseline"       ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			-- The fingerprint schemes the run's results carry, sorted, and
 			-- the mark of the salt the client's is taken with. Null where the
 			-- run reported nothing, and "none" where nothing carried one.
 			"fingerprints"   ` + t.text + ` NULL,
 			-- Whether the fingerprints changed from the last run on the build
 			-- that stated any, which leaves every lead matched probably.
-			"rebaseline"     ` + t.boolean + ` DEFAULT FALSE NOT NULL,
+			"fingerprints_changed" ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			-- What the sender is told: what was dropped or discarded and why,
 			-- and how many results it opened, saw again and did not see, as
 			-- JSON. It names no result.
@@ -159,9 +156,6 @@ func seriesV0110(t *columnTypes) []string {
 			"last_run_id"         ` + t.ref + ` NOT NULL,
 			-- Null while the last comparable run saw it.
 			"absent_run_id"       ` + t.refNull + ` NULL,
-			-- Whether it arrived in the series' baseline, or was carried from
-			-- a finding that did.
-			"baseline"            ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			CONSTRAINT "sighting_finding_unique" UNIQUE ("finding_id"),
 			CONSTRAINT "sighting_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id"),
 			CONSTRAINT "sighting_series_fk" FOREIGN KEY ("series_id") REFERENCES "series"("id"),

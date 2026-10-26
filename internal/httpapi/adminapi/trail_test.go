@@ -184,11 +184,6 @@ var administrativeActs = []trailedAct{
 		kind: "setting", about: "repositories of mine",
 	},
 	{
-		id: "set-important-paths", what: "the paths whose leads are worked from their first run",
-		who: "internal-triager", method: http.MethodPut, path: "/v1/products/mine/important-paths",
-		body: `{"paths":["src"]}`, kind: "setting", about: "important paths of mine",
-	},
-	{
 		id: "propose-lead-rule", what: "a standing rule for leads", who: "internal-triager",
 		method: http.MethodPost, path: "/v1/products/mine/lead-rules",
 		body: `{"prefix":"tests","reason":"used_in_tests","reasoning":"the tests do not ship"}`,
@@ -642,6 +637,7 @@ var outsideTheTrail = map[string]string{
 	"approve-claim":                "the decision record",
 	"assess-issue":                 "the decision record",
 	"assign-finding":               "the decision record",
+	"assign-lead":                  "the decision record",
 	"assign-matching-findings":     "the decision record",
 	"carry-decisions":              "the decision record",
 	"comment-on-claim":             "the decision record",
@@ -694,7 +690,6 @@ var outsideTheTrail = map[string]string{
 	"upload-report-attachment":    "recorded on the attachment, which names who uploaded it",
 	"withdraw-advisory-approval":  "recorded on the agreement, which names who took it back and when",
 	"redact-attachment":           "recorded on the attachment",
-	"escalate-lead":               "recorded on the escalation, which names who pulled it in and when",
 	"upload-attachment":           "recorded on the attachment, which names who uploaded it",
 	"upload-scan":                 "recorded as the scan's provenance",
 	"upload-analysis":             "recorded as the run's provenance",

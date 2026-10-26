@@ -31,7 +31,7 @@ async function drawn(readsInternal: boolean) {
           items: [
             {
               series: "semgrep/default",
-              states: { open: 3, baseline: 40, dismissed: 2 },
+              states: { open: 3, "not-reproduced": 40, dismissed: 2 },
               waiting: 1,
               ruled: 2,
             },

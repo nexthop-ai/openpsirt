@@ -75,18 +75,18 @@ func (a *Applier) TellingLapses(tell func(context.Context, []triage.ForPerson)) 
 // Receipt is what a pipeline is told about a run it sent. It counts and
 // never names a result.
 type Receipt struct {
-	Opened        int            `json:"opened" doc:"Results the run reported that the build did not hold open"`
-	Seen          int            `json:"seen" doc:"Results the build held open that the run reported again"`
-	Returned      int            `json:"returned" doc:"Of those seen again, the ones an earlier run had not reported"`
-	NotReproduced int            `json:"not_reproduced" doc:"Results the build held open that this comparable run did not report"`
-	SharpDrop     bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers"`
-	Probable      int            `json:"probable,omitempty" doc:"Results paired with a lead on its function or its nearest line rather than its whole key"`
-	Inherited     int            `json:"inherited,omitempty" doc:"Results new to the build carried from a lead of the branch it was cut from"`
-	Reopened      int            `json:"reopened,omitempty" doc:"Results found again at the place of a lead on the build that was closed"`
-	Rebaseline    bool           `json:"rebaseline,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any"`
-	Dropped       map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"`
-	Scanners      []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
-	Discarded     map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
+	Opened              int            `json:"opened" doc:"Results the run reported that the build did not hold open"`
+	Seen                int            `json:"seen" doc:"Results the build held open that the run reported again"`
+	Returned            int            `json:"returned" doc:"Of those seen again, the ones an earlier run had not reported"`
+	NotReproduced       int            `json:"not_reproduced" doc:"Results the build held open that this comparable run did not report"`
+	SharpDrop           bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers"`
+	Probable            int            `json:"probable,omitempty" doc:"Results paired with a lead on its function or its nearest line rather than its whole key"`
+	Inherited           int            `json:"inherited,omitempty" doc:"Results new to the build carried from a lead of the branch it was cut from"`
+	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the place of a lead on the build that was closed"`
+	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any"`
+	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"`
+	Scanners            []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
+	Discarded           map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
 }
 
 // The reasons a result is dropped, as a receipt names them.
@@ -319,13 +319,6 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	}
 	comparable, reason := series.Comparability(run.Params, previous, placed.Signals)
 	run.Comparable, run.Reason = &comparable, reason
-	if comparable {
-		had, err := store.HasBaseline(ctx, set.ID)
-		if err != nil {
-			return "", err
-		}
-		run.Baseline = !had
-	}
 
 	keyed := make([]Keyed, len(placed.Results))
 	for i, res := range placed.Results {
@@ -338,13 +331,13 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		if err != nil {
 			return "", err
 		}
-		run.Rebaseline = last != "" && last != run.Fingerprints
+		run.FingerprintsChanged = last != "" && last != run.Fingerprints
 	}
 	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.TargetID)
 	if err != nil {
 		return "", err
 	}
-	matched, fresh, missed, returned, err := match(ctx, tx, open, keyed, run.Rebaseline)
+	matched, fresh, missed, returned, err := match(ctx, tx, open, keyed, run.FingerprintsChanged)
 	if err != nil {
 		return "", err
 	}
@@ -391,7 +384,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, freshPlaces(set.ID, fresh, from), again); err != nil {
 		return "", err
 	}
-	opened, inBaseline, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
+	opened, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
 	if err != nil {
 		return "", err
 	}
@@ -405,26 +398,13 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		return "", err
 	}
 
-	// A result the baseline holds on another build is in it here too: it is
-	// the same result, seen first by another build.
-	carriedIn := make(map[int64]bool, len(inBaseline))
-	for _, id := range inBaseline {
-		carriedIn[id] = true
-	}
 	seen := make([]int64, 0, len(matched)+len(opened))
 	for id := range matched {
 		seen = append(seen, id)
 	}
-	for _, id := range opened {
-		if !carriedIn[id] {
-			seen = append(seen, id)
-		}
-	}
+	seen = append(seen, opened...)
 	sort.Slice(seen, func(i, j int) bool { return seen[i] < seen[j] })
-	if err := store.Saw(ctx, run, seen, run.Baseline); err != nil {
-		return "", err
-	}
-	if err := store.Saw(ctx, run, inBaseline, true); err != nil {
+	if err := store.Saw(ctx, run, seen); err != nil {
 		return "", err
 	}
 	if comparable {
@@ -438,7 +418,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	}
 
 	receipt.Opened, receipt.Seen, receipt.Returned = len(opened), len(matched), returned
-	receipt.Rebaseline = run.Rebaseline
+	receipt.FingerprintsChanged = run.FingerprintsChanged
 	for _, k := range matched {
 		if !strong(k.On) {
 			receipt.Probable++
@@ -513,7 +493,7 @@ func printsOf(placed Placed, keyed []Keyed) string {
 		}
 	}
 	// A result carrying no fingerprint beside others that do says nothing
-	// of how the run fingerprints, so it alone never makes a re-baseline.
+	// of how the run fingerprints, so it alone never makes a fingerprint change.
 	if len(parts) == 0 {
 		parts = append(parts, "none")
 	}

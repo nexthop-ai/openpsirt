@@ -141,8 +141,8 @@ func leadState(t *testing.T, r *httpapitest.Reach, place string) string {
 func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		if got := leadState(t, r, place); got != "baseline" {
-			t.Fatalf("a lead in the series' first run is %q; want baseline", got)
+		if got := leadState(t, r, place); got != "open" {
+			t.Fatalf("a lead in the series' first run is %q; want open", got)
 		}
 		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
 			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
@@ -150,8 +150,8 @@ func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
-		if got := leadState(t, r, place); got != "baseline" {
-			t.Errorf("a lead whose dismissal waits for a second person is %q; want it where it was", got)
+		if got := leadState(t, r, place); got != "open" {
+			t.Errorf("a lead whose dismissal waits for a second person is %q; want it open", got)
 		}
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
@@ -275,133 +275,24 @@ func leadsOf(t *testing.T, r *httpapitest.Reach, who, query string) leadsListed 
 	return got
 }
 
-func TestTheQueueLeavesTheBaselineOutAndCountsIt(t *testing.T) {
+func TestTheQueueHoldsALeadFromTheSeriesFirstRun(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		got := leadsOf(t, r, "internal-reader", "")
-		if len(got.Items) != 0 || got.Total != 0 || got.States["baseline"] != 1 {
-			t.Fatalf("the queue is %+v; want nothing listed and one baseline lead counted", got)
-		}
-		searched := leadsOf(t, r, "internal-reader", "?state=baseline")
-		if len(searched.Items) != 1 || searched.Items[0].Place != place || searched.Items[0].State != "baseline" ||
-			searched.Items[0].Path != "src/a.c" || searched.Items[0].Builds != 1 {
-			t.Errorf("the baseline lists %+v; want the seeded lead", searched.Items)
+		if len(got.Items) != 1 || got.Total != 1 || got.Items[0].Place != place || got.Items[0].State != "open" ||
+			got.Items[0].Path != "src/a.c" || got.Items[0].Builds != 1 || got.States["open"] != 1 {
+			t.Fatalf("the queue is %+v; want the seeded lead listed and counted open", got)
 		}
 		// Somebody who reads no internal material is told of no lead.
-		if got := leadsOf(t, r, "reader", "?state=baseline"); len(got.Items) != 0 || len(got.States) != 0 {
+		if got := leadsOf(t, r, "reader", ""); len(got.Items) != 0 || len(got.States) != 0 {
 			t.Errorf("a reader of public material is shown %+v", got)
 		}
-	})
-}
-
-func TestALeadPulledInIsInTheQueue(t *testing.T) {
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		at := "/v1/products/mine/leads/" + place + "/escalation"
-		// Somebody who reads the lead and does not triage it is answered as
-		// closing it as fixed answers them.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reader", http.MethodPost, at, `{}`),
-			http.StatusNotFound)
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/leads/nothing-here/escalation", `{}`), http.StatusNotFound)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, `{}`); got.Code != http.StatusOK {
-			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
-		}
-		got := leadsOf(t, r, "internal-reader", "")
-		if len(got.Items) != 1 || got.Items[0].Place != place || got.Items[0].State != "open" {
-			t.Fatalf("the queue is %+v; want the lead pulled in", got)
-		}
-		if got.States["baseline"] != 0 || got.States["open"] != 1 {
-			t.Errorf("the lead pulled in is counted %v; want it open", got.States)
-		}
-		if got := leadState(t, r, place); got != "open" {
-			t.Errorf("the lead's evidence says %q; want open", got)
-		}
-		// The other internal triagers are told, once, and its author is not.
-		told := func(who string) int {
-			var theirs struct {
-				Items []struct {
-					Kind string `json:"kind"`
-				} `json:"items"`
-			}
-			httpapitest.Read(t, r, who, "/v1/notifications", &theirs)
-			n := 0
-			for _, item := range theirs.Items {
-				if item.Kind == "lead-escalated" {
-					n++
-				}
-			}
-			return n
-		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, `{}`); got.Code != http.StatusOK {
-			t.Fatalf("pulling the lead in again answered %d: %s", got.Code, got.Body)
-		}
-		if n := told("internal-lead"); n != 1 {
-			t.Errorf("another internal triager was told %d times; want once", n)
-		}
-		if n := told("internal-triager"); n != 0 {
-			t.Errorf("the triager who pulled it in was told %d times; want never", n)
-		}
-		if n := told("internal-reader"); n != 0 {
-			t.Errorf("an internal reader who does not triage was told %d times; want never", n)
-		}
-	})
-}
-
-func TestALeadUnderAnImportantPathIsInTheQueue(t *testing.T) {
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		httpapitest.SeededLead(t, r)
-		const at = "/v1/products/mine/important-paths"
-		set := func(body string) {
-			t.Helper()
-			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, body); got.Code != http.StatusNoContent {
-				t.Fatalf("marking %s answered %d: %s", body, got.Code, got.Body)
-			}
-		}
-		// A sibling whose name begins the same is not under it.
-		set(`{"paths":["sr","src/a"]}`)
-		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 0 {
-			t.Fatalf("a lead under no important path is in the queue: %+v", got.Items)
-		}
-		set(`{"paths":["/src/"]}`)
-		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 1 || got.Items[0].State != "open" {
-			t.Fatalf("a lead under an important path is not in the queue: %+v", got)
-		}
-		var held struct {
-			Paths []string `json:"paths"`
-		}
-		httpapitest.Read(t, r, "internal-reader", at, &held)
-		if len(held.Paths) != 1 || held.Paths[0] != "src" {
-			t.Errorf("the product holds %q; want src", held.Paths)
-		}
-		set(`{"paths":["src/a.c"]}`)
-		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 1 {
-			t.Errorf("a lead whose own path is important is not in the queue: %+v", got)
-		}
-		set(`{"paths":[]}`)
-		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 0 || got.States["baseline"] != 1 {
-			t.Errorf("taking the path off leaves %+v; want the lead back in the baseline", got)
-		}
-	})
-}
-
-func TestAnImportantPathThatSaysNothingIsRefused(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const at = "/v1/products/mine/important-paths"
-		for _, body := range []string{`{"paths":["../etc"]}`, `{"paths":["/"]}`, `{"paths":["src","src/"]}`, `{"paths":["a//b"]}`} {
-			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, body),
-				http.StatusUnprocessableEntity)
-		}
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reader", http.MethodPut, at, `{"paths":["src"]}`),
-			http.StatusForbidden)
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, ""), http.StatusForbidden)
 	})
 }
 
 func TestAClaimWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, "/v1/products/mine/leads/"+place+"/escalation", `{}`)
 		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
 		if got.Code != http.StatusCreated {
@@ -477,10 +368,6 @@ func TestTheRecordStatesALeadsReasonAsAReason(t *testing.T) {
 func TestALeadSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKeptAsItStands(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		at := "/v1/products/mine/leads/" + place + "/escalation"
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, `{}`); got.Code != http.StatusOK {
-			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
-		}
 		ended := func(on *time.Time) {
 			t.Helper()
 			if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, on).

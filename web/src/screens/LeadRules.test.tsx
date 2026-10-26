@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LeadRules } from "./LeadRules";
-import { accept, answer, mounted, screen, serve, settle } from "../test/mount";
+import { accept, mounted, screen, serve, settle } from "../test/mount";
 import { change, labeled, press } from "../test/controls";
 
 const mount = mounted();
@@ -59,7 +59,6 @@ async function drawn(may: { triages_internal?: boolean; agrees_internal?: boolea
         },
       };
     if (path === "/v1/products/{product}/lead-rules") return { data: { items: RULES } };
-    if (path === "/v1/products/{product}/important-paths") return { data: { paths: ["src/net"] } };
     return undefined;
   });
   mount.render(
@@ -78,7 +77,6 @@ describe("the dismissal rules", () => {
     expect(text()).toContain("cppcheck/knownConditionTrueFalse");
     expect(text()).toContain("40 · 10 when approved");
     expect(text()).toContain("Outgrown");
-    expect(text()).toContain("src/net");
   });
 
   it("offers approval to an approver, for a rule waiting or outgrown that is not theirs", async () => {
@@ -110,20 +108,6 @@ describe("the dismissal rules", () => {
       prefix: "vendor",
       reason: "wont_fix",
       reasoning: "not ours",
-    });
-  });
-
-  it("saves the important paths one to a line", async () => {
-    await drawn({ triages_internal: true });
-    const sent = answer("PUT", () => ({ status: 204 }));
-    change(
-      mount.host().querySelector<HTMLTextAreaElement>('textarea[aria-label="Important paths"]'),
-      "src/net\n\n  src/crypto  \n",
-    );
-    await press(mount.host(), "Save");
-    await settle();
-    expect((sent()[0]?.[1] as { body: unknown }).body).toEqual({
-      paths: ["src/net", "src/crypto"],
     });
   });
 });

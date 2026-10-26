@@ -32,7 +32,6 @@ type AnalysisReceiptBody struct {
 	// Comparable is absent until the run is applied.
 	Comparable    *bool          `json:"comparable,omitempty" doc:"Whether the results this run did not report count as not reproduced. Absent until it is applied"`
 	NotComparable core.RunReason `json:"not_comparable,omitempty" doc:"Why they do not, where they do not"`
-	Baseline      bool           `json:"baseline,omitempty" doc:"Whether this was the series' first comparable run"`
 	Tool          string         `json:"tool,omitempty" doc:"The analyzer that ran"`
 	ToolVersion   string         `json:"tool_version,omitempty" doc:"Its version"`
 	// Counts is absent until the run has been read.
@@ -103,7 +102,7 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 				RunID: s.ID, Series: s.SeriesName, Commit: s.SourceCommit,
 				BuiltAt: core.Stamp(s.BuiltAt), ReceivedAt: core.Stamp(s.ReceivedAt),
 				Status: core.RunStatus(s.Status), Failure: s.Failure,
-				Comparable: s.Comparable, NotComparable: core.RunReason(s.Reason), Baseline: s.Baseline,
+				Comparable: s.Comparable, NotComparable: core.RunReason(s.Reason),
 				Tool: s.ToolName, ToolVersion: s.ToolVersion,
 			}
 			if s.Receipt != "" {

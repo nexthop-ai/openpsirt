@@ -7,7 +7,7 @@ import { initials } from "../ui/initials";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { scopeQuery, useScope } from "../app/scope";
-import { useWho } from "../app/session";
+import { mayOf, useWho } from "../app/session";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -16,7 +16,7 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
-import { findingOf } from "../app/routes";
+import { findingOf, leadAt, leadsAt } from "../app/routes";
 
 // One page of what somebody holds. The answer carries a total, so this is a
 // page rather than a cap and the footer pages through the rest.
@@ -112,6 +112,10 @@ export function Assignments() {
     !row.team && row.person === who.data?.identity;
   const others = peopleRows.filter((row) => !own(row));
   const myCount = peopleRows.find(own)?.open ?? 0;
+  // Leads are left out of the findings list, so the unheld ones of the
+  // product in scope are linked where this screen points at unheld work.
+  const leadsIn =
+    scope.product && mayOf(who.data, scope.product)?.reads_internal ? scope.product : undefined;
 
   return (
     <>
@@ -197,6 +201,7 @@ export function Assignments() {
         <ByPerson
           rows={others}
           query={holdings}
+          leadsIn={leadsIn}
           onPick={(name, isTeam) => {
             const now = new URLSearchParams(params);
             now.delete("person");
@@ -216,10 +221,12 @@ type Query = { isPending: boolean; isError: boolean; error: unknown };
 function ByPerson({
   rows,
   query,
+  leadsIn,
   onPick,
 }: {
   rows: Body<"HoldingBody">[];
   query: Query;
+  leadsIn?: string;
   onPick: (name: string, team: boolean) => void;
 }) {
   const queries = useQueryClient();
@@ -249,7 +256,11 @@ function ByPerson({
       <Empty
         title="Nobody else is holding anything."
         detail="What is waiting for nobody is the findings list under Unassigned; this one is about work somebody has taken on."
-      />
+      >
+        {leadsIn && (
+          <Link to={leadsAt(leadsIn, { assigned: "nobody" })}>Unassigned leads in {leadsIn}</Link>
+        )}
+      </Empty>
     );
   }
 
@@ -339,7 +350,8 @@ function ByPerson({
 
 // One person's own work, in the same units as what nobody is dealing with: one
 // row per issue in a component in a product, not one per build. The same code
-// built several ways is one piece of work and was taken on as one.
+// built several ways is one piece of work and was taken on as one. A static
+// analysis lead is a row of its own, named by its rule, and opens its page.
 function Held({
   rows,
   total,
@@ -385,10 +397,15 @@ function Held({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const to = findingOf(row);
+              const to = row.place
+                ? leadAt(
+                    { product: row.product, stream: row.stream, variant: row.variant },
+                    row.place,
+                  )
+                : findingOf(row);
               return (
                 <tr
-                  key={`${row.product} ${row.vulnerability} ${row.component} ${row.version}`}
+                  key={`${row.product} ${row.vulnerability} ${row.component} ${row.version} ${row.place ?? ""}`}
                   className="row opens"
                   onClick={opener(to)}
                 >
@@ -399,6 +416,7 @@ function Held({
                     <Link to={to} className="id">
                       {row.vulnerability}
                     </Link>{" "}
+                    {row.place && <span className="hint">lead</span>}{" "}
                     <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
                   </td>
                   <td>

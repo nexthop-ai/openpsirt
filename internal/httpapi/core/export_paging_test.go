@@ -268,3 +268,41 @@ func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
 		}
 	})
 }
+
+// Lists written in turn are each written whole, in order, every row once,
+// whatever their sizes are against the export's page: an empty list among
+// them, one ending exactly on a page, and one ending part-way through one.
+func TestListsWrittenInTurnAreEachWrittenWholeInOrder(t *testing.T) {
+	list := func(name string, rows int) Paged {
+		return func(_ context.Context, limit, offset int) ([][]string, error) {
+			page := [][]string{}
+			for i := offset; i < offset+limit && i < rows; i++ {
+				page = append(page, []string{fmt.Sprintf("%s%d", name, i)})
+			}
+			return page, nil
+		}
+	}
+	sizes := []int{exportPage, 0, exportPage + 3, 1}
+	parts := make([]Paged, 0, len(sizes))
+	var want []string
+	for i, n := range sizes {
+		name := string(rune('a' + i))
+		parts = append(parts, list(name, n))
+		for j := range n {
+			want = append(want, fmt.Sprintf("%s%d", name, j))
+		}
+	}
+	var written []string
+	if err := eachPage(t.Context(), Exporting{Header: []string{"n"}, Rows: InTurn(parts...)},
+		func(page [][]string) {
+			for _, row := range page {
+				written = append(written, row[0])
+			}
+		}, func() {}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(written, ",") != strings.Join(want, ",") {
+		t.Fatalf("wrote %d rows, %v…; want %d, %v…", len(written), written[:min(5, len(written))],
+			len(want), want[:5])
+	}
+}

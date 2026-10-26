@@ -16,8 +16,8 @@ import (
 )
 
 // LeadAct is something a person did to a lead that the product's internal
-// triagers hear about: pulled it into the queue, handed it off as a flaw, or
-// moved it into or out of the flaw's case.
+// triagers hear about: handed it off as a flaw, or moved it into or out of
+// the flaw's case.
 type LeadAct struct {
 	Kind      Kind
 	ProductID int64
@@ -45,8 +45,6 @@ func TellLeadTriagers(ctx context.Context, db *bun.DB, act LeadAct) error {
 		lead.Product, lead.Stream, lead.Variant)
 	var body string
 	switch act.Kind {
-	case LeadEscalated:
-		body = what + " was pulled into the queue."
 	case LeadHandedOff:
 		body = what + " was handed off as a flaw."
 	case LeadMoved:

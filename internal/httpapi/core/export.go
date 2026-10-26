@@ -53,7 +53,7 @@ type Exporting struct {
 	// is the unit its statement answers in.
 	//
 	// Exactly one of Rows and Stream is set.
-	Rows func(ctx context.Context, limit, offset int) ([][]string, error)
+	Rows Paged
 	// Stream hands over every row as it arrives, for a reader that can open a
 	// cursor over the whole answer.
 	//
@@ -76,6 +76,29 @@ type Exporting struct {
 	// connection back all the same. And only so many streams run at once,
 	// which streamSlots decides from the size of the pool.
 	Stream func(ctx context.Context, each func([]string) error) error
+}
+
+// Paged reads one page of a file's rows.
+type Paged func(ctx context.Context, limit, offset int) ([][]string, error)
+
+// InTurn is the rows of several lists one after another, for a file holding
+// more than one: every row of the first, then every row of the next.
+//
+// A list is done when it answers an empty page, and the next is read from its
+// own first row. The offset a page is asked at is the number of rows written
+// before it, which is how every export is paged.
+func InTurn(parts ...Paged) Paged {
+	at, from := 0, 0
+	return func(ctx context.Context, limit, offset int) ([][]string, error) {
+		for at < len(parts) {
+			rows, err := parts[at](ctx, limit, offset-from)
+			if err != nil || len(rows) > 0 {
+				return rows, err
+			}
+			at, from = at+1, offset
+		}
+		return nil, nil
+	}
 }
 
 // Stated is one fact a file says about itself.

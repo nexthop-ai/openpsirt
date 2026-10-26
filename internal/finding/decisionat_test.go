@@ -37,11 +37,13 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"f", "fo"}: "two rows of one build at one place",
 	},
 	"analysis/state.go": {
-		{"f", "le"}: "a lead pulled into the queue, at its place in the product bound",
 		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
 	},
 	"finding/handoff.go": {
 		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
+	},
+	"finding/assign.go": {
+		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product of its stream",
 	},
 	"finding/disclaim.go": {
 		{"f", "lt"}: "two rows of one build at one place",
@@ -49,6 +51,9 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 	"finding/register.go": {
 		{"d3", "de"}: "a decision against another of its product at its place",
 		{"d2", "de"}: "a decision against another of its product at its place",
+	},
+	"finding/routing.go": {
+		{"f", "fs"}: "two rows of one lead in the product bound",
 	},
 	"triage/claim.go": {
 		{"de", "lh"}: "a decision about a lead handed off as a flaw, at its place in its own product",

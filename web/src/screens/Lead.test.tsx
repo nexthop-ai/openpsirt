@@ -3,8 +3,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Lead } from "./Lead";
-import { accept, mounted, screen, serve, settle } from "../test/mount";
-import { change, pick, press } from "../test/controls";
+import { accept, answer, mounted, screen, serve, settle } from "../test/mount";
+import { change, pick, press, type Init } from "../test/controls";
 
 const mount = mounted();
 
@@ -34,24 +34,42 @@ const EVIDENCE = {
   state: "open",
 };
 
-async function drawn(triages: boolean, evidence: object = EVIDENCE) {
-  serve((path) => {
+async function drawn(triages: boolean, evidence: object = EVIDENCE, hides = false) {
+  const spy = serve((path) => {
     if (path === "/v1/session/me")
       return {
         data: {
           identity: "ana",
           name: "Ana",
           kind: "person",
-          reach: [{ product: "sonic", reads_internal: true, triages_internal: triages }],
+          reach: [
+            { product: "sonic", reads_internal: true, triages_internal: triages, may_hide: hides },
+          ],
           outcomes: [],
         },
       };
     if (path === "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}")
       return { data: evidence };
+    if (path === "/v1/products/{product}/holders")
+      return { data: { items: [{ kind: "team", identity: "kernel", name: "Kernel" }] } };
     return undefined;
   });
   mount.render(screen(<Lead />, AT, PATTERN));
   await settle();
+  // The visibility each search for a holder asked about.
+  return () =>
+    (spy.mock.calls as unknown as [string, Init][])
+      .filter(([path]) => path === "/v1/products/{product}/holders")
+      .map(([, init]) => (init.params?.query as { visibility?: string }).visibility);
+}
+
+// Opens the holder picker, as somebody clicking into it does.
+async function holderBox() {
+  const box = mount.host().querySelector<HTMLInputElement>('input[role="combobox"]');
+  if (!box) throw new Error("no holder box");
+  box.focus();
+  await settle();
+  return box;
 }
 
 const text = () => mount.host().textContent ?? "";
@@ -76,11 +94,6 @@ describe("a lead", () => {
   it("offers no judgment to somebody who only reads it", async () => {
     await drawn(false);
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);
-  });
-
-  it("offers no way into the queue to somebody who only reads it", async () => {
-    await drawn(false, { ...EVIDENCE, state: "baseline" });
-    expect(text()).not.toContain("Add to the queue");
   });
 
   it("names the claim standing at it in place of the form", async () => {
@@ -120,19 +133,54 @@ describe("a lead", () => {
     });
   });
 
-  it("offers to take a lead out of the baseline", async () => {
-    await drawn(true, { ...EVIDENCE, state: "baseline" });
-    expect(text()).toContain("Add to the queue");
-  });
-
   it("is kept as it stands once every release it was seen in is past its end of life", async () => {
     await drawn(true, { ...EVIDENCE, past_end_of_life: true });
     expect(text()).toContain("Past end of life");
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);
   });
 
-  it("offers no way into the queue once it is past its end of life", async () => {
-    await drawn(true, { ...EVIDENCE, state: "baseline", past_end_of_life: true });
-    expect(text()).not.toContain("Add to the queue");
+  it("says it is in third-party code where the run declared it so", async () => {
+    await drawn(true, { ...EVIDENCE, third_party: true });
+    expect(text()).toContain("Third-party");
+  });
+
+  it("says nothing about third-party code where the run declared none", async () => {
+    await drawn(true, EVIDENCE);
+    expect(text()).not.toContain("Third-party");
+  });
+
+  it("gives it to a team, across the product, from among readers of internal work", async () => {
+    const searched = await drawn(true);
+    const sent = answer("PUT", () => ({ status: 204 }));
+    await holderBox();
+    await press(mount.host(), "Kernel team");
+    await settle();
+    expect(searched()[0]).toBe("internal");
+    const [path, init] = sent()[0] ?? [];
+    expect(path).toBe(
+      "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment",
+    );
+    expect((init as { body: unknown }).body).toEqual({ team: "kernel" });
+  });
+
+  it("offers no holder once it is handed off and kept", async () => {
+    await drawn(true, { ...EVIDENCE, state: "handed-off", handoff: { moved: false } }, true);
+    expect(mount.host().querySelector('input[role="combobox"]')).toBeNull();
+  });
+
+  it("offers no holder once it is handed off and moved into its case", async () => {
+    await drawn(true, { ...EVIDENCE, state: "handed-off", handoff: { moved: true } }, true);
+    expect(mount.host().querySelector('input[role="combobox"]')).toBeNull();
+  });
+
+  it("names who holds it to somebody who only reads it", async () => {
+    await drawn(false, { ...EVIDENCE, assigned_to: "bo", assigned_to_name: "Bo" });
+    expect(text()).toContain("Assigned to Bo");
+    expect(mount.host().querySelector('input[role="combobox"]')).toBeNull();
+  });
+
+  it("offers no holder once it is past its end of life", async () => {
+    await drawn(true, { ...EVIDENCE, past_end_of_life: true });
+    expect(mount.host().querySelector('input[role="combobox"]')).toBeNull();
   });
 });

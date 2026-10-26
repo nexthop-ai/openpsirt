@@ -76,28 +76,36 @@ and a kind it does not name never reaches it.
 | Closure | A run's sweep: what it opens, updates and closes | Vulnerability |
 | Version carry | A decision lapsing when a version it was about moved, and a decision carried to a build whose versions match (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
-| Triage | The findings lists and their counts, one finding's page, assignment and routing, notes on an issue, and disclosure | Vulnerability, entered |
+| Triage | The findings lists and their counts, one finding's page, notes on an issue, and disclosure | Vulnerability, entered |
+| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, routing by a team's rules and its preview, and the lists of who holds what: unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Lead assignment) | Vulnerability, entered, analysis |
 | Decisions | Claims and their rows, the reasoning and its revisions, approvals, comments on a claim, the review queue, every read of one claim, the record of judgments and its file, and the notices about claims: waiting, sent back, lapsed and an agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the places it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |
-| Exports | The findings lists written out as files (REQ-50) | Vulnerability, entered |
+| Exports | The findings lists written out as files (REQ-50): the list's rows, then the leads of the same selection as the Leads consumer reads them | Vulnerability, entered, analysis |
+| Register | The disposition register: what was decided at every place of one build, its screen and its file | Vulnerability, entered |
 | VEX | The documents stating what affects a build | Vulnerability, entered |
 | Advisories | The documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What is said to people about findings | Vulnerability, entered |
 | Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
-| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, what pulls one out of the baseline, the leads a standing rule covers, the queue's file, and the counts of a product's leads by analyzer series, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
+| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, the leads a standing rule covers, the queue's file, the leads a findings list's file carries, and the counts of a product's leads by analyzer series, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
 
-Analysis findings are included by Evidence, Leads and Decisions alone: a
-lead is read through the lead queue, its evidence and the claims about it
-(`DESIGN-analysis.md` § Lead triage). The record's file follows Decisions and
-includes claims about leads, because it writes what the record shows, under the
-same visibility (REQ-50). `DESIGN-interface.md` § Static analysis leads holds
-the screens.
+Analysis findings are included by Evidence, Leads, Decisions, Assignment and
+Exports alone: a lead is read through the lead queue, its evidence and the
+claims about it (`DESIGN-analysis.md` § Lead triage), held the way a finding
+is, and a findings list's file writes out the open leads of its selection
+beside the list's rows. The record's file follows Decisions and includes claims about
+leads, because it writes what the record shows, under the same visibility
+(REQ-50). `DESIGN-interface.md` § Static analysis leads holds the screens.
 
 | Rule | |
 |---|---|
-| The queue's file and the counts by series are part of Leads, not of Exports and Statistics | Exports and Statistics feed the findings lists' files, the vulnerability figures and what a VEX document states, and a lead nobody has judged is none of those. Naming analysis there would reach every statement they hold |
+| Exports names the findings lists' files alone, and the disposition register is Register | The register states the decision at every place of a build beside its VEX document, and reads findings rows by the consumer it names. Naming analysis on one consumer covering both would put every lead into a statement about what a build ships |
+| A findings list's file reads its leads through the Leads consumer's read, and its other rows through the list's own | A list and its file are one read (`DESIGN-reporting.md` § Exports), and a findings file holds the open leads under the queue's visibility and in its order |
+| The counts by series are part of Leads, not of Statistics | Statistics feeds the vulnerability figures, and a lead nobody has judged is not one of them |
 | Each is the queue's own read over the queue's own visibility | A figure, the list it opens and the file of that list count one population |
+| Assignment is a consumer of its own, not part of Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a lead nobody has judged into both. Holding work is one act whatever the work is, so a handover and a lost role move a lead with everything else |
+| The lists of who holds what are Assignment's | Holding work is one act whatever the work is, so a lead held is listed where held work is. The digest of what somebody holds is Notifications', and names no lead |
+| A lead is one piece of held work at its place | A vulnerability's piece of work is an issue in a component in a product. A lead is judged at its place, and its builds may name different versions of its component |
 
 ## Inclusion
 

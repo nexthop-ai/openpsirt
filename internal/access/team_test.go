@@ -251,3 +251,46 @@ func TestInternalWorkIsHeldOnlyByThoseWhoReadIt(t *testing.T) {
 		}
 	})
 }
+
+// Work holding undisclosed and internal rows both is held by a team only where
+// one member reads both. Two members reading one half each are two people
+// neither of whom may open all of it.
+func TestWorkOfTwoVisibilitiesIsHeldByAMemberWhoReadsBoth(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		sonic := f.products["sonic"]
+		embargo := holding(t, f, "embargo", "Embargo", sonic, access.PrivateTriage)
+		analyst := holding(t, f, "analyst", "Analyst", sonic, access.InternalRead)
+		both := holding(t, f, "both", "Both", sonic, access.PrivateRead, access.InternalRead)
+		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		team, err := f.store.DeclareTeam(ctx, "desk", "Desk")
+		if err != nil {
+			t.Fatal(err)
+		}
+		withheld := []access.Visibility{access.Private, access.Internal}
+		for _, member := range []int64{embargo.ID, analyst.ID} {
+			if _, err := f.store.AddToTeam(ctx, team.ID, member, admin.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+		reads, err := f.store.AnyMemberReads(ctx, team.ID, sonic, withheld...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reads {
+			t.Error("two members reading one half each may hold work of both visibilities")
+		}
+		if _, err := f.store.AddToTeam(ctx, team.ID, both.ID, admin.ID); err != nil {
+			t.Fatal(err)
+		}
+		if reads, err = f.store.AnyMemberReads(ctx, team.ID, sonic, withheld...); err != nil {
+			t.Fatal(err)
+		}
+		if !reads {
+			t.Error("a member reading both may not hold work of both visibilities")
+		}
+	})
+}

@@ -101,10 +101,10 @@ const (
 
 // match pairs a run's results with the findings its series holds open on
 // the build, one to one, layer by layer (pair, or pairAcross for a
-// re-baseline). It reports the pairs, the
+// fingerprint change). It reports the pairs, the
 // results nothing matched, the open findings the run did not see, and how
 // many of the pairs had been missed by an earlier run.
-func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keyed, rebaseline bool) (
+func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keyed, printsChanged bool) (
 	map[int64]Keyed, []Keyed, []int64, int, error) {
 
 	absent := make(map[int64]bool, len(open))
@@ -120,7 +120,7 @@ func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keye
 	matched := map[int64]Keyed{}
 	paired := make([]bool, len(keyed))
 	layers := pair
-	if rebaseline {
+	if printsChanged {
 		layers = pairAcross
 	}
 	for _, p := range layers(candidates, keyed) {
@@ -179,14 +179,13 @@ func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64
 // open records each result new to this build as a finding, with what the run
 // said about it. A result the series holds elsewhere takes that lead's place,
 // so a decision on it reaches this build too; any other opens at a place its
-// series and key name. It returns the findings, and those in the baseline
-// because a lead they were carried from is.
+// series and key name. It returns the findings.
 func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, productID, seriesID int64, fresh []Keyed,
 	rules map[string]int64, from map[int]carried, components map[string]int64, root int64) (
-	[]int64, []int64, error) {
+	[]int64, error) {
 
 	if len(fresh) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
 	now := a.now().Truncate(time.Microsecond)
 	places := freshPlaces(seriesID, fresh, from)
@@ -199,7 +198,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 	// next run's sighting is not a new internal lead.
 	handed, err := handedVisibility(ctx, db, productID, places)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	rows := make([]finding.Finding, len(fresh))
 	for i, k := range fresh {
@@ -218,22 +217,18 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 		}
 	}
 	if err := database.InBatches(ctx, db, rows); err != nil {
-		return nil, nil, fmt.Errorf("record what the run found: %w", err)
+		return nil, fmt.Errorf("record what the run found: %w", err)
 	}
 	ids := make([]int64, len(rows))
-	var baseline []int64
 	said := map[int64]Keyed{}
 	for i := range rows {
 		ids[i] = rows[i].ID
 		said[rows[i].ID] = fresh[i]
-		if from[i].baseline {
-			baseline = append(baseline, rows[i].ID)
-		}
 	}
 	if err := write(ctx, db, said, false); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return ids, baseline, nil
+	return ids, nil
 }
 
 // freshPlaces is the place each result new to this build opens at: the lead's

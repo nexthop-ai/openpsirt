@@ -7,20 +7,15 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
-	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -177,125 +172,5 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "that lead could not be closed", err)
 		}
 		return &struct{ Body LeadFixedBody }{Body: LeadFixedBody{At: core.Stamp(done.At)}}, nil
-	})
-}
-
-// LeadEscalatedBody is a lead pulled into the queue.
-type LeadEscalatedBody struct {
-	At string `json:"at" format:"date-time" doc:"When it was pulled in. Pulled in again, the first time stands"`
-}
-
-func registerLeadEscalation(api huma.API, in core.Deps) {
-	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "escalate-lead", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/leads/{place}/escalation",
-		Summary: "Pull a lead into the queue",
-		Description: "Takes a lead out of the baseline and into the queue on every build of the " +
-			"product it is on. A lead already pulled in keeps when it first was, and a lead " +
-			"not in the baseline is unchanged.",
-		Tags: []string{"Triage"},
-	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Place   string `path:"place" doc:"The lead's place identity"`
-	}) (*struct{ Body LeadEscalatedBody }, error) {
-		subject, err := core.Reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
-		if err != nil {
-			return nil, err
-		}
-		done, err := analysis.Escalate(ctx, in.DB.DB, subject, product.ID, input.Place, time.Now())
-		switch {
-		case errors.Is(err, finding.ErrNothingOpenThere), errors.Is(err, access.ErrDenied):
-			return nil, core.NoSuchFinding()
-		case errors.Is(err, finding.ErrLeadPastEndOfLife):
-			return nil, huma.Error409Conflict(err.Error())
-		case err != nil:
-			return nil, core.WentWrong(in.Logger, "that lead could not be pulled in", err)
-		}
-		if done.Fresh {
-			if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadEscalated,
-				ProductID: product.ID, Place: input.Place, By: subject.ID}); err != nil {
-				in.Log().Error("could not say that a lead was pulled in", "error", err)
-			}
-		}
-		return &struct{ Body LeadEscalatedBody }{Body: LeadEscalatedBody{At: core.Stamp(done.At)}}, nil
-	})
-}
-
-// ImportantPathsBody is the paths whose baseline leads are in a product's
-// queue.
-type ImportantPathsBody struct {
-	Paths []string `json:"paths" maxItems:"500" doc:"Path prefixes from the top of the checkout. A lead at or under one is in the queue from its first run"`
-}
-
-func registerImportantPaths(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/important-paths"
-	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-important-paths", Method: http.MethodGet, Path: path,
-		Summary:     "Get a product's important paths",
-		Description: "Returns the path prefixes whose leads are in the queue from their first run, in order.",
-		Tags:        []string{"Triage"},
-	}, core.PerProduct, "", access.InternalRead, access.InternalTriage), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-	}) (*struct{ Body ImportantPathsBody }, error) {
-		subject, err := core.Reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
-		if err != nil {
-			return nil, err
-		}
-		// The product resolved, so the caller can see it: a refusal is for
-		// the role.
-		held, err := analysis.ImportantPaths(ctx, in.DB.DB, subject, product.ID)
-		if err != nil {
-			return nil, core.Asked(in.Logger, err)
-		}
-		return &struct{ Body ImportantPathsBody }{Body: ImportantPathsBody{Paths: held}}, nil
-	})
-
-	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "set-important-paths", Method: http.MethodPut, Path: path,
-		Summary: "Set a product's important paths",
-		Description: "Replaces the path prefixes whose leads are in the queue from their first run. " +
-			"A lead in the baseline at or under one enters the queue at once, and leaves it again " +
-			"where its path is taken off.\n\n" +
-			"Refused, naming the path, where one is empty, climbs out of the checkout or is named " +
-			"twice. Recorded in the administrative trail.",
-		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Body    ImportantPathsBody
-	}) (*struct{}, error) {
-		subject, err := core.Reading(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := core.ProductNamedVisibly(ctx, in, subject, input.Product); err != nil {
-			return nil, err
-		}
-		return &struct{}{}, core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
-			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
-			if err != nil {
-				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
-			}
-			was, err := analysis.ImportantPaths(ctx, tx, subject, product.ID)
-			if err != nil {
-				return core.Asked(in.Logger, err)
-			}
-			paths, err := analysis.ReplaceImportantPaths(ctx, tx, subject, product.ID, input.Body.Paths)
-			if err != nil {
-				return core.Asked(in.Logger, err)
-			}
-			if err := core.Noted(ctx, tx, trail.Setting, "important paths of "+product.Name,
-				trail.Said(strings.Join(was, ", "), true), trail.Said(strings.Join(paths, ", "), true)); err != nil {
-				return core.NotRecorded(in.Logger, err)
-			}
-			return nil
-		})
 	})
 }

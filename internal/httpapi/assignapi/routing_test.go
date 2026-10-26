@@ -122,8 +122,10 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 	// that holds for a team's queue as much as for a person.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
+		// A member who reads the product, so the rule has somewhere to place
+		// what it matches.
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
-			`{"name":"curlers"}`); made.Code != http.StatusCreated {
+			`{"name":"curlers","members":["reader"]}`); made.Code != http.StatusCreated {
 			t.Fatal(made.Body.String())
 		}
 		made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost, "/v1/products/mine/routing-rules",
@@ -525,4 +527,21 @@ func waitFor(t *testing.T, done func() bool, what string) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatalf("waited for %s and it did not happen", what)
+}
+
+// Somebody who triages only internal work reads and previews the routing rules,
+// because a rule places leads. Reading internal work without triaging it is
+// refused both.
+func TestSomebodyWhoTriagesLeadsAloneReadsAndPreviewsTheRoutingRules(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		const at = "/v1/products/mine/routing-rules"
+		for who, want := range map[string]int{"internal-triager": http.StatusOK, "internal-reader": http.StatusForbidden} {
+			for _, path := range []string{at, at + "/preview?beneath=mine"} {
+				if got := httpapitest.AsPerson(t, r, who, http.MethodGet, path, ""); got.Code != want {
+					t.Errorf("%s reading %s answered %d; want %d: %s", who, path, got.Code, want, got.Body)
+				}
+			}
+		}
+	})
 }

@@ -48,7 +48,15 @@ type Scope struct {
 	// Series is a series' name, matched without regard to capitals. A name
 	// no series of the product holds lists nothing.
 	Series string
+	// Unassigned keeps the leads nobody holds on the build a row names. A
+	// lead in a case the reader is not on names no holder, so it is left
+	// out rather than answered by who holds it.
+	Unassigned bool
 }
+
+// LeadAssignees is every word the lead queue asks who holds a lead in: the
+// findings list's word for work nobody holds.
+func LeadAssignees() []string { return []string{finding.HeldByNobody} }
 
 // QueueRow is one lead in a product: its place, and what the newest of its
 // findings in the scope says about it.
@@ -64,8 +72,17 @@ type QueueRow struct {
 	State    State     `bun:"stands"`
 	Builds   int       `bun:"builds"`
 	Opened   time.Time `bun:"opened"`
-	// Stub is a lead moved into a case, read without what the analyzer said.
+	// Holder is the party dealing with the lead on that build, where anybody
+	// is: a person, or a team it is queued with.
+	Holder *int64 `bun:"assigned_to"`
+	// Stub is a lead moved into a case, read without what the analyzer said
+	// or who holds it.
 	Stub bool `bun:"-"`
+	// ThirdParty says the lead is under a path the newest run that saw it
+	// declared as third-party code, as its evidence says.
+	ThirdParty bool `bun:"-"`
+	// Declared is that run's list of third-party paths, as it is stored.
+	Declared string `bun:"third_party"`
 }
 
 // Queue is one page of a product's leads, with how many the list holds in
@@ -89,13 +106,30 @@ type Queue struct {
 // one row per lead however many builds it is on.
 //
 // With no state named it is the queue: open leads nobody's claim waits on.
-// Naming a state lists the leads in it, which is how the baseline is
-// searched. A fixed lead is one closed on a build, and listed there until the
-// lead opens anew at its place on that build. Ordered by what is likely real: the rank of the weaknesses the
-// rule names, whether another analyzer reports the same flaw, the tool's own
+// Naming a state lists the leads in it. A fixed lead is one closed on a
+// build, and listed there until the lead opens anew at its place on that
+// build. Ordered by what is likely real: the rank of the weaknesses the rule
+// names, whether another analyzer reports the same flaw, the tool's own
 // security severity for the rule, its precision, then newest first.
 func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {
+	return leadsOf(ctx, db, subject, scope, want, false, limit, offset)
+}
+
+// OpenLeadsOf is one page of the leads a findings file holds: every open lead
+// of the selection, the ones a claim waits on included, as the file's findings
+// rows include a finding a claim waits on. A lead open only in releases past
+// their end of life is left out, as the queue leaves it out. Ordered as the
+// queue is.
+func OpenLeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
+	limit, offset int) (*Queue, error) {
+	return leadsOf(ctx, db, subject, scope, "", true, limit, offset)
+}
+
+// leadsOf is LeadsOf, with the open leads a claim waits on kept in where
+// waiting is set and no state is named.
+func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
+	waiting bool, limit, offset int) (*Queue, error) {
 
 	visible, err := access.Readable(subject, scope.ProductID)
 	if err != nil {
@@ -112,7 +146,11 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		return nil, err
 	}
 	queued := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where(`"l"."stands" = ?`, string(Open)).Where(`"l"."awaits" = 0`)
+		q = q.Where(`"l"."stands" = ?`, string(Open))
+		if waiting {
+			return q
+		}
+		return q.Where(`"l"."awaits" = 0`)
 	}
 	listed := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if want != "" {
@@ -198,8 +236,12 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		ColumnExpr(`"f"."place_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
-		ColumnExpr(`"s"."name" AS "stream", "va"."name" AS "variant"`).
+		ColumnExpr(`"s"."name" AS "stream", "va"."name" AS "variant", "f"."assigned_to"`).
+		// A finding has one sighting, and its last run is the run the evidence
+		// reads.
+		Join(`JOIN "series_run" AS "sr" ON "sr"."id" = "si"."last_run_id"`).
 		ColumnExpr(state+` AS "stands"`, stateArgs...).
+		ColumnExpr(`"sr"."third_party"`).
 		Where(`"f"."id" IN (?)`, bun.List(newest)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what the leads of product %d say: %w", scope.ProductID, err)
@@ -212,9 +254,11 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	for _, p := range page {
 		r := byPlace[p.Place]
 		r.Builds, r.Opened = p.Builds, p.Opened
-		// What the analyzer said is the case's once the lead is moved.
+		r.ThirdParty = declaredIn(r.Declared, r.Path) != ""
+		// What the analyzer said, and who is working it, are the case's
+		// once the lead is moved.
 		if p.Stub == 1 {
-			r.Message, r.Stub = "", true
+			r.Message, r.Holder, r.Stub = "", nil, true
 		}
 		out.Rows = append(out.Rows, r)
 	}
@@ -259,6 +303,9 @@ func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []acc
 	}
 	if scope.VariantID != nil {
 		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
+	}
+	if scope.Unassigned {
+		q = q.Where(`"f"."assigned_to" IS NULL`).Where(`"f"."visibility" IN (?)`, bun.List(visible))
 	}
 	if scope.Series != "" {
 		named, namedArgs := kind.Leads.Where(`"sn"."kind"`)

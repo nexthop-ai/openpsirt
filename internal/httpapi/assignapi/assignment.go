@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -42,7 +43,7 @@ func unassignedPage(rows []finding.Owned, total int) *UnassignedPage {
 			Stream: row.Stream, Variant: row.Variant,
 			StreamName:  row.StreamName,
 			VariantName: row.VariantName,
-			Places:      row.Places, Builds: row.Builds,
+			Places:      row.Places, Builds: row.Builds, Place: row.Place,
 		})
 	}
 	out.Body.Total = total
@@ -71,6 +72,7 @@ type UnassignedBody struct {
 	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	Places      int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
 	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
+	Place       string `json:"place,omitempty" doc:"The place of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
 }
 
 // HoldingBody is how much work one person has.
@@ -209,7 +211,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 			admits = teamAdmits(team, product)
 		}
 
-		_, undisclosed, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, target, issue,
+		_, withheld, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, target, issue,
 			component, to, admits)
 		if err != nil {
 			return nil, recipient(err, func(err error) error { return core.RefusedFinding(in, err) })
@@ -244,7 +246,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// assigns it again, and the notification is the lesser half of
 		// the two.
 		if to != nil && *to != subject.Party() &&
-			seenBy(ctx, in, input.Body.Person, product, undisclosed) {
+			seenBy(ctx, in, input.Body.Person, product, withheld) {
+			private, internal := notify.Withholding(withheld)
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: input.Vulnerability + " in " + input.Component +
@@ -261,7 +264,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 				// announcement an embargo exists to prevent,
 				// so a channel that leaves here carries the
 				// link alone.
-				Private: undisclosed,
+				Private:  private,
+				Internal: internal,
 				// The same two as columns. Concerns above is a
 				// string a digest matches on; these are what a
 				// read narrows by.
@@ -348,7 +352,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		OperationID: "list-unassigned", Method: http.MethodGet, Path: "/v1/unassigned",
 		Summary: "List findings nobody is dealing with",
 		Description: "Returns open findings with no assignee, across every product you can see, " +
-			"most urgent first.\n\n" +
+			"most urgent first. Static analysis leads are included where you read them, one item " +
+			"per lead, with `place` set.\n\n" +
 			"Deliberately not scoped to one product: work falling between people is exactly what " +
 			"hides when every screen shows one product and nobody looks at the others.\n\n" +
 			"One item per issue in a component in a product, not one per build. The same code " +
@@ -385,7 +390,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Description: "The open findings assigned to somebody, most urgent first, in the same " +
 			"units as what nobody is dealing with: one item per issue in a component in a " +
 			"product, not one per build. The same code built several ways is one piece of " +
-			"work, and it was taken on as one.\n\n" +
+			"work, and it was taken on as one. A static analysis lead is one item, with `place` " +
+			"set, where you read it.\n\n" +
 			"Send `me` as the identity for your own.\n\n" +
 			"An identity nobody holds answers with an empty list rather than a 404, which is " +
 			"also what an identity somebody holds answers when none of their work is yours to " +
@@ -450,7 +456,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 				}
 			}
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, subject, holders,
+		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, subject, holders,
 			scope, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what they are dealing with could not be read", err)
@@ -469,7 +475,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Path:    "/v1/teams/{team}/assignments",
 		Summary: "List what one team is dealing with",
 		Description: "The open findings routed to a team, most urgent first, in the same units " +
-			"as everywhere else: one item per issue in a component in a product.\n\n" +
+			"as everywhere else: one item per issue in a component in a product, and one per static " +
+			"analysis lead you read, with `place` set.\n\n" +
 			"Work goes to a team by standing rule and by an assignment naming one, so a team " +
 			"holds work the way a person does — and the totals list says so. This is the list " +
 			"behind that number.\n\n" +
@@ -514,7 +521,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		case !errors.Is(err, access.ErrNoSuchTeam):
 			return nil, core.WentWrong(in.Logger, "that team could not be looked up", err)
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, subject, holders,
+		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, subject, holders,
 			scope, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what the team is dealing with could not be read", err)
@@ -529,8 +536,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		OperationID: "list-holdings", Method: http.MethodGet, Path: "/v1/assignments",
 		Summary: "List assignment totals",
 		Description: "Returns everyone holding open work you can see, with how much.\n\n" +
-			"Counted in pieces of work — an issue in a component in a product — which is the " +
-			"unit the list behind each person is in. `places` says how many findings those " +
+			"Counted in pieces of work — an issue in a component in a product, or one static " +
+			"analysis lead — which is the unit the list behind each person is in. `places` says how many findings those " +
 			"cover: one flaw in a kernel is one thing to answer and can be dozens of rows to " +
 			"write.\n\n" +
 			"The number worth watching is not how many findings exist but how many are waiting " +
@@ -620,13 +627,14 @@ func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
 // nothing about what the recipient can, and it is the recipient who receives
 // the text.
 //
-// At the visibility of the finding, not merely of the product. The body names
-// the issue, the component and the build, and is stored as written — so
+// At every visibility the work holds, not merely of the product. The body
+// names the issue, the component and the build, and is stored as written — so
 // somebody who may read what has been disclosed and no more is handed the name
 // of a finding nobody has announced, in a product they hold nothing
 // undisclosed on. Seeing that a product exists is not reading its embargoed
-// work.
-func seenBy(ctx context.Context, in core.Deps, identity string, productID int64, undisclosed bool) bool {
+// work, and reading undisclosed work is not reading internal work.
+func seenBy(ctx context.Context, in core.Deps, identity string, productID int64,
+	withheld []access.Visibility) bool {
 	them, err := access.NewStore(in.DB.DB).Resolve(ctx, identity)
 	switch {
 	case errors.Is(err, access.ErrDenied):
@@ -639,34 +647,35 @@ func seenBy(ctx context.Context, in core.Deps, identity string, productID int64,
 			"person", identity, "error", err)
 		return false
 	}
-	if undisclosed {
-		return them.Reads(access.Private, productID)
+	if len(withheld) > 0 {
+		for _, v := range withheld {
+			if !them.Reads(v, productID) {
+				return false
+			}
+		}
+		return true
 	}
 	// A disclosed finding travels with the assignment to whoever holds it,
 	// so reading the product at any visibility is enough to be told.
 	return them.ReadsIn(productID)
 }
 
-// teamMayHold reports whether a team may be handed work whose strictest
-// visibility is this: at least one member reads it.
+// teamMayHold reports whether a team may be handed work holding these
+// visibilities other than public: at least one member reads all of it.
 //
 // Undisclosed work needs a member who reads undisclosed work, and internal work
-// a member who reads internal work. Disclosed work travels with the assignment
-// to whoever holds it, so a member who reads the product at any visibility is
-// enough — a team of people working private reports may be handed a disclosed
-// finding and see it.
+// a member who reads internal work; work holding both needs one member who
+// reads both. Disclosed work travels with the assignment to whoever holds it,
+// so a member who reads the product at any visibility is enough — a team of
+// people working private reports may be handed a disclosed finding and see it.
 func teamMayHold(ctx context.Context, rights *access.Store, teamID, productID int64,
-	strictest access.Visibility) (bool, error) {
+	withheld []access.Visibility) (bool, error) {
 
-	reads, err := rights.AnyMemberReads(ctx, teamID, productID, strictest)
-	if err != nil || reads || strictest != access.Public {
-		return reads, err
+	if len(withheld) > 0 {
+		return rights.AnyMemberReads(ctx, teamID, productID, withheld...)
 	}
 	for _, v := range access.Visibilities() {
-		if v == access.Public {
-			continue
-		}
-		reads, err = rights.AnyMemberReads(ctx, teamID, productID, v)
+		reads, err := rights.AnyMemberReads(ctx, teamID, productID, v)
 		if err != nil || reads {
 			return reads, err
 		}

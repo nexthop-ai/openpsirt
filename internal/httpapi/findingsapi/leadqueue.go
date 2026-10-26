@@ -14,23 +14,26 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // LeadRowBody is one lead in a product's list of them.
 type LeadRowBody struct {
-	Place    string    `json:"place" doc:"The lead's place identity, which addresses it on every build it is on"`
-	Rule     string    `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	Path     string    `json:"path" doc:"The file, from the top of the checkout"`
-	Line     int       `json:"line,omitempty" doc:"The line the result starts at"`
-	Function string    `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
-	Message  string    `json:"message" doc:"What the analyzer says. Empty where the lead is withheld"`
-	Withheld bool      `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so what the analyzer said is not answered"`
-	Stream   string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
-	Variant  string    `json:"variant" doc:"The variant of that build"`
-	State    LeadState `json:"state" doc:"Where the lead stands on that build"`
-	Builds   int       `json:"builds" doc:"The number of builds in the list's scope the lead is listed on, in the state the list asks for"`
-	Opened   string    `json:"opened" format:"date" doc:"When the lead was first opened on any of them"`
+	Place      string    `json:"place" doc:"The lead's place identity, which addresses it on every build it is on"`
+	Rule       string    `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	Path       string    `json:"path" doc:"The file, from the top of the checkout"`
+	Line       int       `json:"line,omitempty" doc:"The line the result starts at"`
+	Function   string    `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
+	Message    string    `json:"message" doc:"What the analyzer says. Empty where the lead is withheld"`
+	Withheld   bool      `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so what the analyzer said is not answered"`
+	ThirdParty bool      `json:"third_party,omitempty" doc:"Whether the lead is in code the newest run that saw it declared third-party"`
+	Stream     string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
+	Variant    string    `json:"variant" doc:"The variant of that build"`
+	State      LeadState `json:"state" doc:"Where the lead stands on that build"`
+	Builds     int       `json:"builds" doc:"The number of builds in the list's scope the lead is listed on, in the state the list asks for"`
+	Opened     string    `json:"opened" format:"date" doc:"When the lead was first opened on any of them"`
+	core.HolderBody
 }
 
 // LeadsOutput is a page of a product's leads.
@@ -38,8 +41,8 @@ type LeadsOutput struct {
 	Body struct {
 		Items []LeadRowBody `json:"items"`
 		Total int           `json:"total" doc:"The leads the list holds"`
-		// Counted rather than only listed, so that a list leaving the
-		// baseline out says how much it left (REQ-30).
+		// Counted rather than only listed, so that a list leaving leads
+		// out says how much it left (REQ-30).
 		States  map[string]int `json:"states" doc:"The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build"`
 		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
 		Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
@@ -56,6 +59,9 @@ type LeadsAsked struct {
 	Variant string    `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 	Series  string    `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing"`
 	State   LeadState `query:"state" doc:"List the leads in one state. Left out, the queue"`
+	// Assigned is the findings list's parameter and value for work nobody
+	// holds, so the two read alike.
+	Assigned LeadAssignee `query:"assigned" doc:"Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out"`
 }
 
 // scoped resolves what is asked for against what the reader may see. A
@@ -76,21 +82,40 @@ func (a LeadsAsked) scoped(ctx context.Context, in core.Deps) (access.Subject, a
 	}
 	return subject, analysis.Scope{
 		ProductID: *scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
-		Series: strings.TrimSpace(a.Series),
+		Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
 	}, nil
 }
 
-// leadRow is one lead as the list and its file both state it.
-func leadRow(r analysis.QueueRow) LeadRowBody {
-	row := LeadRowBody{
-		Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message, Withheld: r.Stub,
-		Stream: r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
-		Opened: r.Opened.UTC().Format(time.DateOnly),
+// leadRows is a page of leads as the list and its file both state them, with
+// who holds each one named.
+func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]LeadRowBody, error) {
+	parties := make([]int64, 0, len(rows))
+	for _, r := range rows {
+		if r.Holder != nil {
+			parties = append(parties, *r.Holder)
+		}
 	}
-	if r.Line != nil {
-		row.Line = *r.Line
+	who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, parties)
+	if err != nil {
+		return nil, err
 	}
-	return row
+	out := make([]LeadRowBody, 0, len(rows))
+	for _, r := range rows {
+		row := LeadRowBody{
+			Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message, Withheld: r.Stub,
+			ThirdParty: r.ThirdParty,
+			Stream:     r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
+			Opened: r.Opened.UTC().Format(time.DateOnly),
+		}
+		if r.Line != nil {
+			row.Line = *r.Line
+		}
+		if r.Holder != nil {
+			row.HolderBody = core.HolderOf(who[*r.Holder])
+		}
+		out = append(out, row)
+	}
+	return out, nil
 }
 
 // leadColumns names the columns of the lead queue's file, in the order
@@ -98,7 +123,7 @@ func leadRow(r analysis.QueueRow) LeadRowBody {
 func leadColumns() []string {
 	return []string{
 		"rule", "path", "line", "function", "message", "withheld", "state", "stream", "variant",
-		"builds", "opened", "place",
+		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "place", "third_party",
 	}
 }
 
@@ -111,7 +136,9 @@ func leadCells(row LeadRowBody) []string {
 	}
 	return []string{
 		row.Rule, row.Path, line, row.Function, row.Message, strconv.FormatBool(row.Withheld),
-		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened, row.Place,
+		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened,
+		row.AssignedTo, row.AssignedName, strconv.FormatBool(row.AssignedTeam), row.Place,
+		strconv.FormatBool(row.ThirdParty),
 	}
 }
 
@@ -125,17 +152,17 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			"reports the same flaw on the build, then the tool's own security severity for the rule, " +
 			"then its precision, then newest first.\n\n" +
 			"With no `state` it is the queue: open leads with no claim waiting for a second " +
-			"person. A lead in the baseline is left out until it is pulled in, its path is " +
-			"marked important, or another analyzer reports the same flaw. `state` lists the leads " +
-			"in one state instead, which is how the baseline is searched. `fixed` lists the leads " +
+			"person. `state` lists the leads in one state instead. `fixed` lists the leads " +
 			"closed on a build and not opened anew there.\n\n" +
 			"`states` counts every lead in the scope by state and `waiting` the open ones " +
 			"left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, " +
 			"so what the list leaves out is counted. The queue also leaves out a lead open only in " +
 			"releases past their end of life, and `past_end_of_life` counts those. A lead seen only in " +
-			"such releases is kept as it stands: a decision, a fixed closure, pulling it in and handing " +
+			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +
 			"it off are refused with 409. " +
-			"`stream`, `variant` and `series` are optional and independent. Supports limit and offset.",
+			"`stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps " +
+			"the leads nobody holds on the build each row names, and combines with every other filter. " +
+			"Supports limit and offset.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		LeadsAsked
@@ -157,9 +184,8 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		for state, n := range queue.ByState {
 			out.Body.States[string(state)] = n
 		}
-		out.Body.Items = make([]LeadRowBody, 0, len(queue.Rows))
-		for _, r := range queue.Rows {
-			out.Body.Items = append(out.Body.Items, leadRow(r))
+		if out.Body.Items, err = leadRows(ctx, in, queue.Rows); err != nil {
+			return nil, core.WentWrong(in.Logger, "who holds the leads could not be read", err)
 		}
 		return out, nil
 	})
@@ -185,9 +211,12 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		listing := "the queue: open leads nothing waits on, the baseline and leads open only in releases past their end of life left out"
+		listing := "the queue: open leads nothing waits on, leads open only in releases past their end of life left out"
 		if input.State != "" {
 			listing = "the leads " + string(input.State)
+		}
+		if input.Assigned == finding.HeldByNobody {
+			listing += ", nobody holding them"
 		}
 		out := core.Exporting{
 			What:   "leads",
@@ -199,9 +228,13 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 				if err != nil {
 					return nil, err
 				}
-				rows := make([][]string, 0, len(queue.Rows))
-				for _, r := range queue.Rows {
-					rows = append(rows, leadCells(leadRow(r)))
+				listed, err := leadRows(ctx, in, queue.Rows)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(listed))
+				for _, row := range listed {
+					rows = append(rows, leadCells(row))
 				}
 				return rows, nil
 			},

@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Leads } from "./Leads";
 import { location, mounted, screen, serve, settle } from "../test/mount";
-import { press } from "../test/controls";
+import { press, tick } from "../test/controls";
 
 const mount = mounted();
 
@@ -22,10 +22,13 @@ const ROWS = [
     builds: 3,
     opened: "2026-10-01",
     state: "open",
+    assigned_to: "kernel",
+    assigned_to_name: "Kernel",
+    assigned_team: true,
   },
 ];
 
-async function drawn(at = "/products/sonic/leads") {
+async function drawn(at = "/products/sonic/leads", rows: object[] = ROWS) {
   const asked: unknown[] = [];
   serve((path, init) => {
     if (path === "/v1/session/me")
@@ -42,9 +45,9 @@ async function drawn(at = "/products/sonic/leads") {
       asked.push((init as { params: { query: unknown } }).params.query);
       return {
         data: {
-          items: ROWS,
+          items: rows,
           total: 1,
-          states: { baseline: 40, open: 1 },
+          states: { "not-reproduced": 40, open: 1 },
           waiting: 2,
           ruled: 5,
           past_end_of_life: 3,
@@ -62,15 +65,17 @@ const text = () => mount.host().textContent ?? "";
 
 describe("the leads", () => {
   it("offers the list as a file asked with the same narrowing", async () => {
-    const asked = await drawn("/products/sonic/leads?state=baseline&series=semgrep%2Fdefault");
-    expect(asked[0]).toMatchObject({ state: "baseline", series: "semgrep/default" });
+    const asked = await drawn(
+      "/products/sonic/leads?state=not-reproduced&series=semgrep%2Fdefault",
+    );
+    expect(asked[0]).toMatchObject({ state: "not-reproduced", series: "semgrep/default" });
     const file = Array.from(mount.host().querySelectorAll("a")).find(
       (each) => each.textContent === "CSV",
     );
     const at = new URL(file?.getAttribute("href") ?? "", "http://x");
     expect(at.pathname).toBe("/v1/products/sonic/leads.csv");
     expect(Object.fromEntries(at.searchParams)).toEqual({
-      state: "baseline",
+      state: "not-reproduced",
       series: "semgrep/default",
     });
   });
@@ -85,20 +90,49 @@ describe("the leads", () => {
     );
   });
 
+  it("marks a lead in code its run declared third-party", async () => {
+    await drawn(undefined, [{ ...ROWS[0], third_party: true }]);
+    expect(text()).toContain("Third-party");
+  });
+
+  it("marks nothing third-party where the run declared none", async () => {
+    await drawn();
+    expect(text()).not.toContain("Third-party");
+  });
+
+  it("names who holds each lead", async () => {
+    await drawn();
+    expect(text()).toContain("Kernel · team");
+  });
+
   it("counts what the queue leaves out", async () => {
     await drawn();
     expect(text()).toContain("2 waiting for approval");
     expect(text()).toContain("3 open only past end of life");
     expect(text()).toContain("5 dismissed by a rule");
-    expect(text()).toContain("Baseline 40");
+    expect(text()).toContain("Not reproduced 40");
   });
 
   it("lists one state's leads, which the address carries", async () => {
     const asked = await drawn();
-    await press(mount.host(), "Baseline 40");
+    await press(mount.host(), "Not reproduced 40");
     await settle();
-    expect(location()).toBe("/products/sonic/leads?state=baseline");
-    expect(asked.at(-1)).toMatchObject({ state: "baseline" });
+    expect(location()).toBe("/products/sonic/leads?state=not-reproduced");
+    expect(asked.at(-1)).toMatchObject({ state: "not-reproduced" });
+  });
+
+  it("narrows to the leads nobody holds, which the address and the file carry", async () => {
+    const asked = await drawn("/products/sonic/leads?state=open");
+    tick(mount.host(), "Unassigned only");
+    await settle();
+    expect(location()).toBe("/products/sonic/leads?state=open&assigned=nobody");
+    expect(asked.at(-1)).toMatchObject({ state: "open", assigned: "nobody" });
+    const file = Array.from(mount.host().querySelectorAll("a")).find(
+      (each) => each.textContent === "JSON",
+    );
+    expect(new URL(file?.getAttribute("href") ?? "", "http://x").searchParams.get("assigned")).toBe(
+      "nobody",
+    );
   });
 
   it("asks for the build the address names", async () => {

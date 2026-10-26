@@ -19,7 +19,7 @@ func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 			if !Known(k) {
 				t.Errorf("%s includes %q, which nothing declares", c, k)
 			}
-			if !c.includes(k) {
+			if !c.Includes(k) {
 				t.Errorf("%s lists %q and does not include it", c, k)
 			}
 		}
@@ -30,11 +30,11 @@ func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 }
 
 // builtForAnalysis is the consumers that read analysis results.
-var builtForAnalysis = map[Consumer]bool{Decisions: true, Evidence: true, Leads: true}
+var builtForAnalysis = map[Consumer]bool{Assignment: true, Decisions: true, Exports: true, Evidence: true, Leads: true}
 
 func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 	for _, c := range consumers() {
-		if got, want := c.includes(Analysis), builtForAnalysis[c]; got != want {
+		if got, want := c.Includes(Analysis), builtForAnalysis[c]; got != want {
 			t.Errorf("%s includes analysis results: %v; want %v", c, got, want)
 		}
 	}
@@ -42,7 +42,7 @@ func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 
 func TestOnlyTheSweepAndTheLeadReadersLeaveRecordedFlawsOut(t *testing.T) {
 	for _, c := range consumers() {
-		if got, want := c.includes(Entered), c != Closure && c != Evidence && c != Leads; got != want {
+		if got, want := c.Includes(Entered), c != Closure && c != Evidence && c != Leads; got != want {
 			t.Errorf("%s includes recorded flaws: %v; want %v", c, got, want)
 		}
 	}

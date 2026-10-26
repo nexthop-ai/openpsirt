@@ -64,7 +64,6 @@ var called = map[Kind]string{
 	AnalysisDropped:       "An analyzer run dropped sharply",
 	AnalysisNotComparable: "An analyzer run could not be compared",
 	AnalysisQuiet:         "An analyzer has gone quiet",
-	LeadEscalated:         "A lead was pulled into the queue",
 	LeadHandedOff:         "A lead was handed off as a flaw",
 	LeadMoved:             "A lead moved into or out of a case",
 	RuleOutgrown:          "A standing rule outgrew its approval",

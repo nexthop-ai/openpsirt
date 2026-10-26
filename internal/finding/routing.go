@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -119,11 +120,12 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 
 // Rules lists a product's standing rules, in the order they are tried.
 //
-// Read by whoever triages the product. The rules are its triage configuration
-// and carry no finding, so there is nothing to narrow: a reader gets the whole
+// Read by whoever triages the product at any visibility, internal included,
+// because a rule places leads too. The rules are its triage configuration and
+// carry no finding, so there is nothing to narrow: a reader gets the whole
 // precedence order or none of it.
 func (s *Store) Rules(ctx context.Context, subject access.Subject, productID int64) ([]Routing, error) {
-	if !subject.TriagesIn(productID) {
+	if !subject.TriagesAnyIn(productID) {
 		return nil, access.Denied(fmt.Sprintf("read the routing rules of product %d", productID))
 	}
 	return s.rules(ctx, productID)
@@ -253,14 +255,27 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 	// the write re-checks the holder so that an assignment landing between the
 	// read and the write is not overwritten.
 	var ids []int64
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	holdable, err := s.holdableBy(ctx, rule.TeamID, productID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(holdable) == 0 {
+		return 0, 0, nil
+	}
+	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
 	page := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
 		Where(`"closed_at" IS NULL`).
 		Where(`"assigned_to" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(holdable)).
+		Where(notHandedOffIn).
 		Where(inThisProduct, productID).
 		Where(kinds, kindArgs...).
 		Limit(int64(room))
+	page, err = s.leadsInSupport(ctx, page, productID)
+	if err != nil {
+		return 0, 0, err
+	}
 	if rule.Upstream != "" {
 		page = bySource(page, rule.Upstream)
 	}
@@ -308,6 +323,36 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		return 0, 0, fmt.Errorf("place what that rule matched: %w", err)
 	}
 	return len(ids), int(n), nil
+}
+
+// holdableBy is every visibility a team may be handed work at in a product:
+// undisclosed and internal work where one member reads it, and disclosed work
+// where one member reads the product at any visibility, because disclosed
+// work travels with the assignment. The rule a hand assignment to the team
+// asks.
+//
+// Asked of each place rather than of a group, so an undisclosed place nobody
+// on the team reads is left with nobody while the disclosed places beside it
+// are placed. A person who reads it picks it up from the unassigned list.
+func (s *Store) holdableBy(ctx context.Context, teamID, productID int64) ([]access.Visibility, error) {
+	rights := access.NewStore(s.db)
+	var out []access.Visibility
+	for _, v := range []access.Visibility{access.Private, access.Internal} {
+		reads, err := rights.AnyMemberReads(ctx, teamID, productID, v)
+		if err != nil {
+			return nil, err
+		}
+		if reads {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		reads, err := rights.AnyMemberReads(ctx, teamID, productID, access.Public)
+		if err != nil || !reads {
+			return nil, err
+		}
+	}
+	return append(out, access.Public), nil
 }
 
 // bySource narrows to the components a source-package rule names.
@@ -379,8 +424,8 @@ type Catches struct {
 	Components []string
 	Total      int
 	// Work is how many pieces of work sit at those components — one issue in
-	// one component, whatever it sits at — and Unheld is how many of those
-	// nobody holds. Only the second is what a rule would place, and they are
+	// one component, whatever it sits at, or one lead — and Unheld is how
+	// many of those nobody holds. Only the second is what a rule would place, and they are
 	// both shown because the gap between them is the thing worth knowing.
 	Work, Unheld int
 }
@@ -391,6 +436,9 @@ type Catches struct {
 // than spelling them twice, because a preview that disagreed with the rule
 // would be a confident wrong answer about the one thing nobody can otherwise
 // see.
+//
+// It names no team, so it counts work at every visibility the asker reads,
+// where the sweep places only what one member of the rule's team reads.
 //
 // It does not account for the rules already there. First match wins, so
 // what this catches is what it would place only where no earlier rule claimed
@@ -422,12 +470,17 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	// The same narrowing the sweep does, minus the holder: what a rule matches
 	// and what it would place differ by who holds it, and both are worth
 	// seeing.
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(notHandedOffIn).
 			Where(inThisProductAs(`"f"."target_id"`), productID).
 			Where(kinds, kindArgs...)
+		q, err := s.leadsInSupport(ctx, q, productID)
+		if err != nil {
+			return nil, err
+		}
 		if upstream != "" {
 			q = bySource(q, upstream)
 		}
@@ -476,7 +529,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 
 	counted, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id"`))
+		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + leadPiece + ` AS "lead_place"`))
 	if err != nil {
 		return Catches{}, err
 	}
@@ -488,7 +541,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 
 	unheld, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id"`).
+		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + leadPiece + ` AS "lead_place"`).
 		Where(`"f"."assigned_to" IS NULL`))
 	if err != nil {
 		return Catches{}, err
@@ -499,6 +552,32 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	}
 	found.Unheld = int(free)
 	return found, nil
+}
+
+// leadPiece is what tells one lead from another at one issue and component,
+// over a finding under "f": its place. A piece of work is an issue at a
+// component, and a lead is one place under its analyzer's rule, so two
+// results of one rule in one component are two pieces of work.
+const leadPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."place_identity" ELSE '' END`
+
+// leadsInSupport leaves out of a query over findings under "f" every lead past
+// its end of life: one every release of the product it was seen in is past
+// its end of life, which is kept as it stands (REQ-15). The rule LeadEnded
+// holds, asked of each row.
+func (s *Store) leadsInSupport(ctx context.Context, q *bun.SelectQuery, productID int64) (*bun.SelectQuery, error) {
+	ended, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, s.now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	if len(ended) == 0 {
+		return q, nil
+	}
+	return q.Where(`("f"."kind" <> ? OR EXISTS (SELECT 1 FROM "finding" AS "fs"
+		JOIN "target" AS "ts" ON "ts"."id" = "fs"."target_id"
+		JOIN "stream" AS "ss" ON "ss"."id" = "ts"."stream_id"
+		WHERE "fs"."place_identity" = "f"."place_identity" AND "fs"."kind" = ?
+		  AND "ss"."product_id" = ? AND "ts"."stream_id" NOT IN (?)))`,
+		kind.Analysis, kind.Analysis, productID, bun.List(ended)), nil
 }
 
 // beneathIn is every component sitting at or under a named one, across a

@@ -73,7 +73,6 @@ func leadRulesOf(t *testing.T, r *httpapitest.Reach) map[int64]leadRuleRead {
 func TestAStandingRuleDismissesNothingUntilSomebodyElseApprovesIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, "/v1/products/mine/leads/"+place+"/escalation", `{}`)
 		rule := proposeLeadRule(t, r,
 			`{"rule":"clang-tidy/leak","reason":"false_positive","reasoning":"every allocation here is pooled"}`)
 		if rule.State != "proposed" || rule.Covering != 1 {

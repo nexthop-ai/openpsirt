@@ -5,14 +5,20 @@ package reportsapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -74,6 +80,16 @@ func registerExport(api huma.API, in core.Deps) {
 			"Read with your own visibility, as it streams. It is the same query the screen " +
 			"reads, paged and written out as it goes.\n\n" +
 			"The line this deployment triages at is stated in the file.\n\n" +
+			"Below the findings come every open static analysis lead of the same branch or tag " +
+			"and variant, in the lead queue's order, where you read them, those a claim waits on " +
+			"included and those open only in releases past their end of life left out: `lead` is " +
+			"true on those " +
+			"rows, and `path`, `line`, `function` and `message` say where each is and what the " +
+			"analyzer said. No row carries source text, and `withheld` is false on every lead. A lead carries no rating, component or " +
+			"decision, so a file narrowed by any filter but the order holds no lead, and says " +
+			"so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, " +
+			"and `on=branch` with `support=in-support`, which is what the list reads when " +
+			"neither is asked.\n\n" +
 			"Takes every filter the findings list takes.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
@@ -96,21 +112,28 @@ func registerExport(api huma.API, in core.Deps) {
 		if floor.Hides() {
 			line = floor.Word
 		}
+		findings := func(ctx context.Context, limit, offset int) ([][]string, error) {
+			groups, _, err := store.Groups(ctx, subject, scope, limit, offset, narrowed)
+			if err != nil {
+				return nil, err
+			}
+			rows := make([][]string, 0, len(groups))
+			for _, g := range groups {
+				rows = append(rows, findingCells(g))
+			}
+			return rows, nil
+		}
+		parts, leads := []core.Paged{findings}, withLeads(input.Narrowing, input.AtOneBuild)
+		if leads.Value == leadsListed {
+			parts = append(parts, leadRows(in, subject, analysis.Scope{
+				ProductID: *scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
+			}, ""))
+		}
 		out := core.Exporting{
 			What:   "findings",
-			About:  []core.Stated{{Label: "triaged at or above", Value: line}},
+			About:  []core.Stated{{Label: "triaged at or above", Value: line}, leads},
 			Header: findingColumns(),
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				groups, _, err := store.Groups(ctx, subject, scope, limit, offset, narrowed)
-				if err != nil {
-					return nil, err
-				}
-				rows := make([][]string, 0, len(groups))
-				for _, g := range groups {
-					rows = append(rows, findingCells(g))
-				}
-				return rows, nil
-			},
+			Rows:   core.InTurn(parts...),
 		}
 		name := "findings-" + strings.ToLower(input.Product)
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
@@ -141,6 +164,9 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			"screen reads, paged and written out as it goes.\n\n" +
 			"Each product applies its own triage line, so the file states that rather than " +
 			"naming one line, and `product` is a column.\n\n" +
+			"Below the findings come the open static analysis leads of every product, by " +
+			"product name, as the product export writes them. The columns and the rule about " +
+			"filters are the product export's.\n\n" +
 			"Takes every filter the cross-product list takes. `beneath` and `differs` are " +
 			"not offered here, for the reason that list gives.",
 		Tags: []string{"Findings"},
@@ -161,21 +187,35 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 		}
 		narrowed.MinSeverity = ""
 		store := finding.NewStore(in.DB.DB)
+		findings := func(ctx context.Context, limit, offset int) ([][]string, error) {
+			groups, _, err := store.Anywhere(ctx, subject, limit, offset, narrowed)
+			if err != nil {
+				return nil, err
+			}
+			rows := make([][]string, 0, len(groups))
+			for _, g := range groups {
+				rows = append(rows, append([]string{g.Product}, findingCells(g)...))
+			}
+			return rows, nil
+		}
+		parts, leads := []core.Paged{findings}, withLeads(input.Narrowing, core.AtOneBuild{})
+		if leads.Value == leadsListed {
+			products, err := catalog.NewStore(in.DB.DB).Products(ctx, subject)
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, "the products could not be read", err)
+			}
+			for _, p := range products {
+				if _, err := access.Readable(subject, p.ID); err != nil {
+					continue
+				}
+				parts = append(parts, leadRows(in, subject, analysis.Scope{ProductID: p.ID}, p.Name))
+			}
+		}
 		out := core.Exporting{
 			What:   "findings, every product",
-			About:  []core.Stated{{Label: "triaged at or above", Value: "each product's own line"}},
+			About:  []core.Stated{{Label: "triaged at or above", Value: "each product's own line"}, leads},
 			Header: append([]string{"product"}, findingColumns()...),
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				groups, _, err := store.Anywhere(ctx, subject, limit, offset, narrowed)
-				if err != nil {
-					return nil, err
-				}
-				rows := make([][]string, 0, len(groups))
-				for _, g := range groups {
-					rows = append(rows, append([]string{g.Product}, findingCells(g)...))
-				}
-				return rows, nil
-			},
+			Rows:   core.InTurn(parts...),
 		}
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
 			core.WriteExport(writer, input.Format, "findings", out)
@@ -192,11 +232,15 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 // beside the score because two schemes are scorable and their numbers are not
 // comparable, so a column of them read by somebody's script is a ranking that
 // is not one.
+//
+// A lead is a row of the same columns. The columns after the variant are a
+// lead's, and empty on every other row; the columns before it that a lead
+// carries nothing for are empty on a lead's.
 func findingColumns() []string {
 	return []string{
 		"issue", "severity", "score", "score scheme", "exploited", "component", "version",
 		"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
-		"stream", "variant",
+		"stream", "variant", "lead", "path", "line", "function", "message", "withheld",
 	}
 }
 
@@ -217,6 +261,66 @@ func findingCells(g finding.Group) []string {
 		g.Component, g.Version, g.Ecosystem, g.FixedIn,
 		strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
 		string(g.State), opened, due,
-		g.Stream, g.Variant,
+		g.Stream, g.Variant, "false", "", "", "", "", "",
+	}
+}
+
+// leadsListed is what a findings file says about its leads where it holds
+// them.
+const leadsListed = "every open lead, below the findings, those a claim waits on included and those open only in releases past their end of life left out"
+
+// withLeads is the fact a findings file states about the leads it holds. A
+// lead carries no rating, component, upstream, decision or deadline, so a
+// narrowing asking anything but the order matches none, and the file says so
+// rather than leaving a reader to wonder where the leads went.
+func withLeads(by core.Narrowing, at core.AtOneBuild) core.Stated {
+	switch {
+	case !kind.Exports.Includes(kind.Analysis):
+		return core.Stated{}
+	case !by.OnlyOrders() || at != (core.AtOneBuild{}):
+		return core.Stated{Label: "leads", Value: "none: a filter asks what a lead does not carry"}
+	}
+	return core.Stated{Label: "leads", Value: leadsListed}
+}
+
+// leadRows is the open leads of one product in a selection, as findings file
+// rows, with the product's name in front where the file spans products.
+//
+// The lead queue's read, under its visibility, with the leads a claim waits
+// on kept in. No row carries source text, and none is withheld: a lead read
+// without its message is one moved into a case, which is handed off and so
+// never open. A product whose leads the reader may not read is a part holding
+// no row.
+func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
+	return func(ctx context.Context, limit, offset int) ([][]string, error) {
+		queue, err := analysis.OpenLeadsOf(ctx, in.DB.DB, subject, scope, limit, offset)
+		if errors.Is(err, access.ErrDenied) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		rows := make([][]string, 0, len(queue.Rows))
+		for _, r := range queue.Rows {
+			cells := leadCells(r)
+			if product != "" {
+				cells = append([]string{product}, cells...)
+			}
+			rows = append(rows, cells)
+		}
+		return rows, nil
+	}
+}
+
+// leadCells is one lead as a row of a findings file. The rule is the issue.
+// A line the analyzer named none for is an empty cell, never a zero.
+func leadCells(r analysis.QueueRow) []string {
+	line := ""
+	if r.Line != nil {
+		line = strconv.Itoa(*r.Line)
+	}
+	return []string{
+		r.Rule, "", "", "", "", "", "", "", "", "", "", "", r.Opened.UTC().Format(time.DateOnly), "",
+		r.Stream, r.Variant, "true", r.Path, line, r.Function, r.Message, strconv.FormatBool(r.Stub),
 	}
 }

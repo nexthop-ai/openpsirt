@@ -20,10 +20,7 @@ import (
 // the same result as: the place it takes, and how it was found.
 type carried struct {
 	place string
-	// baseline is whether the lead is in the series' baseline, which makes
-	// the result part of it too.
-	baseline bool
-	on       string
+	on    string
 	// from says where the lead was found.
 	from string
 }
@@ -99,12 +96,10 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 		return err
 	}
 	absent := make(map[int64]bool, len(open))
-	baseline := make(map[int64]bool, len(open))
 	ids := make([]int64, 0, len(open))
 	for _, s := range open {
 		ids = append(ids, s.FindingID)
 		absent[s.FindingID] = s.AbsentRunID != nil
-		baseline[s.FindingID] = s.Baseline
 	}
 	candidates, err := candidatesOf(ctx, db, ids, absent)
 	if err != nil {
@@ -116,7 +111,7 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 	}
 	for _, p := range pair(candidates, fresh) {
 		id := candidates[p.candidate].findingID
-		out[p.result] = carried{place: places[id], baseline: baseline[id], on: p.on, from: fromParent}
+		out[p.result] = carried{place: places[id], on: p.on, from: fromParent}
 	}
 	return nil
 }
@@ -148,7 +143,7 @@ func placesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, e
 // fromSeriesKey looks the results nothing has carried yet up across the
 // series on the whole key. A closed lead on this build comes first, since
 // that is the same result found again here, and then the oldest lead
-// elsewhere. A result is in the baseline where any lead holding its key is.
+// elsewhere.
 func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fresh []Keyed, out map[int]carried) error {
 	var keys []string
 	wanted := map[string]bool{}
@@ -164,7 +159,6 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 		Place    string     `bun:"place_identity"`
 		TargetID int64      `bun:"target_id"`
 		ClosedAt *time.Time `bun:"closed_at"`
-		Baseline bool       `bun:"baseline"`
 	}
 	byKey := map[string][]held{}
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
@@ -176,7 +170,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 			ColumnExpr(`"f"."id", "ar"."match_key", "f"."place_identity", "f"."target_id"`).
-			ColumnExpr(`"f"."closed_at", "si"."baseline"`).
+			ColumnExpr(`"f"."closed_at"`).
 			Where(`"si"."series_id" = ?`, seriesID).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
 			Where(where, args...).
@@ -206,9 +200,6 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 		c := carried{place: hits[0].Place, on: onKey, from: fromSeries}
 		if hits[0].TargetID == targetID && hits[0].ClosedAt != nil {
 			c.from = fromReopened
-		}
-		for _, h := range hits {
-			c.baseline = c.baseline || h.Baseline
 		}
 		out[i] = c
 	}

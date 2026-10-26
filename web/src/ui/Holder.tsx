@@ -30,6 +30,7 @@ export type Held = { kind: "person" | "team"; identity: string; name: string };
 export function Holder({
   product,
   undisclosed,
+  internal,
   value,
   onPick,
   disabled,
@@ -40,6 +41,8 @@ export function Holder({
   // The kind of work being handed over, so the people offered are the
   // ones who could open it.
   undisclosed?: boolean;
+  // Internal work, such as a lead, which only readers of internal work open.
+  internal?: boolean;
   // The present holder, shown when the field is not being typed in.
   value?: { identity: string; name?: string } | null;
   onPick: (held: Held | null) => void;
@@ -73,14 +76,23 @@ export function Holder({
 
   const found = useQuery({
     enabled: open && product !== "",
-    queryKey: ["holders", product, undisclosed === true, typed.trim()],
+    queryKey: [
+      "holders",
+      product,
+      internal ? "internal" : undisclosed ? "private" : "",
+      typed.trim(),
+    ],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/holders", {
           params: {
             path: { product },
             query: {
-              ...(undisclosed ? { visibility: "private" as const } : {}),
+              ...(internal
+                ? { visibility: "internal" as const }
+                : undisclosed
+                  ? { visibility: "private" as const }
+                  : {}),
               ...(typed.trim() ? { q: typed.trim() } : {}),
               limit: 25,
             },

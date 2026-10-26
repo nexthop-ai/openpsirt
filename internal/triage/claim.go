@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -998,6 +999,12 @@ func (s *Store) handedOff(ctx context.Context, claimIDs []int64) (map[int64]bool
 
 // writableRows is claimRows for a write, which a claim about a lead handed off
 // as a flaw is refused.
+//
+// The claim is restamped from the stamp it was read with, after the hand-off
+// is asked about. A hand-off restamps the claim it rests on the same way, so
+// of a write and a hand-off committing at once one matches nothing, and is
+// taken again to find the other: the read of the hand-off alone is a plain
+// read, and answers from before a hand-off that has not committed.
 func (s *Store) writableRows(ctx context.Context, subject access.Subject, claimID int64,
 	allowed func(access.Subject, int64, int64, access.Visibility) bool) (*Claim, []Decision, error) {
 
@@ -1005,10 +1012,118 @@ func (s *Store) writableRows(ctx context.Context, subject access.Subject, claimI
 	if err != nil {
 		return nil, nil, err
 	}
+	stamps, err := s.stampsOf(ctx, []int64{claimID})
+	if err != nil {
+		return nil, nil, err
+	}
 	if err := s.notHandedOff(ctx, claimID); err != nil {
 		return nil, nil, err
 	}
+	if err := s.restamp(ctx, claimID, stamps[claimID]); err != nil {
+		return nil, nil, err
+	}
 	return claim, rows, nil
+}
+
+// restamp restamps a claim from the stamp read. Inside a transaction the
+// store began, it waits for the transaction's end, so the stamp row is
+// locked only after every other statement has run: a writer that locks it
+// first holds that lock across reads another transaction's write is waiting
+// to finish.
+func (s *Store) restamp(ctx context.Context, claimID int64, read int) error {
+	if s.restamps == nil {
+		return Restamp(ctx, s.db, claimID, read)
+	}
+	if _, held := s.restamps[claimID]; !held {
+		s.restamps[claimID] = read
+	}
+	return nil
+}
+
+// restampAll restamps every claim the transaction wrote, in the order of
+// their identifiers, so two transactions lock them in the same order.
+func (s *Store) restampAll(ctx context.Context) error {
+	ids := make([]int64, 0, len(s.restamps))
+	for id := range s.restamps {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		if err := Restamp(ctx, s.db, id, s.restamps[id]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// claimStamp is the stamp a claim's writers match on (Restamp).
+type claimStamp struct {
+	bun.BaseModel `bun:"table:claim_stamp,alias:cs"`
+
+	ClaimID int64 `bun:"claim_id,pk"`
+	Stamp   int   `bun:"stamp,notnull"`
+}
+
+// Restamp changes a claim's stamp from the value read, inside the transaction
+// that read it. A claim whose stamp another writer changed since matched
+// nothing, and the attempt is a lost race the retry helper takes again whole.
+//
+// The stamp is a row of its own, which no foreign key points at, so nothing
+// but another stamp's writer holds its lock. A claim nobody has stamped has no
+// row and reads as zero; its first stamp inserts the row, and a duplicate key
+// there is another writer's first stamp, the same lost race.
+//
+// The new value is always another number. MySQL and MariaDB leave unwritten a
+// row an update leaves as it was, and a cluster certifies only rows that were
+// written, so an update to the value already held lets both writers pass.
+func Restamp(ctx context.Context, db bun.IDB, claimID int64, read int) error {
+	doing := fmt.Sprintf("restamp claim %d", claimID)
+	result, err := db.NewUpdate().Model((*claimStamp)(nil)).
+		Set(`"stamp" = ?`, read+1).
+		Where(`"claim_id" = ?`, claimID).
+		Where(`"stamp" = ?`, read).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	if read != 0 {
+		return movedAll(result, 1, doing)
+	}
+	n, err := database.Affected(result)
+	if err != nil {
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	if n == 1 {
+		return nil
+	}
+	if _, err := db.NewInsert().Model(&claimStamp{ClaimID: claimID, Stamp: read + 1}).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			return fmt.Errorf("%s: %w", doing, database.ErrGoAgain)
+		}
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	return nil
+}
+
+// stampsOf is the stamp each of these claims holds, by claim, as the
+// transaction reads it. A claim with no stamp row holds zero, which is what
+// the map answers for a claim it has no entry for.
+func (s *Store) stampsOf(ctx context.Context, claimIDs []int64) (map[int64]int, error) {
+	out := make(map[int64]int, len(claimIDs))
+	if err := database.IDsInBatches(ctx, claimIDs, func(ctx context.Context, batch []int64) error {
+		var rows []claimStamp
+		if err := s.db.NewSelect().Model(&rows).
+			Where(`"cs"."claim_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
+			return err
+		}
+		for _, row := range rows {
+			out[row.ClaimID] = row.Stamp
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("read the claims' stamps: %w", err)
+	}
+	return out, nil
 }
 
 // movedAll reads an update that matched on what the transaction read. Fewer

@@ -72,7 +72,8 @@ type HandoffOfferBody struct {
 	Rule        string           `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
 	Seen        []LeadBuild      `json:"seen" doc:"Every build the lead was seen in, which the flaw is proposed against"`
 	Suggestions []SuggestionBody `json:"suggestions" doc:"The components offered, most likely first. The build itself is always last"`
-	Prefix      string           `json:"prefix,omitempty" doc:"The path a confirmed component is remembered for: the repository the lead is in, or its directory"`
+	Prefix      string           `json:"prefix,omitempty" doc:"The path a confirmed component is remembered for: the repository or declared third-party path the lead is in, or its directory"`
+	ThirdParty  bool             `json:"third_party,omitempty" doc:"Whether the lead is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted"`
 	Together    int              `json:"together" doc:"The number of other leads linked to the flaw with this one: the leads its confirming claim covers. A move moves them with it"`
 	Discloses   DisclosesBody    `json:"discloses" doc:"What moving the lead, and the leads linked with it, into the flaw's case discloses when the flaw is disclosed"`
 }
@@ -162,7 +163,8 @@ func registerHandoff(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "who wrote about the lead could not be read", err)
 		}
 		body := HandoffOfferBody{
-			Rule: offer.Rule, Seen: leadBuilds(offer.Seen), Prefix: offer.Prefix, Together: offer.Together,
+			Rule: offer.Rule, Seen: leadBuilds(offer.Seen), Prefix: offer.Prefix, ThirdParty: offer.ThirdParty,
+			Together:    offer.Together,
 			Suggestions: make([]SuggestionBody, 0, len(offer.Suggestions)), Discloses: discloses,
 		}
 		for _, s := range offer.Suggestions {

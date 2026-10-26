@@ -41,21 +41,24 @@ type LeadPlace struct {
 
 // LeadEvidenceBody is what the newest run that saw a lead said about it.
 type LeadEvidenceBody struct {
-	Rule      string             `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	At        LeadPlace          `json:"at" doc:"Where the lead is"`
-	Steps     []LeadPlace        `json:"steps" doc:"The path the analyzer took to it, in order"`
-	Related   []LeadPlace        `json:"related" doc:"The other places the analyzer names"`
-	Open      bool               `json:"open" doc:"Whether the lead is open on the build"`
-	LastSeen  string             `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
-	NotSeen   string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
-	Compare   string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
-	Unchanged bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
-	State     LeadState          `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
-	Kin       []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
-	Decision  *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
-	Withheld  bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
-	Ended     bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off"`
-	Handoff   *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
+	Rule       string             `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	At         LeadPlace          `json:"at" doc:"Where the lead is"`
+	Steps      []LeadPlace        `json:"steps" doc:"The path the analyzer took to it, in order"`
+	Related    []LeadPlace        `json:"related" doc:"The other places the analyzer names"`
+	Open       bool               `json:"open" doc:"Whether the lead is open on the build"`
+	LastSeen   string             `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
+	NotSeen    string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
+	Compare    string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
+	Unchanged  bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
+	State      LeadState          `json:"state" doc:"Where the lead stands: open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
+	Kin        []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
+	Decision   *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
+	Withheld   bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
+	ThirdParty bool               `json:"third_party,omitempty" doc:"Whether the lead is in code the newest run that saw it declared third-party"`
+	Ended      bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off"`
+	Handoff    *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
+	// Who is dealing with the lead on this build, while it is open there.
+	core.HolderBody
 }
 
 // LeadHandoffBody is the flaw a lead was handed off as.
@@ -86,6 +89,18 @@ func (LeadState) Schema(huma.Registry) *huma.Schema {
 	offered := make([]any, 0, len(analysis.States()))
 	for _, each := range analysis.States() {
 		offered = append(offered, string(each))
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
+}
+
+// LeadAssignee is who the lead queue is narrowed to as holding a lead.
+type LeadAssignee string
+
+// Schema offers every word the lead queue asks who holds a lead in.
+func (LeadAssignee) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(analysis.LeadAssignees()))
+	for _, each := range analysis.LeadAssignees() {
+		offered = append(offered, each)
 	}
 	return &huma.Schema{Type: huma.TypeString, Enum: offered}
 }
@@ -137,7 +152,7 @@ func registerLeads(api huma.API, in core.Deps) {
 			At:   leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
-			Kin: make([]LeadKin, 0, len(evidence.Kin)), Withheld: evidence.Stub,
+			Kin: make([]LeadKin, 0, len(evidence.Kin)), Withheld: evidence.Stub, ThirdParty: evidence.ThirdParty,
 		}
 		switch err := finding.LeadEnded(ctx, in.DB.DB, named.ProductID, lead.PlaceIdentity, time.Now().UTC()); {
 		case errors.Is(err, finding.ErrLeadPastEndOfLife):
@@ -158,8 +173,16 @@ func registerLeads(api huma.API, in core.Deps) {
 			body.Kin = append(body.Kin, one)
 		}
 		if evidence.Stub {
-			// The claims about a moved lead are private with it.
+			// The claims about a moved lead, and who works it, are private
+			// with it.
 			return &struct{ Body LeadEvidenceBody }{Body: body}, nil
+		}
+		if lead.ClosedAt == nil && lead.AssignedTo != nil {
+			who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, []int64{*lead.AssignedTo})
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, "who is dealing with that lead could not be read", err)
+			}
+			body.HolderBody = core.HolderOf(who[*lead.AssignedTo])
 		}
 		held, err := triage.NewStore(in.DB.DB).PreviouslyAt(ctx, subject, triage.Place{
 			ProductID: named.ProductID, VulnerabilityID: lead.VulnerabilityID, PlaceIdentity: lead.PlaceIdentity,

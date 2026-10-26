@@ -209,6 +209,7 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
   return (
     <div className="card">
       <h3>Hand off</h3>
+      {data.third_party && <p className="hint">Third-party code: report the flaw upstream.</p>}
       <ChoiceCards
         label="Component"
         value={value}

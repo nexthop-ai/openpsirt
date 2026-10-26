@@ -71,7 +71,7 @@ func Kinds() []Kind {
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
-		LeadEscalated, LeadHandedOff, LeadMoved, RuleOutgrown,
+		LeadHandedOff, LeadMoved, RuleOutgrown,
 		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
@@ -279,10 +279,6 @@ const (
 	// build it ran on regularly, naming the last upload of it turned away
 	// where there was one. A condition: the next run clears it.
 	AnalysisQuiet Kind = "analysis-quiet"
-	// LeadEscalated is a lead somebody pulled out of the baseline and into
-	// the queue, told to the product's internal triagers, who now have it to
-	// judge.
-	LeadEscalated Kind = "lead-escalated"
 	// LeadHandedOff is a confirmed lead recorded as a flaw, told to the
 	// product's internal triagers. Recording the flaw tells what recording
 	// any flaw tells; this is the lead's side of it.
@@ -1099,4 +1095,21 @@ func Concerning(productID, vulnerabilityID, componentID int64) string {
 // grant reaching it is on the place, which no issue names.
 func ConcerningLead(productID int64, placeIdentity string) string {
 	return fmt.Sprintf("lead/%d/%s", productID, placeIdentity)
+}
+
+// Withholding is the marks a telling about work holding these visibilities
+// carries: withheld where any is other than public, and internal where any is
+// internal. A reader of undisclosed work reads no internal work, so work
+// holding both is read by those who read internal work, as a claim spanning
+// both is.
+func Withholding(visibilities []access.Visibility) (private, internal bool) {
+	for _, v := range visibilities {
+		if v != access.Public {
+			private = true
+		}
+		if v == access.Internal {
+			internal = true
+		}
+	}
+	return private, internal
 }

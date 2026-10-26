@@ -31,19 +31,21 @@ type Handed struct {
 	// where somebody without the assigner right met work a colleague holds:
 	// those rows stay where they are, as they would one at a time.
 	Moved int64
-	// Undisclosed says at least one of the pieces is work nobody has
-	// announced, which decides what may be said about the act outside the
+	// Withheld is every visibility other than public among the pieces, across
+	// the product, which decides what may be said about the act outside the
 	// application.
-	Undisclosed bool
+	Withheld []access.Visibility
 	// Left is the pieces that did not wholly land where they were sent,
 	// because somebody else holds part of them and this caller may not take
 	// it. Read after the write, narrowed to what the caller may see.
 	Left []Piece
 }
 
-// Admits answers whether work of this strictness may go where it is being
-// sent, read through the transaction the assignment runs in.
-type Admits func(ctx context.Context, db bun.IDB, strictest access.Visibility) error
+// Admits answers whether work holding these visibilities may go where it is
+// being sent, read through the transaction the assignment runs in. Withheld is
+// every visibility other than public open among the work, each once; empty is
+// work disclosed throughout.
+type Admits func(ctx context.Context, db bun.IDB, withheld []access.Visibility) error
 
 // AssignMatching hands every piece of work a narrowing admits to one party, or
 // back to nobody, in one act.
@@ -59,10 +61,9 @@ type Admits func(ctx context.Context, db bun.IDB, strictest access.Visibility) e
 // selection was made out of that list, and a row that has left it is not one
 // the person is looking at any more.
 //
-// Admits is asked about the strictest visibility among the pieces before
-// anything is written, inside the transaction, so a recipient who may not read
-// undisclosed work is refused the whole act rather than handed the disclosed
-// half of it.
+// Admits is asked about every visibility among the pieces before anything is
+// written, inside the transaction, so a recipient who may not read undisclosed
+// work is refused the whole act rather than handed the disclosed half of it.
 func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter, only []Piece, to *int64, admits Admits) (Handed, error) {
 
@@ -132,28 +133,27 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		// locks in the same sequence rather than each waiting on the other.
 		sort.Strings(folds)
 
-		// The strictest visibility among what is being handed over, across
-		// the product rather than the selection: the assignment is
-		// product-wide, so an undisclosed place in another build travels with
-		// it. Narrowed by what the caller may see, like StrictestOf.
-		strictest := access.Public
+		// Every visibility among what is being handed over, across the
+		// product rather than the selection: the assignment is product-wide,
+		// so an undisclosed place in another build travels with it. Narrowed
+		// by what the caller may see, like a single assignment.
+		kinds, kindArgs := kind.Triage.Where(`"kind"`)
+		var withheld []access.Visibility
 		for _, fold := range folds {
-			private, err := anyUndisclosed(ctx, tx, visible, func(q *bun.SelectQuery) *bun.SelectQuery {
+			held, err := withheldAmong(ctx, tx, visible, func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.Where(inThisProduct, productID).
+					Where(kinds, kindArgs...).
 					Where(`"vulnerability_id" IN (?)`, bun.List(byFold[fold])).
 					Where(inFold, fold)
 			})
 			if err != nil {
 				return fmt.Errorf("read how far this is disclosed: %w", err)
 			}
-			if private {
-				strictest = access.Private
-				break
-			}
+			withheld = append(withheld, held...)
 		}
-		handed.Undisclosed = strictest == access.Private
+		handed.Withheld = inOrder(withheld)
 		if to != nil && admits != nil {
-			if err := admits(ctx, tx, strictest); err != nil {
+			if err := admits(ctx, tx, handed.Withheld); err != nil {
 				return err
 			}
 		}
@@ -161,7 +161,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		for _, fold := range folds {
 			moved, err := inner.moveWhere(ctx, tx, subject, productID, to, dispatches,
 				func(q *bun.UpdateQuery) *bun.UpdateQuery {
-					return q.Where(`"vulnerability_id" IN (?)`, bun.List(byFold[fold])).
+					return asPieces(q).Where(`"vulnerability_id" IN (?)`, bun.List(byFold[fold])).
 						Where(inFold, fold)
 				})
 			if err != nil {

@@ -125,8 +125,12 @@ type Offer struct {
 	Seen        []BuildName
 	Suggestions []Suggestion
 	// Prefix is the path a confirmed component is learned for: the
-	// repository the lead is in, or its directory.
+	// repository or declared third-party path the lead is in, or its
+	// directory.
 	Prefix string
+	// ThirdParty says the lead is under a path its newest run declared as
+	// third-party code, so the flaw is reported to the upstream it came from.
+	ThirdParty bool
 	// Together is how many other leads the hand-off links to the flaw with
 	// this one: the leads its confirming claim covers, which a move moves
 	// with it.
@@ -215,6 +219,31 @@ func confirmedAt(ctx context.Context, db bun.IDB, productID, findingID int64) (b
 	return outcome != nil && *outcome == string(Confirmed), nil
 }
 
+// stampedClaim is a claim and the stamp it was read with.
+type stampedClaim struct {
+	ID    int64 `bun:"id"`
+	Stamp int   `bun:"stamp"`
+}
+
+// claimsAt is every claim with a live row at the place of a lead finding, in
+// a product, with the stamp each holds: zero for a claim nobody has stamped.
+func claimsAt(ctx context.Context, db bun.IDB, productID, findingID int64) ([]stampedClaim, error) {
+	var out []stampedClaim
+	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "decision" AS "dc" ON `+finding.DecisionFiledAt("dc", "f")).
+		Join(`JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"`).
+		Join(`LEFT JOIN "claim_stamp" AS "cst" ON "cst"."claim_id" = "sc"."id"`).
+		ColumnExpr(`DISTINCT "sc"."id", COALESCE("cst"."stamp", 0) AS "stamp"`).
+		Where(`"f"."id" = ?`, findingID).
+		Where(`"dc"."product_id" = ?`, productID).
+		Where(`"dc"."live_key" IS NOT NULL`).
+		OrderExpr(`"sc"."id" ASC`).
+		Scan(ctx, &out); err != nil {
+		return nil, fmt.Errorf("read the claims standing at the lead: %w", err)
+	}
+	return out, nil
+}
+
 // Propose is what handing off the lead at a place in a product is offered:
 // the components, ranked, the builds it was seen in, and what moving it into
 // its case would disclose.
@@ -228,11 +257,12 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 	if err != nil {
 		return nil, err
 	}
-	modules, err := series.NewStore(db).ModulesOf(ctx, l.LastRunID)
+	run, modules, err := runAndModules(ctx, series.NewStore(db), l.LastRunID)
 	if err != nil {
 		return nil, err
 	}
-	out := &Offer{Rule: l.Rule, Prefix: prefixOf(l.Path, modules)}
+	declared := declaredThirdParty(run, l.Path)
+	out := &Offer{Rule: l.Rule, Prefix: prefixOf(l.Path, modules, declared), ThirdParty: declared != ""}
 	if out.Seen, err = seenIn(ctx, db, productID, placeIdentity); err != nil {
 		return nil, err
 	}
@@ -363,12 +393,17 @@ func handedWith(ctx context.Context, tx bun.IDB, h *finding.Handoff) ([]finding.
 }
 
 // prefixOf is the path a component confirmed for a lead at a path is learned
-// for: the innermost repository the run names that holds it, or else the
-// file's directory. Empty where the file is at the top of the checkout.
-func prefixOf(at string, modules []series.Module) string {
-	best := ""
+// for: the innermost of the repositories the run names and the third-party
+// path it declared that holds it, or else the file's directory. Empty where
+// the file is at the top of the checkout.
+//
+// A declared path is a prefix in its own right, as a repository is: vendored
+// code copied into the tree has no repository of its own, and every file under
+// it is the one component.
+func prefixOf(at string, modules []series.Module, declared string) string {
+	best := declared
 	for _, m := range modules {
-		if m.Path != "" && (at == m.Path || strings.HasPrefix(at, m.Path+"/")) && len(m.Path) > len(best) {
+		if holds(m.Path, at) && len(m.Path) > len(best) {
 			best = m.Path
 		}
 	}
@@ -649,6 +684,14 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 		if err != nil {
 			return err
 		}
+		// The claims standing at the lead, with the stamps they hold, read
+		// before whether one confirms it. Restamped once it does, so a
+		// revision or withdrawal of the confirmation committing beside this
+		// matches nothing, or makes this match nothing, and is asked again.
+		standing, err := claimsAt(ctx, tx, in.ProductID, l.ID)
+		if err != nil {
+			return err
+		}
 		if err := finding.LeadEnded(ctx, tx, in.ProductID, in.PlaceIdentity, now); err != nil {
 			return err
 		}
@@ -661,6 +704,11 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 			return err
 		} else if !ok {
 			return ErrNotConfirmed
+		}
+		for _, c := range standing {
+			if err := triage.Restamp(ctx, tx, c.ID, c.Stamp); err != nil {
+				return err
+			}
 		}
 		// Every lead the confirming claim covers is the one flaw, and is
 		// linked to it: a lead of the group left behind holds a claim
@@ -683,11 +731,12 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 			}
 			rows = append(rows, row)
 		}
-		modules, err := series.NewStore(tx).ModulesOf(ctx, l.LastRunID)
+		run, modules, err := runAndModules(ctx, series.NewStore(tx), l.LastRunID)
 		if err != nil {
 			return err
 		}
-		if err := learn(ctx, tx, in.ProductID, prefixOf(l.Path, modules), strings.TrimSpace(in.Flaw.Component),
+		prefix := prefixOf(l.Path, modules, declaredThirdParty(run, l.Path))
+		if err := learn(ctx, tx, in.ProductID, prefix, strings.TrimSpace(in.Flaw.Component),
 			strings.TrimSpace(in.Flaw.Ecosystem), strings.TrimSpace(in.Flaw.Namespace), subject.ID, now); err != nil {
 			return err
 		}

@@ -904,6 +904,8 @@ var tables = []string{
 	"claim_revision",
 	// Before claim and target, both of which it points at.
 	"claim_build",
+	// Before claim, which it points at.
+	"claim_stamp",
 	// Before person, which it points at, and after everything above, which
 	// points at it.
 	"claim",
@@ -988,10 +990,6 @@ var tables = []string{
 	"advisory",
 	// Before person, which it points at.
 	"outbound",
-	// Before person and product, which it points at.
-	"lead_escalation",
-	// Before product, which it points at.
-	"lead_important_path",
 	// Before person and product, which it points at.
 	"lead_rule",
 	// Before person, product and vulnerability, which they point at.

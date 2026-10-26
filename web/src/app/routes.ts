@@ -82,11 +82,17 @@ export const inboxReportAt = (product: string, reference: string) =>
 // every build or one.
 export const leadsAt = (
   product: string,
-  query?: { state?: string; stream?: string; variant?: string; series?: string },
+  query?: {
+    state?: string;
+    stream?: string;
+    variant?: string;
+    series?: string;
+    assigned?: "nobody";
+  },
 ) => at("leads", { product }, query);
 // One lead's evidence on one build.
 export const leadAt = (build: Build, place: string) => at("lead", { ...build, place });
-// The standing rules and important paths deciding what reaches the queue.
+// The standing rules dismissing a product's leads.
 export const leadRulesAt = (product: string) => at("leadRules", { product });
 // The hosts a product's source links open on, and what it says per path.
 export const repositoriesAt = (product: string) => at("repositories", { product });

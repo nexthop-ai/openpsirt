@@ -47,9 +47,9 @@ type Upgrade struct {
 	// Recorded in the same transaction as the promise, so a promise nobody
 	// is carrying and a holder with no promise are both impossible.
 	HoldBy *int64
-	// Admits is asked whether HoldBy may hold work of the strictest
-	// visibility the promise covers, in the same transaction, before
-	// anything is handed over. Nil admits any holder.
+	// Admits is asked whether HoldBy may hold work of every visibility the
+	// promise covers, in the same transaction, before anything is handed
+	// over. Nil admits any holder.
 	Admits finding.Admits
 }
 
@@ -250,12 +250,12 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 			// the promise was asked for is part of what the holder is asked
 			// about.
 			if up.Admits != nil {
-				strictest, err := finding.NewStore(tx).StrictestOnComponent(ctx, subject,
+				withheld, err := finding.NewStore(tx).WithheldOnComponent(ctx, subject,
 					up.ProductID, wanted, up.Component, up.Version)
 				if err != nil {
 					return err
 				}
-				if err := up.Admits(ctx, tx, strictest); err != nil {
+				if err := up.Admits(ctx, tx, withheld); err != nil {
 					return err
 				}
 			}

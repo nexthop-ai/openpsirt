@@ -8,7 +8,7 @@ import { useAfterClaim } from "./claims";
 import type { Build } from "../app/routes";
 
 // Static analysis leads: the queue, one lead's evidence, and the product's
-// standing rules and important paths that decide what reaches the queue.
+// standing rules that dismiss leads.
 //
 // One module, because every act here moves more than one read: a judgment
 // about a lead moves the queue, the lead, the leads it is one flaw with and
@@ -40,7 +40,15 @@ function useAfterLead() {
 }
 
 // What narrows a product's leads, on the list and in its file alike.
-type LeadsAsked = { stream?: string; variant?: string; series?: string; state?: LeadState };
+// `assigned` reads as the findings list's does: "nobody" keeps the leads
+// nobody holds.
+type LeadsAsked = {
+  stream?: string;
+  variant?: string;
+  series?: string;
+  state?: LeadState;
+  assigned?: "nobody";
+};
 
 // The narrowing as the query a request carries, with nothing for what is unset.
 export function leadsQuery(asked: LeadsAsked): Record<string, string> {
@@ -67,6 +75,7 @@ export function useLeads(
               ...(asked.variant ? { variant: asked.variant } : {}),
               ...(asked.series ? { series: asked.series } : {}),
               ...(asked.state ? { state: asked.state } : {}),
+              ...(asked.assigned ? { assigned: asked.assigned } : {}),
             },
           },
         }),
@@ -130,14 +139,25 @@ export function useFixLead(build: Build, place: string) {
   });
 }
 
-export function useEscalateLead(product: string, place: string) {
+// A party, not a person: a team holds a lead exactly as somebody does. Nobody
+// hands it back.
+export function useAssignLead(build: Build, place: string) {
   const after = useAfterLead();
   return useMutation({
-    mutationFn: async () =>
+    mutationFn: async (held: { kind: "person" | "team"; identity: string } | null) =>
       unwrap(
-        await api.POST("/v1/products/{product}/leads/{place}/escalation", {
-          params: { path: { product, place } },
-        }),
+        await api.PUT(
+          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment",
+          {
+            params: { path: { ...build, place } },
+            body:
+              held === null
+                ? {}
+                : held.kind === "team"
+                  ? { team: held.identity }
+                  : { person: held.identity },
+          },
+        ),
       ),
     onSuccess: after,
   });
@@ -189,36 +209,6 @@ export function useRetireLeadRule(product: string) {
         }),
       ),
     onSuccess: after,
-  });
-}
-
-export function useImportantPaths(product: string): UseQueryResult<string[]> {
-  return useQuery({
-    queryKey: ["important-paths", product],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/important-paths", {
-          params: { path: { product } },
-        }),
-      ).paths ?? [],
-  });
-}
-
-export function useSetImportantPaths(product: string) {
-  const queries = useQueryClient();
-  const after = useAfterLead();
-  return useMutation({
-    mutationFn: async (paths: string[]) =>
-      unwrap(
-        await api.PUT("/v1/products/{product}/important-paths", {
-          params: { path: { product } },
-          body: { paths },
-        }),
-      ),
-    onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["important-paths"] });
-      after();
-    },
   });
 }
 

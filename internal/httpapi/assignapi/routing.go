@@ -122,13 +122,15 @@ func registerRouting(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		// Declared triage, like the rule it previews. What comes back is
-		// narrowed to what the asker may read, but a preview is part of
-		// writing a rule and nobody who may not write one has a reason to run
-		// it.
-		product, err := core.TriagedProduct(ctx, in, subject, input.Product)
+		// Triage at any visibility, as reading the rules asks. What comes
+		// back is narrowed to what the asker may read, so somebody who
+		// triages leads alone counts the leads a rule would place.
+		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
+		}
+		if !subject.TriagesAnyIn(product.ID) {
+			return nil, huma.Error403Forbidden("not authorized")
 		}
 		if input.Upstream == "" && input.Beneath == "" {
 			return nil, huma.Error422UnprocessableEntity(
@@ -166,6 +168,8 @@ func registerRouting(api huma.API, in core.Deps) {
 			"they sit.\n\n" +
 			"It places only work nobody holds. A human assignment always wins, and " +
 			"adding a rule never takes something out of somebody's hands.\n\n" +
+			"It places work only at a visibility one member of the team reads. Undisclosed " +
+			"or internal work nobody on the team reads stays unassigned.\n\n" +
 			"Applying it to what is open is queued rather than done here. The reply says " +
 			"the rule was recorded, not that the sweep has finished. Where the queue is " +
 			"full the rule is not recorded and the answer is 503: send it again later.",

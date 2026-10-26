@@ -38,8 +38,8 @@ func TestLeadCountsBySeriesAreReadOnlyUnderInternalRead(t *testing.T) {
 		for _, who := range []string{"internal-reader", "internal-triager", "internal-reviewer"} {
 			var got leadSeries
 			httpapitest.Read(t, r, who, leadSeriesAt, &got)
-			if len(got.Items) != 1 || got.Items[0].Series != "clang-tidy/default" || got.Items[0].States["baseline"] != 1 {
-				t.Errorf("%s read %+v; want the seeded series and its one baseline lead", who, got.Items)
+			if len(got.Items) != 1 || got.Items[0].Series != "clang-tidy/default" || got.Items[0].States["open"] != 1 {
+				t.Errorf("%s read %+v; want the seeded series and its one open lead", who, got.Items)
 			}
 		}
 		// Reading the product at every other visibility, triaging it or
@@ -54,7 +54,7 @@ func TestLeadCountsBySeriesAreReadOnlyUnderInternalRead(t *testing.T) {
 		} {
 			got := httpapitest.AsPerson(t, r, who, http.MethodGet, leadSeriesAt, "")
 			httpapitest.RefusedWith(t, got, want)
-			if body := got.Body.String(); strings.Contains(body, "clang-tidy") || strings.Contains(body, "baseline") {
+			if body := got.Body.String(); strings.Contains(body, "clang-tidy") || strings.Contains(body, "not-reproduced") {
 				t.Errorf("%s was refused with what the counts hold: %s", who, body)
 			}
 		}
@@ -69,29 +69,23 @@ func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 		httpapitest.ApplyRunIn(t, r, "semgrep/default", time.Now().UTC().Add(-time.Hour),
 			httpapitest.OtherToolRun("semgrep", "sqli", "89", "src/c.c", 3, 7))
 
-		// One lead of each series moved out of the baseline: the seeded one
-		// dismissed with a second person's agreement, one of the other
-		// series' pulled into the queue.
+		// The seeded lead is dismissed with a second person's agreement, and
+		// the other series' two stay open.
 		decided := decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
-		other := leadsOf(t, r, "internal-reader", "?series=SEMGREP/default&state=baseline")
-		if len(other.Items) != 2 {
-			t.Fatalf("the other series' baseline is %+v; want its two leads", other.Items)
-		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/leads/"+other.Items[0].Place+"/escalation", `{}`); got.Code >= 300 {
-			t.Fatalf("pulling a lead in answered %d: %s", got.Code, got.Body)
+		if other := leadsOf(t, r, "internal-reader", "?series=SEMGREP/default"); len(other.Items) != 2 {
+			t.Fatalf("the other series' queue is %+v; want its two leads", other.Items)
 		}
 
 		var counted leadSeries
 		httpapitest.Read(t, r, "internal-reader", leadSeriesAt, &counted)
 		want := map[string]map[string]int{
 			"clang-tidy/default": {"dismissed": 1},
-			"semgrep/default":    {"baseline": 1, "open": 1},
+			"semgrep/default":    {"open": 2},
 		}
 		if len(counted.Items) != len(want) {
 			t.Fatalf("the counts are %+v; want one entry per series", counted.Items)
@@ -110,7 +104,7 @@ func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 		}
 		// A name no series holds lists nothing, where the product's leads
 		// stand in the state asked for.
-		if got := leadsOf(t, r, "internal-reader", "?series=nobody&state=baseline"); got.Total != 0 || len(got.Items) != 0 {
+		if got := leadsOf(t, r, "internal-reader", "?series=nobody&state=open"); got.Total != 0 || len(got.Items) != 0 {
 			t.Errorf("a series nobody holds lists %+v", got)
 		}
 	})
@@ -156,7 +150,7 @@ func TestTheLeadFileHoldsWhatTheListHoldsAndWithholdsWhatItWithholds(t *testing.
 
 		_, rows, body := leadFile(t, r, "internal-reader", "?state=handed-off")
 		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != "" || rows[0][5] != "true" ||
-			rows[0][11] != place {
+			rows[0][14] != place {
 			t.Fatalf("an internal reader's file holds %q; want the moved lead, withheld", rows)
 		}
 		if strings.Contains(body, message) || strings.Contains(body, snippet) {
@@ -196,16 +190,20 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		_, rows, body := leadFile(t, r, "internal-reader", "")
-		if len(rows) != 0 || !strings.Contains(body, "the queue") {
-			t.Fatalf("the file of a queue holding only the baseline holds %q:\n%s", rows, body)
+		if !strings.Contains(body, "the queue") {
+			t.Errorf("the file with no state does not say it is the queue:\n%s", body)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/leads/"+place+"/escalation", `{}`); got.Code >= 300 {
-			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
+		if len(rows) != 1 || rows[0][14] != place || rows[0][6] != "open" || rows[0][2] != "12" {
+			t.Errorf("the queue's file holds %q; want the seeded lead, open at line 12", rows)
 		}
-		if _, rows, _ := leadFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][11] != place ||
-			rows[0][6] != "open" || rows[0][2] != "12" {
-			t.Errorf("the queue's file holds %q; want the lead pulled in, open at line 12", rows)
+		// Whoever holds a lead is a column of the file, as the list names them.
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut,
+			"/v1/products/mine/streams/master/variants/broadcom/leads/"+place+"/assignment",
+			`{"person":"internal-triager"}`); got.Code >= 300 {
+			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
+		}
+		if _, rows, _ := leadFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][11] != "internal-triager" {
+			t.Errorf("the queue's file holds %q; want the lead held by the internal triager", rows)
 		}
 	})
 }

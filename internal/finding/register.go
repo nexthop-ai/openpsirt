@@ -152,7 +152,7 @@ func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
 		return 0, nil, err
 	}
 	return productID, func(q *bun.SelectQuery) *bun.SelectQuery {
-		kinds, args := kind.Exports.Where(`"f"."kind"`)
+		kinds, args := kind.Register.Where(`"f"."kind"`)
 		return q.TableExpr(`"finding" AS "f"`).
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).

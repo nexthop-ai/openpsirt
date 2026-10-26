@@ -5,8 +5,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { mayOf, useWho } from "../app/session";
 import {
+  useAssignLead,
   useDecideLead,
-  useEscalateLead,
   useFixLead,
   useLead,
   type Evidence,
@@ -18,6 +18,7 @@ import { claimAt, leadAt, leadsAt, type Build } from "../app/routes";
 import { ChoiceCards } from "../ui/ChoiceCards";
 import { Editor } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
+import { Holder } from "../ui/Holder";
 import { Loading } from "../ui/Loading";
 import { labeled } from "../ui/Outcome";
 import { linkable } from "../ui/addressable";
@@ -27,9 +28,8 @@ import { Handoff } from "./LeadHandoff";
 
 // One lead on one build: what the analyzer said, the path it took, the leads
 // that are the same flaw, and where the lead stands. Somebody who triages
-// internal material judges it here, pulls it out of the baseline, or closes it
-// as fixed once a run no longer sees it, and hands a confirmed one off as a
-// flaw.
+// internal material judges it here, closes it as fixed once a run no longer
+// sees it, and hands a confirmed one off as a flaw.
 export function Lead() {
   const { product = "", stream = "", variant = "", place = "" } = useParams();
   const build: Build = { product, stream, variant };
@@ -46,6 +46,9 @@ export function Lead() {
   // A move of one already handed off concerns its flaw, and stays offered.
   const ended = !!evidence.past_end_of_life;
   const acts = triages && !ended;
+  // A lead handed off as a flaw, kept or moved, is closed work for its
+  // holder: its flaw is assigned instead.
+  const assigns = triages && !ended && !evidence.handoff;
 
   return (
     <div>
@@ -58,6 +61,12 @@ export function Lead() {
           </Link>{" "}
           <span className={`state ${LEAD_TONES[evidence.state]}`}>{stateSaid(evidence.state)}</span>
           {ended && <span className="state closed"> Past end of life</span>}
+          {evidence.third_party && (
+            <span className="state closed" title="The analysis run declared this path third-party">
+              {" "}
+              Third-party
+            </span>
+          )}
         </p>
       </div>
 
@@ -66,6 +75,9 @@ export function Lead() {
         <Place place={at} />
         {evidence.withheld && (
           <p className="hint">Part of a case you are not on. Only where it is is shown.</p>
+        )}
+        {!evidence.withheld && evidence.open && (
+          <LeadAssignee build={build} place={place} evidence={evidence} assigns={assigns} />
         )}
         <p className="hint">
           Last seen {on(evidence.last_seen)}
@@ -138,7 +150,6 @@ export function Lead() {
           ) : (
             <p className="hint">None.</p>
           )}
-          {acts && evidence.state === "baseline" && <Escalate product={product} place={place} />}
           {acts && evidence.state === "not-reproduced" && evidence.open && (
             <FixForm build={build} place={place} />
           )}
@@ -313,20 +324,50 @@ function DecideForm({ build, place }: { build: Build; place: string }) {
   );
 }
 
-function Escalate({ product, place }: { product: string; place: string }) {
-  const escalate = useEscalateLead(product, place);
+// Who is dealing with the lead, and the picker that changes it for somebody
+// who triages it. Applies to every build of the product the lead is open on.
+function LeadAssignee({
+  build,
+  place,
+  evidence,
+  assigns,
+}: {
+  build: Build;
+  place: string;
+  evidence: Evidence;
+  assigns: boolean;
+}) {
+  const assign = useAssignLead(build, place);
+  const holder = evidence.assigned_to
+    ? { identity: evidence.assigned_to, name: evidence.assigned_to_name }
+    : null;
+  if (!assigns) {
+    return holder ? (
+      <p className="hint">
+        Assigned to {holder.name ?? holder.identity}
+        {evidence.assigned_team && " · team"}
+      </p>
+    ) : null;
+  }
   return (
-    <div style={{ marginTop: 10 }}>
-      <button
-        type="button"
-        className="btn quiet"
-        disabled={escalate.isPending}
-        onClick={() => escalate.mutate()}
-        title="Takes it out of the baseline on every build of the product."
+    <div className="assignee">
+      <span
+        className="l"
+        title="Applies to every build with this lead. Set it to nobody to unassign"
       >
-        Add to the queue
-      </button>
-      {escalate.error != null && <Failed error={escalate.error} what="It was not added." />}
+        Assigned to
+      </span>
+      <div style={{ minWidth: 220 }}>
+        <Holder
+          product={build.product}
+          internal
+          value={holder}
+          disabled={assign.isPending}
+          onPick={(held) => assign.mutate(held)}
+        />
+      </div>
+      {assign.isPending && <span className="hint">Saving…</span>}
+      {assign.error != null && <Failed error={assign.error} what="That could not be recorded." />}
     </div>
   );
 }

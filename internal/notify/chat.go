@@ -88,7 +88,7 @@ var sharedKinds = map[Kind]bool{
 	VulnerabilityDataStale: true, RiskUnagreed: true, PairsConcentrated: true,
 	SupplierSilent: true, InventoryMoved: true, AnalysisDropped: true,
 	AnalysisNotComparable: true, AnalysisQuiet: true,
-	LeadEscalated: true, LeadHandedOff: true, LeadMoved: true, RuleOutgrown: true,
+	LeadHandedOff: true, LeadMoved: true, RuleOutgrown: true,
 	UpstreamFailing: true, UpstreamRecovered: true,
 	ObligationOpen: true, ObligationNear: true, ObligationPassed: true,
 }

@@ -17,8 +17,7 @@ import { on } from "../ui/when";
 import { LEAD_STATES, LEAD_TONES, located, stateSaid } from "./leads";
 
 // A product's static analysis leads. With no state it is the queue: open
-// leads nothing waits on, the baseline left out. A state lists that state's
-// leads instead, which is how the baseline is searched.
+// leads nothing waits on. A state lists that state's leads instead.
 export function Leads() {
   const { product = "" } = useParams();
   const [params, setParams] = useSearchParams();
@@ -27,16 +26,17 @@ export function Leads() {
   const stream = params.get("stream") ?? undefined;
   const variant = params.get("variant") ?? undefined;
   const series = params.get("series") ?? undefined;
+  const assigned = params.get("assigned") === "nobody" ? "nobody" : undefined;
   const [offset, setOffset] = useState(0);
-  const listed = useLeads(product, { state, stream, variant, series, offset });
+  const listed = useLeads(product, { state, stream, variant, series, assigned, offset });
   const opener = useRowOpener();
   const reads = !!mayOf(useWho().data, product)?.reads_internal;
 
-  const go = (next?: LeadState) => {
+  const go = (next?: LeadState, unheld = assigned) => {
     setOffset(0);
     setParams(
       Object.fromEntries(
-        Object.entries({ state: next, stream, variant, series }).filter(
+        Object.entries({ state: next, stream, variant, series, assigned: unheld }).filter(
           ([, value]) => value !== undefined,
         ),
       ) as Record<string, string>,
@@ -48,7 +48,7 @@ export function Leads() {
   const file = (format: "csv" | "json") =>
     fileAt("/v1/products/{product}/leads.{format}", format, {
       path: { product },
-      query: leadsQuery({ state, stream, variant, series }),
+      query: leadsQuery({ state, stream, variant, series, assigned }),
     });
   const counts = listed.data?.states ?? {};
   const rows = listed.data?.items ?? [];
@@ -62,6 +62,7 @@ export function Leads() {
           {stream && ` · ${stream}`}
           {variant && ` · ${variant}`}
           {series && ` · ${series}`}
+          {assigned && " · unassigned"}
         </p>
         <span style={{ marginLeft: "auto" }}>
           <Link className="btn quiet" to={leadRulesAt(product)}>
@@ -93,6 +94,15 @@ export function Leads() {
         ))}
       </div>
 
+      <label className="hint">
+        <input
+          type="checkbox"
+          checked={!!assigned}
+          onChange={(e) => go(state, e.target.checked ? "nobody" : undefined)}
+        />{" "}
+        Unassigned only
+      </label>
+
       {!state &&
         listed.data &&
         (listed.data.waiting > 0 || listed.data.ruled > 0 || listed.data.past_end_of_life > 0) && (
@@ -106,7 +116,7 @@ export function Leads() {
               listed.data.ruled > 0 && (
                 <Link
                   key="ruled"
-                  to={leadsAt(product, { state: "dismissed", stream, variant, series })}
+                  to={leadsAt(product, { state: "dismissed", stream, variant, series, assigned })}
                 >
                   {listed.data.ruled.toLocaleString()} dismissed by a rule
                 </Link>
@@ -147,6 +157,7 @@ export function Leads() {
                   <th>Build</th>
                   <th>Opened</th>
                   <th>State</th>
+                  <th>Assigned to</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,6 +200,19 @@ export function Leads() {
                         <span className={`state ${LEAD_TONES[row.state]}`}>
                           {stateSaid(row.state)}
                         </span>
+                        {row.third_party && (
+                          <span
+                            className="state closed"
+                            title="The analysis run declared this path third-party"
+                          >
+                            {" "}
+                            Third-party
+                          </span>
+                        )}
+                      </td>
+                      <td className="hint" style={{ whiteSpace: "nowrap" }}>
+                        {row.assigned_to && (row.assigned_to_name ?? row.assigned_to)}
+                        {row.assigned_team && " · team"}
                       </td>
                     </tr>
                   );
