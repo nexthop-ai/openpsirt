@@ -79,6 +79,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	if err != nil {
 		return nil, err
 	}
+	reach := finding.LeadReach(subject, productID)
 	var rows []struct {
 		Place string `bun:"place_identity"`
 		Rule  string `bun:"rule"`
@@ -96,7 +97,10 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 			`THEN 1 ELSE 0 END AS "same"`, groupLines, groupLines).
 		Where(`"f"."id" = ?`, leadID).
 		Where(nearby(duplicateLines)).
-		Where(`"g"."visibility" IN (?)`, bun.List(visible)).
+		// A lead included in its flaw's case is read by the flaw's readers
+		// beside the product's own visibilities, as the queue reads it.
+		Where(`("g"."visibility" IN (?) OR EXISTS (SELECT 1 FROM "finding" AS "f" WHERE "f"."id" = "g"."id" AND `+
+			reach.Included+`))`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		OrderExpr(`"same" DESC, "ag"."last_line" ASC, "g"."place_identity" ASC`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the leads lead %d may be one flaw with: %w", leadID, err)

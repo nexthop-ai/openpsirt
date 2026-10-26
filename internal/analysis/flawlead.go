@@ -156,12 +156,6 @@ func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, produc
 		}
 		for i := range with {
 			one := &with[i]
-			if one.Moved() {
-				if err := finding.SetLeadVisibility(ctx, tx, productID, []string{one.PlaceIdentity},
-					access.Private, access.Internal); err != nil {
-					return err
-				}
-			}
 			if err := one.Unlink(ctx, tx); err != nil {
 				return err
 			}

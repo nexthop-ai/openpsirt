@@ -35,25 +35,6 @@ func (s *Store) LeadAt(ctx context.Context, subject access.Subject, targetID int
 	return s.leadWhere(ctx, targetID, placeIdentity, reach.Full, reach.FullArgs)
 }
 
-// LeadOrStubAt is LeadAt for a read of the lead's evidence, and reports
-// whether the subject reads it only as a stub: the lead without the case
-// (LeadReading).
-func (s *Store) LeadOrStubAt(ctx context.Context, subject access.Subject, targetID int64,
-	placeIdentity string) (*Finding, bool, error) {
-
-	productID, err := productOf(ctx, s.db, targetID)
-	if err != nil {
-		return nil, false, err
-	}
-	reach := LeadReach(subject, productID)
-	lead, err := s.leadWhere(ctx, targetID, placeIdentity, reach.Full, reach.FullArgs)
-	if !errors.Is(err, ErrNoOpenFinding) {
-		return lead, false, err
-	}
-	lead, err = s.leadWhere(ctx, targetID, placeIdentity, reach.Stub, reach.StubArgs)
-	return lead, err == nil, err
-}
-
 // leadWhere is the lead at a place on one build that a condition admits.
 func (s *Store) leadWhere(ctx context.Context, targetID int64, placeIdentity string,
 	reads string, readArgs []any) (*Finding, error) {

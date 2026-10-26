@@ -562,25 +562,3 @@ func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
 		}
 	})
 }
-
-// A lead moved into a case is read by somebody not on it without its holder,
-// so narrowing to work nobody holds leaves it out rather than answering who
-// holds it by whether it is listed.
-func TestTheQueueNarrowedToNobodyLeavesOutALeadInACaseTheReaderIsNotOn(t *testing.T) {
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		httpapitest.HandedOffLead(t, r, true)
-		var all, unheld struct {
-			Items []struct {
-				Place string `json:"place"`
-			} `json:"items"`
-		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=handed-off", &all)
-		if len(all.Items) != 1 {
-			t.Fatalf("the handed-off leads are %+v; want the moved lead, read without its holder", all.Items)
-		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=handed-off&assigned=nobody", &unheld)
-		if len(unheld.Items) != 0 {
-			t.Errorf("a lead in a case the reader is not on is listed as unheld: %+v", unheld.Items)
-		}
-	})
-}

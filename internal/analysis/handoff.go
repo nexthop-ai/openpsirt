@@ -874,8 +874,8 @@ func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int
 }
 
 // Unmove takes a moved lead back out of its flaw's case while the flaw is
-// undisclosed, and every lead handed off as the flaw with it: each is
-// internal again, and the claims about it with it.
+// undisclosed, and every lead handed off as the flaw with it: the flaw's
+// readers who read it only through the case read it no longer.
 func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity string) error {
 	if err := MayHandOff(subject, productID); err != nil {
 		return err
@@ -907,37 +907,28 @@ func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID i
 	})
 }
 
-// moveOut takes a moved lead back out of its flaw's case: its findings and
-// the claims about it are internal again, and the undo is recorded as the
-// access change it is.
+// moveOut takes a moved lead back out of its flaw's case, and the undo is
+// recorded as the access change it is. The lead and the claims about it stay
+// internal throughout, so only the flaw's readers lose it.
 func moveOut(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.Handoff) error {
-	if err := finding.SetLeadVisibility(ctx, tx, h.ProductID, []string{h.PlaceIdentity},
-		access.Private, access.Internal); err != nil {
-		return err
-	}
 	if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.Handoff)(nil)).
-		Set(`"visibility" = ?`, access.Internal).
 		Set(`"moved_by" = NULL`).Set(`"moved_at" = NULL`), h); err != nil {
 		return err
 	}
 	return recordMove(ctx, tx, subject, h, false)
 }
 
-// moveIn moves a handed-off lead into its flaw's case: its findings and the
-// claims about it go private with the flaw, and the move is recorded as the
-// access change it is.
+// moveIn moves a handed-off lead into its flaw's case, and the move is
+// recorded as the access change it is. The lead and the claims about it stay
+// internal, so everybody who read it keeps it, and the flaw's readers read it
+// as well (finding.LeadReading).
 func moveIn(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.Handoff, now time.Time) error {
-	if err := finding.SetLeadVisibility(ctx, tx, h.ProductID, []string{h.PlaceIdentity},
-		access.Internal, access.Private); err != nil {
-		return err
-	}
 	by := subject.ID
 	if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.Handoff)(nil)).
-		Set(`"visibility" = ?`, access.Private).
 		Set(`"moved_by" = ?`, by).Set(`"moved_at" = ?`, now), h); err != nil {
 		return err
 	}
-	h.Visibility, h.MovedBy, h.MovedAt = access.Private, &by, &now
+	h.MovedBy, h.MovedAt = &by, &now
 	return recordMove(ctx, tx, subject, h, true)
 }
 

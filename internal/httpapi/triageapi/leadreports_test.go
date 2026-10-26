@@ -140,29 +140,28 @@ func leadFile(t *testing.T, r *httpapitest.Reach, who, query string) (int, [][]s
 	return got.Code, rows, body
 }
 
-// The lead queue's file holds what the list holds for the same reader and
-// nothing the list withholds: a moved lead is a row with no message to an
-// internal reader not on its case, and no row carries source text.
-func TestTheLeadFileHoldsWhatTheListHoldsAndWithholdsWhatItWithholds(t *testing.T) {
+// The lead queue's file holds what the list holds for the same reader: a lead
+// included in its flaw's case is whole to its internal readers and to the
+// flaw's readers, and no row carries source text.
+func TestTheLeadFileHoldsWhatTheListHolds(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, _ := httpapitest.HandedOffLead(t, r, true)
 		const message, snippet = "p is leaked", "return;"
 
 		_, rows, body := leadFile(t, r, "internal-reader", "?state=handed-off")
-		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != "" || rows[0][5] != "true" ||
-			rows[0][14] != place {
-			t.Fatalf("an internal reader's file holds %q; want the moved lead, withheld", rows)
+		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != message || rows[0][13] != place {
+			t.Fatalf("an internal reader's file holds %q; want the included lead whole", rows)
 		}
-		if strings.Contains(body, message) || strings.Contains(body, snippet) {
-			t.Errorf("an internal reader's file carries what the lead page withholds:\n%s", body)
+		if strings.Contains(body, snippet) {
+			t.Errorf("the file carries source text:\n%s", body)
 		}
 
-		// A reader of undisclosed work is on the flaw's side of the move and
-		// reads the lead whole, as the list answers them; the snippet is the
-		// evidence's alone.
+		// A reader of undisclosed work reads the lead whole once it is
+		// included, as the list answers them; the snippet is the evidence's
+		// alone.
 		_, rows, body = leadFile(t, r, "private", "?state=handed-off")
-		if len(rows) != 1 || rows[0][4] != message || rows[0][5] != "false" {
-			t.Errorf("a reader of undisclosed work's file holds %q; want the moved lead whole", rows)
+		if len(rows) != 1 || rows[0][4] != message {
+			t.Errorf("a reader of undisclosed work's file holds %q; want the included lead whole", rows)
 		}
 		if strings.Contains(body, snippet) {
 			t.Errorf("the file carries source text:\n%s", body)
@@ -193,7 +192,7 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 		if !strings.Contains(body, "the queue") {
 			t.Errorf("the file with no state does not say it is the queue:\n%s", body)
 		}
-		if len(rows) != 1 || rows[0][14] != place || rows[0][6] != "open" || rows[0][2] != "12" {
+		if len(rows) != 1 || rows[0][13] != place || rows[0][5] != "open" || rows[0][2] != "12" {
 			t.Errorf("the queue's file holds %q; want the seeded lead, open at line 12", rows)
 		}
 		// Whoever holds a lead is a column of the file, as the list names them.
@@ -202,7 +201,7 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 			`{"person":"internal-triager"}`); got.Code >= 300 {
 			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
 		}
-		if _, rows, _ := leadFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][11] != "internal-triager" {
+		if _, rows, _ := leadFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][10] != "internal-triager" {
 			t.Errorf("the queue's file holds %q; want the lead held by the internal triager", rows)
 		}
 	})

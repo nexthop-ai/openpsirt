@@ -66,17 +66,21 @@ func TestAKeptLeadsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
 	})
 }
 
-func TestAMovedLeadsCollaboratorsAreManagedByItsReadersOfUndisclosedWork(t *testing.T) {
+func TestAnIncludedLeadsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, _ := httpapitest.HandedOffLead(t, r, true)
 		answered(t, r, place, []asked{
-			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusNotFound},
-			{"embargo-reader", http.MethodPut, "/collaborators/internal-reader", "", http.StatusNoContent},
+			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
+			{"internal-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
+			// The flaw's readers read the included lead, and do not decide
+			// who else does.
+			{"embargo-reader", http.MethodGet, "", "", http.StatusOK},
+			{"embargo-reader", http.MethodGet, "/collaborators", "", http.StatusNotFound},
+			{"embargo-reader", http.MethodPut, "/collaborators/reader", "", http.StatusNotFound},
 			// Somebody granted the lead reads it, and does not decide who
 			// else does.
-			{"internal-reader", http.MethodGet, "", "", http.StatusOK},
-			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusNotFound},
-			{"internal-reader", http.MethodPut, "/collaborators/reader", "", http.StatusNotFound},
+			{"outsider", http.MethodGet, "", "", http.StatusOK},
+			{"outsider", http.MethodGet, "/collaborators", "", http.StatusNotFound},
 		})
 	})
 }

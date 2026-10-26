@@ -1465,7 +1465,6 @@ the screens draw them.
 | A handed-off lead shows its flaw, linked, in place of the decision | Moving in or out is one button while the flaw is undisclosed, and its collaborators are listed beside it. A kept lead lists what moving it in discloses above the button |
 | Undoing a hand-off is offered beside the move while the flaw is undisclosed, and asks why | It closes the flaw on every build, which hover says before it is asked for |
 | A recorded flaw's page shows the lead it came from, to a reader who reads the lead | The rule and place, linked to the lead, its state, the component suggested, the builds proposed, and whether the hand-off was undone. On a build where its lead is not reproduced, Fixed here starts from the build that did not see it, and a person closes it |
-| A lead in a case the reader is not on says so, and shows where it is alone | The queue's row reads Withheld in place of the message |
 | The leads screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
 | A series in the address narrows the leads screen, and is named in its heading | Each figure of Leads by analyzer opens the list of its series and state |
 | Unassigned only narrows the leads screen to the leads nobody holds, kept in the address and named in its heading | The findings list holds no lead, so unheld leads are found here. It holds across the tabs, the counts and the file (`DESIGN-analysis.md` § Lead queue) |

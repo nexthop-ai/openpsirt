@@ -89,7 +89,7 @@ func TestTheFindingsFileCarriesTheOpenLeadsToInternalReadersAlone(t *testing.T) 
 				}
 				l := leads[0]
 				if l["issue"] != "clang-tidy/leak" || l["path"] != "src/a.c" || l["line"] != "12" ||
-					l["message"] != message || l["withheld"] != "false" || l["stream"] != "master" ||
+					l["message"] != message || l["stream"] != "master" ||
 					l["variant"] != "broadcom" || l["severity"] != "" || l["component"] != "" {
 					t.Errorf("%s: %s's file holds the lead as %v", path, who, l)
 				}

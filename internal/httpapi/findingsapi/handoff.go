@@ -363,8 +363,8 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 		Identity string `path:"identity"`
 	}
 	// handed is the hand-off of the lead a route names, where the reader
-	// reads the lead in the product at the visibility it holds while its flaw
-	// is undisclosed: who is on a lead is managed by whoever reads it there.
+	// reads internal work in the product: who is on a lead is managed by its
+	// internal readers, kept or moved.
 	handed := func(ctx context.Context, db bun.IDB, at *leadAt, place string) (*finding.Handoff, error) {
 		if _, err := finding.NewStore(db).LeadAt(ctx, at.subject, at.target, place); err != nil {
 			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
@@ -376,7 +376,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 		if h == nil {
 			return nil, huma.Error404NotFound(analysis.ErrNotHandedOff.Error())
 		}
-		if !at.subject.Reads(h.Undisclosed(), at.named.ProductID) {
+		if !at.subject.Reads(access.Internal, at.named.ProductID) {
 			return nil, core.NoSuchFinding()
 		}
 		return h, nil

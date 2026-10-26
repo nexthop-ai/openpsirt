@@ -102,33 +102,72 @@ func TestOnlyAConfirmedLeadIsHandedOffBySomebodyWorkingBothHalves(t *testing.T) 
 	})
 }
 
-func TestAMovedLeadIsAStubToSomebodyNotOnItsCase(t *testing.T) {
+// handedOffItems is the handed-off leads one person lists, with what the
+// analyzer said of each.
+func handedOffItems(t *testing.T, r *httpapitest.Reach, who string) []string {
+	t.Helper()
+	var listed struct {
+		Items []struct {
+			Message string `json:"message"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, who, "/v1/products/mine/leads?state=handed-off", &listed)
+	said := make([]string, 0, len(listed.Items))
+	for _, item := range listed.Items {
+		said = append(said, item.Message)
+	}
+	return said
+}
+
+// claimAt is the claim made at a lead's place.
+func claimAt(t *testing.T, r *httpapitest.Reach, place string) string {
+	t.Helper()
+	var claim int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
+		Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprintf("/v1/claims/%d", claim)
+}
+
+func TestAnIncludedLeadStaysWholeToEverybodyWhoReadIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
-		stub := evidenceAs(t, r, "internal-reader", place)
-		if !stub.Withheld || stub.At.Message != "" || stub.At.Snippet != "" || len(stub.Steps) != 0 ||
-			stub.Handoff != nil || stub.Decision != nil {
-			t.Fatalf("an internal reader read %+v; want the state, rule, location and sightings alone", stub)
+		place, _ := httpapitest.HandedOffLead(t, r, true)
+		got := evidenceAs(t, r, "internal-reader", place)
+		if got.At.Message != "p is leaked" || got.At.Snippet == "" || got.Decision == nil || got.Handoff != nil {
+			t.Errorf("an internal reader read %+v; want the whole lead and its claim, and nothing of the flaw", got)
 		}
-		if stub.State != "handed-off" || stub.Rule != "clang-tidy/leak" || stub.At.Path != "src/a.c" || stub.At.StartLine != 12 {
-			t.Errorf("an internal reader read %s %s at %s:%d; want the lead's state, rule and place",
-				stub.State, stub.Rule, stub.At.Path, stub.At.StartLine)
+		if said := handedOffItems(t, r, "internal-reader"); len(said) != 1 || said[0] != "p is leaked" {
+			t.Errorf("an internal reader listed %q; want the included lead, whole", said)
 		}
-		var listed struct {
-			Items []struct {
-				Message  string `json:"message"`
-				Withheld bool   `json:"withheld"`
-			} `json:"items"`
+		if claim := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, claimAt(t, r, place), ""); claim.Code != http.StatusOK {
+			t.Errorf("an internal reader reading the claim at the included lead answered %d: %s", claim.Code, claim.Body)
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=handed-off", &listed)
-		if len(listed.Items) != 1 || !listed.Items[0].Withheld || listed.Items[0].Message != "" {
-			t.Errorf("an internal reader listed %+v; want the moved lead, withheld", listed.Items)
+	})
+}
+
+func TestTheFlawsReadersReadALeadOnlyOnceItIsIncluded(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodGet, leadAt(place), ""),
+			http.StatusNotFound)
+		if said := handedOffItems(t, r, "private"); len(said) != 0 {
+			t.Errorf("a reader of undisclosed work listed %q before the lead was included; want nothing", said)
+		}
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("including the lead answered %d: %s", got.Code, got.Body)
 		}
 		full := evidenceAs(t, r, "private", place)
-		if full.Withheld || full.At.Message != "p is leaked" || full.Handoff == nil || !full.Handoff.Moved ||
-			full.Handoff.Flaw != flaw {
+		if full.At.Message != "p is leaked" || full.Handoff == nil || !full.Handoff.Moved || full.Handoff.Flaw != flaw {
 			t.Errorf("a reader of undisclosed work read %+v; want the whole lead and its flaw", full)
 		}
+		if said := handedOffItems(t, r, "private"); len(said) != 1 || said[0] != "p is leaked" {
+			t.Errorf("a reader of undisclosed work listed %q; want the included lead, whole", said)
+		}
+		// Reading undisclosed work is not reading internal work: the lead
+		// reaches them, and no other internal lead does.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/products/mine/lead-series", ""),
+			http.StatusForbidden)
 	})
 }
 
@@ -136,7 +175,7 @@ func TestAKeptLeadNamesItsFlawOnlyToThePeopleOnTheCase(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, flaw := httpapitest.HandedOffLead(t, r, false)
 		internal := evidenceAs(t, r, "internal-reader", place)
-		if internal.Withheld || internal.At.Message != "p is leaked" || internal.Handoff != nil {
+		if internal.At.Message != "p is leaked" || internal.Handoff != nil {
 			t.Errorf("an internal reader read %+v; want the whole lead and nothing of the case", internal)
 		}
 		// A kept lead is internal, which reading undisclosed work does not
@@ -206,14 +245,17 @@ func TestASnippetIsDisclosedWhereItsPathSaysSo(t *testing.T) {
 	})
 }
 
-func TestAnUndoneMoveMakesTheLeadInternalAgain(t *testing.T) {
+func TestAnUndoneMoveTakesBackOnlyTheFlawsReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, _ := httpapitest.HandedOffLead(t, r, true)
+		if got := evidenceAs(t, r, "embargo-reader", place); got.At.Message != "p is leaked" {
+			t.Fatalf("a reader of undisclosed work read %+v while the lead was included; want the whole lead", got)
+		}
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("undoing the move answered %d: %s", got.Code, got.Body)
 		}
-		if got := evidenceAs(t, r, "internal-reader", place); got.Withheld || got.At.Message != "p is leaked" {
-			t.Errorf("an internal reader read %+v; want the whole lead again", got)
+		if got := evidenceAs(t, r, "internal-reader", place); got.At.Message != "p is leaked" {
+			t.Errorf("an internal reader read %+v; want the whole lead still", got)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(place), ""),
 			http.StatusNotFound)
@@ -225,7 +267,7 @@ func TestAnUndoneMoveMakesTheLeadInternalAgain(t *testing.T) {
 	})
 }
 
-func TestALaterSightingOfAMovedLeadOpensInItsCase(t *testing.T) {
+func TestALaterSightingOfAnIncludedLeadOpensReadableByBothAudiences(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, _ := httpapitest.HandedOffLead(t, r, true)
 		now := time.Now().UTC()
@@ -241,8 +283,13 @@ func TestALaterSightingOfAMovedLeadOpensInItsCase(t *testing.T) {
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
-		if len(held) != 2 || held[0] != "private" || held[1] != "private" {
-			t.Errorf("the lead's findings are %v; want the reopened one in the case beside the closed one", held)
+		if len(held) != 2 || held[0] != "internal" || held[1] != "internal" {
+			t.Errorf("the lead's findings are %v; want the reopened one internal beside the closed one", held)
+		}
+		for _, who := range []string{"internal-reader", "private"} {
+			if got := evidenceAs(t, r, who, place); !got.Open || got.At.Message != "p is leaked" {
+				t.Errorf("%s read the reopened lead as %+v; want it open and whole", who, got)
+			}
 		}
 	})
 }
@@ -345,7 +392,7 @@ func TestAKeptLeadStaysWhereItIsOnceItsFlawIsDisclosed(t *testing.T) {
 		disclosed(t, r, flaw)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
 			leadAt(place)+"/move", ""), http.StatusConflict)
-		if got := evidenceAs(t, r, "internal-reader", place); got.Withheld || got.At.Message != "p is leaked" {
+		if got := evidenceAs(t, r, "internal-reader", place); got.At.Message != "p is leaked" {
 			t.Errorf("an internal reader read %+v; want the kept lead, internal still", got)
 		}
 		if got := evidenceAs(t, r, "lead-handler", place); got.Handoff == nil || !got.Handoff.Disclosed || got.Handoff.Moved {
@@ -443,7 +490,7 @@ func TestAnUndoneBatchLeavesTheConfirmationAHandOffRestsOn(t *testing.T) {
 	})
 }
 
-func TestAMoveLandingWhileARunAppliesTakesTheSightingTheRunOpened(t *testing.T) {
+func TestAMoveLandingWhileARunAppliesReachesTheSightingTheRunOpened(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, _ := httpapitest.HandedOffLead(t, r, false)
 		now := time.Now().UTC()
@@ -472,8 +519,11 @@ func TestAMoveLandingWhileARunAppliesTakesTheSightingTheRunOpened(t *testing.T) 
 			Scan(t.Context(), &held); err != nil {
 			t.Fatal(err)
 		}
-		if len(held) != 2 || held[0] != "private" || held[1] != "private" {
-			t.Errorf("the lead's findings are %v; want the one the run opened in the case with the other", held)
+		if len(held) != 2 || held[0] != "internal" || held[1] != "internal" {
+			t.Errorf("the lead's findings are %v; want the one the run opened internal with the other", held)
+		}
+		if got := evidenceAs(t, r, "private", place); !got.Open || got.Handoff == nil || !got.Handoff.Moved {
+			t.Errorf("a reader of undisclosed work read %+v; want the sighting the run opened, in the case", got)
 		}
 	})
 }

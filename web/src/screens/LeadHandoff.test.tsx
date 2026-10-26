@@ -227,19 +227,4 @@ describe("a handed-off lead", () => {
     expect(text()).not.toContain("Undo hand-off");
     expect(text()).not.toContain("Collaborators");
   });
-
-  it("says a stub is part of a case the reader is not on", async () => {
-    await drawn(
-      {
-        ...HANDED,
-        handoff: undefined,
-        withheld: true,
-        at: { path: "src/zlib/a.c", start_line: 7 },
-        decision: undefined,
-      },
-      false,
-    );
-    expect(text()).toContain("Part of a case you are not on");
-    expect(text()).not.toContain("Decision");
-  });
 });

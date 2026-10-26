@@ -73,10 +73,7 @@ export function Lead() {
       <div className="card">
         <h3>Result</h3>
         <Place place={at} />
-        {evidence.withheld && (
-          <p className="hint">Part of a case you are not on. Only where it is is shown.</p>
-        )}
-        {!evidence.withheld && evidence.open && (
+        {evidence.open && (
           <LeadAssignee build={build} place={place} evidence={evidence} assigns={assigns} />
         )}
         <p className="hint">
@@ -137,7 +134,7 @@ export function Lead() {
         handsOff={handsOff && (!ended || evidence.state === "handed-off")}
       />
 
-      {!evidence.withheld && evidence.state !== "handed-off" && (
+      {evidence.state !== "handed-off" && (
         <div className="card">
           <h3>Decision</h3>
           {evidence.decision ? (

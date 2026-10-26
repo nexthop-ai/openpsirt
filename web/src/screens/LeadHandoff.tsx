@@ -56,7 +56,7 @@ export function Handoff({
   if (evidence.handoff) {
     return <HandedOff build={build} place={place} evidence={evidence} handsOff={handsOff} />;
   }
-  if (handsOff && evidence.state === "confirmed" && !evidence.withheld) {
+  if (handsOff && evidence.state === "confirmed") {
     return <HandOffForm build={build} place={place} />;
   }
   return null;
@@ -108,8 +108,8 @@ function HandedOff({
             onClick={() => move.mutate(!handed.moved)}
             title={
               handed.moved
-                ? "Makes it internal again. Internal readers see all of it."
-                : "Makes it private. Internal readers see only where it is. Disclosed with the flaw."
+                ? "The flaw's readers stop seeing it. Internal readers keep it."
+                : "The flaw's readers see it too. Internal readers keep it. Disclosed with the flaw."
             }
           >
             {handed.moved ? "Take out of the case" : "Move into the case"}
@@ -179,7 +179,7 @@ function UndoHandOff({ build, place }: { build: Build; place: string }) {
   return (
     <div style={{ marginTop: 10 }}>
       <Editor
-        label="Why undo it"
+        label="Reason"
         value={because}
         onChange={setBecause}
         rows={3}
@@ -347,7 +347,7 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
             {
               value: "move",
               label: "Move into the case",
-              note: "Private now, disclosed with the flaw",
+              note: "The flaw's readers see it now, disclosed with the flaw",
             },
           ]}
         />

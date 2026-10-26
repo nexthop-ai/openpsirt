@@ -113,7 +113,7 @@ func TestAnUndoneHandOffConfirmsTheLeadAgainAndTakesTheFlawBack(t *testing.T) {
 			t.Fatalf("undoing the hand-off answered %d: %s", got.Code, got.Body)
 		}
 
-		if got := evidenceAs(t, r, "internal-reader", place); got.State != "confirmed" || got.Withheld ||
+		if got := evidenceAs(t, r, "internal-reader", place); got.State != "confirmed" ||
 			got.Handoff != nil || got.At.Message != "p is leaked" {
 			t.Errorf("an internal reader reads the lead as %s %+v; want the whole lead, confirmed", got.State, got)
 		}

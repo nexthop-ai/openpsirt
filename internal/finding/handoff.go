@@ -30,8 +30,8 @@ type Handoff struct {
 	PlaceIdentity   string `bun:"place_identity,notnull"`
 	VulnerabilityID int64  `bun:"vulnerability_id,notnull"`
 	// Visibility is what the lead's findings hold, and what a sighting
-	// opening later opens at: internal where the lead was kept, private once
-	// it was moved into the case, public once its flaw was disclosed.
+	// opening later opens at: internal while its flaw is undisclosed, kept or
+	// moved, and public once a moved lead was disclosed with its flaw.
 	Visibility access.Visibility `bun:"visibility,notnull"`
 	HandedBy   int64             `bun:"handed_by,notnull"`
 	HandedAt   time.Time         `bun:"handed_at,notnull"`
@@ -123,16 +123,6 @@ func (h Handoff) Moved() bool { return h.MovedAt != nil }
 // Disclosed reports whether the lead's flaw is disclosed.
 func (h Handoff) Disclosed() bool { return h.DisclosedAt != nil }
 
-// Undisclosed is the visibility the lead holds while its flaw is undisclosed:
-// internal where it was kept, private where it was moved. Who manages a lead
-// is asked at it, before and after disclosure alike.
-func (h Handoff) Undisclosed() access.Visibility {
-	if h.Moved() {
-		return access.Private
-	}
-	return access.Internal
-}
-
 // HandoffAt is the hand-off of the lead at a place in a product, or nil where
 // it was not handed off.
 func HandoffAt(ctx context.Context, db bun.IDB, productID int64, placeIdentity string) (*Handoff, error) {
@@ -170,30 +160,32 @@ const undisclosedLead = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 
 // caseVisibilities is what a moved lead holds while its flaw is a case and
 // once it is disclosed.
-var caseVisibilities = []access.Visibility{access.Private, access.Public}
+var caseVisibilities = []access.Visibility{access.Internal, access.Public}
 
 // LeadReading is who may read the lead finding under "f" in one product, as
 // two conditions with what each binds.
 //
-// Full is the lead itself. It is read at the visibilities the subject reads
+// Full is every lead the subject reads: at the visibilities the subject reads
 // in the product, on the leads they were granted while their flaw is
-// undisclosed, and on a lead moved into a case they were brought into.
+// undisclosed, on a lead moved into a case they were brought into, and as
+// Included.
 //
-// Stub is the lead without the case: state, rule, location and sightings, and
-// never what the analyzer said. It is a lead moved into a case, to somebody
-// reading internal work in the product who reads it no other way. Asked only
-// where Full is not met.
+// Included is a lead moved into its flaw's case while the flaw is
+// undisclosed, to somebody who reads private work in the product. The lead
+// stays internal, so its internal readers keep it, and the flaw's private
+// readers read it as well. A list of the product's leads carries it beside the
+// product's own visibilities.
 type LeadReading struct {
-	Full     string
-	FullArgs []any
-	Stub     string
-	StubArgs []any
+	Full         string
+	FullArgs     []any
+	Included     string
+	IncludedArgs []any
 }
 
 // LeadReach is who may read a product's leads. The anonymous subject reads
 // none: a lead is not one of the security documents a product publishes.
 func LeadReach(s access.Subject, productID int64) LeadReading {
-	none := LeadReading{Full: "1 = 0", Stub: "1 = 0"}
+	none := LeadReading{Full: "1 = 0", Included: "1 = 0"}
 	if s.Kind == access.Anonymous {
 		return none
 	}
@@ -214,12 +206,14 @@ func LeadReach(s access.Subject, productID int64) LeadReading {
 		args = append(args, bun.List(caseVisibilities), productID, bun.List(cases))
 	}
 	out := none
+	if s.Sees(productID) && s.Reads(access.Private, productID) && !s.Reads(access.Internal, productID) {
+		out.Included = `("f"."visibility" = ? AND ` + movedLead + ` AND ` + undisclosedLead + `)`
+		out.IncludedArgs = []any{access.Internal, productID, productID}
+		clauses = append(clauses, out.Included)
+		args = append(args, out.IncludedArgs...)
+	}
 	if len(clauses) > 0 {
 		out.Full, out.FullArgs = "("+strings.Join(clauses, " OR ")+")", args
-	}
-	if s.Sees(productID) && s.Reads(access.Internal, productID) {
-		out.Stub = `("f"."visibility" IN (?) AND ` + movedLead + `)`
-		out.StubArgs = []any{bun.List(caseVisibilities), productID}
 	}
 	return out
 }
@@ -234,11 +228,6 @@ func LeadVisible(s access.Subject, productID int64) ([]access.Visibility, error)
 		return nil, access.Denied(fmt.Sprintf("read the leads of product %d", productID))
 	}
 	return access.Readable(s, productID)
-}
-
-// Either is the condition that the lead is read in full or as a stub.
-func (r LeadReading) Either() (string, []any) {
-	return "(" + r.Full + " OR " + r.Stub + ")", append(append([]any{}, r.FullArgs...), r.StubArgs...)
 }
 
 // leadsFollow carries the leads moved into one issue's case in one product to
@@ -273,7 +262,7 @@ func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int
 		} else if n != 1 {
 			return fmt.Errorf("record the leads handed off as this flaw as disclosed: %w", database.ErrGoAgain)
 		}
-		if h.Moved() && h.Visibility == access.Private {
+		if h.Moved() && h.Visibility == access.Internal {
 			moved = append(moved, h)
 		}
 	}
@@ -289,7 +278,7 @@ func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int
 	if err := stripUndisclosedSnippets(ctx, db, productID, places); err != nil {
 		return err
 	}
-	if err := SetLeadVisibility(ctx, db, productID, places, access.Private, access.Public); err != nil {
+	if err := SetLeadVisibility(ctx, db, productID, places, access.Internal, access.Public); err != nil {
 		return err
 	}
 	// Matched on what was read: a lead taken out of the case since is a
@@ -297,7 +286,7 @@ func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int
 	result, err := db.NewUpdate().Model((*Handoff)(nil)).
 		Set(`"visibility" = ?`, access.Public).
 		Where(`"id" IN (?)`, bun.List(ids)).
-		Where(`"visibility" = ?`, access.Private).
+		Where(`"visibility" = ?`, access.Internal).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record the leads disclosed with their flaw: %w", err)

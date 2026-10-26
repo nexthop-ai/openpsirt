@@ -572,7 +572,6 @@ JSON, as `DESIGN-reporting.md` § Exports writes every file.
 |---|---|
 | The file is the list: the same filters, the same order, every row rather than one page | A list and its file are one read, so a filter the screen applies is never missing from the file |
 | It is read under the list's visibility | A reader is written the leads the list shows them, and nothing else (REQ-42, REQ-43) |
-| A lead in a case the reader is not on is a row with an empty message, marked withheld | What the analyzer said is the case's once the lead is moved, as the list withholds it |
 | A row names who holds the lead as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`DESIGN-reporting.md` § Exports) |
 | A row says whether the lead is in third-party code, as the list does | Read from the newest run that saw the lead, as its evidence is (§ Third-party code) |
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
@@ -593,7 +592,7 @@ series, by state. The reports catalog draws it as Leads by analyzer
 | Each count is the total the list answers for that series and state | A figure and the list it opens count one population, under the same visibility |
 | Counted over every build of the product | A series is the product's. A stream or variant would list a series that never ran there with every count zero, which reads as an analyzer that found nothing |
 | A series holding no lead is listed with every count zero | An analyzer that runs and finds nothing is a fact about the product |
-| Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of leads is internal however it is narrowed. A reader of a moved lead through its case reads the lead and not the product's figures |
+| Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of leads is internal however it is narrowed. A reader of a moved lead through its flaw reads the lead and not the product's figures |
 | Ordered by the series' name | The series are few, and a reader looks one up by its name |
 
 ## Lead assignment
@@ -618,7 +617,7 @@ assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 | The unassigned list leaves out a lead's sightings in releases past their end of life | Nobody may take a lead seen only there, and the lead queue narrowed to work nobody holds leaves it out the same way (§ End of life) |
 | A lead handed off as a flaw leaves the lists of held work, kept or moved | Its flaw is what is judged, fixed and disclosed, and the flaw is held and listed as itself. The handed-off lead is closed work for its holder |
 | Handing somebody's work to another person leaves a handed-off lead with them, and asks nothing about it. Releasing their work releases it | It is listed to nobody, so moving it hands over nothing, and a recipient who may not read it is not refused for it |
-| The lead's page and every row of the queue and its file name who holds it | The page names the holder on its build while it is open there; a row names the holder of the finding it shows. A stub names nobody |
+| The lead's page and every row of the queue and its file name who holds it | The page names the holder on its build while it is open there; a row names the holder of the finding it shows |
 | The person given it is told "a lead assigned", at internal visibility | `DESIGN-notifications.md` § Lead notices |
 
 ## Weakness families
@@ -743,12 +742,21 @@ takes a moved one back out.
 
 | | Kept | Moved |
 |---|---|---|
-| Visibility of the lead and the claims at its place | Internal | Private |
-| An internal reader reads | The whole lead, and nothing of the case | A stub: the state, the rule, the location and when it was seen |
+| Visibility of the lead and the claims at its place | Internal | Internal |
+| An internal reader reads | The whole lead, and nothing of the case | The whole lead, and nothing of the case |
+| Somebody granted the lead reads | The whole lead, and its flaw | The whole lead, and its flaw |
 | A reader of undisclosed work reads | Nothing | The whole lead, and its flaw |
 | A reader on the flaw's case reads | Nothing, unless they were granted the lead | The whole lead, and its flaw |
 | When the flaw is disclosed | The lead stays internal | The lead and its claims go public with the flaw (REQ-40) |
-| A later sighting opens | Internal | Private, in the case |
+| A later sighting opens | Internal | Internal, read by both audiences |
+
+| Rule | |
+|---|---|
+| A move adds the flaw's readers to the lead's readers and takes nobody away | Somebody who read the lead once keeps reading it |
+| An undone move takes back only the readers the move added | The lead's internal readers and its grants are as they were |
+| The flaw's readers read a moved lead wherever its internal readers do: its evidence, the queue and the counts beside it, its file and the findings file, the coverage of a standing rule, and its kin | One rule in the data layer, so no list answers differently from the page (REQ-42, REQ-43) |
+| Reading undisclosed work reads no internal lead the flaw does not hold | The addition is the moved leads of an undisclosed flaw, and nothing else of the product's internal work |
+| The claims at a moved lead's place stay with its internal readers | A claim is filed under the analyzer's rule, and the flaw's readers read decisions filed under the flaw |
 
 | Rule | |
 |---|---|
@@ -756,6 +764,7 @@ takes a moved one back out.
 | At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets), and a later run describing the disclosed lead again is stripped the same way | A product's source is not published because one flaw in it was, and a run writes what the analyzer sent |
 | Disclosure records the time on the hand-off of every lead handed off as the flaw, kept or moved | A kept lead stays internal, so its visibility does not say its flaw is public |
 | A move or its undo is refused with 409 once the flaw is disclosed, kept lead or moved | Disclosure is one way |
+| The notice of a move goes to the audience it went to before the readers changed | A move tells the flaw's people the lead is in the case |
 | A move and its undo take every lead handed off as the flaw | The leads of one flaw are one case |
 | A run writes itself onto the hand-off of every lead it describes or opens at, before it reads a hand-off or writes a lead's source | A disclosure or a move of one of those leads then waits for the run, or finds the hand-off changed |
 | A move, its undo and a disclosure each change the hand-off only as it was read in their transaction: its visibility, its flaw undisclosed, and the last run to describe it | One that lost a race to another, or to a run, is asked again. A disclosure that read the hand-off before a run cannot see the source the run wrote, and a move cannot see the sighting it opened |
@@ -771,7 +780,7 @@ takes a moved one back out.
 | It takes every lead handed off as the flaw | The leads of one flaw are one case, as a move takes them |
 | It is refused with 409 once the flaw is disclosed, and asks for a reason | Disclosure is one way. Undoing takes the flaw out of every build, which a person explains |
 | Each lead is confirmed again: the link goes, the claim confirming it stands, and it returns to the queue's lists of held work with whoever held it | The judgment that it is real was not undone, the recording was |
-| A moved lead is internal again, with the claims at its place | A lead with no case to be in is the internal material it was |
+| A moved lead is read by its internal readers alone again | A lead with no case to be in is the internal material it always was |
 | Every grant of the leads ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
 | The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a hand-off somebody undid should not have been recorded, and a hand-off made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
 | The flaw keeps the record of its lead, marked undone with who, when and why | What was recorded and taken back stays on the record |
@@ -801,9 +810,9 @@ one handed-off lead, as case collaborators are brought into one flaw
 
 | Rule | |
 |---|---|
-| A grant reaches the lead's evidence at the internal and private visibilities while its flaw is undisclosed, and nothing else | It is one lead, never a list. Disclosure ends it, kept lead or moved |
+| A grant reaches the lead's evidence while its flaw is undisclosed, and nothing else | It is one lead, never a list. Disclosure ends it, kept lead or moved |
 | A grant does not reach the build's inventory or tree, or the lead's kin | It is a grant of one lead, not of the build it is on or the leads beside it |
-| Collaborators are managed by somebody who reads the lead at the visibility it holds while its flaw is undisclosed: internal where it was kept, private where it was moved | Whoever reads the lead decides who else does. A grant of the lead is not one of those readings |
+| Collaborators are managed by somebody who reads the product's internal work, kept lead or moved | The lead is internal until its flaw is disclosed. A grant of the lead, and a reading through the flaw, are not readings of internal work |
 | A grant or a withdrawal is refused with 409 once the flaw is disclosed, and is made in one transaction with the read of the hand-off it depends on | The grants have ended |
 | A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in, in a line their grant reaches | As a case collaborator is |
 | A reader on the flaw's case reads a moved lead in full | The lead is part of the case |
@@ -1006,8 +1015,8 @@ it is about.
 | The documentation hosts are a list in the code | An analyzer documenting rules elsewhere has its documentation dropped until the list names it |
 | A tool is told apart by the name its output gives it | Two configurations of one tool in one invocation are one series. A pipeline running a tool twice runs the client twice |
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
-| An internal reader tells a moved lead from a kept one | A moved lead is a stub to them and a kept one is not. That a lead is in a case is what the stub says, and the case is what it withholds |
-| The claims about a moved lead are read by readers of the product's undisclosed work, and by nobody on the flaw's case or granted the lead alone | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A case collaborator reads the lead's evidence and the flaw's decisions |
+| An internal reader reads a moved lead whole, and is not told its flaw | The flaw is undisclosed work. The lead's state reads handed off for both |
+| The claims about a moved lead are read by its internal readers, and by nobody who reads it only through the flaw or a grant | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A reader of undisclosed work reads the lead's evidence and the flaw's decisions |
 | A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their claims to the new name |
 | Every lead of a series' first run is in the queue | A vulnerability scanner's first scan has no baseline either, and starting to analyze a codebase leaves what it already holds to be triaged and fixed. A codebase analyzed for the first time puts every result in front of a triager at once, and the order and the standing rules are what thin it |
 | An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |

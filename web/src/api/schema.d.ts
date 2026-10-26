@@ -2689,7 +2689,7 @@ export interface paths {
          *
          *     The line this deployment triages at is stated in the file.
          *
-         *     Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text, and `withheld` is false on every lead. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
+         *     Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
          *
          *     Takes every filter the findings list takes.
          *
@@ -3531,7 +3531,7 @@ export interface paths {
          * Export static analysis leads
          * @description The lead list as a file: every row the same filters would list, not one page of them, in the same order.
          *
-         *     Read with your own visibility, as it is written. A lead in a case you are not on is a row with an empty message and `withheld` true. No row carries source text.
+         *     Read with your own visibility, as it is written. No row carries source text.
          *
          *     With no `state` it is the queue, and the file says so. Takes every filter the lead list takes.
          *
@@ -10233,8 +10233,6 @@ export interface components {
             third_party?: boolean;
             /** @description Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
-            /** @description Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered */
-            withheld?: boolean;
         };
         LeadFixedBody: {
             /**
@@ -10339,7 +10337,7 @@ export interface components {
              * @description The line the result starts at
              */
             line?: number;
-            /** @description What the analyzer says. Empty where the lead is withheld */
+            /** @description What the analyzer says */
             message: string;
             /**
              * Format: date
@@ -10363,8 +10361,6 @@ export interface components {
             third_party?: boolean;
             /** @description The variant of that build */
             variant: string;
-            /** @description Whether the lead is part of a case you are not on, so what the analyzer said is not answered */
-            withheld?: boolean;
         };
         LeadRuleBody: {
             /**

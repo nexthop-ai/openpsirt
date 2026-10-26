@@ -77,9 +77,6 @@ func TestTheAnonymousSubjectReadsNoLead(t *testing.T) {
 		if _, err := finding.NewStore(r.DB.DB).LeadAt(ctx, anybody, target, place); !errors.Is(err, finding.ErrNoOpenFinding) {
 			t.Errorf("the anonymous subject reading the lead was answered %v", err)
 		}
-		if _, stub, err := finding.NewStore(r.DB.DB).LeadOrStubAt(ctx, anybody, target, place); !errors.Is(err, finding.ErrNoOpenFinding) {
-			t.Errorf("the anonymous subject reading the lead as a stub (%v) was answered %v", stub, err)
-		}
 		for _, state := range []analysis.State{"", analysis.HandedOff} {
 			queue, err := analysis.LeadsOf(ctx, r.DB.DB, anybody, analysis.Scope{ProductID: mine.ID}, state, 50, 0)
 			if err == nil && (queue.Total != 0 || len(queue.Rows) != 0) {
