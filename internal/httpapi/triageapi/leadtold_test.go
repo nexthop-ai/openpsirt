@@ -66,3 +66,21 @@ func TestAMentionOnALeadClaimReachesSomebodyWhoReadsOnlyInternalWork(t *testing.
 		}
 	})
 }
+
+func TestAnApprovalBatchUndoneIsToldToALeadProposerWhoReadsOnlyInternalWork(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		decided := decideLead(t, r, httpapitest.SeededLead(t, r),
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			t.Fatalf("approving under a batch answered %d: %s", got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodDelete,
+			"/v1/approval-batches/tuesday", ""); got.Code != http.StatusOK {
+			t.Fatalf("undoing the batch answered %d: %s", got.Code, got.Body)
+		}
+		if n := toldOfKind(t, r, "internal-triager", notify.ApprovalUndone); n != 1 {
+			t.Errorf("the proposer, who reads internal work alone, read %d lines about the batch undone; want one", n)
+		}
+	})
+}

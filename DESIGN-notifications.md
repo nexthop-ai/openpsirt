@@ -211,7 +211,8 @@ found, and each is about internal work, so it is withheld on the terms of
 
 A claim on a lead is told on the terms of every other claim: waiting for a
 second person, sent back and left, rows of it set aside, lapsed, an agreement an
-edit took back, and a mention in its notes. Its rows are internal work, so each
+edit took back, an agreement taken back with its batch, and a mention in its
+notes. Its rows are internal work, so each
 line is withheld as internal (§ The notification list).
 
 | Notice | Kind | To | Clears |
