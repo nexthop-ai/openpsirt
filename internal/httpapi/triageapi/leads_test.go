@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
@@ -470,6 +471,75 @@ func TestWithdrawingAnAgreedDismissalOfALeadReopensIt(t *testing.T) {
 		}
 		if queued := leadsOf(t, r, "internal-reader", ""); len(queued.Items) != 1 || queued.Items[0].Place != place {
 			t.Errorf("the queue holds %+v after the dismissal was withdrawn; want the lead back", queued.Items)
+		}
+	})
+}
+
+// A run of the lead's own series on its own build, applied and comparable, is
+// the only run a fix is named by: each of those taken away from a run that
+// would otherwise be accepted is refused.
+func TestAFixedLeadNamesOnlyAnAppliedComparableRunOfItsSeriesOnItsBuild(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		lead := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		now := time.Now().UTC()
+		httpapitest.ApplyRun(t, r, now.Add(-2*time.Hour), httpapitest.LeadRun(false))
+		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))
+		httpapitest.ApplyRunIn(t, r, "cppcheck/default", now.Add(-90*time.Minute),
+			httpapitest.OtherToolRun("cppcheck", "overflow", "787", "src/c.c", 9))
+		var later struct {
+			ID     int64 `bun:"id"`
+			Series int64 `bun:"series_id"`
+			Target int64 `bun:"target_id"`
+		}
+		if err := r.DB.DB.NewSelect().TableExpr(`"series_run" AS "sr"`).
+			ColumnExpr(`"sr"."id", "sr"."series_id", "sr"."target_id"`).
+			Where(`"sr"."built_at" = (SELECT MAX("m"."built_at") FROM "series_run" AS "m" WHERE "m"."series_id" =
+				(SELECT "s0"."series_id" FROM "series_run" AS "s0" ORDER BY "s0"."id" LIMIT 1))`).
+			Where(`"sr"."series_id" = (SELECT "s1"."series_id" FROM "series_run" AS "s1" ORDER BY "s1"."id" LIMIT 1)`).
+			Scan(t.Context(), &later); err != nil {
+			t.Fatal(err)
+		}
+		var otherSeries int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"series_run" AS "sr"`).ColumnExpr(`MAX("sr"."series_id")`).
+			Where(`"sr"."series_id" <> ?`, later.Series).Scan(t.Context(), &otherSeries); err != nil {
+			t.Fatal(err)
+		}
+		names := catalog.NewStore(r.DB.DB)
+		mine, err := names.ProductByName(t.Context(), "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := names.DeclareStream(t.Context(), mine.ID, "v1", catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
+		otherBuild := r.TargetOf(t, httpapitest.Build{Product: "mine", Stream: "v1", Variant: "broadcom"})
+		body := fmt.Sprintf(`{"because":"the bounds check landed","fixed_in":%d}`, later.ID)
+		for _, c := range []struct {
+			name   string
+			column string
+			value  any
+			was    any
+		}{
+			{"on another build", "target_id", otherBuild, later.Target},
+			{"of another series", "series_id", otherSeries, later.Series},
+			{"not comparable", "comparable", false, true},
+			{"not applied", "status", "superseded", "applied"},
+		} {
+			if _, err := r.DB.DB.NewUpdate().TableExpr(`"series_run"`).Set(`"`+c.column+`" = ?`, c.value).
+				Where(`"id" = ?`, later.ID).Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, lead+"/fixed", body); got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("naming a run %s answered %d: %s", c.name, got.Code, got.Body)
+			}
+			if _, err := r.DB.DB.NewUpdate().TableExpr(`"series_run"`).Set(`"`+c.column+`" = ?`, c.was).
+				Where(`"id" = ?`, later.ID).Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, lead+"/fixed", body); got.Code != http.StatusOK {
+			t.Errorf("naming the later run of the lead's series on its build answered %d: %s", got.Code, got.Body)
 		}
 	})
 }
