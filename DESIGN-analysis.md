@@ -199,6 +199,7 @@ input to a key and never a key by itself.
 | Key | Digest of | Strength |
 |---|---|---|
 | Whole | The rule, the path, the fingerprint or the line where there is none, the message with its digits taken out, the enclosing function and the call chain | Strong |
+| Unprinted | The whole key without the fingerprint or the line. Compared by a re-baseline alone, and only where one result and one lead hold it (§ Re-baseline) | Strong |
 | Function | The rule, the path, the message with its digits taken out, and the enclosing function. Absent where the output names no function | Probable |
 | Line | The rule, the path and the message with its digits taken out, compared with the nearest line | Probable |
 
@@ -214,13 +215,14 @@ input to a key and never a key by itself.
 
 A run is paired with the leads its series holds open on the build, one to
 one, a layer at a time, each layer on what the layers before it left: the
-whole key, then the function, then the nearest line.
+whole key, then the function, then the nearest line. A re-baseline compares
+the unprinted key after the whole key and before the function.
 
 | Rule | |
 |---|---|
 | A lead the last comparable run did not see is a candidate in every layer | Of 28 absences hand-checked, 5 came back one or two builds later. A lead it saw comes first where a layer cannot tell two apart |
 | The line layer offers a result the eight leads sharing its line key nearest its line | A generated file repeating one message holds thousands of results under one key, and offering each all of them is quadratic |
-| Each lead records how its newest sighting was paired: on the whole key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Lead triage) |
+| Each lead records how its newest sighting was paired: on the whole key, the unprinted key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Lead triage) |
 
 ### Carrying
 
@@ -250,7 +252,11 @@ re-baseline.
 | A run reporting nothing records nothing | It says nothing about how results are fingerprinted, and reading it as a change would make the next run a re-baseline |
 | `none` is recorded only where no result carried a fingerprint | One unhashable result appearing or going away beside others says nothing about how the run fingerprints |
 | The salt is recorded as the client states its mark, a short digest | A rotated salt changes every fingerprint and no scheme name |
-| A re-baseline is matched like any other run, and says so on its receipt | Its whole keys no longer meet the leads', so its pairings are the probable layers' |
+| A re-baseline says so on its receipt | Its whole keys no longer meet the leads' |
+| A re-baseline pairs a result and a lead on the unprinted key where they are the only result and the only lead holding it, and the pairing is strong | A rotated salt or a new scheme changes every fingerprint and nothing else, so a key nothing else holds is the same result, and its dismissal carries |
+| A result or a lead sharing its unprinted key with another falls to the probable layers | The fingerprint was what told them apart, and pairing them by line is a guess, so their dismissals lapse |
+| The unprinted key is compared for the re-baseline alone | On any other run a fingerprint that changed is the analyzer saying the result changed |
+| Carrying from a closed lead or another build is on the whole key, on a re-baseline too | A result carried across a rotation opens as a new lead there |
 
 ## Placement
 

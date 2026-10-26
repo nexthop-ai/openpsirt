@@ -324,7 +324,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	if err != nil {
 		return "", err
 	}
-	matched, fresh, missed, returned, err := match(ctx, tx, open, keyed)
+	matched, fresh, missed, returned, err := match(ctx, tx, open, keyed, run.Rebaseline)
 	if err != nil {
 		return "", err
 	}

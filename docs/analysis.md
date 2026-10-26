@@ -538,7 +538,7 @@ of the suite, so its runs need no rules file.
 |---|---|
 | Paths | Relative to the checkout, with `/`, in the case the checkout's index holds, whether the tool wrote it through a symbolic link or not. A path outside the checkout is sent as it is and dropped by the deployment with its result |
 | Repositories | Every repository the checkout holds, submodules included, with its commit and its remote as a web address. A repository with uncommitted changes is named as changed |
-| Fingerprints | A hash of each result's line and the line either side, with white space and line endings normalized, so a result keeps its identity when the code around it moves. With `--salt-file` the hash is keyed, and the analyzer's own fingerprints are left out |
+| Fingerprints | A hash of each result's line and the line either side, with white space and line endings normalized, so a result keeps its identity when the code around it moves. With `--salt-file` the hash is keyed, and the analyzer's own fingerprints are left out. A salt can be rotated: the first run under a new one keeps each result's lead, and its dismissal, wherever the result is the only one of its rule, file, message and function. Results sharing all four are matched by line, and their dismissals wait to be confirmed again |
 | Source | Nothing, unless `--snippets` is given. Whole-file contents, attachments and suggested fixes in an analyzer's SARIF are always removed |
 
 `write` stores exactly the document `upload` would send.

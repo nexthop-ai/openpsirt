@@ -221,14 +221,19 @@ func analysisV0110(t *columnTypes) []string {
 			-- path, the fingerprint or the line, the message with its digits
 			-- taken out, the function and the call chain.
 			"match_key"     ` + t.hash + ` NOT NULL,
+			-- The same without the fingerprint or the line, which a run
+			-- whose fingerprints changed compares where one result and one
+			-- lead hold it.
+			"unprinted_key" ` + t.hash + ` NOT NULL,
 			-- The two probable keys: the rule, the path and the message with
 			-- its digits taken out, with the function where the output names
 			-- one, and with neither.
 			"function_key"  ` + t.hash + ` NULL,
 			"line_key"      ` + t.hash + ` NOT NULL,
 			-- How the newest sighting was paired with the lead: on the whole
-			-- key, which is strong, or on the function or the nearest line,
-			-- which is probable. Null where the sighting opened it.
+			-- key or on the whole key without its fingerprint, which are
+			-- strong, or on the function or the nearest line, which are
+			-- probable. Null where the sighting opened it.
 			"matched_on"    ` + t.kind + ` NULL,
 			-- The analyzer's own rating and how sure it is, where it gives
 			-- them.

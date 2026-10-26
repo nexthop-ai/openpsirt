@@ -38,6 +38,7 @@ type result struct {
 	Fingerprint       string `bun:"fingerprint,nullzero"`
 	FingerprintScheme string `bun:"fingerprint_scheme,nullzero"`
 	MatchKey          string `bun:"match_key,notnull"`
+	UnprintedKey      string `bun:"unprinted_key,notnull"`
 	FunctionKey       string `bun:"function_key,nullzero"`
 	LineKey           string `bun:"line_key,notnull"`
 	MatchedOn         string `bun:"matched_on,nullzero"`
@@ -99,10 +100,11 @@ const (
 )
 
 // match pairs a run's results with the findings its series holds open on
-// the build, one to one, layer by layer (pair). It reports the pairs, the
+// the build, one to one, layer by layer (pair, or pairAcross for a
+// re-baseline). It reports the pairs, the
 // results nothing matched, the open findings the run did not see, and how
 // many of the pairs had been missed by an earlier run.
-func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keyed) (
+func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keyed, rebaseline bool) (
 	map[int64]Keyed, []Keyed, []int64, int, error) {
 
 	absent := make(map[int64]bool, len(open))
@@ -117,7 +119,11 @@ func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keye
 	}
 	matched := map[int64]Keyed{}
 	paired := make([]bool, len(keyed))
-	for _, p := range pair(candidates, keyed) {
+	layers := pair
+	if rebaseline {
+		layers = pairAcross
+	}
+	for _, p := range layers(candidates, keyed) {
 		k := keyed[p.result]
 		k.On = p.on
 		matched[candidates[p.candidate].findingID] = k
@@ -150,13 +156,13 @@ func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var rows []result
 		if err := db.NewSelect().Model(&rows).
-			Column("finding_id", "match_key", "function_key", "line_key", "start_line").
+			Column("finding_id", "match_key", "unprinted_key", "function_key", "line_key", "start_line").
 			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
 			return err
 		}
 		for _, r := range rows {
 			c := candidate{
-				findingID: r.FindingID, key: r.MatchKey, functionKey: r.FunctionKey,
+				findingID: r.FindingID, key: r.MatchKey, unprinted: r.UnprintedKey, functionKey: r.FunctionKey,
 				lineKey: r.LineKey, absent: absent[r.FindingID],
 			}
 			if r.StartLine != nil {
@@ -283,7 +289,7 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 			StartLine: stated(k.StartLine), StartColumn: stated(k.StartColumn),
 			EndLine: stated(k.EndLine), EndColumn: stated(k.EndColumn),
 			Enclosing: k.Function, CallChain: k.Chain, MessageText: k.Message,
-			Fingerprint: k.Print, FingerprintScheme: k.Scheme, MatchKey: k.Key,
+			Fingerprint: k.Print, FingerprintScheme: k.Scheme, MatchKey: k.Key, UnprintedKey: k.UnprintedKey,
 			FunctionKey: k.FunctionKey, LineKey: k.LineKey, MatchedOn: k.On, Level: k.Level,
 			Snippet: k.Snippet, SnippetLine: stated(k.SnippetLine),
 			LastPath: lastPath, LastPathIdentity: pathIdentity(lastPath), LastLine: stated(lastLine),
