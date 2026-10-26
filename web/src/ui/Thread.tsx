@@ -43,6 +43,7 @@ export function Thread({
   mine,
   about,
   undisclosed,
+  internal,
   word,
   consequence,
   placeholder,
@@ -60,6 +61,8 @@ export function Thread({
   mine: (writtenBy: string) => boolean;
   about: { product: string; vulnerability: string };
   undisclosed?: boolean;
+  // Whether the thing discussed is internal material, a lead not in a case.
+  internal?: boolean;
   // The name for one piece, and what adding one does not do. The two words
   // that are genuinely a caller's, so the wording stays deliberate rather than
   // drifting together by accident.
@@ -146,7 +149,7 @@ export function Thread({
           label={word}
           placeholder={placeholder}
           attachTo={about}
-          mentions={mentioning(about.product, undisclosed)}
+          mentions={mentioning(about.product, undisclosed, internal)}
         />
       </div>
       {adding.error != null && <Failed error={adding.error} what="That could not be added." />}
@@ -239,6 +242,7 @@ export function EditPiece({
   onDone,
   about,
   undisclosed,
+  internal,
 }: {
   id: number;
   was: string;
@@ -251,6 +255,7 @@ export function EditPiece({
   onDone: () => void;
   about: { product: string; vulnerability: string };
   undisclosed?: boolean;
+  internal?: boolean;
 }) {
   const [text, setText] = useState(was);
   const edit = useEdit();
@@ -262,7 +267,7 @@ export function EditPiece({
         rows={4}
         label={label}
         attachTo={about}
-        mentions={mentioning(about.product, undisclosed)}
+        mentions={mentioning(about.product, undisclosed, internal)}
       />
       {edit.error != null && <Failed error={edit.error} what="That could not be changed." />}
       <div className="actions">

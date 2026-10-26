@@ -81,12 +81,20 @@ export function Lead() {
         )}
         <p className="hint">
           Last seen {on(evidence.last_seen)}
+          {evidence.last_commit && <Commit sha={evidence.last_commit} />}
           {evidence.not_seen && ` · not seen ${on(evidence.not_seen)}`}
+          {evidence.not_seen && evidence.not_seen_commit && (
+            <Commit sha={evidence.not_seen_commit} />
+          )}
           {evidence.unchanged && " · the code did not change between those builds"}
           {linkable(evidence.compare) && (
             <>
               {" · "}
-              <a href={linkable(evidence.compare) ?? undefined} target="_blank" rel="noreferrer">
+              <a
+                href={linkable(evidence.compare) ?? undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Compare builds
               </a>
             </>
@@ -173,6 +181,17 @@ export function Lead() {
   );
 }
 
+// The commit the lead's repository was at in a build, shortened, with the
+// whole of it on hover.
+function Commit({ sha }: { sha: string }) {
+  return (
+    <span className="mono" title={sha}>
+      {" "}
+      at {sha.slice(0, 12)}
+    </span>
+  );
+}
+
 // One place the analyzer named: where, what it said there, and the code.
 function Place({ place }: { place: LeadPlace }) {
   const href = linkable(place.link);
@@ -181,7 +200,13 @@ function Place({ place }: { place: LeadPlace }) {
     <div>
       <div>
         {href ? (
-          <a className="mono" href={href} target="_blank" rel="noreferrer" title={place.revision}>
+          <a
+            className="mono"
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={place.revision}
+          >
             {where}
           </a>
         ) : (

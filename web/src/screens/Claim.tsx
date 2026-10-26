@@ -109,6 +109,7 @@ export function Claim({ who }: { who: Who }) {
         mine={(wrote) => wrote === who.identity}
         about={about}
         undisclosed={!!it.undisclosed}
+        internal={!!it.internal}
       />
     </>
   );
@@ -408,6 +409,7 @@ function Reasoning({
         approved={claim.happened === "approved"}
         about={about}
         undisclosed={!!claim.undisclosed}
+        internal={!!claim.internal}
         onDone={onChanged}
       />
     </div>

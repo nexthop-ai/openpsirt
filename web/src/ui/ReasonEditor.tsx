@@ -50,6 +50,7 @@ export function ReasonEditor({
   onDone,
   spaced = false,
   undisclosed,
+  internal,
 }: {
   claimId: number;
   reasoning: string;
@@ -66,6 +67,8 @@ export function ReasonEditor({
   // The disclosure of the thing being argued about, which decides who
   // may be offered after an @. This is the same text the decision form writes.
   undisclosed?: boolean;
+  // Whether it is internal material, a lead not in a case.
+  internal?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(reasoning);
@@ -90,7 +93,7 @@ export function ReasonEditor({
             draftKey={draftKey}
             label="Reasoning"
             attachTo={about}
-            mentions={mentioning(about.product, undisclosed)}
+            mentions={mentioning(about.product, undisclosed, internal)}
           />
           {revise.error != null && <Failed error={revise.error} what="That could not be stored." />}
           <div className="actions" style={{ marginTop: 8 }}>

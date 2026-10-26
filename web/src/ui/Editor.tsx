@@ -45,14 +45,20 @@ const MARKS: Mark[] = [
 // of that visibility in that product, so asking as though an undisclosed
 // finding were public offers colleagues who cannot open what they are being
 // called to. Written once because four screens ask it and two of them had
-// started to answer it differently.
+// started to answer it differently. A claim about a lead not in a case is
+// about internal material, and the server tells a mention at that visibility.
 export function mentioning(
   product?: string,
   undisclosed?: boolean,
-): { product: string; visibility: "public" | "private" } | undefined {
+  internal?: boolean,
+): { product: string; visibility: Visibility } | undefined {
   if (!product) return undefined;
-  return { product, visibility: undisclosed ? "private" : "public" };
+  return { product, visibility: internal ? "internal" : undisclosed ? "private" : "public" };
 }
+
+// The visibility of what a piece of text is about, as the mention picker
+// asks it.
+type Visibility = "public" | "private" | "internal";
 
 export function Editor({
   value,
@@ -75,7 +81,7 @@ export function Editor({
   label?: string;
   // The product mentions are offered from. Omitted where there is none in
   // hand, in which case nothing is offered rather than everybody.
-  mentions?: { product: string; visibility?: "public" | "private" };
+  mentions?: { product: string; visibility?: Visibility };
   // The issue a file would be attached to. Omitted where there is none in
   // hand, and then no attach control is offered — a control that could not
   // say what it was attaching to would be one that guessed.

@@ -482,6 +482,7 @@ export function Comments({
   mine,
   about,
   undisclosed,
+  internal,
   within,
 }: {
   claimId: number;
@@ -496,6 +497,8 @@ export function Comments({
   // calls them to something they will be refused, and on an undisclosed one
   // the mention itself says a finding exists.
   undisclosed?: boolean;
+  // Whether it is internal material, a lead not in a case.
+  internal?: boolean;
 }) {
   const comment = useComment();
   const comments = useQuery({
@@ -512,6 +515,7 @@ export function Comments({
         mine={mine}
         about={about}
         undisclosed={undisclosed}
+        internal={internal}
         word="Comment"
         consequence="Does not affect the approval"
         placeholder="A question, a note, something worth knowing later."
@@ -535,6 +539,7 @@ export function Comments({
             useEdit={useEditComment}
             about={about}
             undisclosed={undisclosed}
+            internal={internal}
             onDone={done}
           />
         )}

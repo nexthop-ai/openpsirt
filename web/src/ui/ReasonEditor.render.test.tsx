@@ -75,3 +75,32 @@ describe("revising and withdrawing a claim's reasoning", () => {
     ).not.toContain("Withdraw");
   });
 });
+
+describe("naming somebody in a claim's reasoning", () => {
+  it("offers readers of internal work on a claim about a lead", async () => {
+    const reads = serve((path) =>
+      path === "/v1/products/{product}/mentionable" ? { data: { items: [] } } : { data: {} },
+    );
+    mount.render(
+      screen(
+        <ReasonEditor
+          claimId={12}
+          reasoning="Unreachable."
+          state="waiting"
+          approved={false}
+          about={{ product: "sonic", vulnerability: "clang/unix.Malloc" }}
+          internal
+          onDone={vi.fn()}
+        />,
+      ),
+    );
+    await settle();
+    await press(mount.host(), "Revise reasoning");
+    change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "Ask @an");
+    await settle();
+    const asked = (reads.mock.calls as unknown as [string, { params: { query: object } }][])
+      .filter(([path]) => path === "/v1/products/{product}/mentionable")
+      .at(-1);
+    expect(asked?.[1].params.query).toMatchObject({ visibility: "internal", q: "an" });
+  });
+});
