@@ -1448,6 +1448,7 @@ the screens draw them.
 | The leads that are the same flaw and those that possibly are are two lists | One decision covers the first and never the second, and the first list says so on hover |
 | The decision card names the claim standing at the lead, or offers the form | A lead under a claim takes no second one, so the form is not offered beside it. The claim opens on the claim page, which is where it is agreed to |
 | The claim page offers Agree on a claim about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A claim says it is internal, and the screen asks the reader's reach there, as the server does |
+| On a claim about internal material the claim page offers the comment box to somebody who triages or approves internal work, and the control linking where it is worked on to somebody who triages it | The flaw's readers read a moved lead's claims and take no part in them. The server refuses both to anybody else |
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
 | A lead not reproduced offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it, and names the build of the first run that did not see it. A fixed lead names the build it was fixed in |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |

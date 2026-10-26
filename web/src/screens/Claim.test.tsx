@@ -173,3 +173,44 @@ describe("the answer a second person gives", () => {
     expect(agree()).toBeDefined();
   });
 });
+
+describe("a claim about internal material read by somebody who may not argue it", () => {
+  async function drawn(may: Record<string, boolean>) {
+    const reader: Who = {
+      ...ANA,
+      identity: "bo",
+      reach: [{ product: "sonic", ...may }] as unknown as Who["reach"],
+    };
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: reader };
+      if (path === "/v1/claims/{id}") {
+        return {
+          data: {
+            claim: { id: 4, proposed_by: "ana" },
+            place: { product: "sonic", vulnerability: "clang-tidy/leak" },
+            argument: { outcome: "confirmed" },
+            internal: true,
+            issues: 1,
+            places: 1,
+            age_days: 1,
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Claim who={reader} />, "/claims/4", "/claims/:id", client()));
+    await settle();
+    const text = mount.host().textContent ?? "";
+    const buttons = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);
+    return { comments: text.includes("Add a comment"), links: buttons.includes("Link it") };
+  }
+
+  it("offers no comment box and no link to somebody who only reads it", async () => {
+    expect(await drawn({ reads_private: true })).toEqual({ comments: false, links: false });
+  });
+
+  it("offers a comment box to an approver and both to a triager", async () => {
+    expect(await drawn({ agrees_internal: true })).toEqual({ comments: true, links: false });
+    expect(await drawn({ triages_internal: true })).toEqual({ comments: true, links: true });
+  });
+});

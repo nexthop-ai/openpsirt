@@ -66,6 +66,12 @@ export function Claim({ who }: { who: Who }) {
   // products is two pieces of work with two sets of readers.
   const about = { product: it.place.product, vulnerability: it.place.vulnerability };
   const again = () => void queries.invalidateQueries({ queryKey: ["claim", id] });
+  // Reading a claim about internal material is not arguing it: the flaw's
+  // readers read a moved lead's claims and take no part in them. A comment
+  // takes triage or approval there, and a link takes triage.
+  const here = mayOf(who, it.place.product ?? "");
+  const comments = !it.internal || !!(here?.triages_internal || here?.agrees_internal);
+  const links = !it.internal || !!here?.triages_internal;
 
   return (
     <>
@@ -98,7 +104,7 @@ export function Claim({ who }: { who: Who }) {
         </p>
       </div>
 
-      <Argument claim={it} id={id} onChanged={again} />
+      <Argument claim={it} id={id} links={links} onChanged={again} />
       <Reasoning claim={it} about={about} onChanged={again} />
       <Reaffirm claim={it} id={id} mine={mine} />
       <Answer claim={it} mine={mine} onAnswered={again} />
@@ -110,13 +116,24 @@ export function Claim({ who }: { who: Who }) {
         about={about}
         undisclosed={!!it.undisclosed}
         internal={!!it.internal}
+        writes={comments}
       />
     </>
   );
 }
 
 // The claim's argument, its landing place, and its present reach.
-function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChanged: () => void }) {
+function Argument({
+  claim,
+  id,
+  links,
+  onChanged,
+}: {
+  claim: Claimed;
+  id: number;
+  links: boolean;
+  onChanged: () => void;
+}) {
   const bulk = claim.issues > 1;
   return (
     <div className={`card standing ${stripeOf(claim.happened, !!claim.argument.needs_approval)}`}>
@@ -251,7 +268,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
           </Link>
         </p>
       )}
-      <Elsewhere id={id} where={claim.claim.elsewhere ?? ""} onSet={onChanged} />
+      <Elsewhere id={id} where={claim.claim.elsewhere ?? ""} onSet={onChanged} writes={links} />
     </div>
   );
 }

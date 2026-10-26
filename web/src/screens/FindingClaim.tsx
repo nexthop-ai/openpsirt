@@ -484,6 +484,7 @@ export function Comments({
   undisclosed,
   internal,
   within,
+  writes = true,
 }: {
   claimId: number;
   // Drawn inside the decision's own card rather than as a card of its own.
@@ -499,6 +500,8 @@ export function Comments({
   undisclosed?: boolean;
   // Whether it is internal material: a lead's, until its flaw is disclosed.
   internal?: boolean;
+  // Whether the reader may comment, which reading the claim does not imply.
+  writes?: boolean;
 }) {
   const comment = useComment();
   const comments = useQuery({
@@ -544,6 +547,7 @@ export function Comments({
           />
         )}
         useHistory={useCommentHistory}
+        writes={writes}
       />
     </div>
   );

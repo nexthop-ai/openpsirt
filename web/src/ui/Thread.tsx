@@ -54,6 +54,7 @@ export function Thread({
   onAdd,
   edit,
   useHistory,
+  writes = true,
 }: {
   items: Said[];
   // A piece written by whoever is reading. The identity alone: a
@@ -80,6 +81,9 @@ export function Thread({
   edit: (piece: Said, done: () => void) => ReactNode;
   // A hook, named as one so the rules of hooks are checked where it is called.
   useHistory: (id: number) => UseQueryResult<{ items?: Version[] | null }>;
+  // Whether the reader may add to the thread. A reader who may not is shown
+  // the thread without the box the server would refuse.
+  writes?: boolean;
 }) {
   const [text, setText] = useState("");
   const [showing, setShowing] = useState<number | null>(null);
@@ -139,47 +143,51 @@ export function Thread({
           ))}
         </div>
       )}
-      <div className="field" style={{ margin: "14px 0 0", maxWidth: "78ch" }}>
-        <label>Add a {lower}</label>
-        <Editor
-          value={text}
-          onChange={setText}
-          draftKey={draftKey}
-          rows={4}
-          label={word}
-          placeholder={placeholder}
-          attachTo={about}
-          mentions={mentioning(about.product, undisclosed, internal)}
-        />
-      </div>
-      {adding.error != null && <Failed error={adding.error} what="That could not be added." />}
-      {/* A name that reached nobody. Said without saying why: either no such
+      {writes && (
+        <>
+          <div className="field" style={{ margin: "14px 0 0", maxWidth: "78ch" }}>
+            <label>Add a {lower}</label>
+            <Editor
+              value={text}
+              onChange={setText}
+              draftKey={draftKey}
+              rows={4}
+              label={word}
+              placeholder={placeholder}
+              attachTo={about}
+              mentions={mentioning(about.product, undisclosed, internal)}
+            />
+          </div>
+          {adding.error != null && <Failed error={adding.error} what="That could not be added." />}
+          {/* A name that reached nobody. Said without saying why: either no such
           person is recorded or they cannot read this, and telling those apart
           would answer "can this person see undisclosed work" one piece at a
           time. The text is kept either way — losing a paragraph to fix a word
           is the wrong trade. */}
-      {notNotified.length > 0 && (
-        <p className="hint">
-          Nobody was told about {notNotified.map((name) => `@${name}`).join(", ")} — either there is
-          no such person here, or they cannot read this. The {lower} was saved.
-        </p>
+          {notNotified.length > 0 && (
+            <p className="hint">
+              Nobody was told about {notNotified.map((name) => `@${name}`).join(", ")} — either
+              there is no such person here, or they cannot read this. The {lower} was saved.
+            </p>
+          )}
+          <div className="actions">
+            <button
+              type="button"
+              className="btn"
+              disabled={!text.trim() || adding.isPending}
+              onClick={() =>
+                onAdd(text, () => {
+                  forget(draftKey);
+                  setText("");
+                })
+              }
+            >
+              {word}
+            </button>
+            <span className="consequence">{consequence}</span>
+          </div>
+        </>
       )}
-      <div className="actions">
-        <button
-          type="button"
-          className="btn"
-          disabled={!text.trim() || adding.isPending}
-          onClick={() =>
-            onAdd(text, () => {
-              forget(draftKey);
-              setText("");
-            })
-          }
-        >
-          {word}
-        </button>
-        <span className="consequence">{consequence}</span>
-      </div>
     </>
   );
 }
