@@ -15,9 +15,10 @@ import (
 //
 // The grant is on the pair of product and place, as a case collaborator's is
 // on the pair of product and issue. It reads the lead's evidence and nothing
-// else of the product, and reaches the lead only while it is internal or
-// private: once its flaw is disclosed the lead is read by whoever reads the
-// product's disclosed work, and the grant reaches nothing more.
+// else of the product, at the internal and private visibilities, and only
+// while the lead's flaw is undisclosed: disclosure ends it, kept lead or
+// moved. A moved lead goes public with its flaw and a kept one stays
+// internal.
 type LeadCollaborator struct {
 	bun.BaseModel `bun:"table:lead_collaborator,alias:lc"`
 
@@ -35,8 +36,8 @@ type LeadCollaborator struct {
 	LivePerson *int64 `bun:"live_person_id"`
 }
 
-// leadVisibilities is what a lead grant reaches: a kept lead and a moved one
-// before its flaw is disclosed.
+// leadVisibilities is what a lead grant reaches while the lead's flaw is
+// undisclosed: a kept lead and a moved one.
 var leadVisibilities = []Visibility{Internal, Private}
 
 // LeadGrantVisibilities is what a lead grant reaches, for a condition over

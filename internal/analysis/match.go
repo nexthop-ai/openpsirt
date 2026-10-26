@@ -183,11 +183,9 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 		return nil, nil, nil
 	}
 	now := a.now().Truncate(time.Microsecond)
-	places := make([]string, len(fresh))
-	for i, k := range fresh {
-		places[i] = identity(seriesID, k.Key)
+	places := freshPlaces(seriesID, fresh, from)
+	for i := range fresh {
 		if c, ok := from[i]; ok {
-			places[i] = c.place
 			fresh[i].On = c.on
 		}
 	}
@@ -230,6 +228,19 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 		return nil, nil, err
 	}
 	return ids, baseline, nil
+}
+
+// freshPlaces is the place each result new to this build opens at: the lead's
+// it was carried from, or the one its series and key name.
+func freshPlaces(seriesID int64, fresh []Keyed, from map[int]carried) []string {
+	places := make([]string, len(fresh))
+	for i, k := range fresh {
+		places[i] = identity(seriesID, k.Key)
+		if c, ok := from[i]; ok {
+			places[i] = c.place
+		}
+	}
+	return places
 }
 
 // describeAgain records what this run said about the findings it saw again,

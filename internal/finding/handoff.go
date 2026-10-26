@@ -40,6 +40,58 @@ type Handoff struct {
 	// DisclosedAt is when its flaw was disclosed, kept or moved. A kept lead
 	// stays internal past it, so the visibility alone does not say so.
 	DisclosedAt *time.Time `bun:"disclosed_at"`
+	// LastRunID is the last analysis run to describe the lead, written before
+	// the run writes anything about it. A write matched on it finds a run that
+	// landed since it was read.
+	LastRunID *int64 `bun:"last_run_id"`
+}
+
+// matchedOn narrows an update of one hand-off to the run it was read after,
+// for a write that a run describing the lead since has to send round again.
+func (h Handoff) matchedOn(q *bun.UpdateQuery) *bun.UpdateQuery {
+	if h.LastRunID == nil {
+		return q.Where(`"last_run_id" IS NULL`)
+	}
+	return q.Where(`"last_run_id" = ?`, *h.LastRunID)
+}
+
+// AsRead narrows an update of one hand-off to the row as it was read: its
+// visibility, its flaw undisclosed, and the last run to describe it. A move,
+// an undo, a disclosure or a run landing since is a lost race, which the
+// retry reads again.
+func (h Handoff) AsRead(q *bun.UpdateQuery) *bun.UpdateQuery {
+	return h.matchedOn(q.Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).
+		Where(`"disclosed_at" IS NULL`))
+}
+
+// Describing writes a run onto the hand-offs of the leads it is about to
+// describe in one product: those at the places given, and those of the
+// findings given. Written before the run reads a hand-off or writes a lead's
+// source, so a disclosure or a move of one of them either waits for the run
+// or finds the hand-off changed and reads again.
+func Describing(ctx context.Context, db bun.IDB, productID, runID int64, places []string, findingIDs []int64) error {
+	for start := 0; start < len(places); start += database.BatchSize {
+		batch := places[start:min(start+database.BatchSize, len(places))]
+		if _, err := db.NewUpdate().Model((*Handoff)(nil)).
+			Set(`"last_run_id" = ?`, runID).
+			Where(`"product_id" = ?`, productID).
+			Where(`"place_identity" IN (?)`, bun.List(batch)).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("mark the leads the run opens at: %w", err)
+		}
+	}
+	if err := database.IDsInBatches(ctx, findingIDs, func(ctx context.Context, batch []int64) error {
+		_, err := db.NewUpdate().Model((*Handoff)(nil)).
+			Set(`"last_run_id" = ?`, runID).
+			Where(`"product_id" = ?`, productID).
+			Where(`"place_identity" IN (SELECT "df"."place_identity" FROM "finding" AS "df" WHERE "df"."id" IN (?))`,
+				bun.List(batch)).
+			Exec(ctx)
+		return err
+	}); err != nil {
+		return fmt.Errorf("mark the leads the run describes again: %w", err)
+	}
+	return nil
 }
 
 // Moved reports whether the lead was moved into its flaw's case.
@@ -160,22 +212,35 @@ func (r LeadReading) Either() (string, []any) {
 // stripped first. Every lead handed off as the issue, kept or moved, is marked
 // disclosed. Run inside the disclosure's transaction.
 func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64, now time.Time) error {
-	if _, err := db.NewUpdate().Model((*Handoff)(nil)).
-		Set(`"disclosed_at" = ?`, now).
-		Where(`"product_id" = ?`, productID).
-		Where(filed.Under(filed.Column(`"vulnerability_id"`)), vulnerabilityID).
-		Where(`"disclosed_at" IS NULL`).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("record the leads handed off as this flaw as disclosed: %w", err)
-	}
-	var moved []Handoff
-	if err := db.NewSelect().Model(&moved).
+	var handed []Handoff
+	if err := db.NewSelect().Model(&handed).
 		Where(`"lh"."product_id" = ?`, productID).
 		Where(filed.Under(filed.HandoffIssue), vulnerabilityID).
-		Where(`"lh"."moved_at" IS NOT NULL`).
-		Where(`"lh"."visibility" = ?`, access.Private).
+		Where(`"lh"."disclosed_at" IS NULL`).
 		Scan(ctx); err != nil {
-		return fmt.Errorf("read the leads moved into this case: %w", err)
+		return fmt.Errorf("read the leads handed off as this flaw: %w", err)
+	}
+	var moved []Handoff
+	for _, h := range handed {
+		// Matched on the run it was read after: a run describing the lead
+		// since wrote source this transaction cannot see, and the retry
+		// strips it.
+		result, err := h.matchedOn(db.NewUpdate().Model((*Handoff)(nil)).
+			Set(`"disclosed_at" = ?`, now).
+			Where(`"id" = ?`, h.ID).
+			Where(`"disclosed_at" IS NULL`)).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("record the leads handed off as this flaw as disclosed: %w", err)
+		}
+		if n, err := database.Affected(result); err != nil {
+			return fmt.Errorf("record the leads handed off as this flaw as disclosed: %w", err)
+		} else if n != 1 {
+			return fmt.Errorf("record the leads handed off as this flaw as disclosed: %w", database.ErrGoAgain)
+		}
+		if h.Moved() && h.Visibility == access.Private {
+			moved = append(moved, h)
+		}
 	}
 	if len(moved) == 0 {
 		return nil

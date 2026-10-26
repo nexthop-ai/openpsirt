@@ -86,6 +86,13 @@ func OtherToolRun(tool, rule, tag, file string, lines ...int) string {
 // run is applied in a series of its own.
 func ApplyRunIn(t *testing.T, r *Reach, seriesName string, built time.Time, doc string) {
 	t.Helper()
+	ApplyRunOn(t, r, r.DB, seriesName, built, doc)
+}
+
+// ApplyRunOn is ApplyRunIn applying the run through db, a handle over the
+// reach's database that a test watches.
+func ApplyRunOn(t *testing.T, r *Reach, db *database.DB, seriesName string, built time.Time, doc string) {
+	t.Helper()
 	ctx := t.Context()
 	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
 	if err != nil {
@@ -121,7 +128,7 @@ func ApplyRunIn(t *testing.T, r *Reach, seriesName string, built time.Time, doc 
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if status, err := analysis.NewApplier(r.DB).Apply(ctx, runID); err != nil || status != series.Applied {
+	if status, err := analysis.NewApplier(db).Apply(ctx, runID); err != nil || status != series.Applied {
 		t.Fatalf("the run ended %s: %v", status, err)
 	}
 }

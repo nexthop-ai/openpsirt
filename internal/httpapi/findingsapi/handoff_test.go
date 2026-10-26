@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/findingsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -33,6 +35,15 @@ func evidenceAs(t *testing.T, r *httpapitest.Reach, who, place string) findingsa
 // disclosed discloses a flaw found here, which always takes a second person.
 func disclosed(t *testing.T, r *httpapitest.Reach, flaw string) {
 	t.Helper()
+	if err := agreeToDisclose(t, r, askToDisclose(t, r, flaw)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// askToDisclose asks to disclose a flaw found here, and is the movement
+// waiting for a second person.
+func askToDisclose(t *testing.T, r *httpapitest.Reach, flaw string) int64 {
+	t.Helper()
 	got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 		"/v1/products/mine/issues/"+flaw+"/disclosure", `{"reason":"fixed in every release"}`)
 	if got.Code != http.StatusCreated {
@@ -44,10 +55,18 @@ func disclosed(t *testing.T, r *httpapitest.Reach, flaw string) {
 	if err := json.Unmarshal(got.Body.Bytes(), &asked); err != nil {
 		t.Fatal(err)
 	}
-	if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
-		fmt.Sprintf("/v1/disclosure-movements/%d/approval", asked.ID), ""); got.Code != http.StatusNoContent {
-		t.Fatalf("agreeing to the disclosure answered %d: %s", got.Code, got.Body)
+	return asked.ID
+}
+
+// agreeToDisclose is the second person agreeing to a disclosure asked for. It
+// answers rather than failing the test, so a rival goroutine may call it.
+func agreeToDisclose(t *testing.T, r *httpapitest.Reach, movement int64) error {
+	got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
+		fmt.Sprintf("/v1/disclosure-movements/%d/approval", movement), "")
+	if got.Code != http.StatusNoContent {
+		return fmt.Errorf("agreeing to the disclosure answered %d: %s", got.Code, got.Body)
 	}
+	return nil
 }
 
 func TestAConfirmedLeadIsHandedOffAsAFlawOnce(t *testing.T) {
@@ -351,5 +370,110 @@ func TestAHandedOffLeadsClaimIsNeitherRevisedNorWithdrawn(t *testing.T) {
 			`{"reasoning":"p leaks, and more besides"}`), http.StatusConflict)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, at, ""),
 			http.StatusConflict)
+	})
+}
+
+func TestADisclosureLandingWhileARunAppliesStripsWhatTheRunWrote(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		movement := askToDisclose(t, r, flaw)
+		// The disclosure is agreed to after the run has described the lead
+		// again and read its hand-off, and before the run commits.
+		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "sighting", 3*time.Second,
+			func() error { return agreeToDisclose(t, r, movement) })
+		watched := *r.DB
+		watched.DB = hooked
+		// The run keeps source at the lead's step too, which it writes as a
+		// row of its own.
+		doc := strings.Replace(httpapitest.LeadRun(true), `"region":{"startLine":3}`,
+			`"region":{"startLine":3,"snippet":{"text":"p = malloc(1);"}}`, 1)
+		httpapitest.ApplyRunOn(t, r, &watched, "clang-tidy/default", time.Now().UTC().Add(-time.Hour), doc)
+		if err := rival(); err != nil {
+			t.Fatal(err)
+		}
+		got := evidenceAs(t, r, "reader", place)
+		if got.At.Message != "p is leaked" || got.At.Snippet != "" || len(got.Steps) != 1 || got.Steps[0].Snippet != "" {
+			t.Errorf("a reader of disclosed work read %q with snippet %q and steps %+v; want the lead without the source the run wrote",
+				got.At.Message, got.At.Snippet, got.Steps)
+		}
+	})
+}
+
+func TestAnUndoneBatchLeavesTheConfirmationAHandOffRestsOn(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
+		}
+		var decided struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			t.Fatalf("agreeing to the confirmation answered %d: %s", got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/hand-off",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
+			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
+		}
+		got = httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodDelete, "/v1/approval-batches/tuesday", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("undoing the batch answered %d: %s", got.Code, got.Body)
+		}
+		var undone struct {
+			Undone int64 `json:"undone"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &undone); err != nil {
+			t.Fatal(err)
+		}
+		var state string
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."state"`).
+			Where(`"de"."claim_id" = ?`, decided.ClaimID).Scan(t.Context(), &state); err != nil {
+			t.Fatal(err)
+		}
+		if undone.Undone != 0 || state != "approved" {
+			t.Errorf("undoing the batch undid %d and left the confirmation %s; want it approved still",
+				undone.Undone, state)
+		}
+	})
+}
+
+func TestAMoveLandingWhileARunAppliesTakesTheSightingTheRunOpened(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, _ := httpapitest.HandedOffLead(t, r, false)
+		now := time.Now().UTC()
+		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/fixed",
+			`{"because":"the early return frees p"}`); got.Code != http.StatusOK {
+			t.Fatalf("closing the lead answered %d: %s", got.Code, got.Body)
+		}
+		// The lead is moved after the run has read its hand-off, and before
+		// the run opens the sighting at it.
+		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "finding", 3*time.Second, func() error {
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+				return fmt.Errorf("the move answered %d: %s", got.Code, got.Body)
+			}
+			return nil
+		})
+		watched := *r.DB
+		watched.DB = hooked
+		httpapitest.ApplyRunOn(t, r, &watched, "clang-tidy/default", now.Add(-30*time.Minute), httpapitest.LeadRun(true))
+		if err := rival(); err != nil {
+			t.Fatal(err)
+		}
+		var held []string
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
+			Where(`"f"."kind" = ?`, kind.Analysis).Where(`"f"."place_identity" = ?`, place).
+			Scan(t.Context(), &held); err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 2 || held[0] != "private" || held[1] != "private" {
+			t.Errorf("the lead's findings are %v; want the one the run opened in the case with the other", held)
+		}
 	})
 }

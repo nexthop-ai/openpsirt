@@ -131,6 +131,11 @@ func leadV0110(t *columnTypes) []string {
 			-- When its flaw was disclosed, kept or moved. Null while the
 			-- flaw is undisclosed.
 			"disclosed_at"     ` + t.timestamp + `,
+			-- The last analysis run to describe the lead, written before
+			-- the run writes anything about it. A disclosure or a move that
+			-- read the hand-off before the run and writes it after finds the
+			-- value changed, and reads again.
+			"last_run_id"      ` + t.refNull + `,
 			CONSTRAINT "lead_handoff_place_unique" UNIQUE ("product_id", "place_identity"),
 			CONSTRAINT "lead_handoff_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "lead_handoff_flaw_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),

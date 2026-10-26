@@ -126,7 +126,11 @@ type Offer struct {
 	Suggestions []Suggestion
 	// Prefix is the path a confirmed component is learned for: the
 	// repository the lead is in, or its directory.
-	Prefix    string
+	Prefix string
+	// Together is how many other leads the hand-off links to the flaw with
+	// this one: the leads its confirming claim covers, which a move moves
+	// with it.
+	Together  int
 	Discloses Disclosure
 }
 
@@ -287,10 +291,75 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 			return nil, err
 		}
 	}
-	if out.Discloses, err = disclosing(ctx, db, productID, placeIdentity); err != nil {
+	together, err := togetherAt(ctx, db, productID, placeIdentity)
+	if err != nil {
+		return nil, err
+	}
+	out.Together = len(together) - 1
+	if out.Discloses, err = disclosing(ctx, db, productID, together); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// togetherAt is the places of the leads handed off with the lead at a place,
+// that place first. A lead handed off goes with every lead handed off as its
+// flaw; one not handed off yet, with every lead the claim confirming it
+// covers that nobody handed off.
+func togetherAt(ctx context.Context, db bun.IDB, productID int64, placeIdentity string) ([]string, error) {
+	handed, err := finding.HandoffAt(ctx, db, productID, placeIdentity)
+	if err != nil {
+		return nil, err
+	}
+	var others []string
+	if handed != nil {
+		if err := db.NewSelect().Model((*finding.Handoff)(nil)).
+			Column("lh.place_identity").
+			Where(`"lh"."product_id" = ?`, productID).
+			Where(`"lh"."vulnerability_id" = ?`, handed.VulnerabilityID).
+			Where(`"lh"."place_identity" <> ?`, placeIdentity).
+			OrderExpr(`"lh"."id" ASC`).
+			Scan(ctx, &others); err != nil {
+			return nil, fmt.Errorf("read the leads handed off as the flaw: %w", err)
+		}
+		return append([]string{placeIdentity}, others...), nil
+	}
+	if err := db.NewSelect().TableExpr(`"decision" AS "dc"`).
+		Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"`).
+		Join(`JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"`).
+		Join(`JOIN "decision" AS "od" ON "od"."claim_id" = "dc"."claim_id" AND "od"."product_id" = "dc"."product_id"`).
+		Join(`JOIN "vulnerability" AS "ov" ON "ov"."id" = "od"."vulnerability_id"`).
+		ColumnExpr(`DISTINCT "od"."place_identity"`).
+		Where(`"dc"."product_id" = ?`, productID).
+		Where(`"dc"."place_identity" = ?`, placeIdentity).
+		Where(`"rv"."kind" = ?`, string(kind.Rule)).
+		Where(`"sc"."outcome" = ?`, string(Confirmed)).
+		Where(`"dc"."live_key" IS NOT NULL`).
+		Where(`("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL))`).
+		Where(`"ov"."kind" = ?`, string(kind.Rule)).
+		Where(`"od"."live_key" IS NOT NULL`).
+		Where(`"od"."place_identity" <> ?`, placeIdentity).
+		Where(`NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+			WHERE "lh"."product_id" = "od"."product_id" AND "lh"."place_identity" = "od"."place_identity")`).
+		OrderExpr(`"od"."place_identity" ASC`).
+		Scan(ctx, &others); err != nil {
+		return nil, fmt.Errorf("read the leads confirmed with the lead: %w", err)
+	}
+	return append([]string{placeIdentity}, others...), nil
+}
+
+// handedWith is every hand-off of the flaw a hand-off links, in one product,
+// as the transaction reads them: the leads that move together.
+func handedWith(ctx context.Context, tx bun.IDB, h *finding.Handoff) ([]finding.Handoff, error) {
+	var rows []finding.Handoff
+	if err := tx.NewSelect().Model(&rows).
+		Where(`"lh"."product_id" = ?`, h.ProductID).
+		Where(`"lh"."vulnerability_id" = ?`, h.VulnerabilityID).
+		OrderExpr(`"lh"."id" ASC`).
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the leads handed off as the flaw: %w", err)
+	}
+	return rows, nil
 }
 
 // prefixOf is the path a component confirmed for a lead at a path is learned
@@ -469,19 +538,19 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 	return out, nil
 }
 
-// disclosing is what disclosing the lead at a place in a product with its
-// flaw discloses.
-func disclosing(ctx context.Context, db bun.IDB, productID int64, placeIdentity string) (Disclosure, error) {
+// disclosing is what disclosing the leads at these places in a product with
+// their flaw discloses.
+func disclosing(ctx context.Context, db bun.IDB, productID int64, places []string) (Disclosure, error) {
 	var out Disclosure
 	claims := `SELECT "dc"."claim_id" FROM "decision" AS "dc"
 		JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"
-		WHERE "dc"."product_id" = ? AND "dc"."place_identity" = ? AND "rv"."kind" = ?`
+		WHERE "dc"."product_id" = ? AND "dc"."place_identity" IN (?) AND "rv"."kind" = ?`
 	if err := db.NewSelect().
 		TableExpr(`(SELECT "cr"."written_by" AS "person_id" FROM "claim_revision" AS "cr"
 			WHERE "cr"."claim_id" IN (`+claims+`)
 			UNION ALL SELECT "cm"."written_by" AS "person_id" FROM "claim_comment" AS "cm"
 			WHERE "cm"."claim_id" IN (`+claims+`)) AS "w"`,
-			productID, placeIdentity, string(kind.Rule), productID, placeIdentity, string(kind.Rule)).
+			productID, bun.List(places), string(kind.Rule), productID, bun.List(places), string(kind.Rule)).
 		ColumnExpr(`"w"."person_id", COUNT(*) AS "writings"`).
 		GroupExpr(`"w"."person_id"`).
 		OrderExpr(`"w"."person_id" ASC`).
@@ -508,7 +577,7 @@ func disclosing(ctx context.Context, db bun.IDB, productID int64, placeIdentity 
 			ColumnExpr(`COALESCE("`+alias+`"."path", '') AS "path", "`+alias+`"."`+message+`" AS "message_text"`).
 			ColumnExpr(`CASE WHEN "`+alias+`"."snippet" IS NULL THEN NULL ELSE TRUE END AS "snippet"`).
 			Where(`"s"."product_id" = ?`, productID).
-			Where(`"f"."place_identity" = ?`, placeIdentity).
+			Where(`"f"."place_identity" IN (?)`, bun.List(places)).
 			Where(kinds, kindArgs...)
 	}
 	for _, q := range []*bun.SelectQuery{from("analysis_result", "ar", "message_text"),
@@ -561,9 +630,10 @@ type Recorded struct {
 }
 
 // HandOff records a confirmed lead as a flaw here, through the path every
-// recorded flaw takes, and links the two in the same transaction. The
-// component chosen is learned for the lead's prefix, and the lead moves into
-// the case where the person asked.
+// recorded flaw takes, and links it and every lead its confirming claim
+// covers to the flaw in the same transaction. The component chosen is learned
+// for the lead's prefix, and the leads move into the case where the person
+// asked.
 func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing) (*Recorded, error) {
 	if err := MayHandOff(subject, in.ProductID); err != nil {
 		return nil, err
@@ -589,15 +659,26 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 		} else if !ok {
 			return ErrNotConfirmed
 		}
-		row := &finding.Handoff{
-			ProductID: in.ProductID, PlaceIdentity: in.PlaceIdentity, VulnerabilityID: vulnerabilityID,
-			Visibility: access.Internal, HandedBy: subject.ID, HandedAt: now,
+		// Every lead the confirming claim covers is the one flaw, and is
+		// linked to it: a lead of the group left behind holds a claim
+		// nothing may change and no flaw.
+		together, err := togetherAt(ctx, tx, in.ProductID, in.PlaceIdentity)
+		if err != nil {
+			return err
 		}
-		if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
-			if database.IsDuplicate(err) {
-				return ErrHandedOff
+		rows := make([]*finding.Handoff, 0, len(together))
+		for _, place := range together {
+			row := &finding.Handoff{
+				ProductID: in.ProductID, PlaceIdentity: place, VulnerabilityID: vulnerabilityID,
+				Visibility: access.Internal, HandedBy: subject.ID, HandedAt: now,
 			}
-			return fmt.Errorf("link the lead to its flaw: %w", err)
+			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
+				if database.IsDuplicate(err) {
+					return ErrHandedOff
+				}
+				return fmt.Errorf("link the lead to its flaw: %w", err)
+			}
+			rows = append(rows, row)
 		}
 		modules, err := series.NewStore(tx).ModulesOf(ctx, l.LastRunID)
 		if err != nil {
@@ -608,7 +689,11 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 			return err
 		}
 		if in.Move {
-			return moveIn(ctx, tx, subject, row, now)
+			for _, row := range rows {
+				if err := moveIn(ctx, tx, subject, row, now); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}
@@ -689,7 +774,8 @@ func learn(ctx context.Context, tx bun.IDB, productID int64, prefix, component, 
 	return nil
 }
 
-// Move moves a kept lead into its flaw's case while the flaw is undisclosed.
+// Move moves a kept lead into its flaw's case while the flaw is undisclosed,
+// and every lead handed off as the flaw with it.
 func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity string,
 	now time.Time) error {
 
@@ -707,12 +793,26 @@ func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int
 		case h.Moved():
 			return ErrAlreadyMoved
 		}
-		return moveIn(ctx, tx, subject, h, now.UTC().Truncate(time.Microsecond))
+		with, err := handedWith(ctx, tx, h)
+		if err != nil {
+			return err
+		}
+		at := now.UTC().Truncate(time.Microsecond)
+		for i := range with {
+			if with[i].Moved() || with[i].Disclosed() {
+				continue
+			}
+			if err := moveIn(ctx, tx, subject, &with[i], at); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
 // Unmove takes a moved lead back out of its flaw's case while the flaw is
-// undisclosed: it is internal again, and the claims about it with it.
+// undisclosed, and every lead handed off as the flaw with it: each is
+// internal again, and the claims about it with it.
 func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity string) error {
 	if err := MayHandOff(subject, productID); err != nil {
 		return err
@@ -728,17 +828,36 @@ func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID i
 		case !h.Moved():
 			return ErrNotMoved
 		}
-		if err := finding.SetLeadVisibility(ctx, tx, productID, []string{placeIdentity},
-			access.Private, access.Internal); err != nil {
+		with, err := handedWith(ctx, tx, h)
+		if err != nil {
 			return err
 		}
-		if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.Handoff)(nil)).
-			Set(`"visibility" = ?`, access.Internal).
-			Set(`"moved_by" = NULL`).Set(`"moved_at" = NULL`), h); err != nil {
-			return err
+		for i := range with {
+			if !with[i].Moved() || with[i].Disclosed() {
+				continue
+			}
+			if err := moveOut(ctx, tx, subject, &with[i]); err != nil {
+				return err
+			}
 		}
-		return recordMove(ctx, tx, subject, h, false)
+		return nil
 	})
+}
+
+// moveOut takes a moved lead back out of its flaw's case: its findings and
+// the claims about it are internal again, and the undo is recorded as the
+// access change it is.
+func moveOut(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.Handoff) error {
+	if err := finding.SetLeadVisibility(ctx, tx, h.ProductID, []string{h.PlaceIdentity},
+		access.Private, access.Internal); err != nil {
+		return err
+	}
+	if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.Handoff)(nil)).
+		Set(`"visibility" = ?`, access.Internal).
+		Set(`"moved_by" = NULL`).Set(`"moved_at" = NULL`), h); err != nil {
+		return err
+	}
+	return recordMove(ctx, tx, subject, h, false)
 }
 
 // moveIn moves a handed-off lead into its flaw's case: its findings and the
@@ -760,11 +879,10 @@ func moveIn(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.
 }
 
 // updateAsRead runs an update of one hand-off matched on what the transaction
-// read of it: a move, an undo or a disclosure landing since is a lost race,
-// which the retry reads again.
+// read of it: a move, an undo, a disclosure or a run landing since is a lost
+// race, which the retry reads again.
 func updateAsRead(ctx context.Context, q *bun.UpdateQuery, h *finding.Handoff) error {
-	result, err := q.Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).
-		Where(`"disclosed_at" IS NULL`).Exec(ctx)
+	result, err := h.AsRead(q).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("move the lead: %w", err)
 	}

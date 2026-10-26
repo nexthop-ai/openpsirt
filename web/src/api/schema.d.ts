@@ -4873,11 +4873,11 @@ export interface paths {
         put?: never;
         /**
          * Hand off a confirmed lead as a flaw
-         * @description Records a confirmed lead as a flaw in this product, found here and undisclosed, through the same path as `POST /v1/products/{product}/findings`, and links the lead to it.
+         * @description Records a confirmed lead as a flaw in this product, found here and undisclosed, through the same path as `POST /v1/products/{product}/findings`, and links the lead to it, with every other lead the claim confirming it covers.
          *
          *     `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
          *
-         *     `move` makes the lead part of the flaw's case: it becomes private, internal readers keep only its state, rule, location and sightings, and it is disclosed with the flaw. Left out, the lead is kept internal and linked.
+         *     `move` makes the linked leads part of the flaw's case: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
          *
          *     A lead nobody confirmed, or one already handed off, is refused with 409.
          *
@@ -4900,7 +4900,7 @@ export interface paths {
         get?: never;
         /**
          * Move a handed-off lead into its flaw's case
-         * @description Makes a kept lead part of its flaw's case: it becomes private, internal readers keep only its state, rule, location and sightings, and it is disclosed with the flaw. `GET .../hand-off` lists what that discloses.
+         * @description Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
          *
          *     Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
          *
@@ -4910,7 +4910,7 @@ export interface paths {
         post?: never;
         /**
          * Take a lead back out of its flaw's case
-         * @description Makes a moved lead internal again while its flaw is undisclosed, with the claims about it. It stays linked to the flaw.
+         * @description Makes a moved lead internal again while its flaw is undisclosed, with the claims about it and every lead linked to the same flaw. They stay linked to the flaw.
          *
          *     Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
          *
@@ -9493,7 +9493,7 @@ export interface components {
              * @example https://example.com/schemas/HandoffOfferBody.json
              */
             readonly $schema?: string;
-            /** @description What moving the lead into the flaw's case discloses when the flaw is disclosed */
+            /** @description What moving the lead, and the leads linked with it, into the flaw's case discloses when the flaw is disclosed */
             discloses: components["schemas"]["DisclosesBody"];
             /** @description The path a confirmed component is remembered for: the repository the lead is in, or its directory */
             prefix?: string;
@@ -9503,6 +9503,11 @@ export interface components {
             seen: components["schemas"]["LeadBuild"][] | null;
             /** @description The components offered, most likely first. The build itself is always last */
             suggestions: components["schemas"]["SuggestionBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of other leads linked to the flaw with this one: the leads its confirming claim covers. A move moves them with it
+             */
+            together: number;
         };
         HeldBody: {
             /** @description Whether this grants anything right now */

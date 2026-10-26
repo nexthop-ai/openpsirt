@@ -331,3 +331,62 @@ func TestALeadOfAGroupThatIsFixedIsNotDecided(t *testing.T) {
 		}
 	})
 }
+
+// handedOffAs is a lead's state and the flaw it is handed off as, as somebody
+// reading undisclosed work reads it.
+func handedOffAs(t *testing.T, r *httpapitest.Reach, place string) (string, string, bool) {
+	t.Helper()
+	var got struct {
+		State   string `json:"state"`
+		Handoff *struct {
+			Flaw  string `json:"flaw"`
+			Moved bool   `json:"moved"`
+		} `json:"handoff"`
+	}
+	httpapitest.Read(t, r, "lead-handler", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &got)
+	if got.Handoff == nil {
+		return got.State, "", false
+	}
+	return got.State, got.Handoff.Flaw, got.Handoff.Moved
+}
+
+func TestAHandOffLinksEveryLeadItsConfirmationCovers(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, kin := besideTheLeak(t, r, 4)
+		if len(kin) != 1 {
+			t.Fatalf("the leak's kin are %v; want the overflow on line 4", kin)
+		}
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"p leaks and n overflows, one flaw"}`)
+		at := "/v1/products/mine/streams/master/variants/broadcom/leads/"
+		var offer struct {
+			Together  int `json:"together"`
+			Discloses struct {
+				Paths []string `json:"paths"`
+			} `json:"discloses"`
+		}
+		httpapitest.Read(t, r, "lead-handler", at+place+"/hand-off", &offer)
+		if offer.Together != 1 || len(offer.Discloses.Paths) != 2 {
+			t.Errorf("the hand-off offers %+v; want the overflow with it, and both files disclosed", offer)
+		}
+		got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/hand-off",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks","move":true}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
+		}
+		_, flaw, _ := handedOffAs(t, r, place)
+		if state, as, moved := handedOffAs(t, r, kin[0]); state != "handed-off" || as != flaw || !moved {
+			t.Errorf("the overflow confirmed with the leak is %s as %q, moved %v; want it handed off as %s and moved",
+				state, as, moved, flaw)
+		}
+		// One flaw is recorded once.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+kin[0]+"/hand-off",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows"}`), http.StatusConflict)
+		// The leads of one flaw move together.
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, at+kin[0]+"/move", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("taking the overflow out of the case answered %d: %s", got.Code, got.Body)
+		}
+		if _, _, moved := handedOffAs(t, r, place); moved {
+			t.Errorf("the leak stayed in the case its overflow was taken out of")
+		}
+	})
+}

@@ -948,20 +948,40 @@ var ErrLeadHandedOff = refusal.New("that lead was handed off as a flaw, which is
 // notHandedOff refuses a write to a claim about a lead handed off as a flaw.
 // Asked inside the transaction writing it, of every row the claim covers.
 func (s *Store) notHandedOff(ctx context.Context, claimID int64) error {
-	handed, err := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "de"."vulnerability_id"`).
-		Join(`JOIN "lead_handoff" AS "lh" ON "lh"."product_id" = "de"."product_id"
-			AND "lh"."place_identity" = "de"."place_identity"`).
-		Where(`"de"."claim_id" = ?`, claimID).
-		Where(`"rv"."kind" = ?`, string(kind.Rule)).
-		Exists(ctx)
+	handed, err := s.handedOff(ctx, []int64{claimID})
 	if err != nil {
-		return fmt.Errorf("read whether claim %d is about a lead handed off: %w", claimID, err)
+		return err
 	}
-	if handed {
+	if handed[claimID] {
 		return ErrLeadHandedOff
 	}
 	return nil
+}
+
+// handedOff is which of these claims are about a lead handed off as a flaw:
+// a row of the claim filed under an analyzer's rule at a place handed off.
+func (s *Store) handedOff(ctx context.Context, claimIDs []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if err := database.IDsInBatches(ctx, claimIDs, func(ctx context.Context, batch []int64) error {
+		var some []int64
+		if err := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
+			Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "de"."vulnerability_id"`).
+			Join(`JOIN "lead_handoff" AS "lh" ON "lh"."product_id" = "de"."product_id"
+				AND "lh"."place_identity" = "de"."place_identity"`).
+			ColumnExpr(`DISTINCT "de"."claim_id"`).
+			Where(`"de"."claim_id" IN (?)`, bun.List(batch)).
+			Where(`"rv"."kind" = ?`, string(kind.Rule)).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		for _, id := range some {
+			out[id] = true
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("read which claims are about a lead handed off: %w", err)
+	}
+	return out, nil
 }
 
 // writableRows is claimRows for a write, which a claim about a lead handed off

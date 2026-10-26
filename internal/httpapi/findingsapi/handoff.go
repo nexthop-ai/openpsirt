@@ -73,7 +73,8 @@ type HandoffOfferBody struct {
 	Seen        []LeadBuild      `json:"seen" doc:"Every build the lead was seen in, which the flaw is proposed against"`
 	Suggestions []SuggestionBody `json:"suggestions" doc:"The components offered, most likely first. The build itself is always last"`
 	Prefix      string           `json:"prefix,omitempty" doc:"The path a confirmed component is remembered for: the repository the lead is in, or its directory"`
-	Discloses   DisclosesBody    `json:"discloses" doc:"What moving the lead into the flaw's case discloses when the flaw is disclosed"`
+	Together    int              `json:"together" doc:"The number of other leads linked to the flaw with this one: the leads its confirming claim covers. A move moves them with it"`
+	Discloses   DisclosesBody    `json:"discloses" doc:"What moving the lead, and the leads linked with it, into the flaw's case discloses when the flaw is disclosed"`
 }
 
 // HandedOffBody is the record of a lead handed off.
@@ -160,7 +161,7 @@ func registerHandoff(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "who wrote about the lead could not be read", err)
 		}
 		body := HandoffOfferBody{
-			Rule: offer.Rule, Seen: leadBuilds(offer.Seen), Prefix: offer.Prefix,
+			Rule: offer.Rule, Seen: leadBuilds(offer.Seen), Prefix: offer.Prefix, Together: offer.Together,
 			Suggestions: make([]SuggestionBody, 0, len(offer.Suggestions)), Discloses: discloses,
 		}
 		for _, s := range offer.Suggestions {
@@ -177,13 +178,13 @@ func registerHandoff(api huma.API, in core.Deps) {
 		Summary: "Hand off a confirmed lead as a flaw",
 		Description: "Records a confirmed lead as a flaw in this product, found here and " +
 			"undisclosed, through the same path as `POST /v1/products/{product}/findings`, and " +
-			"links the lead to it.\n\n" +
+			"links the lead to it, with every other lead the claim confirming it covers.\n\n" +
 			"`builds` is the whole set the flaw is recorded against. `component` names what " +
 			"carries it, as the builds name it, and is remembered for the lead's prefix so the next " +
 			"lead under it is offered the same; leave it out for the build itself.\n\n" +
-			"`move` makes the lead part of the flaw's case: it becomes private, internal readers " +
-			"keep only its state, rule, location and sightings, and it is disclosed with the flaw. " +
-			"Left out, the lead is kept internal and linked.\n\n" +
+			"`move` makes the linked leads part of the flaw's case: they become private, internal " +
+			"readers keep only their state, rule, location and sightings, and they are disclosed " +
+			"with the flaw. Left out, the leads are kept internal and linked.\n\n" +
 			"A lead nobody confirmed, or one already handed off, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
@@ -278,9 +279,10 @@ func registerHandoff(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "move-lead", Method: http.MethodPut, Path: leadPath + "/move",
 		Summary: "Move a handed-off lead into its flaw's case",
-		Description: "Makes a kept lead part of its flaw's case: it becomes private, internal " +
-			"readers keep only its state, rule, location and sightings, and it is disclosed with " +
-			"the flaw. `GET .../hand-off` lists what that discloses.\n\n" +
+		Description: "Makes a kept lead part of its flaw's case, with every lead linked to the " +
+			"same flaw: they become private, internal readers keep only their state, rule, location " +
+			"and sightings, and they are disclosed with the flaw. `GET .../hand-off` lists what that " +
+			"discloses.\n\n" +
 			"Recorded in the administration trail. A lead not handed off, one already moved, or " +
 			"one whose flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
@@ -290,7 +292,8 @@ func registerHandoff(api huma.API, in core.Deps) {
 		OperationID: "unmove-lead", Method: http.MethodDelete, Path: leadPath + "/move",
 		Summary: "Take a lead back out of its flaw's case",
 		Description: "Makes a moved lead internal again while its flaw is undisclosed, with the " +
-			"claims about it. It stays linked to the flaw.\n\n" +
+			"claims about it and every lead linked to the same flaw. They stay linked to the " +
+			"flaw.\n\n" +
 			"Recorded in the administration trail. A lead not handed off, a kept lead, or one whose " +
 			"flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,

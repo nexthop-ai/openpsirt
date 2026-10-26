@@ -336,6 +336,17 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 	if err != nil {
 		return "", err
 	}
+	again := make([]int64, 0, len(matched))
+	for id := range matched {
+		again = append(again, id)
+	}
+	sort.Slice(again, func(i, j int) bool { return again[i] < again[j] })
+	// Marked before the run reads a hand-off or writes a lead's source: a
+	// disclosure or a move of a lead it describes waits for it, or reads
+	// again.
+	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, freshPlaces(set.ID, fresh, from), again); err != nil {
+		return "", err
+	}
 	opened, inBaseline, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
 	if err != nil {
 		return "", err
@@ -345,10 +356,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 	}
 	// What the run kept beside a lead disclosed with its flaw is stripped
 	// again, as disclosure stripped it.
-	described := append([]int64{}, opened...)
-	for id := range matched {
-		described = append(described, id)
-	}
+	described := append(append([]int64{}, opened...), again...)
 	if err := finding.StripDisclosedLeads(ctx, tx, set.ProductID, described); err != nil {
 		return "", err
 	}

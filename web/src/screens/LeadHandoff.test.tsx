@@ -29,6 +29,7 @@ const CONFIRMED = {
 const OFFER = {
   rule: "clang/unix.Malloc",
   prefix: "src/zlib",
+  together: 0,
   seen: [
     { stream: "master", variant: "broadcom" },
     { stream: "master", variant: "mellanox" },
@@ -51,7 +52,7 @@ const OFFER = {
   },
 };
 
-async function drawn(evidence: object, hides = true) {
+async function drawn(evidence: object, hides = true, offer: object = OFFER) {
   serve((path) => {
     if (path === "/v1/session/me")
       return {
@@ -66,7 +67,7 @@ async function drawn(evidence: object, hides = true) {
         },
       };
     if (path === LEAD) return { data: evidence };
-    if (path === `${LEAD}/hand-off`) return { data: OFFER };
+    if (path === `${LEAD}/hand-off`) return { data: offer };
     if (path === `${LEAD}/collaborators`) return { data: { items: [] } };
     if (path === "/v1/products/{product}/mentionable") return { data: { items: [] } };
     return undefined;
@@ -97,6 +98,11 @@ describe("handing off a lead", () => {
       component: "zlib",
     });
     expect(text()).toContain("SONIC-2026-000001");
+  });
+
+  it("says the leads confirmed with it are handed off with it", async () => {
+    await drawn(CONFIRMED, true, { ...OFFER, together: 1 });
+    expect(text()).toContain("Also hands off 1 other lead confirmed with this one.");
   });
 
   it("picks no resembling component for the person", async () => {
@@ -175,6 +181,11 @@ describe("a handed-off lead", () => {
     await press(mount.host(), "Move into the case");
     await settle();
     expect(sent()[0]?.[0]).toBe(`${LEAD}/move`);
+  });
+
+  it("says a move takes the leads linked to its flaw", async () => {
+    await drawn(HANDED, true, { ...OFFER, together: 2 });
+    expect(text()).toContain("Moves with 2 other leads linked to this flaw.");
   });
 
   it("offers no move once its flaw is disclosed", async () => {

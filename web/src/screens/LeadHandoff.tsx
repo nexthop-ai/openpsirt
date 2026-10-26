@@ -92,6 +92,9 @@ function HandedOff({
             {handed.disclosed && " · disclosed"}
           </span>
         </p>
+        {offering && offer.data && offer.data.together > 0 && (
+          <p className="hint">Moves with {others(offer.data.together)} linked to this flaw.</p>
+        )}
         {offering && offer.data && <Discloses discloses={offer.data.discloses} />}
         {offering && offer.isError && (
           <Failed error={offer.error} what="What a move discloses could not be read." />
@@ -282,6 +285,9 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
           draftKey={`lead-handoff:${build.product}:${place}`}
         />
       </div>
+      {data.together > 0 && (
+        <p className="hint">Also hands off {others(data.together)} confirmed with this one.</p>
+      )}
       <div style={{ marginTop: 10 }}>
         <ChoiceCards
           label="The lead"
@@ -320,6 +326,11 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
       {handOff.error != null && <Failed error={handOff.error} what="Nothing was handed off." />}
     </div>
   );
+}
+
+// The other leads a hand-off or a move takes with this one.
+function others(n: number): string {
+  return n === 1 ? "1 other lead" : `${n} other leads`;
 }
 
 // What moving a lead into its flaw's case discloses with the flaw.

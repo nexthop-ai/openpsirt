@@ -589,10 +589,11 @@ hand-off is offered, and `POST` on the same address records it.
 | Rule | |
 |---|---|
 | Only a confirmed lead is handed off, and only once | Confirmation is the judgment that it is a flaw; a second flaw for one lead is one flaw recorded twice |
+| A hand-off links the lead and every lead its confirming claim covers that nobody handed off to the one flaw | One claim confirmed them as one flaw (§ Grouped leads). A lead of the group left behind holds a claim nothing may change, and no flaw |
 | A hand-off is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal lead and writes the private flaw |
 | The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A lead is carried by its place rather than by versions |
 | The flaw and the link are written in one transaction, which reads again that the lead is confirmed and not handed off | A retry is asked the question again (REQ-71) |
-| A handed-off lead takes no claim, and no claim about it is revised, withdrawn, split, approved or sent back; each is refused with 409 | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
+| A handed-off lead takes no claim, and no claim about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a claim out | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
 | A hand-off, a move and an undo are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
 
 ### Hand-off offer
@@ -604,7 +605,8 @@ hand-off is offered, and `POST` on the same address records it.
 | Lacking | For each component, the builds the lead was seen in that hold no such component. Recording the flaw against them is refused |
 | Unanalyzed | For each component, the builds in use that hold it and that the lead's series never analyzed. A variant nobody analyzes ships the same code |
 | Prefix | The innermost repository the run names holding the file, or else the file's directory |
-| Disclosure | What moving the lead into the case discloses with the flaw (§ Keep or move) |
+| Together | How many other leads the hand-off links to the flaw with this one, and a move moves with it |
+| Disclosure | What moving the lead and the leads linked with it into the case discloses with the flaw (§ Keep or move) |
 
 | Rule | |
 |---|---|
@@ -633,7 +635,9 @@ takes a moved one back out.
 | At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets), and a later run describing the disclosed lead again is stripped the same way | A product's source is not published because one flaw in it was, and a run writes what the analyzer sent |
 | Disclosure records the time on the hand-off of every lead handed off as the flaw, kept or moved | A kept lead stays internal, so its visibility does not say its flaw is public |
 | A move or its undo is refused with 409 once the flaw is disclosed, kept lead or moved | Disclosure is one way |
-| A move, its undo and a disclosure each change the hand-off only as it was read in their transaction | One that lost a race to another is asked again |
+| A move and its undo take every lead handed off as the flaw | The leads of one flaw are one case |
+| A run writes itself onto the hand-off of every lead it describes or opens at, before it reads a hand-off or writes a lead's source | A disclosure or a move of one of those leads then waits for the run, or finds the hand-off changed |
+| A move, its undo and a disclosure each change the hand-off only as it was read in their transaction: its visibility, its flaw undisclosed, and the last run to describe it | One that lost a race to another, or to a run, is asked again. A disclosure that read the hand-off before a run cannot see the source the run wrote, and a move cannot see the sighting it opened |
 | A move and its undo are recorded in the administrative trail, as the change of access they are | A move changes who reads the lead |
 | A move and its undo are made by somebody holding `internal-triage` and `private-triage` | The hand-off's own rule |
 

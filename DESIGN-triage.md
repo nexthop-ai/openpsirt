@@ -261,6 +261,7 @@ holds the ones nobody has agreed to yet.
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
 | Undoing a bulk approval takes back only the agreements the person undoing gave | A batch is named by whoever gives it, so two reviewers may each hold one of the same name. Undoing one is not a way to withdraw another reviewer's agreement |
 | A claim it reaches only part of is left alone whole | The agreement is one row keyed on the claim, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
+| A claim about a lead handed off as a flaw is left alone whole | Its flaw is judged instead, and nothing else changes the claim (`DESIGN-analysis.md` § Hand-off) |
 | What an undo reports is what returned to waiting | A decision another agreement still stands on, and one that has ended, is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
