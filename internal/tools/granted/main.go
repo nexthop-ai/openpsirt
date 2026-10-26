@@ -67,7 +67,9 @@ var inside = map[string]string{
 	"internal/access/estate.go:WithdrawEstateRole": "withdraws a grant across the estate, which is one row of that table",
 	"internal/access/estate.go:EstateGrants":       "lists what one person holds across the estate, beside Grants",
 	"internal/access/estate.go:EveryEstateGrant":   "lists what everybody holds across the estate, beside People",
-	"internal/access/grants.go:GrantRole":          "records a grant on one product, which is one row of that table",
+	"internal/access/estate.go:PeopleReaching": "reads both tables, through People and EveryEstateGrant, " +
+		"which this gate names one table each",
+	"internal/access/grants.go:GrantRole": "records a grant on one product, which is one row of that table",
 	"internal/access/grants.go:holds": "whether a per-product grant that failed to insert is already there, " +
 		"which is a question about that row; an estate grant does not make it a duplicate",
 	"internal/access/grants.go:People":   "lists what everybody holds per product, beside EveryEstateGrant",

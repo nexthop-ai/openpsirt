@@ -61,6 +61,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A reconcile writes a batch of rows a statement | One sweep can open, restate or clear every condition one person holds at once, and a statement a row is a round trip a row. Opening 152,859 claim-waiting conditions for 204 people took 700.9 and 704.4 s a row at a time, and 7.0 to 8.0 s a batch at a time, on PostgreSQL 16 at one processor over a 1 ms link. A sweep that changes nothing takes 7.0 to 7.5 s there |
 | A restated condition is written by a statement carrying every row's new sentence | Each row of a batch says something different, so the statement chooses each column's value by the row's identifier |
 | Who may do what is read once per sweep | Every condition reads the same people and grants, and administrators are the same people read again |
+| A role across every product counts in every audience as a role on each product | An audience worked out from per-product grants alone treats somebody reading through an estate role as nobody, so a report they hold is told to the product's triagers instead (`DESIGN-access.md` § A role across every product) |
 | Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a claim to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
 ## Triggers and kinds

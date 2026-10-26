@@ -242,3 +242,40 @@ func TestSomebodyANoteNamesIsNotToldOfItTwice(t *testing.T) {
 		}
 	})
 }
+
+// A holder who reads reports through a role across every product is somebody
+// who can be told, as one holding the role on the product is.
+func TestAHolderReadingReportsAcrossEveryProductIsToldOfTheirReport(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		a := newAudienceWorld(t, w)
+		rights := access.NewStore(w.DB.DB)
+		estate, err := rights.Ensure(ctx, "estate@example.com", "estate@example.com", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantEstateRole(ctx, estate.ID, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
+		held := estate.PartyID
+		report := a.report(t, &held)
+		watch := notify.NewWatch(w.DB.DB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := notify.TellReport(ctx, w.DB.DB, notify.ReportAct{
+			Kind: notify.ReportMessage, ProductID: w.Product.ID, Product: w.Product.Name,
+			Reference: report.Reference, AssignedTo: &held,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		for _, kind := range []notify.Kind{notify.Unanswered, notify.ReportMessage} {
+			if a.told(t, estate, kind) == 0 {
+				t.Errorf("%s: the holder reading reports across every product was not told", kind)
+			}
+			if a.told(t, a.worker, kind) != 0 {
+				t.Errorf("%s: the report was told to everybody who works reports, as though nobody held it", kind)
+			}
+		}
+	})
+}

@@ -216,7 +216,7 @@ func fanOut(out map[int64][]Holds, acts map[int64]map[int64]acts, productID int6
 
 // Once derives every condition and reconciles it against what is being said.
 func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
-	people, held, err := access.NewStore(w.db).People(ctx)
+	people, held, err := access.NewStore(w.db).PeopleReaching(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("read who may hear about this: %w", err)
 	}
