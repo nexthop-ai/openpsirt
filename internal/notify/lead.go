@@ -48,12 +48,11 @@ func TellLeadTriagers(ctx context.Context, db *bun.DB, act LeadAct) error {
 	case LeadEscalated:
 		body = what + " was pulled into the queue."
 	case LeadHandedOff:
-		body = what + " was handed off as " + lead.Flaw + "."
+		body = what + " was handed off as a flaw."
 	case LeadMoved:
-		body = what + " was moved into the case of " + lead.Flaw +
-			". Internal readers keep its state, rule, place and sightings."
+		body = what + " was moved into its flaw's case. Internal readers keep its state, rule, place and sightings."
 		if !act.Into {
-			body = what + " was taken back out of the case of " + lead.Flaw + " and is internal again."
+			body = what + " was taken back out of its flaw's case and is internal again."
 		}
 	default:
 		return fmt.Errorf("%s is not something done to a lead", act.Kind)
@@ -93,8 +92,6 @@ type namedLead struct {
 	ProductName string `bun:"product_name"`
 	StreamName  string `bun:"stream_name"`
 	VariantName string `bun:"variant_name"`
-	// Flaw is the identifier it was handed off as, where it was.
-	Flaw string `bun:"flaw"`
 }
 
 // leadNamed is the lead at a place in a product as its newest open finding
@@ -110,9 +107,6 @@ func leadNamed(ctx context.Context, db bun.IDB, productID int64, place string) (
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		Join(`LEFT JOIN "lead_handoff" AS "lh" ON "lh"."product_id" = "st"."product_id" `+
-			`AND "lh"."place_identity" = "f"."place_identity"`).
-		Join(`LEFT JOIN "vulnerability" AS "fl" ON "fl"."id" = "lh"."vulnerability_id"`).
 		ColumnExpr(`"v"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path" AS "path"`).
 		ColumnExpr(`"p"."display_name" AS "product"`).
@@ -121,7 +115,6 @@ func leadNamed(ctx context.Context, db bun.IDB, productID int64, place string) (
 		ColumnExpr(`"p"."name" AS "product_name"`).
 		ColumnExpr(`"st"."name" AS "stream_name"`).
 		ColumnExpr(`"va"."name" AS "variant_name"`).
-		ColumnExpr(`COALESCE("fl"."identifier", '') AS "flaw"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."place_identity" = ?`, place).
 		Where(`"f"."kind" = ?`, kind.Analysis).

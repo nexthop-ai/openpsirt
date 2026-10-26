@@ -89,6 +89,10 @@ func registerClaims(api huma.API, in core.Deps) {
 				// words about an embargo landing in a mail
 				// server.
 				Private: true,
+				// Withheld as internal where any row set aside is
+				// internal work, which a reader of undisclosed work
+				// alone does not read.
+				Internal: done.ReturnedInternal,
 				// The product the returned rows are in, which
 				// is what a later read narrows by.
 				ProductID: &done.ReturnedIn,

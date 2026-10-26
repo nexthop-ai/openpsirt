@@ -497,12 +497,12 @@ func toldOf(t *testing.T, r *httpapitest.Reach, who, kind string) []string {
 	return out
 }
 
-func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersButNotTheirAuthor(t *testing.T) {
+func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersWithoutTheFlawAndNotToTheirAuthor(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, flaw := httpapitest.HandedOffLead(t, r, false)
 		if got := toldOf(t, r, "internal-triager", "lead-handed-off"); len(got) != 1 ||
-			!strings.Contains(got[0], "handed off as "+flaw) {
-			t.Errorf("the internal triager was told %q; want the hand-off and its flaw", got)
+			!strings.Contains(got[0], "handed off as a flaw") || strings.Contains(got[0], flaw) {
+			t.Errorf("the internal triager was told %q; want the hand-off without its flaw", got)
 		}
 		for _, who := range []string{"lead-handler", "internal-reader", "private-triage"} {
 			if got := toldOf(t, r, who, "lead-handed-off"); len(got) != 0 {
@@ -513,8 +513,8 @@ func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersButNotTheirAuthor(t
 			t.Fatalf("the move answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "internal-triager", "lead-moved"); len(got) != 1 ||
-			!strings.Contains(got[0], "moved into the case of "+flaw) {
-			t.Errorf("the internal triager was told %q; want the move", got)
+			!strings.Contains(got[0], "moved into its flaw's case") || strings.Contains(got[0], flaw) {
+			t.Errorf("the internal triager was told %q; want the move without its flaw", got)
 		}
 	})
 }

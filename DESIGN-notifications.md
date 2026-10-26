@@ -210,9 +210,9 @@ found, and each is about internal work, so it is withheld on the terms of
 ## Lead notices
 
 A claim on a lead is told on the terms of every other claim: waiting for a
-second person, sent back and left, lapsed, and an agreement an edit took back.
-Its rows are internal work, so each line is withheld as internal (§ The
-notification list).
+second person, sent back and left, rows of it set aside, lapsed, an agreement an
+edit took back, and a mention in its notes. Its rows are internal work, so each
+line is withheld as internal (§ The notification list).
 
 | Notice | Kind | To | Clears |
 |---|---|---|---|
@@ -230,6 +230,7 @@ notification list).
 | A claim's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
 | A lead's escalation by an important path, or by a second analyzer, tells nobody | It happens as a run applies, and the lead arrives in the queue with the rest of the run |
 | A lead sent back links to the lead | A rule names no finding page |
+| A hand-off or a move names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of a kept lead's case (`DESIGN-analysis.md` § Keep or move) |
 
 ## Staleness conditions
 

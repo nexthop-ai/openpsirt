@@ -47,9 +47,6 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"d3", "de"}: "a decision against another of its product at its place",
 		{"d2", "de"}: "a decision against another of its product at its place",
 	},
-	"notify/lead.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
-	},
 	"triage/claim.go": {
 		{"de", "lh"}: "a decision about a lead handed off as a flaw, at its place in its own product",
 	},
