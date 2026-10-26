@@ -1286,7 +1286,7 @@ openpsirt-analysis upload \
 </tr>
 <tr>
 <td><code>--salt-file</code></td>
-<td>A file holding a secret that keys each result's fingerprint. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt makes the next run a re-baseline</td>
+<td>A file holding a secret that keys each result's fingerprint. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt changes every fingerprint, and the next run is matched as a fingerprint change</td>
 </tr>
 <tr>
 <td><code>--url</code></td>

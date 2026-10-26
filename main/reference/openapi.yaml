@@ -593,9 +593,6 @@ components:
     AnalysisReceiptBody:
       additionalProperties: false
       properties:
-        baseline:
-          description: Whether this was the series' first comparable run
-          type: boolean
         built_at:
           description: The build time the run states, or the time it arrived where it states none
           type: string
@@ -899,6 +896,23 @@ components:
           description: A URL to the JSON Schema for this object.
           examples:
             - https://example.com/schemas/Assign-findingRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        person:
+          description: Their sign-in identity, or empty for nobody
+          type: string
+        team:
+          description: "A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"
+          type: string
+      type: object
+    Assign-leadRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Assign-leadRequest.json
           format: uri
           readOnly: true
           type: string
@@ -4842,7 +4856,7 @@ components:
           $ref: "#/components/schemas/DisclosesBody"
           description: What moving the lead, and the leads linked with it, into the flaw's case discloses when the flaw is disclosed
         prefix:
-          description: "The path a confirmed component is remembered for: the repository the lead is in, or its directory"
+          description: "The path a confirmed component is remembered for: the repository or declared third-party path the lead is in, or its directory"
           type: string
         rule:
           description: The analyzer's rule, as <tool>/<rule>
@@ -4861,6 +4875,9 @@ components:
           type:
             - array
             - "null"
+        third_party:
+          description: Whether the lead is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted
+          type: boolean
         together:
           description: "The number of other leads linked to the flaw with this one: the leads its confirming claim covers. A move moves them with it"
           format: int64
@@ -4986,27 +5003,6 @@ components:
       properties:
         purl:
           type: string
-      type: object
-    ImportantPathsBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ImportantPathsBody.json
-          format: uri
-          readOnly: true
-          type: string
-        paths:
-          description: Path prefixes from the top of the checkout. A lead at or under one is in the queue from its first run
-          items:
-            type: string
-          maxItems: 500
-          type:
-            - array
-            - "null"
-      required:
-        - paths
       type: object
     Info:
       additionalProperties: false
@@ -5811,23 +5807,6 @@ components:
         - outcome
         - reasoning
       type: object
-    LeadEscalatedBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/LeadEscalatedBody.json
-          format: uri
-          readOnly: true
-          type: string
-        at:
-          description: When it was pulled in. Pulled in again, the first time stands
-          format: date-time
-          type: string
-      required:
-        - at
-      type: object
     LeadEvidenceBody:
       additionalProperties: false
       properties:
@@ -5837,6 +5816,15 @@ components:
             - https://example.com/schemas/LeadEvidenceBody.json
           format: uri
           readOnly: true
+          type: string
+        assigned_team:
+          description: "Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it"
+          type: boolean
+        assigned_to:
+          description: "Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is"
+          type: string
+        assigned_to_name:
+          description: Their display name, where it differs from the name above
           type: string
         at:
           $ref: "#/components/schemas/LeadPlace"
@@ -5869,7 +5857,7 @@ components:
           description: Whether the lead is open on the build
           type: boolean
         past_end_of_life:
-          description: Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off
+          description: Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off
           type: boolean
         related:
           description: The other places the analyzer names
@@ -5882,9 +5870,8 @@ components:
           description: The analyzer's rule, as <tool>/<rule>
           type: string
         state:
-          description: "Where the lead stands: in the baseline, open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"
+          description: "Where the lead stands: open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"
           enum:
-            - baseline
             - open
             - not-reproduced
             - fixed
@@ -5900,6 +5887,9 @@ components:
           type:
             - array
             - "null"
+        third_party:
+          description: Whether the lead is in code the newest run that saw it declared third-party
+          type: boolean
         unchanged:
           description: Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code
           type: boolean
@@ -6046,6 +6036,15 @@ components:
     LeadRowBody:
       additionalProperties: false
       properties:
+        assigned_team:
+          description: "Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it"
+          type: boolean
+        assigned_to:
+          description: "Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is"
+          type: string
+        assigned_to_name:
+          description: Their display name, where it differs from the name above
+          type: string
         builds:
           description: The number of builds in the list's scope the lead is listed on, in the state the list asks for
           format: int64
@@ -6076,7 +6075,6 @@ components:
         state:
           description: Where the lead stands on that build
           enum:
-            - baseline
             - open
             - not-reproduced
             - fixed
@@ -6088,6 +6086,9 @@ components:
         stream:
           description: The branch or tag of the newest build the lead is listed on, to link to
           type: string
+        third_party:
+          description: Whether the lead is in code the newest run that saw it declared third-party
+          type: boolean
         variant:
           description: The variant of that build
           type: string
@@ -8018,7 +8019,6 @@ components:
             - analysis-dropped
             - analysis-not-comparable
             - analysis-quiet
-            - lead-escalated
             - lead-handed-off
             - lead-moved
             - rule-outgrown
@@ -8307,7 +8307,6 @@ components:
             - analysis-dropped
             - analysis-not-comparable
             - analysis-quiet
-            - lead-escalated
             - lead-handed-off
             - lead-moved
             - rule-outgrown
@@ -9790,6 +9789,9 @@ components:
             type: integer
           description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"
           type: object
+        fingerprints_changed:
+          description: Whether the fingerprints the results carry changed from the last run on the build that carried any
+          type: boolean
         inherited:
           description: Results new to the build carried from a lead of the branch it was cut from
           format: int64
@@ -9806,9 +9808,6 @@ components:
           description: Results paired with a lead on its function or its nearest line rather than its whole key
           format: int64
           type: integer
-        rebaseline:
-          description: Whether the fingerprints the results carry changed from the last run on the build that carried any
-          type: boolean
         reopened:
           description: Results found again at the place of a lead on the build that was closed
           format: int64
@@ -12708,6 +12707,9 @@ components:
         namespace:
           description: The namespace its package identifier names, where it names one
           type: string
+        place:
+          description: The place of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built
+          type: string
         places:
           description: The number of findings a judgment here would be recorded against, across every build it is in
           format: int64
@@ -14708,7 +14710,7 @@ paths:
       description: |-
         Returns everyone holding open work you can see, with how much.
 
-        Counted in pieces of work — an issue in a component in a product — which is the unit the list behind each person is in. `places` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
+        Counted in pieces of work — an issue in a component in a product, or one static analysis lead — which is the unit the list behind each person is in. `places` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
 
         The number worth watching is not how many findings exist but how many are waiting behind somebody: an idle account holding nothing is harmless, and work stuck behind a person who has gone is the problem — nothing tells this software that somebody has left.
 
@@ -17251,6 +17253,8 @@ paths:
 
         Each product applies its own triage line, so the file states that rather than naming one line, and `product` is a column.
 
+        Below the findings come the open static analysis leads of every product, by product name, as the product export writes them. The columns and the rule about filters are the product export's.
+
         Takes every filter the cross-product list takes. `beneath` and `differs` are not offered here, for the reason that list gives.
 
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
@@ -18768,7 +18772,7 @@ paths:
   /v1/people/{identity}/assignments:
     get:
       description: |-
-        The open findings assigned to somebody, most urgent first, in the same units as what nobody is dealing with: one item per issue in a component in a product, not one per build. The same code built several ways is one piece of work, and it was taken on as one.
+        The open findings assigned to somebody, most urgent first, in the same units as what nobody is dealing with: one item per issue in a component in a product, not one per build. The same code built several ways is one piece of work, and it was taken on as one. A static analysis lead is one item, with `place` set, where you read it.
 
         Send `me` as the identity for your own.
 
@@ -20645,6 +20649,8 @@ paths:
         Read with your own visibility, as it streams. It is the same query the screen reads, paged and written out as it goes.
 
         The line this deployment triages at is stated in the file.
+
+        Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text, and `withheld` is false on every lead. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
 
         Takes every filter the findings list takes.
 
@@ -23299,76 +23305,6 @@ paths:
           - internal-read
           - internal-triage
         note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
-  /v1/products/{product}/important-paths:
-    get:
-      description: |-
-        Returns the path prefixes whose leads are in the queue from their first run, in order.
-
-        Requires: internal-read or internal-triage on the product
-      operationId: get-important-paths
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ImportantPathsBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Get a product's important paths
-      tags:
-        - Triage
-      x-openpsirt-requires:
-        scope: product
-        any_of:
-          - internal-read
-          - internal-triage
-    put:
-      description: |-
-        Replaces the path prefixes whose leads are in the queue from their first run. A lead in the baseline at or under one enters the queue at once, and leaves it again where its path is taken off.
-
-        Refused, naming the path, where one is empty, climbs out of the checkout or is named twice. Recorded in the administrative trail.
-
-        Requires: internal-triage on the product
-      operationId: set-important-paths
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ImportantPathsBody"
-        required: true
-      responses:
-        "204":
-          description: No Content
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Set a product's important paths
-      tags:
-        - Triage
-      x-openpsirt-requires:
-        scope: product
-        any_of:
-          - internal-triage
   /v1/products/{product}/issues/{vulnerability}/aliases/{alias}:
     delete:
       description: |-
@@ -24547,9 +24483,9 @@ paths:
       description: |-
         Returns one row per lead the product holds, however many builds it is on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer reports the same flaw on the build, then the tool's own security severity for the rule, then its precision, then newest first.
 
-        With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
+        With no `state` it is the queue: open leads with no claim waiting for a second person. `state` lists the leads in one state instead. `fixed` lists the leads closed on a build and not opened anew there.
 
-        `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
+        `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the leads nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-leads
@@ -24588,7 +24524,6 @@ paths:
           schema:
             description: List the leads in one state. Left out, the queue
             enum:
-              - baseline
               - open
               - not-reproduced
               - fixed
@@ -24596,6 +24531,15 @@ paths:
               - not-security
               - confirmed
               - handed-off
+            type: string
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+          explode: false
+          in: query
+          name: assigned
+          schema:
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            enum:
+              - nobody
             type: string
         - description: The number returned
           explode: false
@@ -24682,7 +24626,6 @@ paths:
           schema:
             description: List the leads in one state. Left out, the queue
             enum:
-              - baseline
               - open
               - not-reproduced
               - fixed
@@ -24690,6 +24633,15 @@ paths:
               - not-security
               - confirmed
               - handed-off
+            type: string
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+          explode: false
+          in: query
+          name: assigned
+          schema:
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            enum:
+              - nobody
             type: string
         - in: path
           name: format
@@ -24714,46 +24666,6 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
-  /v1/products/{product}/leads/{place}/escalation:
-    post:
-      description: |-
-        Takes a lead out of the baseline and into the queue on every build of the product it is on. A lead already pulled in keeps when it first was, and a lead not in the baseline is unchanged.
-
-        Requires: internal-triage on the product
-      operationId: escalate-lead
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-        - description: The lead's place identity
-          in: path
-          name: place
-          required: true
-          schema:
-            description: The lead's place identity
-            type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LeadEscalatedBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Pull a lead into the queue
-      tags:
-        - Triage
-      x-openpsirt-requires:
-        scope: product
-        any_of:
-          - internal-triage
   /v1/products/{product}/mentionable:
     get:
       description: |-
@@ -25679,6 +25591,8 @@ paths:
         It matches on component identity as well as on a place in the tree. A rule naming a source package catches every binary package built from it, wherever they sit.
 
         It places only work nobody holds. A human assignment always wins, and adding a rule never takes something out of somebody's hands.
+
+        It places work only at a visibility one member of the team reads. Undisclosed or internal work nobody on the team reads stays unassigned.
 
         Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished. Where the queue is full the rule is not recorded and the answer is 503: send it again later.
 
@@ -27788,6 +27702,69 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment:
+    put:
+      description: |-
+        Records who is dealing with this lead.
+
+        It covers the product, not the build named in the path: what is assigned is the lead on every build of the product it is open on.
+
+        Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
+
+        A person is given a lead only where they may read it at its visibility, and a team only where one member may. A lead every release of which is past its end of life is refused with 409, and so is a lead handed off as a flaw: assign the flaw instead.
+
+        A lead seen on a build it was not open on when it was assigned starts unassigned there.
+
+        Requires: public-triage or private-triage or internal-triage on the product. At the lead's visibility. Giving it to somebody else also needs assigner. Taking a lead nobody holds, or handing back your own, does not.
+      operationId: assign-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Assign-leadRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Assign a lead to somebody
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+          - internal-triage
+        note: At the lead's visibility. Giving it to somebody else also needs assigner. Taking a lead nobody holds, or handing back your own, does not.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators:
     get:
       description: |-
@@ -31413,7 +31390,7 @@ paths:
   /v1/teams/{team}/assignments:
     get:
       description: |-
-        The open findings routed to a team, most urgent first, in the same units as everywhere else: one item per issue in a component in a product.
+        The open findings routed to a team, most urgent first, in the same units as everywhere else: one item per issue in a component in a product, and one per static analysis lead you read, with `place` set.
 
         Work goes to a team by standing rule and by an assignment naming one, so a team holds work the way a person does — and the totals list says so. This is the list behind that number.
 
@@ -31958,7 +31935,7 @@ paths:
   /v1/unassigned:
     get:
       description: |-
-        Returns open findings with no assignee, across every product you can see, most urgent first.
+        Returns open findings with no assignee, across every product you can see, most urgent first. Static analysis leads are included where you read them, one item per lead, with `place` set.
 
         Deliberately not scoped to one product: work falling between people is exactly what hides when every screen shows one product and nobody looks at the others.
 
