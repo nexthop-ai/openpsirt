@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -75,6 +76,9 @@ type Queue struct {
 	ByState map[State]int
 	Waiting int
 	Ruled   int
+	// Ended is the open leads the queue leaves out because every release
+	// they were seen in is past its end of life.
+	Ended int
 }
 
 // LeadsOf is one page of a product's leads where the subject may read them,
@@ -105,7 +109,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 			Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
 			Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
-			ColumnExpr(`"f"."id", "f"."place_identity", "f"."target_id", "f"."opened_at"`).
+			ColumnExpr(`"f"."id", "f"."place_identity", "f"."target_id", "f"."opened_at", "t"."stream_id"`).
 			ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 			ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
 			ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
@@ -128,11 +132,24 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		}
 		return q
 	}
+	// A lead seen only in releases past their end of life is kept as it
+	// stands and is no work for anybody, so the queue counts none of its
+	// sightings there. The lists by state still show it.
+	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	queued := func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where(`"l"."stands" = ?`, string(Open)).Where(`"l"."awaits" = 0`)
+	}
 	listed := func(q *bun.SelectQuery) *bun.SelectQuery {
-		if want == "" {
-			return q.Where(`"l"."stands" = ?`, string(Open)).Where(`"l"."awaits" = 0`)
+		if want != "" {
+			return q.Where(`"l"."stands" = ?`, string(want))
 		}
-		return q.Where(`"l"."stands" = ?`, string(want))
+		if len(ended) > 0 {
+			q = q.Where(`"l"."stream_id" NOT IN (?)`, bun.List(ended))
+		}
+		return queued(q)
 	}
 
 	out := &Queue{ByState: map[State]int{}}
@@ -160,6 +177,14 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
 		ColumnExpr(`COUNT(DISTINCT "l"."place_identity")`).Scan(ctx, &out.Total); err != nil {
 		return nil, fmt.Errorf("count the leads listed in product %d: %w", scope.ProductID, err)
+	}
+	if want == "" && len(ended) > 0 {
+		var all int
+		if err := queued(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
+			ColumnExpr(`COUNT(DISTINCT "l"."place_identity")`).Scan(ctx, &all); err != nil {
+			return nil, fmt.Errorf("count the leads of product %d past their end of life: %w", scope.ProductID, err)
+		}
+		out.Ended = all - out.Total
 	}
 
 	var page []struct {

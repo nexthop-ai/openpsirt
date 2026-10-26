@@ -89,6 +89,9 @@ func Escalate(ctx context.Context, db bun.IDB, subject access.Subject, productID
 				return access.Denied(fmt.Sprintf("pull a lead in product %d into the queue", productID))
 			}
 		}
+		if err := finding.LeadEnded(ctx, tx, productID, placeIdentity, now); err != nil {
+			return err
+		}
 		row := escalation{ProductID: productID, PlaceIdentity: placeIdentity,
 			EscalatedBy: subject.ID, EscalatedAt: now.UTC().Truncate(time.Microsecond)}
 		if err := database.InBatchesKeeping(ctx, tx, []escalation{row}); err != nil {

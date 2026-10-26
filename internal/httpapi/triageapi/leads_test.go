@@ -265,6 +265,7 @@ type leadsListed struct {
 	States  map[string]int `json:"states"`
 	Waiting int            `json:"waiting"`
 	Ruled   int            `json:"ruled"`
+	Ended   int            `json:"past_end_of_life"`
 }
 
 func leadsOf(t *testing.T, r *httpapitest.Reach, who, query string) leadsListed {
@@ -469,6 +470,47 @@ func TestTheRecordStatesALeadsReasonAsAReason(t *testing.T) {
 		}
 		if got := record.Items[0]; got.Reason != "false_positive" || got.Justification != "" {
 			t.Errorf("the record states %+v; want the lead's reason as its reason and no justification", got)
+		}
+	})
+}
+
+func TestALeadSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKeptAsItStands(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		at := "/v1/products/mine/leads/" + place + "/escalation"
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, `{}`); got.Code != http.StatusOK {
+			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
+		}
+		ended := func(on *time.Time) {
+			t.Helper()
+			if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, on).
+				Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		yesterday := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
+		ended(&yesterday)
+
+		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 0 || got.Ended != 1 {
+			t.Errorf("the queue is %+v; want the lead left out and counted", got)
+		}
+		if got := leadsOf(t, r, "internal-reader", "?state=open"); len(got.Items) != 1 {
+			t.Errorf("the open leads are %+v; want the lead still listed", got)
+		}
+		var evidence struct {
+			Ended bool `json:"past_end_of_life"`
+		}
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &evidence)
+		if !evidence.Ended {
+			t.Error("the lead's evidence does not say its releases are past their end of life")
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/leads/"+place+"/decision",
+			`{"outcome":"confirmed","reasoning":"p leaks"}`), http.StatusConflict)
+
+		ended(nil)
+		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 1 || got.Ended != 0 {
+			t.Errorf("back in support, the queue is %+v; want the lead", got)
 		}
 	})
 }

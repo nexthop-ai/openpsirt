@@ -124,4 +124,15 @@ describe("a lead", () => {
     await drawn(true, { ...EVIDENCE, state: "baseline" });
     expect(text()).toContain("Add to the queue");
   });
+
+  it("is kept as it stands once every release it was seen in is past its end of life", async () => {
+    await drawn(true, { ...EVIDENCE, past_end_of_life: true });
+    expect(text()).toContain("Past end of life");
+    expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);
+  });
+
+  it("offers no way into the queue once it is past its end of life", async () => {
+    await drawn(true, { ...EVIDENCE, state: "baseline", past_end_of_life: true });
+    expect(text()).not.toContain("Add to the queue");
+  });
 });

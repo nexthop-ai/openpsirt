@@ -74,18 +74,31 @@ export function Leads() {
         ))}
       </div>
 
-      {!state && listed.data && (listed.data.waiting > 0 || listed.data.ruled > 0) && (
-        <p className="hint">
-          {listed.data.waiting > 0 &&
-            `${listed.data.waiting.toLocaleString()} waiting for approval`}
-          {listed.data.waiting > 0 && listed.data.ruled > 0 && " · "}
-          {listed.data.ruled > 0 && (
-            <Link to={leadsAt(product, { state: "dismissed", stream, variant })}>
-              {listed.data.ruled.toLocaleString()} dismissed by a rule
-            </Link>
-          )}
-        </p>
-      )}
+      {!state &&
+        listed.data &&
+        (listed.data.waiting > 0 || listed.data.ruled > 0 || listed.data.past_end_of_life > 0) && (
+          <p className="hint">
+            {[
+              listed.data.waiting > 0 && (
+                <span key="waiting">
+                  {listed.data.waiting.toLocaleString()} waiting for approval
+                </span>
+              ),
+              listed.data.ruled > 0 && (
+                <Link key="ruled" to={leadsAt(product, { state: "dismissed", stream, variant })}>
+                  {listed.data.ruled.toLocaleString()} dismissed by a rule
+                </Link>
+              ),
+              listed.data.past_end_of_life > 0 && (
+                <span key="ended">
+                  {listed.data.past_end_of_life.toLocaleString()} past end of life
+                </span>
+              ),
+            ]
+              .filter(Boolean)
+              .flatMap((each, i) => (i === 0 ? [each] : [" · ", each]))}
+          </p>
+        )}
 
       {listed.isPending ? (
         <Loading />

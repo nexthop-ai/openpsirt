@@ -124,7 +124,8 @@ func refusedHandoff(in core.Deps, err error) error {
 		return huma.Error403Forbidden("not authorized")
 	case errors.Is(err, analysis.ErrHandedOff), errors.Is(err, analysis.ErrNotConfirmed),
 		errors.Is(err, analysis.ErrAlreadyMoved), errors.Is(err, analysis.ErrNotMoved),
-		errors.Is(err, analysis.ErrFlawDisclosed), errors.Is(err, analysis.ErrNotHandedOff):
+		errors.Is(err, analysis.ErrFlawDisclosed), errors.Is(err, analysis.ErrNotHandedOff),
+		errors.Is(err, finding.ErrLeadPastEndOfLife):
 		return huma.Error409Conflict(err.Error())
 	}
 	return refusedFlaw(in, err)

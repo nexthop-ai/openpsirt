@@ -649,6 +649,9 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 		if err != nil {
 			return err
 		}
+		if err := finding.LeadEnded(ctx, tx, in.ProductID, in.PlaceIdentity, now); err != nil {
+			return err
+		}
 		if handed, err := finding.HandoffAt(ctx, tx, in.ProductID, in.PlaceIdentity); err != nil {
 			return err
 		} else if handed != nil {
@@ -735,7 +738,7 @@ func Answerable(ctx context.Context, tx bun.IDB, subject access.Subject, product
 	if handed != nil {
 		return ErrHandedOff
 	}
-	return nil
+	return finding.LeadEnded(ctx, tx, productID, lead.PlaceIdentity, time.Now().UTC())
 }
 
 // learn records the component a path prefix was confirmed as, replacing what

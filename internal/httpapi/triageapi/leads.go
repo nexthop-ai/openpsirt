@@ -115,8 +115,8 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			return places, nil
 		})
 		switch {
-		case errors.Is(err, analysis.ErrHandedOff):
-			return nil, huma.Error409Conflict(analysis.ErrHandedOff.Error())
+		case errors.Is(err, analysis.ErrHandedOff), errors.Is(err, finding.ErrLeadPastEndOfLife):
+			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNoOpenFinding):
 			return nil, core.NoSuchFinding()
 		}
@@ -167,7 +167,7 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 		}
 		done, err := finding.NewStore(in.DB.DB).FixLead(ctx, subject, target.ID, input.Place, input.Body.Because)
 		switch {
-		case errors.Is(err, finding.ErrStillSeen):
+		case errors.Is(err, finding.ErrStillSeen), errors.Is(err, finding.ErrLeadPastEndOfLife):
 			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNoReason):
 			return nil, core.Asked(in.Logger, err)
@@ -210,6 +210,8 @@ func registerLeadEscalation(api huma.API, in core.Deps) {
 		switch {
 		case errors.Is(err, finding.ErrNothingOpenThere), errors.Is(err, access.ErrDenied):
 			return nil, core.NoSuchFinding()
+		case errors.Is(err, finding.ErrLeadPastEndOfLife):
+			return nil, huma.Error409Conflict(err.Error())
 		case err != nil:
 			return nil, core.WentWrong(in.Logger, "that lead could not be pulled in", err)
 		}

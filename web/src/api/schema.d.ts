@@ -3479,7 +3479,7 @@ export interface paths {
          *
          *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
          *
-         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead seen only in releases past their end of life, and `past_end_of_life` counts those. Such a lead is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream` and `variant` are optional and independent. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -10054,6 +10054,8 @@ export interface components {
             not_seen?: string;
             /** @description Whether the lead is open on the build */
             open: boolean;
+            /** @description Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off */
+            past_end_of_life?: boolean;
             /** @description The other places the analyzer names */
             related: components["schemas"]["LeadPlace"][] | null;
             /** @description The analyzer's rule, as <tool>/<rule> */
@@ -10254,6 +10256,11 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["LeadRowBody"][] | null;
+            /**
+             * Format: int64
+             * @description Open leads left out of the queue because every release they were seen in is past its end of life. Zero for a list by state
+             */
+            past_end_of_life: number;
             /**
              * Format: int64
              * @description Dismissed leads an approved standing rule covers, counted among the dismissed in states

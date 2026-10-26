@@ -28,6 +28,7 @@ shares is in `DESIGN-ingest.md`.
 - [Weakness families](#weakness-families)
 - [Grouped leads](#grouped-leads)
 - [Hand-off](#hand-off)
+- [End of life](#end-of-life)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
 - [Not built](#not-built)
@@ -669,6 +670,22 @@ one handed-off lead, as case collaborators are brought into one flaw
 | A grant or a withdrawal is refused with 409 once the flaw is disclosed, and is made in one transaction with the read of the hand-off it depends on | The grants have ended |
 | A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in, in a line their grant reaches | As a case collaborator is |
 | A reader on the flaw's case reads a moved lead in full | The lead is part of the case |
+
+## End of life
+
+A lead seen only in releases past their end of life is kept as it stands, and
+nothing about it is deleted (REQ-15). When a release reaches its end of life
+is in `DESIGN-data-model.md` § End of support.
+
+| Rule | |
+|---|---|
+| A lead is past its end of life when every release of the product holding a finding of it is | A lead also seen in a supported release is work there |
+| The queue leaves out its sightings in releases past their end of life, and counts the leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
+| A decision, a fixed closure, pulling it into the queue and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
+| A claim already standing at it is still agreed to or withdrawn | The claim is a judgment somebody made, and an approval is of what was read (REQ-28) |
+| A lead already handed off is still moved into or out of its flaw's case | The move is about the flaw, which is judged on its own builds |
+| Its evidence says it is past its end of life | The page offers none of the refused controls |
+| A retired branch, tag or variant takes no run (§ The upload), so it stops producing sightings, and its leads stay listed with the product | `DESIGN-data-model.md` § Catalog retirement. Retiring closes off what arrives, and keeps what was found |
 
 ## Receipts
 

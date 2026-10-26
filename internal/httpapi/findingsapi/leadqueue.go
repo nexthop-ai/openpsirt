@@ -40,6 +40,7 @@ type LeadsOutput struct {
 		States  map[string]int `json:"states" doc:"The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build"`
 		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
 		Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
+		Ended   int            `json:"past_end_of_life" doc:"Open leads left out of the queue because every release they were seen in is past its end of life. Zero for a list by state"`
 	}
 }
 
@@ -59,7 +60,9 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			"closed on a build and not opened anew there.\n\n" +
 			"`states` counts every lead in the scope by state and `waiting` the open ones " +
 			"left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, " +
-			"so what the list leaves out is counted. " +
+			"so what the list leaves out is counted. The queue also leaves out a lead seen only in " +
+			"releases past their end of life, and `past_end_of_life` counts those. Such a lead is kept as it " +
+			"stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. " +
 			"`stream` and `variant` are optional and independent. Supports limit and offset.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
@@ -87,6 +90,7 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		}
 		out := &LeadsOutput{}
 		out.Body.Total, out.Body.Waiting, out.Body.Ruled = queue.Total, queue.Waiting, queue.Ruled
+		out.Body.Ended = queue.Ended
 		out.Body.States = map[string]int{}
 		for state, n := range queue.ByState {
 			out.Body.States[string(state)] = n

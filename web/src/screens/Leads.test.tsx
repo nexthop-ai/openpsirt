@@ -41,7 +41,14 @@ async function drawn(at = "/products/sonic/leads") {
     if (path === "/v1/products/{product}/leads") {
       asked.push((init as { params: { query: unknown } }).params.query);
       return {
-        data: { items: ROWS, total: 1, states: { baseline: 40, open: 1 }, waiting: 2, ruled: 5 },
+        data: {
+          items: ROWS,
+          total: 1,
+          states: { baseline: 40, open: 1 },
+          waiting: 2,
+          ruled: 5,
+          past_end_of_life: 3,
+        },
       };
     }
     return undefined;
@@ -67,6 +74,7 @@ describe("the leads", () => {
   it("counts what the queue leaves out", async () => {
     await drawn();
     expect(text()).toContain("2 waiting for approval");
+    expect(text()).toContain("3 past end of life");
     expect(text()).toContain("5 dismissed by a rule");
     expect(text()).toContain("Baseline 40");
   });
