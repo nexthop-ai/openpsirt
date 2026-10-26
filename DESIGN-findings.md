@@ -4,7 +4,7 @@ What a scan run found, where it sits, and how it is ranked and closed.
 
 Satisfies REQ-08, REQ-11, REQ-13, REQ-14, REQ-15, REQ-17, REQ-18, REQ-19,
 REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-31, REQ-32, REQ-33,
-REQ-37, REQ-78.
+REQ-37, REQ-78, REQ-85.
 
 ## Contents
 
@@ -753,7 +753,7 @@ contact address is published rather than at some volume of them.
 | An issue merged from issues reported in two products answers each product with its own report | Each name carried its own report. The one a reader reads and writes to is the first received that they may read, and a message on what nobody here may read is refused as no such report |
 | Credit preference is kept apart from the name reported under | "Anonymous" is a real answer, and so is a handle that is not the name on the mail |
 | The received date is what the embargo runs from (REQ-37) | A report that arrived a fortnight before anybody typed it in no longer puts this clock behind the reporter's. It falls back to when the record was made, and a date nobody can read is treated as one nobody gave. A report found here starts no embargo |
-| The acknowledgement is the first message recorded as sent to the reporter | Its day is the acknowledged date, and whoever recorded it is who acknowledged. It is derived from the correspondence rather than stored beside it, so the two cannot disagree. The unanswered condition fires at once rather than after a period, and clears when one is recorded |
+| The acknowledgement is the first message recorded as sent to the reporter | Its day is the acknowledged date, and whoever recorded it is who acknowledged. It is derived from the correspondence, so the two cannot disagree. The unanswered condition fires at once rather than after a period, and clears when one is recorded |
 | What was claimed goes through the submission policy typed text does | It is rendered as markdown where it is read back and it quotes somebody outside this deployment, which is the case the policy exists for (REQ-67) |
 
 A public intake form is out of scope. This is the inside half.
@@ -800,7 +800,7 @@ act is kept and readable.
 | Edits | The title, the claim and what is known of the reporter change while the report is open: not judged, and no ruling waiting over it. Every version an edit replaces is kept with who replaced it and when, numbered from one, and version one is the report as recorded. An edit that changes nothing keeps nothing |
 | Edits once judged | Refused. A judgment is of particular words, as an approval is (REQ-28); the claim a ruling or an acceptance answered is the one on record |
 | Correspondence | A message is recorded with its direction, sent or received, the day it carries and what it said, which may reference files attached to the report. Nothing is sent from this deployment: a message is recorded after somebody sent it, from an address they already have |
-| Message days | Today where none is given. More than a day ahead of today is refused, since a day in the future records a message nobody has sent. A message is never edited or removed, because it is evidence of what the reporter was told |
+| Message days | Today where none is given. More than a day ahead of today is refused; one day ahead is the reach of a time zone. A message is never edited or removed, because it is evidence of what the reporter was told |
 | Correspondence on a flaw found here | Refused. Nobody outside sent it, so there is nobody to write to |
 | Notes | Markdown written by somebody who works the report, editable by its author, with every earlier wording kept. A name mentioned is told only where that person reads the product's reports; a name nobody reading reports holds is returned unnotified, worded alike whether or not the person exists (§ Report visibility) |
 | Notes and messages after judgment | Accepted. The conversation with a reporter outlasts the judgment of their claim, and both stay readable from the issue it became, under the report rule |

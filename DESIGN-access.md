@@ -254,7 +254,7 @@ yourself is still doing it.
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
-| A vulnerability report is assigned under the same three rows, at undisclosed work | A report is undisclosed whatever it claims (`DESIGN-findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
+| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever it claims (`DESIGN-findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
 
 ### Assignment by narrowing
 
