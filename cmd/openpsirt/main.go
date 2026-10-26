@@ -487,7 +487,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 			"mapping", mapping.String(), "grants", mapping.Grants)
 	}
 	settings := setting.NewStore(db.DB)
-	rights := access.NewStore(db.DB)
+	rights := httpapi.Rights(db.DB)
 	logger.Info("roles are assigned", "mode", mode)
 
 	// One provider at a time is a rule across time, not only at one instant
@@ -534,8 +534,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 		// both ways in — including the administrator's setting, which is the
 		// one that decides and is read per request rather than at startup.
 		Access: access.NewResolver(
-			rights.DerivingWithin(httpapi.DerivedWindow(settings, cfg.SessionLifetime)).
-				HandingBack(finding.HandBack),
+			rights.DerivingWithin(httpapi.DerivedWindow(settings, cfg.SessionLifetime)),
 			access.Trust{
 				Header: cfg.TrustedHeader, From: cfg.TrustedSources,
 				GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
