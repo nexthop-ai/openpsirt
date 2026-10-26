@@ -709,7 +709,7 @@ holds the files that are reachable nowhere else.
 | A figure counting anything closed opens nothing | The findings lists hold what is open. "Fixed" counts what closed, and "Appeared" counts what opened in the window whether or not it has closed since, so a link under either opens a list of something else |
 | A link adds its filter to the list's address as a parameter of its own | The address for a partial scope already carries a query, and a second `?` joined onto it becomes part of the branch's name |
 | A section counted by product alone says so | The triage times, the repeated deferrals and the dismissals are read for a product and never for a branch or a variant, so the heading's scope is not theirs. Each names the product, every branch and variant, or every product where none is picked |
-| A sheet counted by product alone says so in its header | Effort, advisories issued and approval quality are read for a product and never for a branch or a variant. Their header, on screen and printed, names the product, every branch and variant, in place of the picker's scope |
+| A sheet counted by product alone says so in its header | Effort, advisories issued, approval quality and leads by analyzer are read for a product and never for a branch or a variant. Their header, on screen and printed, names the product, every branch and variant, in place of the picker's scope |
 | Every narrowing the sheet's controls apply is in the printed header | The controls do not print. Effort names its team, the register its states and closure reasons, and the support sheet how far ahead it warns |
 | A rolling window is asked for as the date it began | The record a figure links to reads a date from midnight, and a window counted from this minute holds rows the figure does not count. The program overview and approval quality ask from the same date their links carry |
 | A link out of a report carries the period and the product the figure was computed with | The record reads its narrowing from the address rather than from the picker, so an entry that dropped the selection opened every product the reader can see from a page scoped to one — a different population under the same name, which is worse than no link |
@@ -734,7 +734,7 @@ holds the files that are reachable nowhere else.
 |---|---|
 | Program | Program overview, backlog over time, deadline compliance, effort by component |
 | Controls | Approval quality, the exception report, standing corrections, administrative changes |
-| Coverage | Scan coverage, match coverage, carried patches |
+| Coverage | Scan coverage, leads by analyzer, match coverage, carried patches |
 | Releases | Release comparison, release readiness, releases out of support |
 | Records | Disposition register, advisories issued |
 | Also on screens | Assignments, Disclosing, pending upgrades |
@@ -753,6 +753,7 @@ Deadline compliance and the disposition register have sections above.
 | Effort by component | The subjects of the judgments in a period, most argued first, with what came out of them. Effort by subject, above, holds the rest |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
+| Leads by analyzer | How many static analysis leads each analyzer series of one product holds in each state, across every build of the product. Each figure opens the lead list for its series and state. Read only by somebody holding `internal-read` on the product; anybody else is told leads are internal and is answered no count. `DESIGN-analysis.md` § Leads by series holds what is counted |
 | Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible. Its issue and product counts are the ones that document states, beside the title it carried; an issue taken off the advisory since is still named in what readers hold. An issuance recorded without its bytes is counted from the advisory's coverage today |
 
 An issuance carries no visibility of its own, so a row of the last of those is
@@ -838,7 +839,7 @@ Any list that can be read can be exported, as CSV or JSON. What exports: the
 findings list, the cross-product findings list, the record of judgments, the
 review queue, what became of the reader's own claims, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, a comparison of two
-builds' inventories, the fix bundles, the upgrades one build is waiting on,
+builds' inventories, the fix bundles, the upgrades one build is waiting on, the lead queue,
 what keeps being put off, the backlog over time, what has been changed
 administratively, what a build holds that the scanner cannot match, and the
 disposition register, which is the one an auditor
@@ -875,6 +876,7 @@ stops is one somebody reads as whole.
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own claims; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
 | The record's file includes claims about leads | It writes what the record shows, under the same visibility (REQ-50). The findings lists' files include no lead (`DESIGN-kinds.md` § Consumers) |
+| The lead queue's file is the queue, under the queue's visibility | It belongs to the Leads consumer, so the findings lists' files still hold no lead. A lead in a case the reader is not on is a row with no message, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
 
 ## Settings
 

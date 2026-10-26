@@ -85,14 +85,19 @@ and a kind it does not name never reaches it.
 | Advisories | The documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What is said to people about findings | Vulnerability, entered |
 | Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
-| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, what pulls one out of the baseline, the leads a standing rule covers, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
+| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, what pulls one out of the baseline, the leads a standing rule covers, the queue's file, and the counts of a product's leads by analyzer series, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
 
 Analysis findings are included by Evidence, Leads and Decisions alone: a
 lead is read through the lead queue, its evidence and the claims about it
 (`DESIGN-analysis.md` § Lead triage). The record's file follows Decisions and
 includes claims about leads, because it writes what the record shows, under the
-same visibility (REQ-50). A file of the lead queue is **not built**;
-`DESIGN-interface.md` § Static analysis leads holds the screens.
+same visibility (REQ-50). `DESIGN-interface.md` § Static analysis leads holds
+the screens.
+
+| Rule | |
+|---|---|
+| The queue's file and the counts by series are part of Leads, not of Exports and Statistics | Exports and Statistics feed the findings lists' files, the vulnerability figures and what a VEX document states, and a lead nobody has judged is none of those. Naming analysis there would reach every statement they hold |
+| Each is the queue's own read over the queue's own visibility | A figure, the list it opens and the file of that list count one population |
 
 ## Inclusion
 

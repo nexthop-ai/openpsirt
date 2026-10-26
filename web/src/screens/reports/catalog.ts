@@ -157,6 +157,13 @@ export const GROUPS: Group[] = [
         answers: "What is being scanned, when each build was last seen, and what has gone quiet.",
       },
       {
+        slug: "leads-by-analyzer",
+        name: "Leads by analyzer",
+        answers: "How many static analysis leads each analyzer holds, and where they stand.",
+        // A series is one product's, and its leads are internal to it.
+        needs: "product",
+      },
+      {
         name: "Match coverage",
         answers: "Components in a build the scanner can't match, and why. They report no findings.",
         to: (at) => matchCoverageAt(buildOf(at)),

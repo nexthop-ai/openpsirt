@@ -3466,6 +3466,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/lead-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count leads by analyzer series
+         * @description Returns one entry per analyzer series the product holds, ordered by name, with how many of its leads stand in each state across every build of the product. A series with no leads is listed with every count zero.
+         *
+         *     Each count is the total the lead list answers for the same `series` and `state`.
+         *
+         *     Refused, with no count, to anybody who does not read internal material in the product.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires internal-read on the product.
+         */
+        get: operations["list-lead-series"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/leads": {
         parameters: {
             query?: never;
@@ -3479,11 +3505,37 @@ export interface paths {
          *
          *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
          *
-         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead seen only in releases past their end of life, and `past_end_of_life` counts those. Such a lead is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream` and `variant` are optional and independent. Supports limit and offset.
+         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead seen only in releases past their end of life, and `past_end_of_life` counts those. Such a lead is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-leads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/leads.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export static analysis leads
+         * @description The lead list as a file: every row the same filters would list, not one page of them, in the same order.
+         *
+         *     Read with your own visibility, as it is written. A lead in a case you are not on is a row with an empty message and `withheld` true. No row carries source text.
+         *
+         *     With no `state` it is the queue, and the file says so. Takes every filter the lead list takes.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-leads"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10248,6 +10300,24 @@ export interface components {
             /** @description Whether you proposed it. The proposer may not approve it */
             yours?: boolean;
         };
+        LeadSeriesBody: {
+            /**
+             * Format: int64
+             * @description Dismissed leads an approved standing rule covers, counted among the dismissed in states
+             */
+            ruled: number;
+            /** @description The series' name, as its producer first sent it */
+            series: string;
+            /** @description The series' leads by where they stand, every state named. A lead on two builds in two states counts in both */
+            states: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Open leads a claim waiting for a second person leaves out of the queue, counted among the open in states
+             */
+            waiting: number;
+        };
         LeadsOutputBody: {
             /**
              * Format: uri
@@ -10330,6 +10400,15 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["LeadRuleBody"][] | null;
+        };
+        "List-lead-seriesResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-lead-seriesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LeadSeriesBody"][] | null;
         };
         "List-set-aside-workResponse": {
             /**
@@ -20069,6 +20148,37 @@ export interface operations {
             };
         };
     };
+    "list-lead-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-lead-seriesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-leads": {
         parameters: {
             query?: {
@@ -20076,6 +20186,8 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                series?: string;
                 /** @description List the leads in one state. Left out, the queue */
                 state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
                 /** @description The number returned */
@@ -20099,6 +20211,45 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LeadsOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-leads": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                series?: string;
+                /** @description List the leads in one state. Left out, the queue */
+                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

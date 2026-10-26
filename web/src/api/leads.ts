@@ -39,9 +39,19 @@ function useAfterLead() {
   };
 }
 
+// What narrows a product's leads, on the list and in its file alike.
+type LeadsAsked = { stream?: string; variant?: string; series?: string; state?: LeadState };
+
+// The narrowing as the query a request carries, with nothing for what is unset.
+export function leadsQuery(asked: LeadsAsked): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(asked).filter((entry): entry is [string, string] => !!entry[1]),
+  );
+}
+
 export function useLeads(
   product: string,
-  asked: { stream?: string; variant?: string; state?: LeadState; offset?: number },
+  asked: LeadsAsked & { offset?: number },
 ): UseQueryResult<Leads> {
   return useQuery({
     queryKey: ["leads", product, asked],
@@ -55,11 +65,27 @@ export function useLeads(
               offset: asked.offset ?? 0,
               ...(asked.stream ? { stream: asked.stream } : {}),
               ...(asked.variant ? { variant: asked.variant } : {}),
+              ...(asked.series ? { series: asked.series } : {}),
               ...(asked.state ? { state: asked.state } : {}),
             },
           },
         }),
       ),
+  });
+}
+
+export type LeadSeries = Body<"LeadSeriesBody">;
+
+// How many leads each analyzer series of a product holds, by state. Keyed
+// under the leads, because every act that moves a lead moves these.
+export function useLeadSeries(product: string): UseQueryResult<LeadSeries[]> {
+  return useQuery({
+    enabled: product !== "",
+    queryKey: ["leads", product, "by-series"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/products/{product}/lead-series", { params: { path: { product } } }))
+        .items ?? [],
+    retry: false,
   });
 }
 

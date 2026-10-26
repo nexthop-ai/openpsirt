@@ -497,6 +497,7 @@ one way to say a path does not matter is kept rather than two.
 | A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
+| A series narrows the list by its name, matched without regard to capitals | A name no series of the product holds lists nothing, the same answer as a series holding no lead |
 | A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
 | A rule's tier is the highest of every weakness recorded for it, ranked again each time a run names the rule | A rule's weaknesses accumulate as its tags do, and a tier table changed by an upgrade reaches a rule at its next run |
 | A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |
@@ -519,6 +520,35 @@ A baseline lead enters the queue when it is escalated.
 | A product marks at most 500 important paths | Each is asked of every baseline lead a list reads |
 | Somebody who reads a lead and does not triage it is answered as though it were not there | As closing a lead as fixed answers them |
 | Escalation is worked out when a lead is read | Marking or unmarking a path moves every lead under it at once |
+
+### Queue file
+
+`GET /v1/products/{product}/leads.{format}` writes the list out as CSV or
+JSON, as `DESIGN-reporting.md` § Exports writes every file.
+
+| Rule | |
+|---|---|
+| The file is the list: the same filters, the same order, every row rather than one page | A list and its file are one read, so a filter the screen applies is never missing from the file |
+| It is read under the list's visibility | A reader is written the leads the list shows them, and nothing else (REQ-42, REQ-43) |
+| A lead in a case the reader is not on is a row with an empty message, marked withheld | What the analyzer said is the case's once the lead is moved, as the list withholds it |
+| No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
+| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves the baseline out |
+| A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
+
+### Leads by series
+
+`GET /v1/products/{product}/lead-series` counts a product's leads per analyzer
+series, by state. The reports catalog draws it as Leads by analyzer
+(`DESIGN-reporting.md` § Pages of the catalog's own).
+
+| Rule | |
+|---|---|
+| Every state is counted, zero included, beside how many open leads a waiting claim leaves out of the queue and how many dismissed leads a standing rule covers | The states are worked out for the queue already, so each costs nothing more |
+| Each count is the total the list answers for that series and state | A figure and the list it opens count one population, under the same visibility |
+| Counted over every build of the product | A series is the product's. A stream or variant would list a series that never ran there with every count zero, which reads as an analyzer that found nothing |
+| A series holding no lead is listed with every count zero | An analyzer that runs and finds nothing is a fact about the product |
+| Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of leads is internal however it is narrowed. A reader of a moved lead through its case reads the lead and not the product's figures |
+| Ordered by the series' name | The series are few, and a reader looks one up by its name |
 
 ## Weakness families
 
@@ -828,8 +858,7 @@ it is about.
 
 | Part | State |
 |---|---|
-| A file of the lead queue | Not built. The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it. The findings lists' files include no lead; the record's file carries claims about leads, as the record does. `DESIGN-interface.md` § Static analysis leads holds the screens |
-| Leads in the statistics and reports | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report counts how many leads there are, or how long one took to be judged or fixed. Approval quality reads lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
+| Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
 | A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
 | Third-party paths | Recorded on the run and read by nothing |

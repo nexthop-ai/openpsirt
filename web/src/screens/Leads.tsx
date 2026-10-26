@@ -4,7 +4,8 @@
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { mayOf, useWho } from "../app/session";
-import { PAGE, useLeads, type LeadState } from "../api/leads";
+import { fileAt } from "../api/links";
+import { PAGE, leadsQuery, useLeads, type LeadState } from "../api/leads";
 import { leadAt, leadRulesAt, leadsAt, productAt } from "../app/routes";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -25,8 +26,9 @@ export function Leads() {
   const state = Object.hasOwn(LEAD_STATES, asked) ? (asked as LeadState) : undefined;
   const stream = params.get("stream") ?? undefined;
   const variant = params.get("variant") ?? undefined;
+  const series = params.get("series") ?? undefined;
   const [offset, setOffset] = useState(0);
-  const listed = useLeads(product, { state, stream, variant, offset });
+  const listed = useLeads(product, { state, stream, variant, series, offset });
   const opener = useRowOpener();
   const reads = !!mayOf(useWho().data, product)?.reads_internal;
 
@@ -34,12 +36,20 @@ export function Leads() {
     setOffset(0);
     setParams(
       Object.fromEntries(
-        Object.entries({ state: next, stream, variant }).filter(([, value]) => value !== undefined),
+        Object.entries({ state: next, stream, variant, series }).filter(
+          ([, value]) => value !== undefined,
+        ),
       ) as Record<string, string>,
       { replace: true },
     );
   };
 
+  // The list on screen as a file: the same narrowing, every row of it.
+  const file = (format: "csv" | "json") =>
+    fileAt("/v1/products/{product}/leads.{format}", format, {
+      path: { product },
+      query: leadsQuery({ state, stream, variant, series }),
+    });
   const counts = listed.data?.states ?? {};
   const rows = listed.data?.items ?? [];
 
@@ -51,10 +61,19 @@ export function Leads() {
           Static analysis results in <Link to={productAt(product)}>{product}</Link>
           {stream && ` · ${stream}`}
           {variant && ` · ${variant}`}
+          {series && ` · ${series}`}
         </p>
-        <Link className="btn quiet" to={leadRulesAt(product)}>
-          Dismissal rules
-        </Link>
+        <span style={{ marginLeft: "auto" }}>
+          <Link className="btn quiet" to={leadRulesAt(product)}>
+            Dismissal rules
+          </Link>{" "}
+          <a className="btn quiet" href={file("csv")}>
+            CSV
+          </a>{" "}
+          <a className="btn quiet" href={file("json")}>
+            JSON
+          </a>
+        </span>
       </div>
 
       <div className="tabs2">
@@ -85,7 +104,10 @@ export function Leads() {
                 </span>
               ),
               listed.data.ruled > 0 && (
-                <Link key="ruled" to={leadsAt(product, { state: "dismissed", stream, variant })}>
+                <Link
+                  key="ruled"
+                  to={leadsAt(product, { state: "dismissed", stream, variant, series })}
+                >
                   {listed.data.ruled.toLocaleString()} dismissed by a rule
                 </Link>
               ),

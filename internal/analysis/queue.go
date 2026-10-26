@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // waitingClaim is whether a claim at the place of the finding under "f", in
@@ -38,12 +39,15 @@ var precisionRank = func() string {
 	return out + ` ELSE 0 END`
 }()
 
-// Scope narrows a product's leads to one stream, one variant or one build.
-// Unset is every one under the product.
+// Scope narrows a product's leads to one stream, one variant or one build,
+// and to one analyzer series. Unset is every one under the product.
 type Scope struct {
 	ProductID int64
 	StreamID  *int64
 	VariantID *int64
+	// Series is a series' name, matched without regard to capitals. A name
+	// no series of the product holds lists nothing.
+	Series string
 }
 
 // QueueRow is one lead in a product: its place, and what the newest of its
@@ -97,41 +101,8 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	if err != nil {
 		return nil, err
 	}
-	// The product's own visibilities, and a moved lead as a stub. A lead
-	// granted one at a time is reached through its evidence, never a list.
-	reach := finding.LeadReach(subject, scope.ProductID)
-	perFinding := func() *bun.SelectQuery {
-		state, stateArgs := stateOf(scope.ProductID)
-		kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
-		q := db.NewSelect().TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-			Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-			Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
-			Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
-			ColumnExpr(`"f"."id", "f"."place_identity", "f"."target_id", "f"."opened_at", "t"."stream_id"`).
-			ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
-			ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
-			ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
-			ColumnExpr(precisionRank+` AS "precise"`).
-			ColumnExpr(state+` AS "stands"`, stateArgs...).
-			ColumnExpr(`CASE WHEN `+waitingClaim+` THEN 1 ELSE 0 END AS "awaits"`, scope.ProductID).
-			ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
-			Where(`"s"."product_id" = ?`, scope.ProductID).
-			Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
-				WHERE "fo"."place_identity" = "f"."place_identity" AND "fo"."target_id" = "f"."target_id"
-				  AND "fo"."closed_at" IS NULL))`).
-			ColumnExpr(`CASE WHEN "f"."visibility" IN (?) THEN 0 ELSE 1 END AS "stub"`, bun.List(visible)).
-			Where(`("f"."visibility" IN (?) OR `+reach.Stub+`)`, append([]any{bun.List(visible)}, reach.StubArgs...)...).
-			Where(kinds, kindArgs...)
-		if scope.StreamID != nil {
-			q = q.Where(`"t"."stream_id" = ?`, *scope.StreamID)
-		}
-		if scope.VariantID != nil {
-			q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
-		}
-		return q
-	}
+	perFinding := func() *bun.SelectQuery { return leadFindings(db, subject, scope, visible) }
+
 	// A lead seen only in releases past their end of life is kept as it
 	// stands and is no work for anybody, so the queue counts none of its
 	// sightings there. The lists by state still show it.
@@ -247,4 +218,52 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		out.Rows = append(out.Rows, r)
 	}
 	return out, nil
+}
+
+// leadFindings is every finding of a lead in the scope that the subject may
+// read, one row per finding: the lead's place, its build, its series, where it
+// stands, whether a claim waits on it, whether a standing rule covers it, and
+// what the queue orders it by.
+//
+// The product's own visibilities, and a moved lead as a stub. A lead granted
+// one at a time is reached through its evidence, never a list. A finding
+// closed on a build is read until the lead opens anew at its place there.
+func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
+	reach := finding.LeadReach(subject, scope.ProductID)
+	state, stateArgs := stateOf(scope.ProductID)
+	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
+	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
+		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"f"."id", "f"."place_identity", "f"."target_id", "f"."opened_at", "si"."series_id", "t"."stream_id"`).
+		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
+		ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
+		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
+		ColumnExpr(precisionRank+` AS "precise"`).
+		ColumnExpr(state+` AS "stands"`, stateArgs...).
+		ColumnExpr(`CASE WHEN `+waitingClaim+` THEN 1 ELSE 0 END AS "awaits"`, scope.ProductID).
+		ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
+		Where(`"s"."product_id" = ?`, scope.ProductID).
+		Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
+			WHERE "fo"."place_identity" = "f"."place_identity" AND "fo"."target_id" = "f"."target_id"
+			  AND "fo"."closed_at" IS NULL))`).
+		ColumnExpr(`CASE WHEN "f"."visibility" IN (?) THEN 0 ELSE 1 END AS "stub"`, bun.List(visible)).
+		Where(`("f"."visibility" IN (?) OR `+reach.Stub+`)`, append([]any{bun.List(visible)}, reach.StubArgs...)...).
+		Where(kinds, kindArgs...)
+	if scope.StreamID != nil {
+		q = q.Where(`"t"."stream_id" = ?`, *scope.StreamID)
+	}
+	if scope.VariantID != nil {
+		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
+	}
+	if scope.Series != "" {
+		named, namedArgs := kind.Leads.Where(`"sn"."kind"`)
+		q = q.Where(`"si"."series_id" IN (SELECT "sn"."id" FROM "series" AS "sn"
+			WHERE "sn"."product_id" = ? AND "sn"."name_folded" = ? AND `+named+`)`,
+			append([]any{scope.ProductID, typedname.Matching(scope.Series)}, namedArgs...)...)
+	}
+	return q
 }

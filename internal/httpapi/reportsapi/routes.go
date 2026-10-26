@@ -22,6 +22,7 @@ func Register(api huma.API, in core.Deps) {
 	registerOverview(api, in)
 	registerCoverage(api, in)
 	registerCoverageExport(api, in)
+	registerLeadSeries(api, in)
 	registerOutOfSupport(api, in)
 	registerPublished(api, in)
 	registerAudit(api, in)

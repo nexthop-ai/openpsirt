@@ -1460,6 +1460,9 @@ the screens draw them.
 | Keeping or moving the lead is a choice of two cards, and moving lists what goes public with the flaw before it is sent | The people whose writing is disclosed are named, as are the paths, and the snippets removed at disclosure are counted |
 | A handed-off lead shows its flaw, linked, in place of the decision | Moving in or out is one button while the flaw is undisclosed, and its collaborators are listed beside it. A kept lead lists what moving it in discloses above the button |
 | A lead in a case the reader is not on says so, and shows where it is alone | The queue's row reads Withheld in place of the message |
+| The leads screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
+| A series in the address narrows the leads screen, and is named in its heading | Each figure of Leads by analyzer opens the list of its series and state |
+| Leads by analyzer asks for no count from somebody who does not read internal material in the product | It says leads are internal. A table of zeros reads as an analyzer finding nothing |
 
 ## Disclosure and advisories
 

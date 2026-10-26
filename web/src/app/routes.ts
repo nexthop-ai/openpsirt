@@ -82,7 +82,7 @@ export const inboxReportAt = (product: string, reference: string) =>
 // every build or one.
 export const leadsAt = (
   product: string,
-  query?: { state?: string; stream?: string; variant?: string },
+  query?: { state?: string; stream?: string; variant?: string; series?: string },
 ) => at("leads", { product }, query);
 // One lead's evidence on one build.
 export const leadAt = (build: Build, place: string) => at("lead", { ...build, place });
