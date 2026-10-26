@@ -112,13 +112,20 @@ func TestAMessageFromTheReporterIsToldToWhoeverHoldsTheReport(t *testing.T) {
 			t.Fatalf("giving the report out answered %d: %s", got.Code, got.Body)
 		}
 
-		// A message sent is the holder's own act and tells nobody.
+		// A message sent is told to whoever watches the report, apart from
+		// whoever recorded it.
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost, at+"/messages",
 			`{"direction":"sent","body":"Thank you; we are looking."}`); got.Code != http.StatusCreated {
 			t.Fatalf("recording a message sent answered %d: %s", got.Code, got.Body)
 		}
 		if n := told(t, r, "private-triage", notify.ReportMessage); n != 0 {
-			t.Errorf("a message sent was told to the holder %d times", n)
+			t.Errorf("a message sent was told to the holder as the reporter writing %d times", n)
+		}
+		if n := told(t, r, "private-triage", notify.ReportSent); n != 1 {
+			t.Errorf("the holder was told of a message sent %d times, want once", n)
+		}
+		if n := told(t, r, "private-dispatcher", notify.ReportSent); n != 0 {
+			t.Errorf("whoever recorded a message sent was told of it %d times", n)
 		}
 
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost, at+"/messages",
@@ -174,5 +181,37 @@ func TestANoteOnAReportTellsOnlyThoseWhoReadReports(t *testing.T) {
 		// Somebody who reads no reports is told the report is not there.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodGet, at+"/notes", ""),
 			http.StatusNotFound)
+	})
+}
+
+func TestANoteOnAReportIsToldToItsHolderAndNotToItsAuthor(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		at := recordReport(t, r)
+		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, at+"/assignment",
+			`{"person":"private-triage"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("giving the report out answered %d: %s", got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost, at+"/notes",
+			`{"body":"The reporter's address bounces."}`); got.Code != http.StatusCreated {
+			t.Fatalf("noting on a report answered %d: %s", got.Code, got.Body)
+		}
+		if n := told(t, r, "private-triage", notify.ReportNoted); n != 1 {
+			t.Errorf("the holder was told of a colleague's note %d times, want once", n)
+		}
+		if n := told(t, r, "private-dispatcher", notify.ReportNoted); n != 0 {
+			t.Errorf("the note's author was told of it %d times", n)
+		}
+		// Named in a note, the holder hears of the mention alone.
+		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost, at+"/notes",
+			`{"body":"@private-triage, can you reply?"}`); got.Code != http.StatusCreated {
+			t.Fatalf("noting on a report answered %d: %s", got.Code, got.Body)
+		}
+		if n := told(t, r, "private-triage", notify.ReportNoted); n != 1 {
+			t.Errorf("the holder named in a note was told of it as a note too: %d notes, want 1", n)
+		}
+		if n := told(t, r, "private-triage", notify.Mentioned); n != 1 {
+			t.Errorf("the holder named in a note was told of the mention %d times, want once", n)
+		}
 	})
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/uptrace/bun"
 
@@ -130,23 +131,41 @@ func (a *reportAudience) of(ctx context.Context, productID int64, held *int64) (
 	return out, nil
 }
 
-// ReportWritten is a message from a reporter, recorded on their report.
-type ReportWritten struct {
+// ReportAct is something done on a report that its audience hears of: a
+// message from the reporter or to them, or a note.
+type ReportAct struct {
+	// Kind is ReportMessage for a message received, ReportSent for one sent,
+	// and ReportNoted for a note.
+	Kind      Kind
 	ProductID int64
 	// Product is the product's name, as an address names it.
 	Product   string
 	Reference string
 	// AssignedTo is the party holding the report, absent where nobody does.
 	AssignedTo *int64
-	// By is who recorded it, and is not told.
+	// By is who did it, and is not told.
 	By int64
+	// Named is everybody a note named who was told of the mention, and is
+	// not told of the note as well.
+	Named []int64
 }
 
-// TellReportWritten tells the report's audience that its reporter wrote: the
-// holder, the team whose queue it is in, or everybody who works reports in
-// the product. An event, and undisclosed, so nothing leaving the deployment
-// names the report.
-func TellReportWritten(ctx context.Context, db *bun.DB, act ReportWritten) error {
+// reportSaid is the line each act on a report is told in.
+var reportSaid = map[Kind]string{
+	ReportMessage: "The reporter of %s wrote again, in %s",
+	ReportSent:    "A message to the reporter of %s was recorded, in %s",
+	ReportNoted:   "A note was written on %s, in %s",
+}
+
+// TellReport tells the report's audience what was done on it: the holder,
+// the team whose queue it is in, or everybody who works reports in the
+// product. The audience is who watches a report. An event, and undisclosed,
+// so nothing leaving the deployment names the report.
+func TellReport(ctx context.Context, db *bun.DB, act ReportAct) error {
+	said, ok := reportSaid[act.Kind]
+	if !ok {
+		return fmt.Errorf("%s is not something done on a report", act.Kind)
+	}
 	reach, err := whoActs(ctx, db)
 	if err != nil {
 		return err
@@ -162,12 +181,12 @@ func TellReportWritten(ctx context.Context, db *bun.DB, act ReportWritten) error
 	productID := act.ProductID
 	var failed error
 	for _, personID := range told {
-		if personID == act.By {
+		if personID == act.By || slices.Contains(act.Named, personID) {
 			continue
 		}
 		if err := NewStore(db).Tell(ctx, Telling{
-			PersonID: personID, Kind: ReportMessage,
-			Body:    "The reporter of " + act.Reference + " wrote again, in " + act.Product,
+			PersonID: personID, Kind: act.Kind,
+			Body:    fmt.Sprintf(said, act.Reference, act.Product),
 			Link:    weblink.InboxReport(act.Product, act.Reference),
 			Private: true, ProductID: &productID,
 		}); err != nil {

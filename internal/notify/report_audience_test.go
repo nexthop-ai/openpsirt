@@ -172,8 +172,8 @@ func TestAReporterWritingBackIsToldToTheHolderTheTeamOrEverybodyWhoWorksReports(
 				report := a.report(t, held)
 				// Recorded by somebody outside every tier, so nobody is
 				// left out for being the one who recorded it.
-				if err := notify.TellReportWritten(t.Context(), w.DB.DB, notify.ReportWritten{
-					ProductID: w.Product.ID, Product: w.Product.Name,
+				if err := notify.TellReport(t.Context(), w.DB.DB, notify.ReportAct{
+					Kind: notify.ReportMessage, ProductID: w.Product.ID, Product: w.Product.Name,
 					Reference: report.Reference, AssignedTo: held, By: 0,
 				}); err != nil {
 					t.Fatal(err)
@@ -188,14 +188,57 @@ func TestWhoeverRecordsAReportersMessageIsNotToldOfIt(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		a := newAudienceWorld(t, w)
 		report := a.report(t, nil)
-		if err := notify.TellReportWritten(t.Context(), w.DB.DB, notify.ReportWritten{
-			ProductID: w.Product.ID, Product: w.Product.Name,
+		if err := notify.TellReport(t.Context(), w.DB.DB, notify.ReportAct{
+			Kind: notify.ReportMessage, ProductID: w.Product.ID, Product: w.Product.Name,
 			Reference: report.Reference, By: a.worker.ID,
 		}); err != nil {
 			t.Fatal(err)
 		}
 		if n := a.told(t, a.worker, notify.ReportMessage); n != 0 {
 			t.Errorf("whoever recorded the message was told of it %d times", n)
+		}
+	})
+}
+
+// A message sent to the reporter and a note on the report reach the report's
+// audience, the people who watch it, by the same tiers as the reporter
+// writing back.
+func TestANoteOrAMessageSentIsToldToWhoeverWatchesTheReport(t *testing.T) {
+	for _, kind := range []notify.Kind{notify.ReportSent, notify.ReportNoted} {
+		for _, tier := range tiers {
+			t.Run(string(kind)+" "+tier.name, func(t *testing.T) {
+				fixture.Each(t, func(t *testing.T, w *fixture.World) {
+					a := newAudienceWorld(t, w)
+					held := tier.held(a)
+					report := a.report(t, held)
+					if err := notify.TellReport(t.Context(), w.DB.DB, notify.ReportAct{
+						Kind: kind, ProductID: w.Product.ID, Product: w.Product.Name,
+						Reference: report.Reference, AssignedTo: held, By: 0,
+					}); err != nil {
+						t.Fatal(err)
+					}
+					a.check(t, kind, tier.want)
+				})
+			})
+		}
+	}
+}
+
+// Somebody a note named is told of the mention, and not of the note as
+// well.
+func TestSomebodyANoteNamesIsNotToldOfItTwice(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		a := newAudienceWorld(t, w)
+		party := a.holder.PartyID
+		report := a.report(t, &party)
+		if err := notify.TellReport(t.Context(), w.DB.DB, notify.ReportAct{
+			Kind: notify.ReportNoted, ProductID: w.Product.ID, Product: w.Product.Name,
+			Reference: report.Reference, AssignedTo: &party, Named: []int64{a.holder.ID},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if n := a.told(t, a.holder, notify.ReportNoted); n != 0 {
+			t.Errorf("the holder named in a note was told of the note %d times as well", n)
 		}
 	})
 }

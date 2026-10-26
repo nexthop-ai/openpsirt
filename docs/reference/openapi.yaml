@@ -8555,6 +8555,8 @@ components:
             - disclosed
             - unanswered-report
             - report-message
+            - report-sent
+            - report-noted
             - vulnerability-data-stale
             - risk-unagreed
             - pairs-concentrated
@@ -8846,6 +8848,8 @@ components:
             - disclosed
             - unanswered-report
             - report-message
+            - report-sent
+            - report-noted
             - vulnerability-data-stale
             - risk-unagreed
             - pairs-concentrated
@@ -26505,7 +26509,7 @@ paths:
 
         Recorded on a judged report as on an open one. Refused on a flaw found here, which has no reporter, and for a day more than one ahead of today.
 
-        A message received is told to whoever holds the report, where that is a person other than you.
+        The message is told to the report's audience: whoever holds it, the members of the team whose queue it is in who read reports, or everybody who works reports here where nobody holds it. Whoever records it is not told.
 
         The text is markdown and goes through the policy a report's claim does; a 422 names the line and the offending text. Attach a file that came with it to the report and refer to it here.
 
@@ -26594,6 +26598,8 @@ paths:
         Adds a markdown note on this report, open or judged. It is never sent to the reporter.
 
         A name written after an `@` is told, where that person may read this product's reports; the response lists the names that reached nobody.
+
+        The note is told to the report's audience: whoever holds it, the members of the team whose queue it is in who read reports, or everybody who works reports here where nobody holds it. Neither you nor anybody the note names is told of it this way.
 
         The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
 

@@ -85,6 +85,8 @@ true is cleared, and running the same pass twice changes nothing.
 | A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges. To the report's audience (§ Report audience). Clears when the first message sent to the reporter is recorded, which is the acknowledgement |
 | A report given to you | event | To the person a report is assigned to, where that is not whoever assigned it, and only where they read the product's reports. Never to a team. Undisclosed |
 | A reporter writing back | event | A message recorded as received on a report, to the report's audience (§ Report audience), apart from whoever recorded it. Undisclosed |
+| A message sent to a reporter | event | A message recorded as sent on a report, to the report's audience, apart from whoever recorded it. Undisclosed |
+| A note on a report | event | To the report's audience, apart from its author and anybody it names, who is told of the mention instead. An edit tells nobody. Undisclosed |
 | An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
@@ -324,8 +326,9 @@ Who hears about a vulnerability report turns on who holds it.
 | Nobody | Everybody who may triage undisclosed work in the product, since answering a report is working it |
 | A person or a queue nobody here can tell | As nobody: a holder who has left or no longer reads the reports, or a queue with no member who reads them, would leave the report told to nobody |
 
-The unanswered condition and a reporter writing back both use it. Everybody
-told may open the report, so neither names a report the reader is refused.
+The audience is who watches a report. The unanswered condition, a reporter
+writing back, a message sent to them and a note all use it. Everybody told may
+open the report, so none names a report the reader is refused.
 
 ## Reports that must come back empty
 
@@ -887,3 +890,4 @@ finding it names may since have been decided, closed or reopened.
 | A chat account registered to somebody's address is taken to be theirs | The platform's administrator controls which addresses its accounts hold, and a deployment that does not trust them should not configure the bot |
 | Chat carries nothing opened more than a day ago | A backlog from before a platform was configured, or from a day it refused, is in the application, and delivered at once it buries what is new |
 | A team's channel carries only the queue condition | It is the one notification that names a team. Assignment to a team and routing by rule make none |
+| A report's watchers are its audience, with no list of their own | Nobody joins or leaves a report except by who holds it. Findings and leads have no watch list to follow, and the audience already decides who may open the report |

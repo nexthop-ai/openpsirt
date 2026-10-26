@@ -67,7 +67,7 @@ func Kinds() []Kind {
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ApprovalWithdrawn, ClaimLapsed, MergeSuperseded, BroughtIn, Disclosed,
-		Unanswered, ReportMessage,
+		Unanswered, ReportMessage, ReportSent, ReportNoted,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
@@ -242,6 +242,13 @@ const (
 	// ReportMessage is a message from a reporter, logged on a report, told to
 	// the report's audience. The reporter is waiting on the answer.
 	ReportMessage Kind = "report-message"
+	// ReportSent is a message to a reporter, logged on a report, told to the
+	// report's audience: whoever watches the report hears what the reporter
+	// was told.
+	ReportSent Kind = "report-sent"
+	// ReportNoted is a note written on a report, told to the report's
+	// audience apart from anybody it names, who is told of the mention.
+	ReportNoted Kind = "report-noted"
 
 	// The two conditions about the deployment rather than about anybody's
 	// work. Both are a report that has to come back empty, asked as a

@@ -315,8 +315,9 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 			"evidences.\n\n" +
 			"Recorded on a judged report as on an open one. Refused on a flaw found here, " +
 			"which has no reporter, and for a day more than one ahead of today.\n\n" +
-			"A message received is told to whoever holds the report, where that is a person " +
-			"other than you.\n\n" +
+			"The message is told to the report's audience: whoever holds it, the members of " +
+			"the team whose queue it is in who read reports, or everybody who works reports " +
+			"here where nobody holds it. Whoever records it is not told.\n\n" +
 			"The text is markdown and goes through the policy a report's claim does; a 422 " +
 			"names the line and the offending text. Attach a file that came with it to the " +
 			"report and refer to it here.",
@@ -338,13 +339,15 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 		if err != nil {
 			return nil, refusedReport(in, err, "that message could not be recorded")
 		}
+		told := notify.ReportSent
 		if message.Direction == finding.Received {
-			if err := notify.TellReportWritten(ctx, in.DB.DB, notify.ReportWritten{
-				ProductID: row.ProductID, Product: product.Name, Reference: row.Reference,
-				AssignedTo: row.AssignedTo, By: subject.ID,
-			}); err != nil {
-				in.Log().ErrorContext(ctx, "could not say that a reporter wrote", "error", err)
-			}
+			told = notify.ReportMessage
+		}
+		if err := notify.TellReport(ctx, in.DB.DB, notify.ReportAct{
+			Kind: told, ProductID: row.ProductID, Product: product.Name, Reference: row.Reference,
+			AssignedTo: row.AssignedTo, By: subject.ID,
+		}); err != nil {
+			in.Log().ErrorContext(ctx, "could not say that a message was recorded", "error", err)
 		}
 		return &struct{ Body MessageBody }{Body: messageBody(*message, subject.Identity, "")}, nil
 	})
@@ -400,6 +403,10 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 			"to the reporter.\n\n" +
 			"A name written after an `@` is told, where that person may read this product's " +
 			"reports; the response lists the names that reached nobody.\n\n" +
+			"The note is told to the report's audience: whoever holds it, the members of the " +
+			"team whose queue it is in who read reports, or everybody who works reports here " +
+			"where nobody holds it. Neither you nor anybody the note names is told of it " +
+			"this way.\n\n" +
 			"The text is markdown and is validated before it is stored; a 422 names the line " +
 			"and the offending text.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
@@ -422,6 +429,16 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 		out := &struct{ Body NoteWritten }{}
 		out.Body.ID = note.ID
 		out.Body.NotNotified = tellReportNamed(ctx, in, subject, *row, product.Name, note.Body)
+		named, err := reportReadersNamed(ctx, in, subject, row.ProductID, note.Body)
+		if err != nil {
+			in.Log().WarnContext(ctx, "could not read who a note named", "error", err)
+		}
+		if err := notify.TellReport(ctx, in.DB.DB, notify.ReportAct{
+			Kind: notify.ReportNoted, ProductID: row.ProductID, Product: product.Name,
+			Reference: row.Reference, AssignedTo: row.AssignedTo, By: subject.ID, Named: named,
+		}); err != nil {
+			in.Log().ErrorContext(ctx, "could not say that a note was written", "error", err)
+		}
 		return out, nil
 	})
 
@@ -502,4 +519,24 @@ func tellReportNamed(ctx context.Context, in core.Deps, subject access.Subject,
 		in.Log().WarnContext(ctx, "could not tell who was named", "error", err)
 	}
 	return dropped
+}
+
+// reportReadersNamed is everybody a note on a report names who may read the
+// product's reports: those the mention reaches.
+func reportReadersNamed(ctx context.Context, in core.Deps, subject access.Subject,
+	productID int64, body string) ([]int64, error) {
+
+	names := markdown.Mentions(body)
+	if len(names) == 0 {
+		return nil, nil
+	}
+	readers, err := access.NewStore(in.DB.DB).ReadersNamed(ctx, subject, productID, access.Private, names)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int64, 0, len(readers))
+	for _, reader := range readers {
+		out = append(out, reader.ID)
+	}
+	return out, nil
 }
