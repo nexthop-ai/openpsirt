@@ -5,7 +5,7 @@ import { type Scoped } from "../../app/scope";
 import {
   recordAt,
   comparisonAt,
-  inventoriesAt,
+  uploadsAt,
   matchCoverageAt,
   reportAt,
   streamsAt,
@@ -176,8 +176,8 @@ export const GROUPS: Group[] = [
       },
       {
         name: "Carried patches",
-        answers: "Fixes a distribution carries without changing the version. On the inventories.",
-        to: (at) => inventoriesAt(buildOf(at)),
+        answers: "Fixes a distribution carries without changing the version. On Uploads.",
+        to: (at) => uploadsAt(buildOf(at)),
         needs: "build",
       },
     ],

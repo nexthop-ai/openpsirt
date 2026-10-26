@@ -17,7 +17,7 @@ import {
   buildFindingsAt,
   inboxAt,
   leadsAt,
-  inventoriesAt,
+  uploadsAt,
   productFindingsAt,
   reviewQueueAt,
 } from "../app/routes";
@@ -231,7 +231,7 @@ export function Product() {
                             page exists to show: a product reads as clean when
                             part of it was never looked at. */}
                         {row.last_scan_at ? (
-                          <Link to={inventoriesAt(build)}>{on(row.last_scan_at)}</Link>
+                          <Link to={uploadsAt(build)}>{on(row.last_scan_at)}</Link>
                         ) : (
                           <span className="alertish">never</span>
                         )}

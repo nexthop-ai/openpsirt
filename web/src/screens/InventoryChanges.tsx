@@ -9,7 +9,7 @@ import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { MovedPage, PAGE, type Kind } from "../ui/NamesMoved";
-import { inventoriesAt } from "../app/routes";
+import { uploadsAt } from "../app/routes";
 
 // What one upload changed about a build's inventory.
 //
@@ -51,7 +51,7 @@ export function InventoryChanges() {
       <div className="screen-head">
         <span className="crumbs">
           <Link
-            to={inventoriesAt({ product, stream, variant })}
+            to={uploadsAt({ product, stream, variant })}
             className="linkish"
             style={{ fontWeight: 500 }}
           >

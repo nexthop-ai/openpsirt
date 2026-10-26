@@ -23,7 +23,7 @@ describe("the scope panel on a screen that needs a build", () => {
       if (path === "/v1/products/{product}/variants") return { data: { items: [{ name: "arm" }] } };
       return { data: { items: [] } };
     });
-    mount.render(screen(<Scope />, "/products/sonic/streams/master/variants/x/inventories"));
+    mount.render(screen(<Scope />, "/products/sonic/streams/master/variants/x/uploads"));
     await settle();
     await act(async () => mount.host().querySelector<HTMLButtonElement>("button.scope")?.click());
     await settle();
@@ -116,12 +116,12 @@ describe("applying a pick", () => {
   });
 
   it("swaps the build on a screen about one build and keeps the screen", async () => {
-    await opened("/products/edgeos/streams/main/variants/x86/inventories");
+    await opened("/products/edgeos/streams/main/variants/x86/uploads");
     await pick("sonic");
-    expect(location()).toBe("/products/edgeos/streams/main/variants/x86/inventories");
+    expect(location()).toBe("/products/edgeos/streams/main/variants/x86/uploads");
     await pick("master");
     await pick("arm");
-    expect(location()).toBe("/products/sonic/streams/master/variants/arm/inventories");
+    expect(location()).toBe("/products/sonic/streams/master/variants/arm/uploads");
   });
 
   it("says the products could not be read rather than listing none", async () => {

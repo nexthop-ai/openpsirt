@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { matchPath } from "react-router-dom";
+import type { Body } from "../api/client";
 import table from "./routes.json";
 
 // Every address this application answers, and every address into it the
@@ -29,6 +30,10 @@ export const ROUTES = Object.fromEntries(
 export const BUILD = "/products/:product/streams/:stream/variants/:variant";
 
 export type Build = { product: string; stream: string; variant: string };
+
+// The kinds of upload a build's Uploads screen has a tab for, in the server's
+// own words.
+export type UploadType = Body<"UploadKindBody">["type"];
 
 // Query parameters for an address. An undefined value is left out; an empty
 // one is kept, because some screens tell a parameter set to nothing from one
@@ -195,7 +200,9 @@ export const decideAt = (build: Build, component: string, which: Which = {}) =>
       namespace: which.namespace || undefined,
     },
   );
-export const inventoriesAt = (build: Build) => at("inventories", build);
+// A build's uploads, opened on one kind of upload where one is named.
+export const uploadsAt = (build: Build, type?: UploadType) =>
+  type && type !== "sbom" ? at("uploadsOf", { ...build, type }) : at("uploads", build);
 export const inventoryChangesAt = (build: Build, scan: number) =>
   at("inventoryChanges", { ...build, scan });
 export const runAt = (build: Build, run: number) => at("run", { ...build, run });

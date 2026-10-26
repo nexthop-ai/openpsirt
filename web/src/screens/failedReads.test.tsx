@@ -3,7 +3,7 @@
 
 import type { Who } from "../app/session";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Inventories } from "./Inventories";
+import { Uploads } from "./Uploads";
 import { InventoryCompare } from "./InventoryCompare";
 import { Exploited } from "./Exploited";
 import { GrantGrid } from "./GrantGrid";
@@ -58,11 +58,7 @@ describe("a secondary read that fails", () => {
   it("says which builds went quiet could not be read", async () => {
     failing("/v1/scanning");
     mount.render(
-      screen(
-        <Inventories />,
-        "/products/sonic/streams/master/variants/x/inventories",
-        `${BUILD}/inventories`,
-      ),
+      screen(<Uploads />, "/products/sonic/streams/master/variants/x/uploads", `${BUILD}/uploads`),
     );
     await settle();
     expect(mount.host().textContent).toContain("Which builds have gone quiet could not be read.");

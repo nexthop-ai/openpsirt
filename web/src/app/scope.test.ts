@@ -21,9 +21,9 @@ describe("which screens need a whole build", () => {
     // dependency graph across branches.
     expect(needsBuild(`${BUILD}/dependencies`)).toBe(true);
     expect(needsBuild(`${BUILD}/dependencies/libnl-3-200/decide`)).toBe(true);
-    expect(needsBuild(`${BUILD}/inventories`)).toBe(true);
+    expect(needsBuild(`${BUILD}/uploads`)).toBe(true);
     // What one upload changed is that upload's, and an upload is one build's.
-    expect(needsBuild(`${BUILD}/inventories/4/changes`)).toBe(true);
+    expect(needsBuild(`${BUILD}/uploads/4/changes`)).toBe(true);
     expect(needsBuild(`${BUILD}/findings/CVE-2026-1/components/libnl-3-200`)).toBe(true);
   });
 
@@ -139,11 +139,11 @@ describe("changing scope stays on the screen", () => {
     ).toBe("/products/sonic/streams/202411/variants/mellanox/dependencies");
   });
 
-  it("lands a run or an inventory's changes on the new build's inventories", () => {
+  it("lands a run or an inventory's changes on the new build's uploads", () => {
     const to = { product: "sonic", stream: "master", variant: "mellanox" };
-    const there = "/products/sonic/streams/master/variants/mellanox/inventories";
+    const there = "/products/sonic/streams/master/variants/mellanox/uploads";
     expect(rescoped(`${BUILD}/runs/7`, to)).toBe(there);
-    expect(rescoped(`${BUILD}/inventories/9/changes`, to)).toBe(there);
+    expect(rescoped(`${BUILD}/uploads/9/changes`, to)).toBe(there);
   });
 
   it("keeps a segment that carries an escaped slash as one segment", () => {

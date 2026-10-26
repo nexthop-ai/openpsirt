@@ -14,7 +14,7 @@ import { Failed } from "./Failed";
 import { Unread } from "./Reading";
 import { useReseed } from "./reseed";
 import { Required } from "./Required";
-import { inventoriesAt } from "../app/routes";
+import { uploadsAt } from "../app/routes";
 
 // The build an upload is sent to.
 type Target = { product: string; stream: string; variant: string };
@@ -91,7 +91,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       void queries.invalidateQueries({ queryKey: ["scans"] });
       void queries.invalidateQueries({ queryKey: ["scanning"] });
       onClose();
-      navigate(inventoriesAt(to));
+      navigate(uploadsAt(to));
     },
   });
 
@@ -136,8 +136,8 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <span>
             {held.product} · {held.stream} · {held.variant} already holds this inventory, as scan{" "}
             {held.scan}. Nothing was queued.{" "}
-            <Link to={inventoriesAt(held)} onClick={onClose} className="linkish">
-              View inventories →
+            <Link to={uploadsAt(held)} onClick={onClose} className="linkish">
+              View uploads →
             </Link>
           </span>
         </div>

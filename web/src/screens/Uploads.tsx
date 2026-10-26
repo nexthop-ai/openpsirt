@@ -17,24 +17,116 @@ import { Icon } from "../ui/Icons";
 import { UploadDrawer } from "../ui/Upload";
 import { Wide } from "../ui/Wide";
 import { sizeSaid } from "../ui/size";
-import { inventoryChangesAt, runAt } from "../app/routes";
+import { inventoryChangesAt, runAt, uploadsAt, type Build, type UploadType } from "../app/routes";
 import { linkTo } from "../api/links";
+import { AnalysisRuns, Documents } from "./UploadLists";
 
 // How often a page holding an unsettled upload is asked for again.
 const UNSETTLED = 15_000;
 
-// Each build's uploads, and what the scan of them found. A scan is what the
-// deployment does to an inventory after it arrives; what a person uploads, and
-// what this list is of, is inventories.
+// The tabs, one per kind of upload, in the order the server lists them. The
+// label is plain words and the acronym is on hover.
+const TABS: { type: UploadType; label: string; title: string }[] = [
+  { type: "sbom", label: "SBOMs", title: "Software bills of materials" },
+  { type: "sarif", label: "Static analysis", title: "SARIF runs from static analyzers" },
+  { type: "vex", label: "VEX documents", title: "Vulnerability Exploitability eXchange" },
+  { type: "supplier-advisory", label: "Supplier advisories", title: "CSAF security advisories" },
+];
+
+// Everything one build was sent, one tab per kind of upload. SBOMs and static
+// analysis runs are this build's; VEX documents and supplier advisories are
+// its product's, so every build of the product shows the same ones.
+//
+// The tabs come from the every-kind list, which leaves out a kind the reader
+// may not read. Each tab's rows come from that kind's own list.
+export function Uploads() {
+  const { product = "", stream = "", variant = "", type } = useParams();
+  const build = { product, stream, variant };
+  const [uploading, setUploading] = useState(false);
+
+  const kinds = useQuery({
+    queryKey: ["uploads", product, stream, variant],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/uploads", {
+          params: { path: { product, stream, variant } },
+        }),
+      ),
+    refetchInterval: (query) =>
+      query.state.data?.items?.some((each) => each.latest?.status === "in-progress")
+        ? UNSETTLED
+        : false,
+  });
+  const listed = kinds.data?.items ?? [];
+  // The ones the reader may read, once the list says which. Where it cannot
+  // be read, every tab, and each kind's own list says whether it answers.
+  const shown = kinds.isSuccess
+    ? TABS.filter((tab) => listed.some((each) => each.type === tab.type))
+    : TABS;
+  const tab = shown.find((each) => each.type === (type ?? "sbom"))?.type ?? "sbom";
+
+  return (
+    <>
+      <div className="screen-head">
+        <h2>Uploads</h2>
+        <p>
+          {product} · {stream} · {variant}
+        </p>
+        <span style={{ marginLeft: "auto" }}>
+          <button type="button" className="btn" onClick={() => setUploading(true)}>
+            <Icon name="upload" size={14} /> Upload inventory
+          </button>
+        </span>
+      </div>
+
+      {kinds.isError && <Failed error={kinds.error} what="The uploads could not be read." />}
+
+      {/* The tab is in the address, so a link lands on one kind and the
+          back button leaves it. */}
+      <nav className="tabs2" aria-label="Upload types">
+        {shown.map((each) => {
+          const held = listed.find((one) => one.type === each.type);
+          const wrong = held?.latest?.status === "failed" || held?.latest?.status === "refused";
+          return (
+            <Link
+              key={each.type}
+              to={uploadsAt(build, each.type)}
+              className={wrong ? "tab2 urgent" : "tab2"}
+              title={wrong ? `${each.title}. The newest one ${held?.latest?.status}` : each.title}
+              aria-selected={tab === each.type}
+              aria-current={tab === each.type ? "page" : undefined}
+            >
+              {each.label}
+              {held && <span className="n">{held.total.toLocaleString()}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {kinds.isPending ? (
+        <Loading />
+      ) : tab === "sarif" ? (
+        <AnalysisRuns build={build} />
+      ) : tab === "vex" || tab === "supplier-advisory" ? (
+        <Documents product={product} type={tab} />
+      ) : (
+        <SBOMs build={build} />
+      )}
+
+      <Fab label="Upload inventory" onClick={() => setUploading(true)} />
+      <UploadDrawer open={uploading} onClose={() => setUploading(false)} />
+    </>
+  );
+}
+
+// Each build's SBOM uploads, and what the scan of them found.
 //
 // A build quietly dropping out is the failure that makes everything else
 // wrong, so a build that has gone quiet is named at the top rather than being
 // invisible on the screen about it.
-export function Inventories() {
-  const { product = "", stream = "", variant = "" } = useParams();
-  const at = { product, stream, variant };
-  const [uploading, setUploading] = useState(false);
-
+function SBOMs({ build }: { build: Build }) {
+  const { product, stream, variant } = build;
+  const at = build;
   const scans = useQuery({
     queryKey: ["scans", product, stream, variant],
     queryFn: async () =>
@@ -69,26 +161,13 @@ export function Inventories() {
   const retired = (scanning.data?.items ?? []).filter((b) => b.out_of_support && b.quiet_days > 0);
 
   if (scans.isPending) return <Loading />;
-  if (scans.isError)
-    return <Failed error={scans.error} what="The inventories could not be read." />;
+  if (scans.isError) return <Failed error={scans.error} what="The SBOMs could not be read." />;
 
   const items = scans.data?.items ?? [];
   const measured = scans.data?.measured_against;
 
   return (
     <>
-      <div className="screen-head">
-        <h2>Inventories</h2>
-        <p>
-          {product} · {stream} · {variant}· newest first
-        </p>
-        <span style={{ marginLeft: "auto" }}>
-          <button type="button" className="btn" onClick={() => setUploading(true)}>
-            <Icon name="upload" size={14} /> Upload inventory
-          </button>
-        </span>
-      </div>
-
       {scanning.isError && (
         <Failed error={scanning.error} what="Which builds have gone quiet could not be read." />
       )}
@@ -288,9 +367,6 @@ export function Inventories() {
           already dealt with. Folded by default — most visits are
           about whether a scan landed. */}
       <CarriedPatches at={{ product, stream, variant }} />
-
-      <Fab label="Upload inventory" onClick={() => setUploading(true)} />
-      <UploadDrawer open={uploading} onClose={() => setUploading(false)} />
     </>
   );
 }

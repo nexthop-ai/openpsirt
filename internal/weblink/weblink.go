@@ -153,12 +153,12 @@ func LeadRules(product string) string {
 	return "/products/" + url.PathEscape(product) + "/lead-rules"
 }
 
-// Inventories is the list of what one build sent.
-func Inventories(product, stream, variant string) string {
+// Uploads is the list of what one build was sent.
+func Uploads(product, stream, variant string) string {
 	if climbs(product, stream, variant) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/inventories"
+	return build(product, stream, variant) + "/uploads"
 }
 
 // InventoryChanges is what one upload moved in a build's inventory.
@@ -166,7 +166,7 @@ func InventoryChanges(product, stream, variant string, scan int64) string {
 	if climbs(product, stream, variant) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/inventories/" + strconv.FormatInt(scan, 10) + "/changes"
+	return build(product, stream, variant) + "/uploads/" + strconv.FormatInt(scan, 10) + "/changes"
 }
 
 // Report is one report sheet, opened on a window of days.

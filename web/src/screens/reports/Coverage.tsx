@@ -15,7 +15,7 @@ import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
 import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
-import { inventoriesAt } from "../../app/routes";
+import { uploadsAt } from "../../app/routes";
 
 // The builds being scanned, and the ones that have gone silent.
 //
@@ -25,7 +25,7 @@ import { inventoriesAt } from "../../app/routes";
 // scanned on every list ordered by what is open. It is the same failure shape
 // as a skipped database engine passing a test suite.
 //
-// The front page names the three quietest and the inventories screen answers
+// The front page names the three quietest and the Uploads screen answers
 // for one product. This is the whole estate, longest silent first, which is
 // the form somebody takes to whoever owns the pipeline.
 // The rows the sheet lists. The figures above them are the whole estate,
@@ -141,7 +141,7 @@ export function Coverage() {
                       >
                         <td>{build.product}</td>
                         <td>
-                          {/* The build's own inventories screen, which is where
+                          {/* The build's own Uploads screen, which is where
                               somebody goes to see what did arrive and when. */}
                           <Link
                             className="id"
@@ -191,7 +191,7 @@ function fileAt(format: "csv" | "json", asked: string): string {
 }
 
 function scansAt(product: string, stream: string, variant: string): string {
-  return inventoriesAt({ product, stream, variant });
+  return uploadsAt({ product, stream, variant });
 }
 
 // The one word a build's row says about its state, in the order the counts

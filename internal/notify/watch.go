@@ -460,7 +460,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			// read are in the body.
 			About: identify("quiet", row.Product, row.Stream, row.Variant),
 			Body:  body,
-			Link:  weblink.Inventories(row.Product, row.Stream, row.Variant),
+			Link:  weblink.Uploads(row.Product, row.Stream, row.Variant),
 		})
 	}
 	return holding, nil
