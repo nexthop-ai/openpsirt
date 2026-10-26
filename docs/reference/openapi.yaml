@@ -4859,7 +4859,7 @@ components:
           $ref: "#/components/schemas/DisclosesBody"
           description: What moving the lead, and the leads linked with it, into the flaw's case discloses when the flaw is disclosed
         prefix:
-          description: "The path a confirmed component is remembered for: the repository the lead is in, or its directory"
+          description: "The path a confirmed component is remembered for: the repository or declared third-party path the lead is in, or its directory"
           type: string
         rule:
           description: The analyzer's rule, as <tool>/<rule>
@@ -4878,6 +4878,9 @@ components:
           type:
             - array
             - "null"
+        third_party:
+          description: Whether the lead is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted
+          type: boolean
         together:
           description: "The number of other leads linked to the flaw with this one: the leads its confirming claim covers. A move moves them with it"
           format: int64
@@ -5926,6 +5929,9 @@ components:
           type:
             - array
             - "null"
+        third_party:
+          description: Whether the lead is in code the newest run that saw it declared third-party
+          type: boolean
         unchanged:
           description: Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code
           type: boolean

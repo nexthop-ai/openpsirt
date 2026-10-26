@@ -29,6 +29,7 @@ shares is in `DESIGN-ingest.md`.
 - [Weakness families](#weakness-families)
 - [Grouped leads](#grouped-leads)
 - [Hand-off](#hand-off)
+- [Third-party code](#third-party-code)
 - [End of life](#end-of-life)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
@@ -126,7 +127,7 @@ What a run says about itself, from its documents or from the fields:
 | Exit status and completion | `invocations[].exitCode` and `executionSuccessful`; the first non-zero and the first failure win |
 | Rule set | A digest of the rule identifiers enabled, and their count. From the `rules` field, or from the documents' rule list where it lists a rule that never fired |
 | Commit, series, build time | `openpsirt/commit`, `openpsirt/series`, `openpsirt/built`, or `automationDetails.id` |
-| Third-party paths | The `third-party` field, recorded on the run |
+| Third-party paths | The `third-party` field, recorded on the run and read at hand-off and in the evidence (§ Third-party code) |
 
 A rule list naming only rules that fired is not a rule set: clang and cppcheck
 list what fired, and a run of them that found nothing lists nothing.
@@ -671,7 +672,8 @@ hand-off is offered, and `POST` on the same address records it.
 | Components | Ranked: the one the lead's prefix was confirmed as before, the one the lead was placed on as it arrived, up to five whose names resemble the prefix's last segment, then the build itself |
 | Lacking | For each component, the builds the lead was seen in that hold no such component. Recording the flaw against them is refused |
 | Unanalyzed | For each component, the builds in use that hold it and that the lead's series never analyzed. A variant nobody analyzes ships the same code |
-| Prefix | The innermost repository the run names holding the file, or else the file's directory |
+| Prefix | The innermost repository the run names or third-party path it declared holding the file, or else the file's directory |
+| Third-party | Whether the file is under a path the run declared third-party, so the flaw is reported to the upstream (§ Third-party code) |
 | Together | How many other leads the hand-off links to the flaw with this one, and a move moves with it |
 | Disclosure | What moving the lead and the leads linked with it into the case discloses with the flaw (§ Keep or move) |
 
@@ -722,6 +724,22 @@ one handed-off lead, as case collaborators are brought into one flaw
 | A grant or a withdrawal is refused with 409 once the flaw is disclosed, and is made in one transaction with the read of the hand-off it depends on | The grants have ended |
 | A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in, in a line their grant reaches | As a case collaborator is |
 | A reader on the flaw's case reads a moved lead in full | The lead is part of the case |
+
+## Third-party code
+
+A run declares the paths holding code the product did not write (§ Run
+parameters). A lead under one is a lead like any other, triaged and confirmed
+as any other is.
+
+| Rule | |
+|---|---|
+| A declared path is a prefix in its own right, as a repository is | Vendored code copied into the tree has no repository of its own. Every file under the path, at any depth, shares one prefix and one confirmed component (§ Hand-off offer) |
+| The innermost of the run's repositories and declared paths holding a file is its prefix | A repository nested in vendored code names its own component, as a repository nested in another does |
+| A declared path holds itself and every path under it, compared exactly | `src/vendor/zlib` holds `src/vendor/zlib/inflate.c` and not `src/vendor/zlibx/a.c`; paths are case-sensitive |
+| The declaration read is the newest run's to see the lead | The run's description of the checkout is the one the lead's place was read against, as its repositories are |
+| A run's list that does not read as a list of paths declares nothing | The upload writes a list of paths from the top of the checkout, and nothing else is a declaration |
+| The lead's evidence and its hand-off offer say it is third-party | A person handing off the flaw reports it to the upstream it came from. Its advisory or VEX then reaches the product's builds through the supplier and upstream paths (`DESIGN-ingest.md` § Supplier advisories) |
+| A third-party lead is still handed off here | The flaw ships in the product's builds until the upstream's fix arrives, and recording it is what tracks that |
 
 ## End of life
 
@@ -884,7 +902,6 @@ it is about.
 | Part | State |
 |---|---|
 | Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
-| Third-party paths | Recorded on the run and read by nothing |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 

@@ -64,6 +64,12 @@ export function Lead() {
           </Link>{" "}
           <span className={`state ${LEAD_TONES[evidence.state]}`}>{stateSaid(evidence.state)}</span>
           {ended && <span className="state closed"> Past end of life</span>}
+          {evidence.third_party && (
+            <span className="state closed" title="The analysis run declared this path third-party">
+              {" "}
+              Third-party
+            </span>
+          )}
         </p>
       </div>
 

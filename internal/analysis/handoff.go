@@ -125,8 +125,12 @@ type Offer struct {
 	Seen        []BuildName
 	Suggestions []Suggestion
 	// Prefix is the path a confirmed component is learned for: the
-	// repository the lead is in, or its directory.
+	// repository or declared third-party path the lead is in, or its
+	// directory.
 	Prefix string
+	// ThirdParty says the lead is under a path its newest run declared as
+	// third-party code, so the flaw is reported to the upstream it came from.
+	ThirdParty bool
 	// Together is how many other leads the hand-off links to the flaw with
 	// this one: the leads its confirming claim covers, which a move moves
 	// with it.
@@ -228,11 +232,12 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 	if err != nil {
 		return nil, err
 	}
-	modules, err := series.NewStore(db).ModulesOf(ctx, l.LastRunID)
+	run, modules, err := runAndModules(ctx, series.NewStore(db), l.LastRunID)
 	if err != nil {
 		return nil, err
 	}
-	out := &Offer{Rule: l.Rule, Prefix: prefixOf(l.Path, modules)}
+	declared := declaredThirdParty(run, l.Path)
+	out := &Offer{Rule: l.Rule, Prefix: prefixOf(l.Path, modules, declared), ThirdParty: declared != ""}
 	if out.Seen, err = seenIn(ctx, db, productID, placeIdentity); err != nil {
 		return nil, err
 	}
@@ -363,12 +368,17 @@ func handedWith(ctx context.Context, tx bun.IDB, h *finding.Handoff) ([]finding.
 }
 
 // prefixOf is the path a component confirmed for a lead at a path is learned
-// for: the innermost repository the run names that holds it, or else the
-// file's directory. Empty where the file is at the top of the checkout.
-func prefixOf(at string, modules []series.Module) string {
-	best := ""
+// for: the innermost of the repositories the run names and the third-party
+// path it declared that holds it, or else the file's directory. Empty where
+// the file is at the top of the checkout.
+//
+// A declared path is a prefix in its own right, as a repository is: vendored
+// code copied into the tree has no repository of its own, and every file under
+// it is the one component.
+func prefixOf(at string, modules []series.Module, declared string) string {
+	best := declared
 	for _, m := range modules {
-		if m.Path != "" && (at == m.Path || strings.HasPrefix(at, m.Path+"/")) && len(m.Path) > len(best) {
+		if holds(m.Path, at) && len(m.Path) > len(best) {
 			best = m.Path
 		}
 	}
@@ -683,11 +693,12 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 			}
 			rows = append(rows, row)
 		}
-		modules, err := series.NewStore(tx).ModulesOf(ctx, l.LastRunID)
+		run, modules, err := runAndModules(ctx, series.NewStore(tx), l.LastRunID)
 		if err != nil {
 			return err
 		}
-		if err := learn(ctx, tx, in.ProductID, prefixOf(l.Path, modules), strings.TrimSpace(in.Flaw.Component),
+		prefix := prefixOf(l.Path, modules, declaredThirdParty(run, l.Path))
+		if err := learn(ctx, tx, in.ProductID, prefix, strings.TrimSpace(in.Flaw.Component),
 			strings.TrimSpace(in.Flaw.Ecosystem), strings.TrimSpace(in.Flaw.Namespace), subject.ID, now); err != nil {
 			return err
 		}

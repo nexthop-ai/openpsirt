@@ -44,6 +44,9 @@ type Evidence struct {
 	// Stub says the lead was moved into a case the reader is not on, so
 	// what the analyzer said, the source and the kin are withheld.
 	Stub bool
+	// ThirdParty says the lead is under a path the newest run that saw it
+	// declared as third-party code.
+	ThirdParty bool
 }
 
 // Located is one place a run named for a lead.
@@ -116,7 +119,8 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 			Snippet: said.Snippet, SnippetLine: atLeast(said.SnippetLine),
 			Link: config.File(link, said.Path, atLeast(said.StartLine), atLeast(said.EndLine)),
 		},
-		LastSeen: last.BuiltAt,
+		LastSeen:   last.BuiltAt,
+		ThirdParty: declaredThirdParty(last, said.Path) != "",
 	}
 	for _, p := range places {
 		one := Located{

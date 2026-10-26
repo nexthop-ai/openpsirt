@@ -149,6 +149,16 @@ describe("a lead", () => {
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);
   });
 
+  it("says it is in third-party code where the run declared it so", async () => {
+    await drawn(true, { ...EVIDENCE, third_party: true });
+    expect(text()).toContain("Third-party");
+  });
+
+  it("says nothing about third-party code where the run declared none", async () => {
+    await drawn(true, EVIDENCE);
+    expect(text()).not.toContain("Third-party");
+  });
+
   it("offers no way into the queue once it is past its end of life", async () => {
     await drawn(true, { ...EVIDENCE, state: "baseline", past_end_of_life: true });
     expect(text()).not.toContain("Add to the queue");

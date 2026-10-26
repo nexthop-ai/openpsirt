@@ -100,6 +100,26 @@ describe("handing off a lead", () => {
     expect(text()).toContain("SONIC-2026-000001");
   });
 
+  it("says a flaw in third-party code is reported upstream, and still records it", async () => {
+    await drawn(CONFIRMED, true, { ...OFFER, third_party: true });
+    expect(text()).toContain("report the flaw upstream");
+    const sent = accept(() => ({
+      status: 201,
+      data: { identifier: "SONIC-2026-000001", component: "zlib", builds: 1, places: 1 },
+    }));
+    pick(mount.host(), "zlib");
+    change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "inflate overflows");
+    await press(mount.host(), "Hand off");
+    await settle();
+    expect(sent()).toHaveLength(1);
+    expect(text()).toContain("SONIC-2026-000001");
+  });
+
+  it("says nothing of an upstream for code of the product's own", async () => {
+    await drawn(CONFIRMED);
+    expect(text()).not.toContain("upstream");
+  });
+
   it("says the leads confirmed with it are handed off with it", async () => {
     await drawn(CONFIRMED, true, { ...OFFER, together: 1 });
     expect(text()).toContain("Also hands off 1 other lead confirmed with this one.");

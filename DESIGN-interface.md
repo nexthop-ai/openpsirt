@@ -1452,6 +1452,7 @@ the screens draw them.
 | A lead's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work for a kept lead and readers of undisclosed work for a moved one, and is not offered past end of life. Choosing applies to every build the lead is open on |
 | The queue's rows name who holds each lead | A team carries the word team beside its name |
 | A lead past its end of life says so beside its state and offers no decision, hand-off, queue or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). A move of a lead already handed off stays |
+| A lead in code its run declared third-party reads Third-party beside its state, and its hand-off says to report the flaw upstream | The flaw is the upstream's (`DESIGN-analysis.md` § Third-party code). The hand-off is still offered, and what declared it is said on hover |
 | The dismissal rules screen lists every standing rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
 | Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |
 | A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |

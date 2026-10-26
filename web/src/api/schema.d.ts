@@ -9608,7 +9608,7 @@ export interface components {
             readonly $schema?: string;
             /** @description What moving the lead, and the leads linked with it, into the flaw's case discloses when the flaw is disclosed */
             discloses: components["schemas"]["DisclosesBody"];
-            /** @description The path a confirmed component is remembered for: the repository the lead is in, or its directory */
+            /** @description The path a confirmed component is remembered for: the repository or declared third-party path the lead is in, or its directory */
             prefix?: string;
             /** @description The analyzer's rule, as <tool>/<rule> */
             rule: string;
@@ -9616,6 +9616,8 @@ export interface components {
             seen: components["schemas"]["LeadBuild"][] | null;
             /** @description The components offered, most likely first. The build itself is always last */
             suggestions: components["schemas"]["SuggestionBody"][] | null;
+            /** @description Whether the lead is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted */
+            third_party?: boolean;
             /**
              * Format: int64
              * @description The number of other leads linked to the flaw with this one: the leads its confirming claim covers. A move moves them with it
@@ -10173,6 +10175,8 @@ export interface components {
             state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             /** @description The path the analyzer took to it, in order */
             steps: components["schemas"]["LeadPlace"][] | null;
+            /** @description Whether the lead is in code the newest run that saw it declared third-party */
+            third_party?: boolean;
             /** @description Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
             /** @description Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered */
