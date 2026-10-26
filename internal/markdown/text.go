@@ -4,12 +4,15 @@
 package markdown
 
 import (
+	"bufio"
+	"bytes"
+	stdhtml "html"
 	"strings"
 
 	"github.com/yuin/goldmark/ast"
 	extast "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
-	"github.com/yuin/goldmark/util"
 )
 
 // Text is markdown reduced to the words it shows: emphasis, headings, lists
@@ -31,11 +34,10 @@ func Text(source string) string {
 		case *ast.Text:
 			if entering {
 				// The segment is the source as written, which a renderer
-				// decodes as it writes: escapes and character references
-				// are resolved here, except in code, which is as written.
+				// decodes as it writes, except in code, which is as written.
 				v := node.Segment.Value(src)
 				if p := n.Parent(); p == nil || p.Kind() != ast.KindCodeSpan {
-					v = util.ResolveEntityNames(util.ResolveNumericReferences(util.UnescapePunctuations(v)))
+					v = decoded(v)
 				}
 				b.Write(v)
 				if node.SoftLineBreak() || node.HardLineBreak() {
@@ -71,6 +73,18 @@ func Text(source string) string {
 		return ast.WalkContinue, nil
 	})
 	return strings.TrimSpace(collapse(b.String()))
+}
+
+// decoded is a text segment as the renderer shows it: escapes and character
+// references resolved in one pass, so what one of them produces is never read
+// as another. The renderer's writer escapes every character it writes, so
+// undoing that escaping returns its text exactly.
+func decoded(v []byte) []byte {
+	var out bytes.Buffer
+	w := bufio.NewWriter(&out)
+	html.DefaultWriter.Write(w, v)
+	_ = w.Flush()
+	return []byte(stdhtml.UnescapeString(out.String()))
 }
 
 // collapse writes each line with its own surrounding space removed and the

@@ -19,6 +19,10 @@ func TestMarkdownIsReducedToTheWordsItShows(t *testing.T) {
 		{"line one\nline two", "line one line two"},
 		{"a \\_b\\_ &lt; c &#38; d", "a _b_ < c & d"},
 		{"`a \\_b &lt; c`", "a \\_b &lt; c"},
+		{"\\&lt; b", "&lt; b"},
+		{"&#38;lt; b", "&lt; b"},
+		{"\\&amp; b", "&amp; b"},
+		{"a &quot;b&quot; &#x3C;c&#x3E;", "a \"b\" <c>"},
 	} {
 		if got := Text(c.in); got != c.want {
 			t.Errorf("Text(%q) = %q; want %q", c.in, got, c.want)
