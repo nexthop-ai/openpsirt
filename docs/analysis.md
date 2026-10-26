@@ -150,6 +150,10 @@ stays open, and the receipt counts it as uncompared.
 | For a result it found, unless told otherwise | Told to exit zero on results, then passed |
 | For a result and for a failure alike | Not passed |
 
+CodeQL states its run successful even where every compilation failed. Its
+SARIF names each file it expected to analyze and each file it extracted, and a
+run that extracted none of the files it expected is not comparable.
+
 ## Pipelines
 
 Each example installs the client, runs Ruff, and sends Ruff's SARIF. Any
@@ -491,6 +495,19 @@ A direct upload goes without what the client adds:
 | Content fingerprints | A result is matched on the analyzer's own fingerprint, or on its line, so moved code reads as a new result more often |
 | Paths in the checkout index's case | A path is placed as the analyzer wrote it |
 | Whole-file contents, fixes and attachments removed before sending | They leave the pipeline, and the deployment removes them on arrival |
+
+Without the client's fingerprint, a result is matched on what its analyzer
+wrote. Where that is only the rule, the path, the line and the message, a
+result whose line moved is paired with the nearest result of the same rule and
+message in its file, and its dismissal is asked to be affirmed again:
+
+| Analyzer, uploaded plain | Matched on | When lines move above it |
+|---|---|---|
+| CodeQL | Its `primaryLocationLineHash` | It keeps its lead |
+| cppcheck | Its `hash/v1`, with the path | It keeps its lead |
+| clang 22 and later | Its issue hash, with the path | It keeps its lead |
+| clang before 22 | The rule, path, line and message | It is paired by nearest line, and two results moving past each other can swap. Send its `plist-multi-file` output through the client, which carries the issue hash in every version and the enclosing function |
+| clang-tidy | The rule, path, line and message | It is paired by nearest line, and two results moving past each other can swap. The client adds a content fingerprint |
 
 ## Recipes by language
 
