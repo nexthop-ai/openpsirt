@@ -53,6 +53,11 @@ signature first, as above.
 | `openpsirt-analysis write --output FILE …` | Builds the run and stores it, to see what would be sent |
 | `openpsirt-analysis version` | Prints the client's version |
 
+The client reads a path with no starting point as relative to the directory
+it runs in, and does not read the working directory the output states. Run it
+from the directory the analyzer ran in. An upload without the client is placed
+against the working directory the output states.
+
 ## The analyzer's output
 
 | Analyzer | Write |

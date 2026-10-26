@@ -932,6 +932,7 @@ it against the source root it is given (§ Placement).
 | Rule | |
 |---|---|
 | A path arrives absolute, as a `file://` address, relative to the working directory, or under a starting point the output defines | Each is resolved before it is placed. A chain of starting points is followed to sixteen steps |
+| A path naming no starting point is relative to the directory the client runs in | The working directory the output states is not read here, so the client is run from where the analyzer ran |
 | A drive letter and a path on a drive compare without regard to case | Windows compares them that way |
 | A path's case is taken from the checkout's index | A tool on a case-insensitive system writes the case it was asked for. Where two indexed paths differ only by case, the path is left as the tool wrote it |
 | A path is inside the checkout where it is as written, or once the links along it and along the checkout's own path are followed | git names the checkout with its links followed, and a tool run from a directory reached through a link writes its paths through the link |
@@ -1023,6 +1024,7 @@ it is about.
 | The documentation hosts are a list in the code | An analyzer documenting rules elsewhere has its documentation dropped until the list names it |
 | A tool is told apart by the name its output gives it | Two configurations of one tool in one invocation are one series. A pipeline running a tool twice runs the client twice |
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
+| The client places a path naming no starting point against the directory it runs in, and the deployment against the working directory the output states | One output sent both ways is placed differently when the analyzer ran outside the directory the client runs in |
 | An internal reader reads a moved lead whole, and is not told its flaw | The flaw is undisclosed work. The lead's state reads handed off for both |
 | A grant of a moved lead reaches its evidence and not the claims at its place | The claims are widened for the flaw's two audiences, and a lead grant is a third reach of one place's findings |
 | A notice or a mention about a claim at a moved lead reaches its internal readers alone | A mention resolves names against the people who read the claim's visibility in its product, and that stays internal until disclosure. A reader of the flaw reads the claim and is not told of a note on it |
