@@ -10305,6 +10305,8 @@ export interface components {
             state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             /** @description The branch or tag of the newest build the lead is listed on, to link to */
             stream: string;
+            /** @description Whether the lead is in code the newest run that saw it declared third-party */
+            third_party?: boolean;
             /** @description The variant of that build */
             variant: string;
             /** @description Whether the lead is part of a case you are not on, so what the analyzer said is not answered */

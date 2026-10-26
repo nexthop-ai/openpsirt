@@ -190,6 +190,15 @@ export function Leads() {
                         <span className={`state ${LEAD_TONES[row.state]}`}>
                           {stateSaid(row.state)}
                         </span>
+                        {row.third_party && (
+                          <span
+                            className="state closed"
+                            title="The analysis run declared this path third-party"
+                          >
+                            {" "}
+                            Third-party
+                          </span>
+                        )}
                       </td>
                       <td className="hint" style={{ whiteSpace: "nowrap" }}>
                         {row.assigned_to && (row.assigned_to_name ?? row.assigned_to)}

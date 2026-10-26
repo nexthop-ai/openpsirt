@@ -70,6 +70,11 @@ type QueueRow struct {
 	// Stub is a lead moved into a case, read without what the analyzer said
 	// or who holds it.
 	Stub bool `bun:"-"`
+	// ThirdParty says the lead is under a path the newest run that saw it
+	// declared as third-party code, as its evidence says.
+	ThirdParty bool `bun:"-"`
+	// Declared is that run's list of third-party paths, as it is stored.
+	Declared string `bun:"third_party"`
 }
 
 // Queue is one page of a product's leads, with how many the list holds in
@@ -203,7 +208,11 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		ColumnExpr(`"f"."place_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
 		ColumnExpr(`"s"."name" AS "stream", "va"."name" AS "variant", "f"."assigned_to"`).
+		// A finding has one sighting, and its last run is the run the evidence
+		// reads.
+		Join(`JOIN "series_run" AS "sr" ON "sr"."id" = "si"."last_run_id"`).
 		ColumnExpr(state+` AS "stands"`, stateArgs...).
+		ColumnExpr(`"sr"."third_party"`).
 		Where(`"f"."id" IN (?)`, bun.List(newest)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what the leads of product %d say: %w", scope.ProductID, err)
@@ -216,6 +225,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	for _, p := range page {
 		r := byPlace[p.Place]
 		r.Builds, r.Opened = p.Builds, p.Opened
+		r.ThirdParty = declaredIn(r.Declared, r.Path) != ""
 		// What the analyzer said, and who is working it, are the case's
 		// once the lead is moved.
 		if p.Stub == 1 {

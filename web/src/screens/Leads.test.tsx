@@ -28,7 +28,7 @@ const ROWS = [
   },
 ];
 
-async function drawn(at = "/products/sonic/leads") {
+async function drawn(at = "/products/sonic/leads", rows: object[] = ROWS) {
   const asked: unknown[] = [];
   serve((path, init) => {
     if (path === "/v1/session/me")
@@ -45,7 +45,7 @@ async function drawn(at = "/products/sonic/leads") {
       asked.push((init as { params: { query: unknown } }).params.query);
       return {
         data: {
-          items: ROWS,
+          items: rows,
           total: 1,
           states: { baseline: 40, open: 1 },
           waiting: 2,
@@ -86,6 +86,16 @@ describe("the leads", () => {
     expect(link?.getAttribute("href")).toBe(
       "/products/sonic/streams/master/variants/broadcom/leads/abc",
     );
+  });
+
+  it("marks a lead in code its run declared third-party", async () => {
+    await drawn(undefined, [{ ...ROWS[0], third_party: true }]);
+    expect(text()).toContain("Third-party");
+  });
+
+  it("marks nothing third-party where the run declared none", async () => {
+    await drawn();
+    expect(text()).not.toContain("Third-party");
   });
 
   it("names who holds each lead", async () => {

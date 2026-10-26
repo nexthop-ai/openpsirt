@@ -4,6 +4,7 @@
 package findingsapi_test
 
 import (
+	"encoding/csv"
 	"net/http"
 	"strconv"
 	"strings"
@@ -78,6 +79,49 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			}
 		}
 
+		// The queue's list and its file say the same, read from the same run.
+		var listed struct {
+			Items []struct {
+				Path       string `json:"path"`
+				ThirdParty bool   `json:"third_party"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=baseline", &listed)
+		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet,
+			"/v1/products/mine/leads.csv?state=baseline", "")
+		records, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatalf("the file is not CSV a strict reader reads: %v\n%s", err, file.Body)
+		}
+		inFile := map[string]string{}
+		var header []string
+		for _, record := range records {
+			switch {
+			case strings.HasPrefix(record[0], "#"):
+			case header == nil:
+				header = record
+			default:
+				named := map[string]string{}
+				for i, column := range header {
+					named[column] = record[i]
+				}
+				inFile[named["path"]] = named["third party"]
+			}
+		}
+		inList := map[string]bool{}
+		for _, item := range listed.Items {
+			inList[item.Path] = item.ThirdParty
+		}
+		for _, path := range []string{shallow, deep, own, "src/a.c"} {
+			want := strings.HasPrefix(path, "src/vendor/zlib/")
+			if got, ok := inList[path]; !ok || got != want {
+				t.Errorf("the queue lists %s as third-party %v (listed %v); want %v", path, got, ok, want)
+			}
+			if got := inFile[path]; got != strconv.FormatBool(want) {
+				t.Errorf("the queue's file holds %s as third-party %q; want %v", path, got, want)
+			}
+		}
+
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(placeOf[deep])+"/decision",
 			`{"outcome":"confirmed","reasoning":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
@@ -99,4 +143,56 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			t.Errorf("a lead outside the vendored code was offered %+v first", first)
 		}
 	})
+}
+
+// A lead is third-party in the queue when the newest run that saw it declared
+// it so, which is the run its evidence reads. An older run's declaration does
+// not reach the queue once a newer run declares nothing.
+func TestTheLeadQueueReadsThirdPartyFromTheNewestRunThatSawTheLead(t *testing.T) {
+	const vendored = "src/vendor/zlib/inflate.c"
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-2*time.Hour), vendoredRun(vendored))
+		r.PatchedRows(t, `UPDATE "series_run" SET "third_party" = '["src/vendor/zlib"]'
+			WHERE "series_id" IN (SELECT "id" FROM "series" WHERE "name" = 'cppcheck/default')`)
+		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour), vendoredRun(vendored))
+
+		var listed struct {
+			Items []struct {
+				Path       string `json:"path"`
+				ThirdParty bool   `json:"third_party"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=baseline", &listed)
+		seen := false
+		for _, item := range listed.Items {
+			if item.Path != vendored {
+				continue
+			}
+			seen = true
+			if item.ThirdParty {
+				t.Errorf("the queue lists %s as third-party from an older run; the newest run declared nothing", vendored)
+			}
+		}
+		if !seen {
+			t.Fatalf("the queue lists no lead at %s: %+v", vendored, listed.Items)
+		}
+		if got := evidenceAs(t, r, "internal-reader", placeAt(t, r, vendored)); got.ThirdParty {
+			t.Errorf("the lead at %s says third-party from an older run; the newest run declared nothing", vendored)
+		}
+	})
+}
+
+// placeAt is the place identity of the newest lead at a path.
+func placeAt(t *testing.T, r *httpapitest.Reach, path string) string {
+	t.Helper()
+	var place string
+	if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
+		ColumnExpr(`"f"."place_identity"`).
+		Where(`"ar"."path" = ?`, path).Where(`"f"."kind" = ?`, kind.Analysis).
+		OrderExpr(`"f"."id" DESC`).Limit(1).Scan(t.Context(), &place); err != nil {
+		t.Fatal(err)
+	}
+	return place
 }

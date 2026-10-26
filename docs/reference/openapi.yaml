@@ -6129,6 +6129,9 @@ components:
         stream:
           description: The branch or tag of the newest build the lead is listed on, to link to
           type: string
+        third_party:
+          description: Whether the lead is in code the newest run that saw it declared third-party
+          type: boolean
         variant:
           description: The variant of that build
           type: string

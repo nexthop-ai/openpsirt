@@ -19,18 +19,19 @@ import (
 
 // LeadRowBody is one lead in a product's list of them.
 type LeadRowBody struct {
-	Place    string    `json:"place" doc:"The lead's place identity, which addresses it on every build it is on"`
-	Rule     string    `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	Path     string    `json:"path" doc:"The file, from the top of the checkout"`
-	Line     int       `json:"line,omitempty" doc:"The line the result starts at"`
-	Function string    `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
-	Message  string    `json:"message" doc:"What the analyzer says. Empty where the lead is withheld"`
-	Withheld bool      `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so what the analyzer said is not answered"`
-	Stream   string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
-	Variant  string    `json:"variant" doc:"The variant of that build"`
-	State    LeadState `json:"state" doc:"Where the lead stands on that build"`
-	Builds   int       `json:"builds" doc:"The number of builds in the list's scope the lead is listed on, in the state the list asks for"`
-	Opened   string    `json:"opened" format:"date" doc:"When the lead was first opened on any of them"`
+	Place      string    `json:"place" doc:"The lead's place identity, which addresses it on every build it is on"`
+	Rule       string    `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	Path       string    `json:"path" doc:"The file, from the top of the checkout"`
+	Line       int       `json:"line,omitempty" doc:"The line the result starts at"`
+	Function   string    `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
+	Message    string    `json:"message" doc:"What the analyzer says. Empty where the lead is withheld"`
+	Withheld   bool      `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so what the analyzer said is not answered"`
+	ThirdParty bool      `json:"third_party,omitempty" doc:"Whether the lead is in code the newest run that saw it declared third-party"`
+	Stream     string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
+	Variant    string    `json:"variant" doc:"The variant of that build"`
+	State      LeadState `json:"state" doc:"Where the lead stands on that build"`
+	Builds     int       `json:"builds" doc:"The number of builds in the list's scope the lead is listed on, in the state the list asks for"`
+	Opened     string    `json:"opened" format:"date" doc:"When the lead was first opened on any of them"`
 	core.HolderBody
 }
 
@@ -98,7 +99,8 @@ func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]Le
 	for _, r := range rows {
 		row := LeadRowBody{
 			Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message, Withheld: r.Stub,
-			Stream: r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
+			ThirdParty: r.ThirdParty,
+			Stream:     r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
 			Opened: r.Opened.UTC().Format(time.DateOnly),
 		}
 		if r.Line != nil {
@@ -117,7 +119,7 @@ func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]Le
 func leadColumns() []string {
 	return []string{
 		"rule", "path", "line", "function", "message", "withheld", "state", "stream", "variant",
-		"builds", "opened", "assigned_to", "place",
+		"builds", "opened", "assigned_to", "place", "third party",
 	}
 }
 
@@ -131,7 +133,7 @@ func leadCells(row LeadRowBody) []string {
 	return []string{
 		row.Rule, row.Path, line, row.Function, row.Message, strconv.FormatBool(row.Withheld),
 		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened,
-		row.AssignedTo, row.Place,
+		row.AssignedTo, row.Place, strconv.FormatBool(row.ThirdParty),
 	}
 }
 

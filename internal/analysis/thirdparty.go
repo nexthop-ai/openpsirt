@@ -17,11 +17,19 @@ import (
 // The run's list is the one the upload wrote, a JSON list of paths from the
 // top of the checkout. One that does not read as that list declares nothing.
 func declaredThirdParty(run *series.Run, at string) string {
-	if run == nil || run.ThirdParty == "" {
+	if run == nil {
+		return ""
+	}
+	return declaredIn(run.ThirdParty, at)
+}
+
+// declaredIn is declaredThirdParty over a run's list as it is stored.
+func declaredIn(list, at string) string {
+	if list == "" {
 		return ""
 	}
 	var paths []string
-	if json.Unmarshal([]byte(run.ThirdParty), &paths) != nil {
+	if json.Unmarshal([]byte(list), &paths) != nil {
 		return ""
 	}
 	best := ""
