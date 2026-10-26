@@ -562,6 +562,19 @@ type held struct {
 func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[int64][]Role,
 	everywhere []Role) error {
 
+	// What they held before is read first, so a sign-in that took a role
+	// away hands back what that leaves them unable to read. Asked only when
+	// something went: this runs on every request a proxy reports groups for.
+	var before []Grant
+	if err := s.db.NewSelect().Model(&before).Column("product_id", "role").
+		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Scan(ctx); err != nil {
+		return fmt.Errorf("read what was derived from groups: %w", err)
+	}
+	var beforeEstate []EstateGrant
+	if err := s.db.NewSelect().Model(&beforeEstate).Column("role").
+		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Scan(ctx); err != nil {
+		return fmt.Errorf("read what was derived from groups across every product: %w", err)
+	}
 	if _, err := s.db.NewDelete().Model((*Grant)(nil)).
 		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Exec(ctx); err != nil {
 		return fmt.Errorf("clear what was derived from groups: %w", err)
@@ -597,7 +610,17 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 			return fmt.Errorf("record what these groups grant across every product: %w", err)
 		}
 	}
-	return nil
+	taken := false
+	for _, grant := range before {
+		taken = taken || !holds(roles[grant.ProductID], grant.Role)
+	}
+	for _, grant := range beforeEstate {
+		taken = taken || !holds(everywhere, grant.Role)
+	}
+	if !taken {
+		return nil
+	}
+	return s.handBackAfter(ctx, Narrowed{People: []int64{personID}})
 }
 
 // SwitchTo changes where roles come from, for the whole deployment.
@@ -693,7 +716,9 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 	default:
 		return refusal.Errorf("%q is not a way for roles to be assigned", mode)
 	}
-	return nil
+	// Either way somebody may read less: the assigned roles set aside, or
+	// the derived ones cleared.
+	return s.handBackAfter(ctx, Narrowed{Everybody: true})
 }
 
 // ErrNobodyAdministers is a start refused because nothing in the mode it

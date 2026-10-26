@@ -287,7 +287,11 @@ func NameAdministrators(ctx context.Context, db bun.IDB, identities []string) ([
 // A start that would leave nobody able to administer is refused with
 // access.ErrNobodyAdministers, inside the same transaction, so a configuration
 // no process serves changes nothing and records nothing.
-func MapGroups(ctx context.Context, db bun.IDB, mappings []access.Mapping) (access.Mapped, access.Mode, error) {
+//
+// A change of mode hands back, through handBack and in the same transaction,
+// the work it leaves with somebody who no longer reads it.
+func MapGroups(ctx context.Context, db bun.IDB, mappings []access.Mapping,
+	handBack access.HandBack) (access.Mapped, access.Mode, error) {
 	var mapped access.Mapped
 	var mode access.Mode
 	err := database.Within(ctx, db, func(ctx context.Context, db bun.IDB) error {
@@ -319,7 +323,7 @@ func MapGroups(ctx context.Context, db bun.IDB, mappings []access.Mapping) (acce
 			return err
 		}
 		if access.AsMode(stored) != mode {
-			if err := access.NewStore(db).SwitchTo(ctx, mode); err != nil {
+			if err := access.NewStore(db).HandingBack(handBack).SwitchTo(ctx, mode); err != nil {
 				return err
 			}
 			if _, _, err := settings.Change(ctx, setting.RoleMode, string(mode)); err != nil {

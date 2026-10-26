@@ -133,6 +133,9 @@ type Store struct {
 	//
 	// Nil, or a window of zero, leaves a derived grant in force indefinitely.
 	derivedFor func(context.Context) time.Duration
+	// handBack hands back work a narrowing write of this store's own leaves
+	// with a holder who no longer reads it. Nil hands back nothing.
+	handBack HandBack
 }
 
 // DerivingWithin returns a store where a grant a group derived stays in force

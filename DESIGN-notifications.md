@@ -106,6 +106,11 @@ scanned nightly. What a build changed is on the receipts and in the trend, and
 the one exception is below: an upload that changed much of what a build is made
 of.
 
+Work handed back because its holder stopped reading it notifies nobody, as no
+hand-back does (`DESIGN-access.md` § Lost reading). It leaves the holder's
+counts, the absence alert and their digest at the next sweep, and a routing
+rule's sweep puts it in a team's queue, where the queue alerts find it.
+
 ## The in-application area
 
 The channel that always exists. A self-hosted operator who never configured mail

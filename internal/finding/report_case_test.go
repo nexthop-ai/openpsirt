@@ -485,29 +485,6 @@ func TestAHandOverMovesTheReportsSomebodyHolds(t *testing.T) {
 	})
 }
 
-// Withdrawing somebody's last role on a product hands back the reports they
-// hold there, and they wait for somebody again.
-func TestWithdrawingALastRoleHandsBackTheReportsHeld(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		leaving := f.holder(t, "leaving@example.com", access.PrivateTriage)
-		row := f.aReport(t, leaving, "Something.")
-		mine := leaving.Party()
-		if _, err := f.store.AssignReport(ctx, leaving, f.productID, row.Reference, &mine, nil); err != nil {
-			t.Fatal(err)
-		}
-		admin := access.NewPerson(leaving.ID, "admin", true, nil, 0)
-		moved, err := f.store.ReleaseIn(ctx, admin, mine, f.productID)
-		if err != nil || moved != 1 {
-			t.Fatalf("withdrawing the last role moved %d (%v), want the one report", moved, err)
-		}
-		waiting, total, err := f.store.HeldReports(ctx, leaving, f.productID, nil, 50, 0)
-		if err != nil || total != 1 || len(waiting) != 1 || waiting[0].Reference != row.Reference {
-			t.Errorf("after the hand-back %d reports wait for somebody (%v), want the one handed back", total, err)
-		}
-	})
-}
-
 func TestAReportsHistoryHoldsEveryAct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

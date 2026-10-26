@@ -1059,7 +1059,7 @@ and the caller retries a request that changed nothing.
 | Inside the act | Why |
 |---|---|
 | A job queued for what was written | The job and the rows it describes commit together. Queued after the commit, a failure to queue is reported as the write failing once the write has landed, or the rows stand with nothing ever picking them up |
-| Work handed back when somebody loses their last role | Done after the withdrawal, a failure leaves the role gone and the work with somebody who can no longer open it, and asking again answers that there is no such grant before it reaches the hand-back. It is bounded by how much that person was holding |
+| Work handed back when somebody stops reading it | Done after the write that took the reading away, a failure leaves the reading gone and the work with somebody who can no longer open it, and asking again answers that there is no such grant before it reaches the hand-back. It is bounded by how much the people and teams that write named were holding (`DESIGN-access.md` § Lost reading) |
 
 | Job | A full queue |
 |---|---|

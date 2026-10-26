@@ -283,7 +283,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		Summary: "Hand back everything one person is dealing with",
 		Description: "Returns all their open findings and vulnerability reports to the unassigned " +
 			"lists. For when somebody " +
-			"has left, or their last role is removed.\n\n" +
+			"has left.\n\n" +
 			"Nothing tells this software that somebody has gone — membership is read at sign-in, " +
 			"and a person who has left never signs in again. So this is an action an " +
 			"administrator takes rather than something that happens on its own, and until it is " +

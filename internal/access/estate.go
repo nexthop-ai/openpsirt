@@ -156,13 +156,3 @@ func holds(roles []Role, role Role) bool {
 	}
 	return false
 }
-
-// ProductsCovered is every product an estate grant reaches, which is the
-// catalog.
-//
-// Named rather than reusing everyProduct at the call site: what the withdrawal
-// path needs is "what did that grant cover", and spelling it as "every
-// product" there would read as an assumption rather than as the rule.
-func (s *Store) ProductsCovered(ctx context.Context) ([]int64, error) {
-	return s.everyProduct(ctx)
-}

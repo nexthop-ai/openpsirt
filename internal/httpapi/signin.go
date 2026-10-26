@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
@@ -161,7 +162,9 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 		return
 	}
 
-	rights := access.NewStore(in.DB.DB)
+	// A sign-in that takes a role away hands back what that leaves them
+	// unable to read, inside the write that took it.
+	rights := access.NewStore(in.DB.DB).HandingBack(finding.HandBack)
 
 	// Authenticating is not being authorized. The question asked here follows
 	// from where this deployment says roles come from.

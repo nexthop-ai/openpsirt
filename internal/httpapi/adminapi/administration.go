@@ -550,10 +550,13 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Summary: "Withdraw a user's role on a product",
 		Description: "Withdraws one role from one person. Takes effect at their next request; " +
 			"end their sessions to cut them off now.\n\n" +
-			"If it was their last role on that product, everything they were dealing with there " +
-			"goes back to the unassigned list. Otherwise that work is in no list at all: not in " +
-			"the shared one because it is assigned, and not in theirs because they can no " +
-			"longer open it. `released` says how much moved.\n\n" +
+			"What they were dealing with there and may no longer read goes back to the " +
+			"unassigned list: everything, where it was their last role on that product, and " +
+			"otherwise the undisclosed or internal work and vulnerability reports the role let " +
+			"them read. Left with them, that work is in no list at all: not in the shared one " +
+			"because it is assigned, and not in theirs because they can no longer open it. " +
+			"Teams they are on give up work no remaining member reads. `released` says how " +
+			"much moved.\n\n" +
 			"The grant is removed rather than marked as ended. What somebody used to hold is " +
 			"answered by the record of what they did, so this list only ever says what is true " +
 			"today.",
@@ -564,11 +567,10 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Role     string `path:"role"`
 	}) (*struct {
 		Body struct {
-			Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role here"`
+			Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them here"`
 		}
 	}, error) {
-		subject, err := core.Requester(ctx)
-		if err != nil {
+		if _, err := core.Requester(ctx); err != nil {
 			return nil, err
 		}
 		var released int64
@@ -607,23 +609,17 @@ func registerAdministration(api huma.API, a core.Administering) {
 				trail.Said(in.Role, true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}
-			// Asked inside, so what it sees is what the withdrawal left rather
-			// than what another administrator leaves behind afterwards. Their
-			// last role here going is what turns their assigned work into work
-			// nobody can reach.
-			remaining, err := store.HoldsAnythingIn(ctx, person.ID, product.ID)
-			if err != nil {
-				return core.WentWrong(a.Logger, "cannot read what they still hold", err)
-			}
-			if remaining || !handsBack(a) {
+			if !handsBack(a) {
 				return nil
 			}
-			// Handed back in the withdrawal's own transaction. Done after it,
-			// a failure leaves the role gone and the work with somebody who
-			// can no longer open it, and asking again answers that there is
-			// no such grant before it reaches the hand-back.
-			if released, err = finding.NewStore(tx).ReleaseIn(ctx, subject, person.PartyID,
-				product.ID); err != nil {
+			// Handed back in the withdrawal's own transaction, asked of what
+			// the withdrawal left rather than what another administrator
+			// leaves behind afterwards. Done after it, a failure leaves the
+			// role gone and the work with somebody who can no longer open it,
+			// and asking again answers that there is no such grant before it
+			// reaches the hand-back.
+			if released, err = finding.NewStore(tx).HandBackUnread(ctx,
+				access.Narrowed{People: []int64{person.ID}}); err != nil {
 				return core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
 			}
 			return nil
@@ -633,7 +629,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 
 		out := &struct {
 			Body struct {
-				Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role here"`
+				Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them here"`
 			}
 		}{}
 		out.Body.Released = released
@@ -705,19 +701,19 @@ func registerAdministration(api huma.API, a core.Administering) {
 			"product is granted there deliberately. Roles held against a named product are " +
 			"untouched, and are withdrawn one at a time through the path that names the " +
 			"product.\n\n" +
-			"Where this was their last role in a product, what they were dealing with there " +
-			"goes back to the unassigned list. `released` says how much moved in total.",
+			"What they were dealing with and may no longer read goes back to the unassigned " +
+			"list, product by product, as when a role on one product is withdrawn. `released` " +
+			"says how much moved in total.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
 		Role     string `path:"role"`
 	}) (*struct {
 		Body struct {
-			Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role there"`
+			Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them"`
 		}
 	}, error) {
-		subject, err := core.Requester(ctx)
-		if err != nil {
+		if _, err := core.Requester(ctx); err != nil {
 			return nil, err
 		}
 		var released int64
@@ -746,35 +742,15 @@ func registerAdministration(api huma.API, a core.Administering) {
 				return core.NotRecorded(a.Logger, err)
 			}
 
-			// The same reason the per-product withdrawal releases work: their
-			// last role in a product going is what turns their assigned
-			// findings into work nobody can reach — assigned, so out of the
-			// shared queue, and assigned to somebody who can no longer open
-			// it. An estate role is the last role in every product at once, so
-			// this asks for each.
-			//
-			// The products are read, and the work handed back, in the
-			// withdrawal's own transaction, for the reason the per-product
-			// withdrawal gives: done after it, a failure leaves the work with
-			// somebody who can no longer open it and no request that reaches
-			// the hand-back again.
-			covered, err := store.ProductsCovered(ctx)
-			if err != nil {
-				return core.WentWrong(a.Logger, "cannot read what the grant covered", err)
+			// Handed back in the withdrawal's own transaction, in every
+			// product at once, for the reason the per-product withdrawal
+			// gives.
+			if !handsBack(a) {
+				return nil
 			}
-			for _, productID := range covered {
-				remaining, err := store.HoldsAnythingIn(ctx, person.ID, productID)
-				if err != nil {
-					return core.WentWrong(a.Logger, "cannot read what they still hold", err)
-				}
-				if remaining || !handsBack(a) {
-					continue
-				}
-				moved, err := finding.NewStore(tx).ReleaseIn(ctx, subject, person.PartyID, productID)
-				if err != nil {
-					return core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
-				}
-				released += moved
+			if released, err = finding.NewStore(tx).HandBackUnread(ctx,
+				access.Narrowed{People: []int64{person.ID}}); err != nil {
+				return core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
 			}
 			return nil
 		}); err != nil {
@@ -783,7 +759,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 
 		out := &struct {
 			Body struct {
-				Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role there"`
+				Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them"`
 			}
 		}{}
 		out.Body.Released = released
@@ -791,8 +767,8 @@ func registerAdministration(api huma.API, a core.Administering) {
 	})
 }
 
-// handsBack is whether this deployment hands back the work of somebody whose
-// last role in a product went.
+// handsBack is whether this deployment hands back the work of somebody who
+// may no longer read it.
 func handsBack(a core.Administering) bool {
 	return a.Findings != nil
 }

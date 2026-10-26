@@ -31,7 +31,7 @@ type Administering struct {
 	// somebody can no longer reach it, rather than staying where nobody can.
 	// Nil where the routes built over it release nothing.
 	//
-	// The withdrawal of somebody's last role on a product hands back inside
+	// A withdrawn role or a change to a team's membership hands back inside
 	// its own transaction, over a store built on it, and reads this only as
 	// whether to. A deactivation hands back over this store, on the pooled
 	// handle, once the deactivation has committed.

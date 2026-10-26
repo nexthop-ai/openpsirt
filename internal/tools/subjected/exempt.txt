@@ -12,6 +12,7 @@ finding.Store.TagsOn A helper over a narrowed read: the finding detail reads it 
 finding.Store.RulingsOf A helper over a narrowed read: the reports were read under their own authorization, and this reads their rulings.
 finding.Store.Unacknowledged A background pass: the stale watch reads every unanswered report and decides who hears of each.
 finding.Store.ApplyRules A background pass: the routing sweep places a product's open findings by its rules.
+finding.Store.HandBackUnread A background pass: it hands back, inside a write that took reading away, the work that write left with a holder who no longer reads it.
 finding.Store.Builds Not varying by reader: which builds a scope names. The scope's product was resolved for the caller first.
 finding.Store.BuildsForWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
 finding.Store.RetiredWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.

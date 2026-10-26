@@ -483,42 +483,6 @@ func (s *Store) HandOver(ctx context.Context, subject access.Subject, from, to i
 	return s.handOver(ctx, subject, from, &to)
 }
 
-// ReleaseIn hands back what one person holds in one product.
-//
-// The narrow form of Release, for when somebody's last role on a product is
-// withdrawn. What they hold elsewhere is untouched, because nothing about that
-// product changed.
-//
-// Administrative like Release: this moves work somebody else was given.
-func (s *Store) ReleaseIn(ctx context.Context, subject access.Subject, party, productID int64) (int64, error) {
-	if !subject.Admin {
-		return 0, access.Denied("move work assigned to somebody else")
-	}
-	var moved int64
-	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		kinds, kindArgs := kind.Assignment.Where(`"kind"`)
-		result, err := tx.NewUpdate().Model((*Finding)(nil)).
-			Set(`"assigned_to" = ?`, nil).Set(`"assigned_at" = ?`, nil).
-			Where(kinds, kindArgs...).
-			Where(`"assigned_to" = ?`, party).
-			Where(`"closed_at" IS NULL`).
-			Where(inThisProduct, productID).
-			Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("hand back what they were dealing with: %w", err)
-		}
-		moved, err = database.Affected(result)
-		if err != nil {
-			return fmt.Errorf("hand back what they were dealing with: %w", err)
-		}
-		reports, err := moveReportsOf(ctx, tx, party, nil, productID,
-			s.now().UTC().Truncate(time.Microsecond))
-		moved += reports
-		return err
-	})
-	return moved, err
-}
-
 func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64, to *int64) (int64, error) {
 	if !subject.Admin {
 		// Moving work somebody else was given is an administrative act. A

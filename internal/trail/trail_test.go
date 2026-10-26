@@ -441,14 +441,14 @@ func TestConfigurationsGroupMappingsAreRecordedAgainstConfiguration(t *testing.T
 		// and the refusal changes nothing.
 		if _, _, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{
 			{Group: "readers", Grants: string(access.PublicRead)},
-		}); !errors.Is(err, access.ErrNobodyAdministers) {
+		}, nil); !errors.Is(err, access.ErrNobodyAdministers) {
 			t.Errorf("mappings nobody could administer under answered %v", err)
 		}
 		if roles := of(trail.Role); len(roles) != 0 || !active() {
 			t.Errorf("a refused start recorded %+v, or set the assigned role aside", roles)
 		}
 
-		mapped, mode, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads})
+		mapped, mode, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -473,14 +473,14 @@ func TestConfigurationsGroupMappingsAreRecordedAgainstConfiguration(t *testing.T
 			t.Errorf("the switch to group-bound was recorded as %+v", settings)
 		}
 
-		if _, _, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads}); err != nil {
+		if _, _, err := trail.MapGroups(ctx, w.DB.DB, []access.Mapping{leads}, nil); err != nil {
 			t.Fatal(err)
 		}
 		if len(of(trail.Role)) != 1 || len(of(trail.Setting)) != 1 {
 			t.Error("a start stating the same mappings recorded something")
 		}
 
-		if _, mode, err = trail.MapGroups(ctx, w.DB.DB, nil); err != nil {
+		if _, mode, err = trail.MapGroups(ctx, w.DB.DB, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 		if mode != access.Direct {

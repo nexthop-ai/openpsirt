@@ -2055,7 +2055,7 @@ export interface paths {
         put?: never;
         /**
          * Hand back everything one person is dealing with
-         * @description Returns all their open findings and vulnerability reports to the unassigned lists. For when somebody has left, or their last role is removed.
+         * @description Returns all their open findings and vulnerability reports to the unassigned lists. For when somebody has left.
          *
          *     Nothing tells this software that somebody has gone — membership is read at sign-in, and a person who has left never signs in again. So this is an action an administrator takes rather than something that happens on its own, and until it is taken their work is in no list at all: not in the shared one because it is assigned, and not in anybody's own because they are not here.
          *
@@ -2104,7 +2104,7 @@ export interface paths {
         get?: never;
         /**
          * Deactivate a user
-         * @description Records that somebody has left. They are refused at every way in — a session, a personal token, a group-bound sign-in — from the next request onward, their sessions are ended, and what they were dealing with is handed back so it is not held by somebody who is gone.
+         * @description Records that somebody has left. They are refused at every way in — a session, a personal token, a group-bound sign-in — from the next request onward, their sessions are ended, and what they were dealing with is handed back so it is not held by somebody who is gone. So is work in the queue of a team they were on that no remaining member reads.
          *
          *     Nobody is deleted. The record names them as the proposer of judgments and the approver of others, and their roles are left where they are: what somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it. What stops them is the date.
          *
@@ -2176,7 +2176,7 @@ export interface paths {
          * Withdraw a user's role on a product
          * @description Withdraws one role from one person. Takes effect at their next request; end their sessions to cut them off now.
          *
-         *     If it was their last role on that product, everything they were dealing with there goes back to the unassigned list. Otherwise that work is in no list at all: not in the shared one because it is assigned, and not in theirs because they can no longer open it. `released` says how much moved.
+         *     What they were dealing with there and may no longer read goes back to the unassigned list: everything, where it was their last role on that product, and otherwise the undisclosed or internal work and vulnerability reports the role let them read. Left with them, that work is in no list at all: not in the shared one because it is assigned, and not in theirs because they can no longer open it. Teams they are on give up work no remaining member reads. `released` says how much moved.
          *
          *     The grant is removed rather than marked as ended. What somebody used to hold is answered by the record of what they did, so this list only ever says what is true today.
          *
@@ -2204,7 +2204,7 @@ export interface paths {
          *
          *     It leaves no per-product grants in its place: anything still wanted on one product is granted there deliberately. Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
          *
-         *     Where this was their last role in a product, what they were dealing with there goes back to the unassigned list. `released` says how much moved in total.
+         *     What they were dealing with and may no longer read goes back to the unassigned list, product by product, as when a role on one product is withdrawn. `released` says how much moved in total.
          *
          *     Requires: administrator
          */
@@ -6584,7 +6584,7 @@ export interface paths {
         post?: never;
         /**
          * Retire a team
-         * @description Takes a team out of use. Nothing new is routed to it and its membership goes, while work already routed to it still names it — the row stays for the same reason an account is deactivated rather than deleted.
+         * @description Takes a team out of use. Nothing new is routed to it and its membership goes. Work in its queue goes back to the unassigned list, since nobody is left on it to read that work. The row stays, so where work was routed before still names it, for the same reason an account is deactivated rather than deleted.
          *
          *     Requires: administrator
          */
@@ -6665,6 +6665,8 @@ export interface paths {
         /**
          * Take somebody off a team
          * @description Removes somebody from a team. Work they have already taken stays theirs: membership says where work arrives, not who holds what has arrived.
+         *
+         *     Work in the team's queue that no remaining member may read goes back to the unassigned list.
          *
          *     Requires: administrator
          */
@@ -15248,7 +15250,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description Findings and vulnerability reports handed back because that was their last role there
+             * @description Findings, leads and vulnerability reports handed back because they may no longer read them
              */
             released: number;
         };
@@ -15261,7 +15263,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description Findings and vulnerability reports handed back because that was their last role here
+             * @description Findings, leads and vulnerability reports handed back because they may no longer read them here
              */
             released: number;
         };
