@@ -85,7 +85,7 @@ func registerExport(api huma.API, in core.Deps) {
 			"included and those open only in releases past their end of life left out: `lead` is " +
 			"true on those " +
 			"rows, and `path`, `line`, `function` and `message` say where each is and what the " +
-			"analyzer said. No row carries source text, and `withheld` is false on every lead. A lead carries no rating, component or " +
+			"analyzer said. No row carries source text. A lead carries no rating, component or " +
 			"decision, so a file narrowed by any filter but the order holds no lead, and says " +
 			"so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, " +
 			"and `on=branch` with `support=in-support`, which is what the list reads when " +
@@ -240,7 +240,7 @@ func findingColumns() []string {
 	return []string{
 		"issue", "severity", "score", "score scheme", "exploited", "component", "version",
 		"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
-		"stream", "variant", "lead", "path", "line", "function", "message", "withheld",
+		"stream", "variant", "lead", "path", "line", "function", "message",
 	}
 }
 
@@ -261,7 +261,7 @@ func findingCells(g finding.Group) []string {
 		g.Component, g.Version, g.Ecosystem, g.FixedIn,
 		strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
 		string(g.State), opened, due,
-		g.Stream, g.Variant, "false", "", "", "", "", "",
+		g.Stream, g.Variant, "false", "", "", "", "",
 	}
 }
 
@@ -287,9 +287,7 @@ func withLeads(by core.Narrowing, at core.AtOneBuild) core.Stated {
 // rows, with the product's name in front where the file spans products.
 //
 // The lead queue's read, under its visibility, with the leads a claim waits
-// on kept in. No row carries source text, and none is withheld: a lead read
-// without its message is one moved into a case, which is handed off and so
-// never open. A product whose leads the reader may not read is a part holding
+// on kept in. No row carries source text. A product whose leads the reader may not read is a part holding
 // no row.
 func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
 	return func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -321,6 +319,6 @@ func leadCells(r analysis.QueueRow) []string {
 	}
 	return []string{
 		r.Rule, "", "", "", "", "", "", "", "", "", "", "", r.Opened.UTC().Format(time.DateOnly), "",
-		r.Stream, r.Variant, "true", r.Path, line, r.Function, r.Message, strconv.FormatBool(r.Stub),
+		r.Stream, r.Variant, "true", r.Path, line, r.Function, r.Message,
 	}
 }

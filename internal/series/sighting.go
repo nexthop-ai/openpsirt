@@ -24,6 +24,9 @@ type Sighting struct {
 	FirstRunID  int64  `bun:"first_run_id,notnull"`
 	LastRunID   int64  `bun:"last_run_id,notnull"`
 	AbsentRunID *int64 `bun:"absent_run_id"`
+	// FixedRunID is the run whose build a person stated the finding fixed
+	// in, once they closed it as fixed.
+	FixedRunID *int64 `bun:"fixed_run_id"`
 }
 
 // Sightings is the open findings of a kind a series reports against one build,

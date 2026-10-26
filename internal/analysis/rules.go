@@ -377,10 +377,11 @@ func ruleIn(ctx context.Context, tx bun.IDB, productID, ruleID int64) (*leadRule
 func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
 	ids []int64) (map[int64]int, error) {
 
-	visible, err := access.Readable(subject, productID)
+	visible, err := finding.LeadVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}
+	reach := finding.LeadReach(subject, productID)
 	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
 	var counted []struct {
 		ID    int64 `bun:"id"`
@@ -395,7 +396,7 @@ func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		Where(`"lr"."product_id" = ?`, productID).
 		Where(`"lr"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		Where(kinds, kindArgs...).
 		Where(covers).
 		GroupExpr(`"lr"."id"`).

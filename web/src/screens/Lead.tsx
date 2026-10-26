@@ -73,20 +73,25 @@ export function Lead() {
       <div className="card">
         <h3>Result</h3>
         <Place place={at} />
-        {evidence.withheld && (
-          <p className="hint">Part of a case you are not on. Only where it is is shown.</p>
-        )}
-        {!evidence.withheld && evidence.open && (
+        {evidence.open && (
           <LeadAssignee build={build} place={place} evidence={evidence} assigns={assigns} />
         )}
         <p className="hint">
           Last seen {on(evidence.last_seen)}
+          {evidence.last_commit && <Commit sha={evidence.last_commit} />}
           {evidence.not_seen && ` · not seen ${on(evidence.not_seen)}`}
+          {evidence.not_seen && evidence.not_seen_commit && (
+            <Commit sha={evidence.not_seen_commit} />
+          )}
           {evidence.unchanged && " · the code did not change between those builds"}
           {linkable(evidence.compare) && (
             <>
               {" · "}
-              <a href={linkable(evidence.compare) ?? undefined} target="_blank" rel="noreferrer">
+              <a
+                href={linkable(evidence.compare) ?? undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Compare builds
               </a>
             </>
@@ -129,7 +134,7 @@ export function Lead() {
         handsOff={handsOff && (!ended || evidence.state === "handed-off")}
       />
 
-      {!evidence.withheld && evidence.state !== "handed-off" && (
+      {evidence.state !== "handed-off" && (
         <div className="card">
           <h3>Decision</h3>
           {evidence.decision ? (
@@ -150,12 +155,37 @@ export function Lead() {
           ) : (
             <p className="hint">None.</p>
           )}
-          {acts && evidence.state === "not-reproduced" && evidence.open && (
-            <FixForm build={build} place={place} />
+          {acts &&
+            evidence.state === "not-reproduced" &&
+            evidence.open &&
+            evidence.not_seen_run !== undefined && (
+              <FixForm build={build} place={place} fixedIn={evidence.not_seen_run} />
+            )}
+          {evidence.fixed_in && (
+            <p className="hint">
+              Fixed in the build made {on(evidence.fixed_in.built)}
+              {evidence.fixed_in.commit && (
+                <>
+                  {" "}
+                  at <span className="mono">{evidence.fixed_in.commit.slice(0, 12)}</span>
+                </>
+              )}
+            </p>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+// The commit the lead's repository was at in a build, shortened, with the
+// whole of it on hover.
+function Commit({ sha }: { sha: string }) {
+  return (
+    <span className="mono" title={sha}>
+      {" "}
+      at {sha.slice(0, 12)}
+    </span>
   );
 }
 
@@ -167,7 +197,13 @@ function Place({ place }: { place: LeadPlace }) {
     <div>
       <div>
         {href ? (
-          <a className="mono" href={href} target="_blank" rel="noreferrer" title={place.revision}>
+          <a
+            className="mono"
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={place.revision}
+          >
             {where}
           </a>
         ) : (
@@ -372,11 +408,12 @@ function LeadAssignee({
   );
 }
 
-function FixForm({ build, place }: { build: Build; place: string }) {
+function FixForm({ build, place, fixedIn }: { build: Build; place: string; fixedIn: number }) {
   const [because, setBecause] = useState("");
   const fix = useFixLead(build, place);
   return (
     <div style={{ marginTop: 10 }}>
+      <p className="hint">Fixed in the build of the first run that did not see it.</p>
       <Editor
         label="Fixed by"
         value={because}
@@ -389,7 +426,9 @@ function FixForm({ build, place }: { build: Build; place: string }) {
         className="btn"
         style={{ marginTop: 8 }}
         disabled={because.trim() === "" || fix.isPending}
-        onClick={() => fix.mutate(because.trim(), { onSuccess: () => setBecause("") })}
+        onClick={() =>
+          fix.mutate({ because: because.trim(), fixedIn }, { onSuccess: () => setBecause("") })
+        }
       >
         Close as fixed
       </button>

@@ -76,7 +76,7 @@ func TestRevivingAClaimWhosePlaceIsTakenNamesTheClaimStandingThere(t *testing.T)
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		first := f.claims(t, f.at())
-		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		standing := f.claims(t, f.at())
@@ -125,7 +125,7 @@ func TestMovingAWithdrawnPromiseOntoATakenPlaceNamesTheClaimThere(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Withdraw(ctx, f.triager, promised.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, promised.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		standing := f.claims(t, f.at())
@@ -153,7 +153,7 @@ func TestAWithdrawnClaimIsNotOfferedForReaffirming(t *testing.T) {
 			t.Fatalf("a partly lapsed claim reads as re-affirmable %v (%v), want true, "+
 				"so this checks nothing", ok, err)
 		}
-		if err := f.store.Withdraw(ctx, f.triager, made[0].ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, made[0].ClaimID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -291,7 +291,7 @@ func TestWhatAPersonGotThroughIsCountedInClaims(t *testing.T) {
 			t.Fatal(err)
 		}
 		dropped := f.claimsMany(t, f.places("under-d", "under-e"))
-		if err := f.store.Withdraw(ctx, f.triager, dropped[0].ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, dropped[0].ClaimID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -390,7 +390,7 @@ func TestAWithdrawnClaimReachesNothing(t *testing.T) {
 			t.Fatalf("a standing claim reaches %+v in %v, want one finding in one build",
 				before.Reach, before.Builds)
 		}
-		if err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		after, err := f.store.Whole(ctx, f.triager, made.ClaimID)
@@ -425,7 +425,7 @@ func TestAWithdrawnClaimReportsWhatItReachedWhenItWasWithdrawn(t *testing.T) {
 			t.Fatal(err)
 		}
 		made := f.claims(t, at)
-		if err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		later := f.build(t, f.product, "2026.04")
@@ -505,7 +505,7 @@ func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Second)
 		f.ends(t, made[1].ID, ended)
 
-		if err := f.store.Withdraw(ctx, f.triager, made[0].ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, made[0].ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		if got := f.row(t, made[0].ID); got.State != triage.Withdrawn {
@@ -527,7 +527,7 @@ func TestARevivedClaimHasNoMomentItStoppedApplying(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		first := f.claims(t, f.at())
-		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		if got := f.row(t, first.ID); got.EndedAt == nil {
@@ -573,7 +573,7 @@ func TestAClaimWithAWithdrawnRowIsNotReaffirmedAmongMany(t *testing.T) {
 			t.Fatalf("a partly lapsed claim reads as re-affirmable %v (%v), want true, "+
 				"so this checks nothing", ok, err)
 		}
-		if err := f.store.Withdraw(ctx, f.triager, claimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, claimID); err != nil {
 			t.Fatal(err)
 		}
 

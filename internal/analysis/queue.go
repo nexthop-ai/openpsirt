@@ -48,9 +48,7 @@ type Scope struct {
 	// Series is a series' name, matched without regard to capitals. A name
 	// no series of the product holds lists nothing.
 	Series string
-	// Unassigned keeps the leads nobody holds on the build a row names. A
-	// lead in a case the reader is not on names no holder, so it is left
-	// out rather than answered by who holds it.
+	// Unassigned keeps the leads nobody holds on the build a row names.
 	Unassigned bool
 }
 
@@ -75,9 +73,6 @@ type QueueRow struct {
 	// Holder is the party dealing with the lead on that build, where anybody
 	// is: a person, or a team it is queued with.
 	Holder *int64 `bun:"assigned_to"`
-	// Stub is a lead moved into a case, read without what the analyzer said
-	// or who holds it.
-	Stub bool `bun:"-"`
 	// ThirdParty says the lead is under a path the newest run that saw it
 	// declared as third-party code, as its evidence says.
 	ThirdParty bool `bun:"-"`
@@ -131,7 +126,7 @@ func OpenLeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	waiting bool, limit, offset int) (*Queue, error) {
 
-	visible, err := access.Readable(subject, scope.ProductID)
+	visible, err := finding.LeadVisible(subject, scope.ProductID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,14 +197,12 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		Newest int64     `bun:"newest"`
 		Builds int       `bun:"builds"`
 		Opened time.Time `bun:"opened"`
-		Stub   int       `bun:"stub"`
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
 		ColumnExpr(`"l"."place_identity", MAX("l"."id") AS "newest"`).
 		// Builds rather than rows: a lead fixed, seen again and fixed again
 		// on one build is two closed rows there.
 		ColumnExpr(`COUNT(DISTINCT "l"."target_id") AS "builds", MIN("l"."opened_at") AS "opened"`).
-		ColumnExpr(`MIN("l"."stub") AS "stub"`).
 		GroupExpr(`"l"."place_identity"`).
 		OrderExpr(`MAX("l"."tier") DESC, MAX("l"."corroborated") DESC`).
 		OrderExpr(`MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
@@ -255,11 +248,6 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		r := byPlace[p.Place]
 		r.Builds, r.Opened = p.Builds, p.Opened
 		r.ThirdParty = declaredIn(r.Declared, r.Path) != ""
-		// What the analyzer said, and who is working it, are the case's
-		// once the lead is moved.
-		if p.Stub == 1 {
-			r.Message, r.Holder, r.Stub = "", nil, true
-		}
 		out.Rows = append(out.Rows, r)
 	}
 	return out, nil
@@ -270,7 +258,7 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 // stands, whether a claim waits on it, whether a standing rule covers it, and
 // what the queue orders it by.
 //
-// The product's own visibilities, and a moved lead as a stub. A lead granted
+// The product's own visibilities, and a lead included in its flaw's case. A lead granted
 // one at a time is reached through its evidence, never a list. A finding
 // closed on a build is read until the lead opens anew at its place there.
 func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
@@ -295,8 +283,7 @@ func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []acc
 		Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
 			WHERE "fo"."place_identity" = "f"."place_identity" AND "fo"."target_id" = "f"."target_id"
 			  AND "fo"."closed_at" IS NULL))`).
-		ColumnExpr(`CASE WHEN "f"."visibility" IN (?) THEN 0 ELSE 1 END AS "stub"`, bun.List(visible)).
-		Where(`("f"."visibility" IN (?) OR `+reach.Stub+`)`, append([]any{bun.List(visible)}, reach.StubArgs...)...).
+		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		Where(kinds, kindArgs...)
 	if scope.StreamID != nil {
 		q = q.Where(`"t"."stream_id" = ?`, *scope.StreamID)
@@ -305,7 +292,7 @@ func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []acc
 		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
 	}
 	if scope.Unassigned {
-		q = q.Where(`"f"."assigned_to" IS NULL`).Where(`"f"."visibility" IN (?)`, bun.List(visible))
+		q = q.Where(`"f"."assigned_to" IS NULL`)
 	}
 	if scope.Series != "" {
 		named, namedArgs := kind.Leads.Where(`"sn"."kind"`)

@@ -727,6 +727,7 @@ in a comparison exactly as a reported one does.
 | Recorded against the build itself, the place is the build's root, which has no name of its own | The product's name differs per variant, so a place keyed on it is a different place in each of them: one flaw across three variants was three places and three decisions. The scan path collapses a root parent for the same reason |
 | A name the build holds more than once is refused with the choices | A name is not unique within a build and not rarely: a real switch image ships three vendored copies of one library, and thirteen names in it are held at one version by two components. The resolution goes through the same lookup every other component reference takes — it did not, and took the first row a name matched |
 | A flaw is recorded from a confirmed lead through this same path, found here, undisclosed and at no version, and the flaw and the link to the lead are written in one transaction | The lead's builds and component are proposed and a person confirms them; `DESIGN-analysis.md` § Hand-off holds the offer and what happens to the lead |
+| A flaw recorded from a lead records the lead, the component the hand-off ranked first and the builds it proposed, and keeps them once the hand-off is undone | What the person was offered beside what they chose. `DESIGN-analysis.md` § Hand-off holds who reads them |
 
 ## Reports
 

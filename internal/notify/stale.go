@@ -467,10 +467,6 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(rows) == 0 {
-		return out, nil
-	}
-
 	rights := access.NewStore(w.db)
 	for _, row := range rows {
 		members, err := rights.MembersOf(ctx, row.TeamID)
@@ -499,7 +495,95 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			out[personID] = append(out[personID], holds)
 		}
 	}
-	return out, nil
+	return out, w.leadQueuesUntaken(ctx, since, out)
+}
+
+// leadQueuesUntaken adds to what queuesUntaken tells the leads sitting in a
+// team's queue that nobody has taken, one condition per team and product.
+//
+// A lead is one piece of work at its place, however many builds it is open
+// on. One handed off as a flaw is closed work for its holder, and one a claim
+// stands on is being judged. Every lead it counts is internal, so it reaches
+// the members who read the product's internal work and nobody else.
+func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[int64][]Holds) error {
+	var rows []struct {
+		TeamID    int64  `bun:"team_id"`
+		Team      string `bun:"team"`
+		TeamName  string `bun:"team_name"`
+		ProductID int64  `bun:"product_id"`
+		Product   string `bun:"product"`
+		Waiting   int    `bun:"waiting"`
+	}
+	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
+	work := w.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
+		ColumnExpr(`"tm"."id" AS "team_id"`).
+		ColumnExpr(`"tm"."display_name" AS "team_display"`).
+		ColumnExpr(`"tm"."name" AS "team_name"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		Where(kinds, kindArgs...).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."assigned_at" IS NOT NULL`).
+		Where(`"f"."assigned_at" <= ?`, since).
+		Where(`"tm"."retired_at" IS NULL`).
+		Where(`NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+			WHERE "lh"."product_id" = "st"."product_id" AND "lh"."place_identity" = "f"."place_identity")`).
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dc"
+			WHERE "dc"."product_id" = "st"."product_id" AND "dc"."live_key" IS NOT NULL
+			AND ` + finding.DecisionFiledAt("dc", "f") + `)`).
+		GroupExpr(`"tm"."id", "tm"."display_name", "tm"."name", "st"."product_id", "f"."place_identity"`)
+
+	if err := w.db.NewSelect().
+		TableExpr(`(?) AS "q"`, work).
+		ColumnExpr(`"q"."team_id" AS "team_id"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF("q"."team_display", ''), "q"."team_name")) AS "team"`).
+		ColumnExpr(`MIN("q"."team_name") AS "team_name"`).
+		ColumnExpr(`"q"."product_id" AS "product_id"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`COUNT(*) AS "waiting"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "q"."product_id"`).
+		GroupExpr(`"q"."team_id", "q"."product_id"`).
+		Scan(ctx, &rows); err != nil {
+		return fmt.Errorf("read which leads are sitting in a queue: %w", err)
+	}
+
+	rights := access.NewStore(w.db)
+	for _, row := range rows {
+		members, err := rights.MembersOf(ctx, row.TeamID)
+		if err != nil {
+			return fmt.Errorf("read who is on that team: %w", err)
+		}
+		productID, teamID := row.ProductID, row.TeamID
+		holds := Holds{
+			About: identify(fmt.Sprintf("lead-queue-untaken %d %d", row.TeamID, row.ProductID)),
+			Body: fmt.Sprintf("%s has %s waiting in %s that nobody has taken. "+
+				"Work in a queue is held by nobody until somebody picks it up.",
+				row.Team, leadsWaiting(row.Waiting), row.Product),
+			Link:    weblink.AssignmentsTeam(row.TeamName),
+			Private: true, Internal: true,
+			ProductID: &productID,
+			TeamID:    &teamID,
+		}
+		for _, personID := range members {
+			if !w.reach[personID][row.ProductID].readsInternal {
+				continue
+			}
+			out[personID] = append(out[personID], holds)
+		}
+	}
+	return nil
+}
+
+// leadsWaiting says how many leads wait, in the unit the lead queue counts.
+func leadsWaiting(n int) string {
+	if n == 1 {
+		return "1 static analysis lead"
+	}
+	return fmt.Sprintf("%d static analysis leads", n)
 }
 
 // plainly is a number of days as somebody would say it.

@@ -33,7 +33,7 @@ what is particular to analyzer results is in `DESIGN-analysis.md`.
 | Place identity | Component and consumer (`DESIGN-data-model.md` § Place identity) | Component and consumer | A lead identity, minted at the first sighting and carried by matching |
 | Carry across builds | Version and chain match (REQ-25) | Stated by a person | Matching (`DESIGN-analysis.md`) |
 | Absence | The run closes it, with a reason | Nothing; a person closes it | Not reproduced; the finding stays open |
-| Visibilities | Public, private | Private, public | Internal; private once moved into a case, and public once its flaw is disclosed |
+| Visibilities | Public, private | Private, public | Internal, and public once its flaw is disclosed |
 
 The issue kinds are data the code reads: a producer's names resolve among the
 ones its kind declares. What absence means is what each kind's own reader
@@ -115,7 +115,7 @@ leads, because it writes what the record shows, under the same visibility
 | Kinds are named as an inclusion, never as an exclusion | A list of exclusions is a list somebody forgets to extend |
 | A statement reading findings by identifiers a kind-narrowed statement chose names none again | The identifiers already carry the answer |
 | The finding indexes a read answers from without the table carry the kind beside the visibility | A covering index without the kind costs a table row per finding read |
-| The kind is the first boundary, and the internal visibility the second | A lead moved into a private case is private, and only its kind keeps it out of the vulnerability documents and figures |
+| The kind is the first boundary, and the internal visibility the second | A lead moved into a case is public once its flaw is disclosed, and only its kind keeps it out of the vulnerability documents and figures |
 
 ## Runs and series
 

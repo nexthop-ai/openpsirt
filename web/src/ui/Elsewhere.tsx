@@ -15,7 +15,20 @@ import { Outward } from "./Outward";
 // person for it would leave it unset. Nothing is ever fetched from it. The
 // claim page and the finding's claim card draw it alike; what is read again
 // once it is set is the caller's.
-export function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () => void }) {
+//
+// A reader who may not argue about the claim is told where it is and offered
+// no control.
+export function Elsewhere({
+  id,
+  where,
+  onSet,
+  writes = true,
+}: {
+  id: number;
+  where: string;
+  onSet: () => void;
+  writes?: boolean;
+}) {
   const point = useMutation({
     mutationFn: async (to: string) =>
       unwrap(
@@ -41,19 +54,21 @@ export function Elsewhere({ id, where, onSet }: { id: number; where: string; onS
       ) : (
         "Nothing here says where this is being worked on. "
       )}
-      <button
-        type="button"
-        className="linkish"
-        onClick={() => {
-          const to = window.prompt(
-            "The place this is being worked on: a ticket, a thread, a change. Nothing is ever sent to it.",
-            where,
-          );
-          if (to !== null) point.mutate(to.trim());
-        }}
-      >
-        {where ? "Change it" : "Link it"}
-      </button>
+      {writes && (
+        <button
+          type="button"
+          className="linkish"
+          onClick={() => {
+            const to = window.prompt(
+              "The place this is being worked on: a ticket, a thread, a change. Nothing is ever sent to it.",
+              where,
+            );
+            if (to !== null) point.mutate(to.trim());
+          }}
+        >
+          {where ? "Change it" : "Link it"}
+        </button>
+      )}
       {point.error != null && <Failed error={point.error} what="That could not be recorded." />}
     </p>
   );

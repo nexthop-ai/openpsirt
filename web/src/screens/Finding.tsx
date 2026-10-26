@@ -16,6 +16,7 @@ import { ExploitedHere } from "./FindingExploited";
 import { Notes } from "./FindingNotes";
 import { Duplicates, MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
+import { FlawLeadCard, fixedFromLead, useFlawLead } from "./FlawLead";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
@@ -175,6 +176,9 @@ export function Finding() {
   const here = mayOf(who.data, product);
   const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
   const places = useMemo(() => it?.places ?? [], [it]);
+  // The lead a recorded flaw came from, read once for its card and the fix it
+  // offers on this build.
+  const flawLead = useFlawLead(product, vulnerability, !!it?.recorded);
   // A place is the component and what pulls it in; two chains reaching the
   // same pair are one place, and the head counts what a decision covers.
   const distinct = new Set(places.map((place) => place.place)).size;
@@ -1188,7 +1192,22 @@ export function Finding() {
             record one before the analysis is finished. */}
         {it.recorded && <AffectedBuilds product={product} vulnerability={vulnerability} />}
 
-        {it.recorded && <Resolve at={at} vulnerability={vulnerability} />}
+        {it.recorded && (
+          <FlawLeadCard
+            product={product}
+            vulnerability={vulnerability}
+            stream={stream}
+            variant={variant}
+          />
+        )}
+
+        {it.recorded && (
+          <Resolve
+            at={at}
+            vulnerability={vulnerability}
+            prefill={fixedFromLead(flawLead.data, stream, variant)}
+          />
+        )}
 
         {previous.length > 0 && (
           <PreviousCard

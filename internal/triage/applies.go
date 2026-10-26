@@ -149,7 +149,7 @@ func matchVersion(query *bun.SelectQuery, column, stated string) *bun.SelectQuer
 // All of it. An approval names one revision, so reading only the current one
 // leaves somebody unable to see what was actually agreed to.
 func (s *Store) Revisions(ctx context.Context, subject access.Subject, claimID int64) ([]Revision, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, readableOn); err != nil {
+	if _, _, err := s.readableClaimRows(ctx, subject, claimID); err != nil {
 		return nil, err
 	}
 	var revisions []Revision
@@ -164,7 +164,7 @@ func (s *Store) Revisions(ctx context.Context, subject access.Subject, claimID i
 // Approvals returns who agreed to a claim and to which words, including
 // agreements later taken back.
 func (s *Store) Approvals(ctx context.Context, subject access.Subject, claimID int64) ([]Approval, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, readableOn); err != nil {
+	if _, _, err := s.readableClaimRows(ctx, subject, claimID); err != nil {
 		return nil, err
 	}
 	var approvals []Approval
@@ -216,7 +216,7 @@ func (s *Store) Read(ctx context.Context, subject access.Subject, decisionID int
 func (s *Store) ReadClaim(ctx context.Context, subject access.Subject,
 	claimID int64) (*Claim, []Decision, error) {
 
-	return s.claimRows(ctx, subject, claimID, readableOn)
+	return s.readableClaimRows(ctx, subject, claimID)
 }
 
 // Filter narrows a list of decisions to what somebody is looking for.

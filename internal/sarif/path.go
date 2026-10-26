@@ -18,6 +18,10 @@ type Paths struct {
 	// root is the checkout's own address, with a trailing slash, where the run
 	// states one.
 	root string
+	// working is where the tool was run, relative to the root, with a
+	// trailing slash, or empty where the run states no working directory
+	// inside the checkout.
+	working string
 	// modules is each repository's place, relative to the root, with a
 	// trailing slash, in the order the run lists them.
 	modules []string
@@ -38,6 +42,18 @@ func PathsOf(run *Run, root string) Paths {
 				break
 			}
 		}
+	}
+	// An address with no starting point is relative to where the tool was
+	// run. The first invocation stating a working directory says where.
+	for _, inv := range run.Invocations {
+		wd := inv.WorkingDirectory
+		if wd.URI == "" {
+			continue
+		}
+		if rel, ok := p.place(wd.URI, wd.Base); ok && rel != "" {
+			p.working = dir(rel)
+		}
+		break
 	}
 	for _, m := range run.Modules {
 		// A repository mapped to nothing is the checkout itself.
@@ -74,8 +90,9 @@ func (p Paths) Relative(uri, base string) (string, bool) {
 func (p Paths) place(uri, base string) (string, bool) {
 	abs, ok := p.absolute(uri, base, 0)
 	if !ok {
-		// A relative address with no starting point, or with the root's name
-		// left undefined, is relative to the root. Any other undefined name
+		// A relative address with the root's name left undefined is relative
+		// to the root, and one with no starting point to where the tool was
+		// run, the root where the run does not say. Any other undefined name
 		// places it nowhere this can tell.
 		if base != "" && !isRoot(base) {
 			return "", false
@@ -83,6 +100,9 @@ func (p Paths) place(uri, base string) (string, bool) {
 		rel, ok := relativeOf(uri)
 		if !ok {
 			return "", false
+		}
+		if base == "" {
+			rel = p.working + rel
 		}
 		return clean(rel)
 	}

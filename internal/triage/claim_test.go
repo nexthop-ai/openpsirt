@@ -403,7 +403,7 @@ func TestAFindingReportsWhatStandsWhatStoodAndWhatMightCarry(t *testing.T) {
 		// takes the whole argument back, so every row of the claim is history:
 		// holding part of one back is setting rows aside, which is a different
 		// act with a different record.
-		if err := f.store.Withdraw(ctx, f.triager, first[0].ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, first[0].ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		earlier, err := f.store.EarlierAt(ctx, f.reviewer, f.product, f.issue, places)

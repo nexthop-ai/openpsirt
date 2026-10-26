@@ -53,6 +53,11 @@ signature first, as above.
 | `openpsirt-analysis write --output FILE …` | Builds the run and stores it, to see what would be sent |
 | `openpsirt-analysis version` | Prints the client's version |
 
+The client reads a path with no starting point as relative to the directory
+it runs in, and does not read the working directory the output states. Run it
+from the directory the analyzer ran in. An upload without the client is placed
+against the working directory the output states.
+
 ## The analyzer's output
 
 | Analyzer | Write |
@@ -68,6 +73,21 @@ series of its own, named once per analyzer as `--series TOOL=NAME`: for
 example `--series clang=clang-sa --series cppcheck=cppcheck-all`. The tool is
 the name its output gives it, in any case. `write` stores each analyzer's run
 in a file of its own, the analyzer's name before the extension.
+
+### Dependency and secret scanners
+
+This upload takes static analysis of the product's own code. Two kinds of
+tool that write SARIF are sent elsewhere or not at all:
+
+| Tool | Where its results go |
+|---|---|
+| A dependency scanner: govulncheck, cargo-audit, Trivy, Grype, OSV-Scanner, Snyk Open Source, OWASP Dependency-Check, npm audit, pip-audit, bundler-audit, Retire.js | Nowhere. A vulnerable dependency is found by matching the build's inventory, sent as [Build pipelines](pipeline.md) describes, and the same issue arriving here would be triaged twice |
+| A secret scanner: gitleaks, TruffleHog, detect-secrets, ggshield, Secretlint, Nosey Parker, Kingfisher | Nowhere. Its results carry the secret itself, and this deployment does not store one |
+
+A run from one of these is left out whole and named on the receipt, and an
+upload holding nothing else is refused. A result whose rule is an advisory's
+identifier, such as `CVE-2026-12345` or `GHSA-…`, is dropped and counted on the
+receipt, whatever tool wrote it.
 
 ## The upload
 
@@ -120,7 +140,8 @@ never reaches another address.
 A run is compared with its series' last, and a result missing from it is
 recorded as no longer found, only where the run states its coverage and
 exited cleanly. A run that is not comparable is still recorded, and its
-receipt says why.
+receipt says why. A result last reported by another tool version or rule set
+stays open, and the receipt counts it as uncompared.
 
 | Analyzer | Coverage stated by |
 |---|---|
@@ -133,6 +154,10 @@ receipt says why.
 | Only when it failed | Passed with `--exit-status` |
 | For a result it found, unless told otherwise | Told to exit zero on results, then passed |
 | For a result and for a failure alike | Not passed |
+
+CodeQL states its run successful even where every compilation failed. Its
+SARIF names each file it expected to analyze and each file it extracted, and a
+run that extracted none of the files it expected is not comparable.
 
 ## Pipelines
 
@@ -202,24 +227,57 @@ all three runners.
 
 ### GitLab CI
 
+One job per runner, each its own variant. The hosted macOS and Windows
+runners are chosen by tag; the Windows runner runs PowerShell and takes no
+`image`.
+
 ```yaml
-analysis:
+variables:
+  BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v{{ release }}
+
+.unix: &unix
+  - curl -fsSL -O "$BASE/$CLIENT.tar.gz" -O "$BASE/SHA256SUMS"
+  - grep " $CLIENT.tar.gz\$" SHA256SUMS | shasum -a 256 -c
+  - tar -xzf "$CLIENT.tar.gz" && export PATH="$PWD/$CLIENT:$PATH"
+  - python3 -m venv .venv && . .venv/bin/activate && pip install ruff
+  - status=0; ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
+  - >
+    openpsirt-analysis upload
+    --product sonic --stream "$CI_COMMIT_BRANCH" --variant "$VARIANT"
+    --series ruff --built "$CI_PIPELINE_CREATED_AT"
+    --rules-file .openpsirt/ruff.rules --exit-status "$status"
+    ruff.sarif
+
+analysis-linux:
   image: python:3
-  variables:
-    BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v{{ release }}
-    CLIENT: openpsirt-analysis_{{ release }}_linux_amd64
+  variables: {CLIENT: "openpsirt-analysis_{{ release }}_linux_amd64", VARIANT: linux}
+  script: *unix
+
+analysis-macos:
+  tags: [saas-macos-medium-m1]
+  image: macos-26-xcode-26
+  variables: {CLIENT: "openpsirt-analysis_{{ release }}_darwin_arm64", VARIANT: macos}
+  script: *unix
+
+analysis-windows:
+  tags: [saas-windows-medium-amd64]
+  variables: {CLIENT: "openpsirt-analysis_{{ release }}_windows_amd64", VARIANT: windows}
   script:
-    - curl -fsSL -O "$BASE/$CLIENT.tar.gz" -O "$BASE/SHA256SUMS"
-    - grep " $CLIENT.tar.gz\$" SHA256SUMS | sha256sum -c -
-    - tar -xzf "$CLIENT.tar.gz" && export PATH="$PWD/$CLIENT:$PATH"
-    - pip install ruff
-    - status=0; ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
-    - >
-      openpsirt-analysis upload
-      --product sonic --stream "$CI_COMMIT_BRANCH" --variant broadcom
-      --series ruff --built "$CI_PIPELINE_CREATED_AT"
-      --rules-file .openpsirt/ruff.rules --exit-status "$status"
-      ruff.sarif
+    - |
+      Invoke-WebRequest "$env:BASE/$env:CLIENT.zip" -OutFile "$env:CLIENT.zip"
+      Invoke-WebRequest "$env:BASE/SHA256SUMS" -OutFile SHA256SUMS
+      $want = ((Select-String -Path SHA256SUMS -SimpleMatch " $env:CLIENT.zip").Line -split '\s+')[0]
+      if ((Get-FileHash "$env:CLIENT.zip" -Algorithm SHA256).Hash -ne $want) { throw "$env:CLIENT.zip does not match SHA256SUMS" }
+      Expand-Archive "$env:CLIENT.zip" -DestinationPath .
+      $env:Path = "$PWD\$env:CLIENT;$env:Path"
+      python -m pip install ruff
+      python -m ruff check --output-format sarif --output-file ruff.sarif --exit-zero .
+      $status = $LASTEXITCODE
+      openpsirt-analysis upload `
+        --product sonic --stream "$env:CI_COMMIT_BRANCH" --variant "$env:VARIANT" `
+        --series ruff --built "$env:CI_PIPELINE_CREATED_AT" `
+        --rules-file .openpsirt/ruff.rules --exit-status $status `
+        ruff.sarif
 ```
 
 `OPENPSIRT_URL` and `OPENPSIRT_KEY` are CI/CD variables, the key masked.
@@ -229,32 +287,72 @@ analysis:
 
 ### Jenkins
 
+A matrix over agents labeled `linux`, `macos` and `windows`, each its own
+variant:
+
 ```groovy
 pipeline {
-  agent any
+  agent none
   environment {
     OPENPSIRT_URL = 'https://openpsirt.example.com'
     OPENPSIRT_KEY = credentials('openpsirt-key')
     BASE = 'https://github.com/nexthop-ai/openpsirt/releases/download/v{{ release }}'
-    CLIENT = 'openpsirt-analysis_{{ release }}_linux_amd64'
   }
   stages {
     stage('Analysis') {
-      steps {
-        sh '''
-          curl -fsSL -O "$BASE/$CLIENT.tar.gz" -O "$BASE/SHA256SUMS"
-          grep " $CLIENT.tar.gz\\$" SHA256SUMS | sha256sum -c -
-          tar -xzf "$CLIENT.tar.gz"
-          PATH="$PWD/$CLIENT:$PATH"
-          pip install ruff
-          status=0
-          ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
-          openpsirt-analysis upload \
-            --product sonic --stream main --variant broadcom \
-            --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --rules-file .openpsirt/ruff.rules --exit-status "$status" \
-            ruff.sarif
-        '''
+      matrix {
+        axes {
+          axis {
+            name 'VARIANT'
+            values 'linux', 'macos', 'windows'
+          }
+        }
+        agent { label "${VARIANT}" }
+        stages {
+          stage('Send') {
+            steps {
+              script {
+                def client = [linux: 'linux_amd64', macos: 'darwin_arm64', windows: 'windows_amd64'][env.VARIANT]
+                withEnv(["CLIENT=openpsirt-analysis_{{ release }}_${client}"]) {
+                  if (isUnix()) {
+                    sh '''
+                      curl -fsSL -O "$BASE/$CLIENT.tar.gz" -O "$BASE/SHA256SUMS"
+                      grep " $CLIENT.tar.gz\\$" SHA256SUMS | shasum -a 256 -c
+                      tar -xzf "$CLIENT.tar.gz"
+                      PATH="$PWD/$CLIENT:$PATH"
+                      python3 -m venv .venv && . .venv/bin/activate && pip install ruff
+                      status=0
+                      ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
+                      openpsirt-analysis upload \\
+                        --product sonic --stream main --variant "$VARIANT" \\
+                        --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \\
+                        --rules-file .openpsirt/ruff.rules --exit-status "$status" \\
+                        ruff.sarif
+                    '''
+                  } else {
+                    powershell '''
+                      Invoke-WebRequest "$env:BASE/$env:CLIENT.zip" -OutFile "$env:CLIENT.zip"
+                      Invoke-WebRequest "$env:BASE/SHA256SUMS" -OutFile SHA256SUMS
+                      $want = ((Select-String -Path SHA256SUMS -SimpleMatch " $env:CLIENT.zip").Line -split '\\s+')[0]
+                      if ((Get-FileHash "$env:CLIENT.zip" -Algorithm SHA256).Hash -ne $want) { throw "$env:CLIENT.zip does not match SHA256SUMS" }
+                      Expand-Archive "$env:CLIENT.zip" -DestinationPath .
+                      $env:Path = "$PWD\\$env:CLIENT;$env:Path"
+                      python -m pip install ruff
+                      python -m ruff check --output-format sarif --output-file ruff.sarif --exit-zero .
+                      $status = $LASTEXITCODE
+                      $built = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                      openpsirt-analysis upload `
+                        --product sonic --stream main --variant "$env:VARIANT" `
+                        --series ruff --built $built `
+                        --rules-file .openpsirt/ruff.rules --exit-status $status `
+                        ruff.sarif
+                    '''
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -262,31 +360,70 @@ pipeline {
 ```
 
 `openpsirt-key` is a secret-text credential, and `credentials()` masks it in
-the log. Groovy reads `\\$` inside `'''` as `\$`, which the shell reads as a
-literal `$`.
+the log. Groovy reads `\\` inside `'''` as one backslash, so the shell sees
+`\$` and `\`, and PowerShell sees `\s+` and `\`. Each agent label names
+the machines of one system; the macOS agents here are Apple silicon, and an
+Intel one takes `darwin_amd64`.
 
 ### Azure Pipelines
 
+A matrix over the hosted Linux, macOS and Windows images, each its own
+variant. The hosted macOS image is Intel, so it takes the `darwin_amd64`
+client.
+
 ```yaml
+strategy:
+  matrix:
+    linux:
+      image: ubuntu-latest
+      client: linux_amd64
+      variant: linux
+    macos:
+      image: macOS-latest
+      client: darwin_amd64
+      variant: macos
+    windows:
+      image: windows-latest
+      client: windows_amd64
+      variant: windows
+
 pool:
-  vmImage: ubuntu-latest
+  vmImage: $(image)
 
 variables:
   BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v{{ release }}
-  CLIENT: openpsirt-analysis_{{ release }}_linux_amd64
+  CLIENT: openpsirt-analysis_{{ release }}_$(client)
 
 steps:
   - checkout: self
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+
   - bash: |
       curl -fsSL -O "$BASE/$CLIENT.tar.gz" -O "$BASE/SHA256SUMS"
-      grep " $CLIENT.tar.gz\$" SHA256SUMS | sha256sum -c -
+      grep " $CLIENT.tar.gz\$" SHA256SUMS | shasum -a 256 -c
       tar -xzf "$CLIENT.tar.gz"
-      export PATH="$PWD/$CLIENT:$PATH"
+      echo "##vso[task.prependpath]$PWD/$CLIENT"
+    displayName: Install the client
+    condition: ne(variables['Agent.OS'], 'Windows_NT')
+
+  - pwsh: |
+      Invoke-WebRequest "$env:BASE/$env:CLIENT.zip" -OutFile "$env:CLIENT.zip"
+      Invoke-WebRequest "$env:BASE/SHA256SUMS" -OutFile SHA256SUMS
+      $want = ((Select-String -Path SHA256SUMS -SimpleMatch " $env:CLIENT.zip").Line -split '\s+')[0]
+      if ((Get-FileHash "$env:CLIENT.zip" -Algorithm SHA256).Hash -ne $want) { throw "$env:CLIENT.zip does not match SHA256SUMS" }
+      Expand-Archive "$env:CLIENT.zip" -DestinationPath .
+      Write-Host "##vso[task.prependpath]$PWD\$env:CLIENT"
+    displayName: Install the client
+    condition: eq(variables['Agent.OS'], 'Windows_NT')
+
+  - bash: |
       pip install ruff
       status=0
       ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
       openpsirt-analysis upload \
-        --product sonic --stream "$(Build.SourceBranchName)" --variant broadcom \
+        --product sonic --stream "$(Build.SourceBranchName)" --variant "$(variant)" \
         --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --rules-file .openpsirt/ruff.rules --exit-status "$status" \
         ruff.sarif
@@ -297,7 +434,8 @@ steps:
 ```
 
 A secret variable reaches a script only through `env`, so the key is mapped
-there.
+there. The last step runs under Git Bash on the Windows image, so one step
+serves all three.
 
 ### GitHub code scanning
 
@@ -362,6 +500,19 @@ A direct upload goes without what the client adds:
 | Content fingerprints | A result is matched on the analyzer's own fingerprint, or on its line, so moved code reads as a new result more often |
 | Paths in the checkout index's case | A path is placed as the analyzer wrote it |
 | Whole-file contents, fixes and attachments removed before sending | They leave the pipeline, and the deployment removes them on arrival |
+
+Without the client's fingerprint, a result is matched on what its analyzer
+wrote. Where that is only the rule, the path, the line and the message, a
+result whose line moved is paired with the nearest result of the same rule and
+message in its file, and its dismissal is asked to be affirmed again:
+
+| Analyzer, uploaded plain | Matched on | When lines move above it |
+|---|---|---|
+| CodeQL | Its `primaryLocationLineHash` | It keeps its lead |
+| cppcheck | Its `hash/v1`, with the path | It keeps its lead |
+| clang 22 and later | Its issue hash, with the path | It keeps its lead |
+| clang before 22 | The rule, path, line and message | It is paired by nearest line, and two results moving past each other can swap. Send its `plist-multi-file` output through the client, which carries the issue hash in every version and the enclosing function |
+| clang-tidy | The rule, path, line and message | It is paired by nearest line, and two results moving past each other can swap. The client adds a content fingerprint |
 
 ## Recipes by language
 

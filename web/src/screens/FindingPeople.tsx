@@ -286,9 +286,12 @@ export function Assignee({
 export function Resolve({
   at,
   vulnerability,
+  prefill = "",
 }: {
   at: { product: string; stream: string; variant: string };
   vulnerability: string;
+  // What the fix is first written as, where something here already says it.
+  prefill?: string;
 }) {
   const queries = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -321,7 +324,14 @@ export function Resolve({
       </p>
       {close.error != null && <Failed error={close.error} what="That could not be closed." />}
       {!open ? (
-        <button type="button" className="btn quiet" onClick={() => setOpen(true)}>
+        <button
+          type="button"
+          className="btn quiet"
+          onClick={() => {
+            if (because === "") setBecause(prefill);
+            setOpen(true);
+          }}
+        >
           Close as fixed…
         </button>
       ) : (

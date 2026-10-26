@@ -16,6 +16,7 @@ import {
   useHandOff,
   useHandoffOffer,
   useMoveLead,
+  useUndoHandOff,
   type Evidence,
   type HandoffOffer,
 } from "../api/leads";
@@ -26,6 +27,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { People } from "./FindingPeople";
+import { Markdown } from "../ui/Markdown";
 
 type Suggestion = NonNullable<HandoffOffer["suggestions"]>[number];
 type Seen = NonNullable<HandoffOffer["seen"]>[number];
@@ -55,7 +57,7 @@ export function Handoff({
   if (evidence.handoff) {
     return <HandedOff build={build} place={place} evidence={evidence} handsOff={handsOff} />;
   }
-  if (handsOff && evidence.state === "confirmed" && !evidence.withheld) {
+  if (handsOff && evidence.state === "confirmed") {
     return <HandOffForm build={build} place={place} />;
   }
   return null;
@@ -107,14 +109,15 @@ function HandedOff({
             onClick={() => move.mutate(!handed.moved)}
             title={
               handed.moved
-                ? "Makes it internal again. Internal readers see all of it."
-                : "Makes it private. Internal readers see only where it is. Disclosed with the flaw."
+                ? "The flaw's readers stop seeing it. Internal readers keep it."
+                : `The flaw's readers see it too. Internal readers keep it. ${PUBLISHED_TO}`
             }
           >
             {handed.moved ? "Take out of the case" : "Move into the case"}
           </button>
         )}
         {move.error != null && <Failed error={move.error} what="Nothing was moved." />}
+        {handsOff && !handed.disclosed && <UndoHandOff build={build} place={place} />}
       </div>
       {!handed.disclosed && (
         <People
@@ -152,6 +155,52 @@ function HandedOff({
         />
       )}
     </>
+  );
+}
+
+// Undoing the hand-off: the lead is confirmed again and the flaw is taken
+// back out of every build as invalid, so it asks why.
+function UndoHandOff({ build, place }: { build: Build; place: string }) {
+  const [open, setOpen] = useState(false);
+  const [because, setBecause] = useState("");
+  const undo = useUndoHandOff(build, place);
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="btn quiet"
+        style={{ marginLeft: 8 }}
+        onClick={() => setOpen(true)}
+        title="The lead is confirmed again. The flaw is closed as invalid on every build."
+      >
+        Undo hand-off…
+      </button>
+    );
+  }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <Editor
+        label="Reason"
+        value={because}
+        onChange={setBecause}
+        rows={3}
+        draftKey={`lead-undo:${build.product}:${place}`}
+      />
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={because.trim() === "" || undo.isPending}
+          onClick={() => undo.mutate(because.trim(), { onSuccess: () => setBecause("") })}
+        >
+          Undo hand-off
+        </button>
+        <button type="button" className="btn quiet" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+      {undo.error != null && <Failed error={undo.error} what="The hand-off was not undone." />}
+    </div>
   );
 }
 
@@ -299,7 +348,7 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
             {
               value: "move",
               label: "Move into the case",
-              note: "Private now, disclosed with the flaw",
+              note: "The flaw's readers see it now, disclosed with the flaw",
             },
           ]}
         />
@@ -334,29 +383,55 @@ function others(n: number): string {
   return n === 1 ? "1 other lead" : `${n} other leads`;
 }
 
+// Who reads a moved lead once its flaw is disclosed. Signed-in readers of the
+// product only: a lead is never in a published VEX or CSAF document.
+const PUBLISHED_TO =
+  "Once the flaw is disclosed, readable by everyone signed in with public access to this product. Not included in published VEX or CSAF.";
+
 // What moving a lead into its flaw's case discloses with the flaw.
 function Discloses({ discloses }: { discloses: HandoffOffer["discloses"] }) {
+  const authors = discloses.authors ?? [];
+  const said = discloses.said ?? [];
   return (
     <div className="reading" style={{ marginTop: 10 }}>
-      <p>Disclosed with the flaw:</p>
-      <ul>
-        {(discloses.authors ?? []).length > 0 && (
-          <li>
-            What {(discloses.authors ?? []).map((a) => a.name || a.identity).join(", ")} wrote about
-            it
-          </li>
-        )}
-        {(discloses.paths ?? []).length > 0 && (
-          <li>
-            The paths <span className="mono">{(discloses.paths ?? []).join(", ")}</span>
-          </li>
-        )}
-        {discloses.messages > 0 && <li>{discloses.messages} analyzer messages</li>}
-        {discloses.snippets > 0 && <li>{discloses.snippets} source snippets</li>}
-      </ul>
-      {discloses.stripped > 0 && (
-        <p className="hint">{discloses.stripped} source snippets are removed at disclosure.</p>
+      <h4>Disclosed with the flaw</h4>
+      <p className="hint">{PUBLISHED_TO}</p>
+      {authors.map((a) => (
+        <div key={a.identity}>
+          <h5>{a.name || a.identity}</h5>
+          {(a.notes ?? []).map((n, i) => (
+            <div key={i}>
+              <p className="hint">
+                {n.comment ? "Comment" : "Reasoning"} on claim {n.claim}
+              </p>
+              <Markdown source={n.body} />
+            </div>
+          ))}
+        </div>
+      ))}
+      {said.length > 0 && (
+        <>
+          <h5>Analyzer messages</h5>
+          <ul>
+            {said.map((m, i) => (
+              <li key={i}>
+                {m.path && <span className="mono">{m.path}</span>} {m.message}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
+      {(discloses.paths ?? []).length > 0 && (
+        <p>
+          Paths <span className="mono">{(discloses.paths ?? []).join(", ")}</span>
+        </p>
+      )}
+      <p className="hint">
+        {discloses.snippets > 0
+          ? `Source snippets: ${discloses.snippets} published`
+          : "Source snippets: not published"}
+        {discloses.stripped > 0 && ` · ${discloses.stripped} removed at disclosure`}
+      </p>
     </div>
   );
 }

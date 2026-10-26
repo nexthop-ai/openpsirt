@@ -16,7 +16,7 @@ func limits() Limits {
 	return Limits{
 		MaxBytes: 1 << 20, MaxDepth: 32, MaxRuns: 4, MaxResults: 100, MaxRules: 100,
 		MaxLocations: 10, MaxSteps: 20, MaxModules: 8, MaxBases: 8, MaxChain: 4,
-		MaxProperties: 16, MaxText: 200, MaxHeld: 1000,
+		MaxProperties: 16, MaxText: 200, MaxHeld: 1000, MaxSnippet: 64,
 	}
 }
 
@@ -27,7 +27,8 @@ func readFile(t *testing.T, name string) Log {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	log, err := NewUpload(limits()).Read(f)
+	// A real tool's output is read within the bounds a deployment ships.
+	log, err := NewUpload(DefaultLimits()).Read(f)
 	if err != nil {
 		t.Fatalf("%s: %v", name, err)
 	}
@@ -220,7 +221,6 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 
 func TestEveryEntryReadCountsTowardWhatTheUploadHolds(t *testing.T) {
 	step := `{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}}`
-	notice := func(id string) string { return `{"level":"error","descriptor":{"id":"` + id + `"}}` }
 	rules := func(rules string) string {
 		return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t","rules":[` + rules + `]}}}]}`
 	}
@@ -239,8 +239,6 @@ func TestEveryEntryReadCountsTowardWhatTheUploadHolds(t *testing.T) {
 		"arguments":       {run(`,"results":[{"message":{"text":"x","arguments":["a","b"]}}]`), 4},
 		"fingerprints":    {run(`,"results":[{"partialFingerprints":{"a":"1","b":"2"}}]`), 4},
 		"kept steps": {run(`,"results":[{"codeFlows":[{"threadFlows":[{"locations":[` + step + `,` + step + `]}]}]}]`),
-			4},
-		"notified rules": {run(`,"invocations":[{"toolExecutionNotifications":[` + notice("a") + `,` + notice("b") + `]}]`),
 			4},
 		"changed repositories": {run(`,"properties":{"openpsirt/changed":["a","b"]}`), 3},
 	} {
@@ -380,6 +378,17 @@ func TestWholeFilesAndFixesAreCountedAndNeverKept(t *testing.T) {
 	}
 }
 
+func TestAMessageHoldingOnlyMarkdownIsReducedToItsText(t *testing.T) {
+	doc := run(`,"results":[{"message":{"markdown":"**Null** [pointer](https://example.com) <b>p</b>"}}]`)
+	r := read(t, doc).Runs[0]
+	if got := r.Results[0].Message; got != "Null pointer p" {
+		t.Errorf("message %q; want the words the markdown shows", got)
+	}
+	if r.Discarded.Markdown != 1 {
+		t.Errorf("discarded %+v; want the markdown counted", r.Discarded)
+	}
+}
+
 func TestALocationsSourceIsReadFromItsWidestRegion(t *testing.T) {
 	for name, regions := range map[string]string{
 		"context last":  `"region":{"startLine":3,"snippet":{"text":"secret();"}},"contextRegion":{"startLine":1,"endLine":5,"snippet":{"text":"a\nsecret();"}}`,
@@ -395,11 +404,12 @@ func TestALocationsSourceIsReadFromItsWidestRegion(t *testing.T) {
 			t.Errorf("%s: placed at %d-%d; want the region's own lines", name, loc.StartLine, loc.EndLine)
 		}
 	}
-	long := strings.Repeat("x", MostSnippet+10)
+	most := limits().MaxSnippet
+	long := strings.Repeat("x", most+10)
 	doc := run(`,"results":[{"message":{"text":"m"},
 		"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":3,"snippet":{"text":"` + long + `"}}}}]}]`)
-	if got := read(t, doc).Runs[0].Results[0].Locations[0].Snippet; len(got) > MostSnippet {
-		t.Errorf("kept %d bytes of source; want at most %d", len(got), MostSnippet)
+	if got := read(t, doc).Runs[0].Results[0].Locations[0].Snippet; len(got) != most {
+		t.Errorf("kept %d bytes of source; want the configured %d", len(got), most)
 	}
 }
 
@@ -465,7 +475,7 @@ func TestWhatTheClientWritesIsRead(t *testing.T) {
 	}
 	inv := r.Invocations[0]
 	if inv.ExitCode == nil || *inv.ExitCode != 1 || inv.Successful == nil || *inv.Successful ||
-		inv.Errors != 1 || len(inv.Notified) != 1 {
+		inv.Errors != 1 || inv.Signals() != 1 {
 		t.Errorf("invocation %+v", inv)
 	}
 	refused(t, run(`,"properties":{"openpsirt/unitsExpectd":1}`), limits(), "not one this deployment reads")
@@ -650,5 +660,173 @@ func TestARuleIsFoundByIdentifierThenByPositionInItsComponent(t *testing.T) {
 		if got := r.Results[i]; got.RuleID != want.id || got.Level != want.level {
 			t.Errorf("result %d: rule %q at %q; want %q at %q", i, got.RuleID, got.Level, want.id, want.level)
 		}
+	}
+}
+
+func TestClangTidyOutputIsReadWithNoFingerprintAndNoFunction(t *testing.T) {
+	log := readFile(t, "clangtidy-artemis.sarif")
+	r := log.Runs[0]
+	if r.Tool.Name != "clang-tidy" || len(r.Tool.Rules) != 0 || !r.Ran || len(r.Results) != 1 {
+		t.Fatalf("tool %q with %d rules, ran %v, %d results", r.Tool.Name, len(r.Tool.Rules), r.Ran, len(r.Results))
+	}
+	res := r.Results[0]
+	if res.RuleID != "clang-analyzer-core.NullDereference" || res.Level != "warning" ||
+		res.Message != "Dereference of null pointer (loaded from variable 'p')" {
+		t.Errorf("result %+v", res)
+	}
+	// Nothing but the rule, the path, the line and the message identifies
+	// it: the matching it gets is the line layer's.
+	if len(res.Fingerprints) != 0 || res.Locations[0].Function != "" || len(res.Steps) != 0 {
+		t.Errorf("fingerprints %v, function %q, %d steps", res.Fingerprints, res.Locations[0].Function, len(res.Steps))
+	}
+	placed, dropped := Prepare(&log.Runs[0], "/var/tmp/testing-dir/assignment")
+	if len(placed) != 1 || dropped.Outside != 0 || placed[0].Path != "src/main.cpp" {
+		t.Errorf("placed %+v, dropped %+v", placed, dropped)
+	}
+}
+
+func TestCodeQLOutputIsReadWithItsRuleSetFingerprintsAndCoverage(t *testing.T) {
+	log := readFile(t, "codeql2150-cpp.sarif")
+	r := log.Runs[0]
+	if r.Tool.Name != "CodeQL" || r.Tool.Version != "2.15.0" || !r.Ran || len(r.Results) != 22 {
+		t.Fatalf("tool %q %q, ran %v, %d results", r.Tool.Name, r.Tool.Version, r.Ran, len(r.Results))
+	}
+	if len(r.Tool.Rules) <= len(r.Results) {
+		t.Errorf("%d rules; CodeQL lists every query it ran", len(r.Tool.Rules))
+	}
+	for _, res := range r.Results {
+		if res.Fingerprints["primaryLocationLineHash"] == "" {
+			t.Errorf("%s carries no line hash: %v", res.RuleID, res.Fingerprints)
+		}
+	}
+	inv := r.Invocations[0]
+	if inv.Successful == nil || !*inv.Successful || inv.Expected != 13 || inv.Extracted != 13 || inv.Signals() != 0 {
+		t.Errorf("invocation %+v, %d signals", inv, inv.Signals())
+	}
+	placed, dropped := Prepare(&log.Runs[0], "/src")
+	if len(placed) != 22 || dropped.Outside != 0 {
+		t.Errorf("placed %d, dropped %+v", len(placed), dropped)
+	}
+}
+
+func TestACodeQLRunThatExtractedNothingItExpectedIsAFailure(t *testing.T) {
+	notify := func(id string) string {
+		return `{"level":"none","descriptor":{"id":"` + id + `"},
+			"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}]}`
+	}
+	cases := []struct {
+		name          string
+		notifications []string
+		signals       int
+	}{
+		{"expected and extracted", []string{notify("cpp/baseline/expected-extracted-files"),
+			notify("cpp/diagnostics/successfully-extracted-files")}, 0},
+		{"expected and none extracted", []string{notify("cpp/baseline/expected-extracted-files")}, 1},
+		{"no coverage stated", nil, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			doc := run(`,"results":[],"invocations":[{"executionSuccessful":true,
+				"toolExecutionNotifications":[` + strings.Join(c.notifications, ",") + `]}]`)
+			inv := read(t, doc).Runs[0].Invocations[0]
+			if got := inv.Signals(); got != c.signals {
+				t.Errorf("%+v reports %d failures; want %d", inv, got, c.signals)
+			}
+		})
+	}
+}
+
+func TestARelativeAddressIsRelativeToWhereTheToolRan(t *testing.T) {
+	results := `,"results":[{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"lib/a.c"}}}]},
+		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"b.c","uriBaseId":"%SRCROOT%"}}}]}]`
+	for _, c := range []struct {
+		name, invocations, first string
+	}{
+		{"run in a directory of the checkout",
+			`,"invocations":[{"workingDirectory":{"uri":"file:///home/builder/sonic/src"}}]`, "src/lib/a.c"},
+		{"run in a directory named relative to the root",
+			`,"invocations":[{"workingDirectory":{"uri":"src","uriBaseId":"SRCROOT"}}]`, "src/lib/a.c"},
+		{"run at the top of the checkout",
+			`,"invocations":[{"workingDirectory":{"uri":"file:///home/builder/sonic/"}}]`, "lib/a.c"},
+		{"run outside the checkout",
+			`,"invocations":[{"workingDirectory":{"uri":"file:///tmp/build"}}]`, "lib/a.c"},
+		{"stating no working directory", ``, "lib/a.c"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			log := read(t, run(results+c.invocations))
+			placed, _ := Prepare(&log.Runs[0], "/home/builder/sonic")
+			if len(placed) != 2 || placed[0].Path != c.first || placed[1].Path != "b.c" {
+				t.Errorf("placed %+v; want %s, then b.c under the root's own name", placed, c.first)
+			}
+		})
+	}
+}
+
+func TestEveryPropertyBagIsBoundedWhereverItIs(t *testing.T) {
+	bag := `"properties":{"a":1,"b":{"c":[1,2]}}`
+	loc := func(inner string) string {
+		return `{"physicalLocation":{"artifactLocation":{"uri":"a.c"` + inner + `}}}`
+	}
+	for name, doc := range map[string]string{
+		"a run's":    run(`,` + bag),
+		"a driver's": `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t",` + bag + `}}}]}`,
+		"a rule's": `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t","rules":[{"id":"r",` +
+			bag + `}]}}}]}`,
+		"a result's":            run(`,"results":[{` + bag + `}]`),
+		"a message's":           run(`,"results":[{"message":{"text":"m",` + bag + `}}]`),
+		"a location's":          run(`,"results":[{"locations":[{` + bag + `}]}]`),
+		"an artifact address's": run(`,"results":[{"locations":[` + loc(`,`+bag) + `]}]`),
+		"a flow step's": run(`,"results":[{"codeFlows":[{"threadFlows":[{"locations":[{"location":` +
+			loc("") + `,` + bag + `}]}]}]}]`),
+		"an invocation's":    run(`,"invocations":[{` + bag + `}]`),
+		"a notification's":   run(`,"invocations":[{"toolExecutionNotifications":[{"level":"note",` + bag + `}]}]`),
+		"a member not read":  run(`,"taxonomies":[{"name":"CWE",` + bag + `}]`),
+		"a bag within a bag": run(`,"results":[{"properties":{"x":{` + bag + `}}}]`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			lim := limits()
+			lim.MaxProperties = 2
+			if _, err := NewUpload(lim).Read(strings.NewReader(doc)); err != nil {
+				t.Fatalf("refused at a bound the bag meets: %v", err)
+			}
+			lim.MaxProperties = 1
+			refused(t, doc, lim, "members in a property bag")
+		})
+	}
+}
+
+func TestOneDocumentIsBoundedOnItsOwnAndAsSent(t *testing.T) {
+	doc := run(`,"results":[{"ruleId":"x"},{"ruleId":"y"}]`)
+	lim := limits()
+	lim.MaxPart = int64(len(doc))
+	upload := NewUpload(lim)
+	for i := range 2 {
+		if _, err := upload.Read(strings.NewReader(doc)); err != nil {
+			t.Fatalf("document %d at its bound: %v", i+1, err)
+		}
+	}
+	lim.MaxPart = int64(len(doc) - 1)
+	refused(t, doc, lim, "bytes in one document once decompressed")
+
+	lim = limits()
+	lim.MaxPartCompressed = 100
+	if err := lim.OrDefault().Sent(100); err != nil {
+		t.Errorf("a document sent at its bound: %v", err)
+	}
+	if err := lim.OrDefault().Sent(101); err == nil || !strings.Contains(err.Error(), "one document as it was sent") {
+		t.Errorf("a document sent past its bound: %v", err)
+	}
+}
+
+func TestTheBoundsLeftUnsetFollowTheUploadsBound(t *testing.T) {
+	got := Limits{MaxBytes: 1 << 30}.OrDefault()
+	if got.MaxPart != 1<<30 || got.MaxCompressed != 1<<30 || got.MaxPartCompressed != 1<<30 {
+		t.Errorf("an upload bound of 1 GiB left one document at %d, the upload as sent at %d and one document as sent at %d; want all three 1 GiB",
+			got.MaxPart, got.MaxCompressed, got.MaxPartCompressed)
+	}
+	part := Limits{MaxBytes: 1 << 30, MaxPart: 1 << 20}.OrDefault()
+	if part.MaxCompressed != 1<<30 || part.MaxPartCompressed != 1<<20 {
+		t.Errorf("a document bound of 1 MiB left the upload as sent at %d and one document as sent at %d; want 1 GiB and 1 MiB",
+			part.MaxCompressed, part.MaxPartCompressed)
 	}
 }

@@ -50,6 +50,8 @@ func TestTheAnalyzerBoundsAreReachableFromTheEnvironment(t *testing.T) {
 		"BYTES": "1048576", "DEPTH": "11", "RUNS": "12", "RESULTS": "13", "RULES": "14",
 		"LOCATIONS": "15", "STEPS": "16", "MODULES": "17", "BASES": "18", "CHAIN": "19",
 		"PROPERTIES": "20", "TEXT": "21", "HELD": "22", "DOCUMENTS": "23",
+		"PART_BYTES": "1048577", "COMPRESSED_BYTES": "1048578", "PART_COMPRESSED_BYTES": "1048579",
+		"SNIPPET": "24",
 	} {
 		t.Setenv("OPENPSIRT_ANALYSIS_MAX_"+name, value)
 	}
@@ -58,7 +60,8 @@ func TestTheAnalyzerBoundsAreReachableFromTheEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := sarif.Limits{
-		MaxBytes: 1 << 20, MaxDepth: 11, MaxRuns: 12, MaxResults: 13, MaxRules: 14,
+		MaxBytes: 1 << 20, MaxPart: 1<<20 + 1, MaxCompressed: 1<<20 + 2, MaxPartCompressed: 1<<20 + 3,
+		MaxSnippet: 24, MaxDepth: 11, MaxRuns: 12, MaxResults: 13, MaxRules: 14,
 		MaxLocations: 15, MaxSteps: 16, MaxModules: 17, MaxBases: 18, MaxChain: 19,
 		MaxProperties: 20, MaxText: 21, MaxHeld: 22,
 	}

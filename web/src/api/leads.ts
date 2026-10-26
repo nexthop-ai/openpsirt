@@ -128,11 +128,11 @@ export function useDecideLead(build: Build, place: string) {
 export function useFixLead(build: Build, place: string) {
   const after = useAfterLead();
   return useMutation({
-    mutationFn: async (because: string) =>
+    mutationFn: async ({ because, fixedIn }: { because: string; fixedIn: number }) =>
       unwrap(
         await api.POST(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/fixed",
-          { params: { path: { ...build, place } }, body: { because } },
+          { params: { path: { ...build, place } }, body: { because, fixed_in: fixedIn } },
         ),
       ),
     onSuccess: after,
@@ -260,6 +260,22 @@ export function useHandOff(build: Build, place: string) {
 }
 
 // Moves a handed-off lead into its flaw's case, or takes it back out.
+// Undoes a hand-off: the lead is confirmed again, and its flaw is taken back
+// out of every build as invalid.
+export function useUndoHandOff(build: Build, place: string) {
+  const after = useAfterHandoff();
+  return useMutation({
+    mutationFn: async (because: string) =>
+      unwrap(
+        await api.POST(
+          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off/withdrawal",
+          { params: { path: { ...build, place } }, body: { because } },
+        ),
+      ),
+    onSuccess: after,
+  });
+}
+
 export function useMoveLead(build: Build, place: string) {
   const after = useAfterHandoff();
   const path =

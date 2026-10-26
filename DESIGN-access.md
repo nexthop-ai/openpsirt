@@ -112,9 +112,9 @@ as an analyzer's leads (REQ-14). Analysis results are its first users.
 | Its roles are granted like every other read and triage role | Per product, across every product, or from a group mapping. The people working analyzer output work a high volume of noise and the private team works few embargoed cases, and neither is handed the other's material |
 | `internal-read` alone lists the product and nothing open against it but internal findings | It is a read role like the other two, so the product is one its holder may know exists, and a capability granted beside it reaches something |
 | The anonymous subject reads no internal work | It reads disclosed work in a publishing product, and internal work is never disclosed. Described under [anybody at all](#anybody-at-all) |
-| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A lead moved into a flaw's case is private, so the case reaches it |
-| A lead moved into a private case is a stub to a reader of internal work alone: its state, rule, location and when it was seen | The lead was internal work before it was a case, and the case is what is withheld (`DESIGN-analysis.md` § Keep or move) |
-| A lead collaborator is granted one handed-off lead at the internal and private visibilities while its flaw is undisclosed, and reads its evidence alone | A grant of one lead is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, kept lead or moved (`DESIGN-analysis.md` § Lead collaborators) |
+| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A lead moved into a flaw's case stays internal, and the case reaches it and the claims at its place as one of the flaw's readers (`DESIGN-analysis.md` § Keep or move) |
+| A lead moved into its flaw's case is read whole by everybody who read it before, and with the claims at its place by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the move adds readers. Undoing the move takes back only the readers it added (`DESIGN-analysis.md` § Keep or move) |
+| A lead collaborator is granted one handed-off lead while its flaw is undisclosed, and reads its evidence alone | A grant of one lead is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, kept lead or moved (`DESIGN-analysis.md` § Lead collaborators) |
 | `internal-triage` triages nothing about a product as a whole: routing, assignment, a rating, a record of an attack, an obligation, an inventory upload | Each is about what the product's builds ship, which internal triage reads none of |
 | Approving at internal visibility needs its holder to read internal work and hold the approver capability | A claim there is about a lead, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Lead triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
 | A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
@@ -666,8 +666,9 @@ to ask.
 | A pipeline | An API key | Send scans and analyzer runs, and read back what became of its own |
 | Anybody at all | None, and none is looked at | Read the security documents of the products that publish. § Anybody at all |
 
-A pipeline may send and nothing else — no reading findings, no triage, no
-reporting. A build server has no business holding a person's permissions, and
+A pipeline sends, and reads back the receipts of what was sent to the builds
+its key covers. It reads no finding, triages nothing and reports nothing. A
+build server has no business holding a person's permissions, and
 this keeps the visibility rules out of its reach rather than relying on them
 being applied correctly to it.
 
@@ -693,6 +694,7 @@ cookie resolves to it.
 | It reads disclosed work in a product that publishes, and nothing else | Asked whether it reads a product, it answers yes for the disclosed visibility of a publishing product and no for everything else. Every list, count and lookup narrowed by those two questions narrows it the same way, so a product that does not publish is not listed, not counted and not named |
 | It is nobody | It holds no role, no case, no team and nothing over the deployment, so it triages, approves and decides nothing, and every read asking for a person refuses it |
 | Three reads are open to it | The documents published and the advisories that went out, each asking for it by name; and disclosed findings, decisions and patches in a publishing product, which the pass that writes the documents reads through it. Every read asking for a person refuses it |
+| It reads no lead, a disclosed one included | A lead is not one of the security documents a product publishes. A lead moved into a case is public once its flaw is disclosed, so every read of leads, lists, counts and groups included, refuses this subject before it narrows by visibility |
 | Which products publish takes no subject | It is what builds this subject, and it is the deployment's configuration, the same for everybody who asks |
 | A signed-in person does not read the published documents through it | They read findings through the API, where their own grants answer; the store of published documents refuses anybody but this subject and the deployment itself |
 

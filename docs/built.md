@@ -18,7 +18,7 @@ database built by a release candidate or any other earlier build is recreated.
 | Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default. A supplier's statement that its own product is not affected closes the finding inside that product |
 | Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |
 | Access | Roles per product or across every product, public, private and internal as separate grants, enforced in the data layer |
-| Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections, and a review queue listed by the reason each claim waits |
+| Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections, and a review queue listed by the reason each claim waits. Static analysis leads in a queue of their own, ordered by what is likely real, with their evidence and source links, standing rules that dismiss by rule or path, grouping across analyzers, and hand-off of a confirmed lead as a flaw recorded here |
 | Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public. A report from outside ruled a duplicate of a flaw found here starts the flaw's disclosure date |
 | Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
@@ -27,13 +27,13 @@ database built by a release candidate or any other earlier build is recreated.
 | Reporting | Release comparison, trends, deadlines, release readiness, exception reports, and exports as CSV or JSON |
 | Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, Slack and Zulip channels and direct messages, and operational alerts |
 | Web interface | Every screen above, embedded into the binary and served from it |
-| Packaging | A container image and a Helm chart for `linux/amd64`, and binary archives for Linux on amd64 and arm64 |
+| Packaging | A container image and a Helm chart for `linux/amd64`, binary archives for Linux on amd64 and arm64, and the `openpsirt-analysis` upload client for Linux, macOS and Windows on amd64 and arm64 |
 
 ## Not built
 
 | Area | Not built |
 |---|---|
-| Ingest | Screens and triage for a static analyzer's findings, findings from a fuzzer, and a producer's own vulnerability report uploaded beside an inventory |
+| Ingest | Findings from a fuzzer, and a producer's own vulnerability report uploaded beside an inventory |
 | Patch branches | Asking a forge's API in place of cloning, and fetching through an outbound HTTP proxy |
 | Triage | Narrowing a judgment to some of the places it covers |
 | Disclosure | Coordinating an embargo with a peer vendor or a coordinator |

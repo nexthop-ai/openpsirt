@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
@@ -42,7 +43,7 @@ func CountsBySeries(ctx context.Context, db bun.IDB, subject access.Subject, pro
 	if !subject.Sees(productID) || !subject.Reads(access.Internal, productID) {
 		return nil, access.Denied(fmt.Sprintf("read the lead counts of product %d", productID))
 	}
-	visible, err := access.Readable(subject, productID)
+	visible, err := finding.LeadVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}

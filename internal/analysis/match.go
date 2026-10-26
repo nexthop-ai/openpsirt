@@ -194,7 +194,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 			fresh[i].On = c.on
 		}
 	}
-	// A lead handed off and moved into its case opens where it is, so the
+	// A handed-off lead opens at the visibility its hand-off holds, so the
 	// next run's sighting is not a new internal lead.
 	handed, err := handedVisibility(ctx, db, productID, places)
 	if err != nil {

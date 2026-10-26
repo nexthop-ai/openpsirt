@@ -50,21 +50,35 @@ type SuggestionBody struct {
 	Unanalyzed []LeadBuild   `json:"unanalyzed" doc:"The builds holding the component that the lead's series never analyzed"`
 }
 
-// AuthorBody is one person who wrote about a lead.
+// NoteBody is one piece of writing on a claim about a lead.
+type NoteBody struct {
+	Claim   int64  `json:"claim" doc:"The claim it was written on"`
+	Comment bool   `json:"comment,omitempty" doc:"Whether it is a comment. Otherwise it is a revision of the claim's reasoning"`
+	Body    string `json:"body" doc:"What was written, in markdown"`
+	Written string `json:"written" format:"date-time"`
+}
+
+// AuthorBody is one person who wrote about a lead, with what they wrote.
 type AuthorBody struct {
-	Identity string `json:"identity"`
-	Name     string `json:"name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Writings int    `json:"writings" doc:"The number of revisions of reasoning and comments they wrote on claims about the lead"`
+	Identity string     `json:"identity"`
+	Name     string     `json:"name,omitempty" doc:"Their display name, where it differs from their identity"`
+	Notes    []NoteBody `json:"notes" doc:"The revisions of reasoning and the comments they wrote on claims about the lead, oldest first"`
+}
+
+// AnalyzerSaidBody is one message the analyzer wrote at a path.
+type AnalyzerSaidBody struct {
+	Path    string `json:"path,omitempty"`
+	Message string `json:"message"`
 }
 
 // DisclosesBody is what moving a lead into its flaw's case discloses with the
 // flaw.
 type DisclosesBody struct {
-	Authors  []AuthorBody `json:"authors" doc:"Everybody who wrote reasoning or a comment on a claim about the lead"`
-	Paths    []string     `json:"paths" doc:"Every path the lead names"`
-	Messages int          `json:"messages" doc:"The number of messages the analyzer wrote at those paths"`
-	Snippets int          `json:"snippets" doc:"The number of source snippets disclosed with the flaw"`
-	Stripped int          `json:"stripped" doc:"The number of source snippets removed at disclosure, under paths the product does not disclose snippets for"`
+	Authors  []AuthorBody       `json:"authors" doc:"Everybody who wrote reasoning or a comment on a claim about the lead or the leads linked with it, with what each wrote, as you read the claims"`
+	Paths    []string           `json:"paths" doc:"Every path the lead names"`
+	Said     []AnalyzerSaidBody `json:"said" doc:"Every message the analyzer wrote at those paths"`
+	Snippets int                `json:"snippets" doc:"The number of source snippets disclosed with the flaw. Zero where none is"`
+	Stripped int                `json:"stripped" doc:"The number of source snippets removed at disclosure, under paths the product does not disclose snippets for"`
 }
 
 // HandoffOfferBody is what a hand-off of one lead is offered.
@@ -185,9 +199,9 @@ func registerHandoff(api huma.API, in core.Deps) {
 			"`builds` is the whole set the flaw is recorded against. `component` names what " +
 			"carries it, as the builds name it, and is remembered for the lead's prefix so the next " +
 			"lead under it is offered the same; leave it out for the build itself.\n\n" +
-			"`move` makes the linked leads part of the flaw's case: they become private, internal " +
-			"readers keep only their state, rule, location and sightings, and they are disclosed " +
-			"with the flaw. Left out, the leads are kept internal and linked.\n\n" +
+			"`move` makes the linked leads part of the flaw's case: everybody who reads them keeps " +
+			"reading them, the flaw's readers read them too, and they are disclosed with the flaw. " +
+			"Left out, the leads are kept internal and linked.\n\n" +
 			"A lead nobody confirmed, or one already handed off, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
@@ -291,8 +305,8 @@ func registerHandoff(api huma.API, in core.Deps) {
 		OperationID: "move-lead", Method: http.MethodPut, Path: leadPath + "/move",
 		Summary: "Move a handed-off lead into its flaw's case",
 		Description: "Makes a kept lead part of its flaw's case, with every lead linked to the " +
-			"same flaw: they become private, internal readers keep only their state, rule, location " +
-			"and sightings, and they are disclosed with the flaw. `GET .../hand-off` lists what that " +
+			"same flaw: everybody who reads them keeps reading them, the flaw's readers read them " +
+			"too, and they are disclosed with the flaw. `GET .../hand-off` lists what that " +
 			"discloses.\n\n" +
 			"Recorded in the administration trail. A lead not handed off, one already moved, or " +
 			"one whose flaw is disclosed, is refused with 409.",
@@ -302,9 +316,9 @@ func registerHandoff(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "unmove-lead", Method: http.MethodDelete, Path: leadPath + "/move",
 		Summary: "Take a lead back out of its flaw's case",
-		Description: "Makes a moved lead internal again while its flaw is undisclosed, with the " +
-			"claims about it and every lead linked to the same flaw. They stay linked to the " +
-			"flaw.\n\n" +
+		Description: "Takes a moved lead out of its flaw's case while the flaw is undisclosed, with " +
+			"every lead linked to the same flaw. The flaw's readers no longer read them, everybody " +
+			"else who read them still does, and they stay linked to the flaw.\n\n" +
 			"Recorded in the administration trail. A lead not handed off, a kept lead, or one whose " +
 			"flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
@@ -321,7 +335,8 @@ func leadBuilds(builds []analysis.BuildName) []LeadBuild {
 	return out
 }
 
-// disclosesBody names the authors of what a move discloses.
+// disclosesBody names the authors of what a move discloses, with what each
+// wrote.
 func disclosesBody(ctx context.Context, in core.Deps, d analysis.Disclosure) (DisclosesBody, error) {
 	people := make([]int64, 0, len(d.Authors))
 	for _, a := range d.Authors {
@@ -332,14 +347,21 @@ func disclosesBody(ctx context.Context, in core.Deps, d analysis.Disclosure) (Di
 		return DisclosesBody{}, err
 	}
 	out := DisclosesBody{Authors: make([]AuthorBody, 0, len(d.Authors)), Paths: d.Paths,
-		Messages: d.Messages, Snippets: d.Snippets, Stripped: d.Stripped}
+		Said: make([]AnalyzerSaidBody, 0, len(d.Said)), Snippets: d.Snippets, Stripped: d.Stripped}
 	if out.Paths == nil {
 		out.Paths = []string{}
 	}
 	for _, a := range d.Authors {
-		out.Authors = append(out.Authors, AuthorBody{
-			Identity: who.Identity(a.PersonID), Name: who.Label(a.PersonID), Writings: a.Writings,
-		})
+		author := AuthorBody{Identity: who.Identity(a.PersonID), Name: who.Label(a.PersonID),
+			Notes: make([]NoteBody, 0, len(a.Notes))}
+		for _, n := range a.Notes {
+			author.Notes = append(author.Notes, NoteBody{Claim: n.ClaimID, Comment: n.Comment, Body: n.Body,
+				Written: core.Stamp(n.WrittenAt)})
+		}
+		out.Authors = append(out.Authors, author)
+	}
+	for _, said := range d.Said {
+		out.Said = append(out.Said, AnalyzerSaidBody{Path: said.Path, Message: said.Message})
 	}
 	return out, nil
 }
@@ -363,8 +385,8 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 		Identity string `path:"identity"`
 	}
 	// handed is the hand-off of the lead a route names, where the reader
-	// reads the lead in the product at the visibility it holds while its flaw
-	// is undisclosed: who is on a lead is managed by whoever reads it there.
+	// reads internal work in the product: who is on a lead is managed by its
+	// internal readers, kept or moved.
 	handed := func(ctx context.Context, db bun.IDB, at *leadAt, place string) (*finding.Handoff, error) {
 		if _, err := finding.NewStore(db).LeadAt(ctx, at.subject, at.target, place); err != nil {
 			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
@@ -376,7 +398,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 		if h == nil {
 			return nil, huma.Error404NotFound(analysis.ErrNotHandedOff.Error())
 		}
-		if !at.subject.Reads(h.Undisclosed(), at.named.ProductID) {
+		if !at.subject.Reads(access.Internal, at.named.ProductID) {
 			return nil, core.NoSuchFinding()
 		}
 		return h, nil
@@ -405,7 +427,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 			"A grant reads the lead's evidence and nothing else of the product, until its flaw " +
 			"is disclosed.",
 		Tags: []string{"Findings"},
-	}, core.PerProduct, "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.", leadReaders()...),
+	}, core.PerProduct, "Where you read internal work in the product, kept lead or moved.", leadReaders()...),
 		func(ctx context.Context, input *leadInput) (*core.ListOutput[LeadCollaboratorBody], error) {
 			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 			if err != nil {
@@ -438,7 +460,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 			"Adding somebody who already holds it succeeds and changes nothing. Once the flaw is " +
 			"disclosed, a grant is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.", leadReaders()...),
+	}, core.PerProduct, "Where you read internal work in the product, kept lead or moved.", leadReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
 			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 			if err != nil {
@@ -502,7 +524,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 			"Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the " +
 			"flaw is disclosed, a withdrawal is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.", leadReaders()...),
+	}, core.PerProduct, "Where you read internal work in the product, kept lead or moved.", leadReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
 			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 			if err != nil {
@@ -563,8 +585,8 @@ func leadCollaboratorBodies(ctx context.Context, in core.Deps, rows []access.Lea
 	return out, nil
 }
 
-// leadReaders is the roles that read a handed-off lead: internal work for a
-// kept lead, undisclosed work for a moved one.
+// leadReaders is the roles that manage who is granted a handed-off lead:
+// internal work, which the lead is until its flaw is disclosed.
 func leadReaders() []access.Role {
-	return append([]access.Role{access.InternalRead, access.InternalTriage}, core.PrivateRights()...)
+	return []access.Role{access.InternalRead, access.InternalTriage}
 }

@@ -307,7 +307,7 @@ func TestADismissalNobodyAgreedToOrThatWasWithdrawnLeavesTheReleaseAffected(t *t
 		if got := status(); !slices.Equal(got.KnownNotAffected, []string{master}) {
 			t.Errorf("an agreed dismissal left the release at %+v", got)
 		}
-		if err := triage.NewStore(f.db.DB).Withdraw(t.Context(), f.who, claim); err != nil {
+		if _, err := triage.NewStore(f.db.DB).Withdraw(t.Context(), f.who, claim); err != nil {
 			t.Fatal(err)
 		}
 		if got := status(); !slices.Equal(got.KnownAffected, []string{master}) {

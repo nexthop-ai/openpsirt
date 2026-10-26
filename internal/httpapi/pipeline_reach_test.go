@@ -4,6 +4,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
@@ -24,6 +25,12 @@ import (
 // Verified by deleting the refusal in reading(): the reads that rely on it
 // then answer a key 404, the answer for a name it may not see, where they
 // refused it.
+//
+// The build holds an analyzer run and the lead it opened, so the receipts a
+// key reads back carry a run. A receipt counts results and names none: the
+// key reads how many the run opened, and never the file, the message, the
+// rule's finding or the place a lead is addressed by. Verified by naming the
+// lead's file in the receipt's failure field, which fails on the file.
 func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	// What a sender may read, and what each answers here: the build's
 	// receipts and its uploads, what one upload changed, and a document it kept. The
@@ -40,6 +47,7 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	parameter := regexp.MustCompile(`\{[^}]+\}`)
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
+		lead := httpapitest.SeededLead(t, r)
 		checked, allowed := 0, 0
 		for path, item := range r.API.OpenAPI().Paths {
 			if item.Get == nil {
@@ -88,6 +96,30 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 		if checked == 0 || allowed != len(sent) {
 			t.Fatalf("%d reads were refused and %d of %d sender reads were found, so this checked "+
 				"less than it names", checked, allowed, len(sent))
+		}
+
+		got := r.WithKey(t, r.Key, http.MethodGet, "/v1/products/mine/streams/master/variants/broadcom/analyses")
+		if got.Code != http.StatusOK {
+			t.Fatalf("the key reading its receipts answered %d: %s", got.Code, got.Text)
+		}
+		var receipts struct {
+			Items []struct {
+				Status string `json:"status"`
+				Counts *struct {
+					Opened int `json:"opened"`
+				} `json:"counts"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal([]byte(got.Text), &receipts); err != nil {
+			t.Fatal(err)
+		}
+		if len(receipts.Items) != 1 || receipts.Items[0].Counts == nil || receipts.Items[0].Counts.Opened != 1 {
+			t.Fatalf("the key read %s, want the one run counting the lead it opened", got.Text)
+		}
+		for _, named := range []string{"src/a.c", "src/b.c", "p is leaked", "return;", lead} {
+			if strings.Contains(got.Text, named) {
+				t.Errorf("a receipt named %q: %s", named, got.Text)
+			}
 		}
 	})
 }

@@ -25,8 +25,7 @@ type LeadRowBody struct {
 	Path       string    `json:"path" doc:"The file, from the top of the checkout"`
 	Line       int       `json:"line,omitempty" doc:"The line the result starts at"`
 	Function   string    `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
-	Message    string    `json:"message" doc:"What the analyzer says. Empty where the lead is withheld"`
-	Withheld   bool      `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so what the analyzer said is not answered"`
+	Message    string    `json:"message" doc:"What the analyzer says"`
 	ThirdParty bool      `json:"third_party,omitempty" doc:"Whether the lead is in code the newest run that saw it declared third-party"`
 	Stream     string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
 	Variant    string    `json:"variant" doc:"The variant of that build"`
@@ -61,7 +60,7 @@ type LeadsAsked struct {
 	State   LeadState `query:"state" doc:"List the leads in one state. Left out, the queue"`
 	// Assigned is the findings list's parameter and value for work nobody
 	// holds, so the two read alike.
-	Assigned LeadAssignee `query:"assigned" doc:"Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out"`
+	Assigned LeadAssignee `query:"assigned" doc:"Limit to the leads with no holder on the build each row names. Every count is then of those leads"`
 }
 
 // scoped resolves what is asked for against what the reader may see. A
@@ -102,7 +101,7 @@ func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]Le
 	out := make([]LeadRowBody, 0, len(rows))
 	for _, r := range rows {
 		row := LeadRowBody{
-			Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message, Withheld: r.Stub,
+			Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message,
 			ThirdParty: r.ThirdParty,
 			Stream:     r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
 			Opened: r.Opened.UTC().Format(time.DateOnly),
@@ -122,7 +121,7 @@ func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]Le
 // leadCells fills them.
 func leadColumns() []string {
 	return []string{
-		"rule", "path", "line", "function", "message", "withheld", "state", "stream", "variant",
+		"rule", "path", "line", "function", "message", "state", "stream", "variant",
 		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "place", "third_party",
 	}
 }
@@ -135,7 +134,7 @@ func leadCells(row LeadRowBody) []string {
 		line = strconv.Itoa(row.Line)
 	}
 	return []string{
-		row.Rule, row.Path, line, row.Function, row.Message, strconv.FormatBool(row.Withheld),
+		row.Rule, row.Path, line, row.Function, row.Message,
 		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened,
 		row.AssignedTo, row.AssignedName, strconv.FormatBool(row.AssignedTeam), row.Place,
 		strconv.FormatBool(row.ThirdParty),
@@ -196,8 +195,7 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		Summary: "Export static analysis leads",
 		Description: "The lead list as a file: every row the same filters would list, not one " +
 			"page of them, in the same order.\n\n" +
-			"Read with your own visibility, as it is written. A lead in a case you are not on is " +
-			"a row with an empty message and `withheld` true. No row carries source text.\n\n" +
+			"Read with your own visibility, as it is written. No row carries source text.\n\n" +
 			"With no `state` it is the queue, and the file says so. Takes every filter the lead " +
 			"list takes.",
 		Tags: []string{"Findings"},

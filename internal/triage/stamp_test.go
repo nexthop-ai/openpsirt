@@ -119,7 +119,7 @@ func TestEveryWriteToAClaimChangesItsStamp(t *testing.T) {
 				}
 				return err
 			}},
-			{"withdrawing it", func(id int64) error { return f.store.Withdraw(ctx, f.triager, id) }},
+			{"withdrawing it", func(id int64) error { _, err := f.store.Withdraw(ctx, f.triager, id); return err }},
 		} {
 			claimID := f.claims(t, f.at()).ClaimID
 			before := stampOf(t, f, claimID)
@@ -129,7 +129,7 @@ func TestEveryWriteToAClaimChangesItsStamp(t *testing.T) {
 			if got := stampOf(t, f, claimID); got == before {
 				t.Errorf("%s left the stamp at %d", c.act, got)
 			}
-			if err := f.store.Withdraw(ctx, f.triager, claimID); err != nil && c.act != "withdrawing it" {
+			if _, err := f.store.Withdraw(ctx, f.triager, claimID); err != nil && c.act != "withdrawing it" {
 				t.Fatalf("clearing the place after %s answered %v", c.act, err)
 			}
 		}

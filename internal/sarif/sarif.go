@@ -128,10 +128,6 @@ type Location struct {
 	widest bool
 }
 
-// MostSnippet is the longest source text kept for one location, in bytes. A
-// client sends a few lines either side of each location.
-const MostSnippet = 4 << 10
-
 // Step is one step of the path a tool took to a result.
 type Step struct {
 	Location
@@ -146,8 +142,32 @@ type Invocation struct {
 	// Errors counts the notifications the tool raised at error level about
 	// its own run.
 	Errors int
-	// Notified is the descriptors those notifications name.
-	Notified []string
+	// WorkingDirectory is where the tool was run, which an address with no
+	// starting point is relative to.
+	WorkingDirectory ArtifactLocation
+	// Expected and Extracted count the files a tool's coverage notifications
+	// name: the files its baseline expected to analyze, and the files it
+	// analyzed. CodeQL writes both, and states its run successful with every
+	// compilation failed.
+	Expected, Extracted int
+}
+
+// Coverage notification descriptors, after the language prefix CodeQL names
+// each with: cpp/baseline/expected-extracted-files.
+const (
+	expectedFiles  = "/baseline/expected-extracted-files"
+	extractedFiles = "/diagnostics/successfully-extracted-files"
+)
+
+// Signals is how many failures of its own run the invocation reports: each
+// notification at error level, and one more where its coverage notifications
+// expected files and it analyzed none of them.
+func (inv Invocation) Signals() int {
+	n := inv.Errors
+	if inv.Expected > 0 && inv.Extracted == 0 {
+		n++
+	}
+	return n
 }
 
 // Module is one repository a run's files came from.

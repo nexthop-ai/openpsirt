@@ -37,8 +37,9 @@ type LeadCollaborator struct {
 }
 
 // leadVisibilities is what a lead grant reaches while the lead's flaw is
-// undisclosed: a kept lead and a moved one.
-var leadVisibilities = []Visibility{Internal, Private}
+// undisclosed. A handed-off lead is internal until its flaw is disclosed,
+// kept or moved.
+var leadVisibilities = []Visibility{Internal}
 
 // LeadGrantVisibilities is what a lead grant reaches, for a condition over
 // findings.

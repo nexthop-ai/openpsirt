@@ -135,6 +135,26 @@ func (c Config) Compare(before, after []Module, path string) (address string, un
 	return address, false
 }
 
+// CommitOf is the commit the repository holding a path was at in a run: the
+// run's repository with the longest prefix holding it, or the top of the
+// checkout's commit where none does. Empty where that is not a commit.
+func CommitOf(modules []Module, top, path string) string {
+	inner := -1
+	for i, m := range modules {
+		if under(path, m.Path) && (inner < 0 || len(m.Path) > len(modules[inner].Path)) {
+			inner = i
+		}
+	}
+	revision := top
+	if inner >= 0 {
+		revision = modules[inner].Revision
+	}
+	if !commit.MatchString(revision) {
+		return ""
+	}
+	return strings.ToLower(revision)
+}
+
 // Snippets is whether source under a path is kept: the setting of the
 // longest prefix that states one, and off where none does.
 func (c Config) Snippets(path string) bool {

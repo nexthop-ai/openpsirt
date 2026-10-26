@@ -91,6 +91,49 @@ describe("a lead", () => {
     expect(hrefs.some((h) => h?.startsWith("javascript:"))).toBe(false);
   });
 
+  it("closes a lead nobody sees any more as fixed in the build of the run that did not see it", async () => {
+    await drawn(true, { ...EVIDENCE, state: "not-reproduced", not_seen_run: 9 });
+    const sent = accept(() => ({ data: { at: "2026-10-02T00:00:00Z" } }));
+    const fields = mount.host().querySelectorAll("textarea");
+    change(fields[fields.length - 1] ?? null, "the bounds check landed");
+    await press(mount.host(), "Close as fixed");
+    await settle();
+    const fixed = sent().find((call) => String(call[0]).endsWith("/fixed"));
+    expect(fixed?.[1]).toMatchObject({ body: { because: "the bounds check landed", fixed_in: 9 } });
+  });
+
+  it("names the build a lead was stated fixed in", async () => {
+    await drawn(true, {
+      ...EVIDENCE,
+      open: false,
+      state: "fixed",
+      fixed_in: { run: 9, built: "2026-10-02T00:00:00Z", commit: "0123456789abcdef" },
+    });
+    expect(mount.host().textContent).toContain("0123456789ab");
+  });
+
+  it("opens a link telling the page it opens nothing of this one", async () => {
+    await drawn(false, {
+      ...EVIDENCE,
+      not_seen: "2026-10-02T00:00:00Z",
+      compare: "https://git.example/compare/a...b",
+    });
+    const opened = [...mount.host().querySelectorAll('a[target="_blank"]')];
+    expect(opened).toHaveLength(2);
+    for (const a of opened) expect(a.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("names the commit its repository was at in the build it was last seen in and the next", async () => {
+    await drawn(false, {
+      ...EVIDENCE,
+      last_commit: "0123456789abcdef0123",
+      not_seen: "2026-10-02T00:00:00Z",
+      not_seen_commit: "fedcba9876543210fedc",
+    });
+    expect(text()).toContain("at 0123456789ab");
+    expect(text()).toContain("at fedcba987654");
+  });
+
   it("offers no judgment to somebody who only reads it", async () => {
     await drawn(false);
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);

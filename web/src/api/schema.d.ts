@@ -2689,7 +2689,7 @@ export interface paths {
          *
          *     The line this deployment triages at is stated in the file.
          *
-         *     Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text, and `withheld` is false on every lead. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
+         *     Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
          *
          *     Takes every filter the findings list takes.
          *
@@ -3274,6 +3274,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/issues/{vulnerability}/lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the lead a flaw was recorded from
+         * @description Returns the static analysis lead a flaw recorded here was handed off from, with the component its hand-off was offered first, the builds it proposed, and whether the hand-off was undone.
+         *
+         *     `fixed_in` lists each build the flaw is still open on where the lead is not reproduced, with the first run that did not see it. Closing the flaw as fixed there is `POST .../findings/{vulnerability}/resolve`, which a person does.
+         *
+         *     A flaw recorded from no lead, and a lead you do not read in full, answer 404.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers where you may read a finding of this issue in this product and read its lead in full. Anywhere else it answers as a flaw recorded from no lead.
+         */
+        get: operations["get-flaw-lead"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/issues/{vulnerability}/notes": {
         parameters: {
             query?: never;
@@ -3505,7 +3531,7 @@ export interface paths {
          * Export static analysis leads
          * @description The lead list as a file: every row the same filters would list, not one page of them, in the same order.
          *
-         *     Read with your own visibility, as it is written. A lead in a case you are not on is a row with an empty message and `withheld` true. No row carries source text.
+         *     Read with your own visibility, as it is written. No row carries source text.
          *
          *     With no `state` it is the queue, and the file says so. Takes every filter the lead list takes.
          *
@@ -4797,7 +4823,7 @@ export interface paths {
          *
          *     A grant reads the lead's evidence and nothing else of the product, until its flaw is disclosed.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
          */
         get: operations["list-lead-collaborators"];
         put?: never;
@@ -4824,7 +4850,7 @@ export interface paths {
          *
          *     Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
          */
         put: operations["add-lead-collaborator"];
         post?: never;
@@ -4834,7 +4860,7 @@ export interface paths {
          *
          *     Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
          */
         delete: operations["remove-lead-collaborator"];
         options?: never;
@@ -4881,6 +4907,8 @@ export interface paths {
          * Close a lead as fixed
          * @description Closes a lead on one build because it is fixed there. The lead has to be one the newest comparable run did not see: a lead a run still sees is refused with 409. `because` says what fixed it, and is required.
          *
+         *     `fixed_in` names the build that fixed it, as the run of the lead's series on this build that analyzed it: an applied, comparable run built at or after the first run that did not see the lead, which the lead's evidence names as `not_seen_run`. Any other run is refused with 422.
+         *
          *     A lead seen again opens anew at the same place.
          *
          *     Requires: internal-triage on the product
@@ -4915,13 +4943,37 @@ export interface paths {
          *
          *     `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
          *
-         *     `move` makes the linked leads part of the flaw's case: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
+         *     `move` makes the linked leads part of the flaw's case: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
          *
          *     A lead nobody confirmed, or one already handed off, is refused with 409.
          *
          *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
          */
         post: operations["hand-off-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off/withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a lead's hand-off
+         * @description Undoes the hand-off of a lead while its flaw is undisclosed, with every lead linked to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the lead it was recorded from, marked undone.
+         *
+         *     `because` is required. Recorded in the administration trail. A lead not handed off, or one whose flaw is disclosed, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        post: operations["undo-lead-handoff"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4938,7 +4990,7 @@ export interface paths {
         get?: never;
         /**
          * Move a handed-off lead into its flaw's case
-         * @description Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
+         * @description Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
          *
          *     Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
          *
@@ -4948,7 +5000,7 @@ export interface paths {
         post?: never;
         /**
          * Take a lead back out of its flaw's case
-         * @description Makes a moved lead internal again while its flaw is undisclosed, with the claims about it and every lead linked to the same flaw. They stay linked to the flaw.
+         * @description Takes a moved lead out of its flaw's case while the flaw is undisclosed, with every lead linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
          *
          *     Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
          *
@@ -7220,6 +7272,10 @@ export interface components {
             /** @description The series the run belongs to */
             series: string;
         };
+        AnalyzerSaidBody: {
+            message: string;
+            path?: string;
+        };
         AnywhereOutputBody: {
             /**
              * Format: uri
@@ -7438,11 +7494,8 @@ export interface components {
             identity: string;
             /** @description Their display name, where it differs from their identity */
             name?: string;
-            /**
-             * Format: int64
-             * @description The number of revisions of reasoning and comments they wrote on claims about the lead
-             */
-            writings: number;
+            /** @description The revisions of reasoning and the comments they wrote on claims about the lead, oldest first */
+            notes: components["schemas"]["NoteBody"][] | null;
         };
         BecameBody: {
             /** @description The person who did it, where a person did, by sign-in identity */
@@ -8609,18 +8662,15 @@ export interface components {
             reason: string;
         };
         DisclosesBody: {
-            /** @description Everybody who wrote reasoning or a comment on a claim about the lead */
+            /** @description Everybody who wrote reasoning or a comment on a claim about the lead or the leads linked with it, with what each wrote, as you read the claims */
             authors: components["schemas"]["AuthorBody"][] | null;
-            /**
-             * Format: int64
-             * @description The number of messages the analyzer wrote at those paths
-             */
-            messages: number;
             /** @description Every path the lead names */
             paths: string[] | null;
+            /** @description Every message the analyzer wrote at those paths */
+            said: components["schemas"]["AnalyzerSaidBody"][] | null;
             /**
              * Format: int64
-             * @description The number of source snippets disclosed with the flaw
+             * @description The number of source snippets disclosed with the flaw. Zero where none is
              */
             snippets: number;
             /**
@@ -9427,6 +9477,11 @@ export interface components {
             readonly $schema?: string;
             /** @description What fixed it, in markdown */
             because: string;
+            /**
+             * Format: int64
+             * @description The run whose build fixed it
+             */
+            fixed_in: number;
         };
         FixBody: {
             /**
@@ -9472,6 +9527,80 @@ export interface components {
         Flag: {
             label: string;
             product_ids: string[] | null;
+        };
+        FlawLeadBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/FlawLeadBody.json
+             */
+            readonly $schema?: string;
+            /** @description Why the hand-off was undone, in markdown */
+            because?: string;
+            /** @description Each build the flaw is still open on whose lead a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the hand-off is undone */
+            fixed_in: components["schemas"]["FlawUnseenBody"][] | null;
+            /** Format: date-time */
+            handed_at: string;
+            /** @description The person who handed it off, by sign-in identity */
+            handed_by: string;
+            /**
+             * Format: int64
+             * @description The line it starts at
+             */
+            line?: number;
+            /** @description Where the lead is, relative to the top of the checkout */
+            path: string;
+            /** @description The lead's place identity */
+            place: string;
+            /** @description The builds the hand-off proposed the flaw against */
+            proposed: components["schemas"]["FlawLeadBuild"][] | null;
+            /** @description The analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /**
+             * @description Where the lead stands on that build
+             * @enum {string}
+             */
+            state: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+            /** @description The branch or tag of the build its newest finding you read is on */
+            stream: string;
+            /** @description The component the hand-off's offer ranked first, which the person may have turned down */
+            suggested: components["schemas"]["FlawSuggestedBody"];
+            /**
+             * Format: date-time
+             * @description When the hand-off was undone. Absent while it stands
+             */
+            undone_at?: string;
+            /** @description The person who undid the hand-off, by sign-in identity */
+            undone_by?: string;
+            /** @description The variant of that build */
+            variant: string;
+        };
+        FlawLeadBuild: {
+            /** @description Whether the lead was seen in it. Otherwise it holds the chosen component and the lead's series never analyzed it */
+            seen: boolean;
+            stream: string;
+            variant: string;
+        };
+        FlawSuggestedBody: {
+            /** @description The component, as the builds name it. Absent where the build itself was offered */
+            component?: string;
+            /** @description Its ecosystem, where its package identifier states one */
+            ecosystem?: string;
+            /**
+             * @description Where the suggestion came from: a prefix confirmed at an earlier hand-off, the component the lead was placed on, a component whose name resembles the lead's directory, or the build itself
+             * @enum {string}
+             */
+            from: "confirmed" | "placed" | "resembles" | "build";
+            /** @description Its namespace, where its package identifier states one */
+            namespace?: string;
+        };
+        FlawUnseenBody: {
+            /** @description The build a person stated fixed the lead, where they closed it as fixed */
+            fixed?: components["schemas"]["LeadRunBody"];
+            /** @description The first run on the build that did not see the lead */
+            not_seen: components["schemas"]["LeadRunBody"];
+            stream: string;
+            variant: string;
         };
         FoldPackageBody: {
             /**
@@ -10166,10 +10295,14 @@ export interface components {
             compare?: string;
             /** @description The live claim at the lead, agreed to or waiting for a second person. Absent where there is none */
             decision?: components["schemas"]["DecisionBody"];
+            /** @description The build a person stated fixed the lead, once they closed it as fixed */
+            fixed_in?: components["schemas"]["LeadRunBody"];
             /** @description The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead */
             handoff?: components["schemas"]["LeadHandoffBody"];
             /** @description Other analyzers' leads on the build that are the same flaw, and those that possibly are */
             kin: components["schemas"]["LeadKin"][] | null;
+            /** @description The commit the lead's own repository was at in the build of the newest run that saw the lead. Absent where the run named none */
+            last_commit?: string;
             /**
              * Format: date-time
              * @description When the build of the newest run that saw the lead was made
@@ -10180,6 +10313,13 @@ export interface components {
              * @description When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it
              */
             not_seen?: string;
+            /** @description The commit the lead's own repository was at in the build of the first run that did not see the lead. Absent where that run named none, or while every run since has seen it */
+            not_seen_commit?: string;
+            /**
+             * Format: int64
+             * @description The run that did not see the lead, which a statement that it was fixed may name
+             */
+            not_seen_run?: number;
             /** @description Whether the lead is open on the build */
             open: boolean;
             /** @description Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off */
@@ -10199,8 +10339,6 @@ export interface components {
             third_party?: boolean;
             /** @description Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
-            /** @description Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered */
-            withheld?: boolean;
         };
         LeadFixedBody: {
             /**
@@ -10305,7 +10443,7 @@ export interface components {
              * @description The line the result starts at
              */
             line?: number;
-            /** @description What the analyzer says. Empty where the lead is withheld */
+            /** @description What the analyzer says */
             message: string;
             /**
              * Format: date
@@ -10329,8 +10467,6 @@ export interface components {
             third_party?: boolean;
             /** @description The variant of that build */
             variant: string;
-            /** @description Whether the lead is part of a case you are not on, so what the analyzer said is not answered */
-            withheld?: boolean;
         };
         LeadRuleBody: {
             /**
@@ -10385,6 +10521,20 @@ export interface components {
             state: "proposed" | "in-force" | "outgrown" | "needs-path" | "retired";
             /** @description Whether you proposed it. The proposer may not approve it */
             yours?: boolean;
+        };
+        LeadRunBody: {
+            /**
+             * Format: date-time
+             * @description When the build it analyzed was made
+             */
+            built: string;
+            /** @description The commit at the top of the checkout it analyzed, where the run stated one */
+            commit?: string;
+            /**
+             * Format: int64
+             * @description The run
+             */
+            run: number;
         };
         LeadSeriesBody: {
             /**
@@ -11255,6 +11405,19 @@ export interface components {
             /** @description The text, in markdown */
             body: string;
         };
+        NoteBody: {
+            /** @description What was written, in markdown */
+            body: string;
+            /**
+             * Format: int64
+             * @description The claim it was written on
+             */
+            claim: number;
+            /** @description Whether it is a comment. Otherwise it is a revision of the claim's reasoning */
+            comment?: boolean;
+            /** Format: date-time */
+            written: string;
+        };
         NoteWritten: {
             /**
              * Format: uri
@@ -11353,7 +11516,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -11500,7 +11663,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -12396,7 +12559,7 @@ export interface components {
             dropped?: {
                 [key: string]: number;
             };
-            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any */
+            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build */
             fingerprints_changed?: boolean;
             /**
              * Format: int64
@@ -12437,6 +12600,11 @@ export interface components {
             seen: number;
             /** @description Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers */
             sharp_drop?: boolean;
+            /**
+             * Format: int64
+             * @description Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set
+             */
+            uncompared?: number;
         };
         ReceiptBody: {
             /** @description The build time the producer states, or the time the upload arrived where it states none */
@@ -14095,6 +14263,16 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             undone: number;
+        };
+        "Undo-lead-handoffRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Undo-lead-handoffRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Why the hand-off is undone, in markdown */
+            because: string;
         };
         UnmatchedBody: {
             /** @description The platform enumeration the scanner is given, where there is one */
@@ -19950,6 +20128,39 @@ export interface operations {
             };
         };
     };
+    "get-flaw-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The flaw, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlawLeadBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-issue-notes": {
         parameters: {
             query?: never;
@@ -20252,7 +20463,7 @@ export interface operations {
                 series?: string;
                 /** @description List the leads in one state. Left out, the queue */
                 state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
-                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out */
+                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
                 assigned?: "nobody";
                 /** @description The number returned */
                 limit?: number;
@@ -20298,7 +20509,7 @@ export interface operations {
                 series?: string;
                 /** @description List the leads in one state. Left out, the queue */
                 state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
-                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out */
+                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
                 assigned?: "nobody";
             };
             header?: never;
@@ -22558,6 +22769,43 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HandedOffBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "undo-lead-handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Undo-lead-handoffRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

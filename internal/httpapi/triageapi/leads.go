@@ -137,6 +137,10 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 		Description: "Closes a lead on one build because it is fixed there. The lead has to be one " +
 			"the newest comparable run did not see: a lead a run still sees is refused with 409. " +
 			"`because` says what fixed it, and is required.\n\n" +
+			"`fixed_in` names the build that fixed it, as the run of the lead's series on this build " +
+			"that analyzed it: an applied, comparable run built at or after the first run that did not " +
+			"see the lead, which the lead's evidence names as `not_seen_run`. Any other run is refused " +
+			"with 422.\n\n" +
 			"A lead seen again opens anew at the same place.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
@@ -146,6 +150,7 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 		Place   string `path:"place" doc:"The lead's place identity"`
 		Body    struct {
 			Because string `json:"because" minLength:"1" doc:"What fixed it, in markdown"`
+			FixedIn int64  `json:"fixed_in" minimum:"1" doc:"The run whose build fixed it"`
 		}
 	}) (*struct{ Body LeadFixedBody }, error) {
 		subject, err := core.Reading(ctx)
@@ -160,11 +165,12 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		done, err := finding.NewStore(in.DB.DB).FixLead(ctx, subject, target.ID, input.Place, input.Body.Because)
+		done, err := finding.NewStore(in.DB.DB).FixLead(ctx, subject, target.ID, input.Place, input.Body.Because,
+			input.Body.FixedIn)
 		switch {
 		case errors.Is(err, finding.ErrStillSeen), errors.Is(err, finding.ErrLeadPastEndOfLife):
 			return nil, huma.Error409Conflict(err.Error())
-		case errors.Is(err, finding.ErrNoReason):
+		case errors.Is(err, finding.ErrNoReason), errors.Is(err, finding.ErrNotAFixingRun):
 			return nil, core.Asked(in.Logger, err)
 		case errors.Is(err, finding.ErrNothingOpenThere), errors.Is(err, access.ErrDenied):
 			return nil, core.NoSuchFinding()

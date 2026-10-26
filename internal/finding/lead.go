@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/series"
 )
 
 // LeadAt is the finding a lead is on one build, where the subject may read
@@ -32,25 +33,6 @@ func (s *Store) LeadAt(ctx context.Context, subject access.Subject, targetID int
 	}
 	reach := LeadReach(subject, productID)
 	return s.leadWhere(ctx, targetID, placeIdentity, reach.Full, reach.FullArgs)
-}
-
-// LeadOrStubAt is LeadAt for a read of the lead's evidence, and reports
-// whether the subject reads it only as a stub: the lead without the case
-// (LeadReading).
-func (s *Store) LeadOrStubAt(ctx context.Context, subject access.Subject, targetID int64,
-	placeIdentity string) (*Finding, bool, error) {
-
-	productID, err := productOf(ctx, s.db, targetID)
-	if err != nil {
-		return nil, false, err
-	}
-	reach := LeadReach(subject, productID)
-	lead, err := s.leadWhere(ctx, targetID, placeIdentity, reach.Full, reach.FullArgs)
-	if !errors.Is(err, ErrNoOpenFinding) {
-		return lead, false, err
-	}
-	lead, err = s.leadWhere(ctx, targetID, placeIdentity, reach.Stub, reach.StubArgs)
-	return lead, err == nil, err
 }
 
 // leadWhere is the lead at a place on one build that a condition admits.
@@ -78,13 +60,20 @@ func (s *Store) leadWhere(ctx context.Context, targetID int64, placeIdentity str
 // ErrStillSeen says a lead a run still sees is not stated fixed.
 var ErrStillSeen = refusal.New("the newest comparable run still sees this lead, so it is not fixed here")
 
+// ErrNotAFixingRun refuses a statement that a lead was fixed in a build no
+// run of its series on that build left it out of.
+var ErrNotAFixingRun = refusal.New("name the run whose build fixed it: a comparable run of the lead's series " +
+	"on this build, at or after the first that did not see it")
+
 // FixLead closes a lead on one build because somebody states it is fixed
-// there. The lead has to be one a comparable run no longer sees: that absence
-// is the evidence the statement is made with, and a run still reporting the
-// result is the authority on what it found. A lead seen again opens anew at
-// the same place.
+// there, naming the run whose build fixed it. The lead has to be one a
+// comparable run no longer sees: that absence is the evidence the statement is
+// made with, and a run still reporting the result is the authority on what it
+// found. The run named is one of the lead's series on the build, applied and
+// comparable, built at or after the first run that did not see it. A lead seen
+// again opens anew at the same place.
 func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID int64,
-	placeIdentity, because string) (*Resolved, error) {
+	placeIdentity, because string, fixedIn int64) (*Resolved, error) {
 
 	because = strings.TrimSpace(because)
 	if because == "" {
@@ -106,10 +95,11 @@ func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID in
 			ID         int64             `bun:"id"`
 			Visibility access.Visibility `bun:"visibility"`
 			Absent     *int64            `bun:"absent_run_id"`
+			Series     int64             `bun:"series_id"`
 		}
 		err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-			ColumnExpr(`"f"."id", "f"."visibility", "si"."absent_run_id"`).
+			ColumnExpr(`"f"."id", "f"."visibility", "si"."absent_run_id", "si"."series_id"`).
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."place_identity" = ?`, placeIdentity).
 			Where(`"f"."closed_at" IS NULL`).
@@ -131,6 +121,21 @@ func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID in
 		if lead.Absent == nil {
 			return ErrStillSeen
 		}
+		fixing, err := tx.NewSelect().TableExpr(`"series_run" AS "sr"`).
+			Join(`JOIN "series_run" AS "ab" ON "ab"."id" = ?`, *lead.Absent).
+			Where(`"sr"."id" = ?`, fixedIn).
+			Where(`"sr"."series_id" = ?`, lead.Series).
+			Where(`"sr"."target_id" = ?`, targetID).
+			Where(`"sr"."status" = ?`, series.Applied).
+			Where(`"sr"."comparable" = ?`, true).
+			Where(`"sr"."built_at" >= "ab"."built_at"`).
+			Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("read the run the lead was fixed in: %w", err)
+		}
+		if !fixing {
+			return ErrNotAFixingRun
+		}
 		if err := LeadEnded(ctx, tx, productID, placeIdentity, now); err != nil {
 			return err
 		}
@@ -150,6 +155,12 @@ func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID in
 			return fmt.Errorf("close lead %d: %w", lead.ID, err)
 		}
 		out.Closed = int(affected)
+		if _, err := tx.NewUpdate().Model((*series.Sighting)(nil)).
+			Set(`"fixed_run_id" = ?`, fixedIn).
+			Where(`"finding_id" = ?`, lead.ID).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("record the build lead %d was fixed in: %w", lead.ID, err)
+		}
 		return nil
 	})
 	if err != nil {

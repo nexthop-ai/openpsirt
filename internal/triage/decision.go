@@ -1135,9 +1135,19 @@ func (s *Store) reaching(ctx context.Context, subject access.Subject, decisionID
 		// were given: a collaborator may argue about the issue they
 		// were brought in on and may not agree to anybody's claim
 		// about it.
-		if !cases || !readableOn(subject, decision.ProductID,
-			decision.VulnerabilityID, decision.Visibility) {
+		if !cases {
 			return nil, ErrNotTheirs
+		}
+		if !readableOn(subject, decision.ProductID, decision.VulnerabilityID, decision.Visibility) {
+			// A lead included in its flaw's case is read by the flaw's
+			// readers, which only the row's place says.
+			included, err := s.readsIncluded(ctx, subject, []int64{decision.ID})
+			if err != nil {
+				return nil, err
+			}
+			if !included[decision.ID] {
+				return nil, ErrNotTheirs
+			}
 		}
 	}
 	return decision, nil

@@ -348,7 +348,7 @@ func TestAWithdrawnAgreementIsNotResurrectedByAVersionBump(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Somebody thought better of it.
-		if err := f.store.Withdraw(ctx, f.triager, agreed.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, agreed.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 

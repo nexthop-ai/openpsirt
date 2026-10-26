@@ -116,7 +116,18 @@ func approvableBy(query *bun.SelectQuery, subject access.Subject, column string)
 
 // readableBy narrows a query to the decisions a subject may see.
 func readableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
-	return narrowedBy(query, subject, column, readable, onCases)
+	where, args := readableWhere(subject, column)
+	return narrowedOn(query, where, args)
+}
+
+// readableWhere is the condition a decision row under the alias named meets
+// where the subject may read it: its finding's visibility, the cases they
+// were brought into, and a lead included in its flaw's case.
+func readableWhere(subject access.Subject, column string) (string, []any) {
+	where, args := visibleCondition(subject, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
+		`"`+column+`"."vulnerability_id"`, readable, onCases)
+	return orIncluded(subject, where, args, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
+		`"`+column+`"."place_identity"`)
 }
 
 // readableFindings narrows a query that joins findings to the ones a subject
@@ -149,8 +160,56 @@ func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, p
 // which is never true, so the outer join quietly becomes an inner one. The
 // empty string means the subject reads everywhere and there is nothing to add.
 func readableFindingsOn(subject access.Subject, finding, product string) (string, []any) {
-	return visibleCondition(subject, product, `"`+finding+`"."visibility"`, `"`+finding+`"."vulnerability_id"`,
+	where, args := visibleCondition(subject, product, `"`+finding+`"."visibility"`, `"`+finding+`"."vulnerability_id"`,
 		readable, onCases)
+	return orIncluded(subject, where, args, product, `"`+finding+`"."visibility"`, `"`+finding+`"."place_identity"`)
+}
+
+// orIncluded widens a reading narrowing by the leads included in an
+// undisclosed flaw's case, for the flaw's readers: somebody who reads
+// undisclosed work in the product, and somebody on the flaw's case. A lead and
+// the claims at its place stay internal while the flaw is undisclosed, so the
+// widening is the internal rows at an included lead's place and nothing else.
+//
+// Only where the subject does not read internal work in the product already,
+// for the reason orBrought gives.
+func orIncluded(subject access.Subject, where string, args []any, product, visibility, place string) (string, []any) {
+	if where == "" || subject.Kind != access.Person {
+		return where, args
+	}
+	var audience []string
+	var audienceArgs []any
+	products, all := subject.Products()
+	if !all {
+		var private []int64
+		for _, id := range products {
+			if subject.Sees(id) && subject.Reads(access.Private, id) && !subject.Reads(access.Internal, id) {
+				private = append(private, id)
+			}
+		}
+		if len(private) > 0 {
+			audience = append(audience, `"ilh"."product_id" IN (?)`)
+			audienceArgs = append(audienceArgs, bun.List(private))
+		}
+	}
+	for _, id := range subject.CaseProducts() {
+		if subject.Reads(access.Internal, id) {
+			continue
+		}
+		audience = append(audience, `("ilh"."product_id" = ? AND "ilh"."vulnerability_id" IN (SELECT "imv"."id"
+			FROM "vulnerability" AS "imv" JOIN "vulnerability" AS "imi" ON "imi"."issue_id" = "imv"."issue_id"
+			WHERE "imi"."id" IN (?)))`)
+		audienceArgs = append(audienceArgs, id, bun.List(subject.Cases(id)))
+	}
+	if len(audience) == 0 {
+		return where, args
+	}
+	included := "(" + visibility + ` = ? AND EXISTS (SELECT 1 FROM "lead_handoff" AS "ilh"
+		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."place_identity" = ` + place + `
+		  AND "ilh"."moved_at" IS NOT NULL AND "ilh"."disclosed_at" IS NULL
+		  AND (` + strings.Join(audience, " OR ") + `)))`
+	args = append(append(append([]any{}, args...), access.Internal), audienceArgs...)
+	return "(" + where + " OR " + included + ")", args
 }
 
 // orBrought widens a narrowing by the cases this subject was brought into: one
@@ -379,8 +438,7 @@ func (s *Store) partlyHidden(ctx context.Context, subject access.Subject,
 // notReadableWhere is the condition a decision row meets where the subject may
 // not read it, cases included — the complement of readableBy.
 func notReadableWhere(subject access.Subject, column string) (string, []any) {
-	return negated(visibleCondition(subject, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
-		`"`+column+`"."vulnerability_id"`, readable, onCases))
+	return negated(readableWhere(subject, column))
 }
 
 // notApprovableWhere is the condition a decision row meets where the subject

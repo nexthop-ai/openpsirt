@@ -94,9 +94,10 @@ func leadV0110(t *columnTypes) []string {
 			"place_identity"   ` + t.hash + ` NOT NULL,
 			-- The flaw it was recorded as.
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
-			-- The visibility the lead's findings hold: internal where it was
-			-- kept, private once moved into the case, public once its flaw
-			-- is disclosed. A sighting opening later opens at it.
+			-- The visibility the lead's findings hold: internal while its
+			-- flaw is undisclosed, kept or moved, and public once a moved
+			-- lead is disclosed with its flaw. A sighting opening later
+			-- opens at it.
 			"visibility"       ` + t.kind + ` NOT NULL,
 			"handed_by"        ` + t.ref + ` NOT NULL,
 			"handed_at"        ` + t.timestamp + ` NOT NULL,
@@ -118,6 +119,48 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "lead_handoff_moved_by_fk" FOREIGN KEY ("moved_by") REFERENCES "person"("id")
 		)` + t.suffix,
 		`CREATE INDEX "lead_handoff_flaw_idx" ON "lead_handoff" ("vulnerability_id")`,
+
+		// The lead a flaw was recorded from, with what its hand-off was
+		// offered: kept with the flaw after the hand-off is undone, which is
+		// when the link above goes.
+		`CREATE TABLE "flaw_lead" (
+			"id"                  ` + t.id + `,
+			"product_id"          ` + t.ref + ` NOT NULL,
+			"vulnerability_id"    ` + t.ref + ` NOT NULL,
+			-- The place of the lead the hand-off was made at.
+			"place_identity"      ` + t.hash + ` NOT NULL,
+			-- The component the offer ranked first, which the person may
+			-- have turned down. Null where it was the build itself.
+			"suggested_component" ` + t.free + ` NULL,
+			"suggested_ecosystem" ` + t.name + ` NULL,
+			"suggested_namespace" ` + t.free + ` NULL,
+			"suggested_from"      ` + t.kind + ` NOT NULL,
+			"handed_by"           ` + t.ref + ` NOT NULL,
+			"handed_at"           ` + t.timestamp + ` NOT NULL,
+			-- Who undid the hand-off, when and why. Null while it stands.
+			"undone_by"           ` + t.refNull + `,
+			"undone_at"           ` + t.timestamp + ` NULL,
+			"undone_note"         ` + t.text + ` NULL,
+			CONSTRAINT "flaw_lead_flaw_unique" UNIQUE ("vulnerability_id"),
+			CONSTRAINT "flaw_lead_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "flaw_lead_flaw_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "flaw_lead_by_fk" FOREIGN KEY ("handed_by") REFERENCES "person"("id"),
+			CONSTRAINT "flaw_lead_undone_by_fk" FOREIGN KEY ("undone_by") REFERENCES "person"("id")
+		)` + t.suffix,
+		`CREATE INDEX "flaw_lead_place_idx" ON "flaw_lead" ("product_id", "place_identity")`,
+
+		// One build of the set a hand-off proposed the flaw against.
+		`CREATE TABLE "flaw_lead_build" (
+			"id"           ` + t.id + `,
+			"flaw_lead_id" ` + t.ref + ` NOT NULL,
+			"target_id"    ` + t.ref + ` NOT NULL,
+			-- True where the lead was seen in it, false where it holds the
+			-- chosen component and the lead's series never analyzed it.
+			"seen"         ` + t.boolean + ` NOT NULL,
+			CONSTRAINT "flaw_lead_build_unique" UNIQUE ("flaw_lead_id", "target_id"),
+			CONSTRAINT "flaw_lead_build_lead_fk" FOREIGN KEY ("flaw_lead_id") REFERENCES "flaw_lead"("id"),
+			CONSTRAINT "flaw_lead_build_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+		)` + t.suffix,
 
 		// The component a path prefix was confirmed as at a hand-off, which
 		// the next hand-off under it is offered first.
@@ -174,7 +217,7 @@ func createLeadV0110(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	for _, table := range []string{"lead_rule", "rule_rating", "rule_family",
-		"lead_handoff", "lead_component", "lead_collaborator"} {
+		"lead_handoff", "flaw_lead", "flaw_lead_build", "lead_component", "lead_collaborator"} {
 		present, err := u.hasColumn(table, "id")
 		if err != nil {
 			return err

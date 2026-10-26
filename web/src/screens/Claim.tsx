@@ -66,6 +66,13 @@ export function Claim({ who }: { who: Who }) {
   // products is two pieces of work with two sets of readers.
   const about = { product: it.place.product, vulnerability: it.place.vulnerability };
   const again = () => void queries.invalidateQueries({ queryKey: ["claim", id] });
+  // Reading a claim about internal material is not arguing it: the flaw's
+  // readers read a moved lead's claims and take no part in them. A comment
+  // takes triage or approval there, and a link, a revision and a withdrawal
+  // take triage.
+  const here = mayOf(who, it.place.product ?? "");
+  const comments = !it.internal || !!(here?.triages_internal || here?.agrees_internal);
+  const links = !it.internal || !!here?.triages_internal;
 
   return (
     <>
@@ -98,8 +105,8 @@ export function Claim({ who }: { who: Who }) {
         </p>
       </div>
 
-      <Argument claim={it} id={id} onChanged={again} />
-      <Reasoning claim={it} about={about} onChanged={again} />
+      <Argument claim={it} id={id} links={links} onChanged={again} />
+      <Reasoning claim={it} about={about} onChanged={again} writes={links} />
       <Reaffirm claim={it} id={id} mine={mine} />
       <Answer claim={it} mine={mine} onAnswered={again} />
       <HoldBack claim={it} mine={mine} onHeld={again} />
@@ -109,13 +116,25 @@ export function Claim({ who }: { who: Who }) {
         mine={(wrote) => wrote === who.identity}
         about={about}
         undisclosed={!!it.undisclosed}
+        internal={!!it.internal}
+        writes={comments}
       />
     </>
   );
 }
 
 // The claim's argument, its landing place, and its present reach.
-function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChanged: () => void }) {
+function Argument({
+  claim,
+  id,
+  links,
+  onChanged,
+}: {
+  claim: Claimed;
+  id: number;
+  links: boolean;
+  onChanged: () => void;
+}) {
   const bulk = claim.issues > 1;
   return (
     <div className={`card standing ${stripeOf(claim.happened, !!claim.argument.needs_approval)}`}>
@@ -250,7 +269,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
           </Link>
         </p>
       )}
-      <Elsewhere id={id} where={claim.claim.elsewhere ?? ""} onSet={onChanged} />
+      <Elsewhere id={id} where={claim.claim.elsewhere ?? ""} onSet={onChanged} writes={links} />
     </div>
   );
 }
@@ -390,10 +409,12 @@ function Reasoning({
   claim,
   about,
   onChanged,
+  writes,
 }: {
   claim: Claimed;
   about: { product: string; vulnerability: string };
   onChanged: () => void;
+  writes: boolean;
 }) {
   const id = claim.claim.id;
   // The card names the screen so the reasoning block is styled as something
@@ -408,7 +429,9 @@ function Reasoning({
         approved={claim.happened === "approved"}
         about={about}
         undisclosed={!!claim.undisclosed}
+        internal={!!claim.internal}
         onDone={onChanged}
+        writes={writes}
       />
     </div>
   );

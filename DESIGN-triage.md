@@ -296,6 +296,7 @@ what became of it, what it wrote, and what it covers now.
 | Refused whole or answered whole | Shown half, a reader would be told about words whose other half is about a finding they may not see |
 | A list showing the rows a reader may read leaves off the reasoning of a claim they may read only part of | The record of judgments, the list of decisions, one decision read alone, and the earlier, similar and elsewhere judgments beside a finding each show a row its reader may read. The reasoning on it is about every place of the claim, so it is shown only where they may read them all |
 | A case grant reaches it | Somebody brought into one issue is offered its decisions by every list they can reach, and a claim offered and then refused reads as a fault rather than as a rule |
+| The flaw's readers reach a claim at a moved lead's place while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the lead, and the same narrowing adds its claims (`DESIGN-analysis.md` § Keep or move) |
 | The counts are narrowed to findings the reader may see | A claim somebody may read can match findings they may not, and a count is the leak even where no row is shown |
 
 ## Claims

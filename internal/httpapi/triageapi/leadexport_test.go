@@ -73,7 +73,7 @@ func leadRowsIn(t *testing.T, header []string, rows [][]string) []map[string]str
 // may not read the product is refused before a byte is written. Across
 // products the lead is written under its product.
 func TestTheFindingsFileCarriesTheOpenLeadsToInternalReadersAlone(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		const message, snippet = "p is leaked", "return;"
 		for _, path := range []string{
@@ -89,7 +89,7 @@ func TestTheFindingsFileCarriesTheOpenLeadsToInternalReadersAlone(t *testing.T) 
 				}
 				l := leads[0]
 				if l["issue"] != "clang-tidy/leak" || l["path"] != "src/a.c" || l["line"] != "12" ||
-					l["message"] != message || l["withheld"] != "false" || l["stream"] != "master" ||
+					l["message"] != message || l["stream"] != "master" ||
 					l["variant"] != "broadcom" || l["severity"] != "" || l["component"] != "" {
 					t.Errorf("%s: %s's file holds the lead as %v", path, who, l)
 				}
@@ -124,7 +124,7 @@ func TestTheFindingsFileCarriesTheOpenLeadsToInternalReadersAlone(t *testing.T) 
 // A lead carries no rating, component or decision, so a findings file
 // narrowed by anything but its order holds none, and says so.
 func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		for _, asked := range []string{
 			"sort=age&asc=true",
@@ -161,7 +161,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 // file holds it, as it holds a finding a claim waits on, though the queue
 // leaves it out.
 func TestAFindingsFileHoldsAnOpenLeadAClaimWaitsOn(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
@@ -180,7 +180,7 @@ func TestAFindingsFileHoldsAnOpenLeadAClaimWaitsOn(t *testing.T) {
 // document's exclusion is pinned beside the other vulnerability consumers,
 // because no outcome a lead takes is one the document states.
 func TestALeadInTheQueueReachesNoFigure(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		if got := leadsOf(t, r, "internal-reader", ""); got.Total != 1 {
 			t.Fatalf("the queue holds %d leads; want the seeded lead, or this checks nothing", got.Total)

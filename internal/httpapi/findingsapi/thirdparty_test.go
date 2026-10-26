@@ -38,7 +38,7 @@ func vendoredRun(files ...string) string {
 // confirmed for one lead under it is offered first for the next. The lead and
 // the offer both say it is third-party; a lead outside it says nothing.
 func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		const shallow, deep, own = "src/vendor/zlib/inflate.c", "src/vendor/zlib/contrib/minizip/zip.c", "src/c.c"
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),
@@ -150,7 +150,7 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 // not reach the queue once a newer run declares nothing.
 func TestTheLeadQueueReadsThirdPartyFromTheNewestRunThatSawTheLead(t *testing.T) {
 	const vendored = "src/vendor/zlib/inflate.c"
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-2*time.Hour), vendoredRun(vendored))
 		r.PatchedRows(t, `UPDATE "series_run" SET "third_party" = '["src/vendor/zlib"]'
