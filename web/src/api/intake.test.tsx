@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   editReportNote,
+  handedBack,
   useAcceptReport,
   useApproveRuling,
   useAssignReport,
@@ -94,7 +95,7 @@ describe("an act on a report, once it lands", () => {
 });
 
 describe("handing back everything somebody holds", () => {
-  it("moves the holdings, the findings nobody holds and the reports nobody holds", async () => {
+  it("refreshes who holds what, every list of held or unheld work, and Home", async () => {
     const { sent, invalidated } = await acted(mount.render, mount.host, "POST", useHandBack, "bo");
     expect(sent).toEqual([
       [
@@ -102,6 +103,6 @@ describe("handing back everything somebody holds", () => {
         { params: { path: { identity: "bo" } }, body: {} },
       ],
     ]);
-    expect(invalidated).toEqual(["findings", "held-reports", "holdings"]);
+    expect(invalidated).toEqual([...handedBack].sort());
   });
 });

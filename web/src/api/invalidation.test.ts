@@ -19,7 +19,7 @@ vi.mock("@tanstack/react-query", async (actual) => ({
 }));
 
 const { useAfterAdvisory } = await import("./advisories");
-const { useAfterReport } = await import("./intake");
+const { useAfterReport, useAfterHandBack } = await import("./intake");
 
 beforeEach(() => {
   invalidated.length = 0;
@@ -62,6 +62,21 @@ describe("what an act invalidates", () => {
         "report",
         "reports",
         "rulings",
+      ].sort(),
+    );
+  });
+
+  it("a hand-back reaches who holds what, every list of held or unheld work, and Home", () => {
+    expect(after(useAfterHandBack)).toEqual(
+      [
+        "assigned",
+        "findings",
+        "held-reports",
+        "holdings",
+        "home",
+        "leads",
+        "reports",
+        "team-assigned",
       ].sort(),
     );
   });

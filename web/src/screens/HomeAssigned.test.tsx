@@ -41,3 +41,27 @@ describe("what the front page says somebody holds", () => {
     expect(await drawn(0)).not.toContain("report");
   });
 });
+
+describe("what the front page says each person has in progress", () => {
+  it("counts a person's reports with their open findings", async () => {
+    serve((path) => {
+      if (path === "/v1/assignments")
+        return {
+          data: {
+            items: [
+              { person: "ana", person_name: "Ana", team: false, open: 3, overdue: 0, reports: 2 },
+            ],
+            total: 1,
+          },
+        };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Home who={ANA} />));
+    await settle();
+    const panel = Array.from(mount.host().querySelectorAll(".panel")).find(
+      (each) => each.querySelector("h3")?.textContent === "In progress",
+    );
+    expect(panel?.querySelector(".tally")?.textContent).toBe("5");
+    expect(panel?.querySelector("li .what")?.textContent).toBe("3 open, 2 reports");
+  });
+});

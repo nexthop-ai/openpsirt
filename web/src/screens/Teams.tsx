@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
+import { useAfterHandBack } from "../api/intake";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -29,6 +30,7 @@ import { Wide } from "../ui/Wide";
 // no controls, and no membership rather than an empty one.
 export function Teams() {
   const queries = useQueryClient();
+  const handedBack = useAfterHandBack();
   const admin = !!useWho().data?.admin;
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -56,7 +58,10 @@ export function Teams() {
   const retire = useMutation({
     mutationFn: async (team: string) =>
       unwrap(await api.DELETE("/v1/teams/{team}", { params: { path: { team } } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["teams"] }),
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: ["teams"] });
+      handedBack();
+    },
   });
   const join = useMutation({
     mutationFn: async (who: { team: string; identity: string }) =>
@@ -66,7 +71,10 @@ export function Teams() {
   const leave = useMutation({
     mutationFn: async (who: { team: string; identity: string }) =>
       unwrap(await api.DELETE("/v1/teams/{team}/members/{identity}", { params: { path: who } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["teams"] }),
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: ["teams"] });
+      handedBack();
+    },
   });
 
   if (teams.isPending) return <Loading />;
@@ -170,7 +178,7 @@ export function Teams() {
                         type="button"
                         className="linkish"
                         style={{ color: "var(--muted)" }}
-                        title="Take it out of use. Work already routed here keeps naming it."
+                        title="Take it out of use. Work in its queue goes back to the unassigned list."
                         disabled={retire.isPending}
                         onClick={() => retire.mutate(team.name ?? "")}
                       >

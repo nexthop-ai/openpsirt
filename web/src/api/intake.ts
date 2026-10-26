@@ -322,10 +322,33 @@ export function useAssignReport(product: string, reference: string) {
   });
 }
 
+// What a hand-back moves: who holds work, every list of held or unheld work,
+// and Home. Withdrawing a role, a team change and a deactivation hand work
+// back as well, so each refreshes these beside its own lists.
+export const handedBack = [
+  "holdings",
+  "held-reports",
+  "findings",
+  "leads",
+  "reports",
+  "assigned",
+  "team-assigned",
+  "home",
+];
+
+export function useAfterHandBack() {
+  const queries = useQueryClient();
+  return () => {
+    for (const key of handedBack) {
+      void queries.invalidateQueries({ queryKey: [key] });
+    }
+  };
+}
+
 // Everything one person holds handed back to nobody: their findings and their
 // open reports.
 export function useHandBack() {
-  const queries = useQueryClient();
+  const after = useAfterHandBack();
   return useMutation({
     mutationFn: async (identity: string) =>
       unwrap(
@@ -334,14 +357,7 @@ export function useHandBack() {
           body: {},
         }),
       ),
-    onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["holdings"] });
-      // The badge for what nobody holds is counted from the findings list, so
-      // that is the key to invalidate. Returning a whole queue is the single
-      // act that moves the number most.
-      void queries.invalidateQueries({ queryKey: ["findings"] });
-      void queries.invalidateQueries({ queryKey: ["held-reports"] });
-    },
+    onSuccess: after,
   });
 }
 

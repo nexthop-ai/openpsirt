@@ -6,7 +6,17 @@ import { act } from "react";
 import { api } from "../api/client";
 import { Access } from "./Access";
 import type { Who } from "../app/session";
-import { screen, serve, settle, mounted, type Answer } from "../test/mount";
+import { handedBack } from "../api/intake";
+import {
+  answer,
+  client,
+  screen,
+  serve,
+  settle,
+  mounted,
+  watchInvalidations,
+  type Answer,
+} from "../test/mount";
 
 const mount = mounted();
 
@@ -87,6 +97,20 @@ describe("the access screen", () => {
     await settle();
     expect(mount.host().textContent).toContain("alice");
     expect(mount.host().querySelector('[title="Withdraw this role"]')).toBeNull();
+  });
+
+  it("refreshes the lists of held work when a withdrawn role hands work back", async () => {
+    deployment();
+    const sent = answer("DELETE", () => ({ data: { released: 1 } }));
+    const queries = client();
+    const invalidated = watchInvalidations(queries);
+    mount.render(screen(<Access who={admin} />, "/", "*", queries));
+    await settle();
+    const withdraw = mount.host().querySelector<HTMLElement>('[title="Withdraw this role"]');
+    await act(async () => withdraw?.click());
+    await settle();
+    expect(sent()).toHaveLength(1);
+    expect(invalidated()).toEqual(expect.arrayContaining(["people", ...handedBack]));
   });
 
   it("unbinds a pinned sign-in from the list", async () => {
