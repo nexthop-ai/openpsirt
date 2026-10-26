@@ -138,6 +138,7 @@
   "leads": { "path": "/products/:product/leads", "query": ["state", "stream", "variant"] },
   "lead": { "path": "/products/:product/streams/:stream/variants/:variant/leads/:place" },
   "leadRules": { "path": "/products/:product/lead-rules" },
+  "repositories": { "path": "/products/:product/repositories" },
   "inboxReport": { "path": "/products/:product/inbox/:reference" },
   "me": { "path": "/me" },
   "access": { "path": "/access" },

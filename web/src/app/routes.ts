@@ -88,6 +88,8 @@ export const leadsAt = (
 export const leadAt = (build: Build, place: string) => at("lead", { ...build, place });
 // The standing rules and important paths deciding what reaches the queue.
 export const leadRulesAt = (product: string) => at("leadRules", { product });
+// The hosts a product's source links open on, and what it says per path.
+export const repositoriesAt = (product: string) => at("repositories", { product });
 
 // A component of a product, wherever it sits. The version travels with it
 // where it is known, and so does the build it was reached from, so the screen

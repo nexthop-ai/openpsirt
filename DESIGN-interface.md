@@ -1250,6 +1250,7 @@ is what the screen is about.
 | A product row says what it triages from | An administrator changes it there. Everybody sees it because it explains a number, and "deployment's" is shown rather than the deployment's current word, because following it and stating it are different things |
 | A product row says whether its documents are published | A box an administrator ticks, and a word for everybody else. What publishing serves is `DESIGN-publishing.md`'s |
 | A product row opens the upstream it trusts | An administrator's row action opens a drawer: the upstream as trusted, how reading it is going, a key it offers in place of the trusted one, a control to stop trusting it, and a field to name one. Naming one is two steps, check and then trust, so the key documents will be checked against is shown before anything is read. What an upstream is, is `DESIGN-upstream.md`'s |
+| A product row opens its repository settings | An administrator's row action, offered to nobody else. § The repositories screen holds the screen |
 | A product, a release and a variant are each corrected and retired from the list that declares them | An administrator edits a name, or takes the thing out of use, from the row. The release list of variants is what a release was built as rather than what the product declares, so it carries no control: correcting one thing in two places is how the two come to disagree |
 | A product's edit offers both of its names and says which one is fixed by publication | The name scans and documents use, and the name screens show. They move independently and only the first can be refused, so offering them together with one sentence beside them is what makes the difference visible at the moment somebody types |
 | A retired product says so on its own page | Nothing lists it, so the page is reached by a link somebody kept. Unmarked it reads as a product in use whose scans have quietly stopped. It is not the out-of-support date shown beside it: that is a date support ended on, and this is not tracked here at all |
@@ -1286,6 +1287,22 @@ carries the two builds picked there, and picks its own pair the same way.
 | The chosen kind is in the address | A link somebody shares opens the same narrowing |
 | The file is the narrowing on the screen | CSV and JSON take the same two builds and the same kind |
 | A build with no inventory is said in words | The server refuses rather than listing every name of the other build as added |
+
+### The repositories screen
+
+One product's repository settings, reached from its row in the products
+table. What the settings are and how they are checked is `DESIGN-analysis.md`
+§ Repository settings.
+
+| Rule | |
+|---|---|
+| An administrator's screen | The endpoint refuses anybody else, so for anybody else the screen reads nothing and says it is for administrators |
+| Hosts and paths are two tables edited in place, saved together | The endpoint replaces both at once. A row is added and removed in place, and nothing is sent until Save |
+| A host offers its two templates only where it is custom | A template left on a host changed from custom is not sent, because the server reads none there |
+| A path states each source setting as kept, not kept, or inherited | Inherited is sent as the setting left out, which takes the nearest prefix stating it |
+| An empty field is left out, and every field is trimmed | A repository and a branch are optional, and the server refuses one without the other |
+| A refusal is shown and the draft stays as typed | The server names the entry it refused |
+| A save moves the lead screens | A lead's links are built from these settings as it is read |
 
 ## Product and scan-run pages
 

@@ -280,8 +280,9 @@ reader's browser does, and signs in where the repository is private.
 
 ### Repository settings
 
-An administrator states them per product, and the change is in the
-administrative trail.
+An administrator states them per product, through the API or the product's
+Repositories screen (`DESIGN-interface.md` § The repositories screen), and the
+change is in the administrative trail.
 
 | Setting | |
 |---|---|
@@ -811,13 +812,11 @@ it is about.
 | Part | State |
 |---|---|
 | A file of the lead queue | Not built. The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it. The findings lists' files include no lead; the record's file carries claims about leads, as the record does. `DESIGN-interface.md` § Static analysis leads holds the screens |
-| A screen for a product's repository settings | Not built. They are read and written through the API |
 | Leads in the statistics and reports | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report counts how many leads there are, or how long one took to be judged or fixed. Approval quality reads lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
 | A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
 | Third-party paths | Recorded on the run and read by nothing |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
-| Releasing a held run | Not built. A held run changes nothing and keeps nothing; the next run is compared against the last applied one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 
 ## Limits
