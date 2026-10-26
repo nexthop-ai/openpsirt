@@ -32,12 +32,13 @@ import (
 //
 // A condition about findings asks of two classes of row: disclosed, and
 // withheld, which is every other visibility. A withheld row is told to
-// whoever reads or triages private work, which is the narrower answer for an
-// internal row: no kind these conditions include holds internal material.
+// whoever reads or triages private work. A condition about claims asks of
+// three, because a claim on a lead is internal work, which a reader of
+// undisclosed work does not read (rows).
 type acts struct {
 	approves                                                 bool
 	readsPublic, readsPrivate, triagesPublic, triagesPrivate bool
-	readsInternal                                            bool
+	readsInternal, triagesInternal                           bool
 }
 
 // reads is what a condition sent to whoever may read it asks, of something
@@ -50,19 +51,35 @@ func (a acts) reads(private bool) bool {
 	return a.readsPublic
 }
 
-// readsAll is whether they read every row of something spanning both
+// rows is how many rows of a claim sit at each visibility.
+type rows struct{ public, private, internal int }
+
+// rowsOf splits a count of a claim's rows by the withheld and internal rows
+// among them.
+func rowsOf(all, withheld, internal int) rows {
+	return rows{public: all - withheld, private: withheld - internal, internal: internal}
+}
+
+// told is the marks a condition about these rows carries.
+func (r rows) told() (private, internal bool) {
+	return r.private+r.internal > 0, r.internal > 0
+}
+
+// readsAll is whether they read every row of something spanning
 // visibilities: a claim may mix disclosed and undisclosed places, and a
 // condition about it is sent to somebody who reads every one of them.
-func (a acts) readsAll(public, private int) bool {
-	return (public == 0 || a.readsPublic) && (private == 0 || a.readsPrivate)
+func (a acts) readsAll(r rows) bool {
+	return (r.public == 0 || a.readsPublic) && (r.private == 0 || a.readsPrivate) &&
+		(r.internal == 0 || a.readsInternal)
 }
 
 // approvesAll is whether they may agree to every row of something spanning
-// both visibilities: the rule a signed-in approver is held to, at each
+// visibilities: the rule a signed-in approver is held to, at each
 // visibility the rows are at.
-func (a acts) approvesAll(public, private int) bool {
-	return (public == 0 || access.MayApprove(access.Public, a.approves, a.readsPublic, a.triagesPublic)) &&
-		(private == 0 || access.MayApprove(access.Private, a.approves, a.readsPrivate, a.triagesPrivate))
+func (a acts) approvesAll(r rows) bool {
+	return (r.public == 0 || access.MayApprove(access.Public, a.approves, a.readsPublic, a.triagesPublic)) &&
+		(r.private == 0 || access.MayApprove(access.Private, a.approves, a.readsPrivate, a.triagesPrivate)) &&
+		(r.internal == 0 || access.MayApprove(access.Internal, a.approves, a.readsInternal, false))
 }
 
 // readsIn is whether they read the product at any visibility: the question
@@ -130,8 +147,10 @@ func actsOf(people []access.Account, held map[int64][]access.Grant) map[int64]ma
 				at.readsPublic, at.triagesPublic = true, true
 			case access.PrivateTriage:
 				at.readsPrivate, at.triagesPrivate = true, true
-			case access.InternalRead, access.InternalTriage:
+			case access.InternalRead:
 				at.readsInternal = true
+			case access.InternalTriage:
+				at.readsInternal, at.triagesInternal = true, true
 			}
 			per[grant.ProductID] = at
 		}

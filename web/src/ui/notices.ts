@@ -64,6 +64,10 @@ const WORDS: Record<Kind, string> = {
   "analysis-dropped": "an analyzer run dropped sharply",
   "analysis-not-comparable": "an analyzer run could not be compared",
   "analysis-quiet": "an analyzer has gone quiet",
+  "lead-escalated": "a lead was pulled into the queue",
+  "lead-handed-off": "a lead was handed off as a flaw",
+  "lead-moved": "a lead moved into or out of a case",
+  "rule-outgrown": "a standing rule outgrew its approval",
   // A window after an attack, counted from when it became known, with
   // nobody outside recorded as told. Said as the fact; whether anybody owed
   // anything is not the tool's answer to give.

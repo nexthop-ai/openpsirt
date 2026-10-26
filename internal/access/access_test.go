@@ -253,8 +253,12 @@ func TestReadingInternalIsNotReadingEitherOther(t *testing.T) {
 	if analyst.Triages(access.Internal, 4) || analyst.TriagesIn(4) {
 		t.Error("reading internal work triages it")
 	}
-	if !analyst.Triages(access.Internal, 5) || !analyst.TriagesIn(5) {
+	if !analyst.Triages(access.Internal, 5) {
 		t.Error("internal triage does not triage internal work")
+	}
+	// The acts about a product as a whole are about what its builds ship.
+	if analyst.TriagesIn(5) {
+		t.Error("internal triage triages the product's disclosed or undisclosed work")
 	}
 	if analyst.Triages(access.Private, 5) || analyst.Triages(access.Public, 5) {
 		t.Error("internal triage triages disclosed or undisclosed work too")

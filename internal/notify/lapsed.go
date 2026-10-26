@@ -48,15 +48,21 @@ func Lapse(one triage.ForPerson) Telling {
 		what = fmt.Sprintf("%d decisions of yours", one.Rows)
 	}
 	why := " stopped applying: the code it was a claim about has moved."
-	if one.RatedWorse {
+	again := " The finding is open again, and re-affirming it is yours to do."
+	switch {
+	case one.RatedWorse:
 		why = " stopped applying: the issue is rated worse than when it was made."
+	case one.Probable:
+		why = " stopped applying: an analyzer run matched the lead only by its function or its nearest line."
+		again = " The lead is open again, and re-affirming it is yours to do."
 	}
 	return Telling{
 		PersonID: one.PersonID, Kind: ClaimLapsed,
-		Body: what + why + " The finding is open again, and re-affirming it is yours to do.",
+		Body: what + why + again,
 		Link: weblink.ReviewQueueReaffirm(),
 		// As careful as the most careful row.
-		Private: one.Undisclosed,
+		Private:  one.Undisclosed,
+		Internal: one.Internal,
 		// The fields a later read narrows by, off the representative row.
 		ProductID:       &one.ProductID,
 		VulnerabilityID: &one.VulnerabilityID,

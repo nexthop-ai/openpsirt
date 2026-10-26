@@ -142,6 +142,14 @@ func Leads(product, stream, variant, state string) string {
 	}.Encode()
 }
 
+// LeadRules is a product's standing rules on leads.
+func LeadRules(product string) string {
+	if climbs(product) {
+		return Home()
+	}
+	return "/products/" + url.PathEscape(product) + "/lead-rules"
+}
+
 // Inventories is the list of what one build sent.
 func Inventories(product, stream, variant string) string {
 	if climbs(product, stream, variant) {

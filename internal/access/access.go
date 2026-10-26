@@ -627,14 +627,16 @@ func MayApprove(visibility Visibility, approver, reads, triages bool) bool {
 	return reads && (approver || triages)
 }
 
-// TriagesIn reports whether this subject triages findings of any visibility
-// in this product.
+// TriagesIn reports whether this subject triages disclosed or undisclosed
+// findings in this product.
 //
 // The question an act about the product rather than about one finding asks:
 // routing, a rating, an obligation, taking unowned work. The finding-level
-// question narrows further where there is a finding to ask it of.
+// question narrows further where there is a finding to ask it of. Internal
+// triage answers no: it is the triage of leads, and every one of those acts
+// is about what a build ships.
 func (s Subject) TriagesIn(productID int64) bool {
-	for _, v := range Visibilities() {
+	for _, v := range []Visibility{Public, Private} {
 		if s.Triages(v, productID) {
 			return true
 		}

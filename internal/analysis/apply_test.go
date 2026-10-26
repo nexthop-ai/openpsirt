@@ -829,6 +829,9 @@ func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 			decided[lead.ID] = w.dismissed(t, lead, start.Add(time.Minute))
 		}
 
+		var heard []triage.ForPerson
+		w.applier.TellingLapses(func(_ context.Context, told []triage.ForPerson) { heard = append(heard, told...) })
+
 		// The salt rotates, so every fingerprint changes and nothing else.
 		lone.print, tied.print, twin.print = "c1", "c2", "c3"
 		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour),
@@ -845,6 +848,10 @@ func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 			if got := w.stateOf(t, decided[lead.ID].ID); got != want {
 				t.Errorf("lead %d paired on %q: dismissal %q; want %q", lead.ID, on[lead.ID], got, want)
 			}
+		}
+		// Its proposer is told once, of both, as internal work.
+		if len(heard) != 1 || heard[0].Rows != 2 || !heard[0].Probable || !heard[0].Internal {
+			t.Errorf("told %+v; want the proposer told once of two lapsed claims on leads", heard)
 		}
 	})
 }

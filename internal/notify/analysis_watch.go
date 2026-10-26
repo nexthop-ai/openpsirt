@@ -12,6 +12,8 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/series"
@@ -300,4 +302,69 @@ func (w *sweep) lastRefused(ctx context.Context, build analysisBuild,
 		return nil, nil
 	}
 	return &turned[0], nil
+}
+
+// rulesOutgrown is every approved standing rule on leads that covers more
+// than its approver saw by the deployment's factor, against whoever may
+// approve it again.
+//
+// It keeps dismissing what it names, so nothing reaches the queue to say the
+// agreement no longer matches what it covers. It clears when the rule is
+// approved again at its size, retired, or covers less.
+func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
+	var products []struct {
+		ID    int64  `bun:"id"`
+		Name  string `bun:"name"`
+		Shown string `bun:"display_name"`
+	}
+	if err := w.db.NewSelect().
+		TableExpr(`"product" AS "p"`).
+		ColumnExpr(`"p"."id", "p"."name", "p"."display_name"`).
+		Where(`"p"."retired_at" IS NULL`).
+		Where(`EXISTS (SELECT 1 FROM "lead_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
+			`AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL)`).
+		Scan(ctx, &products); err != nil {
+		return nil, fmt.Errorf("read which products hold standing rules on leads: %w", err)
+	}
+	out, err := w.everybody(ctx, RuleOutgrown)
+	if err != nil {
+		return nil, err
+	}
+	// Counted as the deployment rather than as anybody in it: the count is
+	// the rule's size, and who hears it is decided below by who may approve.
+	everything := access.Everything("the watch")
+	for _, product := range products {
+		rules, err := analysis.StandingRules(ctx, w.db, everything, product.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, rule := range rules {
+			if rule.State != analysis.RuleOutgrown || rule.ApprovedCovering == nil {
+				continue
+			}
+			named := rule.Rule
+			if rule.Prefix != "" {
+				named += " under " + rule.Prefix
+			}
+			productID := product.ID
+			holds := Holds{
+				About: identify("rule-outgrown", strconv.FormatInt(rule.ID, 10)),
+				Body: fmt.Sprintf("A standing rule in %s dismissing %s covers %d leads, and was approved "+
+					"over %d. It keeps dismissing them until somebody approves it again.",
+					product.Shown, named, rule.Covering, *rule.ApprovedCovering),
+				Link:      weblink.LeadRules(product.Name),
+				Private:   true,
+				Internal:  true,
+				ProductID: &productID,
+			}
+			for personID, per := range w.reach {
+				// Approved again by somebody other than its proposer.
+				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{internal: 1}) {
+					continue
+				}
+				out[personID] = append(out[personID], holds)
+			}
+		}
+	}
+	return out, nil
 }

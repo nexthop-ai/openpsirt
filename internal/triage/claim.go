@@ -820,6 +820,8 @@ type SentBack struct {
 	// row being public says nothing about the rest, and what may leave
 	// this deployment is decided by the most careful row in the set.
 	Undisclosed bool
+	// Internal says at least one row is internal work, on the same terms.
+	Internal bool
 }
 
 // SendBackClaim asks the author for more before agreeing to any of a claim.
@@ -871,6 +873,9 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			// claim's identity and not for this.
 			if row.Visibility != access.Public {
 				result.Undisclosed = true
+			}
+			if row.Visibility == access.Internal {
+				result.Internal = true
 			}
 			ids = append(ids, row.ID)
 		}

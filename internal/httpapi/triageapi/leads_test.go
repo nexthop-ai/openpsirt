@@ -316,6 +316,34 @@ func TestALeadPulledInIsInTheQueue(t *testing.T) {
 		if got := leadState(t, r, place); got != "open" {
 			t.Errorf("the lead's evidence says %q; want open", got)
 		}
+		// The other internal triagers are told, once, and its author is not.
+		told := func(who string) int {
+			var theirs struct {
+				Items []struct {
+					Kind string `json:"kind"`
+				} `json:"items"`
+			}
+			httpapitest.Read(t, r, who, "/v1/notifications", &theirs)
+			n := 0
+			for _, item := range theirs.Items {
+				if item.Kind == "lead-escalated" {
+					n++
+				}
+			}
+			return n
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, `{}`); got.Code != http.StatusOK {
+			t.Fatalf("pulling the lead in again answered %d: %s", got.Code, got.Body)
+		}
+		if n := told("internal-lead"); n != 1 {
+			t.Errorf("another internal triager was told %d times; want once", n)
+		}
+		if n := told("internal-triager"); n != 0 {
+			t.Errorf("the triager who pulled it in was told %d times; want never", n)
+		}
+		if n := told("internal-reader"); n != 0 {
+			t.Errorf("an internal reader who does not triage was told %d times; want never", n)
+		}
 	})
 }
 

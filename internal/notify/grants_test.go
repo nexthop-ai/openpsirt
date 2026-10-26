@@ -221,7 +221,7 @@ func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	})
 }
 
-func TestAClaimAboutALeadIsToldNobody(t *testing.T) {
+func TestAClaimAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		s := aSplit(t, w)
@@ -247,12 +247,33 @@ func TestAClaimAboutALeadIsToldNobody(t *testing.T) {
 		s.claim(t, proposer, 1, 0, dismissed, returned)
 		sweep(t, db)
 
-		for _, who := range []int64{proposer, privateApprover, internalApprover} {
-			for _, kind := range []notify.Kind{notify.ClaimWaiting, notify.SentBackWaiting} {
-				if told := openFor(t, db, who, kind); len(told) != 0 {
-					t.Errorf("person %d was told %s about a lead: %q", who, kind, told)
-				}
+		for _, want := range []struct {
+			who  string
+			id   int64
+			kind notify.Kind
+			told int
+		}{
+			{"the internal approver", internalApprover, notify.ClaimWaiting, 1},
+			{"the proposer", proposer, notify.SentBackWaiting, 1},
+			{"the proposer", proposer, notify.ClaimWaiting, 0},
+			{"an approver of undisclosed work", privateApprover, notify.ClaimWaiting, 0},
+			{"an approver of undisclosed work", privateApprover, notify.SentBackWaiting, 0},
+			{"the internal approver", internalApprover, notify.SentBackWaiting, 0},
+		} {
+			if told := openFor(t, db, want.id, want.kind); len(told) != want.told {
+				t.Errorf("%s was told %s %q; want %d", want.who, want.kind, told, want.told)
 			}
+		}
+		// Marked as internal work, so the list withholds it from a reader of
+		// undisclosed work.
+		marked, err := db.DB.NewSelect().Model((*notify.Notification)(nil)).
+			Where(`"person_id" IN (?, ?)`, internalApprover, proposer).
+			Where(`"internal" = ?`, true).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if marked != 2 {
+			t.Errorf("%d of the lines about the lead are marked internal; want 2", marked)
 		}
 	})
 }

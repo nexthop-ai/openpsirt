@@ -32,9 +32,16 @@ import (
 type Applier struct {
 	db  *database.DB
 	now func() time.Time
-	// drops is told of each applied run that dropped sharply, once its
-	// transaction has committed.
-	drops func(context.Context, Drop)
+	// drops is told of each applied run that dropped sharply, and lapses of
+	// whose claims on leads a run lapsed, once its transaction has committed.
+	drops  func(context.Context, Drop)
+	lapses func(context.Context, []triage.ForPerson)
+}
+
+// told is what an applied run has to say once it commits.
+type told struct {
+	drop   *Drop
+	lapsed []triage.ForPerson
 }
 
 // NewApplier returns an applier.
@@ -55,6 +62,13 @@ type Drop struct {
 // tells once.
 func (a *Applier) TellingDrops(tell func(context.Context, Drop)) *Applier {
 	a.drops = tell
+	return a
+}
+
+// TellingLapses has the applier tell the proposers of the claims on leads a
+// run lapsed, on the terms TellingDrops tells.
+func (a *Applier) TellingLapses(tell func(context.Context, []triage.ForPerson)) *Applier {
+	a.lapses = tell
 	return a
 }
 
@@ -124,16 +138,22 @@ func (a *Applier) Apply(ctx context.Context, runID int64) (series.Status, error)
 		read = &h
 	}
 	var status series.Status
-	var drop *Drop
+	var said told
 	err = database.InTransaction(ctx, a.db.DB, func(ctx context.Context, tx bun.Tx) error {
-		drop = nil
-		status, err = a.apply(ctx, tx, runID, read, &drop)
+		said = told{}
+		status, err = a.apply(ctx, tx, runID, read, &said)
 		return err
 	})
-	if err == nil && drop != nil && a.drops != nil {
-		a.drops(ctx, *drop)
+	if err != nil {
+		return status, err
 	}
-	return status, err
+	if said.drop != nil && a.drops != nil {
+		a.drops(ctx, *said.drop)
+	}
+	if len(said.lapsed) > 0 && a.lapses != nil {
+		a.lapses(ctx, said.lapsed)
+	}
+	return status, nil
 }
 
 // pending is whether a run is still to be applied.
@@ -239,7 +259,7 @@ func modulesOf(r *sarif.Run, root string) []series.Module {
 }
 
 // apply applies a placed run inside one transaction.
-func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held, drop **Drop) (series.Status, error) {
+func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held, said *told) (series.Status, error) {
 	store := series.NewStore(tx)
 	if err := store.Take(ctx, runID); err != nil {
 		return "", err
@@ -337,7 +357,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		}
 		if sharp {
 			receipt.SharpDrop = true
-			*drop = &Drop{RunID: run.ID, SeriesID: set.ID, TargetID: run.TargetID,
+			said.drop = &Drop{RunID: run.ID, SeriesID: set.ID, TargetID: run.TargetID,
 				Missed: len(missed), Live: live(open)}
 		}
 	}
@@ -435,9 +455,11 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 			receipt.Reopened++
 		}
 	}
-	if err := lapseProbable(ctx, tx, set.ProductID, matched, from, a.now()); err != nil {
+	lapsed, err := lapseProbable(ctx, tx, set.ProductID, matched, from, a.now())
+	if err != nil {
 		return "", err
 	}
+	said.lapsed = lapsed.Told
 	run.Status = series.Applied
 	return run.Status, a.end(ctx, store, run, receipt)
 }
@@ -446,7 +468,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 // probably, on its function or its nearest line, whether it was a lead open on
 // the build or one carried from elsewhere.
 func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map[int64]Keyed,
-	from map[int]carried, now time.Time) error {
+	from map[int]carried, now time.Time) (triage.Lapsed, error) {
 
 	var ids []int64
 	for id, k := range matched {
@@ -464,15 +486,14 @@ func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map
 		places = append(places, some...)
 		return nil
 	}); err != nil {
-		return err
+		return triage.Lapsed{}, err
 	}
 	for _, c := range from {
 		if !strong(c.on) {
 			places = append(places, c.place)
 		}
 	}
-	_, err := triage.LapseLeads(ctx, tx, productID, places, now)
-	return err
+	return triage.LapseLeads(ctx, tx, productID, places, now)
 }
 
 // printsOf is what a run's results are fingerprinted with: the scheme each

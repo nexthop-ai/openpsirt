@@ -240,6 +240,10 @@ func registerHandoff(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, refusedHandoff(in, err)
 		}
+		if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadHandedOff,
+			ProductID: at.named.ProductID, Place: input.Place, By: subject.ID}); err != nil {
+			in.Log().Error("could not say that a lead was handed off", "error", err)
+		}
 		return &struct {
 			Status int
 			Body   HandedOffBody
@@ -272,6 +276,10 @@ func registerHandoff(api huma.API, in core.Deps) {
 			}
 			if err != nil {
 				return nil, refusedHandoff(in, err)
+			}
+			if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadMoved,
+				ProductID: at.named.ProductID, Place: input.Place, By: at.subject.ID, Into: move}); err != nil {
+				in.Log().Error("could not say that a lead moved", "error", err)
 			}
 			return &struct{}{}, nil
 		}

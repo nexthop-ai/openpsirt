@@ -14,6 +14,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
 - [An inventory that moved sharply](#an-inventory-that-moved-sharply)
 - [Analyzer alerts](#analyzer-alerts)
+- [Lead notices](#lead-notices)
 - [Staleness conditions](#staleness-conditions)
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
@@ -89,6 +90,8 @@ true is cleared, and running the same pass twice changes nothing.
 | An analyzer run that marked much of a build not reproduced | event | Below, under analyzer alerts |
 | An analyzer series whose newest run on a build could not be compared | condition | Below, under analyzer alerts |
 | An analyzer series gone quiet on a build | condition | Below, under analyzer alerts |
+| A lead pulled into the queue, handed off, or moved into or out of its flaw's case | event | Below, under lead notices |
+| A standing rule on leads outgrowing its approval | condition | Below, under lead notices |
 | A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
 | The same window near its end, where it names a warning | condition | Described under obligation notices below |
 | The same window passed | condition | Described under obligation notices below |
@@ -203,6 +206,30 @@ found, and each is about internal work, so it is withheld on the terms of
 | A series with fewer than three applied runs on a build is never quiet | Two runs are one gap, which is a guess |
 | Builds retired at any level, and releases past their end of life, are left out | Nobody analyzes them on purpose |
 | The thresholds of a sharp drop are the analyzer drop share and floor, both passed | `DESIGN-analysis.md` § Run application |
+
+## Lead notices
+
+A claim on a lead is told on the terms of every other claim: waiting for a
+second person, sent back and left, lapsed, and an agreement an edit took back.
+Its rows are internal work, so each line is withheld as internal (§ The
+notification list).
+
+| Notice | Kind | To | Clears |
+|---|---|---|---|
+| A claim on a lead waiting for a second person | condition | Whoever may approve at internal visibility: the approver capability and `internal-read`, never its proposer | Approved, sent back or withdrawn |
+| A claim on a lead sent back and left | condition | Its author, while they read internal work | Revised or withdrawn |
+| A dismissal of a lead lapsed by a probable pairing | event | Its proposer, once per run, after the run commits | Acknowledged |
+| An agreement to a claim on a lead taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
+| A lead pulled into the queue by a person | event | The product's internal triagers, never whoever pulled it in. Pulled in again, nobody is told | Acknowledged |
+| A lead handed off as a flaw | event | The product's internal triagers, never whoever handed it off. The flaw recorded tells what recording any flaw tells | Acknowledged |
+| A handed-off lead moved into its flaw's case, or taken back out | event | The product's internal triagers, never whoever moved it | Acknowledged |
+| A standing rule on leads outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or covering less |
+
+| Rule | Reason |
+|---|---|
+| A claim's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
+| A lead's escalation by an important path, or by a second analyzer, tells nobody | It happens as a run applies, and the lead arrives in the queue with the rest of the run |
+| A lead sent back links to the lead | A rule names no finding page |
 
 ## Staleness conditions
 

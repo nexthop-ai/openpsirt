@@ -812,11 +812,6 @@ it is about.
 |---|---|
 | A file of the lead queue | Not built. The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it. The findings lists' files include no lead; the record's file carries claims about leads, as the record does. `DESIGN-interface.md` § Static analysis leads holds the screens |
 | A screen for a product's repository settings | Not built. They are read and written through the API |
-| Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
-| Telling anybody a lead was escalated | Not built |
-| Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
-| Telling anybody a claim on a lead waits for a second person or was sent back | Not built. Notifications include no lead (`DESIGN-kinds.md` § Consumers), so the claim notices count the claims about vulnerabilities and flaws alone; the review queue lists a claim on a lead |
-| Telling anybody a lead was handed off or moved | Not built. Recording the flaw tells what recording any flaw tells; a lead collaborator is told they were brought in |
 | Leads in the statistics and reports | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report counts how many leads there are, or how long one took to be judged or fixed. Approval quality reads lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
 | A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
