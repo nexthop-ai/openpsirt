@@ -33,23 +33,32 @@ type FlawUnseenBody struct {
 	Fixed   *LeadRunBody `json:"fixed,omitempty" doc:"The build a person stated fixed the lead, where they closed it as fixed"`
 }
 
+// FlawSuggestedBody is the component a hand-off's offer ranked first, as the
+// flaw's record keeps it.
+type FlawSuggestedBody struct {
+	Component string        `json:"component,omitempty" doc:"The component, as the builds name it. Absent where the build itself was offered"`
+	Ecosystem string        `json:"ecosystem,omitempty" doc:"Its ecosystem, where its package identifier states one"`
+	Namespace string        `json:"namespace,omitempty" doc:"Its namespace, where its package identifier states one"`
+	From      HandoffSource `json:"from" doc:"Where the suggestion came from: a prefix confirmed at an earlier hand-off, the component the lead was placed on, a component whose name resembles the lead's directory, or the build itself"`
+}
+
 // FlawLeadBody is the lead a flaw was recorded from.
 type FlawLeadBody struct {
-	Place     string           `json:"place" doc:"The lead's place identity"`
-	Stream    string           `json:"stream" doc:"The branch or tag of the build its newest finding you read is on"`
-	Variant   string           `json:"variant" doc:"The variant of that build"`
-	Rule      string           `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	Path      string           `json:"path" doc:"Where the lead is, relative to the top of the checkout"`
-	Line      int              `json:"line,omitempty" doc:"The line it starts at"`
-	State     LeadState        `json:"state" doc:"Where the lead stands on that build"`
-	Suggested SuggestionBody   `json:"suggested" doc:"The component the hand-off's offer ranked first, which the person may have turned down. Absent for the build itself"`
-	Proposed  []FlawLeadBuild  `json:"proposed" doc:"The builds the hand-off proposed the flaw against"`
-	HandedBy  string           `json:"handed_by" doc:"The person who handed it off, by sign-in identity"`
-	HandedAt  string           `json:"handed_at" format:"date-time"`
-	UndoneBy  string           `json:"undone_by,omitempty" doc:"The person who undid the hand-off, by sign-in identity"`
-	UndoneAt  string           `json:"undone_at,omitempty" format:"date-time" doc:"When the hand-off was undone. Absent while it stands"`
-	Because   string           `json:"because,omitempty" doc:"Why the hand-off was undone, in markdown"`
-	FixedIn   []FlawUnseenBody `json:"fixed_in" doc:"Each build the flaw is still open on whose lead a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the hand-off is undone"`
+	Place     string            `json:"place" doc:"The lead's place identity"`
+	Stream    string            `json:"stream" doc:"The branch or tag of the build its newest finding you read is on"`
+	Variant   string            `json:"variant" doc:"The variant of that build"`
+	Rule      string            `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	Path      string            `json:"path" doc:"Where the lead is, relative to the top of the checkout"`
+	Line      int               `json:"line,omitempty" doc:"The line it starts at"`
+	State     LeadState         `json:"state" doc:"Where the lead stands on that build"`
+	Suggested FlawSuggestedBody `json:"suggested" doc:"The component the hand-off's offer ranked first, which the person may have turned down"`
+	Proposed  []FlawLeadBuild   `json:"proposed" doc:"The builds the hand-off proposed the flaw against"`
+	HandedBy  string            `json:"handed_by" doc:"The person who handed it off, by sign-in identity"`
+	HandedAt  string            `json:"handed_at" format:"date-time"`
+	UndoneBy  string            `json:"undone_by,omitempty" doc:"The person who undid the hand-off, by sign-in identity"`
+	UndoneAt  string            `json:"undone_at,omitempty" format:"date-time" doc:"When the hand-off was undone. Absent while it stands"`
+	Because   string            `json:"because,omitempty" doc:"Why the hand-off was undone, in markdown"`
+	FixedIn   []FlawUnseenBody  `json:"fixed_in" doc:"Each build the flaw is still open on whose lead a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the hand-off is undone"`
 }
 
 func registerFlawLead(api huma.API, in core.Deps) {
@@ -100,9 +109,8 @@ func registerFlawLead(api huma.API, in core.Deps) {
 		body := FlawLeadBody{
 			Place: origin.Place, Stream: origin.Build.Stream, Variant: origin.Build.Variant,
 			Rule: origin.Rule, Path: origin.Path, Line: origin.Line, State: LeadState(origin.State),
-			Suggested: SuggestionBody{Component: origin.Suggested.Component, Ecosystem: origin.Suggested.Ecosystem,
-				Namespace: origin.Suggested.Namespace, From: HandoffSource(origin.Suggested.From),
-				Lacking: []LeadBuild{}, Unanalyzed: []LeadBuild{}},
+			Suggested: FlawSuggestedBody{Component: origin.Suggested.Component, Ecosystem: origin.Suggested.Ecosystem,
+				Namespace: origin.Suggested.Namespace, From: HandoffSource(origin.Suggested.From)},
 			Proposed: make([]FlawLeadBuild, 0, len(origin.Proposed)),
 			HandedBy: who.Identity(origin.HandedBy), HandedAt: core.Stamp(origin.HandedAt),
 			UndoneAt: core.StampAt(origin.UndoneAt), Because: origin.UndoneNote,

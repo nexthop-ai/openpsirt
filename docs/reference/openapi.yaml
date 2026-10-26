@@ -4615,8 +4615,8 @@ components:
           description: The branch or tag of the build its newest finding you read is on
           type: string
         suggested:
-          $ref: "#/components/schemas/SuggestionBody"
-          description: The component the hand-off's offer ranked first, which the person may have turned down. Absent for the build itself
+          $ref: "#/components/schemas/FlawSuggestedBody"
+          description: The component the hand-off's offer ranked first, which the person may have turned down
         undone_at:
           description: When the hand-off was undone. Absent while it stands
           format: date-time
@@ -4654,6 +4654,29 @@ components:
         - stream
         - variant
         - seen
+      type: object
+    FlawSuggestedBody:
+      additionalProperties: false
+      properties:
+        component:
+          description: The component, as the builds name it. Absent where the build itself was offered
+          type: string
+        ecosystem:
+          description: Its ecosystem, where its package identifier states one
+          type: string
+        from:
+          description: "Where the suggestion came from: a prefix confirmed at an earlier hand-off, the component the lead was placed on, a component whose name resembles the lead's directory, or the build itself"
+          enum:
+            - confirmed
+            - placed
+            - resembles
+            - build
+          type: string
+        namespace:
+          description: Its namespace, where its package identifier states one
+          type: string
+      required:
+        - from
       type: object
     FlawUnseenBody:
       additionalProperties: false

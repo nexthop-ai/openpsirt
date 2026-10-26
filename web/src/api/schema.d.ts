@@ -9468,8 +9468,8 @@ export interface components {
             state: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             /** @description The branch or tag of the build its newest finding you read is on */
             stream: string;
-            /** @description The component the hand-off's offer ranked first, which the person may have turned down. Absent for the build itself */
-            suggested: components["schemas"]["SuggestionBody"];
+            /** @description The component the hand-off's offer ranked first, which the person may have turned down */
+            suggested: components["schemas"]["FlawSuggestedBody"];
             /**
              * Format: date-time
              * @description When the hand-off was undone. Absent while it stands
@@ -9485,6 +9485,19 @@ export interface components {
             seen: boolean;
             stream: string;
             variant: string;
+        };
+        FlawSuggestedBody: {
+            /** @description The component, as the builds name it. Absent where the build itself was offered */
+            component?: string;
+            /** @description Its ecosystem, where its package identifier states one */
+            ecosystem?: string;
+            /**
+             * @description Where the suggestion came from: a prefix confirmed at an earlier hand-off, the component the lead was placed on, a component whose name resembles the lead's directory, or the build itself
+             * @enum {string}
+             */
+            from: "confirmed" | "placed" | "resembles" | "build";
+            /** @description Its namespace, where its package identifier states one */
+            namespace?: string;
         };
         FlawUnseenBody: {
             /** @description The build a person stated fixed the lead, where they closed it as fixed */
