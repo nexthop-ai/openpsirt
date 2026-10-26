@@ -943,6 +943,16 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 	limit = database.AList.Of(limit)
 
 	kinds, kindArgs := c.Where(`"f"."kind"`)
+	// Nobody holds a lead seen only in releases past their end of life, and
+	// nobody may take one, so the work nobody holds leaves out each sighting
+	// of a lead in such a release, as the lead queue does.
+	var ended []int64
+	if len(holders) == 0 {
+		var err error
+		if ended, err = catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, s.now().UTC()); err != nil {
+			return nil, 0, err
+		}
+	}
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -955,6 +965,9 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		}
 		if len(holders) == 0 {
 			q = q.Where(`"f"."assigned_to" IS NULL`)
+			if len(ended) > 0 {
+				q = q.Where(`("f"."kind" <> ? OR "tg"."stream_id" NOT IN (?))`, kind.Analysis, bun.List(ended))
+			}
 		} else {
 			q = q.Where(`"f"."assigned_to" IN (?)`, bun.List(holders))
 		}

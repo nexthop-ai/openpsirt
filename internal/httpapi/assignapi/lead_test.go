@@ -226,6 +226,26 @@ func TestALeadPastItsEndOfLifeIsNotAssigned(t *testing.T) {
 	})
 }
 
+// A lead every release of which is past its end of life is one nobody may
+// take, so the work nobody holds leaves it out, as the lead queue narrowed to
+// nobody does.
+func TestTheUnassignedListLeavesOutALeadPastItsEndOfLife(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
+			t.Fatalf("the unassigned list holds leads %v; want the seeded lead, or this checks nothing", got)
+		}
+		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
+			Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 0 {
+			t.Errorf("the unassigned list holds leads %v past their end of life", got)
+		}
+	})
+}
+
 // Handing everything one person holds to somebody else moves their leads too,
 // and is refused where the recipient may not read internal work.
 func TestHandingOverSomebodysWorkMovesTheirLeadsToAReaderOfThem(t *testing.T) {
