@@ -230,3 +230,63 @@ func TestTheV0110UpgradeCarriesOnPastItsReportStep(t *testing.T) {
 		leaveAtLatest(t, ctx, db)
 	})
 }
+
+// The report v0.10.0 wrote beside a flaw recorded by hand, with no claim of
+// its own, carries the flaw's summary as its claim after the upgrade. A
+// report on a published vulnerability is left as it was: that issue's
+// description is the publisher's, never what the reporter claimed.
+func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		issues := seedIssuesV0100(t, ctx, db)
+		var product, person int64
+		if err := db.DB.NewRaw(`SELECT "id" FROM "product"`).Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.DB.NewRaw(`SELECT "id" FROM "person"`).Scan(ctx, &person); err != nil {
+			t.Fatal(err)
+		}
+		at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
+		for issue, words := range map[int64]string{
+			issues.recorded: "The flaw as somebody here described it.",
+			issues.scanned:  "The publisher's description.",
+		} {
+			if _, err := db.DB.NewRaw(`UPDATE "vulnerability" SET "description" = ? WHERE "id" = ?`,
+				words, issue).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for reference, issue := range map[string]int64{
+			"SONIC-R-2026-333333": issues.recorded, "SONIC-R-2026-444444": issues.scanned,
+		} {
+			if _, err := db.DB.NewRaw(`INSERT INTO "flaw_report"
+				("reference", "product_id", "vulnerability_id", "summary", "recorded_by", "recorded_at",
+				 "evaluated_at", "evaluated_by", "found_here")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				reference, product, issue, "", person, at, at, person, false).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		for reference, want := range map[string]string{
+			"SONIC-R-2026-333333": "The flaw as somebody here described it.",
+			"SONIC-R-2026-444444": "",
+		} {
+			var got *string
+			if err := db.DB.NewRaw(`SELECT "summary" FROM "flaw_report" WHERE "reference" = ?`,
+				reference).Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			said := ""
+			if got != nil {
+				said = *got
+			}
+			if said != want {
+				t.Errorf("report %s claims %q after the upgrade, want %q", reference, said, want)
+			}
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}

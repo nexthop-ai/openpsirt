@@ -144,7 +144,7 @@ function Claim({ report: it, works }: { report: Report; works: boolean }) {
           {it.summary ? (
             <Markdown source={it.summary} className="reading" />
           ) : (
-            <p className="hint">Recorded with the issue. Its description carries the claim.</p>
+            <p className="hint">No claim was recorded.</p>
           )}
           <p className="hint" style={{ marginTop: 8 }}>
             {it.found_here

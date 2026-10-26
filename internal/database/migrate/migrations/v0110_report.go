@@ -308,6 +308,25 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 		add: []added{{column: "reports"}}})
 }
 
+// claimFromFlawV0110 gives the report written beside each flaw recorded by
+// hand the flaw's summary as its claim. v0.10.0 left that report's claim
+// empty and kept the summary on the issue alone, and a judged report can no
+// longer be edited to fill it. Run after the issue kinds are marked, which
+// is how a flaw recorded by hand is told from a published vulnerability; a
+// report with a claim of its own keeps it, so a second start changes nothing.
+func claimFromFlawV0110(ctx context.Context, tx bun.Tx) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE "flaw_report"
+		SET "summary" = (SELECT "v"."description" FROM "vulnerability" AS "v"
+			WHERE "v"."id" = "flaw_report"."vulnerability_id")
+		WHERE ("flaw_report"."summary" IS NULL OR "flaw_report"."summary" = '')
+		  AND EXISTS (SELECT 1 FROM "vulnerability" AS "v"
+			WHERE "v"."id" = "flaw_report"."vulnerability_id" AND "v"."kind" = 'flaw'
+			  AND "v"."description" IS NOT NULL AND "v"."description" <> '')`); err != nil {
+		return fmt.Errorf("give each flaw's report its claim: %w", err)
+	}
+	return nil
+}
+
 // acknowledgedAsSentV0110 writes each acknowledgement v0.10.0 recorded as the
 // first message sent to the reporter, dated the day it was recorded, by
 // whoever recorded it, and holding no text. A report already holding a sent

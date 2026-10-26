@@ -1408,3 +1408,13 @@ on.
 
 Nothing changes for a database v0.9.0 or a later release built. This release
 changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
+
+### From v0.10.2
+
+| Change | What to do |
+|---|---|
+| `POST /v1/products/{product}/reports/{reference}/acknowledgement` and `POST /v1/products/{product}/issues/{vulnerability}/report/acknowledgement` are removed, and a request to either is refused. v0.10.2 recorded with them that somebody answered the reporter | Record a message sent to the reporter instead, with `POST /v1/products/{product}/reports/{reference}/messages` and `direction` set to `sent`. The first message recorded as sent is the acknowledgement |
+| A report's `acknowledged` is the day of the first message recorded as sent, as `YYYY-MM-DD`, and `acknowledged_by` is whoever recorded it. v0.10.2 answered the moment somebody pressed acknowledge | Nothing. The upgrade writes each acknowledgement v0.10.2 recorded as the first message sent, dated the day it was recorded in UTC, by whoever recorded it, with no text. A client parsing `acknowledged` as a moment parses a day |
+| A report's claim is required when it is recorded and when it is edited. v0.10.2 accepted an empty one | Nothing. A report v0.10.2 recorded beside a flaw recorded by hand takes the flaw's summary as its claim. Any other report v0.10.2 recorded with no claim keeps none, and an edit to it while it is open fills one in |
+| A routing rule takes `reports`, which places the product's vulnerability reports instead of findings | Nothing. A rule without it places findings, as before |
+| The unanswered notice and a reporter writing back go to whoever holds the report, the members of the team whose queue it is in, or everybody who works reports in the product where nobody holds it | Nothing. Every report the upgrade carries is held by nobody, so its notices reach whom they reached in v0.10.2 |

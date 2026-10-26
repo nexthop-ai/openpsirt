@@ -50,7 +50,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A vulnerability report is a case: it has a title, a holder, revisions,
 //     notes, a log of correspondence with its reporter and a record of who
 //     held it, and the acknowledgement is the first message sent. A routing
-//     rule may place reports.
+//     rule may place reports. The report beside a flaw recorded by hand
+//     carries the flaw's summary as its claim.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
@@ -63,7 +64,7 @@ func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{
 		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createLeadV0110,
 		notificationInternalV0110, createClaimStampV0110, createDocumentUploadV0110,
-		reportCaseV0110,
+		reportCaseV0110, claimFromFlawV0110,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

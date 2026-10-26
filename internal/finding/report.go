@@ -53,9 +53,9 @@ type FlawReport struct {
 	// as one. Absent is every other report: one nobody has judged, which is
 	// the state every report arrives in, and one a ruling answers.
 	VulnerabilityID *int64 `bun:"vulnerability_id"`
-	// Summary is what was claimed, in the words it was claimed in. It carries
-	// the substance of a report with no issue; once there is one, the issue's
-	// own description is where the claim lives.
+	// Summary is what was claimed, in the words it was claimed in. A report
+	// written beside a flaw recorded by hand carries the flaw's summary. Empty
+	// only on a report v0.10.0 recorded with no claim.
 	Summary string `bun:"summary"`
 	// ReportedBy and Contact are free text, because a reporter is somebody
 	// outside this deployment with no account here — which is the whole shape
