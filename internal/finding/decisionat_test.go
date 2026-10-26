@@ -55,6 +55,9 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 	"finding/routing.go": {
 		{"f", "fs"}: "two rows of one lead in the product bound",
 	},
+	"notify/stale.go": {
+		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product of its stream",
+	},
 	"triage/claim.go": {
 		{"de", "lh"}: "a decision about a lead handed off as a flaw, at its place in its own product",
 	},
