@@ -48,7 +48,15 @@ type Scope struct {
 	// Series is a series' name, matched without regard to capitals. A name
 	// no series of the product holds lists nothing.
 	Series string
+	// Unassigned keeps the leads nobody holds on the build a row names. A
+	// lead in a case the reader is not on names no holder, so it is left
+	// out rather than answered by who holds it.
+	Unassigned bool
 }
+
+// LeadAssignees is every word the lead queue asks who holds a lead in: the
+// findings list's word for work nobody holds.
+func LeadAssignees() []string { return []string{finding.HeldByNobody} }
 
 // QueueRow is one lead in a product: its place, and what the newest of its
 // findings in the scope says about it.
@@ -295,6 +303,9 @@ func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []acc
 	}
 	if scope.VariantID != nil {
 		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
+	}
+	if scope.Unassigned {
+		q = q.Where(`"f"."assigned_to" IS NULL`).Where(`"f"."visibility" IN (?)`, bun.List(visible))
 	}
 	if scope.Series != "" {
 		named, namedArgs := kind.Leads.Where(`"sn"."kind"`)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -58,6 +59,9 @@ type LeadsAsked struct {
 	Variant string    `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 	Series  string    `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing"`
 	State   LeadState `query:"state" doc:"List the leads in one state. Left out, the queue"`
+	// Assigned is the findings list's parameter and value for work nobody
+	// holds, so the two read alike.
+	Assigned LeadAssignee `query:"assigned" doc:"Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out"`
 }
 
 // scoped resolves what is asked for against what the reader may see. A
@@ -78,7 +82,7 @@ func (a LeadsAsked) scoped(ctx context.Context, in core.Deps) (access.Subject, a
 	}
 	return subject, analysis.Scope{
 		ProductID: *scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
-		Series: strings.TrimSpace(a.Series),
+		Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
 	}, nil
 }
 
@@ -155,7 +159,9 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			"releases past their end of life, and `past_end_of_life` counts those. A lead seen only in " +
 			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +
 			"it off are refused with 409. " +
-			"`stream`, `variant` and `series` are optional and independent. Supports limit and offset.",
+			"`stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps " +
+			"the leads nobody holds on the build each row names, and combines with every other filter. " +
+			"Supports limit and offset.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		LeadsAsked
@@ -207,6 +213,9 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		listing := "the queue: open leads nothing waits on, leads open only in releases past their end of life left out"
 		if input.State != "" {
 			listing = "the leads " + string(input.State)
+		}
+		if input.Assigned == finding.HeldByNobody {
+			listing += ", nobody holding them"
 		}
 		out := core.Exporting{
 			What:   "leads",

@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Leads } from "./Leads";
 import { location, mounted, screen, serve, settle } from "../test/mount";
-import { press } from "../test/controls";
+import { press, tick } from "../test/controls";
 
 const mount = mounted();
 
@@ -119,6 +119,20 @@ describe("the leads", () => {
     await settle();
     expect(location()).toBe("/products/sonic/leads?state=not-reproduced");
     expect(asked.at(-1)).toMatchObject({ state: "not-reproduced" });
+  });
+
+  it("narrows to the leads nobody holds, which the address and the file carry", async () => {
+    const asked = await drawn("/products/sonic/leads?state=open");
+    tick(mount.host(), "Unassigned only");
+    await settle();
+    expect(location()).toBe("/products/sonic/leads?state=open&assigned=nobody");
+    expect(asked.at(-1)).toMatchObject({ state: "open", assigned: "nobody" });
+    const file = Array.from(mount.host().querySelectorAll("a")).find(
+      (each) => each.textContent === "JSON",
+    );
+    expect(new URL(file?.getAttribute("href") ?? "", "http://x").searchParams.get("assigned")).toBe(
+      "nobody",
+    );
   });
 
   it("asks for the build the address names", async () => {

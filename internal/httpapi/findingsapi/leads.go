@@ -93,6 +93,18 @@ func (LeadState) Schema(huma.Registry) *huma.Schema {
 	return &huma.Schema{Type: huma.TypeString, Enum: offered}
 }
 
+// LeadAssignee is who the lead queue is narrowed to as holding a lead.
+type LeadAssignee string
+
+// Schema offers every word the lead queue asks who holds a lead in.
+func (LeadAssignee) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(analysis.LeadAssignees()))
+	for _, each := range analysis.LeadAssignees() {
+		offered = append(offered, each)
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
+}
+
 func registerLeads(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-lead-evidence", Method: http.MethodGet,

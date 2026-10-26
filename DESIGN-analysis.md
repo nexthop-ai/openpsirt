@@ -499,6 +499,9 @@ one way to say a path does not matter is kept rather than two.
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
 | A series narrows the list by its name, matched without regard to capitals | A name no series of the product holds lists nothing, the same answer as a series holding no lead |
+| Narrowed to work nobody holds, the list keeps the leads with no holder on the build each row names, under the parameter and value the findings list uses | The findings list holds no lead, so this is where unheld leads are found (§ Lead assignment) |
+| Narrowed to work nobody holds, every count is of the leads the narrowing keeps | A count beside a narrowed list describes what that list leaves out |
+| Narrowed to work nobody holds, a lead in a case the reader is not on is left out | That row is read without its holder, so listing it would say who holds it |
 | A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
 | A rule's tier is the highest of every weakness recorded for it, ranked again each time a run names the rule | A rule's weaknesses accumulate as its tags do, and a tier table changed by an upgrade reaches a rule at its next run |
 | A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |
@@ -516,6 +519,7 @@ JSON, as `DESIGN-reporting.md` § Exports writes every file.
 | A row says whether the lead is in third-party code, as the list does | Read from the newest run that saw the lead, as its evidence is (§ Third-party code) |
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
 | With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out leads a waiting claim holds and leads past their end of life |
+| Narrowed to work nobody holds, the file says so beside what it lists | A file read later carries the narrowing it was written under |
 | A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
 | A findings list's file writes every open lead of its selection below its findings, through this read with the leads a claim waits on kept in (`DESIGN-reporting.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
 

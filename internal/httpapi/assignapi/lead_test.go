@@ -391,3 +391,67 @@ func TestEachLeadIsOnePieceOfHeldWork(t *testing.T) {
 		}
 	})
 }
+
+// The queue narrowed to work nobody holds reads as the findings list's
+// narrowing does: a lead somebody holds leaves the rows and every count, and
+// handed back it returns to both.
+func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		at := leadAt(place) + "/assignment"
+		type narrowed struct {
+			Items []struct {
+				Place string `json:"place"`
+			} `json:"items"`
+			Total  int            `json:"total"`
+			States map[string]int `json:"states"`
+		}
+		unheld := func() narrowed {
+			var got narrowed
+			httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?assigned=nobody", &got)
+			return got
+		}
+		if got := unheld(); len(got.Items) != 1 || got.Items[0].Place != place || got.Total != 1 || got.States["open"] != 1 {
+			t.Fatalf("the unheld leads are %+v; want the seeded lead, listed and counted", got)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
+		}
+		if got := unheld(); len(got.Items) != 0 || got.Total != 0 || got.States["open"] != 0 {
+			t.Errorf("a held lead is in the unheld leads as %+v", got)
+		}
+		var all narrowed
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads", &all)
+		if len(all.Items) != 1 {
+			t.Errorf("the queue unnarrowed is %+v; want the held lead in it", all)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{}`); got.Code != http.StatusNoContent {
+			t.Fatalf("handing it back answered %d: %s", got.Code, got.Body)
+		}
+		if got := unheld(); len(got.Items) != 1 || got.States["open"] != 1 {
+			t.Errorf("a lead handed back is missing from the unheld leads: %+v", got)
+		}
+	})
+}
+
+// A lead moved into a case is read by somebody not on it without its holder,
+// so narrowing to work nobody holds leaves it out rather than answering who
+// holds it by whether it is listed.
+func TestTheQueueNarrowedToNobodyLeavesOutALeadInACaseTheReaderIsNotOn(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.HandedOffLead(t, r, true)
+		var all, unheld struct {
+			Items []struct {
+				Place string `json:"place"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=handed-off", &all)
+		if len(all.Items) != 1 {
+			t.Fatalf("the handed-off leads are %+v; want the moved lead, read without its holder", all.Items)
+		}
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=handed-off&assigned=nobody", &unheld)
+		if len(unheld.Items) != 0 {
+			t.Errorf("a lead in a case the reader is not on is listed as unheld: %+v", unheld.Items)
+		}
+	})
+}

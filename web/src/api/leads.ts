@@ -40,7 +40,15 @@ function useAfterLead() {
 }
 
 // What narrows a product's leads, on the list and in its file alike.
-type LeadsAsked = { stream?: string; variant?: string; series?: string; state?: LeadState };
+// `assigned` reads as the findings list's does: "nobody" keeps the leads
+// nobody holds.
+type LeadsAsked = {
+  stream?: string;
+  variant?: string;
+  series?: string;
+  state?: LeadState;
+  assigned?: "nobody";
+};
 
 // The narrowing as the query a request carries, with nothing for what is unset.
 export function leadsQuery(asked: LeadsAsked): Record<string, string> {
@@ -67,6 +75,7 @@ export function useLeads(
               ...(asked.variant ? { variant: asked.variant } : {}),
               ...(asked.series ? { series: asked.series } : {}),
               ...(asked.state ? { state: asked.state } : {}),
+              ...(asked.assigned ? { assigned: asked.assigned } : {}),
             },
           },
         }),

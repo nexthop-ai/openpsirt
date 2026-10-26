@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Assignments } from "./Assignments";
 import { screen, serve, settle, mounted } from "../test/mount";
+import { remember } from "../app/scope";
 
 const mount = mounted();
 
@@ -43,5 +44,33 @@ describe("a lead in the work somebody holds", () => {
   it("opens a finding's page where the row is no lead", async () => {
     const to = await drawn({ ...HELD, vulnerability: "CVE-2026-1" });
     expect(to).not.toContain("/leads/");
+  });
+});
+
+describe("nobody else holding anything in a product", () => {
+  afterEach(() => window.sessionStorage.clear());
+
+  async function linked(reads_internal: boolean) {
+    remember({ product: "sonic" });
+    serve((path) => {
+      if (path === "/v1/session/me")
+        return { data: { ...me, reach: [{ product: "sonic", reads_internal }] } };
+      if (path === "/v1/assignments") return { data: [] };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Assignments />, "/assignments?tab=people"));
+    await settle();
+    return Array.from(mount.host().querySelectorAll("a")).find((each) =>
+      each.textContent?.startsWith("Unassigned leads"),
+    );
+  }
+
+  it("links the product's leads nobody holds", async () => {
+    const link = await linked(true);
+    expect(link?.getAttribute("href")).toBe("/products/sonic/leads?assigned=nobody");
+  });
+
+  it("links no leads for somebody who reads no internal material", async () => {
+    expect(await linked(false)).toBeUndefined();
   });
 });

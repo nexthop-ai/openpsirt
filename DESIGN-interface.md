@@ -1220,6 +1220,7 @@ them is a different question.
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The findings list spans every product somebody can see when none is picked, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
 | **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
+| Nobody else holding anything in a product picked links that product's unassigned leads, for somebody who reads internal material there | The findings list the empty screen points at holds no lead |
 | A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 
 A screen for the standing rules (REQ-34), per product, shown as a numbered list
@@ -1465,6 +1466,7 @@ the screens draw them.
 | A lead in a case the reader is not on says so, and shows where it is alone | The queue's row reads Withheld in place of the message |
 | The leads screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
 | A series in the address narrows the leads screen, and is named in its heading | Each figure of Leads by analyzer opens the list of its series and state |
+| Unassigned only narrows the leads screen to the leads nobody holds, kept in the address and named in its heading | The findings list holds no lead, so unheld leads are found here. It holds across the tabs, the counts and the file (`DESIGN-analysis.md` § Lead queue) |
 | Leads by analyzer asks for no count from somebody who does not read internal material in the product | It says leads are internal. A table of zeros reads as an analyzer finding nothing |
 
 ## Disclosure and advisories

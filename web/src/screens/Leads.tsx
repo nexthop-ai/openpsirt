@@ -26,16 +26,17 @@ export function Leads() {
   const stream = params.get("stream") ?? undefined;
   const variant = params.get("variant") ?? undefined;
   const series = params.get("series") ?? undefined;
+  const assigned = params.get("assigned") === "nobody" ? "nobody" : undefined;
   const [offset, setOffset] = useState(0);
-  const listed = useLeads(product, { state, stream, variant, series, offset });
+  const listed = useLeads(product, { state, stream, variant, series, assigned, offset });
   const opener = useRowOpener();
   const reads = !!mayOf(useWho().data, product)?.reads_internal;
 
-  const go = (next?: LeadState) => {
+  const go = (next?: LeadState, unheld = assigned) => {
     setOffset(0);
     setParams(
       Object.fromEntries(
-        Object.entries({ state: next, stream, variant, series }).filter(
+        Object.entries({ state: next, stream, variant, series, assigned: unheld }).filter(
           ([, value]) => value !== undefined,
         ),
       ) as Record<string, string>,
@@ -47,7 +48,7 @@ export function Leads() {
   const file = (format: "csv" | "json") =>
     fileAt("/v1/products/{product}/leads.{format}", format, {
       path: { product },
-      query: leadsQuery({ state, stream, variant, series }),
+      query: leadsQuery({ state, stream, variant, series, assigned }),
     });
   const counts = listed.data?.states ?? {};
   const rows = listed.data?.items ?? [];
@@ -61,6 +62,7 @@ export function Leads() {
           {stream && ` · ${stream}`}
           {variant && ` · ${variant}`}
           {series && ` · ${series}`}
+          {assigned && " · unassigned"}
         </p>
         <span style={{ marginLeft: "auto" }}>
           <Link className="btn quiet" to={leadRulesAt(product)}>
@@ -92,6 +94,15 @@ export function Leads() {
         ))}
       </div>
 
+      <label className="hint">
+        <input
+          type="checkbox"
+          checked={!!assigned}
+          onChange={(e) => go(state, e.target.checked ? "nobody" : undefined)}
+        />{" "}
+        Unassigned only
+      </label>
+
       {!state &&
         listed.data &&
         (listed.data.waiting > 0 || listed.data.ruled > 0 || listed.data.past_end_of_life > 0) && (
@@ -105,7 +116,7 @@ export function Leads() {
               listed.data.ruled > 0 && (
                 <Link
                   key="ruled"
-                  to={leadsAt(product, { state: "dismissed", stream, variant, series })}
+                  to={leadsAt(product, { state: "dismissed", stream, variant, series, assigned })}
                 >
                   {listed.data.ruled.toLocaleString()} dismissed by a rule
                 </Link>

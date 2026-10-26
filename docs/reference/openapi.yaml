@@ -24485,7 +24485,7 @@ paths:
 
         With no `state` it is the queue: open leads with no claim waiting for a second person. `state` lists the leads in one state instead. `fixed` lists the leads closed on a build and not opened anew there.
 
-        `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
+        `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the leads nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-leads
@@ -24531,6 +24531,15 @@ paths:
               - not-security
               - confirmed
               - handed-off
+            type: string
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+          explode: false
+          in: query
+          name: assigned
+          schema:
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            enum:
+              - nobody
             type: string
         - description: The number returned
           explode: false
@@ -24624,6 +24633,15 @@ paths:
               - not-security
               - confirmed
               - handed-off
+            type: string
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+          explode: false
+          in: query
+          name: assigned
+          schema:
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            enum:
+              - nobody
             type: string
         - in: path
           name: format
