@@ -157,20 +157,24 @@ type Config struct {
 	IngestMaxDocuments  int
 	// The bounds an analyzer's results are read within, for the reason the
 	// scan file bounds are here.
-	AnalysisMaxBytes      int
-	AnalysisMaxDocuments  int
-	AnalysisMaxRuns       int
-	AnalysisMaxResults    int
-	AnalysisMaxRules      int
-	AnalysisMaxLocations  int
-	AnalysisMaxSteps      int
-	AnalysisMaxModules    int
-	AnalysisMaxBases      int
-	AnalysisMaxChain      int
-	AnalysisMaxProperties int
-	AnalysisMaxText       int
-	AnalysisMaxDepth      int
-	AnalysisMaxHeld       int
+	AnalysisMaxBytes          int
+	AnalysisMaxPartBytes      int
+	AnalysisMaxCompressed     int
+	AnalysisMaxPartCompressed int
+	AnalysisMaxSnippet        int
+	AnalysisMaxDocuments      int
+	AnalysisMaxRuns           int
+	AnalysisMaxResults        int
+	AnalysisMaxRules          int
+	AnalysisMaxLocations      int
+	AnalysisMaxSteps          int
+	AnalysisMaxModules        int
+	AnalysisMaxBases          int
+	AnalysisMaxChain          int
+	AnalysisMaxProperties     int
+	AnalysisMaxText           int
+	AnalysisMaxDepth          int
+	AnalysisMaxHeld           int
 	// BootstrapAdmins are granted administrator at every startup, not only the
 	// first. Applying it every time makes it the way back in for an operator
 	// who has locked themselves out: add yourself, restart. For software
@@ -401,20 +405,24 @@ func load(given map[string]string) (Config, error) {
 		IngestMaxDepth:      r.number("INGEST_MAX_DEPTH", 0),
 		IngestMaxDocuments:  r.number("INGEST_MAX_DOCUMENTS", 0),
 
-		AnalysisMaxBytes:      r.number("ANALYSIS_MAX_BYTES", 0),
-		AnalysisMaxDocuments:  r.number("ANALYSIS_MAX_DOCUMENTS", 0),
-		AnalysisMaxRuns:       r.number("ANALYSIS_MAX_RUNS", 0),
-		AnalysisMaxResults:    r.number("ANALYSIS_MAX_RESULTS", 0),
-		AnalysisMaxRules:      r.number("ANALYSIS_MAX_RULES", 0),
-		AnalysisMaxLocations:  r.number("ANALYSIS_MAX_LOCATIONS", 0),
-		AnalysisMaxSteps:      r.number("ANALYSIS_MAX_STEPS", 0),
-		AnalysisMaxModules:    r.number("ANALYSIS_MAX_MODULES", 0),
-		AnalysisMaxBases:      r.number("ANALYSIS_MAX_BASES", 0),
-		AnalysisMaxChain:      r.number("ANALYSIS_MAX_CHAIN", 0),
-		AnalysisMaxProperties: r.number("ANALYSIS_MAX_PROPERTIES", 0),
-		AnalysisMaxText:       r.number("ANALYSIS_MAX_TEXT", 0),
-		AnalysisMaxDepth:      r.number("ANALYSIS_MAX_DEPTH", 0),
-		AnalysisMaxHeld:       r.number("ANALYSIS_MAX_HELD", 0),
+		AnalysisMaxBytes:          r.number("ANALYSIS_MAX_BYTES", 0),
+		AnalysisMaxPartBytes:      r.number("ANALYSIS_MAX_PART_BYTES", 0),
+		AnalysisMaxCompressed:     r.number("ANALYSIS_MAX_COMPRESSED_BYTES", 0),
+		AnalysisMaxPartCompressed: r.number("ANALYSIS_MAX_PART_COMPRESSED_BYTES", 0),
+		AnalysisMaxSnippet:        r.number("ANALYSIS_MAX_SNIPPET", 0),
+		AnalysisMaxDocuments:      r.number("ANALYSIS_MAX_DOCUMENTS", 0),
+		AnalysisMaxRuns:           r.number("ANALYSIS_MAX_RUNS", 0),
+		AnalysisMaxResults:        r.number("ANALYSIS_MAX_RESULTS", 0),
+		AnalysisMaxRules:          r.number("ANALYSIS_MAX_RULES", 0),
+		AnalysisMaxLocations:      r.number("ANALYSIS_MAX_LOCATIONS", 0),
+		AnalysisMaxSteps:          r.number("ANALYSIS_MAX_STEPS", 0),
+		AnalysisMaxModules:        r.number("ANALYSIS_MAX_MODULES", 0),
+		AnalysisMaxBases:          r.number("ANALYSIS_MAX_BASES", 0),
+		AnalysisMaxChain:          r.number("ANALYSIS_MAX_CHAIN", 0),
+		AnalysisMaxProperties:     r.number("ANALYSIS_MAX_PROPERTIES", 0),
+		AnalysisMaxText:           r.number("ANALYSIS_MAX_TEXT", 0),
+		AnalysisMaxDepth:          r.number("ANALYSIS_MAX_DEPTH", 0),
+		AnalysisMaxHeld:           r.number("ANALYSIS_MAX_HELD", 0),
 
 		QueueMaxAttempts:  r.number("QUEUE_MAX_ATTEMPTS", queueing.MaxAttempts),
 		QueueClaimTimeout: r.duration("QUEUE_CLAIM_TIMEOUT", queueing.ClaimTimeout),

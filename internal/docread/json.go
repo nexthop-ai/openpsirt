@@ -77,7 +77,51 @@ type JSON struct {
 	maxDepth int
 	depth    int
 	src      *Source
+	// bags bounds the members of every object held under one key, wherever
+	// it is and whether it is read or walked past; pending is whether the
+	// next value is held under that key.
+	bags    *bags
+	pending bool
 }
+
+// bags is a bound on the members of every object under one key.
+type bags struct {
+	key    string
+	most   int
+	refuse func() error
+}
+
+// BoundMembers refuses an object held under key, anywhere in the document,
+// with more than most members, with the error refuse makes. A format's
+// free-form member, such as SARIF's property bag, is bounded this way in
+// every place it is allowed, including the places a reader walks past.
+func (b *JSON) BoundMembers(key string, most int, refuse func() error) {
+	b.bags = &bags{key: key, most: most, refuse: refuse}
+}
+
+// bag is whether the object about to be read is held under the bounded key.
+// Asked once, as the object opens.
+func (b *JSON) bag() bool {
+	is := b.pending
+	b.pending = false
+	return is
+}
+
+// member counts one more member of an object, refusing one past the bound
+// where the object is a bounded one.
+func (b *JSON) member(bounded bool, n *int) error {
+	if !bounded {
+		return nil
+	}
+	*n++
+	if *n > b.bags.most {
+		return b.bags.refuse()
+	}
+	return nil
+}
+
+// under records whether the value after key is held under the bounded key.
+func (b *JSON) under(key string) { b.pending = b.bags != nil && key == b.bags.key }
 
 // NewJSON reads r as JSON, at most maxBytes of it and nested at most
 // maxDepth deep.
@@ -179,10 +223,12 @@ func (b *JSON) leave() { b.depth-- }
 // Object reads one object, calling fn with each key. fn consumes that key's
 // value.
 func (b *JSON) Object(fn func(key string) error) error {
+	bounded := b.bag()
 	if err := b.open('{'); err != nil {
 		return err
 	}
 	defer b.leave()
+	n := 0
 	for b.dec.More() {
 		tok, err := b.Token()
 		if err != nil {
@@ -192,7 +238,13 @@ func (b *JSON) Object(fn func(key string) error) error {
 		if !ok {
 			return refusal.Errorf("object key is %v, not a string", tok)
 		}
-		if err := fn(key); err != nil {
+		if err := b.member(bounded, &n); err != nil {
+			return err
+		}
+		b.under(key)
+		err = fn(key)
+		b.pending = false
+		if err != nil {
 			return err
 		}
 	}
@@ -201,6 +253,7 @@ func (b *JSON) Object(fn func(key string) error) error {
 
 // Array reads one array, calling fn per element. fn consumes that element.
 func (b *JSON) Array(fn func() error) error {
+	b.pending = false
 	if err := b.open('['); err != nil {
 		return err
 	}
@@ -296,6 +349,7 @@ func (b *JSON) StringOrObject(fn func(key string) error) (string, error) {
 // Skip consumes one value of any shape, descending through it so that nesting
 // inside a part of the document we do not read is still bounded.
 func (b *JSON) Skip() error {
+	bounded := b.bag()
 	tok, err := b.Token()
 	if err != nil {
 		return err
@@ -304,17 +358,28 @@ func (b *JSON) Skip() error {
 	if !ok {
 		return nil
 	}
+	bounded = bounded && delim == '{'
 	if err := b.enter(); err != nil {
 		return err
 	}
 	defer b.leave()
+	n := 0
 	for b.dec.More() {
 		if delim == '{' {
-			if _, err := b.Token(); err != nil { // the key
+			tok, err := b.Token() // the key
+			if err != nil {
 				return err
 			}
+			if err := b.member(bounded, &n); err != nil {
+				return err
+			}
+			if key, ok := tok.(string); ok {
+				b.under(key)
+			}
 		}
-		if err := b.Skip(); err != nil {
+		err := b.Skip()
+		b.pending = false
+		if err != nil {
 			return err
 		}
 	}

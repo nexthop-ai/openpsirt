@@ -84,16 +84,46 @@ placing them added 103 MB beside that, an encoding of 98 MB.
 
 | Bound | On |
 |---|---|
-| Bytes | The request, compressed; the upload's documents together once decompressed, counting the text each result is worded with from its rule's message strings; and the placed results once encoded, before any of them is stored |
+| Bytes as sent | The request, and each document, as sent: compressed where it was compressed. The request past its bound is refused before it is read |
+| Bytes decompressed | Each document once decompressed; the upload's documents together once decompressed, counting the text each result is worded with from its rule's message strings; and the placed results once encoded, before any of them is stored. A compressed document is decompressed against what is left of the lesser of the two |
 | Entries held | The upload's documents together: runs, results, rules, locations, kept flow steps, invocations, and the members of every list and map they carry. Each costs memory however few bytes of the document it took |
 | Documents | Per upload. clang writes one per translation unit, so a tool's per-unit documents are merged into one before they are sent |
 | Runs | Per document |
 | Results, rules, repositories, named starting points | Per run |
 | Locations and related locations, flow steps | Per result |
 | Starting-point chains | How many named starting points one path passes through. A chain that loops refuses the document |
-| Property members | Per property bag |
+| Property members | Per property bag, every bag the document holds, read or walked past, a bag within a bag included |
 | Text | Per message or description; a longer one is cut. Filling a message string's placeholders stops at this length |
+| Snippet | Per place; a longer one is cut (§ Snippets) |
 | Depth | Nesting of the JSON |
+
+The bytes as sent default to the bytes decompressed, so a document sent
+without compression is bounded the same either way, and one document may take
+the whole upload's bounds, which is what a tool's per-unit documents merged
+into one take.
+
+Measured on real producers' output:
+
+| Output | Bytes | Gzipped | Results | Rules | Most places per result | Most flow steps per result | Largest property bag | Deepest nesting |
+|---|---|---|---|---|---|---|---|---|
+| CodeQL 2.15.0, C++ queries over a small interpreter | 226,586 | 22,398 | 22 | 165 | 2 | 0 | 9 | 11 |
+| CodeQL 2.2.5, Java queries | 111,783 | 6,439 | 15 | 25 | 4 | 12 | 7 | 14 |
+| clang 18.1.3 static analyzer, one unit | 12,899 | 1,284 | 3 | 2 | 1 | 5 | none | 14 |
+| cppcheck 2.22.0, two units | 6,182 | 853 | 4 | 3 | 2 | 0 | 4 | 9 |
+| clang-tidy through `clang-tidy-sarif` | 751 | 328 | 1 | 0 | 1 | 0 | none | 9 |
+
+The Java output is `samples/sarif/java/detailed/java.sarif` in
+github.com/peter-murray/github-security-report-action at commit `84b2945`; the
+others are the reader's fixtures, whose origins are recorded beside them.
+
+Every output of 5 KB or more compressed 7 to 17 times over, so a gzipped
+upload meets the decompressed bound well before the bound as sent. The largest
+was CodeQL's, about 10 KB a result, most of it the description of every query
+it ran. The defaults are many times what any of them reached: nesting 64
+against 14, a property bag 256 against 9, 1,000 places against 4 and 10,000
+flow steps against 12, so a producer writing richer output than these is not
+refused for it. None of them carries a snippet; the snippet default is the
+4 KiB the upload client sends at most.
 
 ## Run contents
 
@@ -350,7 +380,7 @@ named host, the revision is not a commit, or the path leaves the repository.
 | The upload's own statement of which paths are public decides nothing | A misconfigured pipeline could label a private path public |
 | Source is decided as an upload arrives, for the result and for every step and related place, and a place outside the checkout keeps none | A change to the setting reaches the uploads after it |
 | A context region's source is preferred to its region's, with the line it starts at | It is the wider of the two |
-| At most 4 KiB of source is kept per place | A client sends a few lines either side |
+| At most `analysis.max_snippet` bytes of source are kept per place, 4 KiB where nobody has said | A client sends a few lines either side |
 | A snippet is answered as text, and shown as text | It is uploaded data (REQ-66) |
 | Source is disclosed with a flaw under a path where the longest prefix stating it says so, and stripped everywhere else | Off by default: a private product's source is not published because one flaw in it was (§ Hand-off) |
 
@@ -969,7 +999,7 @@ it is about.
 | Two identical results in one build share a place | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |
 | A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its placed results |
-| The bounds' defaults are a judgment | They are several times the fixtures here and are not measured against the largest real producer. A deployment analyzing a large tree raises them, and the memory limit with the two that are memory figures |
+| The counts per run are measured against small trees | The largest real output measured is CodeQL's 226,586 bytes over a small C++ tree (§ Bounds). No producer's output for a tree the size of a product's own build was measured, so the results per run and the two memory figures rest on the 150,000-result measurement of what reading costs rather than on a producer. A deployment analyzing a large tree raises them, and the memory limit with the two that are memory figures |
 | A link reaches only the repositories a product names a host for | A product of many hosts names each. A repository on none is shown as its remote, which is text |
 | A snippet records what the upload sent | Nothing compares it with the repository, so a patched repository's snippet is the patched source and its link is the source before the patch |
 | A link in a lead with no repository a run names is to a branch | It is marked approximate, and the branch has moved since the build whenever anybody pushed to it |

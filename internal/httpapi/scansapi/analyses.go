@@ -94,13 +94,13 @@ func registerAnalyses(api huma.API, in core.Deps) {
 			"A dependency or secret scanner's run is left out and named on the receipt; this " +
 			"upload takes static analysis alone, and refuses one holding nothing else.",
 		Tags:         []string{"Ingest"},
-		MaxBodyBytes: analysisLimits(in).MaxBytes + core.Envelope,
+		MaxBodyBytes: analysisLimits(in).MaxCompressed + core.Envelope,
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
 				_, _, err := admittedAnalysis(hc.Context(), in, hc.Param("product"), hc.Param("stream"), hc.Param("variant"))
 				return err
 			},
-			Limit:   core.Fixed(analysisLimits(in).MaxBytes + core.Envelope),
+			Limit:   core.Fixed(analysisLimits(in).MaxCompressed + core.Envelope),
 			Refused: analysisRefusedBeforeReading(in),
 		})},
 		DefaultStatus: http.StatusAccepted,
@@ -315,6 +315,9 @@ func readAnalysis(files []huma.FormFile, limits sarif.Limits) ([]sarif.Log, []st
 	digests := make([]string, 0, len(files))
 	upload := sarif.NewUpload(limits)
 	for i, file := range files {
+		if err := limits.Sent(file.Size); err != nil {
+			return nil, nil, fmt.Errorf("document %d: %w", i+1, err)
+		}
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			return nil, nil, err
 		}

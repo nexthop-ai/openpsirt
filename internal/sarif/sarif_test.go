@@ -16,7 +16,7 @@ func limits() Limits {
 	return Limits{
 		MaxBytes: 1 << 20, MaxDepth: 32, MaxRuns: 4, MaxResults: 100, MaxRules: 100,
 		MaxLocations: 10, MaxSteps: 20, MaxModules: 8, MaxBases: 8, MaxChain: 4,
-		MaxProperties: 16, MaxText: 200, MaxHeld: 1000,
+		MaxProperties: 16, MaxText: 200, MaxHeld: 1000, MaxSnippet: 64,
 	}
 }
 
@@ -404,11 +404,12 @@ func TestALocationsSourceIsReadFromItsWidestRegion(t *testing.T) {
 			t.Errorf("%s: placed at %d-%d; want the region's own lines", name, loc.StartLine, loc.EndLine)
 		}
 	}
-	long := strings.Repeat("x", MostSnippet+10)
+	most := limits().MaxSnippet
+	long := strings.Repeat("x", most+10)
 	doc := run(`,"results":[{"message":{"text":"m"},
 		"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":3,"snippet":{"text":"` + long + `"}}}}]}]`)
-	if got := read(t, doc).Runs[0].Results[0].Locations[0].Snippet; len(got) > MostSnippet {
-		t.Errorf("kept %d bytes of source; want at most %d", len(got), MostSnippet)
+	if got := read(t, doc).Runs[0].Results[0].Locations[0].Snippet; len(got) != most {
+		t.Errorf("kept %d bytes of source; want the configured %d", len(got), most)
 	}
 }
 
@@ -758,5 +759,61 @@ func TestARelativeAddressIsRelativeToWhereTheToolRan(t *testing.T) {
 				t.Errorf("placed %+v; want %s, then b.c under the root's own name", placed, c.first)
 			}
 		})
+	}
+}
+
+func TestEveryPropertyBagIsBoundedWhereverItIs(t *testing.T) {
+	bag := `"properties":{"a":1,"b":{"c":[1,2]}}`
+	loc := func(inner string) string {
+		return `{"physicalLocation":{"artifactLocation":{"uri":"a.c"` + inner + `}}}`
+	}
+	for name, doc := range map[string]string{
+		"a run's":    run(`,` + bag),
+		"a driver's": `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t",` + bag + `}}}]}`,
+		"a rule's": `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t","rules":[{"id":"r",` +
+			bag + `}]}}}]}`,
+		"a result's":            run(`,"results":[{` + bag + `}]`),
+		"a message's":           run(`,"results":[{"message":{"text":"m",` + bag + `}}]`),
+		"a location's":          run(`,"results":[{"locations":[{` + bag + `}]}]`),
+		"an artifact address's": run(`,"results":[{"locations":[` + loc(`,`+bag) + `]}]`),
+		"a flow step's": run(`,"results":[{"codeFlows":[{"threadFlows":[{"locations":[{"location":` +
+			loc("") + `,` + bag + `}]}]}]}]`),
+		"an invocation's":    run(`,"invocations":[{` + bag + `}]`),
+		"a notification's":   run(`,"invocations":[{"toolExecutionNotifications":[{"level":"note",` + bag + `}]}]`),
+		"a member not read":  run(`,"taxonomies":[{"name":"CWE",` + bag + `}]`),
+		"a bag within a bag": run(`,"results":[{"properties":{"x":{` + bag + `}}}]`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			lim := limits()
+			lim.MaxProperties = 2
+			if _, err := NewUpload(lim).Read(strings.NewReader(doc)); err != nil {
+				t.Fatalf("refused at a bound the bag meets: %v", err)
+			}
+			lim.MaxProperties = 1
+			refused(t, doc, lim, "members in a property bag")
+		})
+	}
+}
+
+func TestOneDocumentIsBoundedOnItsOwnAndAsSent(t *testing.T) {
+	doc := run(`,"results":[{"ruleId":"x"},{"ruleId":"y"}]`)
+	lim := limits()
+	lim.MaxPart = int64(len(doc))
+	upload := NewUpload(lim)
+	for i := range 2 {
+		if _, err := upload.Read(strings.NewReader(doc)); err != nil {
+			t.Fatalf("document %d at its bound: %v", i+1, err)
+		}
+	}
+	lim.MaxPart = int64(len(doc) - 1)
+	refused(t, doc, lim, "bytes in one document once decompressed")
+
+	lim = limits()
+	lim.MaxPartCompressed = 100
+	if err := lim.OrDefault().Sent(100); err != nil {
+		t.Errorf("a document sent at its bound: %v", err)
+	}
+	if err := lim.OrDefault().Sent(101); err == nil || !strings.Contains(err.Error(), "one document as it was sent") {
+		t.Errorf("a document sent past its bound: %v", err)
 	}
 }

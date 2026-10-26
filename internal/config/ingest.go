@@ -31,19 +31,23 @@ func (c Config) Limits() sbom.Limits {
 // bound left unset at the reader's own default.
 func (c Config) AnalysisLimits() sarif.Limits {
 	return sarif.Limits{
-		MaxBytes:      int64(c.AnalysisMaxBytes),
-		MaxDepth:      c.AnalysisMaxDepth,
-		MaxRuns:       c.AnalysisMaxRuns,
-		MaxResults:    c.AnalysisMaxResults,
-		MaxRules:      c.AnalysisMaxRules,
-		MaxLocations:  c.AnalysisMaxLocations,
-		MaxSteps:      c.AnalysisMaxSteps,
-		MaxModules:    c.AnalysisMaxModules,
-		MaxBases:      c.AnalysisMaxBases,
-		MaxChain:      c.AnalysisMaxChain,
-		MaxProperties: c.AnalysisMaxProperties,
-		MaxText:       c.AnalysisMaxText,
-		MaxHeld:       c.AnalysisMaxHeld,
+		MaxBytes:          int64(c.AnalysisMaxBytes),
+		MaxPart:           int64(c.AnalysisMaxPartBytes),
+		MaxCompressed:     int64(c.AnalysisMaxCompressed),
+		MaxPartCompressed: int64(c.AnalysisMaxPartCompressed),
+		MaxSnippet:        c.AnalysisMaxSnippet,
+		MaxDepth:          c.AnalysisMaxDepth,
+		MaxRuns:           c.AnalysisMaxRuns,
+		MaxResults:        c.AnalysisMaxResults,
+		MaxRules:          c.AnalysisMaxRules,
+		MaxLocations:      c.AnalysisMaxLocations,
+		MaxSteps:          c.AnalysisMaxSteps,
+		MaxModules:        c.AnalysisMaxModules,
+		MaxBases:          c.AnalysisMaxBases,
+		MaxChain:          c.AnalysisMaxChain,
+		MaxProperties:     c.AnalysisMaxProperties,
+		MaxText:           c.AnalysisMaxText,
+		MaxHeld:           c.AnalysisMaxHeld,
 	}.OrDefault()
 }
 

@@ -128,10 +128,6 @@ type Location struct {
 	widest bool
 }
 
-// MostSnippet is the longest source text kept for one location, in bytes. A
-// client sends a few lines either side of each location.
-const MostSnippet = 4 << 10
-
 // Step is one step of the path a tool took to a result.
 type Step struct {
 	Location

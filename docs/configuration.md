@@ -1182,14 +1182,22 @@ it keeps the built-in value.
 
 An upload's documents are held in memory together while they are read, and
 their results are placed beside them, so two of these bound memory rather than
-the document: the size, and the count of entries held. The size also bounds
-the placed results once encoded, which are what a run is held as until it is
-applied. At the defaults an upload comes to about 800 MB, which the server's
-memory limit has to leave room for beside a scan.
+the document: the decompressed size, and the count of entries held. The
+decompressed size also bounds the placed results once encoded, which are what a
+run is held as until it is applied. At the defaults an upload comes to about
+800 MB, which the server's memory limit has to leave room for beside a scan.
+
+The sizes as sent are the network's bounds, and default to the decompressed
+ones, so a document sent without compression is bounded the same either way.
+Analyzer output compresses 7 to 17 times over, so a compressed upload meets the
+decompressed bound first.
 
 | Variable | File key | What it does | Default |
 |---|---|---|---|
-| `OPENPSIRT_ANALYSIS_MAX_BYTES` | `analysis.max_bytes` | How large one upload's documents may be together, decompressed, counting the text their results are worded with from their rules' message strings. Also how large the whole upload may be compressed, and how large its placed results may be once encoded | 256 MB |
+| `OPENPSIRT_ANALYSIS_MAX_BYTES` | `analysis.max_bytes` | How large one upload's documents may be together, decompressed, counting the text their results are worded with from their rules' message strings. Also how large its placed results may be once encoded | 256 MB |
+| `OPENPSIRT_ANALYSIS_MAX_PART_BYTES` | `analysis.max_part_bytes` | How large one document may be, decompressed | 256 MB |
+| `OPENPSIRT_ANALYSIS_MAX_COMPRESSED_BYTES` | `analysis.max_compressed_bytes` | How large the whole upload may be as it is sent, compressed where its documents are. Past it, the upload is refused before it is read | 256 MB |
+| `OPENPSIRT_ANALYSIS_MAX_PART_COMPRESSED_BYTES` | `analysis.max_part_compressed_bytes` | How large one document may be as it is sent, compressed where it is | 256 MB |
 | `OPENPSIRT_ANALYSIS_MAX_DOCUMENTS` | `analysis.max_documents` | How many documents one upload may carry. clang writes one per translation unit, so a tool's per-unit documents are merged into one before they are sent | 16 |
 | `OPENPSIRT_ANALYSIS_MAX_RUNS` | `analysis.max_runs` | How many runs one document may hold | 16 |
 | `OPENPSIRT_ANALYSIS_MAX_RESULTS` | `analysis.max_results` | How many results one run may hold | 100,000 |
@@ -1201,6 +1209,7 @@ memory limit has to leave room for beside a scan.
 | `OPENPSIRT_ANALYSIS_MAX_CHAIN` | `analysis.max_chain` | How many named starting points one path may pass through. A cycle is refused at any length | 16 |
 | `OPENPSIRT_ANALYSIS_MAX_PROPERTIES` | `analysis.max_properties` | How many members one property bag may hold | 256 |
 | `OPENPSIRT_ANALYSIS_MAX_TEXT` | `analysis.max_text` | The longest message or description kept. A longer one is cut rather than refused | 16 KB |
+| `OPENPSIRT_ANALYSIS_MAX_SNIPPET` | `analysis.max_snippet` | The longest source snippet kept for one place. A longer one is cut rather than refused | 4 KB |
 | `OPENPSIRT_ANALYSIS_MAX_DEPTH` | `analysis.max_depth` | How deeply a document may nest | 64 |
 | `OPENPSIRT_ANALYSIS_MAX_HELD` | `analysis.max_held` | How many entries one upload's documents may hold together: results, rules, locations, path steps, invocations and the members of every list they carry. About 200 bytes of memory each, however little of the document each took | 1,000,000 |
 

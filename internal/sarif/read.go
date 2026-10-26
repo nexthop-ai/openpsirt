@@ -19,10 +19,17 @@ import (
 type Limits struct {
 	// MaxBytes is the upload's documents' size once decompressed, together
 	// with the text their results are worded with from their rules' message
-	// strings.
+	// strings, and MaxPart one document's size once decompressed.
 	MaxBytes int64
-	MaxDepth int
-	MaxRuns  int
+	MaxPart  int64
+	// MaxCompressed is the upload's size as it is sent, and
+	// MaxPartCompressed one document's: compressed where it was compressed.
+	MaxCompressed     int64
+	MaxPartCompressed int64
+	// MaxSnippet is the longest source text kept for one location, in bytes.
+	MaxSnippet int
+	MaxDepth   int
+	MaxRuns    int
 	// MaxResults is per run, and MaxRules per run across every component.
 	MaxResults int
 	MaxRules   int
@@ -53,21 +60,31 @@ type Limits struct {
 // A thing held costs about 200 bytes of memory however few bytes of the
 // document it took, so MaxHeld at its default bounds that to about 200 MB on
 // top of MaxBytes.
+//
+// The compressed bounds default to the decompressed ones, so a document sent
+// without compression is bounded as it is held. Analyzer output measured
+// here compresses 7 to 17 times over, so a compressed upload meets the
+// decompressed bound first. One document may take the whole upload's
+// bounds, which is what a tool's per-unit documents merged into one take.
 func DefaultLimits() Limits {
 	return Limits{
-		MaxBytes:      256 << 20,
-		MaxDepth:      64,
-		MaxRuns:       16,
-		MaxResults:    100_000,
-		MaxRules:      10_000,
-		MaxLocations:  1_000,
-		MaxSteps:      10_000,
-		MaxModules:    1_000,
-		MaxBases:      1_000,
-		MaxChain:      16,
-		MaxProperties: 256,
-		MaxText:       16 << 10,
-		MaxHeld:       1_000_000,
+		MaxBytes:          256 << 20,
+		MaxPart:           256 << 20,
+		MaxCompressed:     256 << 20,
+		MaxPartCompressed: 256 << 20,
+		MaxSnippet:        4 << 10,
+		MaxDepth:          64,
+		MaxRuns:           16,
+		MaxResults:        100_000,
+		MaxRules:          10_000,
+		MaxLocations:      1_000,
+		MaxSteps:          10_000,
+		MaxModules:        1_000,
+		MaxBases:          1_000,
+		MaxChain:          16,
+		MaxProperties:     256,
+		MaxText:           16 << 10,
+		MaxHeld:           1_000_000,
 	}
 }
 
@@ -85,13 +102,19 @@ func (l Limits) OrDefault() Limits {
 		{&l.MaxRules, &d.MaxRules}, {&l.MaxLocations, &d.MaxLocations}, {&l.MaxSteps, &d.MaxSteps},
 		{&l.MaxModules, &d.MaxModules}, {&l.MaxBases, &d.MaxBases}, {&l.MaxChain, &d.MaxChain},
 		{&l.MaxProperties, &d.MaxProperties}, {&l.MaxText, &d.MaxText}, {&l.MaxHeld, &d.MaxHeld},
+		{&l.MaxSnippet, &d.MaxSnippet},
 	} {
 		if *f.v <= 0 {
 			*f.v = *f.d
 		}
 	}
-	if l.MaxBytes <= 0 {
-		l.MaxBytes = d.MaxBytes
+	for _, f := range []struct{ v, d *int64 }{
+		{&l.MaxBytes, &d.MaxBytes}, {&l.MaxPart, &d.MaxPart},
+		{&l.MaxCompressed, &d.MaxCompressed}, {&l.MaxPartCompressed, &d.MaxPartCompressed},
+	} {
+		if *f.v <= 0 {
+			*f.v = *f.d
+		}
 	}
 	return l
 }
@@ -107,18 +130,28 @@ type Upload struct {
 	held  int
 }
 
-// NewUpload is an upload that has read nothing.
-func NewUpload(lim Limits) *Upload { return &Upload{lim: lim} }
+// NewUpload is an upload that has read nothing, within lim, with any bound
+// it leaves unset at its default.
+func NewUpload(lim Limits) *Upload { return &Upload{lim: lim.OrDefault()} }
 
-// Read reads the upload's next document, compressed with gzip or not.
+// Read reads the upload's next document, compressed with gzip or not. A
+// document is read within what is left of the upload's decompressed bound and
+// within its own, whichever is less.
 func (u *Upload) Read(r io.Reader) (Log, error) {
 	left := u.lim.MaxBytes - u.bytes
+	part := left > u.lim.MaxPart
+	if part {
+		left = u.lim.MaxPart
+	}
 	plain, err := gunzipped(r, left)
 	if err != nil {
 		return Log{}, err
 	}
 	counted := &counting{r: plain}
 	b := docread.NewJSON(counted, left, u.lim.MaxDepth)
+	b.BoundMembers("properties", u.lim.MaxProperties, func() error {
+		return over("members in a property bag", u.lim.MaxProperties)
+	})
 	rd := reader{b: b, lim: u.lim, up: u, read: counted}
 	log, err := rd.log()
 	if err == nil {
@@ -126,6 +159,8 @@ func (u *Upload) Read(r io.Reader) (Log, error) {
 	}
 	u.bytes += counted.n
 	switch {
+	case errors.Is(err, docread.ErrTooLarge) && part:
+		return Log{}, over(partBytes, int(u.lim.MaxPart))
 	case errors.Is(err, docread.ErrTooLarge) && left < u.lim.MaxBytes, err == nil && u.bytes > u.lim.MaxBytes:
 		return Log{}, over(uploadBytes, int(u.lim.MaxBytes))
 	case err != nil:
@@ -134,8 +169,19 @@ func (u *Upload) Read(r io.Reader) (Log, error) {
 	return log, nil
 }
 
-// uploadBytes is what the bound on an upload's size counts.
-const uploadBytes = "bytes across the upload's documents and the text worded for their results"
+// Sent refuses a document past its bound as it was sent, compressed or not.
+func (l Limits) Sent(size int64) error {
+	if size > l.MaxPartCompressed {
+		return over("bytes in one document as it was sent", int(l.MaxPartCompressed))
+	}
+	return nil
+}
+
+// What the bounds on an upload's size and one document's size count.
+const (
+	uploadBytes = "bytes across the upload's documents and the text worded for their results"
+	partBytes   = "bytes in one document once decompressed"
+)
 
 // counting counts what passes through it.
 type counting struct {
@@ -866,7 +912,7 @@ func (rd *reader) region(loc *Location, context bool) error {
 					return rd.b.Skip()
 				}
 				s, err := rd.b.Str()
-				snippet = bound.Head(s, MostSnippet)
+				snippet = bound.Head(s, rd.lim.MaxSnippet)
 				return err
 			})
 		default:
@@ -1006,17 +1052,11 @@ const (
 	propSalt          = "openpsirt/salt"
 )
 
-// properties reads one property bag, refusing one with more members than the
-// bound.
+// properties reads one property bag. Every bag the document holds, read or
+// walked past, is refused with more members than the bound, as the reader's
+// stream counts them.
 func (rd *reader) properties(fn func(key string) error) error {
-	n := 0
-	return rd.b.Object(func(key string) error {
-		n++
-		if n > rd.lim.MaxProperties {
-			return over("members in a property bag", rd.lim.MaxProperties)
-		}
-		return fn(key)
-	})
+	return rd.b.Object(fn)
 }
 
 func (rd *reader) runProperties(p *RunProperties) error {
