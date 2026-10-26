@@ -383,12 +383,12 @@ function others(n: number): string {
   return n === 1 ? "1 other lead" : `${n} other leads`;
 }
 
-// What moving a lead into its flaw's case discloses with the flaw.
 // Who reads a moved lead once its flaw is disclosed. Signed-in readers of the
 // product only: a lead is never in a published VEX or CSAF document.
 const PUBLISHED_TO =
   "Once the flaw is disclosed, readable by everyone signed in with public access to this product. Not included in published VEX or CSAF.";
 
+// What moving a lead into its flaw's case discloses with the flaw.
 function Discloses({ discloses }: { discloses: HandoffOffer["discloses"] }) {
   const authors = discloses.authors ?? [];
   const said = discloses.said ?? [];

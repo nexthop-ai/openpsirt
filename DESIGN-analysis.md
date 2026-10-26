@@ -762,7 +762,7 @@ takes a moved one back out.
 | Rule | |
 |---|---|
 | A move discloses, with the flaw, every revision of reasoning and every comment on a claim about the lead or the leads linked with it, every path they name and every message the analyzer wrote there | People writing in the record have to know that from the first word (REQ-40) |
-| The offer shows that writing before the move, grouped by author, with the paths and messages, and says whether snippets are published and how many are stripped | What goes public is read, not counted |
+| The offer shows that writing before the move, grouped by author, with the paths and messages, and says whether snippets are published and how many are stripped | The mover reads what goes public |
 | The writing in the offer is read at the visibilities the caller reads in the product | A hand-off takes both triage roles, and the read is narrowed in the data layer all the same (REQ-42) |
 | Disclosed means readable in the portal by everybody signed in with public access to the product | A lead is never in a published VEX or CSAF document, and the anonymous subject reads no lead |
 | At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets), and a later run describing the disclosed lead again is stripped the same way | A product's source is not published because one flaw in it was, and a run writes what the analyzer sent |
@@ -783,7 +783,7 @@ takes a moved one back out.
 |---|---|
 | It takes every lead handed off as the flaw | The leads of one flaw are one case, as a move takes them |
 | It is refused with 409 once the flaw is disclosed, and asks for a reason | Disclosure is one way. Undoing takes the flaw out of every build, which a person explains |
-| Each lead is confirmed again: the link goes, the claim confirming it stands, and it returns to the queue's lists of held work with whoever held it | The judgment that it is real was not undone, the recording was |
+| Each lead is confirmed again: the link goes, the claim confirming it stands, and it returns to the queue's lists of held work with whoever held it | Undoing takes back the recording and leaves the judgment that it is real |
 | A moved lead is read by its internal readers alone again | A lead with no case to be in is the internal material it always was |
 | Every grant of the leads ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
 | The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a hand-off somebody undid should not have been recorded, and a hand-off made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
