@@ -190,7 +190,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 
 // Discussion returns what has been said about a claim, oldest first.
 func (s *Store) Discussion(ctx context.Context, subject access.Subject, claimID int64) ([]Comment, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, readableOn); err != nil {
+	if _, _, err := s.readableClaimRows(ctx, subject, claimID); err != nil {
 		return nil, err
 	}
 	var comments []Comment
@@ -229,7 +229,7 @@ func (s *Store) Earlier(ctx context.Context, subject access.Subject,
 		Where(`"id" = ?`, commentID).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
-	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, readableOn); err != nil {
+	if _, _, err := s.readableClaimRows(ctx, subject, comment.ClaimID); err != nil {
 		return nil, err
 	}
 	var rows []WasSaid

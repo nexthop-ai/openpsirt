@@ -120,7 +120,7 @@ func (s *Store) PointAt(ctx context.Context, subject access.Subject, claimID int
 	// argue about. The two are asked separately because the second
 	// question names the issue: somebody brought into one case may argue
 	// about it , and a check that only knew the product would refuse them.
-	_, rows, err := s.claimRows(ctx, subject, claimID, readableOn)
+	_, rows, err := s.readableClaimRows(ctx, subject, claimID)
 	if err != nil {
 		return err
 	}
@@ -933,6 +933,13 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 // argues the claims about it.
 func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID int64,
 	allowed func(access.Subject, int64, int64, access.Visibility) bool) (*Claim, []Decision, error) {
+	return s.claimRowsAs(ctx, subject, claimID, allowed, false)
+}
+
+// claimRowsAs is claimRows, widened where widen is set as readableClaimRows
+// says.
+func (s *Store) claimRowsAs(ctx context.Context, subject access.Subject, claimID int64,
+	allowed func(access.Subject, int64, int64, access.Visibility) bool, widen bool) (*Claim, []Decision, error) {
 
 	claim := new(Claim)
 	if err := s.db.NewSelect().Model(claim).Where(`"id" = ?`, claimID).Scan(ctx); err != nil {
@@ -946,12 +953,54 @@ func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID i
 	if len(rows) == 0 {
 		return nil, nil, ErrNotTheirs
 	}
+	var refused []int64
 	for _, row := range rows {
 		if !allowed(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			return nil, nil, ErrNotTheirs
+			refused = append(refused, row.ID)
+		}
+	}
+	if len(refused) > 0 && !widen {
+		return nil, nil, ErrNotTheirs
+	}
+	if len(refused) > 0 {
+		included, err := s.readsIncluded(ctx, subject, refused)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, id := range refused {
+			if !included[id] {
+				return nil, nil, ErrNotTheirs
+			}
 		}
 	}
 	return claim, rows, nil
+}
+
+// readableClaimRows is claimRows for a read: a row the subject reads only as
+// one of the flaw's readers of a lead included in its case is read as well.
+func (s *Store) readableClaimRows(ctx context.Context, subject access.Subject, claimID int64) (*Claim, []Decision, error) {
+	return s.claimRowsAs(ctx, subject, claimID, readableOn, true)
+}
+
+// readsIncluded is which of these decisions the subject reads as one of the
+// flaw's readers of a lead included in its case (orIncluded).
+func (s *Store) readsIncluded(ctx context.Context, subject access.Subject, decisionIDs []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	where, args := orIncluded(subject, "1 = 0", nil, `"de"."product_id"`, `"de"."visibility"`, `"de"."place_identity"`)
+	if where == "1 = 0" || len(decisionIDs) == 0 {
+		return out, nil
+	}
+	var ids []int64
+	if err := s.db.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."id"`).
+		Where(`"de"."id" IN (?)`, bun.List(decisionIDs)).
+		Where(where, args...).
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read which decisions are at an included lead: %w", err)
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
 }
 
 // ErrLeadHandedOff refuses a claim about a lead handed off as a flaw, and a

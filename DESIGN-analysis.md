@@ -743,20 +743,22 @@ takes a moved one back out.
 | | Kept | Moved |
 |---|---|---|
 | Visibility of the lead and the claims at its place | Internal | Internal |
-| An internal reader reads | The whole lead, and nothing of the case | The whole lead, and nothing of the case |
-| Somebody granted the lead reads | The whole lead, and its flaw | The whole lead, and its flaw |
-| A reader of undisclosed work reads | Nothing | The whole lead, and its flaw |
-| A reader on the flaw's case reads | Nothing, unless they were granted the lead | The whole lead, and its flaw |
+| An internal reader reads | The whole lead and its claims, and nothing of the case | The whole lead and its claims, and nothing of the case |
+| Somebody granted the lead reads | The whole lead without its claims, and its flaw | The whole lead without its claims, and its flaw |
+| A reader of undisclosed work reads | Nothing | The whole lead and its claims, and its flaw |
+| A reader on the flaw's case reads | Nothing, unless they were granted the lead | The whole lead and its claims, and its flaw |
 | When the flaw is disclosed | The lead stays internal | The lead and its claims go public with the flaw (REQ-40) |
 | A later sighting opens | Internal | Internal, read by both audiences |
 
 | Rule | |
 |---|---|
 | A move adds the flaw's readers to the lead's readers and takes nobody away | Somebody who read the lead once keeps reading it |
-| An undone move takes back only the readers the move added | The lead's internal readers and its grants are as they were |
+| An undone move takes back only the readers the move added, from the lead and from the claims at its place | The lead's internal readers and its grants are as they were |
 | The flaw's readers read a moved lead wherever its internal readers do: its evidence, the queue and the counts beside it, its file and the findings file, the coverage of a standing rule, and its kin | One rule in the data layer, so no list answers differently from the page (REQ-42, REQ-43) |
 | Reading undisclosed work reads no internal lead the flaw does not hold | The addition is the moved leads of an undisclosed flaw, and nothing else of the product's internal work |
-| The claims at a moved lead's place stay with its internal readers | A claim is filed under the analyzer's rule, and the flaw's readers read decisions filed under the flaw |
+| The flaw's readers read the claims at a moved lead's place while the flaw is undisclosed: the reasoning and its revisions, the approvals, the comments, one claim's page, and every list, count and export holding them | The audience that reads the lead's evidence reads the judgments about it, and those go public with the lead at disclosure |
+| The claims stay internal, and the addition is the internal claims at a moved lead's place and nothing else | A claim is filed under the analyzer's rule, and the flaw's readers read no other internal claim in the product |
+| Reading a claim at a moved lead is not arguing it | A comment and an approval each keep the claim's internal triage role, and a claim about a handed-off lead is neither revised nor withdrawn |
 
 | Rule | |
 |---|---|
@@ -1023,7 +1025,8 @@ it is about.
 | A tool is told apart by the name its output gives it | Two configurations of one tool in one invocation are one series. A pipeline running a tool twice runs the client twice |
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | An internal reader reads a moved lead whole, and is not told its flaw | The flaw is undisclosed work. The lead's state reads handed off for both |
-| The claims about a moved lead are read by its internal readers, and by nobody who reads it only through the flaw or a grant | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A reader of undisclosed work reads the lead's evidence and the flaw's decisions |
+| A grant of a moved lead reaches its evidence and not the claims at its place | The claims are widened for the flaw's two audiences, and a lead grant is a third reach of one place's findings |
+| A notice or a mention about a claim at a moved lead reaches its internal readers alone | A mention resolves names against the people who read the claim's visibility in its product, and that stays internal until disclosure. A reader of the flaw reads the claim and is not told of a note on it |
 | A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their claims to the new name |
 | Every lead of a series' first run is in the queue | A vulnerability scanner's first scan has no baseline either, and starting to analyze a codebase leaves what it already holds to be triaged and fixed. A codebase analyzed for the first time puts every result in front of a triager at once, and the order and the standing rules are what thin it |
 | An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |

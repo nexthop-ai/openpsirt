@@ -125,9 +125,22 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 	// collaborator reaches the decisions of the case they were brought into
 	// and every list that offers them a claim links here. Offered and then
 	// refused reads as a fault rather than as a rule.
+	var refused []int64
 	for _, row := range rows {
 		if !readableOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			return nil, ErrNotTheirs
+			refused = append(refused, row.ID)
+		}
+	}
+	if len(refused) > 0 {
+		// A lead included in its flaw's case is read by the flaw's readers.
+		included, err := s.readsIncluded(ctx, subject, refused)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range refused {
+			if !included[id] {
+				return nil, ErrNotTheirs
+			}
 		}
 	}
 

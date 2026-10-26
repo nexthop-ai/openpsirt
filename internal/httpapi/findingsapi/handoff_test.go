@@ -573,3 +573,85 @@ func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersWithoutTheFlawAndNo
 		}
 	})
 }
+
+// claimReads is what one person reads of the claim at a lead's place, by the
+// status each read of it answers, and whether their list of decisions holds it.
+func claimReads(t *testing.T, r *httpapitest.Reach, who, claim, decision string) (string, bool) {
+	t.Helper()
+	var codes []string
+	for _, path := range []string{claim, claim + "/comments", claim + "/revisions", claim + "/approvals", decision} {
+		codes = append(codes, fmt.Sprint(httpapitest.AsPerson(t, r, who, http.MethodGet, path, "").Code))
+	}
+	var listed struct {
+		Items []struct {
+			Decision struct {
+				ClaimID int64 `json:"claim_id"`
+			} `json:"decision"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, who, "/v1/decisions?limit=200", &listed)
+	listedIt := false
+	for _, item := range listed.Items {
+		if fmt.Sprintf("/v1/claims/%d", item.Decision.ClaimID) == claim {
+			listedIt = true
+		}
+	}
+	exported := httpapitest.AsPerson(t, r, who, http.MethodGet, "/v1/audit.csv", "")
+	if exported.Code != http.StatusOK {
+		t.Fatalf("%s exporting the audit answered %d: %s", who, exported.Code, exported.Body)
+	}
+	if strings.Contains(exported.Body.String(), "clang-tidy/leak") != listedIt {
+		t.Errorf("%s exported %q, where their list held the claim: %v", who, exported.Body, listedIt)
+	}
+	return strings.Join(codes, " "), listedIt
+}
+
+func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+flaw+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing somebody onto the flaw's case answered %d: %s", got.Code, got.Body)
+		}
+		claim := claimAt(t, r, place)
+		var decision int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."id"`).
+			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &decision); err != nil {
+			t.Fatal(err)
+		}
+		decisionAt := fmt.Sprintf("/v1/decisions/%d", decision)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, claim+"/comments",
+			`{"body":"the early return is the only path"}`); got.Code != http.StatusCreated {
+			t.Fatalf("commenting answered %d: %s", got.Code, got.Body)
+		}
+		const whole, none = "200 200 200 200 200", "404 404 404 404 404"
+		expect := func(when string, flawsReaders string) {
+			t.Helper()
+			for who, want := range map[string]string{
+				"internal-reader": whole, "private": flawsReaders, "outsider": flawsReaders,
+			} {
+				got, listed := claimReads(t, r, who, claim, decisionAt)
+				if got != want || listed != (want == whole) {
+					t.Errorf("%s %s read the claim as %s, listed %v; want %s", who, when, got, listed, want)
+				}
+			}
+		}
+		expect("while the lead was kept", none)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("including the lead answered %d: %s", got.Code, got.Body)
+		}
+		expect("while the lead was included", whole)
+		for _, who := range []string{"internal-reader", "private", "outsider"} {
+			if got := evidenceAs(t, r, who, place); got.Decision == nil {
+				t.Errorf("%s read the included lead without its claim", who)
+			}
+		}
+		// Reading the claims is not arguing them.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodPost, claim+"/comments",
+			`{"body":"me too"}`), http.StatusNotFound)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("undoing the move answered %d: %s", got.Code, got.Body)
+		}
+		expect("once the move was undone", none)
+	})
+}
