@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -366,6 +367,52 @@ func TestAHandOffLinksEveryLeadItsConfirmationCovers(t *testing.T) {
 		}
 		if _, _, moved := handedOffAs(t, r, place); moved {
 			t.Errorf("the leak stayed in the case its overflow was taken out of")
+		}
+	})
+}
+
+func TestAnUndoneHandOffIsTrailedUnderEachLeadsOwnName(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, kin := besideTheLeak(t, r, 4)
+		if len(kin) != 1 {
+			t.Fatalf("the leak's kin are %v; want the overflow on line 4", kin)
+		}
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"p leaks and n overflows, one flaw"}`)
+		at := "/v1/products/mine/streams/master/variants/broadcom/leads/"
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/hand-off",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
+			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, at+kin[0]+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("granting the overflow answered %d: %s", got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/hand-off/withdrawal",
+			`{"because":"two flaws after all"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("undoing the hand-off answered %d: %s", got.Code, got.Body)
+		}
+		var trail struct {
+			Items []struct {
+				About  string `json:"about"`
+				Was    string `json:"was"`
+				Became string `json:"became"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=case&limit=100", &trail)
+		var undone, withdrawn []string
+		for _, row := range trail.Items {
+			switch {
+			case row.Became == "hand-off undone":
+				undone = append(undone, row.About)
+			case strings.HasSuffix(row.About, " · embargo-reader") && row.Became == "":
+				withdrawn = append(withdrawn, row.About)
+			}
+		}
+		slices.Sort(undone)
+		if len(undone) != 2 || !strings.HasSuffix(undone[0], "clang-tidy/leak") || !strings.HasSuffix(undone[1], "cppcheck/overflow") {
+			t.Errorf("the undo was trailed as %q; want one row under each lead's name", undone)
+		}
+		if len(withdrawn) != 1 || !strings.Contains(withdrawn[0], "cppcheck/overflow") {
+			t.Errorf("the overflow's grant ended trailed as %q; want it under the overflow's name", withdrawn)
 		}
 	})
 }

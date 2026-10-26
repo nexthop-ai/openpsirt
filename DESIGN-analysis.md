@@ -789,7 +789,7 @@ takes a moved one back out.
 | The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a hand-off somebody undid should not have been recorded, and a hand-off made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
 | The flaw keeps the record of its lead, marked undone with who, when and why | What was recorded and taken back stays on the record |
 | It is written in one transaction that reads each hand-off again and deletes it only as read | A move, a disclosure or a run describing the lead since is a lost race, asked again (REQ-71) |
-| It is recorded in the administrative trail | It changes who reads the leads and what the flaw is |
+| It is recorded in the administrative trail once per lead, each under that lead's own name, as each grant it ends is | It changes who reads the leads and what the flaw is |
 
 ### Fixed in
 

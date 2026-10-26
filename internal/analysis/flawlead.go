@@ -150,16 +150,20 @@ func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, produc
 		if err != nil {
 			return err
 		}
-		name, err := LeadName(ctx, tx, h)
-		if err != nil {
-			return err
-		}
+		was, became := "handed off", "hand-off undone"
 		for i := range with {
 			one := &with[i]
+			name, err := LeadName(ctx, tx, one)
+			if err != nil {
+				return err
+			}
 			if err := one.Unlink(ctx, tx); err != nil {
 				return err
 			}
 			if err := endLeadGrants(ctx, tx, subject, productID, one.PlaceIdentity, name, at); err != nil {
+				return err
+			}
+			if err := recordAccess(ctx, tx, subject, name, &was, &became); err != nil {
 				return err
 			}
 		}
@@ -175,8 +179,7 @@ func UndoHandOff(ctx context.Context, db bun.IDB, subject access.Subject, produc
 			Exec(ctx); err != nil {
 			return fmt.Errorf("record the hand-off as undone: %w", err)
 		}
-		was, became := "handed off", "hand-off undone"
-		return recordAccess(ctx, tx, subject, name, &was, &became)
+		return nil
 	})
 }
 
