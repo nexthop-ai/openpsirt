@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/series"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
@@ -359,6 +360,78 @@ func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
 			}
 			for personID, per := range w.reach {
 				// Approved again by somebody other than its proposer.
+				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{internal: 1}) {
+					continue
+				}
+				out[personID] = append(out[personID], holds)
+			}
+		}
+	}
+	return out, nil
+}
+
+// rulesWaiting is every standing rule on leads that nobody has approved, past
+// the period a claim may wait on a second person, against whoever may approve
+// it.
+//
+// A proposed rule dismisses nothing, so every lead it names stays in the
+// queue while it waits. It clears when the rule is approved or retired.
+func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
+	after, err := setting.NewStore(w.db).Duration(ctx,
+		setting.WaitingAfter, setting.DefaultWaitingAfter)
+	if err != nil {
+		return nil, fmt.Errorf("read how long a standing rule may wait: %w", err)
+	}
+	since := time.Now().UTC().Add(-after)
+	var products []struct {
+		ID    int64  `bun:"id"`
+		Name  string `bun:"name"`
+		Shown string `bun:"display_name"`
+	}
+	if err := w.db.NewSelect().
+		TableExpr(`"product" AS "p"`).
+		ColumnExpr(`"p"."id", "p"."name", "p"."display_name"`).
+		Where(`"p"."retired_at" IS NULL`).
+		Where(`EXISTS (SELECT 1 FROM "lead_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
+			`AND "lr"."approved_at" IS NULL AND "lr"."retired_at" IS NULL AND "lr"."proposed_at" <= ?)`, since).
+		Scan(ctx, &products); err != nil {
+		return nil, fmt.Errorf("read which products hold standing rules waiting on a second person: %w", err)
+	}
+	out, err := w.everybody(ctx, RuleWaiting)
+	if err != nil {
+		return nil, err
+	}
+	// Read as the deployment, as rulesOutgrown reads them: who hears it is
+	// decided below by who may approve.
+	everything := access.Everything("the watch")
+	for _, product := range products {
+		rules, err := analysis.StandingRules(ctx, w.db, everything, product.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, rule := range rules {
+			if rule.State != analysis.RuleProposed || rule.ProposedAt.After(since) {
+				continue
+			}
+			named := rule.Rule
+			switch {
+			case named == "":
+				named = "every lead under " + rule.Prefix
+			case rule.Prefix != "":
+				named += " under " + rule.Prefix
+			}
+			productID := product.ID
+			holds := Holds{
+				About: identify("rule-waiting", strconv.FormatInt(rule.ID, 10)),
+				Body: fmt.Sprintf("A standing rule in %s dismissing %s is waiting for a second person. "+
+					"It dismisses nothing until somebody approves it.", product.Shown, named),
+				Link:      weblink.LeadRules(product.Name),
+				Private:   true,
+				Internal:  true,
+				ProductID: &productID,
+			}
+			for personID, per := range w.reach {
+				// Approved by somebody other than its proposer.
 				if personID == rule.ProposedBy || !per[productID].approvesAll(rows{internal: 1}) {
 					continue
 				}

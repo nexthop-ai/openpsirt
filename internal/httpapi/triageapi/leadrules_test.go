@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -181,6 +183,12 @@ func leadRunWithSecondLeak() string {
 // outgrownTold sweeps, and is how many outgrown rules a person holds.
 func outgrownTold(t *testing.T, r *httpapitest.Reach, who string) int {
 	t.Helper()
+	return ruleNoticesTold(t, r, who, notify.RuleOutgrown)
+}
+
+// ruleNoticesTold sweeps, and is how many notices of one kind a person holds.
+func ruleNoticesTold(t *testing.T, r *httpapitest.Reach, who string, kind notify.Kind) int {
+	t.Helper()
 	if _, _, err := notify.NewWatch(r.DB.DB, slog.New(slog.NewTextHandler(io.Discard, nil))).Once(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +200,7 @@ func outgrownTold(t *testing.T, r *httpapitest.Reach, who string) int {
 	httpapitest.Read(t, r, who, "/v1/notifications", &theirs)
 	n := 0
 	for _, item := range theirs.Items {
-		if item.Kind == string(notify.RuleOutgrown) {
+		if item.Kind == string(kind) {
 			n++
 		}
 	}
@@ -368,5 +376,52 @@ func TestARuleItsToolTagsWithNoWeaknessIsRatedByTheTableHeldForIt(t *testing.T) 
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadRulesAt,
 			`{"rule":"clang/unix.Malloc","reason":"false_positive","reasoning":"every allocation is pooled"}`),
 			http.StatusUnprocessableEntity)
+	})
+}
+
+// A standing rule nobody approves dismisses nothing, so whoever may approve it
+// is told once it has waited the period a claim waits, and never its
+// proposer.
+func TestAStandingRuleWaitingForApprovalIsToldToWhoeverMayApproveIt(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// The proposer may approve as well, so leaving them out is the
+		// proposer rule and nothing else.
+		ctx := t.Context()
+		proposer, err := r.Rights.Ensure(ctx, "internal-triager", httpapitest.ShownAs("internal-triager"), nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mine, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Rights.GrantRole(ctx, proposer.ID, mine.ID, access.Approver); err != nil {
+			t.Fatal(err)
+		}
+		rule := proposeLeadRule(t, r, `{"prefix":"tests","reason":"used_in_tests","reasoning":"the tests do not ship"}`)
+		if n := ruleNoticesTold(t, r, "internal-reviewer", notify.RuleWaiting); n != 0 {
+			t.Fatalf("a rule proposed a moment ago was told as waiting %d times", n)
+		}
+		// One approved beside it waits for nobody.
+		approveLeadRule(t, r, proposeLeadRule(t, r,
+			`{"prefix":"examples","reason":"used_in_tests","reasoning":"the examples do not ship"}`).ID)
+		if _, err := r.DB.DB.NewUpdate().Table("lead_rule").
+			Set(`"proposed_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
+			Where(`1 = 1`).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if n := ruleNoticesTold(t, r, "internal-reviewer", notify.RuleWaiting); n != 1 {
+			t.Errorf("an internal approver holds %d waiting rules; want 1", n)
+		}
+		if n := ruleNoticesTold(t, r, "internal-triager", notify.RuleWaiting); n != 0 {
+			t.Errorf("the rule's proposer holds %d waiting rules; want none", n)
+		}
+		if n := ruleNoticesTold(t, r, "internal-reader", notify.RuleWaiting); n != 0 {
+			t.Errorf("an internal reader who may not approve holds %d waiting rules; want none", n)
+		}
+		approveLeadRule(t, r, rule.ID)
+		if n := ruleNoticesTold(t, r, "internal-reviewer", notify.RuleWaiting); n != 0 {
+			t.Errorf("an approved rule is still told as waiting %d times", n)
+		}
 	})
 }

@@ -71,7 +71,7 @@ func Kinds() []Kind {
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
-		LeadHandedOff, LeadMoved, RuleOutgrown,
+		LeadHandedOff, LeadMoved, RuleOutgrown, RuleWaiting,
 		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
@@ -291,6 +291,10 @@ const (
 	// its approver saw by the deployment's factor. A condition: approving it
 	// again, retiring it or its covering less clears it.
 	RuleOutgrown Kind = "rule-outgrown"
+	// RuleWaiting is a standing rule on leads nobody has approved, past the
+	// period a claim may wait on a second person. A condition: approving it
+	// or retiring it clears it.
+	RuleWaiting Kind = "rule-waiting"
 	// RiskUnagreed is something hidden with nobody's agreement behind it.
 	//
 	// The one outcome-shaped failure the record cannot find on its own

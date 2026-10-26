@@ -280,6 +280,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		{AnalysisQuiet, s.analysesQuiet, "which analyzers have gone quiet"},
 		// A standing rule on leads covering more than was agreed to.
 		{RuleOutgrown, s.rulesOutgrown, "which standing rules on leads have outgrown their approval"},
+		{RuleWaiting, s.rulesWaiting, "which standing rules on leads are waiting on a second person"},
 	} {
 		holding, err := each.of(ctx)
 		if err != nil {

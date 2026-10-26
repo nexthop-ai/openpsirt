@@ -225,6 +225,7 @@ line is withheld as internal (§ The notification list).
 | A handed-off lead moved into its flaw's case, or taken back out | event | The product's internal triagers, never whoever moved it | Acknowledged |
 | A lead assigned | event | The person given it, while they read it at every visibility it is open at. Never a team, never whoever gave it out, and nobody for handing one back | Acknowledged |
 | A standing rule on leads outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or covering less |
+| A standing rule on leads waiting for its approval | condition | Whoever may approve at internal visibility, never its proposer, once it has waited the period a claim waits | Approved or retired |
 | Leads sitting in a team's queue | condition | The team's members who read the product's internal work, after the period queued work waits | Taken by a person, judged, handed off or closed |
 
 | Rule | Reason |
@@ -234,6 +235,7 @@ line is withheld as internal (§ The notification list).
 | A hand-off or a move names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of a kept lead's case (`DESIGN-analysis.md` § Keep or move) |
 | A lead assigned names the analyzer's rule, its path and line, and the build it was assigned from | The line is internal work, and names no more than the lead's page |
 | A lead open at internal and at private visibility is withheld as internal | Its recipient reads both, and a reader of undisclosed work reads no internal row |
+| A standing rule waiting for approval is one condition per rule | It dismisses nothing while it waits, so every lead it names stays in the queue, and one approval answers all of them |
 | Leads in a team's queue are counted one per place, for each team and product, apart from the team's other queued work, and the condition names the team | A lead is one piece of work at its place (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
 | A lead a claim stands on, or one handed off as a flaw, is not waiting | A claim is somebody judging it, and a handed-off lead is closed work for its holder |
 | Team routing reaches a lead notice through the team's queue alone | A hand-off, a move and an assignment are each one act about one lead, told to the people the table names. A series alert is about a series, which no team holds |
