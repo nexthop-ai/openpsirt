@@ -129,6 +129,83 @@ func (h *afterRead) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.
 
 func (h *afterRead) AfterQuery(context.Context, *bun.QueryEvent) {}
 
+// RivalAfterSelect returns a handle over db's connections on which a rival
+// writer lands right after the first read of one table, before whatever
+// statement comes next, and a function that answers what the rival returned.
+//
+// That is the interleaving between two reads a write depends on: a value
+// counted after the row was read can count a change the row read does not
+// hold. The rival is waited for up to wait, runs on db rather than on the
+// handle, and fails the test where it never ran. SQLite has one connection,
+// so the test is skipped there.
+func RivalAfterSelect(t *testing.T, db *database.DB, read string, wait time.Duration,
+	rival func() error) (*bun.DB, func() error) {
+
+	t.Helper()
+	if db.Stats().MaxOpenConnections == 1 {
+		t.Skip("one connection: nothing lands between two reads")
+	}
+	hook := &afterSelect{read: read, wait: wait, rival: rival, done: make(chan error, 1)}
+	hooked := bun.NewDB(db.DB.DB, db.Dialect()).WithQueryHook(hook)
+	var answer error
+	var waited sync.Once
+	finished := func() error {
+		waited.Do(func() {
+			hook.mu.Lock()
+			fired := hook.fired
+			hook.mu.Unlock()
+			if !fired {
+				t.Error("the rival never ran, so nothing landed after the read")
+				return
+			}
+			answer = <-hook.done
+		})
+		return answer
+	}
+	t.Cleanup(func() { _ = finished() })
+	return hooked, finished
+}
+
+type afterSelect struct {
+	read  string
+	wait  time.Duration
+	rival func() error
+	done  chan error
+
+	mu    sync.Mutex
+	armed bool
+	fired bool
+}
+
+func (h *afterSelect) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	h.mu.Lock()
+	fire := h.armed && !h.fired
+	if fire {
+		h.fired = true
+	}
+	h.mu.Unlock()
+	if !fire {
+		return ctx
+	}
+	landed := make(chan error, 1)
+	go func() { landed <- h.rival() }()
+	select {
+	case err := <-landed:
+		h.done <- err
+	case <-time.After(h.wait):
+		go func() { h.done <- <-landed }()
+	}
+	return ctx
+}
+
+func (h *afterSelect) AfterQuery(_ context.Context, e *bun.QueryEvent) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if verbOf(e.Query) == "SELECT" && names(e.Query, h.read) {
+		h.armed = true
+	}
+}
+
 // Hooked is db with hook watching every statement made through it, and
 // nothing made through db itself or through any other handle over the same
 // connections. A store under test is built on the handle this returns, which

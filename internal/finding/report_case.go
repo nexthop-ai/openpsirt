@@ -144,6 +144,21 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 
 	var row *FlawReport
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		// The ordinal is read before the report, so an edit committing
+		// between the two reads takes the number this one would write: the
+		// unique index refuses it, and the attempt is taken again. Read after
+		// the report, it would count that edit and keep, as the version it
+		// replaced, text the report no longer held.
+		var highest int
+		if err := tx.NewSelect().Model((*ReportRevision)(nil)).
+			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+			Where(`"flaw_report_id" = (?)`, tx.NewSelect().Model((*FlawReport)(nil)).
+				Column("id").
+				Where(`"fr"."reference" = ?`, foldReference(reference)).
+				Where(`"fr"."product_id" = ?`, productID)).
+			Scan(ctx, &highest); err != nil {
+			return fmt.Errorf("read how often it was edited: %w", err)
+		}
 		var err error
 		if row, err = reportIn(ctx, tx, productID, reference); err != nil {
 			return err
@@ -155,18 +170,15 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, productID in
 			return nil
 		}
 		now := s.now().UTC().Truncate(time.Microsecond)
-		var highest int
-		if err := tx.NewSelect().Model((*ReportRevision)(nil)).
-			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
-			Where(`"flaw_report_id" = ?`, row.ID).Scan(ctx, &highest); err != nil {
-			return fmt.Errorf("read how often it was edited: %w", err)
-		}
 		if _, err := tx.NewInsert().Model(&ReportRevision{
 			FlawReportID: row.ID, Ordinal: highest + 1,
 			Title: row.Title, Summary: row.Summary,
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
 			ReceivedOn: row.ReceivedOn, ReplacedBy: subject.ID, ReplacedAt: now,
 		}).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				return database.ErrGoAgain
+			}
 			return fmt.Errorf("keep what it said before: %w", err)
 		}
 		res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
@@ -482,6 +494,14 @@ func (s *Store) RewordReportNote(ctx context.Context, subject access.Subject, pr
 	var row *FlawReport
 	note := new(ReportNote)
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		// The ordinal is read before the note, for the reason an edit to the
+		// report reads its own first.
+		var highest int
+		if err := tx.NewSelect().Model((*WasReportNoted)(nil)).
+			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+			Where(`"note_id" = ?`, noteID).Scan(ctx, &highest); err != nil {
+			return fmt.Errorf("read how often it was changed: %w", err)
+		}
 		var err error
 		if row, err = reportIn(ctx, tx, productID, reference); err != nil {
 			return err
@@ -495,15 +515,12 @@ func (s *Store) RewordReportNote(ctx context.Context, subject access.Subject, pr
 			return ErrNoteNotYours
 		}
 		edited := s.now().UTC().Truncate(time.Microsecond)
-		var highest int
-		if err := tx.NewSelect().Model((*WasReportNoted)(nil)).
-			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
-			Where(`"note_id" = ?`, noteID).Scan(ctx, &highest); err != nil {
-			return fmt.Errorf("read how often it was changed: %w", err)
-		}
 		if _, err := tx.NewInsert().Model(&WasReportNoted{
 			NoteID: noteID, Ordinal: highest + 1, Body: note.Body, ReplacedAt: edited,
 		}).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				return database.ErrGoAgain
+			}
 			return fmt.Errorf("keep what it said before: %w", err)
 		}
 		if _, err := tx.NewUpdate().Model((*ReportNote)(nil)).

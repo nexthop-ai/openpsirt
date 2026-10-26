@@ -1141,8 +1141,13 @@ critical, and from what" is the question being asked of it.
 
 An insert that can lose a race on a unique key hands the race back rather than
 reporting the duplicate: recording a person, authorizing a name to sign in with,
-numbering an advisory or its next edition. The act is taken again whole, and its
-look then finds the row the other writer made or numbers after it. A bound
+numbering an advisory or its next edition, numbering a revision of a report or
+of a note on one. The act is taken again whole, and its
+look then finds the row the other writer made or numbers after it. A revision's
+number is read before the row whose text it keeps, so an edit committing between
+the two reads takes the number and the attempt is taken again; read after, the
+count would include that edit and the text kept would be one the row no longer
+held. A bound
 counted before an insert takes turns on a row of the owner's first, written as
 an ordinary update every engine locks the row for: a person's saved filters
 count one under the limit in two transactions at once otherwise, and both add.
@@ -1443,6 +1448,7 @@ one point, so that every test schedules them the same way.
 | Seam | What it does |
 |---|---|
 | A rival after a read | Arms once a statement reads one table, and starts another writer before the next statement writing a second, waiting a bounded time for it. A rival blocked on a lock the transaction holds lands once it commits. A rival that never ran fails the test. Skipped on SQLite, which has one writer |
+| A rival after a select | Arms once a select reads one table, and starts another writer before whatever statement comes next, waiting a bounded time for it. It lands between two reads a write depends on, the gap a rival after a read cannot reach. A rival that never ran fails the test. Skipped on SQLite |
 | A failing statement | The armed statement runs on a context that has already ended, so its failure carries the cancellation a test can tell from any other |
 | A hidden table | Renamed away and put back when the test ends, whatever ends it: a server database is shared by a package's tests |
 | A closed database | Opened and closed, so every call fails. A missing database is refused by a different arm |

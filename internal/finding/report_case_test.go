@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -530,6 +531,85 @@ func TestAReportsHistoryHoldsEveryAct(t *testing.T) {
 		outsider := f.holder(t, "outsider@example.com", access.PublicTriage)
 		if _, err := f.store.ReportHistory(ctx, outsider, f.productID, row.Reference); !errors.Is(err, finding.ErrNoSuchReport) {
 			t.Errorf("somebody who reads no reports read a report's history: %v", err)
+		}
+	})
+}
+
+// Two edits at once keep every version: the one that commits second, having
+// read the report before the first committed, is taken again and keeps what
+// the first wrote as the version it replaced.
+func TestTwoEditsAtOnceKeepEveryVersion(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		row := f.aReport(t, who, "The first words.")
+		edit := func(summary string) finding.Rewritten {
+			return finding.Rewritten{Title: "A title", Summary: summary,
+				ReportedBy: "A. Researcher", Contact: "a@example.org", Received: "2026-09-01"}
+		}
+		// The rival lands after the report is read and before the next
+		// statement, which is where a count read after the report would
+		// count the rival's edit and keep text the report no longer held.
+		hooked, rival := dbtest.RivalAfterSelect(t, f.db, "flaw_report", 5*time.Second,
+			func() error {
+				_, err := f.store.Revise(context.Background(), who, f.productID, row.Reference,
+					edit("The rival's words."))
+				return err
+			})
+		if _, err := finding.NewStore(hooked).Revise(ctx, who, f.productID, row.Reference,
+			edit("The last words.")); err != nil {
+			t.Fatalf("the edit that lost the race was not taken again: %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival edit: %v", err)
+		}
+		was, err := f.store.Revisions(ctx, who, f.productID, row.Reference)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var said []string
+		for _, revision := range was {
+			said = append(said, revision.Summary)
+		}
+		if !slices.Equal(said, []string{"The first words.", "The rival's words."}) {
+			t.Errorf("the revisions kept read %q, want the first words, then the rival's", said)
+		}
+	})
+}
+
+// Two edits of one note at once keep every wording, for the same reason.
+func TestTwoEditsOfANoteAtOnceKeepEveryWording(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		row := f.aReport(t, who, "A claim.")
+		note, _, err := f.store.NoteOnReport(ctx, who, f.productID, row.Reference, "First.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		hooked, rival := dbtest.RivalAfterSelect(t, f.db, "report_note", 5*time.Second,
+			func() error {
+				_, _, err := f.store.RewordReportNote(context.Background(), who, f.productID,
+					row.Reference, note.ID, "The rival's.")
+				return err
+			})
+		if _, _, err := finding.NewStore(hooked).RewordReportNote(ctx, who, f.productID,
+			row.Reference, note.ID, "The last."); err != nil {
+			t.Fatalf("the edit that lost the race was not taken again: %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival edit: %v", err)
+		}
+		was, err := f.store.EarlierReportNote(ctx, who, f.productID, row.Reference, note.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var said []string
+		for _, revision := range was {
+			said = append(said, revision.Body)
+		}
+		if !slices.Equal(said, []string{"First.", "The rival's."}) {
+			t.Errorf("the wordings kept read %q, want the first, then the rival's", said)
 		}
 	})
 }
