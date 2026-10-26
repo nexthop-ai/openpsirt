@@ -17,12 +17,14 @@ import (
 
 // audienceWorld is the people a report's notices choose between: a person
 // who reads reports and may hold one, two members of a team, one of whom
-// reads reports, and somebody who works reports and holds nothing.
+// reads reports, and somebody who works reports and holds nothing. A second
+// team holds only the member who reads no reports, and a person who read
+// reports has left.
 type audienceWorld struct {
 	w                       *fixture.World
 	holder, member, outside *access.Account
-	worker                  *access.Account
-	team                    *access.Team
+	worker, departed        *access.Account
+	team, unread            *access.Team
 }
 
 func newAudienceWorld(t *testing.T, w *fixture.World) audienceWorld {
@@ -41,11 +43,15 @@ func newAudienceWorld(t *testing.T, w *fixture.World) audienceWorld {
 		return them
 	}
 	out := audienceWorld{
-		w:       w,
-		holder:  person("holder@example.com", access.PrivateRead),
-		member:  person("member@example.com", access.PrivateRead),
-		outside: person("outside@example.com", access.PublicTriage),
-		worker:  person("worker@example.com", access.PrivateTriage),
+		w:        w,
+		holder:   person("holder@example.com", access.PrivateRead),
+		member:   person("member@example.com", access.PrivateRead),
+		outside:  person("outside@example.com", access.PublicTriage),
+		worker:   person("worker@example.com", access.PrivateTriage),
+		departed: person("departed@example.com", access.PrivateRead),
+	}
+	if _, err := rights.Deactivate(ctx, out.departed.ID); err != nil {
+		t.Fatal(err)
 	}
 	team, err := rights.DeclareTeam(ctx, "intake", "Intake")
 	if err != nil {
@@ -57,6 +63,14 @@ func newAudienceWorld(t *testing.T, w *fixture.World) audienceWorld {
 		}
 	}
 	out.team = team
+	unread, err := rights.DeclareTeam(ctx, "bystanders", "Bystanders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rights.AddToTeam(ctx, unread.ID, out.outside.ID, out.worker.ID); err != nil {
+		t.Fatal(err)
+	}
+	out.unread = unread
 	return out
 }
 
@@ -108,6 +122,18 @@ var tiers = []struct {
 	}, [4]bool{false, true, false, false}},
 	{"nobody holding it tells everybody who works reports", func(audienceWorld) *int64 {
 		return nil
+	}, [4]bool{false, false, false, true}},
+	{"a holder who reads no reports tells everybody who works reports", func(a audienceWorld) *int64 {
+		party := a.outside.PartyID
+		return &party
+	}, [4]bool{false, false, false, true}},
+	{"a holder who has left tells everybody who works reports", func(a audienceWorld) *int64 {
+		party := a.departed.PartyID
+		return &party
+	}, [4]bool{false, false, false, true}},
+	{"a queue with no member reading reports tells everybody who works reports", func(a audienceWorld) *int64 {
+		party := a.unread.PartyID
+		return &party
 	}, [4]bool{false, false, false, true}},
 }
 

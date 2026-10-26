@@ -322,6 +322,7 @@ Who hears about a vulnerability report turns on who holds it.
 | A person | That person, where they read the product's reports |
 | A team's queue, unclaimed | The team's members who read the product's reports |
 | Nobody | Everybody who may triage undisclosed work in the product, since answering a report is working it |
+| A person or a queue nobody here can tell | As nobody: a holder who has left or no longer reads the reports, or a queue with no member who reads them, would leave the report told to nobody |
 
 The unanswered condition and a reporter writing back both use it. Everybody
 told may open the report, so neither names a report the reader is refused.

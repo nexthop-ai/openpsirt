@@ -61,7 +61,10 @@ func partiesOf(ctx context.Context, db bun.IDB, parties []int64) (map[int64]held
 //   - everybody who works reports in the product, where nobody holds it.
 //
 // A holder and a team member hear only where they read the product's
-// reports, since the line names undisclosed work.
+// reports, since the line names undisclosed work. A holder nobody here can
+// tell is nobody holding it: a person who no longer reads the reports, or a
+// queue with no member who does, falls to the third tier, so the report is
+// never told to nobody.
 type reportAudience struct {
 	db      bun.IDB
 	reach   map[int64]map[int64]acts
@@ -100,7 +103,7 @@ func (a *reportAudience) of(ctx context.Context, productID int64, held *int64) (
 	}
 	party, ok := a.parties[*held]
 	if !ok {
-		return nil, nil
+		return a.of(ctx, productID, nil)
 	}
 	candidates := []int64{party.person}
 	if party.team != 0 {
@@ -120,6 +123,9 @@ func (a *reportAudience) of(ctx context.Context, productID int64, held *int64) (
 		if a.reach[personID][productID].reads(true) {
 			out = append(out, personID)
 		}
+	}
+	if len(out) == 0 {
+		return a.of(ctx, productID, nil)
 	}
 	return out, nil
 }
