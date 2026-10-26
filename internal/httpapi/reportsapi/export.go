@@ -84,11 +84,12 @@ func registerExport(api huma.API, in core.Deps) {
 			"and variant, in the lead queue's order, where you read them, those a claim waits on " +
 			"included and those open only in releases past their end of life left out: `lead` is " +
 			"true on those " +
-			"rows, and `path`, `line`, `function`, `message` and `withheld` say where each is and " +
-			"what the analyzer said. A lead in a case you are not on has an empty message and " +
-			"`withheld` true. No row carries source text. A lead carries no rating, component or " +
+			"rows, and `path`, `line`, `function` and `message` say where each is and what the " +
+			"analyzer said. No row carries source text, and `withheld` is false on every lead. A lead carries no rating, component or " +
 			"decision, so a file narrowed by any filter but the order holds no lead, and says " +
-			"so.\n\n" +
+			"so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, " +
+			"and `on=branch` with `support=in-support`, which is what the list reads when " +
+			"neither is asked.\n\n" +
 			"Takes every filter the findings list takes.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
@@ -286,9 +287,10 @@ func withLeads(by core.Narrowing, at core.AtOneBuild) core.Stated {
 // rows, with the product's name in front where the file spans products.
 //
 // The lead queue's read, under its visibility, with the leads a claim waits
-// on kept in: a lead in a case the reader is
-// not on is a row with an empty message, and none carries source text. A
-// product whose leads the reader may not read is a part holding no row.
+// on kept in. No row carries source text, and none is withheld: a lead read
+// without its message is one moved into a case, which is handed off and so
+// never open. A product whose leads the reader may not read is a part holding
+// no row.
 func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
 	return func(ctx context.Context, limit, offset int) ([][]string, error) {
 		queue, err := analysis.OpenLeadsOf(ctx, in.DB.DB, subject, scope, limit, offset)

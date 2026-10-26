@@ -126,11 +126,22 @@ func TestTheFindingsFileCarriesTheOpenLeadsToInternalReadersAlone(t *testing.T) 
 func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
-		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv?sort=age&asc=true")
-		if leads := leadRowsIn(t, header, rows); len(leads) != 1 {
-			t.Fatalf("a file asking only an order holds the leads %v; want the seeded lead", leads)
+		for _, asked := range []string{
+			"sort=age&asc=true",
+			// The address the Findings screen exports, with the defaults it
+			// writes in: every lead answers these the same way.
+			"on=branch&support=in-support&planned=unplanned&sort=age",
+			"below_floor=true",
+		} {
+			_, said, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv?"+asked)
+			if leads := leadRowsIn(t, header, rows); len(leads) != 1 {
+				t.Fatalf("%s: the file holds the leads %v; want the seeded lead", asked, leads)
+			}
+			if !strings.HasPrefix(said["leads"], "every open lead") {
+				t.Errorf("%s: the file says its leads are %q", asked, said["leads"])
+			}
 		}
-		for _, asked := range []string{"severity=high", "q=leak", "exploited=true", "beneath=zlib"} {
+		for _, asked := range []string{"severity=high", "q=leak", "exploited=true", "beneath=zlib", "on=tag", "planned=planned"} {
 			code, said, header, rows := findingsFile(t, r, "internal-reader",
 				"/v1/products/mine/findings.csv?stream=master&variant=broadcom&"+asked)
 			if code != http.StatusOK {

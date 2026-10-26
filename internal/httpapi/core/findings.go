@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -232,11 +233,25 @@ type Narrowing struct {
 	Ascending    bool                   `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
 }
 
-// OnlyOrders reports whether the narrowing asks nothing but the order the
-// list is paged in. A filter added to the list is a narrowing here without
-// anything naming it.
+// OnlyOrders reports whether the narrowing asks nothing of a lead but the
+// order the list is paged in. A filter added to the list is a narrowing here
+// without anything naming it.
+//
+// Three questions every lead answers the same way, so asking them narrows no
+// lead out: the floor, which a lead has none of; work no promised upgrade
+// covers, which is every lead; and the release questions at their defaults,
+// branches still in support, which are what a list asked nothing about them
+// reads anyway. The screen writes those defaults into every address it
+// exports.
 func (n Narrowing) OnlyOrders() bool {
-	n.Sort, n.Ascending = "", false
+	n.Sort, n.Ascending, n.BelowFloor = "", false, false
+	if n.Planned == Planned(finding.NotPlanned) || n.Planned == PlannedEither {
+		n.Planned = ""
+	}
+	w := finding.Working(plainly(n.On), plainly(n.Support))
+	if slices.Equal(w.Kinds, []string{finding.OnBranch}) && slices.Equal(w.Support, []string{finding.InSupport}) {
+		n.On, n.Support = nil, nil
+	}
 	return reflect.ValueOf(n).IsZero()
 }
 
