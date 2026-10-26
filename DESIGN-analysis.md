@@ -143,7 +143,7 @@ refused for it. None of them carries a snippet; the snippet default is the
 | A path outside the checkout is dropped with its result, and counted | A build host's home directory never lands |
 | A result repeating another of the same upload on rule, path, line, column and message is dropped and counted | clang repeats a header's result once per translation unit that includes it |
 | Whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | No whole file or replacement text is stored, and a message is its text |
-| A message holding only markdown is reduced to the words it shows: no emphasis, heading, list or quote marker, a link and an image as their words, code as written, and no raw HTML | The text is what the analyzer said, shown encoded and never rendered |
+| A message holding only markdown is reduced to the words it shows: no emphasis, heading, list or quote marker, a link and an image as their words, escapes and character references resolved, code as written, and no raw HTML | The text is what the analyzer said, shown encoded and never rendered |
 | A snippet is kept only where the product keeps source under its path, and counted on the receipt as discarded otherwise (§ Source) | A misconfigured pipeline does not put source into the deployment, and the upload is still accepted |
 | The source root is used at the door and not stored | It is a path on somebody's build host |
 

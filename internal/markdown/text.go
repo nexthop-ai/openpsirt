@@ -9,11 +9,13 @@ import (
 	"github.com/yuin/goldmark/ast"
 	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 // Text is markdown reduced to the words it shows: emphasis, headings, lists
 // and quotes without their markers, a link and an image as the words they
-// show, code as written, and raw HTML left out. Blocks are separated by a
+// show, escapes and character references resolved, code as written, and raw
+// HTML left out. Blocks are separated by a
 // line feed.
 //
 // It is for markdown somebody else wrote that is kept as text, such as an
@@ -28,7 +30,14 @@ func Text(source string) string {
 			return ast.WalkSkipChildren, nil
 		case *ast.Text:
 			if entering {
-				b.Write(node.Segment.Value(src))
+				// The segment is the source as written, which a renderer
+				// decodes as it writes: escapes and character references
+				// are resolved here, except in code, which is as written.
+				v := node.Segment.Value(src)
+				if p := n.Parent(); p == nil || p.Kind() != ast.KindCodeSpan {
+					v = util.ResolveEntityNames(util.ResolveNumericReferences(util.UnescapePunctuations(v)))
+				}
+				b.Write(v)
 				if node.SoftLineBreak() || node.HardLineBreak() {
 					b.WriteByte(' ')
 				}

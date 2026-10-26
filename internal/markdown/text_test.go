@@ -17,6 +17,8 @@ func TestMarkdownIsReducedToTheWordsItShows(t *testing.T) {
 		{"<div>\nblock\n</div>\n\nafter", "after"},
 		{"```\nint *p = 0;\n```", "int *p = 0;"},
 		{"line one\nline two", "line one line two"},
+		{"a \\_b\\_ &lt; c &#38; d", "a _b_ < c & d"},
+		{"`a \\_b &lt; c`", "a \\_b &lt; c"},
 	} {
 		if got := Text(c.in); got != c.want {
 			t.Errorf("Text(%q) = %q; want %q", c.in, got, c.want)
