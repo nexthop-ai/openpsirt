@@ -658,6 +658,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
+			Where(notHandedOff).
 			Where(`"f"."assigned_to" IS NOT NULL`)
 		// One product where the caller named one, for a screen that is about
 		// one. Zero is every product, which is what the people tab of the
@@ -826,6 +827,12 @@ type Owned struct {
 // the empty string for any other kind.
 const leadPlace = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."place_identity" ELSE '' END`
 
+// notHandedOff is whether the finding under "f", in the product of the
+// stream under "st", is no lead handed off as a flaw. A handed-off lead is
+// closed work for its holder: its flaw is held and listed as itself.
+const notHandedOff = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."place_identity" = "f"."place_identity")`
+
 // pieceOfWork is what one piece of work held is grouped by, over the finding
 // under "f" and its stream under "st": an issue in a component in a product,
 // or one lead in a product. A lead's builds may name different versions of
@@ -929,7 +936,8 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Where(kinds, kindArgs...).
-			Where(`"f"."closed_at" IS NULL`)
+			Where(`"f"."closed_at" IS NULL`).
+			Where(notHandedOff)
 		if since != nil {
 			q = q.Where(`"f"."opened_at" > ?`, *since)
 		}

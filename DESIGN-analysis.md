@@ -551,7 +551,8 @@ assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 | A lead seen on a build where it was not open when it was assigned starts unassigned there | As a finding arriving under an assigned component does |
 | Losing the last role on a product, deactivation and a handover move leads with everything else | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
 | A team's routing rules place leads nobody holds | `DESIGN-access.md` § Routing rules. Whoever triages internal work in the product reads and previews them |
-| The lists of held work list a lead, one row per lead, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-kinds.md` § Consumers). A kept lead is listed to readers of internal work in the product, and a moved one at its case's visibility. A row names the analyzer's rule and opens the lead's page |
+| The lists of held work list a lead, one row per lead, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-kinds.md` § Consumers). A lead is listed to readers of internal work in the product. A row names the analyzer's rule and opens the lead's page |
+| A lead handed off as a flaw leaves the lists of held work, kept or moved | Its flaw is what is judged, fixed and disclosed, and the flaw is held and listed as itself. The handed-off lead is closed work for its holder |
 | The lead's page and every row of the queue and its file name who holds it | The page names the holder on its build while it is open there; a row names the holder of the finding it shows. A stub names nobody |
 | The person given it is told "a lead assigned", at internal visibility | `DESIGN-notifications.md` § Lead notices |
 

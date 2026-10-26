@@ -343,18 +343,39 @@ func TestATeamsQueueListsALeadItHolds(t *testing.T) {
 	})
 }
 
-// A lead moved into its flaw's case is listed at the case's visibility: to a
-// reader of undisclosed work, and no longer to a reader of internal work alone.
-func TestAMovedLeadIsListedAtItsCasesVisibility(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, true)
-		if got, _ := heldItems(t, r, "embargo-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
-			t.Errorf("a reader of undisclosed work is listed leads %v; want the moved lead", got)
+// A lead handed off as a flaw leaves the lists of held work, kept or moved:
+// its flaw is held and listed as itself.
+func TestAKeptHandedOffLeadLeavesTheListsOfHeldWork(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) { handedOffUnlisted(t, r, false) })
+}
+
+func TestAMovedHandedOffLeadLeavesTheListsOfHeldWork(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) { handedOffUnlisted(t, r, true) })
+}
+
+// handedOffUnlisted hands the seeded lead off, kept or moved, and checks no
+// reader of it is listed it as unassigned work, while its flaw is.
+func handedOffUnlisted(t *testing.T, r *httpapitest.Reach, move bool) {
+	t.Helper()
+	place, flaw := httpapitest.HandedOffLead(t, r, move)
+	for _, who := range []string{"internal-reader", "embargo-reader", "lead-handler"} {
+		if got, _ := heldItems(t, r, who, "/v1/unassigned"); len(got) != 0 {
+			t.Errorf("%s is listed the handed-off lead %v", who, got)
 		}
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 0 {
-			t.Errorf("a reader of internal work alone is listed the moved lead: %v", got)
-		}
-	})
+	}
+	var listed struct {
+		Items []struct {
+			Vulnerability string `json:"vulnerability"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, "lead-handler", "/v1/unassigned", &listed)
+	found := false
+	for _, item := range listed.Items {
+		found = found || item.Vulnerability == flaw
+	}
+	if !found {
+		t.Errorf("the unassigned list holds %+v; want the flaw %s in place of lead %s", listed.Items, flaw, place)
+	}
 }
 
 // Two leads of one rule in one component are two pieces of work: a lead is

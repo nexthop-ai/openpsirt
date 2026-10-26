@@ -42,6 +42,9 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 	"finding/handoff.go": {
 		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
 	},
+	"finding/assign.go": {
+		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product of its stream",
+	},
 	"finding/disclaim.go": {
 		{"f", "lt"}: "two rows of one build at one place",
 	},
