@@ -726,6 +726,7 @@ as any other is.
 |---|---|
 | A declared path is a prefix in its own right, as a repository is | Vendored code copied into the tree has no repository of its own. Every file under the path, at any depth, shares one prefix and one confirmed component (§ Hand-off offer) |
 | The innermost of the run's repositories and declared paths holding a file is its prefix | A repository nested in vendored code names its own component, as a repository nested in another does |
+| A declared path is recorded as a path from the top of the checkout | `./src/vendor`, `src//vendor/` and `/src/vendor` are `src/vendor`, and `..` climbs no higher than the top. A lead's path is compared in that form |
 | A declared path holds itself and every path under it, compared exactly | `src/vendor/zlib` holds `src/vendor/zlib/inflate.c` and not `src/vendor/zlibx/a.c`; paths are case-sensitive |
 | The declaration read is the newest run's to see the lead | The run's description of the checkout is the one the lead's place was read against, as its repositories are |
 | A run's list that does not read as a list of paths declares nothing | The upload writes a list of paths from the top of the checkout, and nothing else is a declaration |
