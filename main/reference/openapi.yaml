@@ -210,6 +210,9 @@ components:
           maxLength: 120
           minLength: 1
           type: string
+        reports:
+          description: Whether it places vulnerability reports rather than findings. Refused with either key
+          type: boolean
         team:
           description: The team work lands on, by name
           minLength: 1
@@ -957,6 +960,23 @@ components:
           type: string
         team:
           description: A team to route the rows to instead, by name
+          type: string
+      type: object
+    Assign-reportRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Assign-reportRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        person:
+          description: Their sign-in identity, or empty for nobody
+          type: string
+        team:
+          description: "A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"
           type: string
       type: object
     AssignedMatchingBody:
@@ -2164,6 +2184,10 @@ components:
           description: What was claimed, in the words it was claimed in
           maxLength: 65536
           type: string
+        title:
+          description: A line naming the claim
+          maxLength: 191
+          type: string
       required:
         - summary
       type: object
@@ -2641,7 +2665,7 @@ components:
           description: They had already left, and the date did not move
           type: boolean
         released:
-          description: Findings handed back because they are gone
+          description: "Findings, leads and vulnerability reports handed back: theirs, and what their teams' queues held that no remaining member reads"
           format: int64
           type: integer
         since:
@@ -3513,6 +3537,23 @@ components:
           description: A URL to the JSON Schema for this object.
           examples:
             - https://example.com/schemas/Edit-issue-noteRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        body:
+          description: The replacement text, in markdown
+          minLength: 1
+          type: string
+      required:
+        - body
+      type: object
+    Edit-report-noteRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Edit-report-noteRequest.json
           format: uri
           readOnly: true
           type: string
@@ -5194,6 +5235,41 @@ components:
         - by
         - about
       type: object
+    HeldReportBody:
+      additionalProperties: false
+      properties:
+        assigned_team:
+          description: "Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it"
+          type: boolean
+        assigned_to:
+          description: "Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is"
+          type: string
+        assigned_to_name:
+          description: Their display name, where it differs from the name above
+          type: string
+        product:
+          description: The product it was reported against, by name
+          type: string
+        received:
+          description: The day it arrived
+          type: string
+        recorded_at:
+          type: string
+        reference:
+          description: The name the report is reached by
+          type: string
+        reported_by:
+          type: string
+        title:
+          type: string
+        waiting:
+          description: Whether a ruling over it is waiting for a second person
+          type: boolean
+      required:
+        - reference
+        - product
+        - recorded_at
+      type: object
     HolderBody:
       additionalProperties: false
       properties:
@@ -5235,6 +5311,10 @@ components:
           description: The number of findings those cover, across every build
           format: int64
           type: integer
+        reports:
+          description: Open vulnerability reports they hold, in products where you read reports
+          format: int64
+          type: integer
         team:
           description: This is a team's queue rather than one person's work
           type: boolean
@@ -5243,6 +5323,7 @@ components:
         - open
         - places
         - overdue
+        - reports
       type: object
     IdentificationHelper:
       additionalProperties: false
@@ -6845,6 +6926,28 @@ components:
       required:
         - items
       type: object
+    ListBodyHeldReportBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyHeldReportBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/HeldReportBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyHolderBody:
       additionalProperties: false
       properties:
@@ -7012,6 +7115,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/MentionableBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyMessageBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyMessageBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/MessageBody"
           type:
             - array
             - "null"
@@ -7320,6 +7445,50 @@ components:
         items:
           items:
             $ref: "#/components/schemas/ReportBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyReportEventBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyReportEventBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/ReportEventBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyReportRevisionBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyReportRevisionBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/ReportRevisionBody"
           type:
             - array
             - "null"
@@ -7887,6 +8056,73 @@ components:
         - merged_at
         - named
       type: object
+    MessageBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/MessageBody.json
+          format: uri
+          readOnly: true
+          type: string
+        body:
+          description: The message, as markdown. Absent on a message an upgrade carried over from an acknowledgement, which holds no text
+          type: string
+        dated:
+          description: The day it was sent or received
+          type: string
+        direction:
+          enum:
+            - sent
+            - received
+          type: string
+        id:
+          format: int64
+          type: integer
+        logged_at:
+          description: When it was recorded
+          type: string
+        logged_by:
+          description: The person who recorded it, by sign-in identity
+          type: string
+        logged_by_name:
+          description: Their display name, where it differs from their identity
+          type: string
+      required:
+        - id
+        - direction
+        - dated
+        - logged_by
+        - logged_at
+      type: object
+    MessageLogBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/MessageLogBody.json
+          format: uri
+          readOnly: true
+          type: string
+        body:
+          description: The message, pasted or summarized, as markdown. A file that came with it is attached to the report and referred to here
+          maxLength: 65536
+          type: string
+        dated:
+          description: The day it was sent or received, as YYYY-MM-DD. Empty is today
+          type: string
+        direction:
+          description: Whether it was sent to the reporter or received from them
+          enum:
+            - sent
+            - received
+          type: string
+      required:
+        - direction
+        - body
+      type: object
     Meta:
       additionalProperties: false
       properties:
@@ -8106,6 +8342,23 @@ components:
       required:
         - body
       type: object
+    Note-on-reportRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Note-on-reportRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        body:
+          description: The text, in markdown
+          minLength: 1
+          type: string
+      required:
+        - body
+      type: object
     NoteBody:
       additionalProperties: false
       properties:
@@ -8301,6 +8554,9 @@ components:
             - brought-in
             - disclosed
             - unanswered-report
+            - report-message
+            - report-sent
+            - report-noted
             - vulnerability-data-stale
             - risk-unagreed
             - pairs-concentrated
@@ -8591,6 +8847,9 @@ components:
             - brought-in
             - disclosed
             - unanswered-report
+            - report-message
+            - report-sent
+            - report-noted
             - vulnerability-data-stale
             - risk-unagreed
             - pairs-concentrated
@@ -10690,12 +10949,25 @@ components:
           readOnly: true
           type: string
         acknowledged:
+          description: The day of the first message sent to the reporter, which is the acknowledgement
           type: string
         acknowledged_by:
-          description: The person who answered them, by sign-in identity
+          description: The person who recorded that message, by sign-in identity
           type: string
         acknowledged_by_name:
           description: Their display name, where it differs from their identity
+          type: string
+        assigned_at:
+          description: When it went to whoever holds it
+          type: string
+        assigned_team:
+          description: "Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it"
+          type: boolean
+        assigned_to:
+          description: "Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is"
+          type: string
+        assigned_to_name:
+          description: Their display name, where it differs from the name above
           type: string
         contact:
           type: string
@@ -10714,6 +10986,13 @@ components:
         duplicate_of:
           description: The issue a duplicate points at
           type: string
+        editable:
+          description: "Whether its title, claim and reporter may still be edited: nobody has judged it and no ruling holds it"
+          type: boolean
+        edits:
+          description: How many times what it says was edited. The earlier versions, the original first, are read from its revisions
+          format: int64
+          type: integer
         evaluated:
           description: When somebody said what it turned out to be
           type: string
@@ -10724,10 +11003,13 @@ components:
           description: Their display name, where it differs from their identity
           type: string
         found_here:
-          description: Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer
+          description: Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date, nobody is owed an answer, and it has no correspondence
           type: boolean
         issue:
           description: The issue the claim turned out to be
+          type: string
+        product:
+          description: The product it was reported against, by name. The notes and correspondence of a report are read under it
           type: string
         received:
           description: The day it arrived, which the embargo is counted from
@@ -10751,7 +11033,10 @@ components:
           format: int64
           type: integer
         summary:
-          description: What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it
+          description: What was claimed, as markdown, as it stands now
+          type: string
+        title:
+          description: A line naming the claim
           type: string
         waiting:
           description: A disposition proposed and waiting for a second person
@@ -10761,9 +11046,119 @@ components:
           type: string
       required:
         - reference
+        - product
         - found_here
+        - editable
         - recorded_by
         - recorded_at
+      type: object
+    ReportEditBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ReportEditBody.json
+          format: uri
+          readOnly: true
+          type: string
+        contact:
+          description: The address to reach them at. Empty clears it
+          maxLength: 191
+          type: string
+        credit:
+          description: The credit they asked for in an advisory
+          maxLength: 191
+          type: string
+        received:
+          description: The day it arrived, as YYYY-MM-DD. Empty clears it
+          type: string
+        reported_by:
+          description: The reporter, as they gave their name. Empty clears it
+          maxLength: 191
+          type: string
+        summary:
+          description: What was claimed, as markdown. Required
+          maxLength: 65536
+          type: string
+        title:
+          description: A line naming the claim. Empty clears it
+          maxLength: 191
+          type: string
+      required:
+        - summary
+      type: object
+    ReportEventBody:
+      additionalProperties: false
+      properties:
+        act:
+          enum:
+            - recorded
+            - edited
+            - noted
+            - note-edited
+            - sent
+            - received
+            - assigned
+            - handed-back
+            - attached
+            - ruling-proposed
+            - ruling-settled
+            - ruling-withdrawn
+            - accepted
+          type: string
+        at:
+          type: string
+        by:
+          description: The person who did it, by sign-in identity. Absent where a standing rule placed it, or an administrator's hand-over moved it
+          type: string
+        by_name:
+          description: Their display name, where it differs from their identity
+          type: string
+        dated:
+          description: The day a message carries
+          type: string
+        disposition:
+          enum:
+            - accepted
+            - duplicate
+            - not-reproducible
+            - out-of-scope
+            - rejected
+          type: string
+        filename:
+          description: The file attached
+          type: string
+        issue:
+          description: The issue it was accepted as
+          type: string
+        note:
+          description: The note written or changed
+          format: int64
+          type: integer
+        rule:
+          description: The standing rule that placed it
+          format: int64
+          type: integer
+        ruling:
+          format: int64
+          type: integer
+        to:
+          description: "Who it went to, on an assignment: a person by sign-in identity, or a team by name"
+          type: string
+        to_name:
+          description: Their display name, where it differs from the name above
+          type: string
+        to_team:
+          description: Whether it went to a team's queue
+          type: boolean
+        version:
+          description: The version an edit replaced, or a note's earlier version
+          format: int64
+          type: integer
+      required:
+        - at
+        - act
       type: object
     ReportIssueBody:
       additionalProperties: false
@@ -10781,6 +11176,45 @@ components:
           type: string
       required:
         - vulnerability
+      type: object
+    ReportRevisionBody:
+      additionalProperties: false
+      properties:
+        contact:
+          description: The address to reach them at
+          type: string
+        credit:
+          description: The credit they asked for in an advisory
+          type: string
+        received:
+          description: The day it arrived, as YYYY-MM-DD
+          type: string
+        replaced_at:
+          description: The moment it stopped saying that
+          type: string
+        replaced_by:
+          description: The person whose edit replaced it, by sign-in identity
+          type: string
+        replaced_by_name:
+          description: Their display name, where it differs from their identity
+          type: string
+        reported_by:
+          description: The reporter, as they gave their name
+          type: string
+        summary:
+          description: What was claimed, as markdown
+          type: string
+        title:
+          description: The line naming the claim
+          type: string
+        version:
+          description: The version number, counting from one. Version one is the report as it was recorded
+          format: int64
+          type: integer
+      required:
+        - version
+        - replaced_by
+        - replaced_at
       type: object
     RepositoriesBody:
       additionalProperties: false
@@ -11168,6 +11602,9 @@ components:
           description: Its position among the others. The first rule that matches places the work
           format: int64
           type: integer
+        reports:
+          description: Whether it places the product's vulnerability reports rather than findings. A rule placing reports names no package and no place
+          type: boolean
         team:
           description: The team work lands on, by the name that addresses it
           type: string
@@ -13941,7 +14378,7 @@ components:
           readOnly: true
           type: string
         released:
-          description: Findings handed back because that was their last role there
+          description: Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
           format: int64
           type: integer
       required:
@@ -13958,7 +14395,7 @@ components:
           readOnly: true
           type: string
         released:
-          description: Findings handed back because that was their last role here
+          description: Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
           format: int64
           type: integer
       required:
@@ -15090,6 +15527,8 @@ paths:
     get:
       description: |-
         Returns everyone holding open work you can see, with how much.
+
+        `reports` counts the open vulnerability reports each holds, in the products where you read reports; somebody holding only reports is listed with no findings.
 
         Counted in pieces of work — an issue in a component in a product, or one static analysis lead — which is the unit the list behind each person is in. `places` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
 
@@ -19228,7 +19667,7 @@ paths:
   /v1/people/{identity}/assignments/hand-back:
     post:
       description: |-
-        Returns all their open findings to the unassigned list. For when somebody has left, or their last role is removed.
+        Returns all their open findings and vulnerability reports to the unassigned lists. For when somebody has left.
 
         Nothing tells this software that somebody has gone — membership is read at sign-in, and a person who has left never signs in again. So this is an action an administrator takes rather than something that happens on its own, and until it is taken their work is in no list at all: not in the shared one because it is assigned, and not in anybody's own because they are not here.
 
@@ -19266,6 +19705,65 @@ paths:
         - Administration
       x-openpsirt-requires:
         scope: deployment
+  /v1/people/{identity}/assignments/reports:
+    get:
+      description: |-
+        The open vulnerability reports somebody holds, theirs and their teams' queues, oldest first. Send `me` as the identity for your own.
+
+        An identity nobody holds answers an empty list, which is also what an identity somebody holds answers when none of their reports are yours to see.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products where you read reports.
+      operationId: list-assigned-reports
+      parameters:
+        - description: Their sign-in identity, or 'me' for your own
+          in: path
+          name: identity
+          required: true
+          schema:
+            description: Their sign-in identity, or 'me' for your own
+            type: string
+        - description: Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyHeldReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the vulnerability reports one person is working
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products where you read reports.
   /v1/people/{identity}/deactivation:
     delete:
       description: |-
@@ -19298,7 +19796,7 @@ paths:
         scope: deployment
     put:
       description: |-
-        Records that somebody has left. They are refused at every way in — a session, a personal token, a group-bound sign-in — from the next request onward, their sessions are ended, and what they were dealing with is handed back so it is not held by somebody who is gone.
+        Records that somebody has left. They are refused at every way in — a session, a personal token, a group-bound sign-in — from the next request onward, their sessions are ended, and what they were dealing with is handed back so it is not held by somebody who is gone. So is work in the queue of a team they were on that no remaining member reads.
 
         Nobody is deleted. The record names them as the proposer of judgments and the approver of others, and their roles are left where they are: what somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it. What stops them is the date.
 
@@ -19375,7 +19873,7 @@ paths:
       description: |-
         Withdraws one role from one person. Takes effect at their next request; end their sessions to cut them off now.
 
-        If it was their last role on that product, everything they were dealing with there goes back to the unassigned list. Otherwise that work is in no list at all: not in the shared one because it is assigned, and not in theirs because they can no longer open it. `released` says how much moved.
+        What they were dealing with there and may no longer read goes back to the unassigned list: everything, where it was their last role on that product, and otherwise the undisclosed or internal work and vulnerability reports the role let them read. Left with them, that work is in no list at all: not in the shared one because it is assigned, and not in theirs because they can no longer open it. Teams they are on give up work no remaining member reads. `released` says how much moved.
 
         The grant is removed rather than marked as ended. What somebody used to hold is answered by the record of what they did, so this list only ever says what is true today.
 
@@ -19422,7 +19920,7 @@ paths:
 
         It leaves no per-product grants in its place: anything still wanted on one product is granted there deliberately. Roles held against a named product are untouched, and are withdrawn one at a time through the path that names the product.
 
-        Where this was their last role in a product, what they were dealing with there goes back to the unassigned list. `released` says how much moved in total.
+        What they were dealing with and may no longer read goes back to the unassigned list, product by product, as when a role on one product is withdrawn. `released` says how much moved in total.
 
         Requires: administrator
       operationId: withdraw-estate-role
@@ -24639,6 +25137,8 @@ paths:
       description: |-
         Who reported it, how to reach them, when it arrived, when somebody answered them, and how they wish to be credited.
 
+        Its notes and correspondence are read from the report itself, under the product `product` names, by whoever may read that product's reports.
+
         The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
 
         Answers 404 where no report is the record of this issue — every issue a scan reported that nobody wrote in about — and to somebody who may not read the product's vulnerability reports.
@@ -24676,45 +25176,6 @@ paths:
         scope: product
         any_of:
           - private-read
-          - private-triage
-  /v1/products/{product}/issues/{vulnerability}/report/acknowledgement:
-    post:
-      description: |-
-        Records that somebody replied to whoever reported this, and when.
-
-        It records that it happened rather than doing it. What reaches a researcher is a mail somebody sends from an address they already have; recording it is what turns "somebody probably replied" into a date the timeline can be evidenced from, and what clears the condition an unanswered report opens.
-
-        Acknowledging twice keeps the first date: when somebody was answered is a fact about the past, and the second person to press it did not change it.
-
-        Requires: public-triage or private-triage on the product
-      operationId: acknowledge-report
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-        - in: path
-          name: vulnerability
-          required: true
-          schema:
-            type: string
-      responses:
-        "204":
-          description: No Content
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: Record that the reporter was answered
-      tags:
-        - Findings
-      x-openpsirt-requires:
-        scope: product
-        any_of:
-          - public-triage
           - private-triage
   /v1/products/{product}/lead-rules:
     get:
@@ -25636,6 +26097,10 @@ paths:
 
         `found_here` marks a flaw somebody here found. Recorded as a flaw, it carries no disclosure date, and it is never listed as waiting for an answer.
 
+        `title` is an optional line naming the claim, and is refused across lines.
+
+        Where a standing rule places this product's reports, the report goes to the first such rule's team that has a member who reads undisclosed work here.
+
         Requires: private-triage on the product
       operationId: record-report
       parameters:
@@ -25673,7 +26138,7 @@ paths:
   /v1/products/{product}/reports/{reference}:
     get:
       description: |-
-        What was claimed, who claimed it, when it arrived, when somebody answered them, and what it turned out to be.
+        What was claimed, who claimed it, when it arrived, when somebody answered them, who holds it, and what it turned out to be.
 
         A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
 
@@ -25714,17 +26179,16 @@ paths:
         any_of:
           - private-read
           - private-triage
-  /v1/products/{product}/reports/{reference}/acknowledgement:
-    post:
+    put:
       description: |-
-        Records that somebody replied to whoever sent this, and when.
+        Replaces the title, the claim and what is recorded about the reporter. Every field is the whole new value, and one left empty is cleared, apart from `summary`, which is required.
 
-        It records that it happened rather than doing it. What reaches a researcher is a mail somebody sends from an address they already have; recording it is what turns "somebody probably replied" into a date the timeline can be evidenced from, and what clears the condition an unanswered report opens.
+        What it said before is kept, and read back from its revisions, the original first. An edit that changes nothing keeps nothing.
 
-        Acknowledging twice keeps the first date: when somebody was answered is a fact about the past, and the second person to press it did not change it.
+        Refused with 422 once the report has been judged, or while a ruling over it waits for a second person. A `received` day that cannot be read is refused rather than cleared.
 
         Requires: private-triage on the product
-      operationId: acknowledge-recorded-report
+      operationId: edit-report
       parameters:
         - in: path
           name: product
@@ -25737,6 +26201,63 @@ paths:
           schema:
             maxLength: 593
             type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportEditBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Edit a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}/assignment:
+    put:
+      description: |-
+        Records who is working this report.
+
+        Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
+
+        A report is undisclosed, so a person is given one only where they read undisclosed work in the product, and a team only where one member does. A judged report is refused with 409: its work goes on as the issue it became, or ended with its ruling.
+
+        The person given it is told, where that is not you.
+
+        Requires: private-triage on the product. Giving a report to somebody else also needs assigner. Taking one nobody holds, or handing back your own, does not.
+      operationId: assign-report
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Assign-reportRequest"
+        required: true
       responses:
         "204":
           description: No Content
@@ -25746,13 +26267,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Record that a reporter was answered
+      summary: Assign a vulnerability report to somebody
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
           - private-triage
+        note: Giving a report to somebody else also needs assigner. Taking one nobody holds, or handing back your own, does not.
   /v1/products/{product}/reports/{reference}/attachments:
     get:
       description: |-
@@ -25855,6 +26377,46 @@ paths:
         scope: product
         any_of:
           - private-triage
+  /v1/products/{product}/reports/{reference}/history:
+    get:
+      description: |-
+        Every act on the report, oldest first: recording it, each edit, each note and change to one, each message logged, each change of holder, each ruling proposed, settled or withdrawn, its acceptance as an issue, and each file attached.
+
+        Requires: private-read or private-triage on the product
+      operationId: list-report-history
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyReportEventBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what was done to a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-read
+          - private-triage
   /v1/products/{product}/reports/{reference}/issue:
     put:
       description: |-
@@ -25905,6 +26467,328 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}/messages:
+    get:
+      description: |-
+        Every message recorded as sent to or received from the reporter, in order of the day each carries. The first sent is the acknowledgement.
+
+        Requires: private-read or private-triage on the product
+      operationId: list-report-messages
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyMessageBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the correspondence on a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-read
+          - private-triage
+    post:
+      description: |-
+        Records a message somebody sent to the reporter or received from them, elsewhere. Nothing is sent from this deployment.
+
+        The first message recorded as sent is the acknowledgement: it clears the condition an unanswered report opens, and its day is the one the timeline evidences.
+
+        Recorded on a judged report as on an open one. Refused on a flaw found here, which has no reporter, and for a day more than one ahead of today.
+
+        The message is told to the report's audience: whoever holds it, the members of the team whose queue it is in who read reports, or everybody who works reports here where nobody holds it. Whoever records it is not told.
+
+        The text is markdown and goes through the policy a report's claim does; a 422 names the line and the offending text. Attach a file that came with it to the report and refer to it here.
+
+        Requires: private-triage on the product
+      operationId: log-report-message
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageLogBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record a message to or from a reporter
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}/notes:
+    get:
+      description: |-
+        The notes written on this report, oldest first, with who wrote each and when. A note is never sent to the reporter and records no judgment.
+
+        Requires: private-read or private-triage on the product
+      operationId: list-report-notes
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyWrittenBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List notes on a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-read
+          - private-triage
+    post:
+      description: |-
+        Adds a markdown note on this report, open or judged. It is never sent to the reporter.
+
+        A name written after an `@` is told, where that person may read this product's reports; the response lists the names that reached nobody.
+
+        The note is told to the report's audience: whoever holds it, the members of the team whose queue it is in who read reports, or everybody who works reports here where nobody holds it. Neither you nor anybody the note names is told of it this way.
+
+        The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+
+        Requires: private-triage on the product
+      operationId: note-on-report
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Note-on-reportRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteWritten"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Add a note to a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}/notes/{note}:
+    put:
+      description: |-
+        Replaces the text of a note. Only its author may do this.
+
+        What it said before is kept, and read back from the note's history.
+
+        Requires: private-triage on the product. Only the author may edit a note.
+      operationId: edit-report-note
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+        - in: path
+          name: note
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Edit-report-noteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteWritten"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Edit a note on a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+        note: Only the author may edit a note.
+  /v1/products/{product}/reports/{reference}/notes/{note}/history:
+    get:
+      description: |-
+        Every version of a note that has been replaced, oldest first. The note itself carries what it says now.
+
+        Requires: private-read or private-triage on the product
+      operationId: get-report-note-history
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+        - in: path
+          name: note
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyWasSaidBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List earlier revisions of a note on a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-read
+          - private-triage
+  /v1/products/{product}/reports/{reference}/revisions:
+    get:
+      description: |-
+        Every version of the report an edit replaced, oldest first. The first is the report as it was recorded. A report never edited answers an empty list, and the report itself is then the original.
+
+        Requires: private-read or private-triage on the product
+      operationId: list-report-revisions
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyReportRevisionBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List earlier versions of a vulnerability report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-read
           - private-triage
   /v1/products/{product}/repositories:
     get:
@@ -26018,6 +26902,8 @@ paths:
 
         It places work only at a visibility one member of the team reads. Undisclosed or internal work nobody on the team reads stays unassigned.
 
+        Send `reports` and neither key for a rule placing the product's vulnerability reports nobody holds. A report is placed only where one member of the team reads undisclosed work here, and a report recorded later is placed as it is recorded.
+
         Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished. Where the queue is full the rule is not recorded and the answer is 503: send it again later.
 
         Requires: assigner on the product. A rule hands work to somebody, continuously, on behalf of whoever wrote it.
@@ -26064,6 +26950,8 @@ paths:
 
         It does not account for the rules already there. First match wins, so what this catches is what it would place only where no earlier rule claimed it first.
 
+        Send `reports` instead of either key for a rule placing vulnerability reports: `work` is then the product's open reports and `unheld` those nobody holds, counted where you read the product's reports and zero elsewhere.
+
         Requires: public-triage or private-triage or internal-triage on the product
       operationId: preview-routing-rule
       parameters:
@@ -26088,6 +26976,13 @@ paths:
             description: A component name, with * for any run of characters
             maxLength: 191
             type: string
+        - description: Preview a rule placing vulnerability reports
+          explode: false
+          in: query
+          name: reports
+          schema:
+            description: Preview a rule placing vulnerability reports
+            type: boolean
       responses:
         "200":
           content:
@@ -31993,7 +32888,7 @@ paths:
   /v1/teams/{team}:
     delete:
       description: |-
-        Takes a team out of use. Nothing new is routed to it and its membership goes, while work already routed to it still names it — the row stays for the same reason an account is deactivated rather than deleted.
+        Takes a team out of use. Nothing new is routed to it and its membership goes. Work in its queue goes back to the unassigned list, since nobody is left on it to read that work. The row stays, so where work was routed before still names it, for the same reason an account is deactivated rather than deleted.
 
         Requires: administrator
       operationId: retire-team
@@ -32092,10 +32987,71 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see. A team nobody declared answers as one whose work you cannot see.
+  /v1/teams/{team}/assignments/reports:
+    get:
+      description: |-
+        The open vulnerability reports routed to a team, oldest first.
+
+        A team nobody declared answers an empty list, which is also what a team whose reports are not yours to see answers.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products where you read reports.
+      operationId: list-team-assigned-reports
+      parameters:
+        - description: The team's name
+          in: path
+          name: team
+          required: true
+          schema:
+            description: The team's name
+            type: string
+        - description: Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyHeldReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the vulnerability reports in one team's queue
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products where you read reports.
   /v1/teams/{team}/members/{identity}:
     delete:
       description: |-
         Removes somebody from a team. Work they have already taken stays theirs: membership says where work arrives, not who holds what has arrived.
+
+        Work in the team's queue that no remaining member may read goes back to the unassigned list.
 
         Requires: administrator
       operationId: remove-from-team
@@ -32630,6 +33586,56 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/unassigned/reports:
+    get:
+      description: |-
+        The open vulnerability reports nobody holds, across every product where you read reports, oldest first. Open is not yet judged; a report whose ruling waits for a second person is still open.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only the products where you read reports.
+      operationId: list-unassigned-reports
+      parameters:
+        - description: Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product where you read reports; a name you cannot see is refused rather than answered empty
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyHeldReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List vulnerability reports nobody is working
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only the products where you read reports.
   /v1/upstream-offers:
     get:
       description: |-

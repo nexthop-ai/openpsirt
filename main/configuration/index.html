@@ -1074,6 +1074,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v0102" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.10.2
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1810,6 +1821,17 @@
     <span class="md-ellipsis">
       
         From v0.10.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v0102" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.10.2
       
     </span>
   </a>
@@ -4490,6 +4512,45 @@ on.</p>
 <h3 id="from-v0101">From v0.10.1<a class="headerlink" href="#from-v0101" title="Permanent link">&para;</a></h3>
 <p>Nothing changes for a database v0.9.0 or a later release built. This release
 changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> says.</p>
+<h3 id="from-v0102">From v0.10.2<a class="headerlink" href="#from-v0102" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /v1/products/{product}/reports/{reference}/acknowledgement</code> and <code>POST /v1/products/{product}/issues/{vulnerability}/report/acknowledgement</code> are removed, and a request to either is refused. v0.10.2 recorded with them that somebody answered the reporter</td>
+<td>Record a message sent to the reporter instead, with <code>POST /v1/products/{product}/reports/{reference}/messages</code> and <code>direction</code> set to <code>sent</code>. The first message recorded as sent is the acknowledgement</td>
+</tr>
+<tr>
+<td>A report's <code>acknowledged</code> is the day of the first message recorded as sent, as <code>YYYY-MM-DD</code>, and <code>acknowledged_by</code> is whoever recorded it. v0.10.2 answered the moment somebody pressed acknowledge</td>
+<td>Nothing. The upgrade writes each acknowledgement v0.10.2 recorded as the first message sent, dated the day it was recorded in UTC, by whoever recorded it, with no text. A client parsing <code>acknowledged</code> as a moment parses a day</td>
+</tr>
+<tr>
+<td>A report's claim is required when it is recorded and when it is edited. v0.10.2 accepted an empty one</td>
+<td>Nothing. A report v0.10.2 left with no claim on a flaw recorded here takes the flaw's summary as its claim. Any other report v0.10.2 recorded with no claim keeps none, and an edit to it while it is open fills one in</td>
+</tr>
+<tr>
+<td>A routing rule takes <code>reports</code>, which places the product's vulnerability reports instead of findings</td>
+<td>Nothing. A rule without it places findings, as before</td>
+</tr>
+<tr>
+<td>The unanswered notice and a reporter writing back go to whoever holds the report, the members of the team whose queue it is in, or everybody who works reports in the product where nobody holds it</td>
+<td>Nothing. Every report the upgrade carries is held by nobody, so its notices reach whom they reached in v0.10.2</td>
+</tr>
+<tr>
+<td>Withdrawing a role that is not somebody's last, a group-bound sign-in that derives fewer roles, the first sign-in after the switch into group-bound mode, a switch out of it, taking somebody off a team and retiring a team hand back the work they leave with a holder who may no longer read it. v0.10.2 handed work back only when somebody's last role on a product went, or they were deactivated</td>
+<td>Nothing. Work v0.10.2 already left with somebody who cannot read it stays with them until a write names its holder</td>
+</tr>
+<tr>
+<td>A role held across every product counts in every notice's audience as a role on each product. v0.10.2 read per-product roles alone, so somebody reading a product only through such a role was told nothing about it</td>
+<td>Nothing</td>
+</tr>
+</tbody>
+</table>
 
 
 
