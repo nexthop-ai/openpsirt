@@ -231,6 +231,49 @@ func TestTheV0110UpgradeCarriesOnPastItsReportStep(t *testing.T) {
 	})
 }
 
+// A stopped upgrade can leave the report step's tables made without the
+// indexes made after them, and its columns changed without the holder's
+// foreign key. Starting again makes what is missing.
+func TestTheV0110UpgradeMakesWhatAStopLeftUnmade(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		if err := migrations.RunV0110ReportStep(ctx, db); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
+		}
+		// On MySQL and MariaDB the index serves a foreign key, so the key
+		// goes with it and comes back alone, as it stands where the table
+		// was made and the index was not.
+		var unmade []string
+		switch db.Server.Engine {
+		case database.MySQL, database.MariaDB:
+			unmade = []string{
+				`ALTER TABLE "report_message" DROP FOREIGN KEY "report_message_report_fk"`,
+				`DROP INDEX "report_message_log_idx" ON "report_message"`,
+				`ALTER TABLE "report_message" ADD CONSTRAINT "report_message_report_fk"
+					FOREIGN KEY ("flaw_report_id") REFERENCES "flaw_report"("id")`,
+				`ALTER TABLE "flaw_report" DROP FOREIGN KEY "flaw_report_holder_fk"`,
+			}
+		case database.Postgres:
+			unmade = []string{
+				`DROP INDEX "report_message_log_idx"`,
+				`ALTER TABLE "flaw_report" DROP CONSTRAINT "flaw_report_holder_fk"`,
+			}
+		default:
+			unmade = []string{`DROP INDEX "report_message_log_idx"`}
+		}
+		for _, stmt := range unmade {
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				t.Fatalf("%s: %v", stmt, err)
+			}
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
 // The report v0.10.0 wrote beside a flaw recorded by hand, with no claim of
 // its own, carries the flaw's summary as its claim after the upgrade. A
 // report on a published vulnerability is left as it was: that issue's
@@ -258,14 +301,34 @@ func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		for reference, issue := range map[string]int64{
-			"SONIC-R-2026-333333": issues.recorded, "SONIC-R-2026-444444": issues.scanned,
+		// The third is a report a flaw was recorded from, which carries the
+		// reporter's own claim and keeps it. Its issue is made a flaw
+		// recorded here the way the seed makes the first.
+		if _, err := db.DB.NewRaw(`INSERT INTO "finding" ("target_id", "kind", "visibility",
+			"vulnerability_id", "component_id", "place_identity", "urgency", "urgency_exploited",
+			"urgency_exploited_here", "urgency_shipped", "opened_at")
+			SELECT "target_id", "kind", "visibility", ?, "component_id", 'place-other', "urgency",
+				"urgency_exploited", "urgency_exploited_here", "urgency_shipped", "opened_at"
+			FROM "finding" WHERE "vulnerability_id" = ?`, issues.untouched, issues.recorded).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`UPDATE "vulnerability" SET "description" = ? WHERE "id" = ?`,
+			"A flaw recorded here.", issues.untouched).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for reference, seeded := range map[string]struct {
+			issue int64
+			claim string
+		}{
+			"SONIC-R-2026-333333": {issues.recorded, ""},
+			"SONIC-R-2026-444444": {issues.scanned, ""},
+			"SONIC-R-2026-555555": {issues.untouched, "The reporter's own words."},
 		} {
 			if _, err := db.DB.NewRaw(`INSERT INTO "flaw_report"
 				("reference", "product_id", "vulnerability_id", "summary", "recorded_by", "recorded_at",
 				 "evaluated_at", "evaluated_by", "found_here")
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				reference, product, issue, "", person, at, at, person, false).Exec(ctx); err != nil {
+				reference, product, seeded.issue, seeded.claim, person, at, at, person, false).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -273,6 +336,7 @@ func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
 		for reference, want := range map[string]string{
 			"SONIC-R-2026-333333": "The flaw as somebody here described it.",
 			"SONIC-R-2026-444444": "",
+			"SONIC-R-2026-555555": "The reporter's own words.",
 		} {
 			var got *string
 			if err := db.DB.NewRaw(`SELECT "summary" FROM "flaw_report" WHERE "reference" = ?`,

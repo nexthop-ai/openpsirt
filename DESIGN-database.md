@@ -537,11 +537,11 @@ says what a report's case holds.
 
 | Table | Change | Every engine |
 |---|---|---|
-| `flaw_report` | Gains a title, who holds it and since when. Loses the acknowledged moment and who acknowledged | Each acknowledgement is first written as a message sent, dated the day it was recorded, by whoever recorded it, with no text. A report already holding a sent message is stepped over, so a start after one that stopped part way writes none twice. The index serving the unanswered list is dropped, then the foreign key naming who acknowledged on the server engines, then the columns. The holder's foreign key is added where the table does not hold it |
-| `flaw_report_revision` | A new table: what a report said before each edit | Made by the release's statement, and stepped over where it is already there |
-| `report_message` | A new table: the correspondence with a reporter | Made by the release's statement, and stepped over where it is already there |
-| `report_note`, `report_note_revision` | New tables: the notes on a report, and each earlier wording | Made by the release's statement, and stepped over where they are already there |
-| `report_assignment` | A new table: every change of who holds a report, with the rule that routed it | Made by the release's statement, and stepped over where it is already there |
+| `flaw_report` | Gains a title, who holds it and since when. Loses the acknowledged moment and who acknowledged | Each acknowledgement is first written as a message sent, dated the day it was recorded, by whoever recorded it, with no text. A report already holding a sent message is stepped over, so a start after one that stopped part way writes none twice. The index serving the unanswered list is dropped, then the foreign key naming who acknowledged on the server engines, then the columns. The holder's foreign key is added where the table does not hold it, whatever the columns say, since a stopped upgrade can leave the columns changed and the key not added |
+| `flaw_report_revision` | A new table: what a report said before each edit | Made by the release's statement. Where it is already there, each of its indexes the table lacks is made |
+| `report_message` | A new table: the correspondence with a reporter | Made by the release's statement. Where it is already there, each of its indexes the table lacks is made |
+| `report_note`, `report_note_revision` | New tables: the notes on a report, and each earlier wording | Made by the release's statement. Where they are already there, each of their indexes a table lacks is made |
+| `report_assignment` | A new table: every change of who holds a report, with the rule that routed it | Made by the release's statement. Where it is already there, each of its indexes the table lacks is made |
 | `routing_rule` | Whether it places vulnerability reports, false for every rule | Added where the table stands, and stepped over where it is already there |
 
 | Check, on each of the four engines | What it holds |

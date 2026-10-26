@@ -228,11 +228,30 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 	declared := flawReportV0110(u.t)
 	for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
 		"report_note_revision", "report_assignment"} {
-		if present, err := u.hasColumn(table, "id"); err != nil {
+		present, err := u.hasColumn(table, "id")
+		if err != nil {
 			return err
-		} else if !present {
+		}
+		if !present {
 			if err := u.create(declared, table); err != nil {
 				return err
+			}
+			continue
+		}
+		// A table a stopped upgrade made may lack the indexes made after it.
+		_, indexes, err := pick(declared, table)
+		if err != nil {
+			return err
+		}
+		for _, stmt := range indexes {
+			held, err := u.hasIndex(table, createsIndex.FindStringSubmatch(stmt)[1])
+			if err != nil {
+				return err
+			}
+			if !held {
+				if err := u.run([]string{stmt}); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -276,16 +295,18 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 			c.drop = append(c.drop, column)
 		}
 	}
-	if len(c.add) > 0 || len(c.drop) > 0 {
-		if u.engine != database.SQLite {
-			holder, err := u.hasForeignKey("flaw_report", "flaw_report_holder_fk")
-			if err != nil {
-				return err
-			}
-			if !holder {
-				c.constraints = []string{"flaw_report_holder_fk"}
-			}
+	// Asked whatever the columns say: a stopped upgrade can leave every
+	// column changed and the key not yet added.
+	if u.engine != database.SQLite {
+		holder, err := u.hasForeignKey("flaw_report", "flaw_report_holder_fk")
+		if err != nil {
+			return err
 		}
+		if !holder {
+			c.constraints = []string{"flaw_report_holder_fk"}
+		}
+	}
+	if len(c.add) > 0 || len(c.drop) > 0 || len(c.constraints) > 0 {
 		if err := u.change(declared, c); err != nil {
 			return err
 		}
@@ -308,10 +329,10 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 		add: []added{{column: "reports"}}})
 }
 
-// claimFromFlawV0110 gives the report written beside each flaw recorded by
-// hand the flaw's summary as its claim. v0.10.0 left that report's claim
-// empty and kept the summary on the issue alone, and a judged report can no
-// longer be edited to fill it. Run after the issue kinds are marked, which
+// claimFromFlawV0110 gives every report with no claim on a flaw recorded here
+// the flaw's summary as its claim. v0.10.0 left the claim of the report
+// written beside a flaw recorded by hand empty and kept the summary on the
+// issue alone, and a judged report can no longer be edited to fill it. Run after the issue kinds are marked, which
 // is how a flaw recorded by hand is told from a published vulnerability; a
 // report with a claim of its own keeps it, so a second start changes nothing.
 func claimFromFlawV0110(ctx context.Context, tx bun.Tx) error {
