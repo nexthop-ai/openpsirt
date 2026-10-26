@@ -567,7 +567,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Role     string `path:"role"`
 	}) (*struct {
 		Body struct {
-			Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them here"`
+			Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
 		}
 	}, error) {
 		if _, err := core.Requester(ctx); err != nil {
@@ -629,7 +629,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 
 		out := &struct {
 			Body struct {
-				Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them here"`
+				Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
 			}
 		}{}
 		out.Body.Released = released
@@ -710,7 +710,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Role     string `path:"role"`
 	}) (*struct {
 		Body struct {
-			Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them"`
+			Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
 		}
 	}, error) {
 		if _, err := core.Requester(ctx); err != nil {
@@ -759,7 +759,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 
 		out := &struct {
 			Body struct {
-				Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back because they may no longer read them"`
+				Released int64 `json:"released" doc:"Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them"`
 			}
 		}{}
 		out.Body.Released = released

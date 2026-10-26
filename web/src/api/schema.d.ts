@@ -8634,7 +8634,7 @@ export interface components {
             already?: boolean;
             /**
              * Format: int64
-             * @description Findings and vulnerability reports handed back because they are gone
+             * @description Findings, leads and vulnerability reports handed back: theirs, and what their teams' queues held that no remaining member reads
              */
             released: number;
             /** @description The date they left */
@@ -15250,7 +15250,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description Findings, leads and vulnerability reports handed back because they may no longer read them
+             * @description Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
              */
             released: number;
         };
@@ -15263,7 +15263,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description Findings, leads and vulnerability reports handed back because they may no longer read them here
+             * @description Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
              */
             released: number;
         };

@@ -333,7 +333,7 @@ holder who cannot open it.
 | A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | The rule a hand assignment to a team asks (§ Teams) |
 | A report goes where undisclosed work goes | A report is read under undisclosed reading (`DESIGN-findings.md` § Report visibility) |
 | Leads go by the same rule as findings | A lead is work at its visibility like any other |
-| It goes back to nobody | Exactly as when somebody leaves. A routing rule's next sweep places it in a team's queue, and the unassigned list holds it until then |
+| It goes back to nobody, and no sweep is queued | Exactly as when somebody leaves. The unassigned list holds it until somebody takes it, and a routing rule places it when a rule is next recorded in the product. Queuing a sweep would let a full queue refuse a withdrawal of access |
 | Asked of whoever the write named, and of every team they are on | A team holds work only while a member reads it, so a member's reading going can strand the team's queue |
 | Inside the write that took the reading away | Done after it, a failure leaves the reading gone, the work with somebody who cannot open it, and no request that reaches the hand-back again. Deactivation hands back after its write commits, for the reason under § Somebody who has left |
 | Nobody is told | The same as any other work handed back (§ Assignment by narrowing) |

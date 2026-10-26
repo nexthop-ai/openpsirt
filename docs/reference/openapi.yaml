@@ -2665,7 +2665,7 @@ components:
           description: They had already left, and the date did not move
           type: boolean
         released:
-          description: Findings and vulnerability reports handed back because they are gone
+          description: "Findings, leads and vulnerability reports handed back: theirs, and what their teams' queues held that no remaining member reads"
           format: int64
           type: integer
         since:
@@ -14378,7 +14378,7 @@ components:
           readOnly: true
           type: string
         released:
-          description: Findings, leads and vulnerability reports handed back because they may no longer read them
+          description: Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
           format: int64
           type: integer
       required:
@@ -14395,7 +14395,7 @@ components:
           readOnly: true
           type: string
         released:
-          description: Findings, leads and vulnerability reports handed back because they may no longer read them here
+          description: Findings, leads and vulnerability reports handed back in any product, theirs and their teams', because the holder may no longer read them
           format: int64
           type: integer
       required:

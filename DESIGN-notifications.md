@@ -87,7 +87,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A report given to you | event | To the person a report is assigned to, where that is not whoever assigned it, and only where they read the product's reports. Never to a team. Undisclosed |
 | A reporter writing back | event | A message recorded as received on a report, to the report's audience (§ Report audience), apart from whoever recorded it. Undisclosed |
 | A message sent to a reporter | event | A message recorded as sent on a report, to the report's audience, apart from whoever recorded it. Undisclosed |
-| A note on a report | event | To the report's audience, apart from its author and anybody it names, who is told of the mention instead. An edit tells nobody. Undisclosed |
+| A note on a report | event | To the report's audience, apart from its author and anybody it names, who is told of the mention instead. An edit tells the names its new text holds, and nobody else. Undisclosed |
 | An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
@@ -109,8 +109,8 @@ of.
 
 Work handed back because its holder stopped reading it notifies nobody, as no
 hand-back does (`DESIGN-access.md` § Lost reading). It leaves the holder's
-counts, the absence alert and their digest at the next sweep, and a routing
-rule's sweep puts it in a team's queue, where the queue alerts find it.
+counts, the absence alert and their digest at the next sweep, and waits in the
+unassigned list.
 
 ## The in-application area
 

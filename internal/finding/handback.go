@@ -33,9 +33,9 @@ func HandBack(ctx context.Context, db bun.IDB, narrowed access.Narrowed) error {
 // The people named are asked about, and so is every team they are on, because
 // a team holds work only while a member reads it.
 //
-// Work goes back to nobody, exactly as when somebody leaves: a routing rule
-// places it in a team's queue on its next sweep, and the unassigned list
-// holds it until then.
+// Work goes back to nobody, exactly as when somebody leaves. No routing sweep
+// is queued, because a full queue would then refuse the write that took the
+// reading away; a rule places the work when one is next recorded.
 func (s *Store) HandBackUnread(ctx context.Context, narrowed access.Narrowed) (int64, error) {
 	var moved int64
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
