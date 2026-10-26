@@ -118,7 +118,8 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 			"re-affirming one claim follows. `waiting` on each entry says which.\n\n" +
 			"Only the person who made a claim may re-affirm it. Where somebody else made any of " +
 			"them the whole act is refused, naming the issues. A claim with no lapsed row that " +
-			"nothing has replaced answers as though it were not there.\n\n" +
+			"nothing has replaced answers as though it were not there. A claim at a lead past " +
+			"its end of life refuses the whole act with 409.\n\n" +
 			"Bounded over the whole act, promises to upgrade aside. The issues it covers count " +
 			"against `triage.agreed-issues` where no claim goes back to an approver, and " +
 			"against `triage.review-issues` where any does; the findings it writes count " +

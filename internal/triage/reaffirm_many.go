@@ -413,6 +413,19 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 		return reaffirmPlan{}, fmt.Errorf(
 			"%w: none of what lapsed is open anywhere any more", ErrNothingOpen)
 	}
+	// A lead past its end of life is kept as it stands, and re-making a
+	// claim at it is a decision like any other.
+	ended := map[string]bool{}
+	for _, p := range proposals {
+		key := fmt.Sprintf("%d\x00%s", p.Place.ProductID, p.Place.PlaceIdentity)
+		if p.Place.Kind != kind.Analysis || ended[key] {
+			continue
+		}
+		ended[key] = true
+		if err := finding.LeadEnded(ctx, s.db, p.Place.ProductID, p.Place.PlaceIdentity, s.now()); err != nil {
+			return reaffirmPlan{}, err
+		}
+	}
 	return reaffirmPlan{
 		previous: *previous, lapsed: lapsed, proposals: proposals,
 		places: len(places), full: full,

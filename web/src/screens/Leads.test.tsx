@@ -88,7 +88,7 @@ describe("the leads", () => {
   it("counts what the queue leaves out", async () => {
     await drawn();
     expect(text()).toContain("2 waiting for approval");
-    expect(text()).toContain("3 past end of life");
+    expect(text()).toContain("3 open only past end of life");
     expect(text()).toContain("5 dismissed by a rule");
     expect(text()).toContain("Baseline 40");
   });

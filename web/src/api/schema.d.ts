@@ -849,6 +849,8 @@ export interface paths {
          *
          *     Bounded unless it is a promise to upgrade. The issues it covers count against `triage.agreed-issues` where nothing goes back to an approver, and against `triage.review-issues` where anything does; the findings it writes count against `triage.write-ceiling`.
          *
+         *     A claim at a lead past its end of life is refused with 409.
+         *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
          *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
@@ -5631,7 +5633,7 @@ export interface paths {
          *
          *     Whether a second person has to agree is decided per claim, by the rules re-affirming one claim follows. `waiting` on each entry says which.
          *
-         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there.
+         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there. A claim at a lead past its end of life refuses the whole act with 409.
          *
          *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
          *
@@ -10328,7 +10330,7 @@ export interface components {
             items: components["schemas"]["LeadRowBody"][] | null;
             /**
              * Format: int64
-             * @description Open leads left out of the queue because every release they were seen in is past its end of life. Zero for a list by state
+             * @description Open leads left out of the queue because every release they are open in is past its end of life. Zero for a list by state
              */
             past_end_of_life: number;
             /**

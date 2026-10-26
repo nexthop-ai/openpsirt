@@ -43,7 +43,7 @@ type LeadsOutput struct {
 		States  map[string]int `json:"states" doc:"The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build"`
 		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
 		Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
-		Ended   int            `json:"past_end_of_life" doc:"Open leads left out of the queue because every release they were seen in is past its end of life. Zero for a list by state"`
+		Ended   int            `json:"past_end_of_life" doc:"Open leads left out of the queue because every release they are open in is past its end of life. Zero for a list by state"`
 	}
 }
 
@@ -184,7 +184,7 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		listing := "the queue: open leads nothing waits on, the baseline left out"
+		listing := "the queue: open leads nothing waits on, the baseline and leads open only in releases past their end of life left out"
 		if input.State != "" {
 			listing = "the leads " + string(input.State)
 		}

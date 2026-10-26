@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
@@ -115,10 +117,15 @@ type Member struct {
 
 // Unanswered is the leads on a lead's build that are the same flaw as it and
 // that nothing answers yet, where the subject may read them: open, under no
-// live claim, waiting or not, and covered by no standing rule. A lead already
-// answered keeps its own answer.
+// live claim, waiting or not, covered by no standing rule, not handed off, and
+// seen in a release still in support. A lead already answered keeps its own
+// answer, and a lead past its end of life is kept as it stands.
 func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Member, error) {
 	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return nil, err
+	}
+	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +146,21 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 			productID).
 		Where(`NOT `+ruled, productID).
 		Where(`NOT `+handedOff, productID).
+		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
+			if len(ended) == 0 {
+				return q
+			}
+			// The rule finding.LeadEnded applies to one lead: seen in at
+			// least one release that is not past its end of life.
+			kinds, kindArgs := kind.Leads.Where(`"fs"."kind"`)
+			args := append([]any{productID}, kindArgs...)
+			args = append(args, bun.List(ended))
+			return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fs"
+				JOIN "target" AS "ts" ON "ts"."id" = "fs"."target_id"
+				JOIN "stream" AS "ss" ON "ss"."id" = "ts"."stream_id"
+				WHERE "ss"."product_id" = ? AND "fs"."place_identity" = "f"."place_identity"
+				  AND `+kinds+` AND "ts"."stream_id" NOT IN (?))`, args...)
+		}).
 		OrderExpr(`"f"."place_identity" ASC`).
 		Scan(ctx, &out); err != nil {
 		return nil, fmt.Errorf("read the leads one judgment about lead %d answers: %w", leadID, err)

@@ -27,6 +27,9 @@ var decidedIssue = regexp.MustCompile(`"?\bdv"?\."?issue_id"?\s*=\s*"?\w+"?\."?v
 // correlated to a finding, by file and by the pair of aliases compared, with
 // what each compares.
 var notADecisionAtAFinding = map[string]map[[2]string]string{
+	"analysis/group.go": {
+		{"f", "fs"}: "two sightings of one lead, in the product bound",
+	},
 	"analysis/handoff.go": {
 		{"lh", "od"}: "a decision about a lead handed off as a flaw, at its place in its own product",
 	},

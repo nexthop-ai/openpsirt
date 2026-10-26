@@ -189,6 +189,8 @@ func RefusedDecision(logger *slog.Logger, err error) error {
 		return huma.Error409Conflict("somebody who proposed any of a claim or wrote any of its reasoning may not agree to it")
 	case errors.Is(err, triage.ErrLeadHandedOff):
 		return huma.Error409Conflict(triage.ErrLeadHandedOff.Error())
+	case errors.Is(err, finding.ErrLeadPastEndOfLife):
+		return huma.Error409Conflict(finding.ErrLeadPastEndOfLife.Error())
 	}
 	// An authorization refusal is not somebody having asked for the
 	// impossible. Without this arm it falls through to the default below and

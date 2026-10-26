@@ -248,6 +248,7 @@ func registerReaffirmClaim(api huma.API, in core.Deps) {
 			"`triage.agreed-issues` where nothing goes back to an approver, and against " +
 			"`triage.review-issues` where anything does; the findings it writes count against " +
 			"`triage.write-ceiling`.\n\n" +
+			"A claim at a lead past its end of life is refused with 409.\n\n" +
 			"A place that is open nowhere any more is not re-made, which is a finding that " +
 			"closed rather than a fault. `reasoning` is required.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,

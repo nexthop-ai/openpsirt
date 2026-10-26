@@ -103,9 +103,10 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	}
 	perFinding := func() *bun.SelectQuery { return leadFindings(db, subject, scope, visible) }
 
-	// A lead seen only in releases past their end of life is kept as it
-	// stands and is no work for anybody, so the queue counts none of its
-	// sightings there. The lists by state still show it.
+	// A sighting in a release past its end of life is no work for anybody,
+	// so the queue counts none of them, and a lead open only there leaves
+	// the queue though it may still be decided where it is seen elsewhere.
+	// The lists by state still show it.
 	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, time.Now().UTC())
 	if err != nil {
 		return nil, err

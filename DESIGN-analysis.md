@@ -618,7 +618,7 @@ at least one.
 | The leads near a lead are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 baseline leads of two analyzers on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
 | A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
 | A judgment about a lead is one claim over it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
-| A lead of the group already answered, waiting on a claim, under a standing rule, fixed, or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
+| A lead of the group already answered, waiting on a claim, under a standing rule, fixed, handed off, past its end of life (§ End of life), or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
 | A lead possibly the same flaw is left out | It is judged on its own |
 
 ## Hand-off
@@ -710,8 +710,10 @@ is in `DESIGN-data-model.md` § End of support.
 | Rule | |
 |---|---|
 | A lead is past its end of life when every release of the product holding a finding of it is | A lead also seen in a supported release is work there |
-| The queue leaves out its sightings in releases past their end of life, and counts the leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
-| A decision, a fixed closure, pulling it into the queue and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
+| The queue leaves out every sighting in a release past its end of life, and counts the open leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
+| A lead open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A lead closed or not reproduced on a supported release is still that release's to decide, and the queue holds open work |
+| A decision, a re-affirmation of a lapsed claim, a fixed closure, pulling it into the queue and a hand-off are refused with 409 | Nobody fixes a release nobody supports. A re-affirmation writes a decision |
+| A judgment about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
 | A claim already standing at it is still agreed to or withdrawn | The claim is a judgment somebody made, and an approval is of what was read (REQ-28) |
 | A lead already handed off is still moved into or out of its flaw's case | The move is about the flaw, which is judged on its own builds |
 | Its evidence says it is past its end of life | The page offers none of the refused controls |

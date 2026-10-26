@@ -112,8 +112,8 @@ export function Leads() {
                 </Link>
               ),
               listed.data.past_end_of_life > 0 && (
-                <span key="ended">
-                  {listed.data.past_end_of_life.toLocaleString()} past end of life
+                <span key="ended" title="Open only in releases past their end of life">
+                  {listed.data.past_end_of_life.toLocaleString()} open only past end of life
                 </span>
               ),
             ]
