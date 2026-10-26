@@ -113,3 +113,33 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 	}
 	return out
 }
+
+// RunV0110ReportStep runs the v0.11.0 upgrade's report step alone, in a
+// transaction of its own as on MySQL and MariaDB: a start that stopped after
+// it, at a later step.
+func RunV0110ReportStep(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, reportCaseV0110)
+}
+
+// StopV0110AfterAcknowledgements makes the report step's tables and writes
+// each acknowledgement as the first message sent, in a transaction of its
+// own, and stops before the acknowledged stamp is dropped: a start that
+// stopped there, as one on MySQL and MariaDB can.
+func StopV0110AfterAcknowledgements(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		declared := flawReportV0110(u.t)
+		for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
+			"report_note_revision", "report_assignment"} {
+			if err := u.create(declared, table); err != nil {
+				return err
+			}
+		}
+		return acknowledgedAsSentV0110(ctx, tx)
+	})
+}

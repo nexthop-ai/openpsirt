@@ -290,8 +290,14 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 			return err
 		}
 	}
-	if err := u.index(declared, "flaw_report", "flaw_report_holder_idx"); err != nil {
+	// Made once and never replaced: MySQL and MariaDB adopt it for the
+	// holder's foreign key and refuse to drop it on a later start.
+	if held, err := u.hasIndex("flaw_report", "flaw_report_holder_idx"); err != nil {
 		return err
+	} else if !held {
+		if err := u.index(declared, "flaw_report", "flaw_report_holder_idx"); err != nil {
+			return err
+		}
 	}
 
 	places, err := u.hasColumn("routing_rule", "reports")

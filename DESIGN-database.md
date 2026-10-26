@@ -356,6 +356,7 @@ asked.
 | Why a probe rather than a keyword | MariaDB accepts `IF NOT EXISTS` on both a table and an index; MySQL accepts it only on a table. A probe is what the two have in common |
 | What is stepped over | Only the exact object the statement names. One that cannot be identified is run, and fails as it always did — a skip on any collision could hide a real one |
 | What it cannot tell apart | A statement that collides with something an earlier run made, and one that collides with something the same migration made two statements ago. The log is what surfaces the second |
+| An index a foreign key adopted is made once and never replaced | MySQL and MariaDB take over an index whose leading column a foreign key names, and refuse to drop it while the key stands, so a start that drops and remakes it fails every time |
 
 CI runs the success path on four engines, which is where this hides: the
 engines agree about what a migration does and disagree only about what is left

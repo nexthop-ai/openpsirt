@@ -122,6 +122,62 @@ func kindOf(db *database.DB) string {
 	return "VARCHAR(16)"
 }
 
+// acknowledgedV0100 records two reports in a v0.10.0 database: one somebody
+// acknowledged late on 3 October, and one nobody answered. It answers the
+// person who recorded both.
+func acknowledgedV0100(t *testing.T, ctx context.Context, db *database.DB) int64 {
+	t.Helper()
+	declared, err := world.Declare(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+	answered := time.Date(2026, 10, 3, 23, 30, 0, 0, time.UTC)
+	report := func(reference string, acknowledged *time.Time) {
+		t.Helper()
+		var by *int64
+		if acknowledged != nil {
+			by = &declared.Person.ID
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "flaw_report"
+			("reference", "product_id", "summary", "recorded_by", "recorded_at",
+			 "acknowledged_at", "acknowledged_by", "found_here")
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			reference, declared.Product.ID, "A claim.", declared.Person.ID, recorded,
+			acknowledged, by, false).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	report("SONIC-R-2026-111111", &answered)
+	report("SONIC-R-2026-222222", nil)
+	return declared.Person.ID
+}
+
+// sentOnce asserts the acknowledged report holds exactly one message, sent on
+// the day it was acknowledged by whoever acknowledged it, and the other none.
+func sentOnce(t *testing.T, ctx context.Context, db *database.DB, by int64) {
+	t.Helper()
+	var rows []struct {
+		Reference string    `bun:"reference"`
+		Direction string    `bun:"direction"`
+		Dated     time.Time `bun:"dated"`
+		LoggedBy  int64     `bun:"logged_by"`
+	}
+	if err := db.DB.NewRaw(`SELECT "fr"."reference", "rm"."direction", "rm"."dated", "rm"."logged_by"
+		FROM "report_message" AS "rm" JOIN "flaw_report" AS "fr" ON "fr"."id" = "rm"."flaw_report_id"`).
+		Scan(ctx, &rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("the upgrade wrote %d messages, want the one acknowledgement: %+v", len(rows), rows)
+	}
+	got := rows[0]
+	if got.Reference != "SONIC-R-2026-111111" || got.Direction != "sent" ||
+		got.Dated.Format(time.DateOnly) != "2026-10-03" || got.LoggedBy != by {
+		t.Errorf("the acknowledgement became %+v", got)
+	}
+}
+
 // A v0.10.0 report's acknowledgement becomes the first message sent to its
 // reporter, dated the day it was recorded, by whoever recorded it, and a
 // report nobody answered has no correspondence.
@@ -130,50 +186,47 @@ func TestAnAcknowledgementBecomesTheFirstMessageSent(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v0100)
-		declared, err := world.Declare(ctx, db)
-		if err != nil {
-			t.Fatal(err)
-		}
-		recorded := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
-		answered := time.Date(2026, 10, 3, 23, 30, 0, 0, time.UTC)
-		report := func(reference string, acknowledged *time.Time) {
-			t.Helper()
-			var by *int64
-			if acknowledged != nil {
-				by = &declared.Person.ID
-			}
-			if _, err := db.DB.NewRaw(`INSERT INTO "flaw_report"
-				("reference", "product_id", "summary", "recorded_by", "recorded_at",
-				 "acknowledged_at", "acknowledged_by", "found_here")
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-				reference, declared.Product.ID, "A claim.", declared.Person.ID, recorded,
-				acknowledged, by, false).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
-		}
-		report("SONIC-R-2026-111111", &answered)
-		report("SONIC-R-2026-222222", nil)
+		by := acknowledgedV0100(t, ctx, db)
 		dbtest.MigrateTo(t, db, v0110)
+		sentOnce(t, ctx, db, by)
+		leaveAtLatest(t, ctx, db)
+	})
+}
 
-		var rows []struct {
-			Reference string    `bun:"reference"`
-			Direction string    `bun:"direction"`
-			Dated     time.Time `bun:"dated"`
-			LoggedBy  int64     `bun:"logged_by"`
+// A start that stopped after writing the acknowledgements as messages, and
+// before dropping the stamp they came from, writes none of them twice: on
+// MySQL and MariaDB the messages commit at the next change to the schema.
+func TestAStoppedUpgradeWritesNoAcknowledgementTwice(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		by := acknowledgedV0100(t, ctx, db)
+		if err := migrations.StopV0110AfterAcknowledgements(ctx, db); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
 		}
-		if err := db.DB.NewRaw(`SELECT "fr"."reference", "rm"."direction", "rm"."dated", "rm"."logged_by"
-			FROM "report_message" AS "rm" JOIN "flaw_report" AS "fr" ON "fr"."id" = "rm"."flaw_report_id"`).
-			Scan(ctx, &rows); err != nil {
-			t.Fatal(err)
+		dbtest.MigrateTo(t, db, v0110)
+		sentOnce(t, ctx, db, by)
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// A start that stopped after the report step, at a later one, carries on
+// over everything the report step made. MySQL and MariaDB adopt the holder
+// index for the holder's foreign key and refuse to drop it, so the index is
+// made once and never replaced.
+func TestTheV0110UpgradeCarriesOnPastItsReportStep(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		by := acknowledgedV0100(t, ctx, db)
+		if err := migrations.RunV0110ReportStep(ctx, db); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
 		}
-		if len(rows) != 1 {
-			t.Fatalf("the upgrade wrote %d messages, want the one acknowledgement: %+v", len(rows), rows)
-		}
-		got := rows[0]
-		if got.Reference != "SONIC-R-2026-111111" || got.Direction != "sent" ||
-			got.Dated.Format(time.DateOnly) != "2026-10-03" || got.LoggedBy != declared.Person.ID {
-			t.Errorf("the acknowledgement became %+v", got)
-		}
+		dbtest.MigrateTo(t, db, v0110)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
+		sentOnce(t, ctx, db, by)
 		leaveAtLatest(t, ctx, db)
 	})
 }
