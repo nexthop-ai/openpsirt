@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import { notYours, unwrap } from "../api/queries";
 import { whereOf, type At } from "../ui/Decide";
 import { Failed } from "../ui/Failed";
@@ -19,6 +19,8 @@ import { Suggest } from "../ui/Suggest";
 import { offeredAs, whoIs } from "../ui/whom";
 import { Required } from "../ui/Required";
 import { Attached } from "../ui/Attached";
+
+type Collaborator = Body<"CollaboratorBody">;
 
 // The people brought into one undisclosed case.
 //
@@ -38,27 +40,67 @@ export function Collaborators({
   product: string;
   vulnerability: string;
 }) {
+  return (
+    <People
+      product={product}
+      scope={[product, vulnerability]}
+      grants="Grants read and comment on this issue only. Cannot agree to claims."
+      list={async () =>
+        unwrap(
+          await api.GET("/v1/products/{product}/issues/{vulnerability}/collaborators", {
+            params: { path: { product, vulnerability } },
+          }),
+        )
+      }
+      add={async (identity) =>
+        unwrap(
+          await api.PUT("/v1/products/{product}/issues/{vulnerability}/collaborators/{identity}", {
+            params: { path: { product, vulnerability, identity } },
+          }),
+        )
+      }
+      remove={async (identity) =>
+        unwrap(
+          await api.DELETE(
+            "/v1/products/{product}/issues/{vulnerability}/collaborators/{identity}",
+            {
+              params: { path: { product, vulnerability, identity } },
+            },
+          ),
+        )
+      }
+    />
+  );
+}
+
+// The people brought into one grant narrower than the product: a case, or one
+// lead. What the grant reaches is said on the card.
+export function People({
+  product,
+  scope,
+  grants,
+  list,
+  add,
+  remove,
+}: {
+  product: string;
+  // What names the grant, after the word every collaborator list is cached
+  // under.
+  scope: readonly string[];
+  grants: string;
+  list: () => Promise<{ items: Collaborator[] | null }>;
+  add: (identity: string) => Promise<unknown>;
+  remove: (identity: string) => Promise<unknown>;
+}) {
   const queries = useQueryClient();
   const [adding, setAdding] = useState("");
   const on = useQuery({
-    queryKey: ["collaborators", product, vulnerability],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/issues/{vulnerability}/collaborators", {
-          params: { path: { product, vulnerability } },
-        }),
-      ),
+    queryKey: ["collaborators", ...scope],
+    queryFn: list,
     // Somebody who may not read undisclosed work here is refused, and that is
     // an answer rather than a fault: the card stays quiet on their screen.
     retry: false,
   });
-  // The people who can be offered: those who already read this product at all —
-  // bringing somebody into a case grants access to somebody who has some, and
-  // cannot bring anybody into the deployment.
-  //
-  // Narrowed by what is typed, in the server, which is where the whole list
-  // is: a page of people asked for without a term is whichever hundred come
-  // back.
   const people = useQuery({
     queryKey: ["mentionable", product, false, adding.trim()],
     queryFn: async () =>
@@ -72,24 +114,14 @@ export function Collaborators({
       ),
   });
   const bring = useMutation({
-    mutationFn: async (identity: string) =>
-      unwrap(
-        await api.PUT("/v1/products/{product}/issues/{vulnerability}/collaborators/{identity}", {
-          params: { path: { product, vulnerability, identity } },
-        }),
-      ),
+    mutationFn: add,
     onSuccess: () => {
       setAdding("");
       void queries.invalidateQueries({ queryKey: ["collaborators"] });
     },
   });
   const take = useMutation({
-    mutationFn: async (identity: string) =>
-      unwrap(
-        await api.DELETE("/v1/products/{product}/issues/{vulnerability}/collaborators/{identity}", {
-          params: { path: { product, vulnerability, identity } },
-        }),
-      ),
+    mutationFn: remove,
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["collaborators"] }),
   });
 
@@ -99,8 +131,8 @@ export function Collaborators({
   if (on.isError) {
     return notYours(on.error) ? null : (
       <div className="card">
-        <h3>On this case</h3>
-        <Failed error={on.error} what="The people on this case could not be read." />
+        <h3>Collaborators</h3>
+        <Failed error={on.error} what="The collaborators could not be read." />
       </div>
     );
   }
@@ -117,7 +149,7 @@ export function Collaborators({
         {rows.length === 0
           ? "Nobody has been brought in."
           : `${rows.length} ${rows.length === 1 ? "person has" : "people have"} been brought in.`}{" "}
-        Grants read and comment on this issue only. Cannot agree to claims.
+        {grants}
       </p>
       {bring.error != null && <Failed error={bring.error} what="They could not be brought in." />}
       {take.error != null && <Failed error={take.error} what="They could not be taken off." />}

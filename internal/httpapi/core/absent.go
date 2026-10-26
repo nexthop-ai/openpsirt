@@ -506,6 +506,18 @@ func LocatedVisibly(ctx context.Context, in Deps, subject access.Subject,
 	return named, nil
 }
 
+// LocatedForLead resolves the three names a build is addressed by, for a route
+// reading one lead on it.
+func LocatedForLead(ctx context.Context, in Deps, subject access.Subject,
+	product, stream, variant string) (*catalog.Named, error) {
+
+	named, err := catalog.NewStore(in.DB.DB).LocateForLead(ctx, subject, product, stream, variant)
+	if err != nil {
+		return nil, Absent(in.Logger, err, "that build could not be looked up", NoSuchProduct)
+	}
+	return named, nil
+}
+
 // VisibleBuild is the reader and the build a route is about: the build
 // resolved as the reader may see it and required to have been scanned.
 func VisibleBuild(ctx context.Context, in Deps, product, stream, variant string) (access.Subject, int64, error) {

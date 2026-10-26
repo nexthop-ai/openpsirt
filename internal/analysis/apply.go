@@ -336,11 +336,28 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 	if err != nil {
 		return "", err
 	}
-	opened, inBaseline, err := a.open(ctx, tx, run, set.ID, fresh, ruleIDs, from, components, inventory.root)
+	again := make([]int64, 0, len(matched))
+	for id := range matched {
+		again = append(again, id)
+	}
+	sort.Slice(again, func(i, j int) bool { return again[i] < again[j] })
+	// Marked before the run reads a hand-off or writes a lead's source: a
+	// disclosure or a move of a lead it describes waits for it, or reads
+	// again.
+	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, freshPlaces(set.ID, fresh, from), again); err != nil {
+		return "", err
+	}
+	opened, inBaseline, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
 	if err != nil {
 		return "", err
 	}
 	if err := describeAgain(ctx, tx, matched); err != nil {
+		return "", err
+	}
+	// What the run kept beside a lead disclosed with its flaw is stripped
+	// again, as disclosure stripped it.
+	described := append(append([]int64{}, opened...), again...)
+	if err := finding.StripDisclosedLeads(ctx, tx, set.ProductID, described); err != nil {
 		return "", err
 	}
 
@@ -511,6 +528,7 @@ func sharpDrop(ctx context.Context, db bun.IDB, missed, live int) (bool, error) 
 	return missed >= floor && missed*100 > share*live, nil
 }
 
-// OpensAt is the visibility every lead opens at, and the one a receipt
-// counting leads is read at: a result nobody has judged is internal.
+// OpensAt is the visibility a lead opens at unless it was handed off, and the
+// one a receipt counting leads is read at: a result nobody has judged is
+// internal.
 const OpensAt = access.Internal

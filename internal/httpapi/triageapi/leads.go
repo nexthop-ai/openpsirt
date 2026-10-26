@@ -50,7 +50,8 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			"The decision covers the lead on every stream and variant it is seen on, and every lead " +
 			"another analyzer reports as the same flaw on the build that nothing answers yet, as one " +
 			"claim agreed to once. A lead that " +
-			"is fixed is refused: it opens again where it is seen again.",
+			"is fixed is refused: it opens again where it is seen again. A lead handed off as a flaw " +
+			"is refused with 409, because its flaw is judged instead.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -95,6 +96,11 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 		// One claim over the lead and every lead that is the same flaw and
 		// that nothing answers yet, worked out where the claim is written.
 		decision, err := store.ProposeGrouped(ctx, subject, first, func(ctx context.Context, tx bun.IDB) ([]triage.Place, error) {
+			// Asked where the claim is written: a hand-off landing first
+			// makes the lead its flaw's.
+			if err := analysis.Answerable(ctx, tx, subject, named.ProductID, lead); err != nil {
+				return nil, err
+			}
 			kin, err := analysis.Unanswered(ctx, tx, subject, named.ProductID, lead.ID)
 			if err != nil {
 				return nil, err
@@ -107,6 +113,12 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			}
 			return places, nil
 		})
+		switch {
+		case errors.Is(err, analysis.ErrHandedOff):
+			return nil, huma.Error409Conflict(analysis.ErrHandedOff.Error())
+		case errors.Is(err, finding.ErrNoOpenFinding):
+			return nil, core.NoSuchFinding()
+		}
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}

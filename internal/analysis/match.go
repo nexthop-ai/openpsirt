@@ -13,6 +13,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
@@ -174,7 +175,7 @@ func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64
 // so a decision on it reaches this build too; any other opens at a place its
 // series and key name. It returns the findings, and those in the baseline
 // because a lead they were carried from is.
-func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fresh []Keyed,
+func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, productID, seriesID int64, fresh []Keyed,
 	rules map[string]int64, from map[int]carried, components map[string]int64, root int64) (
 	[]int64, []int64, error) {
 
@@ -182,20 +183,31 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesI
 		return nil, nil, nil
 	}
 	now := a.now().Truncate(time.Microsecond)
-	rows := make([]finding.Finding, len(fresh))
-	for i, k := range fresh {
-		place := identity(seriesID, k.Key)
+	places := freshPlaces(seriesID, fresh, from)
+	for i := range fresh {
 		if c, ok := from[i]; ok {
-			place = c.place
 			fresh[i].On = c.on
 		}
+	}
+	// A lead handed off and moved into its case opens where it is, so the
+	// next run's sighting is not a new internal lead.
+	handed, err := handedVisibility(ctx, db, productID, places)
+	if err != nil {
+		return nil, nil, err
+	}
+	rows := make([]finding.Finding, len(fresh))
+	for i, k := range fresh {
 		component := root
 		if id, ok := components[k.Remote]; ok {
 			component = id
 		}
+		visibility := OpensAt
+		if v, ok := handed[places[i]]; ok {
+			visibility = v
+		}
 		rows[i] = finding.Finding{
 			TargetID: run.TargetID, Kind: kind.Analysis, VulnerabilityID: rules[k.Rule],
-			Visibility: OpensAt, ComponentID: component, PlaceIdentity: place,
+			Visibility: visibility, ComponentID: component, PlaceIdentity: places[i],
 			OpenedAt: now,
 		}
 	}
@@ -216,6 +228,19 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesI
 		return nil, nil, err
 	}
 	return ids, baseline, nil
+}
+
+// freshPlaces is the place each result new to this build opens at: the lead's
+// it was carried from, or the one its series and key name.
+func freshPlaces(seriesID int64, fresh []Keyed, from map[int]carried) []string {
+	places := make([]string, len(fresh))
+	for i, k := range fresh {
+		places[i] = identity(seriesID, k.Key)
+		if c, ok := from[i]; ok {
+			places[i] = c.place
+		}
+	}
+	return places
 }
 
 // describeAgain records what this run said about the findings it saw again,
@@ -295,4 +320,27 @@ func stated(n int) *int {
 		return nil
 	}
 	return &n
+}
+
+// handedVisibility is the visibility each handed-off lead among these places
+// holds in a product.
+func handedVisibility(ctx context.Context, db bun.IDB, productID int64, places []string) (
+	map[string]access.Visibility, error) {
+
+	out := map[string]access.Visibility{}
+	for start := 0; start < len(places); start += database.BatchSize {
+		batch := places[start:min(start+database.BatchSize, len(places))]
+		var rows []finding.Handoff
+		if err := db.NewSelect().Model(&rows).
+			Column("lh.place_identity", "lh.visibility").
+			Where(`"lh"."product_id" = ?`, productID).
+			Where(`"lh"."place_identity" IN (?)`, bun.List(batch)).
+			Scan(ctx); err != nil {
+			return nil, fmt.Errorf("read which of the leads were handed off: %w", err)
+		}
+		for _, r := range rows {
+			out[r.PlaceIdentity] = r.Visibility
+		}
+	}
+	return out, nil
 }

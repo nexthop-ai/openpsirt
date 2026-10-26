@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -42,6 +41,9 @@ type Evidence struct {
 	// Kin is the other leads on the build that are the same flaw, or
 	// possibly are.
 	Kin []Kin
+	// Stub says the lead was moved into a case the reader is not on, so
+	// what the analyzer said, the source and the kin are withheld.
+	Stub bool
 }
 
 // Located is one place a run named for a lead.
@@ -61,10 +63,23 @@ type Located struct {
 // read the lead and as no lead otherwise. The product's repository settings
 // say where each place links to.
 func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *finding.Finding, productID int64) (Evidence, error) {
-	visible, err := access.Readable(subject, productID)
-	if err != nil || !slices.Contains(visible, lead.Visibility) {
-		return Evidence{}, finding.ErrNoOpenFinding
+	reach := finding.LeadReach(subject, productID)
+	either, eitherArgs := reach.Either()
+	var read struct {
+		Whole int `bun:"whole"`
 	}
+	err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`CASE WHEN `+reach.Full+` THEN 1 ELSE 0 END AS "whole"`, reach.FullArgs...).
+		Where(`"f"."id" = ?`, lead.ID).
+		Where(either, eitherArgs...).
+		Scan(ctx, &read)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return Evidence{}, finding.ErrNoOpenFinding
+	case err != nil:
+		return Evidence{}, fmt.Errorf("read whether lead %d may be read: %w", lead.ID, err)
+	}
+	stub := read.Whole == 0
 	var said result
 	err = db.NewSelect().Model(&said).Where(`"ar"."finding_id" = ?`, lead.ID).Scan(ctx)
 	switch {
@@ -131,7 +146,14 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 		Where(`"f"."id" = ?`, lead.ID).Limit(1).Scan(ctx, &out.State, &out.Rule); err != nil {
 		return Evidence{}, fmt.Errorf("read where lead %d stands: %w", lead.ID, err)
 	}
-	if out.Kin, err = KinOf(ctx, db, subject, productID, lead.ID); err != nil {
+	if stub {
+		// The rule, the place and when it was seen, and nothing the case
+		// holds.
+		out.Stub = true
+		out.At = Located{Path: said.Path, StartLine: out.At.StartLine, EndLine: out.At.EndLine,
+			Function: said.Enclosing, Link: out.At.Link}
+		out.Steps, out.Related = nil, nil
+	} else if out.Kin, err = KinOf(ctx, db, subject, productID, lead.ID); err != nil {
 		return Evidence{}, err
 	}
 	if seen.AbsentRunID != nil {

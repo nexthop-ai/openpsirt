@@ -507,6 +507,11 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	if err != nil {
 		return Subject{}, err
 	}
+	// Every handed-off lead they were granted, for the same reason.
+	leads, err := s.LeadsOf(ctx, person.ID)
+	if err != nil {
+		return Subject{}, err
+	}
 	// Administration a group conferred is bounded the same way the roles it
 	// conferred are, and for the same reason: a group is what says so, and a
 	// credential that never signs in never asks a group again. Without this a
@@ -538,7 +543,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	// Somebody holding the audit permission alone holds access: they reach no
 	// product and read the deployment's own records, which is the whole of
 	// what it is for.
-	if !administers && !audits && len(grants) == 0 && len(cases) == 0 {
+	if !administers && !audits && len(grants) == 0 && len(cases) == 0 && len(leads) == 0 {
 		return Subject{}, ErrDenied
 	}
 
@@ -559,7 +564,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		on = append(on, team.PartyID)
 	}
 	subject := NewPerson(person.ID, person.Identity, administers, grants,
-		person.PartyID, on...).OnCases(cases)
+		person.PartyID, on...).OnCases(cases).OnLeads(leads)
 	if audits {
 		subject = subject.Auditing()
 	}

@@ -82,7 +82,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 		return Revised{}, err
 	}
 
-	claim, rows, err := s.claimRows(ctx, subject, claimID, mayDecideOn)
+	claim, rows, err := s.writableRows(ctx, subject, claimID, mayDecideOn)
 	if err != nil {
 		return Revised{}, err
 	}
@@ -208,7 +208,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 	// with every agreement marked withdrawn — which is the state the whole
 	// approval record exists to make impossible.
 	return s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		_, rows, err := within.claimRows(ctx, subject, claimID, mayDecideOn)
+		_, rows, err := within.writableRows(ctx, subject, claimID, mayDecideOn)
 		if err != nil {
 			return err
 		}
@@ -335,6 +335,11 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	if err != nil {
 		return Undone{}, err
 	}
+	// A confirmation a hand-off rests on stands: its flaw is judged
+	// instead, and nothing about the claim changes again.
+	if claims, decisions, err = s.leavingHandedOff(ctx, claims, decisions); err != nil {
+		return Undone{}, err
+	}
 	if len(claims) == 0 {
 		return Undone{}, nil
 	}
@@ -392,6 +397,39 @@ func (s *Store) returnToWaiting(ctx context.Context, claims []int64) (int64, err
 		return 0, err
 	}
 	return database.Affected(res)
+}
+
+// leavingHandedOff is these claims and their rows without the claims about a
+// lead handed off as a flaw.
+func (s *Store) leavingHandedOff(ctx context.Context, claims, decisions []int64) ([]int64, []int64, error) {
+	handed, err := s.handedOff(ctx, claims)
+	if err != nil || len(handed) == 0 {
+		return claims, decisions, err
+	}
+	kept := make([]int64, 0, len(claims))
+	for _, id := range claims {
+		if !handed[id] {
+			kept = append(kept, id)
+		}
+	}
+	if len(kept) == 0 {
+		return nil, nil, nil
+	}
+	var rows []int64
+	if err := database.IDsInBatches(ctx, decisions, func(ctx context.Context, batch []int64) error {
+		var some []int64
+		if err := s.db.NewSelect().Model((*Decision)(nil)).Column("id").
+			Where(`"de"."id" IN (?)`, bun.List(batch)).
+			Where(`"de"."claim_id" IN (?)`, bun.List(kept)).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		rows = append(rows, some...)
+		return nil
+	}); err != nil {
+		return nil, nil, fmt.Errorf("read what that approval covered: %w", err)
+	}
+	return kept, rows, nil
 }
 
 // wholeClaims keeps only the claims every one of whose rows is in reached, and

@@ -21,6 +21,8 @@ func mappers(err error) map[string]error {
 		"refusedReport":   refusedReport(in, err, "that could not be read"),
 		"refusedMovement": refusedMovement(in, err),
 		"refusedRuling":   refusedRuling(in, err, "that could not be read"),
+		"refusedFlaw":     refusedFlaw(in, err),
+		"refusedHandoff":  refusedHandoff(in, err),
 	}
 }
 

@@ -1,0 +1,102 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package findingsapi_test
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+)
+
+// asked is one request about a handed-off lead and the answer it gets.
+type asked struct {
+	who, method, path, body string
+	want                    int
+}
+
+// answered sends each request about the lead at a place in turn.
+func answered(t *testing.T, r *httpapitest.Reach, place string, cases []asked) {
+	t.Helper()
+	for _, c := range cases {
+		got := httpapitest.AsPerson(t, r, c.who, c.method, leadAt(place)+c.path, c.body)
+		if got.Code != c.want {
+			t.Errorf("%s %s %s answered %d, want %d: %s", c.who, c.method, c.path, got.Code, c.want, got.Body)
+		}
+	}
+}
+
+// handOffNamingNoBuild is a hand-off whose body names a build nobody made,
+// which a caller without the rights is refused before it is looked up.
+const handOffNamingNoBuild = `{"builds":[{"stream":"nosuch","variant":"broadcom"}],"summary":"p leaks"}`
+
+func TestAHandOffAMoveAndAnUndoTakeBothTriageRoles(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, _ := httpapitest.HandedOffLead(t, r, false)
+		var cases []asked
+		// Internal triage alone, private triage alone, and internal reading.
+		for _, who := range []string{"internal-triager", "embargo-triager", "internal-reader"} {
+			cases = append(cases,
+				asked{who, http.MethodGet, "/hand-off", "", http.StatusForbidden},
+				asked{who, http.MethodPost, "/hand-off", handOffNamingNoBuild, http.StatusForbidden},
+				asked{who, http.MethodPut, "/move", "", http.StatusForbidden},
+				asked{who, http.MethodDelete, "/move", "", http.StatusForbidden},
+			)
+		}
+		cases = append(cases,
+			asked{"lead-handler", http.MethodGet, "/hand-off", "", http.StatusOK},
+			asked{"lead-handler", http.MethodDelete, "/move", "", http.StatusConflict},
+		)
+		answered(t, r, place, cases)
+	})
+}
+
+func TestAKeptLeadsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, _ := httpapitest.HandedOffLead(t, r, false)
+		answered(t, r, place, []asked{
+			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
+			{"internal-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
+			{"internal-triager", http.MethodDelete, "/collaborators/outsider", "", http.StatusNoContent},
+			// Undisclosed work alone does not read the internal lead.
+			{"embargo-triager", http.MethodGet, "/collaborators", "", http.StatusNotFound},
+			{"embargo-triager", http.MethodPut, "/collaborators/outsider", "", http.StatusNotFound},
+		})
+	})
+}
+
+func TestAMovedLeadsCollaboratorsAreManagedByItsReadersOfUndisclosedWork(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, _ := httpapitest.HandedOffLead(t, r, true)
+		answered(t, r, place, []asked{
+			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusNotFound},
+			{"embargo-reader", http.MethodPut, "/collaborators/internal-reader", "", http.StatusNoContent},
+			// Somebody granted the lead reads it, and does not decide who
+			// else does.
+			{"internal-reader", http.MethodGet, "", "", http.StatusOK},
+			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusNotFound},
+			{"internal-reader", http.MethodPut, "/collaborators/reader", "", http.StatusNotFound},
+		})
+	})
+}
+
+func TestNoGrantOfALeadChangesOnceItsFlawIsDisclosed(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
+			leadAt(place)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
+		}
+		disclosed(t, r, flaw)
+		answered(t, r, place, []asked{
+			// Reading the disclosed lead is not managing who was granted it.
+			{"reader", http.MethodGet, "/collaborators", "", http.StatusNotFound},
+			{"reader", http.MethodPut, "/collaborators/private", "", http.StatusNotFound},
+			{"reader", http.MethodDelete, "/collaborators/outsider", "", http.StatusNotFound},
+			{"lead-handler", http.MethodGet, "/collaborators", "", http.StatusOK},
+			{"lead-handler", http.MethodPut, "/collaborators/private", "", http.StatusConflict},
+			{"lead-handler", http.MethodDelete, "/collaborators/outsider", "", http.StatusConflict},
+		})
+	})
+}

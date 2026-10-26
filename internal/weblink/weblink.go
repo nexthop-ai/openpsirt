@@ -124,6 +124,14 @@ func Finding(product, stream, variant, vulnerability, component, version string)
 	return address
 }
 
+// Lead is one static analysis lead's evidence on one build.
+func Lead(product, stream, variant, place string) string {
+	if climbs(product, stream, variant, place) {
+		return Home()
+	}
+	return build(product, stream, variant) + "/leads/" + url.PathEscape(place)
+}
+
 // Inventories is the list of what one build sent.
 func Inventories(product, stream, variant string) string {
 	if climbs(product, stream, variant) {

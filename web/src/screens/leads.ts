@@ -14,6 +14,7 @@ export const LEAD_STATES: Record<LeadState, string> = {
   dismissed: "Dismissed",
   "not-security": "Not a security issue",
   confirmed: "Confirmed",
+  "handed-off": "Handed off",
 };
 
 // The chip each state is drawn as.
@@ -25,6 +26,7 @@ export const LEAD_TONES: Record<LeadState, string> = {
   dismissed: "agreed",
   "not-security": "agreed",
   confirmed: "bad",
+  "handed-off": "agreed",
 };
 
 export const LEAD_REASONS: Record<LeadReason, string> = {

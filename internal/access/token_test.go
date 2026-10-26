@@ -490,6 +490,14 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// And granted one handed-off lead here, and one over there.
+		if _, err := f.store.AddToLead(ctx, here, "lead-here", person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.AddToLead(ctx, elsewhere, "lead-there", person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+
 		_, secret, err := f.store.NewToken(ctx, person.ID, "pinned", &here, nil, time.Hour, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -519,6 +527,12 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 		}
 		if narrowed.OnCase(elsewhere, theirs) {
 			t.Error("a token pinned to one product reaches a case in another")
+		}
+		if !narrowed.OnLead(here, "lead-here") {
+			t.Error("a narrowed token cannot read the lead it was granted")
+		}
+		if narrowed.OnLead(elsewhere, "lead-there") || len(narrowed.Leads(elsewhere)) != 0 {
+			t.Error("a token pinned to one product reaches a lead granted in another")
 		}
 
 		// And it is still narrower than its owner, which is the whole point.

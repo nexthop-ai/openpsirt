@@ -273,6 +273,10 @@ type Subject struct {
 	// its comments and its attachments, and a lookup at each of those is
 	// four answers that can disagree.
 	cases map[int64][]int64
+	// leads is the handed-off leads this person was granted one at a time,
+	// as places per product. It reads those leads' evidence and nothing else
+	// of the product. Carried on the subject for the reason cases are.
+	leads map[int64][]string
 	// casesReadOnly takes the write half of a case grant away, for a
 	// credential narrowed to roles that do not include triage. Inverted so
 	// that the zero value acts, which is what every subject not narrowed this
@@ -318,6 +322,29 @@ func (s Subject) OnCaseToAct(productID, vulnerabilityID int64) bool {
 	return !s.casesReadOnly && s.OnCase(productID, vulnerabilityID)
 }
 
+// OnLead reports whether this subject was granted one handed-off lead: one
+// place, in one product. Deliberately not part of Reads, for the reason OnCase
+// is not.
+func (s Subject) OnLead(productID int64, placeIdentity string) bool {
+	if s.Kind != Person {
+		return false
+	}
+	for _, place := range s.leads[productID] {
+		if place == placeIdentity {
+			return true
+		}
+	}
+	return false
+}
+
+// Leads is every handed-off lead this subject was granted in one product.
+func (s Subject) Leads(productID int64) []string {
+	if s.Kind != Person {
+		return nil
+	}
+	return s.leads[productID]
+}
+
 // Cases is every issue this subject collaborates on in one product. Empty
 // where they are on none, which is the ordinary case.
 func (s Subject) Cases(productID int64) []int64 { return s.cases[productID] }
@@ -328,6 +355,20 @@ func (s Subject) Cases(productID int64) []int64 { return s.cases[productID] }
 func (s Subject) CaseProducts() []int64 {
 	products := make([]int64, 0, len(s.cases))
 	for id := range s.cases {
+		products = append(products, id)
+	}
+	sort.Slice(products, func(i, j int) bool { return products[i] < products[j] })
+	return products
+}
+
+// LeadProducts is every product this subject was granted a handed-off lead
+// in, kept apart from Products for the reason CaseProducts is.
+func (s Subject) LeadProducts() []int64 {
+	if s.Kind != Person {
+		return nil
+	}
+	products := make([]int64, 0, len(s.leads))
+	for id := range s.leads {
 		products = append(products, id)
 	}
 	sort.Slice(products, func(i, j int) bool { return products[i] < products[j] })
@@ -382,6 +423,13 @@ func NewPerson(id int64, identity string, admin bool, grants map[int64][]Role,
 // thing eventually.
 func (s Subject) OnCases(cases map[int64][]int64) Subject {
 	s.cases = cases
+	return s
+}
+
+// OnLeads returns this subject with the handed-off leads they were granted.
+// Chained for the reason OnCases is.
+func (s Subject) OnLeads(leads map[int64][]string) Subject {
+	s.leads = leads
 	return s
 }
 
@@ -798,6 +846,14 @@ func (s Subject) Sees(productID int64) bool {
 // the product.
 func (s Subject) Reaches(productID int64) bool {
 	return s.Sees(productID) || len(s.cases[productID]) > 0
+}
+
+// ReachesLead is Reaches asked by a lookup that resolves a build only to read
+// one lead: it admits somebody granted a handed-off lead in the product too.
+// Kept apart from Reaches, so a lead grant resolves the names its lead sits at
+// and never the build's shape.
+func (s Subject) ReachesLead(productID int64) bool {
+	return s.Reaches(productID) || len(s.Leads(productID)) > 0
 }
 
 // HoldsAnywhere reports whether this subject holds one of these roles on any

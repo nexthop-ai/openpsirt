@@ -100,7 +100,7 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 		if out.NeedsApproval {
 			return nil
 		}
-		return makePublic(ctx, tx, productID, vulnerabilityID)
+		return makePublic(ctx, tx, productID, vulnerabilityID, now)
 	})
 	if err != nil {
 		return nil, err
@@ -169,7 +169,8 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 }
 
 // makePublic turns every place of one issue in one product public, open and
-// closed, along with every decision made about it there.
+// closed, along with every decision made about it there and every lead moved
+// into its case.
 //
 // A decision carries the visibility of the finding it was made about, so that
 // who may reach it is answered by the row. Left behind, the decisions of a
@@ -179,7 +180,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 // The disclosure date goes with it. A public finding carries none, and one
 // left behind is read back as the date an embargo ends that has already
 // ended. The movement just recorded keeps where it stood.
-func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) error {
+func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64, now time.Time) error {
 	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	if _, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set(`"visibility" = ?`, access.Public).
@@ -201,7 +202,8 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 		Exec(ctx); err != nil {
 		return fmt.Errorf("disclose the decisions: %w", err)
 	}
-	return nil
+	// A lead moved into the case is part of the record disclosed with it.
+	return leadsFollow(ctx, db, productID, vulnerabilityID, now)
 }
 
 // Audience is who to tell that an issue was disclosed, and the names to tell them

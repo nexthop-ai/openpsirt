@@ -66,6 +66,16 @@ type EnteredBody struct {
 	Places int `json:"places" doc:"The number of findings that opened. One per place the component sits in, in each build"`
 }
 
+// FlawFields is what a recorded flaw says of itself, wherever one is recorded.
+type FlawFields struct {
+	Summary  string          `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
+	Severity core.Recordable `json:"severity,omitempty" doc:"The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
+	// The vector rather than a score. The number is derived from it here, so
+	// the two cannot say different things.
+	Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
+	Weaknesses []string `json:"weaknesses,omitempty" maxItems:"16" pattern:"^(\\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\\s*$" doc:"The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which"`
+}
+
 func registerEntry(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "record-finding", Method: http.MethodPost,
@@ -111,17 +121,12 @@ func registerEntry(api huma.API, in core.Deps) {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
 				Variant string `json:"variant" minLength:"1" doc:"The way that line is built"`
 			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take"`
-			Summary  string          `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
-			Severity core.Recordable `json:"severity,omitempty" doc:"The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
-			// The vector rather than a score. The number is derived from it
-			// here, so the two cannot say different things.
-			Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
-			Weaknesses []string `json:"weaknesses,omitempty" maxItems:"16" pattern:"^(\\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\\s*$" doc:"The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which"`
-			Component  string   `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
-			Version    string   `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
-			Ecosystem  string   `json:"ecosystem,omitempty" doc:"The ecosystem, where two share a name and a version"`
-			Namespace  string   `json:"namespace,omitempty" doc:"The namespace, where two share a name, a version and an ecosystem"`
-			Disclosed  bool     `json:"disclosed,omitempty" doc:"Whether this is already public. Undisclosed by default"`
+			FlawFields
+			Component string `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
+			Version   string `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
+			Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem, where two share a name and a version"`
+			Namespace string `json:"namespace,omitempty" doc:"The namespace, where two share a name, a version and an ecosystem"`
+			Disclosed bool   `json:"disclosed,omitempty" doc:"Whether this is already public. Undisclosed by default"`
 			// ReportedBy is who told us, where somebody did. Every
 			// field is optional: a flaw found by whoever is typing
 			// has no reporter, and a form demanding one asks them
@@ -170,44 +175,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			FromReport: input.Body.FromReport,
 		})
 		if err != nil {
-			// Each of these is the caller's to fix, and says which. Falling
-			// through to the generic refusal would answer a name the build
-			// holds twice, and a summary of nothing but spaces, with a 500
-			// that says the request went wrong at our end.
-			var several *graph.Ambiguous
-			switch {
-			case errors.As(err, &several):
-				return nil, core.SeveralComponents(several,
-					"version, and ecosystem and namespace where two share one")
-			case errors.Is(err, finding.ErrNoSuchComponent):
-				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
-			case errors.Is(err, finding.ErrNothingSaid), errors.Is(err, finding.ErrNotAWeakness):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, cvss.ErrNotAVector):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrNothingScanned):
-				return nil, huma.Error404NotFound(finding.ErrNothingScanned.Error())
-			case errors.Is(err, finding.ErrNoBuild), errors.Is(err, finding.ErrSeveralProducts):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrTooManyPlaces):
-				// The caller's to narrow, and the sentence says by how much.
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrToldTwice):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrNoSuchReport):
-				return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
-			case errors.Is(err, finding.ErrAlreadyJudged):
-				return nil, huma.Error409Conflict(finding.ErrAlreadyJudged.Error())
-			case errors.Is(err, finding.ErrIssueReported):
-				return nil, huma.Error409Conflict(finding.ErrIssueReported.Error())
-			}
-			// A summary the writing policy refuses, answered with where to
-			// look, as every other piece of writing is.
-			var faults markdown.Faults
-			if errors.As(err, &faults) {
-				return nil, core.RefusedText(faults)
-			}
-			return nil, core.RefusedFinding(in, err)
+			return nil, refusedFlaw(in, err)
 		}
 
 		component, err := finding.NewStore(in.DB.DB).ComponentName(ctx, rows[0].ComponentID)
@@ -235,6 +203,48 @@ func registerEntry(api huma.API, in core.Deps) {
 		}
 		return out, nil
 	})
+}
+
+// refusedFlaw is the answer to a recorded flaw the store turned away.
+func refusedFlaw(in core.Deps, err error) error {
+	// Each of these is the caller's to fix, and says which. Falling
+	// through to the generic refusal would answer a name the build
+	// holds twice, and a summary of nothing but spaces, with a 500
+	// that says the request went wrong at our end.
+	var several *graph.Ambiguous
+	switch {
+	case errors.As(err, &several):
+		return core.SeveralComponents(several,
+			"version, and ecosystem and namespace where two share one")
+	case errors.Is(err, finding.ErrNoSuchComponent):
+		return huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
+	case errors.Is(err, finding.ErrNothingSaid), errors.Is(err, finding.ErrNotAWeakness):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, cvss.ErrNotAVector):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrNothingScanned):
+		return huma.Error404NotFound(finding.ErrNothingScanned.Error())
+	case errors.Is(err, finding.ErrNoBuild), errors.Is(err, finding.ErrSeveralProducts):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrTooManyPlaces):
+		// The caller's to narrow, and the sentence says by how much.
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrToldTwice):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrNoSuchReport):
+		return huma.Error404NotFound(finding.ErrNoSuchReport.Error())
+	case errors.Is(err, finding.ErrAlreadyJudged):
+		return huma.Error409Conflict(finding.ErrAlreadyJudged.Error())
+	case errors.Is(err, finding.ErrIssueReported):
+		return huma.Error409Conflict(finding.ErrIssueReported.Error())
+	}
+	// A summary the writing policy refuses, answered with where to
+	// look, as every other piece of writing is.
+	var faults markdown.Faults
+	if errors.As(err, &faults) {
+		return core.RefusedText(faults)
+	}
+	return core.RefusedFinding(in, err)
 }
 
 // ResolvedBody is the record of a flaw marked fixed.

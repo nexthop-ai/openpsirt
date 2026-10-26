@@ -5,6 +5,7 @@ package httpapitest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -85,6 +86,13 @@ func OtherToolRun(tool, rule, tag, file string, lines ...int) string {
 // run is applied in a series of its own.
 func ApplyRunIn(t *testing.T, r *Reach, seriesName string, built time.Time, doc string) {
 	t.Helper()
+	ApplyRunOn(t, r, r.DB, seriesName, built, doc)
+}
+
+// ApplyRunOn is ApplyRunIn applying the run through db, a handle over the
+// reach's database that a test watches.
+func ApplyRunOn(t *testing.T, r *Reach, db *database.DB, seriesName string, built time.Time, doc string) {
+	t.Helper()
 	ctx := t.Context()
 	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
 	if err != nil {
@@ -120,7 +128,7 @@ func ApplyRunIn(t *testing.T, r *Reach, seriesName string, built time.Time, doc 
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if status, err := analysis.NewApplier(r.DB).Apply(ctx, runID); err != nil || status != series.Applied {
+	if status, err := analysis.NewApplier(db).Apply(ctx, runID); err != nil || status != series.Applied {
 		t.Fatalf("the run ended %s: %v", status, err)
 	}
 }
@@ -159,4 +167,30 @@ func SeededLead(t *testing.T, r *Reach) string {
 		t.Fatal(err)
 	}
 	return place
+}
+
+// HandedOffLead is the seeded lead confirmed and handed off as a flaw against
+// the seeded build, kept or moved into its case, with its place and the flaw's
+// identifier.
+func HandedOffLead(t *testing.T, r *Reach, move bool) (string, string) {
+	t.Helper()
+	place := SeededLead(t, r)
+	at := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+	if w := AsPerson(t, r, "internal-triager", "POST", at+"/decision",
+		`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); w.Code != 201 {
+		t.Fatalf("the lead was not confirmed: %d %s", w.Code, w.Body.String())
+	}
+	w := AsPerson(t, r, "lead-handler", "POST", at+"/hand-off",
+		`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks on the early return","move":`+
+			strconv.FormatBool(move)+`}`)
+	if w.Code != 201 {
+		t.Fatalf("the lead was not handed off: %d %s", w.Code, w.Body.String())
+	}
+	var done struct {
+		Identifier string `json:"identifier"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &done); err != nil {
+		t.Fatal(err)
+	}
+	return place, done.Identifier
 }

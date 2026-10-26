@@ -59,6 +59,8 @@ type QueueRow struct {
 	State    State     `bun:"stands"`
 	Builds   int       `bun:"builds"`
 	Opened   time.Time `bun:"opened"`
+	// Stub is a lead moved into a case, read without what the analyzer said.
+	Stub bool `bun:"-"`
 }
 
 // Queue is one page of a product's leads, with how many the list holds in
@@ -91,6 +93,9 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	if err != nil {
 		return nil, err
 	}
+	// The product's own visibilities, and a moved lead as a stub. A lead
+	// granted one at a time is reached through its evidence, never a list.
+	reach := finding.LeadReach(subject, scope.ProductID)
 	perFinding := func() *bun.SelectQuery {
 		state, stateArgs := stateOf(scope.ProductID)
 		kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
@@ -112,7 +117,8 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 			Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
 				WHERE "fo"."place_identity" = "f"."place_identity" AND "fo"."target_id" = "f"."target_id"
 				  AND "fo"."closed_at" IS NULL))`).
-			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			ColumnExpr(`CASE WHEN "f"."visibility" IN (?) THEN 0 ELSE 1 END AS "stub"`, bun.List(visible)).
+			Where(`("f"."visibility" IN (?) OR `+reach.Stub+`)`, append([]any{bun.List(visible)}, reach.StubArgs...)...).
 			Where(kinds, kindArgs...)
 		if scope.StreamID != nil {
 			q = q.Where(`"t"."stream_id" = ?`, *scope.StreamID)
@@ -161,12 +167,14 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		Newest int64     `bun:"newest"`
 		Builds int       `bun:"builds"`
 		Opened time.Time `bun:"opened"`
+		Stub   int       `bun:"stub"`
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
 		ColumnExpr(`"l"."place_identity", MAX("l"."id") AS "newest"`).
 		// Builds rather than rows: a lead fixed, seen again and fixed again
 		// on one build is two closed rows there.
 		ColumnExpr(`COUNT(DISTINCT "l"."target_id") AS "builds", MIN("l"."opened_at") AS "opened"`).
+		ColumnExpr(`MIN("l"."stub") AS "stub"`).
 		GroupExpr(`"l"."place_identity"`).
 		OrderExpr(`MAX("l"."tier") DESC, MAX("l"."corroborated") DESC`).
 		OrderExpr(`MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
@@ -207,6 +215,10 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	for _, p := range page {
 		r := byPlace[p.Place]
 		r.Builds, r.Opened = p.Builds, p.Opened
+		// What the analyzer said is the case's once the lead is moved.
+		if p.Stub == 1 {
+			r.Message, r.Stub = "", true
+		}
 		out.Rows = append(out.Rows, r)
 	}
 	return out, nil

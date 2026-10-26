@@ -21,7 +21,8 @@ type LeadRowBody struct {
 	Path     string    `json:"path" doc:"The file, from the top of the checkout"`
 	Line     int       `json:"line,omitempty" doc:"The line the result starts at"`
 	Function string    `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
-	Message  string    `json:"message" doc:"What the analyzer says"`
+	Message  string    `json:"message" doc:"What the analyzer says. Empty where the lead is withheld"`
+	Withheld bool      `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so what the analyzer said is not answered"`
 	Stream   string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
 	Variant  string    `json:"variant" doc:"The variant of that build"`
 	State    LeadState `json:"state" doc:"Where the lead stands on that build"`
@@ -93,7 +94,7 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		out.Body.Items = make([]LeadRowBody, 0, len(queue.Rows))
 		for _, r := range queue.Rows {
 			row := LeadRowBody{
-				Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message,
+				Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message, Withheld: r.Stub,
 				Stream: r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
 				Opened: r.Opened.UTC().Format(time.DateOnly),
 			}

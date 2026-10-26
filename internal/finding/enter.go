@@ -106,6 +106,10 @@ type Entering struct {
 	// this flaw in the same act, and who told us, and when, is read from it
 	// rather than stated again.
 	FromReport string
+	// Then runs last inside the transaction that records the flaw, with the
+	// issue minted, so what is recorded beside the flaw stands or falls with
+	// it. A static analysis lead handed off is recorded this way.
+	Then func(ctx context.Context, tx bun.IDB, vulnerabilityID int64, now time.Time) error
 }
 
 // ErrToldTwice is a flaw recorded from a report that also says who told us.
@@ -524,9 +528,18 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// timeline is evidenced to. Written through the transaction
 		// rather than through the store, because the store holds a
 		// database and this is inside one of its transactions.
+		then := func() error {
+			if in.Then == nil {
+				return nil
+			}
+			return in.Then(ctx, tx, vulnerabilityID, now)
+		}
 		if reported != nil {
-			return judgeReport(ctx, tx, reported.ID, vulnerabilityID, subject.ID, now,
-				"judge the report this is recorded from")
+			if err := judgeReport(ctx, tx, reported.ID, vulnerabilityID, subject.ID, now,
+				"judge the report this is recorded from"); err != nil {
+				return err
+			}
+			return then()
 		}
 		// Every flaw has a report, whether it was sent in or found here, so
 		// the Inbox is the one list of where flaws came from and the same
@@ -556,7 +569,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if _, err := tx.NewInsert().Model(report).Exec(ctx); err != nil {
 			return fmt.Errorf("record who told us: %w", err)
 		}
-		return nil
+		return then()
 	})
 	if err != nil {
 		return nil, "", err

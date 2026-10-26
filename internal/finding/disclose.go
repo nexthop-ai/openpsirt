@@ -647,7 +647,7 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 			if err := agree(ctx, tx, id, subject.ID, now); err != nil {
 				return err
 			}
-			return makePublic(ctx, tx, asked.ProductID, asked.VulnerabilityID)
+			return makePublic(ctx, tx, asked.ProductID, asked.VulnerabilityID, now)
 		}
 
 		// A ruling's shortening stands only while the ruling does. Withdrawn,

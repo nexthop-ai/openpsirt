@@ -28,6 +28,8 @@ type seeded struct {
 	issue    string
 	rule     string
 	leadRule string
+	lead     string
+	flaw     string
 	record   string
 	window   string
 	fix      string
@@ -40,6 +42,8 @@ func (s *seeded) fill(text string) string {
 	text = strings.ReplaceAll(text, "{window}", s.window)
 	text = strings.ReplaceAll(text, "{fix}", s.fix)
 	text = strings.ReplaceAll(text, "{lead-rule}", s.leadRule)
+	text = strings.ReplaceAll(text, "{lead}", s.lead)
+	text = strings.ReplaceAll(text, "{flaw}", s.flaw)
 	return strings.ReplaceAll(text, "{rule}", s.rule)
 }
 
@@ -427,6 +431,34 @@ var administrativeActs = []trailedAct{
 		kind:   "case", about: "mine · {issue} · reader",
 	},
 	{
+		// A kept lead made part of its flaw's case: who reads it changes.
+		id: "move-lead", what: "a handed-off lead moved into its case", who: "lead-handler",
+		kind: "case", about: "mine · {flaw} · clang-tidy/leak",
+		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
+			seen.lead, seen.flaw = httpapitest.HandedOffLead(t, r, false)
+			return httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
+				seen.fill("/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/move"), "")
+		},
+	},
+	{
+		id: "unmove-lead", what: "a lead taken back out of its case", who: "lead-handler",
+		method: http.MethodDelete,
+		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/move",
+		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
+	},
+	{
+		id: "add-lead-collaborator", what: "somebody granted a handed-off lead", who: "lead-handler",
+		method: http.MethodPut,
+		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/collaborators/reader",
+		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
+	},
+	{
+		id: "remove-lead-collaborator", what: "a lead grant withdrawn", who: "lead-handler",
+		method: http.MethodDelete,
+		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/collaborators/reader",
+		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
+	},
+	{
 		// Deployment-wide and permanent: from here on a scan of any product
 		// reporting that name resolves to this issue.
 		id: "add-alias", what: "another name for an issue", who: "private-triage",
@@ -617,6 +649,7 @@ var outsideTheTrail = map[string]string{
 	"decide-finding":               "the decision record",
 	"decide-together":              "the decision record",
 	"decide-lead":                  "the decision record",
+	"hand-off-lead":                "the flaw's own record, linked to the lead; a move it carries is trailed as move-lead's is",
 	"fix-lead":                     "the decision record",
 	"disclose-issue":               "the decision record",
 	"edit-comment":                 "the decision record",

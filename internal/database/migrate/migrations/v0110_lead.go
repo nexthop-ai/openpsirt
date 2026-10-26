@@ -111,18 +111,94 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "rule_family_unique" UNIQUE ("vulnerability_id", "family"),
 			CONSTRAINT "rule_family_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
 		)` + t.suffix,
+
+		// A confirmed lead recorded as a flaw, by its place in a product.
+		`CREATE TABLE "lead_handoff" (
+			"id"               ` + t.id + `,
+			"product_id"       ` + t.ref + ` NOT NULL,
+			"place_identity"   ` + t.hash + ` NOT NULL,
+			-- The flaw it was recorded as.
+			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			-- The visibility the lead's findings hold: internal where it was
+			-- kept, private once moved into the case, public once its flaw
+			-- is disclosed. A sighting opening later opens at it.
+			"visibility"       ` + t.kind + ` NOT NULL,
+			"handed_by"        ` + t.ref + ` NOT NULL,
+			"handed_at"        ` + t.timestamp + ` NOT NULL,
+			-- Who moved it into the case and when. Null where it is kept.
+			"moved_by"         ` + t.refNull + `,
+			"moved_at"         ` + t.timestamp + `,
+			-- When its flaw was disclosed, kept or moved. Null while the
+			-- flaw is undisclosed.
+			"disclosed_at"     ` + t.timestamp + `,
+			-- The last analysis run to describe the lead, written before
+			-- the run writes anything about it. A disclosure or a move that
+			-- read the hand-off before the run and writes it after finds the
+			-- value changed, and reads again.
+			"last_run_id"      ` + t.refNull + `,
+			CONSTRAINT "lead_handoff_place_unique" UNIQUE ("product_id", "place_identity"),
+			CONSTRAINT "lead_handoff_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "lead_handoff_flaw_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "lead_handoff_by_fk" FOREIGN KEY ("handed_by") REFERENCES "person"("id"),
+			CONSTRAINT "lead_handoff_moved_by_fk" FOREIGN KEY ("moved_by") REFERENCES "person"("id")
+		)` + t.suffix,
+		`CREATE INDEX "lead_handoff_flaw_idx" ON "lead_handoff" ("vulnerability_id")`,
+
+		// The component a path prefix was confirmed as at a hand-off, which
+		// the next hand-off under it is offered first.
+		`CREATE TABLE "lead_component" (
+			"id"              ` + t.id + `,
+			"product_id"      ` + t.ref + ` NOT NULL,
+			-- Held and compared as an important path is.
+			"prefix"          ` + t.free + ` NOT NULL,
+			"prefix_identity" ` + t.hash + ` NOT NULL,
+			"under"           ` + t.free + ` NOT NULL,
+			"under_length"    INTEGER NOT NULL,
+			-- The component as a build names it, without its version: the
+			-- version moves from build to build and the prefix does not.
+			"component"       ` + t.free + ` NOT NULL,
+			"ecosystem"       ` + t.name + ` NULL,
+			"namespace"       ` + t.free + ` NULL,
+			"confirmed_by"    ` + t.ref + ` NOT NULL,
+			"confirmed_at"    ` + t.timestamp + ` NOT NULL,
+			CONSTRAINT "lead_component_prefix_unique" UNIQUE ("product_id", "prefix_identity"),
+			CONSTRAINT "lead_component_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "lead_component_by_fk" FOREIGN KEY ("confirmed_by") REFERENCES "person"("id")
+		)` + t.suffix,
+
+		// One person granted one handed-off lead in one product, as a case
+		// collaborator is granted one issue.
+		`CREATE TABLE "lead_collaborator" (
+			"id"             ` + t.id + `,
+			"product_id"     ` + t.ref + ` NOT NULL,
+			"place_identity" ` + t.hash + ` NOT NULL,
+			"person_id"      ` + t.ref + ` NOT NULL,
+			"added_by"       ` + t.ref + ` NOT NULL,
+			"added_at"       ` + t.timestamp + ` NOT NULL,
+			"removed_by"     ` + t.refNull + `,
+			"removed_at"     ` + t.timestamp + `,
+			-- The person again while the grant stands, null once it is
+			-- withdrawn: one live grant per person per lead.
+			"live_person_id" ` + t.refNull + `,
+			CONSTRAINT "lead_collaborator_live_unique" UNIQUE ("product_id", "place_identity", "live_person_id"),
+			CONSTRAINT "lead_collaborator_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "lead_collaborator_person_fk" FOREIGN KEY ("person_id") REFERENCES "person"("id"),
+			CONSTRAINT "lead_collaborator_added_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id"),
+			CONSTRAINT "lead_collaborator_removed_by_fk" FOREIGN KEY ("removed_by") REFERENCES "person"("id")
+		)` + t.suffix,
+		`CREATE INDEX "lead_collaborator_person_idx" ON "lead_collaborator" ("person_id")`,
 	}
 }
 
-// createLeadV0110 makes the escalation, standing rule, rule rating and rule
-// family tables, stepped over where they are
-// already there.
+// createLeadV0110 makes the escalation, standing rule, rule rating, rule
+// family and hand-off tables, stepped over where they are already there.
 func createLeadV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err
 	}
-	for _, table := range []string{"lead_escalation", "lead_important_path", "lead_rule", "rule_rating", "rule_family"} {
+	for _, table := range []string{"lead_escalation", "lead_important_path", "lead_rule", "rule_rating", "rule_family",
+		"lead_handoff", "lead_component", "lead_collaborator"} {
 		present, err := u.hasColumn(table, "id")
 		if err != nil {
 			return err

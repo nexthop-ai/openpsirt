@@ -994,6 +994,10 @@ var tables = []string{
 	"lead_important_path",
 	// Before person and product, which it points at.
 	"lead_rule",
+	// Before person, product and vulnerability, which they point at.
+	"lead_handoff",
+	"lead_component",
+	"lead_collaborator",
 	// Before team and person, both of which they point at.
 	"team_member",
 	"team",

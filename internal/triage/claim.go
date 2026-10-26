@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -452,7 +453,7 @@ func (s *Store) ApproveClaim(ctx context.Context, subject access.Subject, claimI
 func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimID int64,
 	batch string, except []int64, because string) (*ClaimApproved, error) {
 
-	claim, rows, err := s.claimRows(ctx, subject, claimID, mayApproveOn)
+	claim, rows, err := s.writableRows(ctx, subject, claimID, mayApproveOn)
 	if err != nil {
 		return nil, err
 	}
@@ -744,7 +745,7 @@ func (s *Store) Split(ctx context.Context, subject access.Subject, claimID int64
 func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64,
 	rows []int64, because string) (*Claim, error) {
 
-	claim, all, err := s.claimRows(ctx, subject, claimID, mayDecideOn)
+	claim, all, err := s.writableRows(ctx, subject, claimID, mayDecideOn)
 	if err != nil {
 		return nil, err
 	}
@@ -840,7 +841,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 	var result *SentBack
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		result = &SentBack{}
-		claim, rows, err := within.claimRows(ctx, subject, claimID, mayApproveOn)
+		claim, rows, err := within.writableRows(ctx, subject, claimID, mayApproveOn)
 		if err != nil {
 			return err
 		}
@@ -936,6 +937,64 @@ func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID i
 		if !allowed(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
 			return nil, nil, ErrNotTheirs
 		}
+	}
+	return claim, rows, nil
+}
+
+// ErrLeadHandedOff refuses a claim about a lead handed off as a flaw, and a
+// change to one already made: the flaw is judged instead.
+var ErrLeadHandedOff = refusal.New("that lead was handed off as a flaw, which is judged instead")
+
+// notHandedOff refuses a write to a claim about a lead handed off as a flaw.
+// Asked inside the transaction writing it, of every row the claim covers.
+func (s *Store) notHandedOff(ctx context.Context, claimID int64) error {
+	handed, err := s.handedOff(ctx, []int64{claimID})
+	if err != nil {
+		return err
+	}
+	if handed[claimID] {
+		return ErrLeadHandedOff
+	}
+	return nil
+}
+
+// handedOff is which of these claims are about a lead handed off as a flaw:
+// a row of the claim filed under an analyzer's rule at a place handed off.
+func (s *Store) handedOff(ctx context.Context, claimIDs []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if err := database.IDsInBatches(ctx, claimIDs, func(ctx context.Context, batch []int64) error {
+		var some []int64
+		if err := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
+			Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "de"."vulnerability_id"`).
+			Join(`JOIN "lead_handoff" AS "lh" ON "lh"."product_id" = "de"."product_id"
+				AND "lh"."place_identity" = "de"."place_identity"`).
+			ColumnExpr(`DISTINCT "de"."claim_id"`).
+			Where(`"de"."claim_id" IN (?)`, bun.List(batch)).
+			Where(`"rv"."kind" = ?`, string(kind.Rule)).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		for _, id := range some {
+			out[id] = true
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("read which claims are about a lead handed off: %w", err)
+	}
+	return out, nil
+}
+
+// writableRows is claimRows for a write, which a claim about a lead handed off
+// as a flaw is refused.
+func (s *Store) writableRows(ctx context.Context, subject access.Subject, claimID int64,
+	allowed func(access.Subject, int64, int64, access.Visibility) bool) (*Claim, []Decision, error) {
+
+	claim, rows, err := s.claimRows(ctx, subject, claimID, allowed)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := s.notHandedOff(ctx, claimID); err != nil {
+		return nil, nil, err
 	}
 	return claim, rows, nil
 }

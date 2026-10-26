@@ -1117,6 +1117,7 @@ critical, and from what" is the question being asked of it.
 | Changing a setting | The value read |
 | Bringing a retired product, release or variant back | Still retired. A match of none is another declaration that got there first, and this one records no return to use |
 | Collecting an upload nothing refers to | Still unattached, and not redacted since the page was read |
+| Moving a handed-off lead, taking it back out, or disclosing its flaw | The visibility read, the flaw undisclosed, and the last analysis run to describe the lead, which a run writes before it writes anything about the lead |
 
 An insert that can lose a race on a unique key hands the race back rather than
 reporting the duplicate: recording a person, authorizing a name to sign in with,

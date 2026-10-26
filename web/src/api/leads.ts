@@ -195,3 +195,66 @@ export function useSetImportantPaths(product: string) {
     },
   });
 }
+
+export type HandoffOffer = Body<"HandoffOfferBody">;
+type Handing = Body<"Hand-off-leadRequest">;
+
+// What handing off a confirmed lead is offered. Refused to somebody who does
+// not triage both the internal lead and the private flaw, which the screen
+// asks before it reads this.
+export function useHandoffOffer(build: Build, place: string, wanted: boolean) {
+  return useQuery({
+    queryKey: ["lead-handoff", build.product, build.stream, build.variant, place],
+    queryFn: async () =>
+      unwrap(
+        await api.GET(
+          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off",
+          { params: { path: { ...build, place } } },
+        ),
+      ),
+    enabled: wanted,
+    retry: false,
+  });
+}
+
+// Everything a hand-off or a move can move: the lead, the queue, the claims
+// and a flaw that is now on the findings lists.
+function useAfterHandoff() {
+  const queries = useQueryClient();
+  const after = useAfterLead();
+  return () => {
+    void queries.invalidateQueries({ queryKey: ["lead-handoff"] });
+    void queries.invalidateQueries({ queryKey: ["findings"] });
+    after();
+  };
+}
+
+export function useHandOff(build: Build, place: string) {
+  const after = useAfterHandoff();
+  return useMutation({
+    mutationFn: async (body: Handing) =>
+      unwrap(
+        await api.POST(
+          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off",
+          { params: { path: { ...build, place } }, body },
+        ),
+      ),
+    onSuccess: after,
+  });
+}
+
+// Moves a handed-off lead into its flaw's case, or takes it back out.
+export function useMoveLead(build: Build, place: string) {
+  const after = useAfterHandoff();
+  const path =
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/move" as const;
+  return useMutation({
+    mutationFn: async (move: boolean) =>
+      unwrap(
+        move
+          ? await api.PUT(path, { params: { path: { ...build, place } } })
+          : await api.DELETE(path, { params: { path: { ...build, place } } }),
+      ),
+    onSuccess: after,
+  });
+}
