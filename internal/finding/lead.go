@@ -210,6 +210,10 @@ func LeadEnded(ctx context.Context, db bun.IDB, productID int64, placeIdentity s
 	return ErrLeadPastEndOfLife
 }
 
+// ErrLeadHandedOff refuses a change to who holds a lead handed off as a flaw.
+// It is closed work for its holder: its flaw is held as itself.
+var ErrLeadHandedOff = refusal.New("that lead was handed off as a flaw, so its flaw is assigned instead")
+
 // AssignLead records who is dealing with a lead, across every build of the
 // product it is seen on, or hands it back to nobody where to is nil. Admits
 // is asked whether the party may hold work of every visibility open at the
@@ -269,6 +273,14 @@ func (s *Store) assignLead(ctx context.Context, subject access.Subject, targetID
 	}
 	if err := LeadEnded(ctx, s.db, productID, placeIdentity, s.now().UTC()); err != nil {
 		return 0, nil, err
+	}
+	handedOff, err := s.db.NewSelect().Model((*Handoff)(nil)).
+		Where(`"product_id" = ?`, productID).Where(`"place_identity" = ?`, placeIdentity).Exists(ctx)
+	if err != nil {
+		return 0, nil, fmt.Errorf("read whether that lead was handed off: %w", err)
+	}
+	if handedOff {
+		return 0, nil, ErrLeadHandedOff
 	}
 	dispatches := subject.Holds(access.Assigner, productID)
 	if err := mayMove(subject, productID, to, dispatches); err != nil {

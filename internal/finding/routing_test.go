@@ -686,3 +686,60 @@ func TestARoutingRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
 		})
 	}
 }
+
+// A lead handed off as a flaw is closed work for its holder, so neither the
+// sweep nor the preview counts it.
+func TestARoutingRulePlacesNoHandedOffLead(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		leadsAt(t, f)
+		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
+		var lead finding.Finding
+		if err := f.db.DB.NewSelect().Model(&lead).
+			Where(`"f"."kind" = ?`, "analysis").Where(`"f"."visibility" = ?`, access.Internal).
+			Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// A place of its own, as a lead's is: the fixture's leads share the
+		// places of the vulnerabilities they were made from.
+		lead.PlaceIdentity = "lead-handed-off"
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set(`"place_identity" = ?`, lead.PlaceIdentity).Where(`"id" = ?`, lead.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		person, err := access.NewStore(f.db.DB).Ensure(ctx, "hander@example.com", "Hander", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before, err := f.store.WouldMatch(ctx, who, f.productID, "", "libnl-3-*", 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewInsert().Model(&finding.Handoff{
+			ProductID: f.productID, PlaceIdentity: lead.PlaceIdentity, VulnerabilityID: lead.VulnerabilityID,
+			Visibility: access.Internal, HandedBy: person.ID, HandedAt: time.Now().UTC().Truncate(time.Second),
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		after, err := f.store.WouldMatch(ctx, who, f.productID, "", "libnl-3-*", 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after.Work != before.Work-1 || after.Unheld != before.Unheld-1 {
+			t.Errorf("the preview counts %d pieces, %d unheld, where it counted %d and %d before the hand-off",
+				after.Work, after.Unheld, before.Work, before.Unheld)
+		}
+		leads, others := placedByRule(t, f)
+		if leads[access.Private] == 0 || others == 0 {
+			t.Errorf("the rule placed leads %v and %d vulnerabilities; want every piece but the handed-off lead",
+				leads, others)
+		}
+		var placed finding.Finding
+		if err := f.db.DB.NewSelect().Model(&placed).Where(`"f"."id" = ?`, lead.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if placed.AssignedTo != nil {
+			t.Errorf("the handed-off lead was placed with party %d", *placed.AssignedTo)
+		}
+	})
+}

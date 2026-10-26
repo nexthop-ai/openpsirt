@@ -46,10 +46,9 @@ export function Lead() {
   // A move of one already handed off concerns its flaw, and stays offered.
   const ended = !!evidence.past_end_of_life;
   const acts = triages && !ended;
-  // A lead moved into its flaw's case is the case's, and triaged at its
-  // visibility; a kept one at internal.
-  const moved = !!evidence.handoff?.moved;
-  const assigns = !ended && (moved ? !!may?.may_hide : triages);
+  // A lead handed off as a flaw, kept or moved, is closed work for its
+  // holder: its flaw is assigned instead.
+  const assigns = triages && !ended && !evidence.handoff;
 
   return (
     <div>
@@ -78,13 +77,7 @@ export function Lead() {
           <p className="hint">Part of a case you are not on. Only where it is is shown.</p>
         )}
         {!evidence.withheld && evidence.open && (
-          <LeadAssignee
-            build={build}
-            place={place}
-            evidence={evidence}
-            assigns={assigns}
-            moved={moved}
-          />
+          <LeadAssignee build={build} place={place} evidence={evidence} assigns={assigns} />
         )}
         <p className="hint">
           Last seen {on(evidence.last_seen)}
@@ -338,13 +331,11 @@ function LeadAssignee({
   place,
   evidence,
   assigns,
-  moved,
 }: {
   build: Build;
   place: string;
   evidence: Evidence;
   assigns: boolean;
-  moved: boolean;
 }) {
   const assign = useAssignLead(build, place);
   const holder = evidence.assigned_to
@@ -369,8 +360,7 @@ function LeadAssignee({
       <div style={{ minWidth: 220 }}>
         <Holder
           product={build.product}
-          internal={!moved}
-          undisclosed={moved}
+          internal
           value={holder}
           disabled={assign.isPending}
           onPick={(held) => assign.mutate(held)}

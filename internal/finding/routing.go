@@ -268,6 +268,7 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		Where(`"closed_at" IS NULL`).
 		Where(`"assigned_to" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(holdable)).
+		Where(notHandedOffIn).
 		Where(inThisProduct, productID).
 		Where(kinds, kindArgs...).
 		Limit(int64(room))
@@ -473,6 +474,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(notHandedOffIn).
 			Where(inThisProductAs(`"f"."target_id"`), productID).
 			Where(kinds, kindArgs...)
 		q, err := s.leadsInSupport(ctx, q, productID)

@@ -378,6 +378,62 @@ func handedOffUnlisted(t *testing.T, r *httpapitest.Reach, move bool) {
 	}
 }
 
+// A lead its holder took and then handed off as a flaw, kept or moved, leaves
+// their work and the totals, is not assigned again, and stays where it is when
+// their work is handed over: it is closed work for its holder.
+func TestAKeptHandedOffLeadLeavesItsHoldersWork(t *testing.T) { handedOffHeld(t, false) }
+
+func TestAMovedHandedOffLeadLeavesItsHoldersWork(t *testing.T) { handedOffHeld(t, true) }
+
+// handedOffHeld hands off a lead its holder took first, kept or moved.
+func handedOffHeld(t *testing.T, move bool) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, _ := httpapitest.HandedOffLeadHeldBy(t, r, move, "lead-handler")
+		for _, path := range []string{"/v1/people/lead-handler/assignments", "/v1/people/me/assignments"} {
+			if got, n := heldItems(t, r, "lead-handler", path); len(got) != 0 || n != 0 {
+				t.Errorf("%s holds %d items, leads %v; want the handed-off lead gone", path, n, got)
+			}
+		}
+		var totals struct {
+			Items []struct {
+				Person string `json:"person"`
+				Open   int    `json:"open"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "lead-handler", "/v1/assignments", &totals)
+		for _, row := range totals.Items {
+			if row.Person == "lead-handler" && row.Open != 0 {
+				t.Errorf("the totals count %d pieces held by the lead's holder; want none", row.Open)
+			}
+		}
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/assignment",
+			`{"person":""}`); got.Code != http.StatusConflict {
+			t.Errorf("handing back a handed-off lead answered %d: %s", got.Code, got.Body)
+		}
+		holder := func() *int64 {
+			var held struct {
+				AssignedTo *int64 `bun:"assigned_to"`
+			}
+			if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).Column("assigned_to").
+				Where(`"place_identity" = ?`, place).Limit(1).Scan(t.Context(), &held); err != nil {
+				t.Fatal(err)
+			}
+			return held.AssignedTo
+		}
+		before := holder()
+		if before == nil {
+			t.Fatal("the lead's holder holds nothing, so this checks nothing")
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost,
+			"/v1/people/lead-handler/assignments/hand-back", `{"to":"reader"}`); got.Code != http.StatusOK {
+			t.Errorf("handing over work holding only a handed-off lead answered %d: %s", got.Code, got.Body)
+		}
+		if after := holder(); after == nil || *after != *before {
+			t.Errorf("the hand-over moved the handed-off lead away from its holder, %d", *before)
+		}
+	})
+}
+
 // Two leads of one rule in one component are two pieces of work: a lead is
 // judged at its place, and grouping them would hide the second behind the
 // first.

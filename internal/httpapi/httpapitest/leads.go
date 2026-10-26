@@ -174,8 +174,21 @@ func SeededLead(t *testing.T, r *Reach) string {
 // identifier.
 func HandedOffLead(t *testing.T, r *Reach, move bool) (string, string) {
 	t.Helper()
+	return HandedOffLeadHeldBy(t, r, move, "")
+}
+
+// HandedOffLeadHeldBy is HandedOffLead with the lead taken by one of the cast
+// before it is handed off, where one is named. They take it themselves, so
+// they triage internal work.
+func HandedOffLeadHeldBy(t *testing.T, r *Reach, move bool, holder string) (string, string) {
+	t.Helper()
 	place := SeededLead(t, r)
 	at := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+	if holder != "" {
+		if w := AsPerson(t, r, holder, "PUT", at+"/assignment", `{"person":"`+holder+`"}`); w.Code != 204 {
+			t.Fatalf("%s did not take the lead: %d %s", holder, w.Code, w.Body.String())
+		}
+	}
 	if w := AsPerson(t, r, "internal-triager", "POST", at+"/decision",
 		`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); w.Code != 201 {
 		t.Fatalf("the lead was not confirmed: %d %s", w.Code, w.Body.String())

@@ -163,14 +163,14 @@ describe("a lead", () => {
     expect((init as { body: unknown }).body).toEqual({ team: "kernel" });
   });
 
-  it("offers a lead moved into its case to readers of undisclosed work", async () => {
-    const searched = await drawn(
-      false,
-      { ...EVIDENCE, state: "handed-off", handoff: { moved: true } },
-      true,
-    );
-    await holderBox();
-    expect(searched()[0]).toBe("private");
+  it("offers no holder once it is handed off and kept", async () => {
+    await drawn(true, { ...EVIDENCE, state: "handed-off", handoff: { moved: false } }, true);
+    expect(mount.host().querySelector('input[role="combobox"]')).toBeNull();
+  });
+
+  it("offers no holder once it is handed off and moved into its case", async () => {
+    await drawn(true, { ...EVIDENCE, state: "handed-off", handoff: { moved: true } }, true);
+    expect(mount.host().querySelector('input[role="combobox"]')).toBeNull();
   });
 
   it("names who holds it to somebody who only reads it", async () => {

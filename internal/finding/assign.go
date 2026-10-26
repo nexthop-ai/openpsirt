@@ -539,7 +539,11 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 		if to == nil {
 			update = update.Set(`"assigned_to" = ?`, nil).Set(`"assigned_at" = ?`, nil)
 		} else {
-			update = update.Set(`"assigned_to" = ?`, *to).Set(`"assigned_at" = ?`, now)
+			// A handed-off lead is closed work for its holder, and stays
+			// with them: it is listed to nobody, so moving it hands over
+			// nothing. Released, it is held by nobody.
+			update = update.Set(`"assigned_to" = ?`, *to).Set(`"assigned_at" = ?`, now).
+				Where(notHandedOffIn)
 		}
 		result, err := update.Exec(ctx)
 		if err != nil {
@@ -574,6 +578,7 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 		Where(`"f"."assigned_to" = ?`, from).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" <> ?`, access.Public).
+		Where(notHandedOff).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &held); err != nil {
 		return fmt.Errorf("read where their undisclosed and internal work is: %w", err)
@@ -832,6 +837,13 @@ const leadPlace = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "
 // closed work for its holder: its flaw is held and listed as itself.
 const notHandedOff = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."place_identity" = "f"."place_identity")`
+
+// notHandedOffIn is notHandedOff over the finding under "f" alone, in the
+// product its build is in, for a statement that joins no stream.
+const notHandedOffIn = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+	JOIN "stream" AS "hs" ON "hs"."product_id" = "lh"."product_id"
+	JOIN "target" AS "ht" ON "ht"."stream_id" = "hs"."id"
+	WHERE "ht"."id" = "f"."target_id" AND "lh"."place_identity" = "f"."place_identity")`
 
 // pieceOfWork is what one piece of work held is grouped by, over the finding
 // under "f" and its stream under "st": an issue in a component in a product,

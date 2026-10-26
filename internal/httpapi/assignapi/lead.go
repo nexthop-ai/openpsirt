@@ -34,7 +34,8 @@ func registerLeadAssigning(api huma.API, in core.Deps) {
 			"somebody takes it.\n\n" +
 			"A person is given a lead only where they may read it at its visibility, and a team " +
 			"only where one member may. A lead every release of which is past its end of life " +
-			"is refused with 409.\n\n" +
+			"is refused with 409, and so is a lead handed off as a flaw: assign the flaw " +
+			"instead.\n\n" +
 			"A lead seen on a build it was not open on when it was assigned starts unassigned there.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "At the lead's visibility. Giving it to somebody else also needs "+
@@ -87,7 +88,7 @@ func registerLeadAssigning(api huma.API, in core.Deps) {
 		findings := finding.NewStore(in.DB.DB)
 		_, withheld, err := findings.AssignLead(ctx, subject, targetID, input.Place, to, admits)
 		switch {
-		case errors.Is(err, finding.ErrLeadPastEndOfLife):
+		case errors.Is(err, finding.ErrLeadPastEndOfLife), errors.Is(err, finding.ErrLeadHandedOff):
 			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNothingOpenThere):
 			return nil, core.NoSuchFinding()

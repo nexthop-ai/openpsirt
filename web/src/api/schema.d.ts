@@ -4770,7 +4770,7 @@ export interface paths {
          *
          *     Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
          *
-         *     A person is given a lead only where they may read it at its visibility, and a team only where one member may. A lead every release of which is past its end of life is refused with 409.
+         *     A person is given a lead only where they may read it at its visibility, and a team only where one member may. A lead every release of which is past its end of life is refused with 409, and so is a lead handed off as a flaw: assign the flaw instead.
          *
          *     A lead seen on a build it was not open on when it was assigned starts unassigned there.
          *
