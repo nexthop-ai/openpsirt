@@ -78,6 +78,28 @@ describe("the rules that route work to a team", () => {
     expect(text()).toContain("Recorded.");
   });
 
+  it("adds a rule placing reports, which names no key and previews reports alone", async () => {
+    const asked: Record<string, unknown>[] = [];
+    const { post } = await drawn((query) => {
+      asked.push(query);
+      return 0;
+    });
+    change(field('input[placeholder="kernel to the platform team"]'), "reports rule");
+    const selects = () => Array.from(mount.host().querySelectorAll<HTMLSelectElement>("select"));
+    change(selects().find((each) => each.textContent?.includes("Pick a team")) ?? null, "platform");
+    change(
+      selects().find((each) => each.textContent?.includes("Vulnerability reports")) ?? null,
+      "reports",
+    );
+    await settle();
+    expect(field("#rule-upstream")).toBeNull();
+    expect(asked.at(-1)).toEqual({ reports: true });
+    expect(text()).toContain("Would place 4 of 9 open reports");
+    await press(mount.host(), "Add");
+    await settle();
+    expect(only(post)[1].body).toEqual({ name: "reports rule", team: "platform", reports: true });
+  });
+
   it("holds back a rule that catches nothing, and offers the package it was cut from", async () => {
     await drawn((query) => (query.upstream === "linux" ? 3 : 0));
     await fill("linux-image-6.12");

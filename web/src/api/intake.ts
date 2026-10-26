@@ -22,10 +22,13 @@ export const PAGE = 50;
 
 // Everything an act on a report or a ruling can move. A duplicate ruling moves
 // an issue's disclosure date, and withdrawing one moves it back, so every read
-// carrying that date is among them.
+// carrying that date is among them. A judgment takes a report out of the held
+// lists and the holdings counted beside them.
 export function useAfterReport() {
   const queries = useQueryClient();
   return () => {
+    void queries.invalidateQueries({ queryKey: ["held-reports"] });
+    void queries.invalidateQueries({ queryKey: ["holdings"] });
     void queries.invalidateQueries({ queryKey: ["reports"] });
     void queries.invalidateQueries({ queryKey: ["recorded-report"] });
     void queries.invalidateQueries({ queryKey: ["rulings"] });
@@ -307,7 +310,6 @@ export function useReportHistory(product: string, reference: string) {
 
 export function useAssignReport(product: string, reference: string) {
   const after = useAfterReport();
-  const queries = useQueryClient();
   return useMutation({
     mutationFn: async (body: Body<"Assign-reportRequest">) =>
       unwrap(
@@ -316,10 +318,29 @@ export function useAssignReport(product: string, reference: string) {
           body,
         }),
       ),
+    onSuccess: after,
+  });
+}
+
+// Everything one person holds handed back to nobody: their findings and their
+// open reports.
+export function useHandBack() {
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: async (identity: string) =>
+      unwrap(
+        await api.POST("/v1/people/{identity}/assignments/hand-back", {
+          params: { path: { identity } },
+          body: {},
+        }),
+      ),
     onSuccess: () => {
-      after();
-      void queries.invalidateQueries({ queryKey: ["held-reports"] });
       void queries.invalidateQueries({ queryKey: ["holdings"] });
+      // The badge for what nobody holds is counted from the findings list, so
+      // that is the key to invalidate. Returning a whole queue is the single
+      // act that moves the number most.
+      void queries.invalidateQueries({ queryKey: ["findings"] });
+      void queries.invalidateQueries({ queryKey: ["held-reports"] });
     },
   });
 }

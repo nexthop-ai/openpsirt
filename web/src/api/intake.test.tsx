@@ -3,9 +3,12 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  editReportNote,
   useAcceptReport,
   useApproveRuling,
+  useAssignReport,
   useEditReport,
+  useHandBack,
   useLogMessage,
   useNoteOnReport,
   useRecordReport,
@@ -26,6 +29,8 @@ const EVERY_REPORT_KEY = [
   "duplicates",
   "finding",
   "findings",
+  "held-reports",
+  "holdings",
   "home",
   "issue",
   "recorded-report",
@@ -45,6 +50,13 @@ describe("an act on a report, once it lands", () => {
     ],
     ["editing one", "PUT", () => useEditReport("sonic", "R-1"), { summary: "A socket answers." }],
     ["noting on one", "POST", () => useNoteOnReport("sonic", "R-1"), "Seen before."],
+    [
+      "editing a note on one",
+      "PUT",
+      editReportNote("sonic", "R-1"),
+      { id: 7, body: "Seen twice." },
+    ],
+    ["assigning one", "PUT", () => useAssignReport("sonic", "R-1"), { person: "bo" }],
     ["accepting one as an issue", "PUT", () => useAcceptReport("sonic", "R-1"), "CVE-2026-1"],
     ["proposing a ruling", "POST", () => useRule("sonic"), { reports: ["R-1"], outcome: "spam" }],
     ["approving a ruling", "POST", () => useApproveRuling("sonic"), 4],
@@ -78,5 +90,18 @@ describe("an act on a report, once it lands", () => {
         },
       ],
     ]);
+  });
+});
+
+describe("handing back everything somebody holds", () => {
+  it("moves the holdings, the findings nobody holds and the reports nobody holds", async () => {
+    const { sent, invalidated } = await acted(mount.render, mount.host, "POST", useHandBack, "bo");
+    expect(sent).toEqual([
+      [
+        "/v1/people/{identity}/assignments/hand-back",
+        { params: { path: { identity: "bo" } }, body: {} },
+      ],
+    ]);
+    expect(invalidated).toEqual(["findings", "held-reports", "holdings"]);
   });
 });

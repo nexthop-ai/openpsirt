@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Loading } from "../ui/Loading";
 import { initials } from "../ui/initials";
 import { Link, useSearchParams } from "react-router-dom";
@@ -17,7 +17,7 @@ import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
 import { findingOf, inboxReportAt, leadAt, leadsAt } from "../app/routes";
-import { useHeldReports } from "../api/intake";
+import { useHandBack, useHeldReports } from "../api/intake";
 import { on } from "../ui/when";
 
 // One page of what somebody holds. The answer carries a total, so this is a
@@ -314,23 +314,7 @@ function ByPerson({
   leadsIn?: string;
   onPick: (name: string, team: boolean) => void;
 }) {
-  const queries = useQueryClient();
-  const release = useMutation({
-    mutationFn: async (identity: string) =>
-      unwrap(
-        await api.POST("/v1/people/{identity}/assignments/hand-back", {
-          params: { path: { identity } },
-          body: {},
-        }),
-      ),
-    onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["holdings"] });
-      // The badge for what nobody holds is counted from the findings list, so
-      // that is the key to invalidate. Returning a whole queue is the single
-      // act that moves the number most.
-      void queries.invalidateQueries({ queryKey: ["findings"] });
-    },
-  });
+  const release = useHandBack();
 
   if (query.isPending) return <Loading />;
   if (query.isError) {

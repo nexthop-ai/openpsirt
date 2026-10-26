@@ -188,6 +188,40 @@ describe("one vulnerability report", () => {
   });
 });
 
+describe("who holds a report", () => {
+  const HOLDERS = {
+    "/v1/products/{product}/holders": {
+      items: [
+        { kind: "person", identity: "ana", name: "Ana" },
+        { kind: "team", identity: "kernel", name: "Kernel" },
+      ],
+    },
+  };
+
+  it.each([
+    ["a person", "Ana you", { person: "ana" }],
+    ["a team's queue", "Kernel team", { team: "kernel" }],
+    ["nobody", "No one", { person: "" }],
+  ] as const)("gives it to %s", async (_, option, body) => {
+    const writes = await drawn(SENT_IN, true, HOLDERS);
+    const card = Array.from(mount.host().querySelectorAll(".card")).find(
+      (each) => each.querySelector("h3")?.textContent === "Assigned to",
+    );
+    const box = card?.querySelector<HTMLInputElement>('input[role="combobox"]');
+    if (!box) throw new Error("no holder box");
+    await act(async () => box.focus());
+    await settle();
+    const pick = Array.from(
+      card?.querySelectorAll<HTMLButtonElement>('[role="option"] button') ?? [],
+    ).find((each) => each.textContent === option);
+    await act(async () => pick?.click());
+    await settle();
+    const [path, init] = only(writes.put);
+    expect(path).toBe("/v1/products/{product}/reports/{reference}/assignment");
+    expect(init.body).toEqual(body);
+  });
+});
+
 describe("one vulnerability report read by somebody who does not work it", () => {
   it("offers no act on it", async () => {
     await drawn({ ...SENT_IN, editable: true }, false);
