@@ -123,7 +123,7 @@ func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]Le
 func leadColumns() []string {
 	return []string{
 		"rule", "path", "line", "function", "message", "withheld", "state", "stream", "variant",
-		"builds", "opened", "assigned_to", "place", "third party",
+		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "place", "third_party",
 	}
 }
 
@@ -137,7 +137,8 @@ func leadCells(row LeadRowBody) []string {
 	return []string{
 		row.Rule, row.Path, line, row.Function, row.Message, strconv.FormatBool(row.Withheld),
 		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened,
-		row.AssignedTo, row.Place, strconv.FormatBool(row.ThirdParty),
+		row.AssignedTo, row.AssignedName, strconv.FormatBool(row.AssignedTeam), row.Place,
+		strconv.FormatBool(row.ThirdParty),
 	}
 }
 

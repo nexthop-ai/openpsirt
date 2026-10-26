@@ -150,7 +150,7 @@ func TestTheLeadFileHoldsWhatTheListHoldsAndWithholdsWhatItWithholds(t *testing.
 
 		_, rows, body := leadFile(t, r, "internal-reader", "?state=handed-off")
 		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != "" || rows[0][5] != "true" ||
-			rows[0][12] != place {
+			rows[0][14] != place {
 			t.Fatalf("an internal reader's file holds %q; want the moved lead, withheld", rows)
 		}
 		if strings.Contains(body, message) || strings.Contains(body, snippet) {
@@ -193,7 +193,7 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 		if !strings.Contains(body, "the queue") {
 			t.Errorf("the file with no state does not say it is the queue:\n%s", body)
 		}
-		if len(rows) != 1 || rows[0][12] != place || rows[0][6] != "open" || rows[0][2] != "12" {
+		if len(rows) != 1 || rows[0][14] != place || rows[0][6] != "open" || rows[0][2] != "12" {
 			t.Errorf("the queue's file holds %q; want the seeded lead, open at line 12", rows)
 		}
 		// Whoever holds a lead is a column of the file, as the list names them.

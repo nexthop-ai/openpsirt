@@ -4,8 +4,10 @@
 package assignapi_test
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -206,6 +208,57 @@ func TestATeamHoldsALeadOneOfItsMembersReads(t *testing.T) {
 		page, queue := holderOf(t, r, "internal-reader", place)
 		if page.AssignedTo != "analysis-desk" || !page.AssignedTeam || !queue.AssignedTeam {
 			t.Errorf("the lead page names %+v and the queue %+v; want the team's queue", page, queue)
+		}
+	})
+}
+
+// The queue's file names a lead's holder as the list does: who, their
+// display name, and whether it is a team's queue, since a team and a person
+// may share a name.
+func TestTheLeadFileNamesAHolderAsTheListDoes(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		granted(t, r, "internal-triager", access.Assigner)
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"analysis-desk","members":["internal-reader"]}`); made.Code != http.StatusCreated {
+			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("queueing the lead with the team answered %d: %s", got.Code, got.Body)
+		}
+		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, "/v1/products/mine/leads.csv?state=open", "")
+		records, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatalf("the file is not CSV a strict reader reads: %v\n%s", err, file.Body)
+		}
+		var header []string
+		rows := 0
+		for _, record := range records {
+			switch {
+			case strings.HasPrefix(record[0], "#"):
+			case header == nil:
+				header = record
+			default:
+				named := map[string]string{}
+				for i, column := range header {
+					named[column] = record[i]
+				}
+				if named["place"] != place {
+					continue
+				}
+				rows++
+				if named["assigned_to"] != "analysis-desk" || named["assigned_team"] != "true" {
+					t.Errorf("the file names the holder %q, team %q; want the team's queue",
+						named["assigned_to"], named["assigned_team"])
+				}
+				if _, ok := named["assigned_to_name"]; !ok {
+					t.Error("the file has no column for the holder's display name")
+				}
+			}
+		}
+		if rows != 1 {
+			t.Fatalf("the file holds %d rows for the lead; want one\n%s", rows, file.Body)
 		}
 	})
 }

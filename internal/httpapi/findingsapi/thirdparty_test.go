@@ -105,7 +105,7 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 				for i, column := range header {
 					named[column] = record[i]
 				}
-				inFile[named["path"]] = named["third party"]
+				inFile[named["path"]] = named["third_party"]
 			}
 		}
 		inList := map[string]bool{}
