@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/docread"
+	md "github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -561,9 +562,9 @@ func level(s string) string {
 	return ""
 }
 
-// message reads a message object's text. A message with only markdown keeps
-// the markdown as its text, which is shown encoded and never rendered. Where p
-// is given, it records what the message cites by identifier.
+// message reads a message object's text. A message with only markdown is
+// reduced to the words it shows, which are shown encoded and never rendered.
+// Where p is given, it records what the message cites by identifier.
 func (rd *reader) message(discarded *Discarded, p *pending) (string, error) {
 	var text, markdown string
 	hasText := false
@@ -599,7 +600,7 @@ func (rd *reader) message(discarded *Discarded, p *pending) (string, error) {
 	if markdown != "" {
 		discarded.Markdown++
 		if !hasText {
-			text, hasText = markdown, true
+			text, hasText = md.Text(bound.Head(markdown, rd.lim.MaxText)), true
 		}
 	}
 	if p != nil {

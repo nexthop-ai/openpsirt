@@ -378,6 +378,17 @@ func TestWholeFilesAndFixesAreCountedAndNeverKept(t *testing.T) {
 	}
 }
 
+func TestAMessageHoldingOnlyMarkdownIsReducedToItsText(t *testing.T) {
+	doc := run(`,"results":[{"message":{"markdown":"**Null** [pointer](https://example.com) <b>p</b>"}}]`)
+	r := read(t, doc).Runs[0]
+	if got := r.Results[0].Message; got != "Null pointer p" {
+		t.Errorf("message %q; want the words the markdown shows", got)
+	}
+	if r.Discarded.Markdown != 1 {
+		t.Errorf("discarded %+v; want the markdown counted", r.Discarded)
+	}
+}
+
 func TestALocationsSourceIsReadFromItsWidestRegion(t *testing.T) {
 	for name, regions := range map[string]string{
 		"context last":  `"region":{"startLine":3,"snippet":{"text":"secret();"}},"contextRegion":{"startLine":1,"endLine":5,"snippet":{"text":"a\nsecret();"}}`,

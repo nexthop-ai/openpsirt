@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
 
 // sarifDoc reads a SARIF 2.1.0 document from any tool, to be forwarded with
@@ -173,8 +175,8 @@ func validRegion(r obj) {
 }
 
 // plainMessage reduces a message to its text, reporting whether it held
-// markdown. A message with markdown and no text keeps the markdown as its
-// text, which the deployment shows as text and never renders.
+// markdown. A message with markdown and no text takes the words the markdown
+// shows as its text.
 func plainMessage(m obj) int {
 	if m == nil {
 		return 0
@@ -184,7 +186,7 @@ func plainMessage(m obj) int {
 		return 0
 	}
 	if str(m, "text") == "" {
-		m["text"] = md
+		m["text"] = markdown.Text(md)
 	}
 	delete(m, "markdown")
 	return 1

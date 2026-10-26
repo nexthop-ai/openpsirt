@@ -112,6 +112,7 @@ placing them added 103 MB beside that, an encoding of 98 MB.
 | A path outside the checkout is dropped with its result, and counted | A build host's home directory never lands |
 | A result repeating another of the same upload on rule, path, line, column and message is dropped and counted | clang repeats a header's result once per translation unit that includes it |
 | Whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | No whole file or replacement text is stored, and a message is its text |
+| A message holding only markdown is reduced to the words it shows: no emphasis, heading, list or quote marker, a link and an image as their words, code as written, and no raw HTML | The text is what the analyzer said, shown encoded and never rendered |
 | A snippet is kept only where the product keeps source under its path, and counted on the receipt as discarded otherwise (§ Source) | A misconfigured pipeline does not put source into the deployment, and the upload is still accepted |
 | The source root is used at the door and not stored | It is a path on somebody's build host |
 
@@ -923,7 +924,7 @@ it is about.
 |---|---|
 | No source text leaves unless `--snippets` is given | A run carries paths, lines and fingerprints |
 | With `--snippets`, each location carries its lines, and a context region two lines either side, each bounded at 4,096 bytes | A carriage return is removed from each line |
-| Whole-file contents, fixes, attachments, snippets and markdown messages in forwarded SARIF are removed, and counted in what the client prints | A markdown message with no text keeps its markdown as its text |
+| Whole-file contents, fixes, attachments, snippets and markdown messages in forwarded SARIF are removed, and counted in what the client prints | A markdown message with no text takes the words its markdown shows as its text, reduced as the deployment reduces one |
 | A snippet is removed from every location forwarded SARIF names: a result's own, its related places, its flow steps and stack frames, the flow steps a run lists once, and the places a notification names | Each is a region of source text |
 | A forwarded run's artifact list and starting points are removed | Every path is resolved before it is written, so nothing reads them |
 | The run parameters are written as § Run parameters reads them: `openpsirt/client`, `openpsirt/commit`, `openpsirt/series` or `automationDetails.id` where `--built` is given, the unit counts together or not at all, and an invocation from `--exit-status` | `--compile-commands` gives the units expected as its entry count; for clang, the units analyzed are the documents read. Units expected for a tool that counts none analyzed are not sent, and the client says so |

@@ -357,8 +357,8 @@ func TestNoSourceLeavesWithoutSnippets(t *testing.T) {
 	if id := str(res, "ruleId"); id != "cpp/x" {
 		t.Errorf("rule %q; want the one its position named", id)
 	}
-	if text := str(child(res, "message"), "text"); text != "**leaks** buf" {
-		t.Errorf("message %q; want the markdown kept as its text", text)
+	if text := str(child(res, "message"), "text"); text != "leaks buf" {
+		t.Errorf("message %q; want the markdown reduced to its text", text)
 	}
 	region := child(child(objects(res, "locations")[0], "physicalLocation"), "region")
 	if _, ok := region["endColumn"]; ok {
