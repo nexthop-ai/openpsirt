@@ -34,9 +34,7 @@ every migration after 1.0 will be.
 | Rows written with their own identifiers keep them, and PostgreSQL's identity is moved past them | References still land. The other three move on the insert |
 | A column added is last in its table on the three servers | A rebuilt SQLite table has it where declared. No query reads a column by position |
 | Changing a table is spelled per engine | PostgreSQL drops a uniqueness rule or a foreign key as a constraint; MySQL and MariaDB drop the index or the foreign key, name the table an index is dropped from, and refuse to drop a column a foreign key names |
-| An index the database holds under the name is replaced | On MySQL and MariaDB a stopped upgrade leaves its indexes, and the next start runs the migration from the top |
 | On MySQL and MariaDB a failure part way is recovered from a backup | Each statement commits as it runs and no version is recorded. The operator page says to take one first |
-| The rules an identity, a fold key, a live key and a cut are worked out by are copied into the migration, never called | A later application change must not change what an old database is upgraded into. A test holds each copy to the application's own |
 
 ## The v0.8.0 upgrade
 
@@ -49,6 +47,10 @@ moves. `design-docs/database-schema.md` § Indexes says what each index serves.
 | `decision`, v0.11.0's `decision_occurrence` | An index on the state and the decision | Made where the table stands |
 | `notification` | An index on the kind, whether a row is open, and the person | Made where the table stands |
 | `finding`, PostgreSQL alone | Vacuumed after a fiftieth changes, analyzed after a hundredth | A storage setting |
+
+An index the database already holds under the name is replaced, because on
+MySQL and MariaDB a stopped upgrade leaves the indexes it made and the next
+start runs the migration from the top.
 
 | Check, on each engine | What it holds |
 |---|---|
@@ -97,6 +99,7 @@ runs.
 
 | Rule | Reason |
 |---|---|
+| The rules an identity, a fold key and a live key are worked out by are copied into the migration, never called | A later application change must not change what a v0.8.0 database is upgraded into. A test holds the copies to the application's own: a merged image is stored exactly as v0.9.0 stores it |
 | Findings a rebuild closed before the upgrade stay closed and unjoined | A row is closed, never deleted, and joining would rewrite when each opened |
 | A process applying it answers `/healthz` throughout (`design-docs/packaging.md` § Starting and stopping) | A platform checking that path lets it finish. `/readyz` fails throughout, and a platform ending the process on it undoes the upgrade on every engine |
 | It takes 2 min 41 s on PostgreSQL 16 for ten nightly builds of 34 restamped images, and grows with images times stamps | A month of nightly history takes three times as long. `design-docs/database-measurements.md` § The v0.9.0 upgrade has the run, and `make measure` repeats it |
@@ -114,11 +117,12 @@ the copies removed in a third, each stepping over what a stopped attempt did.
 | Every reference is keyed on its address as given | v0.8.0 keyed it in capitals, cut to an index key's width. Two references v0.8.0 held apart differ in capitals or past the cut, so no keys collide |
 | The copy each claim row carried is removed | SQLite rebuilds both tables; the others drop the column. A table without it is stepped over, with the move above |
 | A claim's reference to its reasoning has no foreign key | Stored reasoning is never deleted |
+| The ways reasoning is cut and each key is worked out are copied into the migration | As the image merge's are |
 
 | Check, on each engine | What it holds |
 |---|---|
 | A v0.8.0 build whose image was restamped between two scans, with findings beneath and against it, a label, a commitment on each stamp's fold, decision occurrences beneath and about it; an image that left and came back; two layers of one name held at once | One component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one label on it, one commitment on its fold; the occurrence proposed last live over an earlier one, an approved one over a proposed one, the occurrence about the image live with no version, the lapsed one as recorded; the returning image on two nodes; both layers left by version |
-| The same on PostgreSQL, with a trigger on every table refusing a removal while a referring column leads no index, and an index made by hand on such a column | Migrations 42 to 44 remove nothing the trigger refuses, the hand-made index remains, and none of the merge's own indexes do |
+| The same on PostgreSQL, with a trigger on every table refusing a removal while a referring column leads no index, and an index made by hand on such a column | Migrations 42 to 44 remove nothing the trigger refuses, components and nodes are removed under it, the hand-made index remains, and none of the merge's own indexes do |
 | The same on MySQL and MariaDB, stopped at the merge's last step | No version recorded, no image version written, every stamp its own component. The next start steps over the table and leaves what an unstopped upgrade leaves |
 | That build's nodes, one component carrying a source package | Its node holds that source package and version; every other node holds none |
 | A recorded flaw rated on the issue row; a scanned issue that absorbed a record rated differently; a scanned issue a merge copied a record's rating onto; a record under a published name, scanned elsewhere, scored by a feed on a newer scheme | The first's rating is the recording product's and in force there, and the issue keeps only the feed's sourced rating; the second keeps the scanner's word and score; the third's copied rating is the recording product's and gone from the issue; the fourth's word and unsourced rating are the recording product's and its issue keeps the feed's score |

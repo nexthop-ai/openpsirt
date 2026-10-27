@@ -60,7 +60,7 @@ rest.
 | A server is not asked again after a scan | Its own background refresh follows the writes. SQLite is asked after every scan (`design-docs/database.md` § SQLite settings) |
 | A failed refresh is logged and the start goes on | Stale estimates make a statement slow, never wrong |
 | The refresh has a quarter of the startup deadline | The rest of the start keeps its time |
-| A table something else holds is stepped over and named in the log | An analysis needs a shared lock, so waits only behind a schema change or a vacuum, never another replica's start. PostgreSQL steps over it in the statement; MySQL and MariaDB wait a second for the metadata lock, where the server default is a year |
+| A table something else holds is stepped over and named in the log | An analysis needs a shared lock, so waits only behind a schema change or a vacuum, never another replica's start. PostgreSQL steps over it in the statement and says so as a warning alone; MySQL and MariaDB wait a second for the metadata lock, where the server default is a year |
 | The startup deadline starts again once an automatic migration finishes | A migration is unbounded |
 
 Analyzing every table at start took 140 ms on MySQL 8.4 over 381,337 findings
@@ -73,8 +73,11 @@ same table took about 60 ms, and a query after it waited for nothing.
 
 | Rule | Reason |
 |---|---|
-| Text a producer supplies has no width: a component's name and version, what it was forked from, an issue's identifier, a fix's version list | No format bounds them, and a width turns an unusual value into a failed scan, which reads as a product that stopped having problems |
-| Text carrying a unique index has a width, and a longer value is refused with a sentence | A decision keyed on a truncated version would match nothing and say so nowhere |
+| Text a producer supplies has no width unless an index carries it: a component's name and version, what it was forked from, a fix's version list | No format bounds them, and a width would fail the scan carrying an unusual value, which reads as a product that stopped having problems |
+| Text an index carries has the name width, 191 characters | Index key length is tightest on MySQL |
+| Text a producer or a document supplies past the width is cut in characters: an issue's identifier, a claim's justification and versions, a key's name | Two values agreeing that far are one value, and a refusal would fail the scan |
+| A name a person types past the width is refused, naming the width | A series, a response window, a notice outside, an assignment rule. The typist can shorten it |
+| A value too long to index whole is keyed on its SHA-256 digest | A reference's address as given, an upstream document's address, a component's fold |
 
 Against the reference producer's real output, 6,845 components: longest
 version 49 characters, name 120, package identifier 140, nothing over 191.
@@ -100,4 +103,4 @@ is a defect.
 
 | Limit | Detail |
 |---|---|
-| Index key length is tightest on MySQL | A long value such as a package identifier is indexed through a hash |
+| A value cut to the width is stored cut | The name width is 191 characters, so two identifiers agreeing that far are one issue |

@@ -34,7 +34,7 @@ claim goes stale.
 | Rule | Reason |
 |---|---|
 | A job holds no payload | The queue stays small however large its subject |
-| Kinds are defined with the queue: read a scan, scan for vulnerabilities, sweep the assignment rules, apply an analyzer's run | A producer and a worker are different packages |
+| Kinds are defined with the queue: read a scan, scan for vulnerabilities, sweep the assignment rules, apply an analyzer's run to its build | |
 | A kind is stored in the row | Renaming one leaves queued work nothing claims |
 
 ## Exclusive handout
@@ -120,7 +120,7 @@ the loop.
 | The first tick is immediate | Whatever accumulated while the process was down is waiting |
 | Reporting stays with each pass | Each logs different things |
 | A failed pass is logged and the loop goes on | What it failed to do is still there next time |
-| One implementation | Copies diverge over what nothing tests: trace context in the log line, spreading goroutines on a cold start, where a measurement or first-run delay sits |
+| One implementation | Copies diverge over what nothing tests: trace context, cold-start spreading, first-run delay |
 
 ## Leases
 
@@ -160,7 +160,7 @@ administrator sets, and the caller is told to retry.
 | The depth counts work held by a worker that stopped reporting | Mid-reclaim every row is claimed by dead workers, and a waiting count reads empty |
 | A stored setting, read as work is queued | The refusal lands on a build server, and its remedy cannot be a new binary or a restart |
 | Back-pressure, not an exact bound | Producers adding at once each count what committed, so the backlog can pass the limit by as many as are adding. An exact bound takes a lock per kind, spelled per engine |
-| An upload refused for a full queue raises an alert naming the build, the limit, and how to raise it | The producer may not retry, so the refusal is where data may be lost. A deep queue still taking work alerts nobody. Not built: the refusal is answered 503, neither logged nor recorded as a refused upload, and the System screen marks the kind at its limit |
+| An upload refused for a full queue raises an alert naming the build, the limit, and how to raise it | The producer may not retry. A deep queue still taking work alerts nobody. Not built: the refusal is answered 503, neither logged nor recorded as a refused upload, and the System screen marks the kind at its limit |
 
 ## Configurable bounds
 
@@ -206,7 +206,7 @@ putting back, and taking or releasing a lease, runs through the retry helper
 |---|---|
 | No queue write runs as a bare statement | A cluster refuses at commit, and a write outside a transaction cannot be retried |
 | Finishing is retried, never reported up | Reported up, a finished job is recorded failed and handed out again, and the work runs twice |
-| An ending whose commit was refused asks the row | It covers a takeover and a commit whose answer was lost. A finish reads as done; a failure and a postponement as unclaimed with their reason; a put-back as no longer failed. Assuming wrongly records a takeover that never happened, or tells an operator their act did nothing |
+| An ending whose commit was refused asks the row | It covers a takeover and a commit whose answer was lost. A finish reads as done; a failure and a postponement as unclaimed with their reason; a put-back as no longer failed |
 | A refused lease take is retried, never read as a lost race | A replica told it lost a race stops sweeping, silently, on every replica at once |
 | The moment a write compares against is read inside each attempt | A retry runs after a pause. A stale moment misses a job that went stale meanwhile, and shortens a retaken lease by the pause |
 
@@ -215,6 +215,6 @@ putting back, and taking or releasing a lease, runs through the retry helper
 | Limit | Detail |
 |---|---|
 | Two workers can run one job | The second claim is legitimate to the database when the holder has not been heard from. The renewal interval bounds the window |
-| On SQLite the claim timeout is the bound on one unit of work | A renewal is a write and waits behind the job's own transaction on the file's one write lock, so it cannot land while the work holds the lock. The timeout must exceed the longest unit of work; past it, a second worker claims once the transaction commits and the job runs twice. The timeout is not shortened to the renewal interval for this reason; renewal protects the other three engines |
+| On SQLite the claim timeout is the bound on one unit of work | A renewal is a write and cannot land while the job's own transaction holds the file's write lock. The timeout must exceed the longest unit of work, or a second worker claims once the transaction commits and the job runs twice; so it is not shortened to the renewal interval. Renewal protects the other three engines |
 | No queue library is used | The mature Go queues tie to one engine or need a separate service |
 | Row locking is verified as not load-bearing | The exclusivity test runs on every engine with the locking clause and without it, and the arm without it fails when the conditional update stops repeating its state; locking hides that defect. The switch is reachable only from the package's tests |

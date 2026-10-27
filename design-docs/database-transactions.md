@@ -31,19 +31,19 @@ and the one in-memory lock stops a process migrating twice.
 
 ## Retryable transactions
 
-A cluster certifies a write across nodes at `COMMIT`. Two nodes touching the
-same rows both run every statement successfully, and one is told at the end
-that the whole transaction rolled back.
+A cluster certifies a write at `COMMIT`: two nodes touching the same rows both
+run every statement successfully, and one is then told the transaction rolled
+back.
 
 | Rule | Reason |
 |---|---|
-| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure | Code checking each statement never learns none of them happened |
+| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure | |
 | Any other failure is reported, never retried | A constraint violation retried hammers the database and hangs |
-| Nothing a transaction depends on is read outside it | A retry re-runs the closure against a moved database. Anything a closure uses but does not fetch is a defect |
+| Nothing a transaction depends on is read outside it | A retry re-runs the closure against a moved database |
 | A read made before the transaction as an early refusal is repeated inside it, and the inside one decides | |
-| A statement whose refusal is an ordinary answer stands on its own savepoint, rolled back on refusal | PostgreSQL aborts the whole transaction after a failed statement. An insert refused by a primary key is how a second replica learns the row exists. The other three carry on without one, so the SQLite loop never shows it |
-| An act is one transaction, and an act is what a person asked for | Recording a person with their roles, declaring a team with its members, filling a tag's parent and when it went out, storing a graph with what the build argued about its patches. Split, a refusal partway answers "nothing happened" over half a write, and the corrected request lands the half twice |
-| The record of an administrative act is inside it | A failure to record fails the act, so no setting moves with nobody recorded |
+| A statement whose refusal is an ordinary answer stands on its own savepoint, rolled back on refusal | PostgreSQL aborts the whole transaction after a failed statement, such as an insert a primary key refuses. The other three carry on, so SQLite never shows it |
+| An act is one transaction, and an act is what a person asked for | Recording a person with their roles, a team with its members, a tag's parent with when it went out, a graph with what the build argued about its patches. Split, a refusal partway leaves half a write, and the resent request lands it twice |
+| The record of an administrative act is inside it | A failure to record fails the act |
 | Giving up does not back off first | Nothing follows the last attempt |
 
 | Read inside the write | What it decides |
@@ -61,8 +61,8 @@ that the whole transaction rolled back.
 
 | Inside the act | Reason |
 |---|---|
-| A job queued for what was written | Job and rows commit together. Queued after, a failure to queue reports a landed write as failed, or leaves rows nothing picks up |
-| Work handed back when somebody stops reading it | Done after, a failure leaves work with somebody who cannot open it, and asking again finds no grant. Bounded by what the people and teams named were holding (`design-docs/access.md` § Lost reading) |
+| A job queued for what was written | Queued after, a failure reports a landed write as failed, or leaves rows nothing picks up |
+| Work handed back when somebody stops reading it | Done after, a failure leaves work with somebody who cannot open it. Bounded by what they held (`design-docs/access.md` § Lost reading) |
 
 | Job | A full queue |
 |---|---|
@@ -75,19 +75,19 @@ that the whole transaction rolled back.
 | The deadline rewrite a policy change forces | Bounded by what is open: nineteen seconds against 441,108 findings, longer than a request |
 | A read naming things in the answer | `design-docs/api.md` § Refusal shape holds the rule |
 
-A store handed a transaction joins it.
+A store method handed a transaction takes one of three spellings.
 
 | Spelling | Correct where |
 |---|---|
 | Refuse | The method owns the retry boundary and decides what a retry re-reads |
 | Join | The requirement is "both statements or neither", which the caller's transaction meets |
-| Join, and hand the race back | The method resolves a lost race by going again, which it cannot do inside a caller's transaction: PostgreSQL has aborted it, and the rest of the act is the caller's. It returns a named error the retry helper recognizes beside the engine codes, and the caller's helper takes the whole act again |
+| Join, and hand the race back | The method resolves a lost race by going again, which it cannot do inside a caller's transaction. It returns a named error the retry helper recognizes beside the engine codes, and the caller's helper takes the whole act again |
 
 | Rule | Reason |
 |---|---|
 | A handler answers a handed-back race as a fault carrying it | The helper reads the cause and goes again. Where nothing does, the caller is told 500 in the handler's own words |
-| Joining is a named helper, never an `if` on the handle's type | Written by hand it reads as a fallback to writing outside a transaction. A joined closure may be re-run by a retry it cannot see |
-| The helper names every handle it accepts and refuses the rest as a fault | A handle that embeds a transaction fails a type test, and running each statement as its own autocommit is no transaction and no retry, said by nobody |
+| Joining is a named helper, never an `if` on the handle's type | By hand it reads as a fallback to writing outside a transaction |
+| The helper names every handle it accepts and refuses the rest as a fault | A handle embedding a transaction fails a type test, and falling back to autocommit is no transaction and no retry, silently |
 
 ## Reads a write depends on
 
@@ -102,9 +102,9 @@ read answers from a snapshot and a write lands on whatever the row holds.
 
 | Rule | Reason |
 |---|---|
-| A write carries what its read answered: it matches the key and the value read, and a match of none takes the attempt again in a new transaction | Otherwise the trail says a writer replaced a value nothing held, which is the question the settings trail answers |
+| A write carries what its read answered: it matches the key and the value read, and a match of none takes the attempt again in a new transaction | Otherwise the trail says a writer replaced a value nothing held |
 | A new transaction, never a second read in the failed one | MySQL and MariaDB fix the snapshot at the opening select |
-| A locking read is not used for this | `SELECT ... FOR UPDATE` is spelled per engine; the condition works on all four (`design-docs/database.md` § Engine-specific code) |
+| A locking read is not used for this | `SELECT ... FOR UPDATE` is spelled per engine; the condition works on all four |
 | Retries are bounded | Two writers resolve in one more attempt, three in two; unresolved contention is reported |
 
 | Write | What it matches on beside the key |
@@ -129,8 +129,8 @@ read answers from a snapshot and a write lands on whatever the row holds.
 | Rule | Reason |
 |---|---|
 | An insert that can lose a race on a unique key hands the race back | Recording a person, authorizing a sign-in name, numbering an advisory or its edition, numbering a revision of a report or its note. Taken again whole, it finds the other writer's row or numbers after it |
-| A revision's number is read before the row whose text it keeps | An edit committing between them takes the number, and the attempt goes again. Read after, the text kept would not be the one numbered |
-| A bound counted before an insert takes turns on a row of the owner's first, an ordinary update writing a new value every time | Two transactions each count one under a person's saved-filter limit and both add. MySQL and MariaDB do not write an unchanged row, and a cluster certifies only written rows |
+| A revision's number is read before the row whose text it keeps | An edit committing between them takes the number, and the attempt goes again |
+| A bound counted before an insert takes turns on a row of the owner's first, an ordinary update writing a new value every time | Otherwise two transactions each count one under a person's saved-filter limit and both add. A new value, because MySQL and MariaDB skip an unchanged row and a cluster certifies only written rows |
 | That row is one per person in the lease table, made before the transaction opens, and nothing takes it as a lease | |
 
 ## Absence and failure
@@ -142,16 +142,11 @@ answers.
 |---|---|
 | A reader says which it hit | The caller chooses a status from it |
 | Absence is a sentinel each package words for itself, matched through wrapping | Matching on a message is reading an engine's error text |
-| A failed read names the act, and the act reaches the log | "Look up product 12" is what an operator needs. The driver's words are not published |
-| One helper makes the distinction | By hand it is made differently at most call sites |
-| A handler's error arm asks which error it holds before answering 404 | Otherwise an outage is "that does not exist", and inside a transaction the cause the retry helper reads is lost. A gate reports an arm whose first statement answers 404 for any error |
+| A failed read names the act, and the act reaches the log | The driver's words are not published |
+| One helper makes the distinction | |
+| A handler's error arm asks which error it holds before answering 404 | Otherwise an outage is "that does not exist" and the retry helper loses the cause. A gate reports an arm answering 404 for any error |
 | A read filling part of an answer fails the answer | Left out, a field reads as absence: a limit as none, a narrowed token as reaching everything, a release note as leaving nothing out |
 | A credential that cannot be looked up is a fault, answered 503 with a time to ask again and logged | Answered as unauthorized, an outage sends every caller to sign in again |
-
-Two readers of one select telling the two apart differently is the ordinary
-failure: a caller of the one that does not turns an error into "nothing has
-been scanned there", and an unreachable database tells every caller their
-products and findings do not exist.
 
 ## Limits
 
