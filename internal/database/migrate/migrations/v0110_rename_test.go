@@ -111,6 +111,148 @@ func (w triageV0100) renamedAs(t *testing.T, ctx context.Context, db *database.D
 	}
 }
 
+// incidentsV0100 is, in a v0.10.0 database, a record that the product was
+// attacked, a release named as carrying its fix, a notice outside about it, a
+// window counted from another and limited to the product, and a finding the
+// record ranks first.
+type incidentsV0100 struct{ incident, fix, told, window, finding int64 }
+
+// seedIncidentsV0100 writes the rows beside the fixture's product, declaring
+// it where nothing seeded before has.
+func seedIncidentsV0100(t *testing.T, ctx context.Context, db *database.DB) incidentsV0100 {
+	t.Helper()
+	var products int
+	if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "product"`).Scan(ctx, &products); err != nil {
+		t.Fatal(err)
+	}
+	if products == 0 {
+		if _, err := world.Declare(ctx, db); err != nil {
+			t.Fatal(err)
+		}
+	}
+	at := time.Date(2026, 10, 20, 3, 0, 0, 0, time.UTC)
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+			t.Fatalf("%v\n%s", err, query)
+		}
+	}
+	id := func(query string, args ...any) int64 {
+		t.Helper()
+		var out int64
+		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
+			t.Fatalf("%v\n%s", err, query)
+		}
+		return out
+	}
+	person := id(`SELECT "id" FROM "person" WHERE "identity" = ?`, world.PersonIdentity)
+	product := id(`SELECT "id" FROM "product" WHERE "name" = ?`, world.ProductName)
+	tag := id(`SELECT "id" FROM "stream" WHERE "product_id" = ? AND "name" = ?`, product, world.TagName)
+	target := id(`SELECT MIN("t"."id") FROM "target" AS "t" JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"
+		WHERE "s"."product_id" = ? AND "s"."name" = ?`, product, world.BranchName)
+	exec(`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "exploited", "first_seen_at", "issue_id")
+		VALUES (?, ?, ?, ?, ?)`, "cve-2026-4600", "cve-2026-4600", true, at, 0)
+	issue := id(`SELECT "id" FROM "vulnerability" WHERE "identifier" = ?`, "cve-2026-4600")
+	exec(`UPDATE "vulnerability" SET "issue_id" = "id" WHERE "id" = ?`, issue)
+	exec(`INSERT INTO "exploited_here" ("vulnerability_id", "product_id", "known_at", "grounds", "recorded_by",
+		"recorded_at", "live_vulnerability_id") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		issue, product, at, "A customer's logs.", person, at, issue)
+	var out incidentsV0100
+	out.incident = id(`SELECT MAX("id") FROM "exploited_here"`)
+	exec(`INSERT INTO "exploited_fix" ("exploited_here_id", "stream_id", "named_by", "named_at", "live_stream_id")
+		VALUES (?, ?, ?, ?, ?)`, out.incident, tag, person, at, tag)
+	out.fix = id(`SELECT MAX("id") FROM "exploited_fix"`)
+	exec(`INSERT INTO "obligation_window" ("name", "length_hours", "declared_by", "declared_at", "live_name",
+		"from_fix") VALUES (?, ?, ?, ?, ?, ?)`, "Early warning", 24, person, at, "early warning", false)
+	first := id(`SELECT MAX("id") FROM "obligation_window"`)
+	exec(`INSERT INTO "obligation_window" ("name", "length_hours", "lead_hours", "declared_by", "declared_at",
+		"live_name", "from_window_id", "from_fix") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		"Full report", 72, 12, person, at, "full report", first, false)
+	out.window = id(`SELECT MAX("id") FROM "obligation_window"`)
+	exec(`INSERT INTO "obligation_window_product" ("window_id", "product_id") VALUES (?, ?)`, out.window, product)
+	exec(`INSERT INTO "told_outside" ("exploited_here_id", "window_id", "recipient", "told_at", "said",
+		"recorded_by", "recorded_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		out.incident, first, "The national response team", at, "It was attacked.", person, at)
+	out.told = id(`SELECT MAX("id") FROM "told_outside"`)
+	exec(`INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key", "first_seen_at")
+		VALUES (?, ?, ?, ?, ?, ?)`, "libbar", "libbar", "2.0", "libbar", "libbar", at)
+	component := id(`SELECT "id" FROM "component" WHERE "identity" = ?`, "libbar")
+	exec(`INSERT INTO "finding" ("target_id", "kind", "visibility", "vulnerability_id", "component_id",
+		"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here", "urgency_shipped", "opened_at")
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		target, "vulnerability", "public", issue, component, "place-libbar", 1, true, true, true, at)
+	out.finding = id(`SELECT MAX("id") FROM "finding"`)
+	return out
+}
+
+// renamedAs asserts every row the seed wrote is read back under v0.11.0's
+// names, each pointing where it pointed before.
+func (w incidentsV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB) {
+	t.Helper()
+	for _, c := range []struct {
+		what, query string
+		args        []any
+	}{
+		{"the incident", `SELECT COUNT(*) FROM "incident" WHERE "id" = ? AND "live_vulnerability_id" IS NOT NULL`,
+			[]any{w.incident}},
+		{"the release carrying its fix", `SELECT COUNT(*) FROM "incident_fix" WHERE "id" = ? AND "incident_id" = ?`,
+			[]any{w.fix, w.incident}},
+		{"the notice outside", `SELECT COUNT(*) FROM "told_outside" AS "t"
+			JOIN "response_window" AS "w" ON "w"."id" = "t"."window_id"
+			WHERE "t"."id" = ? AND "t"."incident_id" = ? AND "w"."name" = 'Early warning'`,
+			[]any{w.told, w.incident}},
+		{"the window counted from another", `SELECT COUNT(*) FROM "response_window" AS "w"
+			JOIN "response_window" AS "f" ON "f"."id" = "w"."from_window_id"
+			WHERE "w"."id" = ? AND "w"."lead_hours" = 12`, []any{w.window}},
+		{"the product the window is limited to", `SELECT COUNT(*) FROM "response_window_product"
+			WHERE "window_id" = ?`, []any{w.window}},
+		{"the finding the incident ranks first", `SELECT COUNT(*) FROM "finding"
+			WHERE "id" = ? AND "urgency_incident" = ?`, []any{w.finding, true}},
+	} {
+		var n int
+		if err := db.DB.NewRaw(c.query, c.args...).Scan(ctx, &n); err != nil {
+			t.Fatalf("read %s: %v", c.what, err)
+		}
+		if n != 1 {
+			t.Errorf("%s reads %d rows after the upgrade, want 1", c.what, n)
+		}
+	}
+}
+
+// A v0.10.0 database holding an incident, its windows and everything beside
+// them is upgraded, and every row reads back under v0.11.0's names in the
+// shape the release declares, with new rows numbered after the old.
+func TestAV0100DatabaseTakesTheV0110IncidentNames(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		seeded := seedIncidentsV0100(t, ctx, db)
+		dbtest.MigrateTo(t, db, v0110)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
+		seeded.renamedAs(t, ctx, db)
+		var person int64
+		if err := db.DB.NewRaw(`SELECT "recorded_by" FROM "incident" WHERE "id" = ?`,
+			seeded.incident).Scan(ctx, &person); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "response_window" ("name", "length_hours", "declared_by",
+			"declared_at", "live_name", "from_fix") VALUES (?, ?, ?, ?, ?, ?)`,
+			"Final report", 720, person, time.Now().UTC(), "final report", false).Exec(ctx); err != nil {
+			t.Fatalf("declare a window after the upgrade: %v", err)
+		}
+		var next int64
+		if err := db.DB.NewRaw(`SELECT MAX("id") FROM "response_window"`).Scan(ctx, &next); err != nil {
+			t.Fatal(err)
+		}
+		if next <= seeded.window {
+			t.Errorf("a window declared after the upgrade is row %d, at or before row %d it held", next,
+				seeded.window)
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
 // A v0.10.0 database holding a claim and everything beside it is upgraded,
 // and every row reads back under v0.11.0's names in the shape the release
 // declares.
@@ -144,6 +286,13 @@ func TestAnUpgradeStoppedPartWayThroughItsRenamesResumes(t *testing.T) {
 		{after: "decision_live_unique", servers: true},
 		{after: "claim_proposer_fk", servers: true},
 		{after: "finding_place_idx"},
+		{after: "exploited_here"},
+		{after: "obligation_window_product"},
+		{after: "exploited_here_id"},
+		{after: "urgency_exploited_here"},
+		{after: "exploited_fix_record_fk", servers: true},
+		{after: "told_outside_record_idx"},
+		{after: "obligation_window_product_window_fk", servers: true},
 	} {
 		t.Run(stop.after, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -154,6 +303,7 @@ func TestAnUpgradeStoppedPartWayThroughItsRenamesResumes(t *testing.T) {
 				dbtest.Empty(t, db)
 				dbtest.MigrateTo(t, db, v0100)
 				seeded := seedTriageV0100(t, ctx, db)
+				incidents := seedIncidentsV0100(t, ctx, db)
 				stopped, err := migrations.StopV0110RenamingAfter(ctx, db, stop.after)
 				if err != nil {
 					t.Fatal(err)
@@ -178,6 +328,7 @@ func TestAnUpgradeStoppedPartWayThroughItsRenamesResumes(t *testing.T) {
 				dbtest.MigrateTo(t, db, v0110)
 				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 				seeded.renamedAs(t, ctx, db)
+				incidents.renamedAs(t, ctx, db)
 				leaveAtLatest(t, ctx, db)
 			})
 		})

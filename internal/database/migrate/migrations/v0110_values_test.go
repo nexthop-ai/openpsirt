@@ -25,8 +25,9 @@ const (
 // seedWordsV0100 writes, in a v0.10.0 database, a row holding each stored
 // word v0.11.0 renames: a bulk claim, a notification and a destination of
 // each renamed kind, a notification linking a decision's row and one linking
-// a claim, a kept filter naming the renamed words, and the bulk action limit
-// under its v0.10.0 name.
+// a claim, a kept filter naming the renamed words, the bulk action limit
+// under its v0.10.0 name, and a change on the trail of the renamed kind
+// beside one of a kind kept.
 func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	declared, err := world.Declare(ctx, db)
@@ -45,7 +46,8 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 		"together", person, at, "not-applicable")
 	exec(`INSERT INTO "claim" ("kind", "proposed_by", "proposed_at", "outcome") VALUES (?, ?, ?, ?)`,
 		"finding", person, at, "not-applicable")
-	for i, kind := range []string{"claim-waiting", "claim-lapsed", "assigned"} {
+	for i, kind := range []string{"claim-waiting", "claim-lapsed", "obligation-open", "obligation-near",
+		"obligation-passed", "assigned"} {
 		exec(`INSERT INTO "notification" ("person_id", "kind", "lifetime", "about", "body", "link",
 			"private", "together", "attempts", "created_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			person, kind, "event", "about-"+kind, "Something happened.", "/", false, "", 0, at)
@@ -64,6 +66,10 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 		person, "kept", "outcome=not-applicable&exclude=placeholder-claims", at)
 	exec(`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
 		"triage.together-cap", "250", at)
+	for _, kind := range []string{"exploited-here", "setting"} {
+		exec(`INSERT INTO "admin_change" ("at", "by", "actor", "kind", "about", "was", "became")
+			VALUES (?, ?, ?, ?, ?, ?, ?)`, at, person, "person", kind, "Obligation window Early warning", nil, "24")
+	}
 }
 
 // wordsRenamed asserts every stored word the seed wrote reads in v0.11.0's
@@ -81,21 +87,38 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'decision-waiting'`, 1},
 		{"a notification of a decision lapsed",
 			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'decision-lapsed'`, 1},
+		{"a notification of a response window running",
+			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'response-window-open'`, 1},
+		{"a notification of a response window ending",
+			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'response-window-near'`, 1},
+		{"a notification of a response window passed",
+			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'response-window-passed'`, 1},
 		{"a notification of a kind kept", `SELECT COUNT(*) FROM "notification" WHERE "kind" = 'assigned'`, 1},
-		{"a notification of a v0.10.0 kind",
-			`SELECT COUNT(*) FROM "notification" WHERE "kind" IN ('claim-waiting', 'claim-lapsed')`, 0},
+		{"a notification of a v0.10.0 kind", `SELECT COUNT(*) FROM "notification" WHERE "kind" IN
+			('claim-waiting', 'claim-lapsed', 'obligation-open', 'obligation-near', 'obligation-passed')`, 0},
 		{"a destination of a decision waiting",
 			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'decision-waiting'`, 1},
 		{"a destination of a decision lapsed",
 			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'decision-lapsed'`, 1},
-		{"a destination of a v0.10.0 kind",
-			`SELECT COUNT(*) FROM "outbound" WHERE "kind" IN ('claim-waiting', 'claim-lapsed')`, 0},
 		{"a link to a decision's row at its new address",
 			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/decision-occurrences/34'`, 1},
 		{"a link to a decision's row at its v0.10.0 address",
 			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/decisions/34'`, 0},
 		{"a link to a decision, left for the interface to forward",
 			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/claims/7'`, 1},
+		{"a destination of a response window running",
+			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'response-window-open'`, 1},
+		{"a destination of a response window ending",
+			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'response-window-near'`, 1},
+		{"a destination of a response window passed",
+			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'response-window-passed'`, 1},
+		{"a destination of a v0.10.0 kind", `SELECT COUNT(*) FROM "outbound" WHERE "kind" IN
+			('claim-waiting', 'claim-lapsed', 'obligation-open', 'obligation-near', 'obligation-passed')`, 0},
+		{"a change to an incident", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'incident'`, 1},
+		{"a change of a kind kept", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'setting'`, 1},
+		{"a change of the v0.10.0 kind", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'exploited-here'`, 0},
+		{"what a change was about, as written", `SELECT COUNT(*) FROM "admin_change"
+			WHERE "about" = 'Obligation window Early warning'`, 2},
 		{"the limit under its new name", `SELECT COUNT(*) FROM "application_setting"
 			WHERE "name" = 'triage.bulk-decision-cap' AND "value" = '250'`, 1},
 		{"the limit under its v0.10.0 name",
@@ -143,7 +166,8 @@ func TestAV0100DatabaseTakesTheV0110StoredWords(t *testing.T) {
 func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
 	for _, step := range []string{
 		"decision.bulk", "notification.decision-lapsed", "outbound.decision-waiting",
-		"notification.link", "saved_filter", "application_setting",
+		"notification.link", "notification.response-window-near", "outbound.response-window-passed",
+		"admin_change.incident", "saved_filter", "application_setting",
 	} {
 		t.Run(step, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

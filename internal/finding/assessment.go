@@ -534,7 +534,7 @@ func reranking(tx bun.IDB, productID int64, rest string, args ...any) *bun.Updat
 	return tx.NewUpdate().
 		Model((*Finding)(nil)).
 		Where(kinds, kindArgs...).
-		Set(`"urgency" = (CASE WHEN "urgency_exploited_here" THEN ? ELSE 0 END)`+
+		Set(`"urgency" = (CASE WHEN "urgency_incident" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_exploited" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_shipped" THEN ? ELSE 0 END) + `+rest,
 			append([]any{int64(exploitedHereBand), int64(exploitedBand), int64(shippedBand)}, args...)...).
@@ -716,7 +716,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		// which the line admits and the window does not read: a window is how
 		// long a fix may take, and being attacked here says nothing about how
 		// long upstream will be.
-		ExploitedHere bool       `bun:"exploited_here"`
+		ExploitedHere bool       `bun:"incident"`
 		OpenedAt      time.Time  `bun:"opened_at"`
 		LearnedAt     *time.Time `bun:"learned_at"`
 		Severity      string     `bun:"severity"`
@@ -731,7 +731,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(rating.Here, productID).
 		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
-		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
 		// Grouped on the learning as well, because it is the base an
 		// exploited deadline is counted from: grouped without it, the
@@ -752,7 +752,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		Where(clocked, clockedArgs...).
 		// What a scan opened. A recorded flaw is clocked by recountOwn, below.
 		Where(`"f"."kind" = ?`, Vulnerable).
-		GroupExpr(`"f"."urgency_exploited", "f"."urgency_exploited_here", "f"."opened_at", `+
+		GroupExpr(`"f"."urgency_exploited", "f"."urgency_incident", "f"."opened_at", `+
 			`"f"."exploited_learned_at", "f"."fix_state", "f"."fixed_at", `+rating.EffectiveExpr).
 		Scan(ctx, &groups)
 	if err != nil {
@@ -766,7 +766,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 			Where(`"vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"closed_at" IS NULL`).
 			Where(`"urgency_exploited" = ?`, group.Exploited).
-			Where(`"urgency_exploited_here" = ?`, group.ExploitedHere).
+			Where(`"urgency_incident" = ?`, group.ExploitedHere).
 			Where(`"opened_at" = ?`, group.OpenedAt).
 			Where(`"kind" = ?`, Vulnerable).
 			// An occurrence a supplier answers on some routes carries no
@@ -1035,7 +1035,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		// milder rating would take off the list has to read both. Reading one
 		// of them offered an approver a number that promised to hide findings
 		// the line would go on admitting.
-		ExploitedHere bool   `bun:"exploited_here"`
+		ExploitedHere bool   `bun:"incident"`
 		Severity      string `bun:"severity"`
 		Open          int    `bun:"open"`
 	}
@@ -1053,14 +1053,14 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 			ColumnExpr(`"si"."id" AS "filed"`).
 			ColumnExpr(`"st"."product_id" AS "product_id"`).
 			ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
-			ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+			ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COUNT(*) AS "open"`).
 			Where(kinds, kindArgs...).
 			Where(`"si"."id" IN (?)`, bun.List(batch)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"st"."product_id" IN (?)`, bun.List(ratedIn)).
-			GroupExpr(`"si"."id", "st"."product_id", "f"."urgency_exploited", "f"."urgency_exploited_here", ` +
+			GroupExpr(`"si"."id", "st"."product_id", "f"."urgency_exploited", "f"."urgency_incident", ` +
 				rating.EffectiveExpr)
 		// Narrowed across every product, not only the claim's: an approver
 		// holding one product is not told how many findings this issue has in

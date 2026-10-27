@@ -41,6 +41,10 @@ var tablesRenamedV0110 = []tableRename{
 	{"claim_comment", "decision_comment"},
 	{"claim_comment_revision", "decision_comment_revision"},
 	{"claim_build", "decision_build"},
+	{"exploited_here", "incident"},
+	{"exploited_fix", "incident_fix"},
+	{"obligation_window", "response_window"},
+	{"obligation_window_product", "response_window_product"},
 }
 
 // columnRename is a column's name before and after, on its table as v0.11.0
@@ -60,6 +64,9 @@ var columnsRenamedV0110 = []columnRename{
 	{"decision_build", "claim_id", "decision_id"},
 	{"upgrade", "claim_id", "decision_id"},
 	{"finding", "place_identity", "occurrence_identity"},
+	{"incident_fix", "exploited_here_id", "incident_id"},
+	{"told_outside", "exploited_here_id", "incident_id"},
+	{"finding", "urgency_exploited_here", "urgency_incident"},
 }
 
 // nameKind is what a renamed name belongs to, which decides how each engine
@@ -144,6 +151,36 @@ var namesRenamedV0110 = []nameRename{
 	{aForeignKey, "decision_build", "claim_build_target_fk", "decision_build_target_fk"},
 
 	{anIndex, "finding", "finding_place_idx", "finding_occurrence_idx"},
+
+	{aPrimaryKey, "incident", "exploited_here_pkey", "incident_pkey"},
+	{aUnique, "incident", "exploited_here_live_unique", "incident_live_unique"},
+	{aForeignKey, "incident", "exploited_here_vulnerability_fk", "incident_vulnerability_fk"},
+	{aForeignKey, "incident", "exploited_here_product_fk", "incident_product_fk"},
+	{aForeignKey, "incident", "exploited_here_recorder_fk", "incident_recorder_fk"},
+	{aForeignKey, "incident", "exploited_here_clearer_fk", "incident_clearer_fk"},
+	{anIndex, "incident", "exploited_here_product_idx", "incident_product_idx"},
+	{anIndex, "incident", "exploited_here_issue_idx", "incident_issue_idx"},
+
+	{aPrimaryKey, "incident_fix", "exploited_fix_pkey", "incident_fix_pkey"},
+	{aUnique, "incident_fix", "exploited_fix_live_unique", "incident_fix_live_unique"},
+	{aForeignKey, "incident_fix", "exploited_fix_record_fk", "incident_fix_incident_fk"},
+	{aForeignKey, "incident_fix", "exploited_fix_stream_fk", "incident_fix_stream_fk"},
+	{aForeignKey, "incident_fix", "exploited_fix_namer_fk", "incident_fix_namer_fk"},
+	{aForeignKey, "incident_fix", "exploited_fix_withdrawer_fk", "incident_fix_withdrawer_fk"},
+
+	{aForeignKey, "told_outside", "told_outside_record_fk", "told_outside_incident_fk"},
+	{anIndex, "told_outside", "told_outside_record_idx", "told_outside_incident_idx"},
+
+	{aPrimaryKey, "response_window", "obligation_window_pkey", "response_window_pkey"},
+	{aUnique, "response_window", "obligation_window_live_unique", "response_window_live_unique"},
+	{aForeignKey, "response_window", "obligation_window_declarer_fk", "response_window_declarer_fk"},
+	{aForeignKey, "response_window", "obligation_window_from_fk", "response_window_from_fk"},
+
+	{aPrimaryKey, "response_window_product", "obligation_window_product_pk", "response_window_product_pk"},
+	{aForeignKey, "response_window_product", "obligation_window_product_window_fk",
+		"response_window_product_window_fk"},
+	{aForeignKey, "response_window_product", "obligation_window_product_product_fk",
+		"response_window_product_product_fk"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
@@ -208,11 +245,18 @@ func declaredV0110(t *columnTypes, table string) []string {
 		statements = commentHistoryBaseline(t)
 	case "claim_build":
 		statements = claimBuildBaseline(t)
+	case "exploited_here", "exploited_fix", "obligation_window", "obligation_window_product":
+		statements = obligationBaseline(t)
 	case "":
-		if table != "upgrade" {
+		switch table {
+		case "upgrade":
+			statements = upgradeBaseline(t)
+		case "told_outside":
+			statements = obligationBaseline(t)
+		default:
 			panic("v0.11.0 gives no table the name " + table)
 		}
-		before, statements = table, upgradeBaseline(t)
+		before = table
 	default:
 		statements = triageBaseline(t)
 	}
@@ -232,7 +276,7 @@ const (
 	renameHoldersShown = 20
 )
 
-// renameV0110 gives the triage tables, columns, indexes and constraints their
+// renameV0110 gives the renamed tables, columns, indexes and constraints their
 // v0.11.0 names. It runs before anything else the upgrade does, so the rest
 // of it, and the declarations it is written against, use the new names.
 //
@@ -448,8 +492,12 @@ func (r renamer) sqliteIndex(n nameRename) error {
 }
 
 // sequence names a renamed PostgreSQL table's identifier sequence after the
-// table.
+// table. A table keyed by the rows it joins has no identifier and no sequence.
 func (r renamer) sequence(table string) error {
+	identified, err := r.u.hasColumn(table, "id")
+	if err != nil || !identified {
+		return err
+	}
 	var had string
 	if err := r.u.tx.QueryRowContext(r.u.ctx, `SELECT pg_get_serial_sequence(?, 'id')`,
 		`"`+table+`"`).Scan(&had); err != nil {

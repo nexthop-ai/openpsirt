@@ -119,7 +119,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 			fixes[0].NamedBy == "" {
 			t.Errorf("the record's fix releases read %+v", fixes)
 		}
-		open := r.Alerts(t, "private-triage", "obligation-open")
+		open := r.Alerts(t, "private-triage", "response-window-open")
 		if len(open) != 1 || !strings.Contains(open[0], "the release of the fix") {
 			t.Errorf("the running windows are %v, want the one counting from the fix", open)
 		}

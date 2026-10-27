@@ -506,7 +506,7 @@ type evidenceRow struct {
 	AnsweredBy         string     `bun:"answered_by"`
 	AnsweredIn         string     `bun:"answered_in"`
 	Urgency            int64      `bun:"urgency"`
-	ExploitedHere      bool       `bun:"exploited_here"`
+	ExploitedHere      bool       `bun:"incident"`
 	FixState           string     `bun:"fix_state"`
 	FixedIn            string     `bun:"fixed_in"`
 	FixedAt            *time.Time `bun:"fixed_at"`
@@ -615,7 +615,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`COALESCE("sb"."publisher", '') AS "answered_by"`).
 		ColumnExpr(`COALESCE("sb"."within", "sb"."component", '') AS "answered_in"`).
 		ColumnExpr(`"f"."urgency" AS "urgency"`).
-		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
 		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).

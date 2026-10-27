@@ -37,7 +37,7 @@ type Told struct {
 	// ExploitedHereID is the record of an attack this notice is about. A
 	// cleared record and the one recorded after it are two incidents, so a
 	// notice belongs to one of them rather than to the issue.
-	ExploitedHereID int64 `bun:"exploited_here_id,notnull"`
+	ExploitedHereID int64 `bun:"incident_id,notnull"`
 	// WindowID is the window this notice answers, where whoever recorded it
 	// said so. Their statement: nothing here decides whether a notice met a
 	// window, and a notice naming none answers none.
@@ -323,7 +323,7 @@ func (s *Store) toldAbout(ctx context.Context,
 	}
 	var rows []Told
 	err := s.db.NewSelect().Model(&rows).
-		Where(`"tod"."exploited_here_id" IN (?)`, bun.List(allowed)).
+		Where(`"tod"."incident_id" IN (?)`, bun.List(allowed)).
 		Order("tod.told_at ASC", "tod.id ASC").
 		Scan(ctx)
 	if err != nil {

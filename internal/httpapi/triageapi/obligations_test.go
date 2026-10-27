@@ -57,11 +57,11 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 			t.Errorf("a window two hours into a day reads as %+v", seen.Items[0].Windows[0])
 		}
 
-		if open := r.Alerts(t, "private-triage", "obligation-open"); len(open) != 2 {
+		if open := r.Alerts(t, "private-triage", "response-window-open"); len(open) != 2 {
 			t.Fatalf("two running windows raised %d notices: %v", len(open), open)
 		}
 		// Nobody who may not act on the product hears of it.
-		if open := r.Alerts(t, "outsider", "obligation-open"); len(open) != 0 {
+		if open := r.Alerts(t, "outsider", "response-window-open"); len(open) != 0 {
 			t.Errorf("somebody with nothing on the product was told: %v", open)
 		}
 
@@ -72,7 +72,7 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 		); got.Code != http.StatusCreated {
 			t.Fatalf("recording a notice answered %d: %s", got.Code, got.Body.String())
 		}
-		open := r.Alerts(t, "private-triage", "obligation-open")
+		open := r.Alerts(t, "private-triage", "response-window-open")
 		if len(open) != 1 || !strings.Contains(open[0], "Final report") {
 			t.Errorf("after the early warning was answered, the running ones are %v", open)
 		}
@@ -128,10 +128,10 @@ func TestAWindowThatEndedWithNobodyToldIsSaidAsPassed(t *testing.T) {
 		r.Declared(t, "Early warning", 24)
 		r.AttackedAt(t, time.Now().UTC().Add(-30*time.Hour))
 
-		if open := r.Alerts(t, "private-triage", "obligation-open"); len(open) != 0 {
+		if open := r.Alerts(t, "private-triage", "response-window-open"); len(open) != 0 {
 			t.Errorf("a window that has ended is still said to be running: %v", open)
 		}
-		if passed := r.Alerts(t, "private-triage", "obligation-passed"); len(passed) != 1 {
+		if passed := r.Alerts(t, "private-triage", "response-window-passed"); len(passed) != 1 {
 			t.Errorf("a window that ended with nobody told raised %d notices", len(passed))
 		}
 	})
@@ -149,7 +149,7 @@ func TestNoWindowIsWatchedUntilADeploymentDeclaresOne(t *testing.T) {
 		if len(seen.Items) != 1 || len(seen.Items[0].Windows) != 0 {
 			t.Errorf("with no window declared the shelf holds %+v", seen)
 		}
-		for _, kind := range []string{"obligation-open", "obligation-passed"} {
+		for _, kind := range []string{"response-window-open", "response-window-passed"} {
 			if told := r.Alerts(t, "private-triage", kind); len(told) != 0 {
 				t.Errorf("with no window declared, %s said %v", kind, told)
 			}
@@ -191,7 +191,7 @@ func TestAnAttackThroughAnUndisclosedIssueReachesOnlyWhoMayReadIt(t *testing.T) 
 			t.Errorf("a private triager was shown %d incidents, want the one", len(seen.Items))
 		}
 
-		if told := r.Alerts(t, "triager", "obligation-open"); len(told) != 0 {
+		if told := r.Alerts(t, "triager", "response-window-open"); len(told) != 0 {
 			t.Errorf("a public triager was told of an undisclosed attack: %v", told)
 		}
 		// Not written for them at all. Every read of the notifications
@@ -201,7 +201,7 @@ func TestAnAttackThroughAnUndisclosedIssueReachesOnlyWhoMayReadIt(t *testing.T) 
 		written, err := r.DB.DB.NewSelect().TableExpr(`"notification" AS "n"`).
 			Join(`JOIN "person" AS "p" ON "p"."id" = "n"."person_id"`).
 			Where(`"p"."identity" = ?`, "triager").
-			Where(`"n"."kind" = ?`, "obligation-open").
+			Where(`"n"."kind" = ?`, "response-window-open").
 			Where(`"n"."cleared_at" IS NULL`).
 			Count(t.Context())
 		if err != nil {
@@ -211,7 +211,7 @@ func TestAnAttackThroughAnUndisclosedIssueReachesOnlyWhoMayReadIt(t *testing.T) 
 			t.Errorf("the sweep wrote %d notices of an undisclosed attack for a public triager",
 				written)
 		}
-		if told := r.Alerts(t, "private-triage", "obligation-open"); len(told) != 1 {
+		if told := r.Alerts(t, "private-triage", "response-window-open"); len(told) != 1 {
 			t.Errorf("a private triager was told %d times, want once", len(told))
 		}
 	})
@@ -225,7 +225,7 @@ func TestARunningWindowStopsBeingSaidWhenItsWindowOrItsRecordGoes(t *testing.T) 
 		early := r.Declared(t, "Early warning", 24)
 		r.Declared(t, "Notification", 72)
 		record := r.AttackedAt(t, time.Now().UTC().Add(-time.Hour))
-		if open := r.Alerts(t, "private-triage", "obligation-open"); len(open) != 2 {
+		if open := r.Alerts(t, "private-triage", "response-window-open"); len(open) != 2 {
 			t.Fatalf("two running windows raised %d notices", len(open))
 		}
 
@@ -233,7 +233,7 @@ func TestARunningWindowStopsBeingSaidWhenItsWindowOrItsRecordGoes(t *testing.T) 
 			fmt.Sprintf("/v1/response-windows/%d", early), ""); got.Code != http.StatusNoContent {
 			t.Fatalf("retiring answered %d: %s", got.Code, got.Body.String())
 		}
-		open := r.Alerts(t, "private-triage", "obligation-open")
+		open := r.Alerts(t, "private-triage", "response-window-open")
 		if len(open) != 1 || !strings.Contains(open[0], "Notification") {
 			t.Errorf("after retiring the early warning, the running ones are %v", open)
 		}
@@ -244,7 +244,7 @@ func TestARunningWindowStopsBeingSaidWhenItsWindowOrItsRecordGoes(t *testing.T) 
 		); got.Code != http.StatusNoContent {
 			t.Fatalf("clearing answered %d: %s", got.Code, got.Body.String())
 		}
-		if open := r.Alerts(t, "private-triage", "obligation-open"); len(open) != 0 {
+		if open := r.Alerts(t, "private-triage", "response-window-open"); len(open) != 0 {
 			t.Errorf("a cleared record still has a running window: %v", open)
 		}
 	})
@@ -257,7 +257,7 @@ func TestANoticeNamingAPassedWindowClearsIt(t *testing.T) {
 		r.Scanned(t)
 		early := r.Declared(t, "Early warning", 24)
 		record := r.AttackedAt(t, time.Now().UTC().Add(-30*time.Hour))
-		if passed := r.Alerts(t, "private-triage", "obligation-passed"); len(passed) != 1 {
+		if passed := r.Alerts(t, "private-triage", "response-window-passed"); len(passed) != 1 {
 			t.Fatalf("a passed window raised %d notices", len(passed))
 		}
 
@@ -268,7 +268,7 @@ func TestANoticeNamingAPassedWindowClearsIt(t *testing.T) {
 		); got.Code != http.StatusCreated {
 			t.Fatalf("recording a notice answered %d: %s", got.Code, got.Body.String())
 		}
-		if passed := r.Alerts(t, "private-triage", "obligation-passed"); len(passed) != 0 {
+		if passed := r.Alerts(t, "private-triage", "response-window-passed"); len(passed) != 0 {
 			t.Errorf("a passed window a notice names is still said: %v", passed)
 		}
 	})
@@ -374,15 +374,15 @@ func TestAWindowWarnsBeforeItsEndWhereItNamesAWarning(t *testing.T) {
 		}
 		r.AttackedAt(t, time.Now().UTC().Add(-20*time.Hour))
 
-		near := r.Alerts(t, "private-triage", "obligation-near")
+		near := r.Alerts(t, "private-triage", "response-window-near")
 		if len(near) != 1 || !strings.Contains(near[0], "Early warning") {
 			t.Fatalf("the windows near their end raised %v, want the early warning alone", near)
 		}
 		// The notice raised when the record stood stays beside it.
-		if open := r.Alerts(t, "private-triage", "obligation-open"); len(open) != 3 {
+		if open := r.Alerts(t, "private-triage", "response-window-open"); len(open) != 3 {
 			t.Errorf("three running windows raised %d running notices: %v", len(open), open)
 		}
-		if told := r.Alerts(t, "outsider", "obligation-near"); len(told) != 0 {
+		if told := r.Alerts(t, "outsider", "response-window-near"); len(told) != 0 {
 			t.Errorf("somebody with nothing on the product was warned: %v", told)
 		}
 
@@ -435,7 +435,7 @@ func TestAWindowLimitedToAnotherProductDoesNotRunForThisOne(t *testing.T) {
 			seen.Items[0].Windows[0].Window.Name != "Ours" {
 			t.Fatalf("the shelf holds %+v, want the window naming this product alone", seen)
 		}
-		open := r.Alerts(t, "private-triage", "obligation-open")
+		open := r.Alerts(t, "private-triage", "response-window-open")
 		if len(open) != 1 || !strings.Contains(open[0], "Ours") {
 			t.Errorf("the running notices are %v, want the window naming this product alone", open)
 		}

@@ -18,13 +18,22 @@ type valueRewrite struct{ table, column, from, to string }
 
 // valuesRewrittenV0110 is every stored word v0.11.0 renames, by the tables as
 // v0.11.0 names them. A notification destination names a kind as a
-// notification does, so both are rewritten.
+// notification does, so both are rewritten. The trail's kind of change is
+// one of a fixed list the API filters on and returns, so it is rewritten
+// too; what a change was about is kept as written.
 var valuesRewrittenV0110 = []valueRewrite{
 	{"decision", "kind", "together", "bulk"},
 	{"notification", "kind", "claim-waiting", "decision-waiting"},
 	{"notification", "kind", "claim-lapsed", "decision-lapsed"},
 	{"outbound", "kind", "claim-waiting", "decision-waiting"},
 	{"outbound", "kind", "claim-lapsed", "decision-lapsed"},
+	{"notification", "kind", "obligation-open", "response-window-open"},
+	{"notification", "kind", "obligation-near", "response-window-near"},
+	{"notification", "kind", "obligation-passed", "response-window-passed"},
+	{"outbound", "kind", "obligation-open", "response-window-open"},
+	{"outbound", "kind", "obligation-near", "response-window-near"},
+	{"outbound", "kind", "obligation-passed", "response-window-passed"},
+	{"admin_change", "kind", "exploited-here", "incident"},
 }
 
 // settingRenamedV0110 is the setting v0.11.0 renames, from its v0.10.0 name.
@@ -40,7 +49,7 @@ var (
 // errValuesStopped is what a rewrite stopped on purpose returns.
 var errValuesStopped = errors.New("the stored words were stopped part way")
 
-// valuesV0110 gives every stored word the triage renames reach its v0.11.0
+// valuesV0110 gives every stored word the renames reach its v0.11.0
 // spelling: a decision's kind, the kinds of notification and destination,
 // the link a notification holds to a decision's row, the address a kept
 // filter opens and a setting's name. It runs after the

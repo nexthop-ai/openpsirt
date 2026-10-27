@@ -8283,7 +8283,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+            kind: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "incident" | "merge" | "upstream";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -11889,7 +11889,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "response-window-open" | "response-window-near" | "response-window-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -12046,7 +12046,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "response-window-open" | "response-window-near" | "response-window-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -15311,7 +15311,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "incident" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -15351,7 +15351,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "incident" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */

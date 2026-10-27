@@ -38,7 +38,7 @@ import (
 // know, and a default would be that reading made for every deployment by
 // nobody who holds it.
 type Window struct {
-	bun.BaseModel `bun:"table:obligation_window,alias:ow"`
+	bun.BaseModel `bun:"table:response_window,alias:ow"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
 	// Name is what the window is called here, as it was typed.
@@ -77,7 +77,7 @@ type Window struct {
 
 // WindowProduct limits a window to one product.
 type WindowProduct struct {
-	bun.BaseModel `bun:"table:obligation_window_product,alias:owp"`
+	bun.BaseModel `bun:"table:response_window_product,alias:owp"`
 
 	WindowID  int64 `bun:"window_id,pk"`
 	ProductID int64 `bun:"product_id,pk"`
@@ -405,7 +405,7 @@ func withLimits(ctx context.Context, db bun.IDB, windows []Window) ([]Window, er
 		Product   string `bun:"product"`
 	}
 	err := db.NewSelect().
-		TableExpr(`"obligation_window_product" AS "owp"`).
+		TableExpr(`"response_window_product" AS "owp"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "owp"."product_id"`).
 		ColumnExpr(`"owp"."window_id" AS "window_id"`).
 		ColumnExpr(`"owp"."product_id" AS "product_id"`).

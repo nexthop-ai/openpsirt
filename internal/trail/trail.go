@@ -77,7 +77,7 @@ const (
 	// does not apply is refused while it stands, and one already agreed to
 	// has its agreement taken back. That is the same kind of act as an alias,
 	// and it belongs beside one.
-	ExploitedHere Kind = "exploited-here"
+	ExploitedHere Kind = "incident"
 	// Case is somebody brought into one undisclosed case, or taken off it
 	// . An access change like the rest of these: it is the one way
 	// somebody reaches an embargoed finding without holding private

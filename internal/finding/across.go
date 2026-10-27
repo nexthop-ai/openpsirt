@@ -616,7 +616,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
+		ColumnExpr(exploitedHereAcross+` AS "incident"`).
 		ColumnExpr(`MAX("pd"."promise") AS "promise"`).
 		Join(`LEFT JOIN (?) AS "pd" ON `+decidedOccurrenceIn(`"pd"."issue_id"`, `"pd"."occurrence_identity"`, "f"), promises).
 		Where(kinds, kindArgs...).
@@ -636,7 +636,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(`SUM("pf"."places") AS "places"`).
 		ColumnExpr(`MIN("pf"."due_at") AS "due_at"`).
 		ColumnExpr(`MAX("pf"."exploited") AS "exploited"`).
-		ColumnExpr(`MAX("pf"."exploited_here") AS "exploited_here"`).
+		ColumnExpr(`MAX("pf"."incident") AS "incident"`).
 		ColumnExpr(`MAX("pf"."promise") AS "promise"`).
 		ColumnExpr(`MIN(CASE WHEN "pf"."fixed_in" <> '' THEN "pf"."fixed_in" END) AS "lo"`).
 		ColumnExpr(`MAX(CASE WHEN "pf"."fixed_in" <> '' THEN "pf"."fixed_in" END) AS "hi"`).
@@ -696,7 +696,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(`SUM("pi"."places") AS "places"`).
 		ColumnExpr(`MIN("pi"."due_at") AS "due_at"`).
 		ColumnExpr(`MAX("pi"."exploited") AS "exploited"`).
-		ColumnExpr(`MAX("pi"."exploited_here") AS "exploited_here"`).
+		ColumnExpr(`MAX("pi"."incident") AS "incident"`).
 		ColumnExpr(`MAX("pi"."promise") AS "promise"`)
 	for j := range columns {
 		column := bun.Ident(fmt.Sprint("on_", j))

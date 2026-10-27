@@ -530,7 +530,7 @@ var administrativeActs = []trailedAct{
 		path: "/v1/products/mine/issues/CVE-2026-9999/incidents",
 		body: `{"known_at":"2026-09-20T14:00:00Z",` +
 			`"grounds":"A customer sent packet captures of the management socket."}`,
-		kind: "exploited-here", about: "CVE-2026-9999 on mine",
+		kind: "incident", about: "CVE-2026-9999 on mine",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			t.Helper()
 			var kept struct {
@@ -547,7 +547,7 @@ var administrativeActs = []trailedAct{
 		// from the fix starts, which is the layer the record sits in.
 		id: "name-fix-release", what: "a tag carrying the fix",
 		who: "private-triage", method: http.MethodPost,
-		kind: "exploited-here", about: "CVE-2026-9999 on mine, fix release",
+		kind: "incident", about: "CVE-2026-9999 on mine, fix release",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
 			t.Helper()
 			names := catalog.NewStore(r.DB.DB)
@@ -576,14 +576,14 @@ var administrativeActs = []trailedAct{
 		id: "withdraw-fix-release", what: "a tag carrying the fix withdrawn",
 		who: "private-triage", method: http.MethodDelete,
 		path: "/v1/incidents/{record}/fixes/{fix}",
-		kind: "exploited-here", about: "CVE-2026-9999 on mine, fix release",
+		kind: "incident", about: "CVE-2026-9999 on mine, fix release",
 	},
 	{
 		id: "clear-exploited-here", what: "a record of being exploited cleared",
 		who: "private-triage", method: http.MethodDelete,
 		path: "/v1/incidents/{record}",
 		body: `{"because":"The captures were of a different deployment."}`,
-		kind: "exploited-here", about: "CVE-2026-9999 on mine",
+		kind: "incident", about: "CVE-2026-9999 on mine",
 	},
 	{
 		// A window decides what every standing attack is watched against,

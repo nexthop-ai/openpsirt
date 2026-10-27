@@ -535,8 +535,8 @@ is 21 to 29 MB beside a 306 MB table.
 Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
 says what a report's case holds.
 
-It renames the triage records first, so the rest of it and the release's
-declarations are written against the new names.
+It renames the triage and incident records first, so the rest of it and the
+release's declarations are written against the new names.
 
 | v0.10.0 table | v0.11.0 table |
 |---|---|
@@ -544,16 +544,21 @@ declarations are written against the new names.
 | `decision_superseded` | `decision_occurrence_superseded` |
 | `claim` | `decision` |
 | `claim_revision`, `claim_approval`, `claim_comment`, `claim_comment_revision`, `claim_build` | `decision_revision`, `decision_approval`, `decision_comment`, `decision_comment_revision`, `decision_build` |
+| `exploited_here`, `exploited_fix` | `incident`, `incident_fix` |
+| `obligation_window`, `obligation_window_product` | `response_window`, `response_window_product` |
 
 | Column | v0.11.0 name |
 |---|---|
 | `claim_id`, on every table above and on `upgrade` | `decision_id` |
 | `decision_id`, on `decision_occurrence_superseded` | `decision_occurrence_id` |
 | `place_identity`, on `decision_occurrence` and `finding` | `occurrence_identity` |
+| `exploited_here_id`, on `incident_fix` and `told_outside` | `incident_id` |
+| `urgency_exploited_here`, on `finding` | `urgency_incident` |
 
 Every index and constraint named after a renamed table or column is renamed
-with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`, and
-`finding_place_idx` is `finding_occurrence_idx`. The tables v0.11.0 creates are
+with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`,
+`finding_place_idx` is `finding_occurrence_idx`, and `told_outside_record_idx`,
+named for the record an incident was, is `told_outside_incident_idx`. The tables v0.11.0 creates are
 declared under the new names, `decision_stamp` among them.
 
 | Rule | Why |
@@ -567,7 +572,7 @@ declared under the new names, `decision_stamp` among them.
 | MySQL and MariaDB rename a foreign key by declaring it again | Neither has a statement for it. It is dropped and declared under its new name in one statement, in place, with foreign keys unchecked so no row is read. Where its index bore the key's name, the index is renamed first and serves the new key: MySQL drops the index it made for a key declared again and builds another, reading every row |
 | SQLite builds a renamed index again | It has no statement renaming one, and SQLite is a development database |
 | SQLite keeps the constraint names v0.10.0 wrote | A constraint's name is part of a SQLite table's text, which only a rebuild rewrites, and SQLite reports none of them |
-| PostgreSQL names each renamed table's sequence after it | The sequence keeps its table's old name otherwise |
+| PostgreSQL names each renamed table's sequence after it, where the table has one | The sequence keeps its table's old name otherwise. `response_window_product` is keyed by the rows it joins and has none |
 
 The stored values the renames reach then take the new words, in a step of
 its own after the renames.
@@ -575,8 +580,9 @@ its own after the renames.
 | Stored value | v0.10.0 | v0.11.0 |
 |---|---|---|
 | A bulk decision's `kind` on `decision` | `together` | `bulk` |
-| `kind` on `notification` and `outbound` | `claim-waiting`, `claim-lapsed` | `decision-waiting`, `decision-lapsed` |
+| `kind` on `notification` and `outbound` | `claim-waiting`, `claim-lapsed`, `obligation-open`, `obligation-near`, `obligation-passed` | `decision-waiting`, `decision-lapsed`, `response-window-open`, `response-window-near`, `response-window-passed` |
 | A notification's `link` to a decision's row at one occurrence | `/decisions/{id}` | `/decision-occurrences/{id}` |
+| A change's `kind` on `admin_change` | `exploited-here` | `incident` |
 | A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
 | The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
 
@@ -589,8 +595,8 @@ its own after the renames.
 | The setting's row moves only where none is under the new name | A row under the new name outranks the former one |
 | The setting is read under its former name while the new one is unset, and each start logs a warning naming both | A v0.10.0 binary still running after the upgrade writes the former name |
 | Changing the setting replaces the former row and removes it in the same transaction, and the trail records the former value as what was replaced | The former name is refused at the API, so this is the one way to clear it and end the warning |
-| A waiting condition's identity keeps the words v0.10.0 hashed | An open condition is matched by that hash, and a new one would notify everybody again |
-| The trail of administrative changes keeps the former setting name | It records a change under the name the setting had |
+| A waiting condition's and a response window condition's identity keep the words v0.10.0 hashed | An open condition is matched by that hash, and a new one would notify everybody again |
+| The trail of administrative changes keeps the former setting name, and what each change was about as written | It records a change under the name the setting had. Its kind is rewritten, because the API filters on and returns it from a fixed list |
 | A decision's record of how its set was chosen is kept as written | It records what somebody asked for |
 
 Each of the upgrade's three phases logs how long it took: the renames, the
@@ -616,10 +622,11 @@ stored values, and the changes after them.
 |---|---|
 | A v0.10.0 database holding an acknowledged report | Upgraded, with the acknowledgement read back as the first message sent, on its day and by the person who recorded it |
 | A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
-| The same, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
+| A v0.10.0 database holding an incident, a release carrying its fix, a notice outside, a window counted from another and limited to a product, and a finding the incident ranks first | Upgraded, each row read back under its v0.11.0 name pointing where it did, each renamed table's declaration describing the table built, and a window declared after it numbered after the rows it had |
+| The same two, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
 | A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
-| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a kept filter naming the renamed words and the bulk action limit | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
-| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
+| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a kept filter naming the renamed words, the bulk action limit and a change on the trail of the renamed kind | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
+| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, a change's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
 
 ### Release records
 

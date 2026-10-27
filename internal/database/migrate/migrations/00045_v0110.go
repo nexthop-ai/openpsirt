@@ -34,10 +34,14 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     a decision, a decision's row at one place is a decision occurrence, and
 //     a place is an occurrence. Renamed first, so everything after is
 //     written against the new names.
+//   - A record that a product was attacked is an incident, and the windows
+//     a deployment declares to answer one are response windows. Renamed
+//     with the triage records.
 //   - The stored words those renames reach follow them, in a step of their
 //     own after the renames: a bulk decision's kind, the kinds of
-//     notification a decision waiting or lapsed raises, the address a kept
-//     filter opens, and the bulk action limit's setting name.
+//     notification a decision waiting or lapsed and a response window
+//     raise, the address a kept filter opens, and the bulk action limit's
+//     setting name.
 //   - An issue records what sort of issue it is: a published vulnerability, a
 //     flaw minted here, or an analyzer's rule.
 //   - The finding indexes a read answers from without the table carry the

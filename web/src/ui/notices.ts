@@ -75,9 +75,9 @@ const WORDS: Record<Kind, string> = {
   // A window after an attack, counted from when it became known, with
   // nobody outside recorded as told. Said as the fact; whether anybody owed
   // anything is not the tool's answer to give.
-  "obligation-open": "window after an attack running",
-  "obligation-near": "window after an attack ending soon",
-  "obligation-passed": "window after an attack passed",
+  "response-window-open": "window after an attack running",
+  "response-window-near": "window after an attack ending soon",
+  "response-window-passed": "window after an attack passed",
 };
 
 // A kind this does not know is shown as it arrived: a server deployed ahead

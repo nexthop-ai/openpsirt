@@ -32,10 +32,10 @@ import (
 // withdrawing it, and the naming stays readable with who took it back, the
 // way a cleared record does.
 type Fix struct {
-	bun.BaseModel `bun:"table:exploited_fix,alias:ef"`
+	bun.BaseModel `bun:"table:incident_fix,alias:ef"`
 
 	ID              int64      `bun:"id,pk,autoincrement"`
-	ExploitedHereID int64      `bun:"exploited_here_id,notnull"`
+	ExploitedHereID int64      `bun:"incident_id,notnull"`
 	StreamID        int64      `bun:"stream_id,notnull"`
 	NamedBy         int64      `bun:"named_by,notnull"`
 	NamedAt         time.Time  `bun:"named_at,notnull"`
@@ -171,7 +171,7 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 		}
 		fix := new(Fix)
 		if err := tx.NewSelect().Model(fix).
-			Where(`"ef"."id" = ?`, fixID).Where(`"ef"."exploited_here_id" = ?`, record.ID).
+			Where(`"ef"."id" = ?`, fixID).Where(`"ef"."incident_id" = ?`, record.ID).
 			Where(`"ef"."withdrawn_at" IS NULL`).
 			Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
@@ -308,7 +308,7 @@ func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"st"."display_name" AS "release_display"`).
 		ColumnExpr(`"st"."released_on" AS "released_on"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "ef"."stream_id"`).
-		Where(`"ef"."exploited_here_id" IN (?)`, bun.List(ids)).
+		Where(`"ef"."incident_id" IN (?)`, bun.List(ids)).
 		Order("ef.named_at ASC", "ef.id ASC").
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the releases named as carrying the fix: %w", err)

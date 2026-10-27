@@ -100,7 +100,12 @@ func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 			default:
 				continue
 			}
-			about := string(kind)
+			// The words v0.10.0 hashed, kept: an open condition is matched by
+			// this hash, and a new one would tell everybody again.
+			about := map[Kind]string{
+				ObligationOpen: "obligation-open", ObligationNear: "obligation-near",
+				ObligationPassed: "obligation-passed",
+			}[kind]
 			from := "when this became known"
 			switch {
 			case due.Window.FromID != nil:

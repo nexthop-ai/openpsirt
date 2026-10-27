@@ -612,7 +612,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				return where
 			}
 			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return where(q).Where(`"urgency_exploited_here" = ?`, true)
+				return where(q).Where(`"urgency_incident" = ?`, true)
 			}
 		}
 		bands := []band{
@@ -684,7 +684,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							Where(onClock, onClockArgs...).
 							Where(`"fix_state" <> ?`, NoFix).
 							Where(`NOT ("fix_state" = ? AND "urgency_exploited" = ? AND `+
-								`"urgency_exploited_here" = ?)`, WontFix, false, false)
+								`"urgency_incident" = ?)`, WontFix, false, false)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {
 							return changed, fmt.Errorf("rewrite deadlines: %w", err)
@@ -799,7 +799,7 @@ func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 				WhereGroup(" OR ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
 					return q.Where(`"fix_state" = ?`, WontFix).
 						Where(`"urgency_exploited" = ?`, false).
-						Where(`"urgency_exploited_here" = ?`, false)
+						Where(`"urgency_incident" = ?`, false)
 				})
 		}).
 		Exec(ctx)
@@ -916,7 +916,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 			Where(`"closed_at" IS NULL`).
 			Where(`"due_at" IS NOT NULL`).
 			Where(`"urgency_exploited" = ?`, false).
-			Where(`"urgency_exploited_here" = ?`, false).
+			Where(`"urgency_incident" = ?`, false).
 			Where(inThisProduct, productID).
 			Where(`"vulnerability_id" NOT IN (SELECT "v"."id" FROM "vulnerability" AS "v" `+
 				rating.Here+` WHERE `+rating.BandExpr+` IN (?))`, productID, bun.List(words)).

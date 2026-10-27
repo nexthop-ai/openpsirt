@@ -776,7 +776,7 @@ type Owned struct {
 	Purl          string `bun:"-"`
 	Severity      string `bun:"severity"`
 	Exploited     bool   `bun:"exploited"`
-	ExploitedHere bool   `bun:"exploited_here"`
+	ExploitedHere bool   `bun:"incident"`
 	// Product is the name that addresses it, and ProductName the one shown.
 	Product     string `bun:"product"`
 	ProductName string `bun:"-"`
@@ -987,7 +987,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		Builds          int       `bun:"builds"`
 		Urgency         int64     `bun:"urgency"`
 		Exploited       int       `bun:"exploited"`
-		ExploitedHere   int       `bun:"exploited_here"`
+		ExploitedHere   int       `bun:"incident"`
 		Occurrences     int       `bun:"places"`
 		Occurrence      string    `bun:"place"`
 		Total           int       `bun:"total"`
@@ -1010,7 +1010,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
 		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
+		ColumnExpr(exploitedHereAcross+` AS "incident"`).
 		// The oldest occurrence decides, as it does everywhere else here: a
 		// group open for a month with one occurrence added yesterday has been
 		// somebody's problem for a month, and a maximum made it read as a day

@@ -105,7 +105,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		Builds        int    `bun:"builds"`
 		Urgency       int64  `bun:"urgency"`
 		Exploited     int    `bun:"exploited"`
-		ExploitedHere int    `bun:"exploited_here"`
+		ExploitedHere int    `bun:"incident"`
 		Worst         int    `bun:"worst"`
 		Total         int    `bun:"total"`
 	}
@@ -128,7 +128,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
+		ColumnExpr(overParts.exploitedHere() + ` AS "incident"`).
 		ColumnExpr(worst + ` AS "worst"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first unless somebody asks otherwise, and every order is
@@ -374,7 +374,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		Occurrences   int   `bun:"places"`
 		Urgency       int64 `bun:"urgency"`
 		Exploited     int   `bun:"exploited"`
-		ExploitedHere int   `bun:"exploited_here"`
+		ExploitedHere int   `bun:"incident"`
 		Total         int   `bun:"total"`
 	}
 	page := s.byComponent(targets, visible, filter).
@@ -386,7 +386,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(overParts.occurrences() + ` AS "places"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
+		ColumnExpr(overParts.exploitedHere() + ` AS "incident"`).
 		// The total rides on the page, as the findings list's does.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// The issue is joined only where the order needs it, the way the

@@ -640,7 +640,7 @@ const CHANGE_SAID: Record<ChangeKind, string> = {
   case: "Cases",
   alias: "Issue names",
   catalog: "Catalog",
-  "exploited-here": "Exploited here",
+  incident: "Incidents",
   merge: "Merged issues",
   upstream: "Upstreams",
 };

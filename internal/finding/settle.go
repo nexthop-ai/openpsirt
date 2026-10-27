@@ -369,7 +369,7 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 	// A record of being attacked that now stands for the kept issue marks
 	// every one of its findings in that product.
 	var attacked []int64
-	if err := v.db.NewSelect().TableExpr(`"exploited_here"`).
+	if err := v.db.NewSelect().TableExpr(`"incident"`).
 		Column("product_id").
 		Where(`"live_vulnerability_id" = ?`, kept).
 		Scan(ctx, &attacked); err != nil {
@@ -580,7 +580,7 @@ func (v *Vulnerabilities) settleAttacks(ctx context.Context, kept, gone, mergeID
 	now time.Time, why superseding) error {
 
 	var standing []standingAttack
-	if err := v.db.NewSelect().TableExpr(`"exploited_here"`).
+	if err := v.db.NewSelect().TableExpr(`"incident"`).
 		Column("id", "product_id", "live_vulnerability_id", "known_at", "recorded_at").
 		Where(`"live_vulnerability_id" IN (?, ?)`, kept, gone).
 		OrderExpr(`"id"`).
@@ -589,7 +589,7 @@ func (v *Vulnerabilities) settleAttacks(ctx context.Context, kept, gone, mergeID
 	}
 	retire := func(a, winner standingAttack) error {
 		product := a.ProductID
-		if _, err := v.db.NewUpdate().TableExpr(`"exploited_here"`).
+		if _, err := v.db.NewUpdate().TableExpr(`"incident"`).
 			Set(`"cleared_at" = ?`, now).
 			Set(`"cleared_by" = NULL`).
 			Set(`"cleared_because" = ?`, why.because).
@@ -613,7 +613,7 @@ func (v *Vulnerabilities) settleAttacks(ctx context.Context, kept, gone, mergeID
 		if winner.LiveID == kept {
 			return nil
 		}
-		if _, err := v.db.NewUpdate().TableExpr(`"exploited_here"`).
+		if _, err := v.db.NewUpdate().TableExpr(`"incident"`).
 			Set(`"live_vulnerability_id" = ?`, kept).
 			Where(`"id" = ?`, winner.ID).Exec(ctx); err != nil {
 			return fmt.Errorf("hold record %d of being attacked under the issue it is read as: %w",

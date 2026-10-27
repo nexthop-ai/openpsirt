@@ -342,7 +342,7 @@ func TestNamingAFixReleaseLandsInTheAdministrativeTrail(t *testing.T) {
 		if len(rows) != 2 {
 			t.Fatalf("%d trail rows about the fix release, want 2", len(rows))
 		}
-		if rows[0].Kind != "exploited-here" || rows[0].By.Int64 != f.triager.ID ||
+		if rows[0].Kind != "incident" || rows[0].By.Int64 != f.triager.ID ||
 			rows[0].Was.Valid || rows[0].Became.String != world.TagName {
 			t.Errorf("naming it trailed %+v", rows[0])
 		}

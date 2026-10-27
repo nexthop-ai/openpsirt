@@ -142,7 +142,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		FixedIn         string     `bun:"fixed_in"`
 		Description     string     `bun:"description"`
 		Exploited       int        `bun:"exploited"`
-		ExploitedHere   int        `bun:"exploited_here"`
+		ExploitedHere   int        `bun:"incident"`
 		LikelihoodPPM   int        `bun:"likelihood_ppm"`
 		DueAt           *time.Time `bun:"due_at"`
 	}
@@ -168,7 +168,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			ColumnExpr(`MAX(CASE WHEN "v"."exploited" THEN 1 ELSE 0 END) AS "exploited"`).
 			// Read off the finding, where a standing record of this product
 			// being attacked is already written for ranking.
-			ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited_here" THEN 1 ELSE 0 END) AS "exploited_here"`).
+			ColumnExpr(`MAX(CASE WHEN "f"."urgency_incident" THEN 1 ELSE 0 END) AS "incident"`).
 			// The earliest deadline among this issue's occurrences here, which
 			// is the one that makes it late. Read with the rest of what a row
 			// shows rather than off the occurrences: the occurrences are read

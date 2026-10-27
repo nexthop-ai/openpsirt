@@ -21,7 +21,7 @@ import (
 func TestAWindowIsNotDeclaredFromOneRetiredAtTheSameTime(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		notification := f.window(t, "Notification", 72)
-		racing, rival := rivalAfterRead(t, f, "obligation_window", "obligation_window", func() error {
+		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
 			return f.store.RetireWindow(context.Background(), f.admin, notification.ID)
 		})
 		_, declared := racing.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
@@ -42,7 +42,7 @@ func TestTwoChangesAtOnceCloseNoLoop(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		a := f.window(t, "A", 24)
 		b := f.window(t, "B", 24)
-		racing, rival := rivalAfterRead(t, f, "obligation_window", "obligation_window", func() error {
+		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
 			_, err := f.store.ChangeWindow(context.Background(), f.admin, b.ID, obligation.WindowSaid{
 				Name: "B", Hours: 24, From: &a.ID,
 			})
@@ -68,7 +68,7 @@ func TestTwoChangesAtOnceCloseNoLoop(t *testing.T) {
 func TestAFixIsNotNamedOnARecordClearedAtTheSameTime(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
-		racing, rival := rivalAfterRead(t, f, "exploited_here", "exploited_fix", func() error {
+		racing, rival := rivalAfterRead(t, f, "incident", "incident_fix", func() error {
 			return triage.NewStore(f.db.DB).ClearExploitedHere(context.Background(), f.triager,
 				record.ID, "It was a test harness.")
 		})

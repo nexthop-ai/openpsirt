@@ -925,18 +925,17 @@ var tables = []string{
 	"issue_note",
 	// Before the notice it belongs to.
 	"told_place",
-	// Before the record of being exploited, the release and the people it
-	// points at.
-	"exploited_fix",
-	// Before the record of being exploited and the window it points at.
+	// Before the incident, the release and the people it points at.
+	"incident_fix",
+	// Before the incident and the window it points at.
 	"told_outside",
 	// Before the window and the product it points at.
-	"obligation_window_product",
+	"response_window_product",
 	// Before person, which it points at, and after the rows naming it.
-	"obligation_window",
+	"response_window",
 	// Before person, product and vulnerability, all of which it points at,
 	// and after the notices that point at it.
-	"exploited_here",
+	"incident",
 	// Before person, product and vulnerability, which it points at.
 	"assessment",
 	// Before product and vulnerability, both of which it points at.
@@ -1154,8 +1153,8 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 			}
 		}
 		// A window points at the window it counts from, the same shape again.
-		if occupied["obligation_window"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "obligation_window" SET "from_window_id" = NULL`); err != nil {
+		if occupied["response_window"] {
+			if _, err := tx.ExecContext(ctx, `UPDATE "response_window" SET "from_window_id" = NULL`); err != nil {
 				return fmt.Errorf("detach windows counting from others: %w", err)
 			}
 		}

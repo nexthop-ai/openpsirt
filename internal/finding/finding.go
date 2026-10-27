@@ -314,7 +314,7 @@ type Finding struct {
 	// folded into it: a feed's word about the world and a person's word about
 	// this product are different facts, and a report that names one of them
 	// reads the column it means.
-	RankExploitedHere bool `bun:"urgency_exploited_here,notnull"`
+	RankExploitedHere bool `bun:"urgency_incident,notnull"`
 	// ExploitedLearnedAt is when exploitation was learned, which is what an
 	// exploited deadline is counted from.
 	//

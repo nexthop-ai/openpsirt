@@ -101,7 +101,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 					_, err := f.store.EarlierNote(ctx, f.triager, note.ID)
 					return err
 				}},
-			{"clearing a record of being exploited", "exploited_here",
+			{"clearing a record of being exploited", "incident",
 				triage.ErrNoSuchExploitedHere,
 				func(ctx context.Context) error {
 					return f.store.ClearExploitedHere(ctx, f.triager, record.ID, "It was a test harness.")

@@ -2094,7 +2094,7 @@ components:
             - case
             - alias
             - catalog
-            - exploited-here
+            - incident
             - merge
             - upstream
           type: string
@@ -8572,9 +8572,9 @@ components:
             - lead-reopened
             - rule-outgrown
             - rule-waiting
-            - obligation-open
-            - obligation-near
-            - obligation-passed
+            - response-window-open
+            - response-window-near
+            - response-window-passed
           type: string
         lifetime:
           description: An event happened once and is acknowledged; a condition holds until what it is about changes
@@ -8889,9 +8889,9 @@ components:
             - lead-reopened
             - rule-outgrown
             - rule-waiting
-            - obligation-open
-            - obligation-near
-            - obligation-passed
+            - response-window-open
+            - response-window-near
+            - response-window-passed
             - "*"
           type: string
         name:
@@ -14494,7 +14494,7 @@ paths:
               - case
               - alias
               - catalog
-              - exploited-here
+              - incident
               - merge
               - upstream
             type: string
@@ -14595,7 +14595,7 @@ paths:
               - case
               - alias
               - catalog
-              - exploited-here
+              - incident
               - merge
               - upstream
             type: string

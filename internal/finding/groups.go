@@ -643,7 +643,7 @@ type groupHead struct {
 	// else — and a list that showed one where the other holds would be the
 	// confusion the two columns exist to prevent.
 	Exploited     int `bun:"exploited"`
-	ExploitedHere int `bun:"exploited_here"`
+	ExploitedHere int `bun:"incident"`
 	// Total is how many groups the filter admits, the same on every row.
 	Total int `bun:"total"`
 }
@@ -760,7 +760,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// decision appears is the worst of what it covers.
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`)
+		ColumnExpr(overParts.exploitedHere() + ` AS "incident"`)
 	if key != "" {
 		grouped = grouped.ColumnExpr(key + ` AS "sort_key"`)
 	}
@@ -771,7 +771,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		grouped = grouped.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
 	}
 	page := paged(s.db, grouped, "vulnerability_id", "fold", "component_id", "places",
-		"urgency", "exploited", "exploited_here").
+		"urgency", "exploited", "incident").
 		// Ordered by urgency unless somebody asked otherwise. Urgency
 		// rather than how widespread something is: sorting by occurrence
 		// count puts whatever ships in the most occurrences at the top,

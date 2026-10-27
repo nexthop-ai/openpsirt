@@ -1111,7 +1111,7 @@ type ratingRow struct {
 	Published     string     `bun:"published"`
 	Assessed      string     `bun:"assessed"`
 	Exploited     bool       `bun:"exploited"`
-	ExploitedHere int        `bun:"exploited_here"`
+	ExploitedHere int        `bun:"incident"`
 	ScoreCenti    int        `bun:"score_centi"`
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ExploitedOn   *time.Time `bun:"exploited_on"`
@@ -1164,7 +1164,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 			ColumnExpr(`COALESCE("v"."severity", ?) AS "published"`, "").
 			ColumnExpr(`COALESCE("ir"."severity", ?) AS "assessed"`, "").
 			ColumnExpr(`"v"."exploited" AS "exploited"`).
-			ColumnExpr(`CASE WHEN "eh"."id" IS NULL THEN 0 ELSE 1 END AS "exploited_here"`).
+			ColumnExpr(`CASE WHEN "eh"."id" IS NULL THEN 0 ELSE 1 END AS "incident"`).
 			ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
 			ColumnExpr(`COALESCE("v"."likelihood_ppm", 0) AS "likelihood_ppm"`).
 			ColumnExpr(`"v"."exploited_on" AS "exploited_on"`).

@@ -78,7 +78,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 		FixState      FixState   `bun:"fix_state"`
 		FixedAt       *time.Time `bun:"fixed_at"`
 		Exploited     bool       `bun:"exploited"`
-		ExploitedHere bool       `bun:"exploited_here"`
+		ExploitedHere bool       `bun:"incident"`
 		LearnedAt     *time.Time `bun:"learned_at"`
 		// OnTheClock is whether the release carries deadlines at all: a tag
 		// and a release past end of life do not.
@@ -98,7 +98,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
 		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).
 		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
-		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 		ColumnExpr(`"f"."exploited_learned_at" AS "learned_at"`).
 		ColumnExpr(`CASE WHEN `+clocked+` THEN 1 ELSE 0 END AS "on_the_clock"`, clockedArgs...).
 		Where(`"f"."kind" = ?`, Entered).

@@ -149,18 +149,18 @@ const (
 	// It clears when a notice names the window, when the record is cleared,
 	// or when the window is retired — and when the end arrives, at which point
 	// the other opens.
-	ObligationOpen Kind = "obligation-open"
+	ObligationOpen Kind = "response-window-open"
 	// ObligationNear is the same window once the warning it names has come
 	// and its end has not, still with no notice recorded against it.
 	//
 	// Beside the one raised when the record stands rather than instead of it.
 	// A day's window and a fortnight's want warnings of different sizes, so
 	// each window says its own, and one that says none raises none.
-	ObligationNear Kind = "obligation-near"
+	ObligationNear Kind = "response-window-near"
 	// ObligationPassed is the same window after its end, still with no
 	// notice recorded against it. Both halves are facts; whether anybody owed
 	// anything is not the tool's answer to give.
-	ObligationPassed Kind = "obligation-passed"
+	ObligationPassed Kind = "response-window-passed"
 
 	// The four things that are wrong because nothing has happened.
 	//

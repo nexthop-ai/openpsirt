@@ -625,7 +625,7 @@ func trailed(t *testing.T, f *fixture, name string) int {
 func TestTwoRetirementsAtOnceRecordOneAct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		early := f.window(t, "Early warning", 24)
-		racing, rival := rivalAfterRead(t, f, "obligation_window", "obligation_window", func() error {
+		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
 			return f.store.RetireWindow(context.Background(), f.admin, early.ID)
 		})
 		first := racing.RetireWindow(t.Context(), f.admin, early.ID)
@@ -651,7 +651,7 @@ func TestTwoRetirementsAtOnceRecordOneAct(t *testing.T) {
 func TestAWindowRetiredWhileBeingChangedIsNotChanged(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		early := f.window(t, "Early warning", 24)
-		racing, rival := rivalAfterRead(t, f, "obligation_window", "obligation_window", func() error {
+		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
 			return f.store.RetireWindow(context.Background(), f.admin, early.ID)
 		})
 		_, changed := racing.ChangeWindow(t.Context(), f.admin, early.ID,
