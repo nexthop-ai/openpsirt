@@ -119,14 +119,12 @@ func TestAV0100DatabaseTakesTheV0110RuleNames(t *testing.T) {
 	})
 }
 
-// An upgrade stopped after any one of these renames is started again, and
-// leaves what one that did not stop leaves.
+// An upgrade stopped after each of these renames in turn, every start resuming
+// the one before it, is started again, and leaves what one that did not stop
+// leaves. One database per engine runs every stop, in the order the upgrade
+// renames, as TestAnUpgradeStoppedPartWayThroughItsRenamesResumes says.
 func TestAnUpgradeStoppedPartWayThroughTheRuleRenamesResumes(t *testing.T) {
-	for _, stop := range []struct {
-		after string
-		// servers is a constraint SQLite does not rename.
-		servers bool
-	}{
+	stops := inRenameOrder(t, []renameStop{
 		{after: "routing_rule"},
 		{after: "routed_by"},
 		{after: "routing_rule_team_fk", servers: true},
@@ -144,28 +142,23 @@ func TestAnUpgradeStoppedPartWayThroughTheRuleRenamesResumes(t *testing.T) {
 		{after: "vex_issuance"},
 		{after: "vex_issuance_once_per_kind", servers: true},
 		{after: "vex_issuance_by_fk", servers: true},
-	} {
-		t.Run(stop.after, func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
-				if stop.servers && db.Server.Engine == database.SQLite {
-					t.Skip("SQLite keeps the constraint names v0.10.0 wrote")
-				}
-				ctx := t.Context()
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0100)
-				seeded := seedRulesV0100(t, ctx, db)
-				stopped, err := migrations.StopV0110RenamingAfter(ctx, db, stop.after)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !stopped {
-					t.Fatalf("nothing renames %s here, so this stopped nothing", stop.after)
-				}
-				dbtest.MigrateTo(t, db, v0110)
-				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
-				seeded.renamedAs(t, ctx, db)
-				leaveAtLatest(t, ctx, db)
+	})
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		seeded := seedRulesV0100(t, ctx, db)
+		for _, stop := range stops {
+			if stop.servers && db.Server.Engine == database.SQLite {
+				continue // SQLite keeps the constraint names v0.10.0 wrote.
+			}
+			stopAt(t, stop.after, func() (bool, error) {
+				return migrations.StopV0110RenamingAfter(ctx, db, stop.after)
 			})
-		})
-	}
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
+		seeded.renamedAs(t, ctx, db)
+		leaveAtLatest(t, ctx, db)
+	})
 }

@@ -195,34 +195,31 @@ func TestAV0100DatabaseTakesTheV0110StoredWords(t *testing.T) {
 	})
 }
 
-// An upgrade stopped after any one step rewriting stored words is started
-// again, and leaves what one that did not stop leaves.
+// An upgrade stopped after each step rewriting stored words in turn, every
+// start resuming the one before it, is started again, and leaves what one that
+// did not stop leaves. One database per engine runs every stop, as
+// TestAnUpgradeStoppedPartWayThroughItsRenamesResumes says.
 func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
-	for _, step := range []string{
+	steps := []string{
 		"decision.bulk", "notification.decision-lapsed", "outbound.decision-waiting",
 		"notification.link", "notification.response-window-near", "outbound.response-window-passed",
 		"admin_change.incident", "job.failed", "admin_change.assignment-rule", "job.assignment.sweep",
 		"saved_filter", "application_setting",
-	} {
-		t.Run(step, func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
-				ctx := t.Context()
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0100)
-				seedWordsV0100(t, ctx, db)
-				stopped, err := migrations.StopV0110RewritingAfter(ctx, db, step)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !stopped {
-					t.Fatalf("no step is named %s, so this stopped nothing", step)
-				}
-				dbtest.MigrateTo(t, db, v0110)
-				wordsRenamed(t, ctx, db)
-				leaveAtLatest(t, ctx, db)
-			})
-		})
 	}
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		seedWordsV0100(t, ctx, db)
+		for _, step := range steps {
+			stopAt(t, step, func() (bool, error) {
+				return migrations.StopV0110RewritingAfter(ctx, db, step)
+			})
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		wordsRenamed(t, ctx, db)
+		leaveAtLatest(t, ctx, db)
+	})
 }
 
 // A kept filter's address takes v0.11.0's words for a word of the address and

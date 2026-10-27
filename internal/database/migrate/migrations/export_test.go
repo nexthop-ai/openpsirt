@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 
 	"github.com/uptrace/bun"
 
@@ -210,6 +211,23 @@ func StopV0110RenamingAfter(ctx context.Context, db *database.DB, name string) (
 		return true, nil
 	}
 	return false, err
+}
+
+// RenameOrderV0110 is the position, in the order the v0.11.0 upgrade runs its
+// renames, of the first statement renaming the named table, column, index or
+// constraint, and -1 where nothing renames that name.
+func RenameOrderV0110(name string) int {
+	var froms []string
+	for _, t := range tablesRenamedV0110 {
+		froms = append(froms, t.from)
+	}
+	for _, c := range columnsRenamedV0110 {
+		froms = append(froms, c.from)
+	}
+	for _, n := range namesRenamedV0110 {
+		froms = append(froms, n.from)
+	}
+	return slices.Index(froms, name)
 }
 
 // StopV0110RewritingAfter runs the v0.11.0 renames and the stored words after
