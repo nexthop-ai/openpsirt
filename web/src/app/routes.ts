@@ -208,7 +208,7 @@ export const inventoryChangesAt = (build: Build, scan: number) =>
   at("inventoryChanges", { ...build, scan });
 export const runAt = (build: Build, run: number) => at("run", { ...build, run });
 export const plannedUpgradesAt = (build: Build) => at("plannedUpgrades", build);
-export const matchCoverageAt = (build: Build) => at("matchCoverage", build);
+export const unmatchedComponentsAt = (build: Build) => at("unmatchedComponents", build);
 export const vexAt = (build: Build) => at("vex", build);
 
 // A build's screen named by what follows the build in an address, for moving

@@ -6,7 +6,7 @@ import {
   auditLogAt,
   comparisonAt,
   uploadsAt,
-  matchCoverageAt,
+  unmatchedComponentsAt,
   analyticsReportAt,
   streamsAt,
   type Build,
@@ -157,8 +157,8 @@ export const GROUPS: Group[] = [
     name: "Coverage",
     reports: [
       {
-        slug: "scan-coverage",
-        name: "Scan coverage",
+        slug: "last-upload-per-build",
+        name: "Last upload per build",
         answers: "What is being scanned, when each build was last seen, and what has gone quiet.",
       },
       {
@@ -169,9 +169,9 @@ export const GROUPS: Group[] = [
         needs: "product",
       },
       {
-        name: "Match coverage",
+        name: "Unmatched components",
         answers: "Components in a build the scanner can't match, and why. They report no findings.",
-        to: (at) => matchCoverageAt(buildOf(at)),
+        to: (at) => unmatchedComponentsAt(buildOf(at)),
         needs: "build",
       },
       {

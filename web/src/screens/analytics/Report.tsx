@@ -6,7 +6,7 @@ import { Navigate, useLocation, useParams } from "react-router-dom";
 import { analyticsReportAt } from "../../app/routes";
 import { Backlog } from "./Backlog";
 import { Compliance } from "./Compliance";
-import { Coverage } from "./Coverage";
+import { LastUploads } from "./LastUploads";
 import { Effort } from "./Effort";
 import { LeadSeries } from "./LeadSeries";
 import { Overview } from "./Overview";
@@ -26,7 +26,7 @@ import { own } from "../../ui/own";
 // eslint-disable-next-line no-restricted-syntax -- Keyed on this interface's own report addresses.
 export const PAGES: Record<string, ReactElement> = {
   "program-overview": <Overview />,
-  "scan-coverage": <Coverage />,
+  "last-upload-per-build": <LastUploads />,
   "leads-by-analyzer": <LeadSeries />,
   "releases-out-of-support": <Support />,
   "approval-quality": <Scrutiny />,
@@ -43,6 +43,7 @@ export const PAGES: Record<string, ReactElement> = {
 // eslint-disable-next-line no-restricted-syntax -- Keyed on report addresses that have moved.
 const RENAMED: Record<string, string> = {
   "rubber-stamp": "approval-quality",
+  "scan-coverage": "last-upload-per-build",
   "where-the-effort-went": "effort-by-component",
 };
 

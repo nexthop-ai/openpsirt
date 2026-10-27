@@ -15,7 +15,7 @@ func TestEveryBuildIsCountedInTheOneStateItIsIn(t *testing.T) {
 	// build counted as scanned and as something else too makes the parts add
 	// up to more than the whole.
 	seen := time.Now()
-	rows := []ingest.Coverage{
+	rows := []ingest.LastUpload{
 		{Product: "scanned", LastReceivedAt: &seen},
 		{Product: "quiet", LastReceivedAt: &seen, Quiet: true},
 		{Product: "never, young"},
@@ -25,8 +25,8 @@ func TestEveryBuildIsCountedInTheOneStateItIsIn(t *testing.T) {
 		{Product: "out of use", RetiredFromUse: true, LastReceivedAt: &seen},
 		{Product: "out of use, never", RetiredFromUse: true},
 	}
-	got := countCoverage(rows)
-	want := coverageCounts{quiet: 2, never: 2, unsupported: 2, retired: 2, scanned: 1}
+	got := countLastUploads(rows)
+	want := lastUploadCounts{quiet: 2, never: 2, unsupported: 2, retired: 2, scanned: 1}
 	if got != want {
 		t.Errorf("counted %+v, want %+v", got, want)
 	}

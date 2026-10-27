@@ -20,8 +20,8 @@ func Register(api huma.API, in core.Deps) {
 	registerInventoryComparisonExport(api, in)
 	// One product's own page.
 	registerOverview(api, in)
-	registerCoverage(api, in)
-	registerCoverageExport(api, in)
+	registerLastUploads(api, in)
+	registerLastUploadsExport(api, in)
 	registerLeadSeries(api, in)
 	registerOutOfSupport(api, in)
 	registerPublished(api, in)

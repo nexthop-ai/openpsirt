@@ -30,8 +30,8 @@ this document is its own.
 - [Known issues at release](#known-issues-at-release)
 - [One issue across the estate](#one-issue-across-the-estate)
 - [The exception report](#the-exception-report)
-- [Dismissals and scan coverage](#dismissals-and-scan-coverage)
-- [Match coverage](#match-coverage)
+- [Dismissals and last uploads](#dismissals-and-last-uploads)
+- [Unmatched components](#unmatched-components)
 - [The analytics catalog](#the-analytics-catalog)
 - [Planned upgrades page cost](#planned-upgrades-page-cost)
 - [Exports](#exports)
@@ -587,7 +587,7 @@ report that exists to find it.
 | A build is a product, a stream and a variant together, or none of them | Named alone, a stream would narrow to a stream of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
 | The file carries every agreement with its dates, beside who agrees now | What somebody agreed to and then stopped agreeing to is what an audit is looking for, and the file carried neither it nor any date. The two are different questions and a column mixing them is the one answer an auditor must not be given |
 
-## Dismissals and scan coverage
+## Dismissals and last uploads
 
 Dismissals are a reportable dataset in their own right. Answered two ways: the
 findings list filters on outcome and on whether a rating was changed, and the
@@ -641,7 +641,7 @@ emits anything outward. Publication exists — a VEX document per build, an
 advisory recorded when it goes out — and those are documents somebody asks for
 and takes away.
 
-## Match coverage
+## Unmatched components
 
 A component the scanner has no way to match reports no findings, which is what
 a component with none reports too. Each build says which of its components are
@@ -720,7 +720,7 @@ also holds the files that are reachable nowhere else.
 | The frame does not print | The rail, the tab bar, the floating action and the menu go, and the grid that places them is flattened, so a page carries no empty column where the rail was. The narrow-screen shape applies to a screen and not to a sheet of paper narrower than it |
 | What is about to go out of support is asked for, and comes back as its own list | The day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, with nobody having decided anything. A warning and an exposure are two things: one is a date somebody can still act before. Asked for, because a second population appearing unasked changes what every figure on the report counts |
 | The register is a page of the catalog's own | It is about one build, and had no screen — only a file, which an auditor had to download to read. So the catalog owns it rather than a build screen listing it, and it asks for a whole build the way the build-scoped entries do |
-| An entry may point at a screen rather than owning a page | Release comparison, release readiness, match coverage, carried patches, the exception report, standing corrections and administrative changes do. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
+| An entry may point at a screen rather than owning a page | Release comparison, release readiness, unmatched components, carried patches, the exception report, standing corrections and administrative changes do. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
 | The catalog is grouped by the question each report answers | The groups are below. A report is looked for by its question, and a flat list of names hides which of them answer the same one |
 | A rail screen that answers a named question is listed apart, under "Also on screens" | Assignments answers holder workload, Disclosure deadlines answers what is running out of embargo, and planned upgrades answers what a build is waiting on. Each is a screen somebody already works in, under the name the rail gives it, and listed among the reports it reads as reporting that does not exist |
 | One address is one entry | Two names over one screen read as two reports, and the reader opens both to find the same page. Known issues at release is the comparison's third column, so it is part of the release comparison entry |
@@ -736,7 +736,7 @@ also holds the files that are reachable nowhere else.
 |---|---|
 | Program | Program overview, backlog over time, deadline compliance, effort by component |
 | Controls | Approval quality, the exception report, standing corrections, administrative changes |
-| Coverage | Scan coverage, leads by analyzer, match coverage, carried patches |
+| Coverage | Last upload per build, leads by analyzer, unmatched components, carried patches |
 | Releases | Release comparison, release readiness, releases out of support |
 | Records | Disposition register, advisories issued |
 | Also on screens | Assignments, Disclosure deadlines, planned upgrades |
@@ -748,7 +748,7 @@ Deadline compliance and the disposition register have sections above.
 | Page | What it answers |
 |---|---|
 | Program overview | What is being fixed against what is appearing, what is aging and whether anybody has looked at it, how long a finding waits for a decision and a decision waits to be agreed to, what keeps being put off, and what has been argued away. Its window is seven, thirty or ninety days or a period between two dates, and the printed header names which |
-| Scan coverage | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support or taken out of use is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. Each build is in one of five states: out of support, out of use, never scanned, quiet, or scanned. "Being scanned" counts the last of those among the builds in support and in use, on this page and on the front page alike. Gone quiet also counts a build never scanned that has been declared longer than the quiet span, and its tile says so. The front page names the three quietest and the Uploads screen answers for one product; this answers for the estate |
+| Last upload per build | The whole estate, longest silent first: how many builds are being scanned, how many have gone quiet, and how many were declared and never filed against. Every other number rests on it. A build out of support or taken out of use is listed, marked, and never counted as quiet — silence there is expected, and a coverage report filling with those stops catching the product that dropped out. Each build is in one of five states: out of support, out of use, never scanned, quiet, or scanned. "Being scanned" counts the last of those among the builds in support and in use, on this page and on the front page alike. Gone quiet also counts a build never scanned that has been declared longer than the quiet span, and its tile says so. The front page names the three quietest and the Uploads screen answers for one product; this answers for the estate |
 | Releases out of support | The releases whose date has passed, and — asked for — the ones about to, how long ago or how long there is left, and how many issues are still open against each, ordered by what is open. Past end-of-life the deadline is removed from every open finding, so none of that pile is overdue, none is due soon, and none of it reaches a figure built on either. That is correct — no work will land there — and it is what makes asking the only way to see it. A date inherited from the product says so: a release following a date and one that stated the same date are different, and only the first moves when the product changes its mind |
 | Backlog over time | Whether the backlog is growing, and what kind of thing is making it grow: what arrived, what was answered and what stood open at the end of each step, each split by severity. Only the open count was split, and ten arriving against ten answered is a team keeping pace where both are low and a team losing ground where what arrives is critical and what leaves is not — which a line of totals draws as flat. A resolved issue is counted at the severity it held while it was open, because the step it left in no longer has one |
 | Approval quality | How much a second pair of eyes actually did. Its sections are below |
@@ -846,7 +846,7 @@ engine.
 
 Any list that can be read can be exported, as CSV or JSON. What exports: the
 findings list, the cross-product findings list, the audit log, the
-review queue, what became of the reader's own decisions, the by-component view, what is running out of time, scan coverage,
+review queue, what became of the reader's own decisions, the by-component view, what is running out of time, the last upload per build,
 what is out of support, a comparison of two builds, a comparison of two
 builds' inventories, the planned upgrades of a product and of one build, the lead queue,
 what keeps being put off, the backlog over time, what has been changed
@@ -942,7 +942,7 @@ severity word for the triage floor; on or off for upstream currency.
 
 - A distribution's binary named differently from its source package matches
   nothing without `upstream`. The identifier does not say whether the names
-  differ, so the match coverage report does not list it. A SONiC kernel image
+  differ, so the unmatched components report does not list it. A SONiC kernel image
   with `distro` alone matched 0.
 - An export answers the question the list beside it answers, embedding the same
   filters rather than re-declaring them. A filter the list applied and the

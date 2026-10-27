@@ -143,7 +143,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 				return nil, core.WentWrong(d.Logger, "cannot count what is open", err)
 			}
 		}
-		seen, err := core.LastScansIn(ctx, d.Scans(), subject, product.ID, func(c ingest.Coverage) string {
+		seen, err := core.LastScansIn(ctx, d.Scans(), subject, product.ID, func(c ingest.LastUpload) string {
 			return c.Stream
 		})
 		if err != nil {

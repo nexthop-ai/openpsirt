@@ -210,7 +210,7 @@ function SBOMs({ build }: { build: Build }) {
         <p className="hint" style={{ marginBottom: 10 }}>
           {(quietTotal - quiet.length).toLocaleString()} more{" "}
           {quietTotal - quiet.length === 1 ? "build has" : "builds have"} gone quiet here and are
-          not named above. The scan-coverage report lists every one of them.
+          not named above. Last upload per build lists them all.
         </p>
       )}
 

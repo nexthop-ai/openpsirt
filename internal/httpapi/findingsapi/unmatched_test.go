@@ -57,10 +57,10 @@ func TestABuildSaysWhatItHoldsThatNothingCanMatch(t *testing.T) {
 		for _, d := range held {
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: httpapitest.SeededRoot, Child: d})
 		}
-		r.Scan(t, "match-coverage", snap, nil)
+		r.Scan(t, "unmatched-components", snap, nil)
 
 		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom/unmatched-components"
-		var all findingsapi.MatchCoverageBody
+		var all findingsapi.UnmatchedComponentsBody
 		httpapitest.Read(t, r, "reader", build, &all)
 		if all.Components != 4 || all.Unmatched != 3 || all.Total != 3 {
 			t.Errorf("holds %d, %d unmatched, %d listed; want 4, 3 and 3",
@@ -75,7 +75,7 @@ func TestABuildSaysWhatItHoldsThatNothingCanMatch(t *testing.T) {
 			t.Errorf("the reasons read %+v", all.Reasons)
 		}
 
-		var one findingsapi.MatchCoverageBody
+		var one findingsapi.UnmatchedComponentsBody
 		httpapitest.Read(t, r, "reader", build+"?reason=no-identifier&limit=1&offset=1", &one)
 		if one.Total != 2 || len(one.Items) != 1 || one.Items[0].Name != "bash" {
 			t.Errorf("the second of the unidentified is %+v of %d, want bash of 2", one.Items, one.Total)
@@ -87,7 +87,7 @@ func TestABuildSaysWhatItHoldsThatNothingCanMatch(t *testing.T) {
 
 		// An offset past every page is an empty page, the largest one there
 		// is included.
-		var past findingsapi.MatchCoverageBody
+		var past findingsapi.UnmatchedComponentsBody
 		httpapitest.Read(t, r, "reader", build+"?offset=9223372036854775807", &past)
 		if past.Total != 3 || len(past.Items) != 0 {
 			t.Errorf("past the end, %d items of %d, want none of 3", len(past.Items), past.Total)

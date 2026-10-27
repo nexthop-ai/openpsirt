@@ -4,11 +4,11 @@
 import { describe, expect, it } from "vitest";
 import type { Body } from "../../api/client";
 import { mounted } from "../../test/mount";
-import { State } from "./Coverage";
+import { State } from "./LastUploads";
 
 const mount = mounted();
 
-const build = (of: Partial<Body<"CoverageBody">>): Body<"CoverageBody"> => ({
+const build = (of: Partial<Body<"LastUploadBody">>): Body<"LastUploadBody"> => ({
   product: "sonic",
   stream: "master",
   stream_kind: "branch",
@@ -17,7 +17,7 @@ const build = (of: Partial<Body<"CoverageBody">>): Body<"CoverageBody"> => ({
   ...of,
 });
 
-const said = (of: Partial<Body<"CoverageBody">>) => {
+const said = (of: Partial<Body<"LastUploadBody">>) => {
   mount.render(<State build={build(of)} />);
   return mount.host().textContent;
 };

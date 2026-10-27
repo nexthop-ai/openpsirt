@@ -122,8 +122,8 @@
   "plannedUpgrades": {
     "path": "/products/:product/streams/:stream/variants/:variant/planned-upgrades"
   },
-  "matchCoverage": {
-    "path": "/products/:product/streams/:stream/variants/:variant/match-coverage"
+  "unmatchedComponents": {
+    "path": "/products/:product/streams/:stream/variants/:variant/unmatched-components"
   },
   "vex": {
     "path": "/products/:product/streams/:stream/variants/:variant/vex",
@@ -198,6 +198,9 @@
   "formerDecision": { "path": "/claims/:id" },
   "formerBulkDecision": {
     "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide"
+  },
+  "formerMatchCoverage": {
+    "path": "/products/:product/streams/:stream/variants/:variant/match-coverage"
   },
   "formerPendingUpgrades": {
     "path": "/products/:product/streams/:stream/variants/:variant/pending-upgrades"

@@ -33,17 +33,17 @@ import { uploadsAt } from "../../app/routes";
 // the answer.
 const SHOWN = 200;
 
-export function Coverage() {
+export function LastUploads() {
   const at = useScope();
   const opener = useRowOpener();
   const scope = scopeQuery(at);
-  const coverage = useQuery({
-    queryKey: ["scanning", "report", scope],
+  const uploads = useQuery({
+    queryKey: ["last-uploads", "report", scope],
     queryFn: async () =>
       unwrap(await api.GET("/v1/last-uploads", { params: { query: { limit: SHOWN, ...scope } } })),
   });
 
-  const builds = coverage.data?.items ?? [];
+  const builds = uploads.data?.items ?? [];
   // Every figure comes from the response rather than from the page of rows
   // beneath it. The server counts them across the whole answer and cuts the
   // page afterwards, so recounting here states a figure about the page under
@@ -53,28 +53,28 @@ export function Coverage() {
   // and never counted in the coverage figure either: silence there is
   // expected, and counting it puts a build nothing has scanned in a year on
   // the covered side.
-  const unsupported = coverage.data?.unsupported ?? 0;
-  const retired = coverage.data?.retired ?? 0;
-  const live = (coverage.data?.total ?? 0) - unsupported - retired;
-  const scanned = coverage.data?.scanned ?? 0;
-  const quiet = coverage.data?.quiet ?? 0;
+  const unsupported = uploads.data?.unsupported ?? 0;
+  const retired = uploads.data?.retired ?? 0;
+  const live = (uploads.data?.total ?? 0) - unsupported - retired;
+  const scanned = uploads.data?.scanned ?? 0;
+  const quiet = uploads.data?.quiet ?? 0;
   // Never scanned is its own answer rather than a long silence: a build
   // nothing has ever been filed against may be one nobody wired up, and its
   // days are measured from when it was declared.
-  const never = coverage.data?.never ?? 0;
+  const never = uploads.data?.never ?? 0;
   const asked = new URLSearchParams(scope).toString();
 
   return (
     <Sheet
-      settled={coverage.isSuccess}
-      name="Scan coverage"
+      settled={uploads.isSuccess}
+      name="Last upload per build"
       answers="what is being scanned, and what has quietly stopped."
-      asked={`quiet after ${coverage.data?.quiet_after_days ?? 7} days`}
+      asked={`quiet after ${uploads.data?.quiet_after_days ?? 7} days`}
     >
-      {coverage.isPending ? (
+      {uploads.isPending ? (
         <Loading />
-      ) : coverage.isError ? (
-        <Failed error={coverage.error} what="The scan coverage could not be read." />
+      ) : uploads.isError ? (
+        <Failed error={uploads.error} what="The last upload per build could not be read." />
       ) : (
         <>
           <section className="panel">
@@ -175,7 +175,7 @@ export function Coverage() {
             {/* The list is a page and the figures above are the estate, so
                 without this the two disagree and the list is the one that
                 looks like an answer. */}
-            <Paged shown={builds.length} total={coverage.data?.total} limit={SHOWN} />
+            <Paged shown={builds.length} total={uploads.data?.total} limit={SHOWN} />
           </section>
         </>
       )}
@@ -197,7 +197,7 @@ function scansAt(product: string, stream: string, variant: string): string {
 // The one word a build's row says about its state, in the order the counts
 // above sort a build: silence that is expected first, then silence that is
 // not, and scanned only for a build a scan has reached.
-export function State({ build }: { build: Body<"CoverageBody"> }) {
+export function State({ build }: { build: Body<"LastUploadBody"> }) {
   if (build.out_of_support) return <span className="hint">out of support</span>;
   if (build.retired) return <span className="hint">taken out of use</span>;
   if (build.quiet) {

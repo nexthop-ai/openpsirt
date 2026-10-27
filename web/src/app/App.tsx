@@ -24,6 +24,7 @@ import {
   vulnerabilityReportAt,
   vulnerabilityReportsAt,
   plannedUpgradesAt,
+  unmatchedComponentsAt,
 } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
@@ -83,8 +84,8 @@ const Incidents = retrying(() => import("../screens/Incidents").then((m) => m.In
 const PlannedUpgrades = retrying(() =>
   import("../screens/PlannedUpgrades").then((m) => m.PlannedUpgrades),
 );
-const MatchCoverage = retrying(() =>
-  import("../screens/MatchCoverage").then((m) => m.MatchCoverage),
+const UnmatchedComponents = retrying(() =>
+  import("../screens/UnmatchedComponents").then((m) => m.UnmatchedComponents),
 );
 const Uploads = retrying(() => import("../screens/Uploads").then((m) => m.Uploads));
 const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
@@ -203,7 +204,7 @@ export function App() {
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
               <Route path={ROUTES.run} element={<Run />} />
               <Route path={ROUTES.plannedUpgrades} element={<PlannedUpgrades />} />
-              <Route path={ROUTES.matchCoverage} element={<MatchCoverage />} />
+              <Route path={ROUTES.unmatchedComponents} element={<UnmatchedComponents />} />
               <Route path={ROUTES.vex} element={<VEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
               <Route path={ROUTES.inventoryComparison} element={<InventoryCompare />} />
@@ -304,6 +305,10 @@ export function App() {
               <Route
                 path={ROUTES.formerBulkDecision}
                 element={<Moved to={(at) => bulkDecisionAt(built(at), at.component ?? "")} />}
+              />
+              <Route
+                path={ROUTES.formerMatchCoverage}
+                element={<Moved to={(at) => unmatchedComponentsAt(built(at))} />}
               />
               <Route
                 path={ROUTES.formerPendingUpgrades}

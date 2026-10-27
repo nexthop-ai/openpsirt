@@ -16,12 +16,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// coverageOutput carries the rows and what was asked of them, because "quiet"
+// lastUploadsOutput carries the rows and what was asked of them, because "quiet"
 // is a judgment against a threshold and a reader cannot check the judgment
 // without the threshold.
-type coverageOutput struct {
+type lastUploadsOutput struct {
 	Body struct {
-		Items []CoverageBody `json:"items"`
+		Items []LastUploadBody `json:"items"`
 		// Quiet is how many of the rows are, so a caller can say so without
 		// counting them again.
 		Quiet int `json:"quiet" doc:"The number gone quiet, across every build and not only this page"`
@@ -37,8 +37,8 @@ type coverageOutput struct {
 	}
 }
 
-// CoverageBody is one declared build and when a scan last arrived for it.
-type CoverageBody struct {
+// LastUploadBody is one declared build and when a scan last arrived for it.
+type LastUploadBody struct {
 	Product    string        `json:"product"`
 	Stream     string        `json:"stream"`
 	StreamKind core.LineKind `json:"stream_kind" doc:"Whether this line moves"`
@@ -64,19 +64,19 @@ type CoverageBody struct {
 	RetiredFromUse bool `json:"retired,omitempty" doc:"Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet"`
 }
 
-// coverageCounts is the estate a coverage answer counts, by the one state each
-// build is in. Quiet is the exception: a build in use and never scanned can be
+// lastUploadCounts is the estate the last upload per build counts, by the one
+// state each build is in. Quiet is the exception: a build in use and never scanned can be
 // quiet too, and is counted in both.
-type coverageCounts struct {
+type lastUploadCounts struct {
 	quiet, never, unsupported, retired, scanned int
 }
 
-// countCoverage sorts every build into the state it is in. Out of support
+// countLastUploads sorts every build into the state it is in. Out of support
 // comes first and taken out of use second, because silence is expected of
 // both; of what is left, a build a scan has never reached is never scanned,
 // and one reached and not quiet is scanned.
-func countCoverage(rows []ingest.Coverage) coverageCounts {
-	var out coverageCounts
+func countLastUploads(rows []ingest.LastUpload) lastUploadCounts {
+	var out lastUploadCounts
 	for _, row := range rows {
 		if row.Quiet {
 			out.quiet++
@@ -95,9 +95,9 @@ func countCoverage(rows []ingest.Coverage) coverageCounts {
 	return out
 }
 
-func registerCoverage(api huma.API, in core.Deps) {
+func registerLastUploads(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-scanning", Method: http.MethodGet, Path: "/v1/last-uploads",
+		OperationID: "list-last-uploads", Method: http.MethodGet, Path: "/v1/last-uploads",
 		Summary: "List the last upload per build",
 		Description: "Returns every build you can see, longest-silent first, with when a scan " +
 			"last arrived for it and whether that is longer ago than this deployment allows.\n\n" +
@@ -110,27 +110,27 @@ func registerCoverage(api huma.API, in core.Deps) {
 		core.ScopeQuery
 		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand"`
 		Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
-	}) (*coverageOutput, error) {
-		rows, quietAfter, err := scanningRows(ctx, in, input.ScopeQuery)
+	}) (*lastUploadsOutput, error) {
+		rows, quietAfter, err := lastUploadRows(ctx, in, input.ScopeQuery)
 		if err != nil {
 			return nil, err
 		}
 
-		out := &coverageOutput{}
+		out := &lastUploadsOutput{}
 		out.Body.QuietAfterDays = int(quietAfter.Hours() / 24)
 		out.Body.Total = len(rows)
 		// Counted before the page is cut, and across the whole answer rather
 		// than the page: a badge saying "3" because three quiet builds fall
 		// on the first page answers a different question from the one it
 		// appears to.
-		counted := countCoverage(rows)
+		counted := countLastUploads(rows)
 		out.Body.Quiet, out.Body.Never = counted.quiet, counted.never
 		out.Body.Unsupported, out.Body.Retired = counted.unsupported, counted.retired
 		out.Body.Scanned = counted.scanned
 		rows = core.Window(rows, input.Limit, input.Offset)
-		out.Body.Items = make([]CoverageBody, 0, len(rows))
+		out.Body.Items = make([]LastUploadBody, 0, len(rows))
 		for _, row := range rows {
-			body := CoverageBody{
+			body := LastUploadBody{
 				Product:        row.Product,
 				Stream:         row.Stream,
 				StreamKind:     core.LineKind(row.StreamKind),
@@ -155,9 +155,9 @@ func registerCoverage(api huma.API, in core.Deps) {
 	})
 }
 
-// scanningRows is when each build the reader may see in the scope was last
+// lastUploadRows is when each build the reader may see in the scope was last
 // scanned, with the threshold past which a build counts as quiet.
-func scanningRows(ctx context.Context, in core.Deps, q core.ScopeQuery) ([]ingest.Coverage, time.Duration, error) {
+func lastUploadRows(ctx context.Context, in core.Deps, q core.ScopeQuery) ([]ingest.LastUpload, time.Duration, error) {
 	subject, err := core.Reading(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -170,7 +170,7 @@ func scanningRows(ctx context.Context, in core.Deps, q core.ScopeQuery) ([]inges
 	if err != nil {
 		return nil, 0, core.WentWrong(in.Logger, "the settings could not be read", err)
 	}
-	rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
+	rows, err := ingest.NewStore(in.DB.DB).LastUploads(ctx, subject, scope, quietAfter)
 	if err != nil {
 		// The last scan of a build by anybody is a person's question, and the
 		// store says so. Answered as a fault, it reads as the deployment being
@@ -180,18 +180,18 @@ func scanningRows(ctx context.Context, in core.Deps, q core.ScopeQuery) ([]inges
 	return rows, quietAfter, nil
 }
 
-// registerCoverageExport writes coverage out as a file.
+// registerLastUploadsExport writes the last upload per build out as a file.
 //
-// Coverage is the report whose whole point is what is *not* there, and the
+// It is the report whose whole point is what is *not* there, and the
 // people who ask for it — an auditor, a release manager, whoever owns the
 // pipeline that stopped — are usually not the people with an account here.
 //
 // The threshold is stated in the file. A `quiet` column of true and false
 // means nothing six months later without the number it was computed against,
 // and a spreadsheet has nowhere else to carry it.
-func registerCoverageExport(api huma.API, in core.Deps) {
+func registerLastUploadsExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "export-scanning", Method: http.MethodGet,
+		OperationID: "export-last-uploads", Method: http.MethodGet,
 		Path:    "/v1/last-uploads.{format}",
 		Summary: "Export the last upload per build",
 		Description: "Every build you can see, longest-silent first, as a file: when a scan " +
@@ -212,12 +212,12 @@ func registerCoverageExport(api huma.API, in core.Deps) {
 		// Read once and paged out of the slice, because the reader answers
 		// whole: asking it again per page would re-run the same statement and
 		// re-sort the same estate for every two hundred rows.
-		rows, quietAfter, err := scanningRows(ctx, in, input.ScopeQuery)
+		rows, quietAfter, err := lastUploadRows(ctx, in, input.ScopeQuery)
 		if err != nil {
 			return nil, err
 		}
 		out := core.Exporting{
-			What:  "scanning",
+			What:  "last upload per build",
 			About: []core.Stated{{Label: "quiet after days", Value: strconv.Itoa(int(quietAfter.Hours() / 24))}},
 			Header: []string{
 				"product", "stream", "kind", "variant",
@@ -255,7 +255,7 @@ func registerCoverageExport(api huma.API, in core.Deps) {
 			},
 		}
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "scanning", out)
+			core.WriteExport(writer, input.Format, "last-uploads", out)
 		}}, nil
 	})
 }

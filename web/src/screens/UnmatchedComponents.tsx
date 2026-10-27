@@ -46,13 +46,13 @@ const REASONS: Record<Body<"ReasonCountBody">["reason"], { label: string; fix: s
 //
 // Such a component reports no findings, which is also what a clean one
 // reports. The tree's header counts them and links here.
-export function MatchCoverage() {
+export function UnmatchedComponents() {
   const { product = "", stream = "", variant = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const reason = params.get("reason") ?? "";
   const [offset, setOffset] = useState(0);
   const coverage = useQuery({
-    queryKey: ["match-coverage", product, stream, variant, reason, offset],
+    queryKey: ["unmatched-components", product, stream, variant, reason, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(

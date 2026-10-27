@@ -69,7 +69,7 @@ const SAMPLES: Record<string, () => string[]> = {
   inventoryChangesAt: () => [routes.inventoryChangesAt(build, 7)],
   runAt: () => [routes.runAt(build, 7)],
   plannedUpgradesAt: () => [routes.plannedUpgradesAt(build)],
-  matchCoverageAt: () => [routes.matchCoverageAt(build)],
+  unmatchedComponentsAt: () => [routes.unmatchedComponentsAt(build)],
   vexAt: () => [routes.vexAt(build)],
   sameScreenAt: () => [
     routes.sameScreenAt(build, ""),

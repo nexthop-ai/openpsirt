@@ -26,7 +26,7 @@ REQ-69.
 - [Scanner warnings](#scanner-warnings)
 - [Scanner output](#scanner-output)
 - [Scanner environment](#scanner-environment)
-- [Scan coverage](#scan-coverage)
+- [Last upload per build](#last-upload-per-build)
 - [Receipts](#receipts)
 - [Receipt cost](#receipt-cost)
 - [Document retrieval](#document-retrieval)
@@ -836,7 +836,7 @@ environment.
 |---|---|
 | Anything else, this deployment's settings included | They hold the database address with its password, the sign-in client secrets, the mail password and the object store's keys, none of which the scanner needs, and what it is not handed it cannot disclose |
 
-## Scan coverage
+## Last upload per build
 
 Every other failure here is loud. Silence is the failure that is not: a build
 nothing files against reports no new findings, closes nothing, fails nothing, and

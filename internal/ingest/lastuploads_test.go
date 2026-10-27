@@ -64,9 +64,9 @@ func scanned(t *testing.T, fn func(t *testing.T, db *database.DB, s *ingest.Stor
 	})
 }
 
-func TestScanningNamesTheBuildThatWentQuiet(t *testing.T) {
+func TestLastUploadsNameTheBuildThatWentQuiet(t *testing.T) {
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
-		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+		rows, err := s.LastUploads(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func TestScanningNamesTheBuildThatWentQuiet(t *testing.T) {
 	})
 }
 
-func TestScanningCountsFromDeclarationWhereNothingEverArrived(t *testing.T) {
+func TestLastUploadsCountFromDeclarationWhereNothingEverArrived(t *testing.T) {
 	// The same failure caught earlier: a build declared and never filed
 	// against. An inner join to the scan table cannot see it at all, which is
 	// the mistake this asserts against.
@@ -108,7 +108,7 @@ func TestScanningCountsFromDeclarationWhereNothingEverArrived(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+		rows, err := s.LastUploads(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,9 +127,9 @@ func TestScanningCountsFromDeclarationWhereNothingEverArrived(t *testing.T) {
 	})
 }
 
-func TestScanningShowsOnlyWhatTheReaderMaySee(t *testing.T) {
+func TestLastUploadsShowOnlyWhatTheReaderMaySee(t *testing.T) {
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, _, theirs int64) {
-		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+		rows, err := s.LastUploads(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,7 +141,7 @@ func TestScanningShowsOnlyWhatTheReaderMaySee(t *testing.T) {
 	})
 }
 
-func TestScanningTellsAPipelineKeyNothing(t *testing.T) {
+func TestLastUploadsTellAPipelineKeyNothing(t *testing.T) {
 	// A key sees the receipts for what it sent and nothing more. When a build
 	// was last scanned by anybody is a fact about the deployment, and a key
 	// that could read it would learn about uploads it did not make.
@@ -156,7 +156,7 @@ func TestScanningTellsAPipelineKeyNothing(t *testing.T) {
 	// the data layer was supposed to stop giving.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, _ access.Subject, ours, _ int64) {
 		pipeline := access.NewPipeline(1, "nightly", access.Scope{ProductID: ours})
-		rows, err := s.Scanning(t.Context(), pipeline, finding.Scope{}, 7*24*time.Hour)
+		rows, err := s.LastUploads(t.Context(), pipeline, finding.Scope{}, 7*24*time.Hour)
 		if !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a pipeline key asking when builds were last scanned got %v", err)
 		}
@@ -166,12 +166,12 @@ func TestScanningTellsAPipelineKeyNothing(t *testing.T) {
 	})
 }
 
-func TestScanningJudgesNothingWithoutAThreshold(t *testing.T) {
+func TestLastUploadsJudgeNothingWithoutAThreshold(t *testing.T) {
 	// Zero is how a caller asks "when was each of these last seen" without
 	// also asking for a judgment, and a threshold of zero must not make
 	// everything quiet.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
-		rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 0)
+		rows, err := s.LastUploads(t.Context(), reader, finding.Scope{}, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -192,7 +192,7 @@ func TestAnUploadThatCouldNotBeReadIsNotBeingHeardFrom(t *testing.T) {
 	// must not look like health.
 	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
 		ctx := t.Context()
-		before, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		before, err := s.LastUploads(ctx, reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -210,11 +210,11 @@ func TestAnUploadThatCouldNotBeReadIsNotBeingHeardFrom(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		after, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		after, err := s.LastUploads(ctx, reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var build *ingest.Coverage
+		var build *ingest.LastUpload
 		for i := range after {
 			if after[i].Variant == "broadcom" {
 				build = &after[i]
@@ -241,7 +241,7 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 	// fine" and "not listed" are different answers, and only one is true.
 	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		before, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		before, err := s.LastUploads(ctx, reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -258,7 +258,7 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		after, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		after, err := s.LastUploads(ctx, reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -290,7 +290,7 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 // reporting success to its own log. Counting only the scans that could be read
 // answers the first half of "silence looks exactly like health"; this is the
 // other half, which is whether anybody is trying.
-func TestCoverageSaysWhetherAnybodyIsTrying(t *testing.T) {
+func TestLastUploadsSayWhetherAnybodyIsTrying(t *testing.T) {
 	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, _, _ int64) {
 		ctx := t.Context()
 		// The build rather than the product it is under. A refusal is recorded
@@ -298,7 +298,7 @@ func TestCoverageSaysWhetherAnybodyIsTrying(t *testing.T) {
 		// back product identifiers.
 		ours := targetOf(t, db, "master", "broadcom")
 
-		rows, err := s.Scanning(ctx, reader, finding.Scope{}, 7*24*time.Hour)
+		rows, err := s.LastUploads(ctx, reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -340,7 +340,7 @@ func TestCoverageSaysWhetherAnybodyIsTrying(t *testing.T) {
 // refusalsIn is what each build in the report says it was last refused for.
 func refusalsIn(t *testing.T, s *ingest.Store, reader access.Subject) []string {
 	t.Helper()
-	rows, err := s.Scanning(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
+	rows, err := s.LastUploads(t.Context(), reader, finding.Scope{}, 7*24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -358,7 +358,7 @@ func DeclineDeclaration(logger *slog.Logger, err error) error {
 // nobody checks.
 func LastScans(ctx context.Context, scans *ingest.Store, subject access.Subject) (map[string]string, error) {
 	return lastScansBy(ctx, scans, subject, finding.Scope{},
-		func(row ingest.Coverage) string { return row.Product })
+		func(row ingest.LastUpload) string { return row.Product })
 }
 
 // LastScansIn is the same within one product, keyed by whichever level the
@@ -367,7 +367,7 @@ func LastScans(ctx context.Context, scans *ingest.Store, subject access.Subject)
 // Narrowed in the query rather than filtered afterwards, so a deployment with
 // many products does not read every build to answer about one.
 func LastScansIn(ctx context.Context, scans *ingest.Store, subject access.Subject, productID int64,
-	key func(ingest.Coverage) string) (map[string]string, error) {
+	key func(ingest.LastUpload) string) (map[string]string, error) {
 
 	return lastScansBy(ctx, scans, subject, finding.Scope{ProductID: &productID}, key)
 }
@@ -376,9 +376,9 @@ func LastScansIn(ctx context.Context, scans *ingest.Store, subject access.Subjec
 // whatever order the rows arrive in. Every stamp is UTC and the same width,
 // so they compare as strings.
 func lastScansBy(ctx context.Context, scans *ingest.Store, subject access.Subject, scope finding.Scope,
-	key func(ingest.Coverage) string) (map[string]string, error) {
+	key func(ingest.LastUpload) string) (map[string]string, error) {
 
-	rows, err := scans.Scanning(ctx, subject, scope, 0)
+	rows, err := scans.LastUploads(ctx, subject, scope, 0)
 	if err != nil {
 		return nil, err
 	}

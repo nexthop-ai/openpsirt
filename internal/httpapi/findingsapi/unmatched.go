@@ -32,8 +32,8 @@ type ReasonCountBody struct {
 	Count  int              `json:"count" doc:"The number of the build's components it covers"`
 }
 
-// MatchCoverageBody is what a build holds that the scanner cannot match.
-type MatchCoverageBody struct {
+// UnmatchedComponentsBody is what a build holds that the scanner cannot match.
+type UnmatchedComponentsBody struct {
 	Components int               `json:"components" doc:"The number of components the build holds"`
 	Unmatched  int               `json:"unmatched" doc:"The number of those the scanner has no way to match"`
 	Reasons    []ReasonCountBody `json:"reasons" doc:"Every reason with how many components it covers, zero included, in the order a component is tested against them. A component is counted under the first reason it meets"`
@@ -41,8 +41,8 @@ type MatchCoverageBody struct {
 	Total      int               `json:"total" doc:"The number of items across every page"`
 }
 
-type matchCoverageOutput struct {
-	Body MatchCoverageBody
+type unmatchedComponentsOutput struct {
+	Body UnmatchedComponentsBody
 }
 
 // unmatchedIn reads what one build holds that the scanner cannot match, and
@@ -77,11 +77,11 @@ func onlyReason(listed []graph.Unmatched, reason string) []graph.Unmatched {
 	return out
 }
 
-// registerMatchCoverage answers what a build holds that the scanner has no way
+// registerUnmatchedComponents answers what a build holds that the scanner has no way
 // to match (REQ-79).
-func registerMatchCoverage(api huma.API, in core.Deps) {
+func registerUnmatchedComponents(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-match-coverage", Method: http.MethodGet,
+		OperationID: "list-unmatched-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components",
 		Summary: "List unmatched components",
 		Description: "Returns the components the build holds now that the vulnerability scanner " +
@@ -97,12 +97,12 @@ func registerMatchCoverage(api huma.API, in core.Deps) {
 		Reason  core.Unmatchable `query:"reason" doc:"One reason alone"`
 		Limit   int              `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
 		Offset  int              `query:"offset" minimum:"0" doc:"The number skipped"`
-	}) (*matchCoverageOutput, error) {
+	}) (*unmatchedComponentsOutput, error) {
 		listed, held, err := unmatchedIn(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		out := &matchCoverageOutput{}
+		out := &unmatchedComponentsOutput{}
 		out.Body.Components, out.Body.Unmatched = held, len(listed)
 		counts := map[graph.Unmatchable]int{}
 		for _, one := range listed {
@@ -126,11 +126,11 @@ func registerMatchCoverage(api huma.API, in core.Deps) {
 	})
 }
 
-// registerMatchCoverageExport writes out what a build holds that the scanner
+// registerUnmatchedComponentsExport writes out what a build holds that the scanner
 // cannot match, whole rather than a page of it.
-func registerMatchCoverageExport(api huma.API, in core.Deps) {
+func registerUnmatchedComponentsExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "export-match-coverage", Method: http.MethodGet,
+		OperationID: "export-unmatched-components", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}",
 		Summary: "Export unmatched components",
 		Description: "Every component the unmatched components list names, as a file, in the same order, " +
@@ -170,7 +170,7 @@ func registerMatchCoverageExport(api huma.API, in core.Deps) {
 			},
 		}
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "match-coverage-"+core.DownloadName(input.Product), out)
+			core.WriteExport(writer, input.Format, "unmatched-components-"+core.DownloadName(input.Product), out)
 		}}, nil
 	})
 }

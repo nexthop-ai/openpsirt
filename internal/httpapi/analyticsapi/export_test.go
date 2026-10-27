@@ -649,7 +649,7 @@ func TestTheTwoListsThatCouldNotLeaveTheScreenNowCan(t *testing.T) {
 	})
 }
 
-func TestCoverageStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T) {
+func TestTheLastUploadsFileStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T) {
 	// A true/false column whose threshold is not in the file is a column
 	// nobody can check later, and coverage is the report read longest after
 	// the fact: what it says is that a build stopped being scanned, which

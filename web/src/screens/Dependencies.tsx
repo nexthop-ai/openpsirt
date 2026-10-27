@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { STEP, keyOf, partsOf, stepsOf, type At, type Node } from "./treeshape";
 import { aroundKey, fetchAround } from "../api/around";
-import { buildFindingsAt, componentAt, matchCoverageAt } from "../app/routes";
+import { buildFindingsAt, componentAt, unmatchedComponentsAt } from "../app/routes";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -360,7 +360,7 @@ function Whole() {
               {" "}
               ·{" "}
               <Link
-                to={matchCoverageAt({ product, stream, variant })}
+                to={unmatchedComponentsAt({ product, stream, variant })}
                 title="The scanner can't match these, so nothing will be found in them."
               >
                 {(top.data?.unmatched ?? 0).toLocaleString()} unmatched

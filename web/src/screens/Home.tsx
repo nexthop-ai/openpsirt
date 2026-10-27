@@ -1042,7 +1042,7 @@ function Status() {
   const at = useScope();
   const scope = scopeQuery(at);
   const scanning = useQuery({
-    queryKey: ["home", "scanning", scope],
+    queryKey: ["home", "last-uploads", scope],
     queryFn: async () => unwrap(await api.GET("/v1/last-uploads", { params: { query: scope } })),
   });
   const builds = scanning.data?.items ?? [];
@@ -1051,7 +1051,8 @@ function Status() {
   // cuts the page afterwards. A build out of support or out of use belongs on
   // neither side of a coverage figure, because silence there is expected, and
   // the covered side is the server's own count of builds scanned and not
-  // quiet — the figure the coverage report shows under the same name.
+  // quiet — the figure the last upload per build report shows under the same
+  // name.
   const quiet = builds.filter((b) => b.quiet);
   const unsupported = scanning.data?.unsupported ?? 0;
   const retired = scanning.data?.retired ?? 0;
@@ -1074,7 +1075,7 @@ function Status() {
         <h3>System status</h3>
       </header>
       {scanning.isError && (
-        <Failed error={scanning.error} what="The scan coverage could not be read." />
+        <Failed error={scanning.error} what="The last upload per build could not be read." />
       )}
       {quiet.slice(0, 3).map((build) => (
         <div className="alert" key={`${build.product}\u0000${build.stream}\u0000${build.variant}`}>

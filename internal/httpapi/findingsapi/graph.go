@@ -47,9 +47,9 @@ type RootsBody struct {
 	// and how much of it was placed.
 	Components int `json:"components" doc:"The number of components this build holds"`
 	Edges      int `json:"edges" doc:"The number of edges placing them"`
-	// Unmatched is what the scanner has no way to match; the match coverage
-	// report lists them.
-	Unmatched int `json:"unmatched" doc:"The number of those components the scanner has no way to match. The match coverage report lists them, with the reason"`
+	// Unmatched is what the scanner has no way to match; the unmatched
+	// components report lists them.
+	Unmatched int `json:"unmatched" doc:"The number of those components the scanner has no way to match. The unmatched components list names them, with the reason"`
 	// Searching is the term somebody typed when Items would be thousands
 	// long, and it comes back with the answer.
 	Term string `json:"term,omitempty" doc:"The search this answers, where one was asked"`

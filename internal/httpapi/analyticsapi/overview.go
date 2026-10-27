@@ -109,13 +109,13 @@ func registerOverview(api huma.API, in core.Deps) {
 		// The last scan of each build, from the same answer the coverage
 		// screen reads rather than a second query that could disagree with it
 		// about which build counts.
-		seen, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject,
+		seen, err := ingest.NewStore(in.DB.DB).LastUploads(ctx, subject,
 			finding.Scope{ProductID: &named.ID}, 0)
 		if err != nil {
 			return nil, core.Refused(in.Logger, err, "cannot read when these were last scanned")
 		}
 		type where struct{ stream, variant string }
-		covered := make(map[where]ingest.Coverage, len(seen))
+		covered := make(map[where]ingest.LastUpload, len(seen))
 		for _, row := range seen {
 			covered[where{row.Stream, row.Variant}] = row
 		}

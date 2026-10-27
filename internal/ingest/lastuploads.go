@@ -17,7 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// Coverage is when a build was last scanned, and whether that is long enough
+// LastUpload is when a build was last scanned, and whether that is long enough
 // ago to be worth saying out loud.
 //
 // A build that stops being scanned looks healthier than one that is: no new
@@ -30,7 +30,7 @@ import (
 // pipeline that was pointed at a name nobody declared is refused loudly; one
 // declared and never pointed at anything fails silently, and this is what
 // says so.
-type Coverage struct {
+type LastUpload struct {
 	ProductID  int64
 	Product    string
 	Stream     string
@@ -60,7 +60,7 @@ type Coverage struct {
 	// release that stopped being scanned because it stopped being supported
 	// is expected rather than a fault, and a build nothing may be filed
 	// against cannot stop being silent — the scan that would is refused.
-	// Coverage that filled with either would stop catching the product that
+	// A list of last uploads that filled with either would stop catching the product that
 	// dropped out silently.
 	Quiet bool
 	// OutOfSupport says this build's release has gone out of support. It is
@@ -78,7 +78,7 @@ type Coverage struct {
 	RetiredFromUse bool
 }
 
-// Scanning reports when each build in scope was last scanned, quietest first.
+// LastUploads reports when each build in scope was last scanned, quietest first.
 //
 // Ordering by silence rather than by name is the point: the answer somebody
 // needs is which build has stopped, and a list alphabetical by product buries
@@ -87,8 +87,8 @@ type Coverage struct {
 // quietAfter of zero or less reports every build with Quiet false, which is
 // how a caller asks "when was each of these last seen" without also asking
 // for a judgment about it.
-func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope finding.Scope,
-	quietAfter time.Duration) ([]Coverage, error) {
+func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope finding.Scope,
+	quietAfter time.Duration) ([]LastUpload, error) {
 
 	// A person's question. A pipeline key sees the receipts on the builds it
 	// may send to and nothing more, and when a build was last scanned by
@@ -182,7 +182,7 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		past[id] = true
 	}
 
-	out := make([]Coverage, 0, len(rows))
+	out := make([]LastUpload, 0, len(rows))
 	for _, r := range rows {
 		from := r.DeclaredAt
 		if r.LastSeen != nil {
@@ -195,7 +195,7 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		if since < 0 {
 			since = 0
 		}
-		out = append(out, Coverage{
+		out = append(out, LastUpload{
 			ProductID:      r.ProductID,
 			Product:        r.Product,
 			Stream:         r.Stream,
@@ -214,7 +214,7 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 
 	// Quietest first, and by name where two have been silent equally long, so
 	// the order does not shuffle between reads.
-	slices.SortFunc(out, func(a, b Coverage) int {
+	slices.SortFunc(out, func(a, b LastUpload) int {
 		if a.Since != b.Since {
 			if a.Since > b.Since {
 				return -1

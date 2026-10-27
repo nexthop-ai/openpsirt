@@ -1649,7 +1649,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
-        get: operations["list-scanning"];
+        get: operations["list-last-uploads"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1677,7 +1677,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
-        get: operations["export-scanning"];
+        get: operations["export-last-uploads"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3661,7 +3661,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
-        get: operations["get-match-coverage"];
+        get: operations["list-unmatched-components"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3683,7 +3683,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
-        get: operations["export-match-coverage"];
+        get: operations["export-unmatched-components"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8490,77 +8490,6 @@ export interface components {
              */
             undecided?: number;
         };
-        CoverageBody: {
-            /** @description The moment a scan last arrived. Absent where none ever has */
-            last_received_at?: string;
-            /** @description The moment an upload against this build was last turned away. Absent where none has been */
-            last_refused_at?: string;
-            /** @description Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet */
-            out_of_support?: boolean;
-            product: string;
-            /** @description Whether that is longer than this deployment allows */
-            quiet?: boolean;
-            /**
-             * Format: int64
-             * @description The span since, in days, measured from the last arrival or from when the build was declared
-             */
-            quiet_days: number;
-            /** @description The words the producer was given the last time one was turned away, in the same words they were given */
-            refused_because?: string;
-            /** @description Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet */
-            retired?: boolean;
-            stream: string;
-            /**
-             * @description Whether this line moves
-             * @enum {string}
-             */
-            stream_kind: "branch" | "tag";
-            variant: string;
-        };
-        CoverageOutputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CoverageOutputBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["CoverageBody"][] | null;
-            /**
-             * Format: int64
-             * @description The number in support and in use never scanned, across every build and not only this page. Those gone quiet are among the quiet as well
-             */
-            never: number;
-            /**
-             * Format: int64
-             * @description The number gone quiet, across every build and not only this page
-             */
-            quiet: number;
-            /**
-             * Format: int64
-             * @description The span this deployment allows, in days
-             */
-            quiet_after_days: number;
-            /**
-             * Format: int64
-             * @description The number in support and taken out of use, across every build and not only this page. Nothing may be filed against these, so they are never counted as quiet
-             */
-            retired: number;
-            /**
-             * Format: int64
-             * @description The number in support and in use that a scan has reached and that have not gone quiet, across every build and not only this page
-             */
-            scanned: number;
-            /**
-             * Format: int64
-             * @description The number of builds to report on
-             */
-            total: number;
-            /**
-             * Format: int64
-             * @description The number out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
-             */
-            unsupported: number;
-        };
         CoveredBody: {
             /**
              * Format: uri
@@ -10479,6 +10408,77 @@ export interface components {
             /** Format: int64 */
             rows: number;
         };
+        LastUploadBody: {
+            /** @description The moment a scan last arrived. Absent where none ever has */
+            last_received_at?: string;
+            /** @description The moment an upload against this build was last turned away. Absent where none has been */
+            last_refused_at?: string;
+            /** @description Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet */
+            out_of_support?: boolean;
+            product: string;
+            /** @description Whether that is longer than this deployment allows */
+            quiet?: boolean;
+            /**
+             * Format: int64
+             * @description The span since, in days, measured from the last arrival or from when the build was declared
+             */
+            quiet_days: number;
+            /** @description The words the producer was given the last time one was turned away, in the same words they were given */
+            refused_because?: string;
+            /** @description Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet */
+            retired?: boolean;
+            stream: string;
+            /**
+             * @description Whether this line moves
+             * @enum {string}
+             */
+            stream_kind: "branch" | "tag";
+            variant: string;
+        };
+        LastUploadsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LastUploadsOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LastUploadBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number in support and in use never scanned, across every build and not only this page. Those gone quiet are among the quiet as well
+             */
+            never: number;
+            /**
+             * Format: int64
+             * @description The number gone quiet, across every build and not only this page
+             */
+            quiet: number;
+            /**
+             * Format: int64
+             * @description The span this deployment allows, in days
+             */
+            quiet_after_days: number;
+            /**
+             * Format: int64
+             * @description The number in support and taken out of use, across every build and not only this page. Nothing may be filed against these, so they are never counted as quiet
+             */
+            retired: number;
+            /**
+             * Format: int64
+             * @description The number in support and in use that a scan has reached and that have not gone quiet, across every build and not only this page
+             */
+            scanned: number;
+            /**
+             * Format: int64
+             * @description The number of builds to report on
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description The number out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
+             */
+            unsupported: number;
+        };
         LateBody: {
             /** @description The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person */
             assigned_to?: string;
@@ -11477,33 +11477,6 @@ export interface components {
             variant_name?: string;
             /** @description The version that build ships under this name — pass it as ?version= when applying a decision there */
             version?: string;
-        };
-        MatchCoverageBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/MatchCoverageBody.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: int64
-             * @description The number of components the build holds
-             */
-            components: number;
-            /** @description The unmatched components, narrowed by reason where one was asked for, ordered by reason and then by name */
-            items: components["schemas"]["UnmatchedBody"][] | null;
-            /** @description Every reason with how many components it covers, zero included, in the order a component is tested against them. A component is counted under the first reason it meets */
-            reasons: components["schemas"]["ReasonCountBody"][] | null;
-            /**
-             * Format: int64
-             * @description The number of items across every page
-             */
-            total: number;
-            /**
-             * Format: int64
-             * @description The number of those the scanner has no way to match
-             */
-            unmatched: number;
         };
         MeasuredBody: {
             /** @description The build time it describes */
@@ -13683,7 +13656,7 @@ export interface components {
             term?: string;
             /**
              * Format: int64
-             * @description The number of those components the scanner has no way to match. The match coverage report lists them, with the reason
+             * @description The number of those components the scanner has no way to match. The unmatched components list names them, with the reason
              */
             unmatched: number;
         };
@@ -14770,6 +14743,33 @@ export interface components {
              */
             reason: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
             version: string;
+        };
+        UnmatchedComponentsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UnmatchedComponentsBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The number of components the build holds
+             */
+            components: number;
+            /** @description The unmatched components, narrowed by reason where one was asked for, ordered by reason and then by name */
+            items: components["schemas"]["UnmatchedBody"][] | null;
+            /** @description Every reason with how many components it covers, zero included, in the order a component is tested against them. A component is counted under the first reason it meets */
+            reasons: components["schemas"]["ReasonCountBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of items across every page
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description The number of those the scanner has no way to match
+             */
+            unmatched: number;
         };
         UpgradeBody: {
             /**
@@ -17742,7 +17742,7 @@ export interface operations {
             };
         };
     };
-    "list-scanning": {
+    "list-last-uploads": {
         parameters: {
             query?: {
                 /** @description Limit to one product, by name. Empty means every product you can see */
@@ -17768,7 +17768,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CoverageOutputBody"];
+                    "application/json": components["schemas"]["LastUploadsOutputBody"];
                 };
             };
             /** @description Error */
@@ -17782,7 +17782,7 @@ export interface operations {
             };
         };
     };
-    "export-scanning": {
+    "export-last-uploads": {
         parameters: {
             query?: {
                 /** @description Limit to one product, by name. Empty means every product you can see */
@@ -20852,7 +20852,7 @@ export interface operations {
             };
         };
     };
-    "get-match-coverage": {
+    "list-unmatched-components": {
         parameters: {
             query?: {
                 /** @description One reason alone */
@@ -20878,7 +20878,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MatchCoverageBody"];
+                    "application/json": components["schemas"]["UnmatchedComponentsBody"];
                 };
             };
             /** @description Error */
@@ -20892,7 +20892,7 @@ export interface operations {
             };
         };
     };
-    "export-match-coverage": {
+    "export-unmatched-components": {
         parameters: {
             query?: {
                 /** @description One reason alone */

@@ -419,7 +419,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 	// administering grants no reading of a product, so an administrator's
 	// subject would not reach every product.
 	everything := access.Everything("the watch")
-	rows, err := ingest.NewStore(w.db).Scanning(ctx, everything, finding.Scope{}, after)
+	rows, err := ingest.NewStore(w.db).LastUploads(ctx, everything, finding.Scope{}, after)
 	if err != nil {
 		return nil, err
 	}

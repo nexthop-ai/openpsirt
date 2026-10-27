@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MatchCoverage } from "./MatchCoverage";
+import { UnmatchedComponents } from "./UnmatchedComponents";
 import { location, mounted, screen, serve, settle } from "../test/mount";
 import { press, type Init } from "../test/controls";
 
@@ -13,7 +13,10 @@ afterEach(() => vi.restoreAllMocks());
 const ROUTE =
   "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components";
 
-async function drawn(total = 2, at = "/products/sonic/streams/master/variants/arm/match-coverage") {
+async function drawn(
+  total = 2,
+  at = "/products/sonic/streams/master/variants/arm/unmatched-components",
+) {
   const spy = serve((path) =>
     path === ROUTE
       ? {
@@ -34,9 +37,9 @@ async function drawn(total = 2, at = "/products/sonic/streams/master/variants/ar
   );
   mount.render(
     screen(
-      <MatchCoverage />,
+      <UnmatchedComponents />,
       at,
-      "/products/:product/streams/:stream/variants/:variant/match-coverage",
+      "/products/:product/streams/:stream/variants/:variant/unmatched-components",
     ),
   );
   await settle();
