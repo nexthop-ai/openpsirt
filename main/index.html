@@ -499,14 +499,14 @@
   
   
     <li class="md-nav__item">
-      <a href="analysis/" class="md-nav__link">
+      <a href="security-testing/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Analyzer results
+    Security testing
   
 
     
@@ -849,9 +849,9 @@ finding the issue.</p>
 we measure against carries 335,021 of them. Nobody can read that list, and
 nobody has to.</p>
 <p>Most findings are answered by a handful of upgrades, and OpenPSIRT shows you
-the handful. Fix bundles group findings by the upgrade that closes them. On a
+the handful. Planned upgrades group findings by the upgrade that closes them. On a
 real image, 5,047 fixable findings collapse into 271 upgrades, and a single
-kernel upgrade closes 917 of them. One decision answers a whole bundle, and the
+kernel upgrade closes 917 of them. One decision answers a whole upgrade, and the
 next scan proves it landed. Binary packages built from the same source move
 together, so curl and the libraries built beside it are one decision.</p>
 <p>Backports stop being a puzzle. A kernel advisory often lists its fix as five
@@ -932,7 +932,7 @@ the interface does, your automation can do too.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <p><a href="trying/">Evaluation</a> stands one up to look at, and <a href="built/">Current state</a>
 says what is built and what is not. To put it to work, <a href="pipeline/">Build pipelines</a>
-shows a pipeline declaring its target and posting its SBOM, and
+shows a pipeline declaring its build and posting its SBOM, and
 <a href="vendor-release/">A vendor's release</a> loads a vendor's SBOM and VEX document so
 their judgments are recorded as theirs. <a href="configuration/">Configuration</a> lists
 every setting, the <a href="reference/api/">API reference</a> every operation, and

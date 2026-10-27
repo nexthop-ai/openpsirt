@@ -366,14 +366,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../analysis/" class="md-nav__link">
+      <a href="../security-testing/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Analyzer results
+    Security testing
   
 
     
@@ -1102,6 +1102,17 @@
     <span class="md-ellipsis">
       
         Renamed API paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#renamed-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed operations
       
     </span>
   </a>
@@ -1883,6 +1894,17 @@
     <span class="md-ellipsis">
       
         Renamed API paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#renamed-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed operations
       
     </span>
   </a>
@@ -2862,7 +2884,7 @@ products = [&quot;router-os&quot;, &quot;switch-os&quot;]
 <tr>
 <td><code>OPENPSIRT_SCANNER_TIMEOUT</code></td>
 <td><code>scanner.timeout</code></td>
-<td>How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below <code>OPENPSIRT_QUEUE_MAX_HOLD</code>, the span a worker may hold one job for, and the process refuses to start where it does not</td>
+<td>How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job fails once its attempts run out. It has to stay below <code>OPENPSIRT_QUEUE_MAX_HOLD</code>, the span a worker may hold one job for, and the process refuses to start where it does not</td>
 <td><code>30m</code></td>
 </tr>
 <tr>
@@ -3847,8 +3869,9 @@ branches arrives as five bare commit links, and the label is what says which
 one applies to the branch you ship.</p>
 <p>Off unless the deployment turns it on. It fetches a copy of each repository a
 patch link names, from the host the link names, and asks the copy which
-branches hold each commit. Progress, failures and the size of each copy are on
-the System screen and at <code>/v1/patch-branch-lookups</code>.</p>
+branches hold each commit. Progress, failures and the size of each copy are in
+the Patch branch lookups panel of the System screen and at
+<code>/v1/patch-branch-lookups</code>.</p>
 <p>Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.</p>
 <table>
@@ -4005,7 +4028,7 @@ build server and waiting for a restart is not a remedy.</p>
 <tr>
 <td><code>OPENPSIRT_QUEUE_MAX_ATTEMPTS</code></td>
 <td><code>queue.max_attempts</code></td>
-<td>How many times a job is tried before it is set aside with its last error</td>
+<td>How many times a job is tried before it fails with its last error</td>
 <td><code>5</code></td>
 </tr>
 <tr>
@@ -4337,7 +4360,7 @@ the database is imported on every start.</p>
 the signal in the message:</p>
 <pre><code>run /usr/local/bin/grype: signal: killed
 </code></pre>
-<p>The job is retried with backoff and set aside after <code>OPENPSIRT_QUEUE_MAX_ATTEMPTS</code>
+<p>The job is retried with backoff and fails after <code>OPENPSIRT_QUEUE_MAX_ATTEMPTS</code>
 attempts, so the symptom is scans that will not complete rather than a pod that
 will not stay up. Where the pod itself is killed instead, a deployment without a
 kept database restarts into the import that exhausted it.</p>
@@ -4586,11 +4609,11 @@ changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> s
 <td>Nothing. The upgrade writes each acknowledgement v0.10.2 recorded as the first message sent, dated the day it was recorded in UTC, by whoever recorded it, with no text. A client parsing <code>acknowledged</code> as a moment parses a day</td>
 </tr>
 <tr>
-<td>A report's claim is required when it is recorded and when it is edited. v0.10.2 accepted an empty one</td>
-<td>Nothing. A report v0.10.2 left with no claim on a flaw recorded here takes the flaw's summary as its claim. Any other report v0.10.2 recorded with no claim keeps none, and an edit to it while it is open fills one in</td>
+<td>A report's reported problem, which v0.10.2 named <code>summary</code>, is required when it is recorded and when it is edited. v0.10.2 accepted an empty one</td>
+<td>Send <code>reported_problem</code>. A report v0.10.2 left with none on a flaw recorded here takes the flaw's summary as its reported problem. Any other report v0.10.2 recorded with none keeps none, and an edit to it while it is open fills one in</td>
 </tr>
 <tr>
-<td>A routing rule takes <code>reports</code>, which places the product's vulnerability reports instead of findings</td>
+<td>An assignment rule takes <code>reports</code>, which places the product's vulnerability reports instead of findings</td>
 <td>Nothing. A rule without it places findings, as before</td>
 </tr>
 <tr>
@@ -4630,8 +4653,20 @@ changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> s
 <td>Rename the columns a script reads</td>
 </tr>
 <tr>
+<td>What a build holds that the scanner cannot match downloads as <code>unmatched-components-…</code>, and the last upload per build as <code>last-uploads</code>, which v0.10.2 named <code>match-coverage-…</code> and <code>scanning</code>. The report is at <code>/analytics/last-upload-per-build</code>, and <code>/reports/scan-coverage</code> forwards there</td>
+<td>Look for the new name where a script picks the file up by its name</td>
+</tr>
+<tr>
+<td>A product's planned upgrades and one build's download as <code>planned-upgrades-…</code>, which v0.10.2 named <code>fix-bundles-…</code> and <code>pending-upgrades-…</code></td>
+<td>Look for the new name where a script picks the file up by its name</td>
+</tr>
+<tr>
 <td>The findings lists and the planned upgrades sort by <code>occurrences</code> in place of <code>places</code></td>
 <td>Ask for <code>sort=occurrences</code>. The upgrade rewrites a saved filter's <code>sort=places</code>, <code>claim</code> and <code>claim_state</code> to <code>sort=occurrences</code>, <code>decision</code> and <code>decision_state</code></td>
+</tr>
+<tr>
+<td>A finding's labels are <code>labels</code> in its response, which v0.10.2 named <code>tags</code>. The findings screen's address narrows by <code>label</code>, and a kept link narrowing by <code>tag</code> opens the list without that narrowing</td>
+<td>Read <code>labels</code>. The upgrade rewrites a saved filter's <code>tag</code> to <code>label</code></td>
 </tr>
 <tr>
 <td>The interface's addresses for a decision are <code>/decisions/{id}</code>, for a decision occurrence <code>/decision-occurrences/{id}</code>, and for a bulk decision <code>…/components/{component}/bulk-decision</code>. <code>/claims/{id}</code> and <code>…/components/{component}/decide</code> forward to them, with the query and fragment they arrived with</td>
@@ -4650,11 +4685,67 @@ changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> s
 <td>Nothing for a notification read in the application: the upgrade rewrites the link. A <code>/decisions/{id}</code> link already sent by mail or chat opens the decision with that identifier, which is a different record. Open the notification in the application instead</td>
 </tr>
 <tr>
-<td>The setting <code>triage.bulk-decision-cap</code> is the bulk action limit, which v0.10.2 named <code>triage.together-cap</code></td>
-<td>Nothing. The upgrade moves the value to the new name, and <code>/v1/settings/triage.together-cap</code> answers 404. A value written under the former name afterwards, by a v0.10.2 still running, is read while the new name is unset, and each start logs <code>a setting is held under its former name and is read from there: set it under its new name</code>. With both set, the new one is read, and the start logs <code>a setting is held under its former name and its new one: the new one is read</code>. Changing the setting under its new name removes the former one and ends the warning</td>
+<td>The setting <code>triage.bulk-decision-cap</code> is the bulk action limit, which v0.10.2 named <code>triage.together-cap</code>, and <code>triage.minimum-severity</code> is the minimum severity, which v0.10.2 named <code>triage.floor</code></td>
+<td>Nothing. The upgrade moves the value to the new name, and <code>/v1/settings/triage.together-cap</code> and <code>/v1/settings/triage.floor</code> answer 404. A value written under the former name afterwards, by a v0.10.2 still running, is read while the new name is unset, and each start logs <code>a setting is held under its former name and is read from there: set it under its new name</code>. With both set, the new one is read, and the start logs <code>a setting is held under its former name and its new one: the new one is read</code></td>
 </tr>
 <tr>
-<td>The upgrade renames the triage tables and columns, then rewrites the stored values above. Each rename waits up to three seconds for a table another session holds, then waits again, logging <code>a rename is waiting for a table something else holds</code> with what holds it</td>
+<td>Response fields name an incident: <code>exploited_here</code> is <code>incident</code> where it says whether one stands, and <code>incidents</code> on a finding's evidence and on a bulk decision's outliers</td>
+<td>Rename the fields a client reads, as <a href="#renamed-api-fields">Renamed API fields</a> lists</td>
+</tr>
+<tr>
+<td>The notification kinds <code>obligation-open</code>, <code>obligation-near</code> and <code>obligation-passed</code> are <code>response-window-open</code>, <code>response-window-near</code> and <code>response-window-passed</code>, in the notifications, a webhook's body and a chat message</td>
+<td>A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for any of them</td>
+</tr>
+<tr>
+<td>A change on the administrative trail recording or clearing an incident, or naming its fix, has the kind <code>incident</code>, which v0.10.2 answered as <code>exploited-here</code>. The trail's <code>kind</code> filter takes <code>incident</code></td>
+<td>Ask for <code>kind=incident</code>. The upgrade rewrites every stored change. A change to a window v0.10.2 recorded keeps saying <code>Obligation window</code> in what it was about; one recorded after says <code>Response window</code></td>
+</tr>
+<tr>
+<td>The planned upgrades download names its <code>exploited here</code> column <code>incident</code></td>
+<td>Rename the column a script reads</td>
+</tr>
+<tr>
+<td>The interface's address for incidents and response windows is <code>/incidents</code>. <code>/exploited-here</code> and <code>/obligations</code> forward to it</td>
+<td>Nothing</td>
+</tr>
+<tr>
+<td>Screens are renamed: Reports is Analytics, at <code>/analytics</code>, Inbox is Vulnerability reports, at <code>/products/{product}/vulnerability-reports</code>, Disclosing is Disclosure deadlines, at <code>/disclosure-deadlines</code>, Report a flaw is Record a flaw, at <code>/record-a-flaw</code>, and The record is Audit log, at <code>/audit-log</code>. Advisories is Published advisories and Scan results is Known vulnerability scan, at the addresses they had</td>
+<td>Nothing. An address v0.10.2 served forwards to the screen's new one, with its query</td>
+</tr>
+<tr>
+<td>A finding with no deadline because it is below its product's minimum severity says <code>below-minimum-severity</code> as its <code>no_deadline</code>, which v0.10.2 answered as <code>below-the-line</code></td>
+<td>A client matching on the reason matches the new word</td>
+</tr>
+<tr>
+<td>The administrative trail's kind for an assignment rule is <code>assignment-rule</code>, which v0.10.2 named <code>routing</code>, in each change and in <code>GET /v1/administration/changes</code></td>
+<td>Ask for <code>kind=assignment-rule</code>. The upgrade rewrites every stored change</td>
+</tr>
+<tr>
+<td>The setting <code>assignment.batch</code> is how many findings one pass of the assignment rules places, which v0.10.2 named <code>routing.batch</code></td>
+<td>Nothing. The upgrade moves the value to the new name, and a value under the former name is read as one under <code>triage.together-cap</code> is</td>
+</tr>
+<tr>
+<td>The background job applying the assignment rules is <code>assignment.sweep</code>, which v0.10.2 named <code>routing.sweep</code></td>
+<td>A monitor matching on the job's kind matches the new one. The upgrade rewrites every stored job</td>
+</tr>
+<tr>
+<td>Every read narrowing by a branch or tag, the findings lists and the code findings among them, takes <code>branch_or_tag</code> in place of <code>stream</code>. The review queue takes <code>branch_or_tag</code> in place of <code>release</code></td>
+<td>Rename the parameter in the request. A former name is refused with 400, naming it</td>
+</tr>
+<tr>
+<td>A branch or tag is <code>branch_or_tag</code> in every response and request, its label <code>branch_or_tag_name</code> and its kind <code>branch_or_tag_kind</code>, which v0.10.2 named <code>stream</code>, <code>stream_name</code> and <code>stream_kind</code></td>
+<td>Rename the fields a client reads or sends, as <a href="#renamed-api-fields">Renamed API fields</a> lists</td>
+</tr>
+<tr>
+<td>The downloads name the column <code>branch_or_tag</code> and its label <code>branch or tag name</code>, which v0.10.2 named <code>stream</code> and <code>stream name</code></td>
+<td>Rename the columns a script reads</td>
+</tr>
+<tr>
+<td>The interface's addresses under <code>/products/{product}/streams</code> are under <code>/products/{product}/branches-and-tags</code>, and the former ones forward there. The findings screen and the review queue narrow by <code>branch_or_tag</code>, and a kept link narrowing by <code>stream</code> or <code>release</code> opens the list without that narrowing</td>
+<td>Nothing</td>
+</tr>
+<tr>
+<td>The upgrade renames tables and columns, then rewrites the stored values above. On a database holding a million rows a table it takes 2.6 s on PostgreSQL, 6.4 s on MySQL, 6.2 s on MariaDB and 8.4 s on SQLite. Each rename waits up to three seconds for a table another session holds, then waits again, logging <code>a rename is waiting for a table something else holds</code> with what holds it</td>
 <td>Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end</td>
 </tr>
 </tbody>
@@ -4720,13 +4811,53 @@ changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> s
 <td><code>place_limit</code></td>
 <td><code>occurrence_limit</code></td>
 </tr>
+<tr>
+<td><code>exploited_here</code>, whether an incident stands</td>
+<td><code>incident</code></td>
+</tr>
+<tr>
+<td><code>exploited_here</code>, a finding's incidents or a count of issues with one</td>
+<td><code>incidents</code></td>
+</tr>
+<tr>
+<td><code>summary</code>, on a vulnerability report</td>
+<td><code>reported_problem</code></td>
+</tr>
+<tr>
+<td><code>triage_floor</code>, a product's own</td>
+<td><code>minimum_severity</code></td>
+</tr>
+<tr>
+<td><code>floor</code>, setting a product's minimum severity, on the findings list and on a build's readiness</td>
+<td><code>minimum_severity</code></td>
+</tr>
+<tr>
+<td><code>routed_by</code>, the rule that placed a finding</td>
+<td><code>assigned_by_rule</code></td>
+</tr>
+<tr>
+<td><code>tags</code>, the labels on a finding</td>
+<td><code>labels</code></td>
+</tr>
+<tr>
+<td><code>stream</code></td>
+<td><code>branch_or_tag</code></td>
+</tr>
+<tr>
+<td><code>stream_name</code></td>
+<td><code>branch_or_tag_name</code></td>
+</tr>
+<tr>
+<td><code>stream_kind</code></td>
+<td><code>branch_or_tag_kind</code></td>
+</tr>
 </tbody>
 </table>
 <p>A notice's <code>places</code>, the places it named, keeps its name.</p>
 <h4 id="renamed-api-paths">Renamed API paths<a class="headerlink" href="#renamed-api-paths" title="Permanent link">&para;</a></h4>
 <p>Every path below <code>/v1/products/{product}/streams</code> moves below
 <code>/v1/products/{product}/branches-and-tags</code>, and <code>…</code> below is a build's address,
-<code>/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}</code>. A path
+<code>/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}</code>. A path
 under it absent from the table keeps the rest of its address.</p>
 <table>
 <thead>
@@ -4755,42 +4886,6 @@ under it absent from the table keeps the rest of its address.</p>
 <tr>
 <td><code>…/findings/{vulnerability}/places/{place}/reach</code></td>
 <td><code>…/findings/{issue}/occurrences/{occurrence}/reach</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}</code></td>
-<td><code>…/code-findings/{occurrence}</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/assignment</code></td>
-<td><code>…/code-findings/{occurrence}/assignment</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/collaborators</code></td>
-<td><code>…/code-findings/{occurrence}/collaborators</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/collaborators/{identity}</code></td>
-<td><code>…/code-findings/{occurrence}/collaborators/{identity}</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/decision</code></td>
-<td><code>…/code-findings/{occurrence}/decision</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/fixed</code></td>
-<td><code>…/code-findings/{occurrence}/fixed</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/hand-off</code></td>
-<td><code>…/code-findings/{occurrence}/flaw</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/hand-off/withdrawal</code></td>
-<td><code>…/code-findings/{occurrence}/flaw/withdrawal</code></td>
-</tr>
-<tr>
-<td><code>…/leads/{place}/move</code></td>
-<td><code>…/code-findings/{occurrence}/flaw/disclosure</code></td>
 </tr>
 <tr>
 <td><code>…/match-coverage</code></td>
@@ -4941,34 +5036,6 @@ under it absent from the table keeps the rest of its address.</p>
 <td><code>/v1/products/{product}/issues/{issue}/incidents</code></td>
 </tr>
 <tr>
-<td><code>/v1/products/{product}/issues/{vulnerability}/lead</code></td>
-<td><code>/v1/products/{product}/issues/{issue}/code-finding</code></td>
-</tr>
-<tr>
-<td><code>/v1/products/{product}/lead-rules</code></td>
-<td><code>/v1/products/{product}/suppression-rules</code></td>
-</tr>
-<tr>
-<td><code>/v1/products/{product}/lead-rules/{id}</code></td>
-<td><code>/v1/products/{product}/suppression-rules/{id}</code></td>
-</tr>
-<tr>
-<td><code>/v1/products/{product}/lead-rules/{id}/approval</code></td>
-<td><code>/v1/products/{product}/suppression-rules/{id}/approval</code></td>
-</tr>
-<tr>
-<td><code>/v1/products/{product}/lead-series</code></td>
-<td><code>/v1/products/{product}/code-finding-series</code></td>
-</tr>
-<tr>
-<td><code>/v1/products/{product}/leads</code></td>
-<td><code>/v1/products/{product}/code-findings</code></td>
-</tr>
-<tr>
-<td><code>/v1/products/{product}/leads.{format}</code></td>
-<td><code>/v1/products/{product}/code-findings.{format}</code></td>
-</tr>
-<tr>
 <td><code>/v1/products/{product}/routing-rules</code></td>
 <td><code>/v1/products/{product}/assignment-rules</code></td>
 </tr>
@@ -5011,6 +5078,246 @@ under it absent from the table keeps the rest of its address.</p>
 <tr>
 <td><code>/v1/work/set-aside/{id}/retry</code></td>
 <td><code>/v1/failed-jobs/{id}/retry</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="renamed-operations">Renamed operations<a class="headerlink" href="#renamed-operations" title="Permanent link">&para;</a></h4>
+<p>A client generated from the API document names its functions by operation, so
+these functions are renamed. Two former identifiers now name another
+operation: <code>get-decision</code> reads a decision, which v0.10.2 named <code>get-claim</code>,
+and <code>reaffirm-decision</code> reaffirms everything one decision covers, which
+v0.10.2 named <code>reaffirm-claim</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Former operation</th>
+<th>Operation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add-advisory-source</code></td>
+<td><code>add-supplier-advisory-feed</code></td>
+</tr>
+<tr>
+<td><code>add-routing-rule</code></td>
+<td><code>add-assignment-rule</code></td>
+</tr>
+<tr>
+<td><code>amend-stream</code></td>
+<td><code>amend-branch-or-tag</code></td>
+</tr>
+<tr>
+<td><code>approve-claim</code></td>
+<td><code>approve-decision</code></td>
+</tr>
+<tr>
+<td><code>change-obligation-window</code></td>
+<td><code>change-response-window</code></td>
+</tr>
+<tr>
+<td><code>clear-exploited-here</code></td>
+<td><code>clear-incident</code></td>
+</tr>
+<tr>
+<td><code>comment-on-claim</code></td>
+<td><code>comment-on-decision</code></td>
+</tr>
+<tr>
+<td><code>decide-together</code></td>
+<td><code>decide-in-bulk</code></td>
+</tr>
+<tr>
+<td><code>declare-obligation-window</code></td>
+<td><code>declare-response-window</code></td>
+</tr>
+<tr>
+<td><code>declare-stream</code></td>
+<td><code>declare-branch-or-tag</code></td>
+</tr>
+<tr>
+<td><code>export-fix-bundles</code></td>
+<td><code>export-planned-upgrades</code></td>
+</tr>
+<tr>
+<td><code>export-match-coverage</code></td>
+<td><code>export-unmatched-components</code></td>
+</tr>
+<tr>
+<td><code>export-my-claims</code></td>
+<td><code>export-my-decisions</code></td>
+</tr>
+<tr>
+<td><code>export-pending-upgrades</code></td>
+<td><code>export-build-planned-upgrades</code></td>
+</tr>
+<tr>
+<td><code>export-scanning</code></td>
+<td><code>export-last-uploads</code></td>
+</tr>
+<tr>
+<td><code>get-claim</code></td>
+<td><code>get-decision</code></td>
+</tr>
+<tr>
+<td><code>get-decision</code></td>
+<td><code>get-decision-occurrence</code></td>
+</tr>
+<tr>
+<td><code>get-match-coverage</code></td>
+<td><code>list-unmatched-components</code></td>
+</tr>
+<tr>
+<td><code>get-pending-upgrades</code></td>
+<td><code>list-build-planned-upgrades</code></td>
+</tr>
+<tr>
+<td><code>get-vex-issued</code></td>
+<td><code>get-published-vex</code></td>
+</tr>
+<tr>
+<td><code>list-advisory-sources</code></td>
+<td><code>list-supplier-advisory-feeds</code></td>
+</tr>
+<tr>
+<td><code>list-audit-claims</code></td>
+<td><code>list-audit-decisions</code></td>
+</tr>
+<tr>
+<td><code>list-claim-approvals</code></td>
+<td><code>list-decision-approvals</code></td>
+</tr>
+<tr>
+<td><code>list-claim-comments</code></td>
+<td><code>list-decision-comments</code></td>
+</tr>
+<tr>
+<td><code>list-claim-revisions</code></td>
+<td><code>list-decision-revisions</code></td>
+</tr>
+<tr>
+<td><code>list-decisions</code></td>
+<td><code>list-decision-occurrences</code></td>
+</tr>
+<tr>
+<td><code>list-fix-bundles</code></td>
+<td><code>list-planned-upgrades</code></td>
+</tr>
+<tr>
+<td><code>list-my-claims</code></td>
+<td><code>list-my-decisions</code></td>
+</tr>
+<tr>
+<td><code>list-obligation-windows</code></td>
+<td><code>list-response-windows</code></td>
+</tr>
+<tr>
+<td><code>list-obligations</code></td>
+<td><code>list-incidents</code></td>
+</tr>
+<tr>
+<td><code>list-patch-branch-progress</code></td>
+<td><code>list-patch-branch-lookups</code></td>
+</tr>
+<tr>
+<td><code>list-routing-rules</code></td>
+<td><code>list-assignment-rules</code></td>
+</tr>
+<tr>
+<td><code>list-scanning</code></td>
+<td><code>list-last-uploads</code></td>
+</tr>
+<tr>
+<td><code>list-set-aside-work</code></td>
+<td><code>list-failed-jobs</code></td>
+</tr>
+<tr>
+<td><code>list-streams</code></td>
+<td><code>list-branches-and-tags</code></td>
+</tr>
+<tr>
+<td><code>list-tags</code></td>
+<td><code>list-labels</code></td>
+</tr>
+<tr>
+<td><code>list-vex-issuances</code></td>
+<td><code>list-published-vex</code></td>
+</tr>
+<tr>
+<td><code>point-claim-elsewhere</code></td>
+<td><code>point-decision-elsewhere</code></td>
+</tr>
+<tr>
+<td><code>preview-routing-rule</code></td>
+<td><code>preview-assignment-rule</code></td>
+</tr>
+<tr>
+<td><code>reaffirm-claim</code></td>
+<td><code>reaffirm-decision</code></td>
+</tr>
+<tr>
+<td><code>reaffirm-decision</code></td>
+<td><code>reaffirm-finding-decision</code></td>
+</tr>
+<tr>
+<td><code>record-exploited-here</code></td>
+<td><code>record-incident</code></td>
+</tr>
+<tr>
+<td><code>record-vex-issued</code></td>
+<td><code>record-published-vex</code></td>
+</tr>
+<tr>
+<td><code>retire-obligation-window</code></td>
+<td><code>retire-response-window</code></td>
+</tr>
+<tr>
+<td><code>retire-routing-rule</code></td>
+<td><code>retire-assignment-rule</code></td>
+</tr>
+<tr>
+<td><code>retire-stream</code></td>
+<td><code>retire-branch-or-tag</code></td>
+</tr>
+<tr>
+<td><code>retry-set-aside-work</code></td>
+<td><code>retry-failed-job</code></td>
+</tr>
+<tr>
+<td><code>revise-claim</code></td>
+<td><code>revise-decision</code></td>
+</tr>
+<tr>
+<td><code>send-claim-back</code></td>
+<td><code>send-decision-back</code></td>
+</tr>
+<tr>
+<td><code>set-product-triage-floor</code></td>
+<td><code>set-product-minimum-severity</code></td>
+</tr>
+<tr>
+<td><code>set-stream-end-of-life</code></td>
+<td><code>set-branch-or-tag-end-of-life</code></td>
+</tr>
+<tr>
+<td><code>split-claim</code></td>
+<td><code>split-decision</code></td>
+</tr>
+<tr>
+<td><code>tag-finding</code></td>
+<td><code>label-finding</code></td>
+</tr>
+<tr>
+<td><code>untag-finding</code></td>
+<td><code>unlabel-finding</code></td>
+</tr>
+<tr>
+<td><code>withdraw-advisory-source</code></td>
+<td><code>withdraw-supplier-advisory-feed</code></td>
+</tr>
+<tr>
+<td><code>withdraw-claim</code></td>
+<td><code>withdraw-decision</code></td>
 </tr>
 </tbody>
 </table>

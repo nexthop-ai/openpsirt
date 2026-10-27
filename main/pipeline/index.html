@@ -14,7 +14,7 @@
         <link rel="prev" href="../trying/">
       
       
-        <link rel="next" href="../analysis/">
+        <link rel="next" href="../security-testing/">
       
       
         
@@ -496,14 +496,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../analysis/" class="md-nav__link">
+      <a href="../security-testing/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Analyzer results
+    Security testing
   
 
     
@@ -810,11 +810,11 @@
 <h1 id="build-pipelines">Build pipelines<a class="headerlink" href="#build-pipelines" title="Permanent link">&para;</a></h1>
 <p>What a build pipeline does, end to end. An inventory is one HTTP request;
 there is no client to install and no agent to run. A static analyzer's run is
-sent with the upload client, as <a href="../analysis/">Analyzer results</a> describes.</p>
+sent with the upload client, as <a href="../security-testing/">Security testing</a> describes.</p>
 <p>The short version: declare what you ship once, mint a key once, and post the
 inventory on every build.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>A scan is filed against a product, a stream and a variant, and an upload naming
+<p>A scan is filed against a product, a branch or tag, and a variant, and an upload naming
 something undeclared is refused — the error says which part is missing. That is
 deliberate: a typo in a pipeline would otherwise create a fourth product nobody
 meant, and the first anybody would know is a screen with four of everything.</p>
@@ -875,7 +875,7 @@ person: it may file scans and it holds none of a person's rights.</p>
   -d '{&quot;name&quot;: &quot;sonic-ci&quot;, &quot;product&quot;: &quot;sonic&quot;}'
 </code></pre>
 <p>A key is scoped to one product, which is required rather than optional, and
-may be narrowed further to one stream and one variant. So a deployment shipping
+may be narrowed further to one branch or tag and one variant. So a deployment shipping
 three products has three keys, and a key that leaks reaches one of them.</p>
 <p>The secret comes back once in <code>item.secret</code>, begins <code>opk_</code>, and is stored hashed — a credential
 store that can hand back what it holds gives up every pipeline's key with a copy
@@ -944,11 +944,11 @@ only failing the step.</p>
         -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
         -F &quot;inventory=@sbom.cdx.json&quot;
 </code></pre>
-<p>Naming the stream from <code>$CI_COMMIT_BRANCH</code> is the shape that bites: the
-stream has to have been declared. A pipeline running on a branch nobody
+<p>Naming the branch from <code>$CI_COMMIT_BRANCH</code> is the shape that bites: the
+branch has to have been declared. A pipeline running on a branch nobody
 declared is refused, every build, until somebody declares it — and the refusal
 says which part is missing rather than making you guess:</p>
-<pre><code>404  product &quot;sonic&quot;: stream &quot;nobody-declared-this&quot;: not declared
+<pre><code>404  product &quot;sonic&quot;: branch or tag &quot;nobody-declared-this&quot;: not declared
 </code></pre>
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
 <p>Poll the SBOM uploads for that build.</p>
