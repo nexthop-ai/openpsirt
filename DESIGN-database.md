@@ -631,6 +631,15 @@ stored values, and the changes after them.
 | SQLite's renames are logged, not held | It builds a renamed index again, so they grow with the rows by design |
 | The changes are logged, not held | They build indexes, which grow with the rows by their nature |
 
+The measurement, at 1,000 and at 1,000,000 rows a table:
+
+| Engine | Renames | Stored values | Changes | Whole upgrade |
+|---|---|---|---|---|
+| PostgreSQL | 111 ms, 156 ms | 18 ms, 67 ms | 0.22 s, 2.2 s | 0.35 s, 2.5 s |
+| MySQL | 817 ms, 847 ms | 19 ms, 447 ms | 0.43 s, 4.8 s | 1.3 s, 6.1 s |
+| MariaDB | 162 ms, 221 ms | 15 ms, 349 ms | 0.09 s, 5.1 s | 0.27 s, 5.7 s |
+| SQLite | 202 ms, 3.3 s | 4 ms, 72 ms | 0.02 s, 3.6 s | 0.23 s, 7.8 s |
+
 | Table | Change | Every engine |
 |---|---|---|
 | `flaw_report` | Gains a title, who holds it and since when. Loses the acknowledged moment and who acknowledged | Each acknowledgement is first written as a message sent, dated the day it was recorded, by whoever recorded it, with no text. A report already holding a sent message is stepped over, so a start after one that stopped part way writes none twice. The index serving the unanswered list is dropped, then the foreign key naming who acknowledged on the server engines, then the columns. The holder's foreign key is added where the table does not hold it, whatever the columns say, since a stopped upgrade can leave the columns changed and the key not added |
