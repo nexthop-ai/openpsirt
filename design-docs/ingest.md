@@ -395,13 +395,13 @@ each fact.
 Whether a component is a container image is read from the format only where
 it carries no package identifier, because the identifier's type decides where
 there is one. An image is identified by its name (REQ-08), as
-`DESIGN-data-model.md` § Container images holds.
+`design-docs/data-model.md` § Container images holds.
 
 The scoped SPDX 2 relationships place their target. `BUILD_DEPENDENCY_OF`,
 `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF` are
 edges carrying what the producer called them; only `TEST_DEPENDENCY_OF` places
 nothing, which is the exception the third version's `test` scope gets too. What
-the word means, and what nothing may read into it, is in `DESIGN-findings.md`.
+the word means, and what nothing may read into it, is in `design-docs/findings.md`.
 
 A component reached only by one of those four has a consumer, so its
 occurrence identity is the one a consumer gives it and a decision keyed on the component
@@ -724,7 +724,7 @@ interval.
 
 | Rule | Reason |
 |---|---|
-| One replica asks, settled by a lease (`DESIGN-queue.md`) | Two reading the same list at the same moment would both see the same build as due, because the check that nothing is queued is made when the list is read |
+| One replica asks, settled by a lease (`design-docs/queue.md`) | Two reading the same list at the same moment would both see the same build as due, because the check that nothing is queued is made when the list is read |
 | The interval is a setting, shipping at a day | The databases the scanner reads are published daily |
 | This does not discover | The component list still comes from the build. What changes between one scan and the next is what is known about those components |
 
@@ -770,7 +770,7 @@ budget, and every bound is configurable.
 | What the scanner said while running | Past the ceiling the beginning is dropped and the end kept, and the run stands. A scanner with a lot to say still scanned, and one that failed says why on its last lines |
 | How many matches one report states | Charged as each match is read rather than after the array, because what a bound stops is the walk |
 | How many addresses one match points at | Bounded separately, because the two multiply: a report inside the match ceiling is still a report of one match pointing at everything |
-| One execution's wall-clock time | A scanner that has stopped making progress fails as a run that failed rather than holding a worker. It stays below the ceiling on one hold (`DESIGN-queue.md`), and the process refuses to start where it does not |
+| One execution's wall-clock time | A scanner that has stopped making progress fails as a run that failed rather than holding a worker. It stays below the ceiling on one hold (`design-docs/queue.md`), and the process refuses to start where it does not |
 
 A report's size is components × matches × references, and a producer controls
 the first factor by uploading a scan file — so nothing about it is bounded by
@@ -914,7 +914,7 @@ individually correct and unable to answer "why is this here".
 
 Three more are worked out when a receipt is read: how many names the inventory
 gained, lost and holds at different versions since the upload before it.
-`DESIGN-data-model.md` § Inventory delta holds what is compared. A build that
+`design-docs/data-model.md` § Inventory delta holds what is compared. A build that
 expected to move three dependencies and moved two hundred has had a base image
 change under it or a lockfile regenerated, and nothing else on a receipt says
 so.
@@ -926,7 +926,7 @@ sending for one variant are describing one artifact.
 
 Which names moved is a listing of its own, reached on the same terms as the
 receipt carrying the counts. An upload that moved much of a build is also told
-to whoever may read the product, on the terms `DESIGN-notifications.md` § An
+to whoever may read the product, on the terms `design-docs/notifications.md` § An
 inventory that moved sharply holds: the telling is worked out once the writes
 have committed, and a message that cannot be composed is logged rather than
 failing an upload whose inventory is stored.
@@ -990,7 +990,7 @@ findings each way. The page holds the run that opened the build.
 
 | Rule | |
 |---|---|
-| An index-only read depends on the visibility map | A finding written since the last vacuum is read from the table. The finding table is vacuumed after a fiftieth of it changes (`DESIGN-database.md` § Indexes) |
+| An index-only read depends on the visibility map | A finding written since the last vacuum is read from the table. The finding table is vacuumed after a fiftieth of it changes (`design-docs/database.md` § Indexes) |
 
 A night costs up to 7 percent more with the two indexes, averaged over the year: 3.75 s and
 3.83 s on PostgreSQL in the restamped shape, 3.39 s and 3.42 s in the quiet
@@ -1017,7 +1017,7 @@ takes a different body and answers a different receipt.
 | Kind | Sent to | Listed by |
 |---|---|---|
 | SBOM | The build | Its receipts (§ Receipts) |
-| Static analysis run, as SARIF | The build | Its runs (`DESIGN-analysis.md`) |
+| Static analysis run, as SARIF | The build | Its runs (`design-docs/analysis.md`) |
 | VEX document | The product | Its uploads, below |
 | Supplier advisory | The product, by upload or by a supplier's feed | Its uploads, below |
 
@@ -1062,7 +1062,7 @@ record holds the rest.
 | A document a feed fetched is recorded where it said something about a component this product ships, set aside something an earlier copy said, or arrived whole and was refused | A distribution lists tens of thousands of advisories about nothing a product here ships |
 | A feed's refusal is a document that arrived whole and was stepped over | Malformed, misshapen, or mismatching the digest its publisher serves, with the publisher and the name where it was parsed that far |
 | A document a feed could not fetch whole is not recorded | Withdrawn, refused by the publisher, past the size bound, or at an address the client turns away. Nothing arrived, and the supplier's own record says what stopped the pass. A statement set listed beside the advisories is left alone and not recorded either |
-| A trusted upstream's documents are not recorded here | They are read on a schedule, from the upstream (`DESIGN-upstream.md`) |
+| A trusted upstream's documents are not recorded here | They are read on a schedule, from the upstream (`design-docs/upstream.md`) |
 
 ### Document lists
 
@@ -1104,7 +1104,7 @@ What is done with the statements is not an ingest question. A statement whose
 product is a build's root is that build's own claim (REQ-11), a supplier's
 statement about its own product closes the finding at every occurrence inside that
 product (REQ-31), and every other statement is evidence and a prefill.
-`DESIGN-triage.md` § Evidence from publishers holds the three.
+`design-docs/triage.md` § Evidence from publishers holds the three.
 
 ## Supplier advisories
 
@@ -1174,7 +1174,7 @@ A supplier's advisories are read on the scan schedule, from an address an
 administrator configured, and land where an uploaded one lands (REQ-31). The
 address is the publisher's CSAF provider description, which names the feeds the
 documents are listed in — the same three files this deployment writes when it
-publishes its own (`DESIGN-remediation.md`).
+publishes its own (`design-docs/remediation.md`).
 
 The deliberate act is choosing the publisher. An upload is somebody deciding
 that one document is worth reading, and a publisher issues hundreds a year:
@@ -1218,7 +1218,7 @@ document has been read.
 | Whether a supplier is still configured is asked inside the write | A pass takes minutes, and one withdrawn during it would go on fetching and recording — which is the request leaving this deployment that withdrawing it was meant to stop |
 | A supplier that could not be read does not stop the next | One publisher unreachable says nothing about another, and a pass that stopped at the first would leave every supplier after it unread for as long as that one stayed down |
 | Two moments are recorded: the last attempt, and the last one that worked | An attempt that failed still happened. One moment moving on every attempt reads as a supplier answering fine right up to the failure it is reporting, so how long one has been unreachable is the gap between them |
-| A supplier unread for longer than a set time is raised with administrators | One that stopped answering looks exactly like one that published nothing. Measured from the last read that worked, or from when it was configured where none has, and never shorter than two scan intervals, since a supplier is read once each. `DESIGN-notifications.md` holds the condition |
+| A supplier unread for longer than a set time is raised with administrators | One that stopped answering looks exactly like one that published nothing. Measured from the last read that worked, or from when it was configured where none has, and never shorter than two scan intervals, since a supplier is read once each. `design-docs/notifications.md` holds the condition |
 | What stopped an attempt is kept bounded | The text carries a publisher's own address and a server's own reason phrase, neither of which they have agreed to bound. Unbounded, the write fails on two of the four engines, which leaves the attempt unrecorded and the supplier fetched again on every wake |
 | A feed entry nobody can date is left alone | It cannot be placed against the mark, so taking it would mean taking it again on every pass for ever |
 | Five publishers with a public CSAF provider description are offered as a fill for the form, and none is configured | Red Hat, SUSE, Cisco, Siemens and NCSC-NL. Choosing the publisher and the product is the deliberate act, so a preset fills the name and the address and the administrator adds it. One the product already reads, by name or by address, is not offered |
@@ -1287,7 +1287,7 @@ discovers broken.
 
 What a scan narrows its matches with is a snapshot of CVE records, kept on disk
 beside the scanner's data and read whole (REQ-12, REQ-31).
-`DESIGN-findings.md` § CVE record ranges holds what a scan does with it.
+`design-docs/findings.md` § CVE record ranges holds what a scan does with it.
 
 | Source | |
 |---|---|
@@ -1328,13 +1328,13 @@ beside the scanner's data and read whole (REQ-12, REQ-31).
 ## Analyzer findings
 
 A static analyzer's run arrives as SARIF through an upload of its own, read
-within bounds of its own; `DESIGN-analysis.md` holds the whole of it. Findings
+within bounds of its own; `design-docs/analysis.md` holds the whole of it. Findings
 from a fuzzer are intended scope and **are not built** (REQ-14).
 
 | Decision | Reason |
 |---|---|
 | Scoped to a product, a release and a variant | A finding that cannot say which build it is about cannot be compared release to release |
-| SARIF is the interchange the deployment reads | It is what the analyzers already emit. Native output would mean one reader per tool with nothing in common, so a tool's native format is read by the upload client (`DESIGN-analysis.md` § Upload client) |
+| SARIF is the interchange the deployment reads | It is what the analyzers already emit. Native output would mean one reader per tool with nothing in common, so a tool's native format is read by the upload client (`design-docs/analysis.md` § Upload client) |
 | Some sources are pulled rather than pushed | A hosted analyzer has its own store and no reason to call this deployment. Pulling is **not built** |
 | Identity is computed here, never taken from the producer | An analyzer's identifier for a result is stable until the tool is upgraded or the file is reformatted, and a finding whose identity moves reopens as new |
 | The bounded JSON reading an inventory uses is shared with the SARIF reader | One implementation of size, depth and token limits for every document read here |

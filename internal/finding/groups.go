@@ -830,7 +830,7 @@ func (s *Store) countGroups(ctx context.Context, grouped *bun.SelectQuery) (int,
 // grouping itself. MariaDB evaluates a HAVING clause wrongly in a grouped
 // statement over a join that also carries a window function and a
 // COUNT(DISTINCT): it drops groups the clause admits and keeps groups it
-// refuses, with no error (DESIGN-database.md § Silently wrong query shapes).
+// refuses, with no error (design-docs/database.md § Silently wrong query shapes).
 // The findings filter decides what the HAVING holds, so a page it narrows is
 // never read with the window beside it.
 func paged(db bun.IDB, grouped *bun.SelectQuery, columns ...string) *bun.SelectQuery {

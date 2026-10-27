@@ -158,7 +158,7 @@ the work decides from is fetched inside the thing that serializes it.
 One row of the table is a lock rather than a lease. An upload writes a fresh
 value into it inside its transaction to serialize the check of the room left,
 and nothing takes it
-(`DESIGN-attachments.md` § Quota and removal).
+(`design-docs/attachments.md` § Quota and removal).
 
 ## Backlog refusal
 
@@ -221,7 +221,7 @@ own.
 
 | Rule | Reason |
 |---|---|
-| A cluster refuses at commit, not at the statement | See `DESIGN-database.md` § Retryable transactions. A write outside a transaction cannot be retried at all: the failure arrives where there is nothing left to go again |
+| A cluster refuses at commit, not at the statement | See `design-docs/database.md` § Retryable transactions. A write outside a transaction cannot be retried at all: the failure arrives where there is nothing left to go again |
 | Finishing is the write where it costs most | Reported up rather than retried, a job that finished is recorded by its caller as failed and handed out again. The work runs twice, which on an ingest looks like real change |
 | An ending whose commit was refused asks the row rather than assuming | A second attempt covers both "somebody else holds it now" and "the commit succeeded and the answer never arrived". A finish reads as done; a failure and a postponement read as unclaimed, with their own reason; a job put back reads as no longer failed, where an earlier attempt matched it. Reporting a lost claim for an ending that landed has the caller record a takeover that did not happen, and reporting a job as not failed after it was put back tells an operator their act did nothing |
 | A lease take that is refused would read as losing a race | A replica told it lost a race it never ran stops sweeping, with nothing logged, on every replica at once |

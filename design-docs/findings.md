@@ -142,7 +142,7 @@ issue that is absorbed stays filed under it, and is read as the issue kept.
 | The other rating claim is withdrawn, naming no person, with the reason "Superseded when the absorbed issue merged into the kept one" | A claim nobody withdrew states why it stopped standing. The rating in force is worked out again from the claim that stands, which re-ranks and re-clocks the product's findings |
 | Where an incident stands under each name in one product, the newer stays | Every standing record has the same standing |
 | The other record is cleared, naming no person, with the same reason | A clearing names who cleared it and why |
-| Each rating claim withdrawn and record cleared this way is a row in the administration trail, with a merge as its actor | What a product lost is asked about afterwards, and no person acted. `DESIGN-access.md` § The administration trail holds the actors |
+| Each rating claim withdrawn and record cleared this way is a row in the administration trail, with a merge as its actor | What a product lost is asked about afterwards, and no person acted. `design-docs/access.md` § The administration trail holds the actors |
 | Two answers that disagree are told to everybody who triages the product: two decisions with different outcomes, two rating claims with different ratings, two records with different dates of attack. Two that agree tell nobody | Nobody chooses which of two answers stands. The date is what every window after an attack counts from, so a different date is a different obligation |
 | Published advisories and VEX documents that named the absorbed issue are left as issued | What went out is a fact about the moment it went |
 | A name recorded by hand that another issue holds is still refused | Recording a name is a person asserting identity, and nothing reported says the two are one |
@@ -232,10 +232,10 @@ would depend on which scan ran last.
 | Field | Rule | Reason |
 |---|---|---|
 | Known-exploited | Moves forward only | It is a claim about the world rather than a description of an issue: a later report not mentioning it is a gap in that report |
-| The day the known-exploited catalog listed it | Keeps the earliest any report states | Exploitation was known from the first listing, and an earliest is the same whatever the order. Moving it re-clocks the issue's exploited findings (`DESIGN-remediation.md` § Deadlines) |
+| The day the known-exploited catalog listed it | Keeps the earliest any report states | Exploitation was known from the first listing, and an earliest is the same whatever the order. Moving it re-clocks the issue's exploited findings (`design-docs/remediation.md` § Deadlines) |
 | Score | Keeps the worst anybody claimed | A maximum is the only answer that comes out the same whatever the order. A report saying something is worse is news; one saying it is milder is a gap |
 | Likelihood | Keeps the newest, by the day the estimate is about | It is a thirty-day forecast recomputed every day and it legitimately falls, so a maximum makes the order answer "was ever risky" rather than "is risky" — a spike read as the issue's value for ever. What makes it order-independent is the day rather than which scan wrote last: a dated estimate beats an undated one and an older dated one, and two undated reports are last-seen |
-| Severity word | Filled in where the issue holds none, or holds a scanner's "unknown", by a word the fold recognizes | A flaw recorded here mints its issue with no word (§ The rating in force), so the first report of it under a published name gives the issue the world's. "Unknown" ranks as no word, so it is a gap and never a filling. A word filled in moves the order of every finding of the issue and works out again the deadline of each, in every product holding it (`DESIGN-remediation.md` § Deadlines) |
+| Severity word | Filled in where the issue holds none, or holds a scanner's "unknown", by a word the fold recognizes | A flaw recorded here mints its issue with no word (§ The rating in force), so the first report of it under a published name gives the issue the world's. "Unknown" ranks as no word, so it is a gap and never a filling. A word filled in moves the order of every finding of the issue and works out again the deadline of each, in every product holding it (`design-docs/remediation.md` § Deadlines) |
 | Likelihood, where a report carries none | Left alone | Silence is a gap in that report. A feed omitting the estimate is not a feed saying it is zero |
 
 A test puts the same two reports through in both orders and asserts they agree.
@@ -707,7 +707,7 @@ somebody holds and a name nobody holds identically (REQ-43).
 | It starts undisclosed, and recording one asks for the private triage right (REQ-37) | Defaulting the other way makes the dangerous mistake the quiet one. Somebody who may argue about known issues in shipped components has not been handed the ones nobody has announced. Already-public is a flag on the request, asking the ordinary right |
 | Every flaw is recorded with a report | One recorded from a report accepts that report. One recorded without names where it came from on the same request, and a report is written from it, already accepted. Vulnerability reports is then the one list of where every flaw came from, whether somebody sent it or somebody here found it |
 | A flaw found here is marked so on its report | It carries no disclosure date (REQ-37) and nobody is owed an answer. Unmarked is a report from outside, because that is the case with somebody counting down to a publication |
-| Its deadline uses the windows for our own products, counted from its first severity (REQ-33) | `DESIGN-remediation.md` § Recorded flaws holds the rule. Recorded without a severity, it is listed and assignable with no deadline, and the reason given is `not-rated` |
+| Its deadline uses the windows for our own products, counted from its first severity (REQ-33) | `design-docs/remediation.md` § Recorded flaws holds the rule. Recorded without a severity, it is listed and assignable with no deadline, and the reason given is `not-rated` |
 
 One identifier, one finding per occurrence in every build. The same code goes out on
 several lines and as several variants at once, so a flaw in it is not a fact
@@ -726,8 +726,8 @@ in a comparison exactly as a reported one does.
 | It is a component at an occurrence, keyed exactly as a scanned one is (REQ-17) | The occurrence is derived from the build's own graph rather than asked for: the entry path has already resolved the component there, and a component can have more than one occurrence at once, which a form question could not express and which is why one recording opens one finding per occurrence. Recorded as sitting directly under the product whatever the graph said, a flaw a person recorded and the same flaw a scan found were two occurrences and two decisions — triaging either did nothing for the other |
 | Recorded against the build itself, the occurrence is the build's root, which has no name of its own | The product's name differs per variant, so an occurrence keyed on it is a different occurrence in each of them: one flaw across three variants was three occurrences and three decisions. The scan path collapses a root parent for the same reason |
 | A name the build holds more than once is refused with the choices | A name is not unique within a build and not rarely: a real switch image ships three vendored copies of one library, and thirteen names in it are held at one version by two components. The resolution goes through the same lookup every other component reference takes — it did not, and took the first row a name matched |
-| A flaw is recorded from a confirmed code finding through this same path, found here, undisclosed and at no version, and the flaw and the link to the code finding are written in one transaction | The code finding's builds and component are proposed and a person confirms them; `DESIGN-analysis.md` § Flaw records holds the offer and what happens to the code finding |
-| A flaw recorded from a code finding records the code finding, the component the flaw record ranked first and the builds it proposed, and keeps them once the flaw record is undone | What the person was offered beside what they chose. `DESIGN-analysis.md` § Flaw records holds who reads them |
+| A flaw is recorded from a confirmed code finding through this same path, found here, undisclosed and at no version, and the flaw and the link to the code finding are written in one transaction | The code finding's builds and component are proposed and a person confirms them; `design-docs/analysis.md` § Flaw records holds the offer and what happens to the code finding |
+| A flaw recorded from a code finding records the code finding, the component the flaw record ranked first and the builds it proposed, and keeps them once the flaw record is undone | What the person was offered beside what they chose. `design-docs/analysis.md` § Flaw records holds who reads them |
 
 ## Reports
 
@@ -804,12 +804,12 @@ act is kept and readable.
 | Correspondence on a flaw found here | Refused. Nobody outside sent it, so there is nobody to write to |
 | Notes | Markdown written by somebody who works the report, editable by its author, with every earlier wording kept. A name mentioned is told only where that person reads the product's reports; a name nobody reading reports holds is returned unnotified, worded alike whether or not the person exists (§ Report visibility) |
 | Notes and messages after a decision | Accepted. The conversation with a reporter outlasts the decision on their claim, and both stay readable from the issue it became, under the report rule |
-| Assignment | A report is held by one person or assigned to one team's queue, as a finding is (`DESIGN-access.md` § Assignment). Given to a person only where they read the product's reports, and to a team only where one member does. Taking one nobody holds, or handing back your own, needs the right to work it; giving one away needs the assigner right as well. A holder who stops reading the product's reports gives back the ones they hold, and a team does where no member still reads them (`DESIGN-access.md` § Lost reading) |
+| Assignment | A report is held by one person or assigned to one team's queue, as a finding is (`design-docs/access.md` § Assignment). Given to a person only where they read the product's reports, and to a team only where one member does. Taking one nobody holds, or handing back your own, needs the right to work it; giving one away needs the assigner right as well. A holder who stops reading the product's reports gives back the ones they hold, and a team does where no member still reads them (`design-docs/access.md` § Lost reading) |
 | Assignment once judged | Refused. Its work goes on as the issue it became, or ended with its ruling. A report under a waiting ruling is still open and may be handed over |
 | Held lists | Open reports by holder: one person with their teams' queues, one team's queue, or nobody. Narrowed to the products where the reader reads reports, and to one of them when asked. A team's queue is not in the list of reports nobody holds |
 | Assignment rules | An assignment rule may place a product's reports instead of findings, naming no package and no occurrence since a report sits at neither. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when the rule is added. First match wins, as for findings |
 | Hand-over | Releasing a person's work and an administrator's hand-over move their open reports with their findings |
-| Notices | The person given a report is told, where that is not whoever gave it. The unanswered report, every message and every note reach the report's audience (`DESIGN-notifications.md` § Report audience); a name a note mentions is told of the mention instead. Each is undisclosed work, so nothing leaving the deployment names the report |
+| Notices | The person given a report is told, where that is not whoever gave it. The unanswered report, every message and every note reach the report's audience (`design-docs/notifications.md` § Report audience); a name a note mentions is told of the mention instead. Each is undisclosed work, so nothing leaving the deployment names the report |
 | History | Every act, oldest first: recorded, edited, noted, a note edited, a message sent or received, assigned or handed back with the rule that assigned it, a file attached, a ruling proposed, in force or withdrawn, and accepted as an issue. Assembled from the rows that hold each act rather than stored twice |
 
 ### Judgment
@@ -836,7 +836,7 @@ one.
 | It reaches a flaw recorded here, at its undisclosed open occurrences in the ruling's product | A scanned issue is published by whoever published its advisory, so no reporter counts down to it here. The occurrences take the date where they have none or a later one |
 | It is a movement of the embargo | Recorded with the act `duplicate`, naming the ruling and the claim the date counts from |
 | A first date needs nobody | As recording a report from outside needs nobody |
-| Bringing an existing date earlier is a shortening | Held to the movement threshold as a person's shortening is, and past it the date stays until a second person agrees (`DESIGN-access.md` § Disclosure-date movements). The arrival it counts from is typed by whoever records the claim, so a ruling is no route around the control a shortening needs |
+| Bringing an existing date earlier is a shortening | Held to the movement threshold as a person's shortening is, and past it the date stays until a second person agrees (`design-docs/access.md` § Disclosure-date movements). The arrival it counts from is typed by whoever records the claim, so a ruling is no route around the control a shortening needs |
 | Withdrawing the ruling puts the date back only where the ruling set it | The embargo's record is replayed without every withdrawn ruling, in the order each movement took effect — when it was agreed to, where it waited: a person's extension or shortening sets an end, and a ruling brings it earlier. Where the answer is where the embargo stands, nothing moves. Where it differs, the occurrences take it, which may be no date at all, and the act `duplicate-undone` records it naming the ruling |
 | The ruling form says the date before it is submitted | "This starts a disclosure date of *date* on *flaw*", and that it waits for a second person where it would, asked of the server with the reports and the issue typed, under the right to propose the ruling. Nothing is shown where the ruling would start no date |
 | A duplicate ruled before the date was set by a ruling is dated by the upgrade to v0.5.0 | A database that release upgraded holds the movement with its ruling and proposer, as one a ruling records today |
@@ -881,7 +881,7 @@ sent, reviewed by nobody, so saying the claim is a disclosed issue must not
 hand it to everybody who reads that product. Anything meant to be read there
 is attached to the issue, which is an act somebody takes.
 
-That is the one place a report and an issue differ, and `DESIGN-attachments.md`
+That is the one place a report and an issue differ, and `design-docs/attachments.md`
 § Fetch authorization holds the attachment half of it. A file on an issue
 follows the issue, including an embargo ending; a file on a report follows the
 report.
@@ -969,7 +969,7 @@ is never raised: there is nobody outside to answer.
 | A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. On a flaw recorded here it carries no deadline until somebody rates it, and says so as `not-rated` (REQ-33) |
 | A person's severity is checked against the words rather than folded | A report's is folded, because a scanner that rated nothing is silent and silence is not a claim that something is mild. A person typing "urgent" is not silent; they are wrong, and folding would replace their judgment with one nobody made |
 | The scheme a score is on travels with it | A number alone is not readable across schemes. It is recorded from the vector on a flaw assessed here, and from what the report states on one a scan brought in |
-| The screen shows the newest generation's rating and names the others beside it | A report commonly rates one issue under version 3 and version 4. The number beside the issue is the newest generation's rating, whole, so a list and the finding screen show the same number on the same scheme. `DESIGN-ingest.md` holds which rating in a generation is kept |
+| The screen shows the newest generation's rating and names the others beside it | A report commonly rates one issue under version 3 and version 4. The number beside the issue is the newest generation's rating, whole, so a list and the finding screen show the same number on the same scheme. `design-docs/ingest.md` holds which rating in a generation is kept |
 | Weaknesses are recorded as given, against no catalog | Trimmed, upper-cased, de-duplicated. A list refusing an identifier it had not heard of would refuse next year's. Where a published document has to name one, the name is looked up then rather than checked now, and an identifier no catalog assigns is left out of that document rather than out of the record |
 | Which one is the root cause is carried rather than picked | A published advisory states one weakness and an issue is commonly classified as several. The feeds say which they call primary, and a person recording a flaw names theirs first — the same statement made by hand. Choosing the lowest number or the earliest string instead is an answer with nothing behind it, and the two disagree: `CWE-20` is the lower number and `CWE-119` the earlier string |
 | A person recording a flaw states at most sixteen weaknesses, each CWE- and a number | Each is a row, and the column holding it is a name's width on three engines. Anything else is refused before anything is written, where the insert would otherwise succeed on one engine and fail as a fault on three |
@@ -1130,7 +1130,7 @@ estimate, the scanned build's order and the tag's order.
 | Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: this build never shipped it, the entry named the wrong product, or it duplicates an issue already tracked |
 | Unaffected | The issue's CVE record states the upstream release this occurrence holds is not affected (§ CVE record ranges) |
-| Disclaimed | A supplier states the product this occurrence sits in, at the version the build ships, is not affected, and every route up the tree from the occurrence runs through that product (`DESIGN-triage.md` § Evidence from publishers); or an upstream this product trusts states the component, at the version the build ships, is not affected or is fixed, for anybody shipping it (`DESIGN-upstream.md` § Statements applied) |
+| Disclaimed | A supplier states the product this occurrence sits in, at the version the build ships, is not affected, and every route up the tree from the occurrence runs through that product (`design-docs/triage.md` § Evidence from publishers); or an upstream this product trusts states the component, at the version the build ships, is not affected or is fixed, for anybody shipping it (`design-docs/upstream.md` § Statements applied) |
 
 Superseded is told apart from Upgraded because they are opposite answers to "was
 this fixed", and conflating them put one issue in a release comparison as both
@@ -1181,7 +1181,7 @@ would be gone by the time anything needed it, and every carried patch would come
 back as an outstanding vulnerability on the first re-scan.
 
 A build's claims arrive with its inventory, or in a document uploaded on its own
-whose statements name the build's root as their product. `DESIGN-triage.md` §
+whose statements name the build's root as their product. `design-docs/triage.md` §
 Statements about the build holds the second.
 
 A statement naming several packages becomes several claims, one per subject.
@@ -1195,7 +1195,7 @@ question asked years later.
 | The reasoning is cut to the bound a markdown field typed here is held to, and kept | One over-long explanation is no reason to refuse the scan or the document carrying it. The cut lands on a character. A NUL is dropped and invalid UTF-8 replaced before the words are keyed. The query builder replaces invalid UTF-8 the same way and is never handed a NUL, so the words keyed are the words stored |
 | The issue's identifier and the justification are cut to an indexed name's width | Every claim of a statement repeats them |
 
-A supplier's statement is stored the same way (`DESIGN-triage.md` § Evidence
+A supplier's statement is stored the same way (`design-docs/triage.md` § Evidence
 from publishers).
 
 A covered finding is kept, never dropped. This is why claims are applied here
@@ -1231,7 +1231,7 @@ one that named something to be matched: the first knows exactly what it is about
 while the second may name a whole source tree. Where neither is attached, the
 claims are read in a stable order.
 
-`DESIGN-ingest.md` § Build-declared suppressions holds how a claim that names
+`design-docs/ingest.md` § Build-declared suppressions holds how a claim that names
 something is matched against a component.
 
 ## CVE record ranges
@@ -1297,7 +1297,7 @@ changes on top of 6.18.55, and those changes are what a record cannot speak for.
 | A version alone | That version |
 | A version and a strict upper bound | From the version up to the bound |
 | A version and an inclusive upper bound | From the version up to and including the bound. A bound ending in `.*` covers every release beginning with what precedes it; `*` alone covers every release |
-| Of no stated type, or `semver` | Ordered as release numbers (`DESIGN-remediation.md` § Version ordering) |
+| Of no stated type, or `semver` | Ordered as release numbers (`design-docs/remediation.md` § Version ordering) |
 | A commit range | Nothing. The kernel's records carry one beside every release range, saying the same thing |
 | Typed as the commit a fix originated in, with a release number for its version | Release numbers. The kernel writes the mainline release a fix first reached that way: `7.1` up to `*`, unaffected. 15,026 of the 17,117 lines of that type in the CVE List of 2026-10-14 carry one |
 | Typed as the commit a fix originated in, with a commit for its version | A commit range |
@@ -1336,7 +1336,7 @@ row and logged, so the row does not read as a closure nothing was recorded for.
 | None held, where no run of the build has read one | Runs, and narrows nothing |
 
 A scan that waits is asked before its run begins, and its job goes back on the
-queue for five minutes without spending an attempt (`DESIGN-queue.md`
+queue for five minutes without spending an attempt (`design-docs/queue.md`
 § Failure handling). Failed, the job would run out of attempts after a few minutes,
 and a run begun keeps the schedule from asking again for a day.
 
@@ -1344,7 +1344,7 @@ The register lists the findings closed this way under their own reason, with
 the lines. A closure saying the issue was never present is judged against no deadline:
 it met nothing and missed nothing.
 
-`DESIGN-ingest.md` § CVE records holds where the snapshot comes from.
+`design-docs/ingest.md` § CVE records holds where the snapshot comes from.
 
 ## Fan-out cost
 
@@ -1600,7 +1600,7 @@ Five signals, in this order:
 
 | Signal | Reason for its position |
 |---|---|
-| An incident in this product through it | A person here saying this product was attacked. Above the signal below it, which is a feed's word about somewhere that may not be here at all. `DESIGN-incidents.md` holds the incident itself |
+| An incident in this product through it | A person here saying this product was attacked. Above the signal below it, which is a feed's word about somewhere that may not be here at all. `design-docs/incidents.md` holds the incident itself |
 | Known to be exploited in the world | The difference between a risk and an incident |
 | Reaches customers | A critical in something only the build system runs matters less than a medium in what people install |
 | Severity | How bad it would be if it happened. Scores from two schemes rank against one another as bands — see § One ladder for every scheme |
@@ -1645,9 +1645,9 @@ is a question about the work and about upstream, and being attacked says
 nothing about either; what it does is admit the finding to the minimum severity
 whatever the rating says, so a finding that was below it gains the clock
 its severity earns and one whose incident is cleared may lose it again. It also
-puts an upstream refusal back on that clock, which `DESIGN-remediation.md`
+puts an upstream refusal back on that clock, which `design-docs/remediation.md`
 describes beside the other reasons a finding carries none.
-`DESIGN-incidents.md` § Response windows holds why the clock a response window
+`design-docs/incidents.md` § Response windows holds why the clock a response window
 runs on is not this one.
 
 Where a report rates an issue only in words, the word stands in for a number, so
@@ -1755,7 +1755,7 @@ be done rather than doing it.
 | Rule | Reason |
 |---|---|
 | The scanner is given what was stored, not the file the build sent | That file is not kept for a moving line, so anything not stored can never be scanned. This is the argument for capturing a component's second identifier scheme at ingest |
-| What a later inventory states reaches its own product's scanner | A qualifier, a platform enumeration or a source package is held on the build's node, and fills in what another build of the same product left out (`DESIGN-data-model.md` § Duplicate descriptions). Another product's statements never reach it |
+| What a later inventory states reaches its own product's scanner | A qualifier, a platform enumeration or a source package is held on the build's node, and fills in what another build of the same product left out (`design-docs/data-model.md` § Duplicate descriptions). Another product's statements never reach it |
 | A distribution stated as a name and a version is told to the scanner in the qualifier it reads | The scanner matches a distribution's package against that distribution's advisories only when the identifier carries `distro`. Docker Scout and BuildKit write `os_name=debian&os_version=13` instead, and one real image of 142 packages, 122 of them Debian's, matched 3 times as written and 66 times with the qualifier added. The stored identifier is left as the producer wrote it |
 | The product itself is left out of what the scanner sees | It is not a package any vulnerability database has heard of, and including it invites a match on a name that happens to collide |
 | A build holding nothing but itself is scanned without the scanner | There is nothing to ask about, and handed an inventory of no components the scanner exits with an error rather than answering none. A services-only inventory, a VEX document sent as an inventory, and a source document naming only itself arrive this way, and each read as a scanner that stopped working. The run names the scanner it would have asked, with no version and no database, because nothing was measured |
@@ -1854,7 +1854,7 @@ the list itself pages through.
 | Rule | |
 |---|---|
 | It rides on the page | Counted after the grouping and before the limit, as a window count over the grouped statement, so the number and the rows cannot describe different sets |
-| The window sits outside the grouping | The findings list and the list across products narrow their groups with a `HAVING` the filter builds, and count in a statement over the grouped one. Asking what differs between builds puts a distinct count in that `HAVING`, a shape `DESIGN-database.md` § Silently wrong query shapes names |
+| The window sits outside the grouping | The findings list and the list across products narrow their groups with a `HAVING` the filter builds, and count in a statement over the grouped one. Asking what differs between builds puts a distinct count in that `HAVING`, a shape `design-docs/database.md` § Silently wrong query shapes names |
 | The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source count as two where the page draws one, and the figure changes with the page being read |
 | A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
 | A total is asked alone with a limit of zero | The by-component view, the planned upgrades and the review queue answer `limit=0` with the total and no rows, read through the same grouping and none of the page's decoration. A view's count on the button beside it, and a badge polled once a minute, are that question |
@@ -1953,7 +1953,7 @@ question next year should find the answer rather than the question.
 | Limit | Detail |
 |---|---|
 | A host's share bounds time, not disk | One arriving copy may grow to the whole quota and remove every other copy to make room. The share stops a host taking the pass again within the day; the copies it removed are fetched again as their commits fall due |
-| Incomplete upgrades are stated as inequality, not ordering | Saying that a version moved and is still not the one that fixes it needs no comparison, and the fixed-in field is free text and is sometimes a list. An ordering exists per ecosystem and refuses the rest — `DESIGN-remediation.md` § Version ordering holds it — and it ranks a set of candidates rather than deciding what a finding says. An order given confidently for a pair it cannot order is worse than none, because the wrong answer is a recommendation somebody acts on |
+| Incomplete upgrades are stated as inequality, not ordering | Saying that a version moved and is still not the one that fixes it needs no comparison, and the fixed-in field is free text and is sometimes a list. An ordering exists per ecosystem and refuses the rest — `design-docs/remediation.md` § Version ordering holds it — and it ranks a set of candidates rather than deciding what a finding says. An order given confidently for a pair it cannot order is worse than none, because the wrong answer is a recommendation somebody acts on |
 | The inverse is not detected | A component at or past the named fix while the scanner still reports the issue means the scanner and the fix data disagree. Deciding that needs an ordering for the ecosystem in hand, which exists for some of them, so it is not asked at all rather than asked where it happens to be answerable |
 | A component nothing leads to still has an occurrence — itself | It ships, and an incomplete graph is normal |
 | Severity is stored on the issue, fix state on the finding | Severity is a property of the vulnerability; whether a fix exists is a property of the version in front of you |

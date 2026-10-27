@@ -9,9 +9,9 @@ Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-24, REQ-25,
 REQ-19, REQ-27, REQ-28, REQ-30, REQ-40, REQ-42, REQ-43, REQ-66, REQ-69.
 
 Neighboring pieces: what a kind declares, and runs and series as any kind
-uses them, are in `DESIGN-kinds.md`; who reads the internal visibility is in
-`DESIGN-access.md` § Internal visibility; the bounded reading every document
-shares is in `DESIGN-ingest.md`.
+uses them, are in `design-docs/kinds.md`; who reads the internal visibility is in
+`design-docs/access.md` § Internal visibility; the bounded reading every document
+shares is in `design-docs/ingest.md`.
 
 ## Contents
 
@@ -210,12 +210,12 @@ Two runs of one series are applied one after the other. Each reads what the
 series last saw and writes what it sees, so two at once would open one result
 twice. Each takes the series' row first, by writing a value to it that
 no run wrote before, because a cluster certifies only rows that were written
-(`DESIGN-database.md` § Retryable transactions).
+(`design-docs/database.md` § Retryable transactions).
 
 A comparable run marking more of the build's open code findings no longer detected than
 the deployment expects of one run is a sharp drop. It is applied, its receipt
 says so, and the product's internal readers are told once, after the run
-commits (`DESIGN-notifications.md` § Analyzer alerts). A run that analyzed
+commits (`design-docs/notifications.md` § Analyzer alerts). A run that analyzed
 part of the tree without saying so reads like a fix sweep, so a person is
 asked to look; setting the run aside would leave every later run superseded
 behind it.
@@ -227,14 +227,14 @@ floor keeps a small series from raising one each time two code findings are fixe
 An applied run, in order:
 
 1. Matches each result to a code finding the series holds open on the build (§ Matching).
-2. Files each rule as an issue of the rule kind, named `<tool>/<rule>` in lower-case tool name, and records the weaknesses its `external/cwe/cwe-N` tags name (`DESIGN-kinds.md` § Name resolution).
+2. Files each rule as an issue of the rule kind, named `<tool>/<rule>` in lower-case tool name, and records the weaknesses its `external/cwe/cwe-N` tags name (`design-docs/kinds.md` § Name resolution).
 3. Opens a code finding for each result nothing matched, internal, at the occurrence § Matching gives it and the component § Placement gives it.
 4. Replaces what the last run said about each code finding it saw again: path, lines, columns, enclosing function, call chain, message, fingerprint, and the flow steps and related places.
 5. Records each code finding as seen by this run. A comparable run records each open code finding it did not see as no longer detected by it, where it is comparable to the run that last saw the code finding, and a code finding no longer detected that is seen again is counted as returned.
 6. Records the repositories the run says its checkout held.
 7. Lets the placed results go, and writes the receipt.
 
-No longer detected is absence, and a code finding stays open (`DESIGN-kinds.md` § Kinds).
+No longer detected is absence, and a code finding stays open (`design-docs/kinds.md` § Kinds).
 A not-comparable run opens and updates code findings and marks none.
 
 A code finding is open and in the queue from the run that opens it, the series' first
@@ -335,7 +335,7 @@ reader's browser does, and signs in where the repository is private.
 ### Repository settings
 
 An administrator states them per product, through the API or the product's
-Repositories screen (`DESIGN-interface.md` § The repositories screen), and the
+Repositories screen (`design-docs/interface.md` § The repositories screen), and the
 change is in the administrative trail.
 
 | Setting | |
@@ -410,14 +410,14 @@ slash.
 
 | Rule | |
 |---|---|
-| The code finding is read through the Evidence consumer, which includes the analysis kind alone (`DESIGN-kinds.md` § Consumers) | Nothing of a code finding reaches a vulnerability consumer |
+| The code finding is read through the Evidence consumer, which includes the analysis kind alone (`design-docs/kinds.md` § Consumers) | Nothing of a code finding reaches a vulnerability consumer |
 | It is read in the data layer at the visibilities the subject reads in the product, and a code finding nobody may read there answers as an occurrence holding nothing (REQ-42, REQ-43) | A different answer would say a code finding is there |
 | The open code finding is answered, or the newest where none is open | A reappearance opens a new finding at the same occurrence |
 | Every link is built when the evidence is read, from the newest run's repositories and the product's settings | A change to the hosts reaches every place at once |
 
 ## Code finding triage
 
-A decision about a code finding is a decision as `DESIGN-triage.md` describes one: one
+A decision about a code finding is a decision as `design-docs/triage.md` describes one: one
 argument, its rows, its reasoning and every revision of it, and a second
 person's approval of one revision (REQ-24, REQ-28). It is keyed on the
 product, the rule the code finding is filed under, and the code finding's occurrence, with no
@@ -446,7 +446,7 @@ seen on (REQ-25).
 | A decision about a code finding covers its occurrence at any version | The occurrence is the code finding, carried by matching rather than by versions |
 | A decision about a code finding is approved by somebody holding `approver` and `internal-read` on the product, and never by its author | The approval every decision has, at the visibility a code finding has |
 | A fixed code finding takes no decision | It opens again where it is seen again |
-| A code finding paired only probably, on its function or its nearest line, lapses the decision dismissing it or calling it no security issue | The decision was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one decision or many, as a lapsed decision is re-affirmed (`DESIGN-triage.md` § Re-affirmation) |
+| A code finding paired only probably, on its function or its nearest line, lapses the decision dismissing it or calling it no security issue | The decision was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one decision or many, as a lapsed decision is re-affirmed (`design-docs/triage.md` § Re-affirmation) |
 | A decision confirming a code finding stands through a probable pairing | It says the flaw is real, and a weaker pairing does not make it less so |
 | The lapse is written in the transaction that records the pairing | A pairing is never recorded with the decision on it left standing |
 
@@ -460,9 +460,9 @@ on one build, with what fixed it and the build that fixed it.
 | Only a code finding the newest comparable run did not see is closed as fixed | That absence is the evidence the statement is made with; a run still reporting the result is the authority on what it found |
 | It closes the code finding on the build named and nowhere else | Each build holding it is a statement of its own |
 | It names the run whose build fixed it: one of the code finding's series on that build, applied and comparable, built at or after the first run that did not see the code finding, and any other run is refused | A statement of a fix names the build it shipped in. The code finding's evidence names the first run that did not see it, and once it is fixed, the run named |
-| It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`DESIGN-findings.md` § Recorded flaws) |
+| It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`design-docs/findings.md` § Recorded flaws) |
 | A code finding seen again opens anew at the same occurrence | The matching that finds a closed code finding carries the result to its occurrence (§ Carrying) |
-| A decision about a code finding is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one decision's reads include it; the findings lists do not |
+| A decision about a code finding is read through the Decisions consumer (`design-docs/kinds.md` § Consumers) | The review queue, approval and one decision's reads include it; the findings lists do not |
 
 ### Suppression rules
 
@@ -566,25 +566,25 @@ one way to say a path does not matter is kept rather than two.
 ### Queue file
 
 `GET /v1/products/{product}/code-findings.{format}` writes the list out as CSV or
-JSON, as `DESIGN-analytics.md` § Exports writes every file.
+JSON, as `design-docs/analytics.md` § Exports writes every file.
 
 | Rule | |
 |---|---|
 | The file is the list: the same filters, the same order, every row rather than one page | A list and its file are one read, so a filter the screen applies is never missing from the file |
 | It is read under the list's visibility | A reader is written the code findings the list shows them, and nothing else (REQ-42, REQ-43) |
-| A row names who holds the code finding as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`DESIGN-analytics.md` § Exports) |
+| A row names who holds the code finding as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`design-docs/analytics.md` § Exports) |
 | A row says whether the code finding is in third-party code, as the list does | Read from the newest run that saw the code finding, as its evidence is (§ Third-party code) |
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
 | With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out code findings a waiting decision holds and code findings past their end of life |
 | Narrowed to work nobody holds, the file says so beside what it lists | A file read later carries the narrowing it was written under |
 | A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
-| A findings list's file writes every open code finding of its selection below its findings, through this read with the code findings a decision waits on kept in (`DESIGN-analytics.md` § Exports) | The finding exports include the code findings the reader reads (REQ-50) |
+| A findings list's file writes every open code finding of its selection below its findings, through this read with the code findings a decision waits on kept in (`design-docs/analytics.md` § Exports) | The finding exports include the code findings the reader reads (REQ-50) |
 
 ### Code findings by series
 
 `GET /v1/products/{product}/code-finding-series` counts a product's code findings per analyzer
 series, by state. The analytics catalog draws it as Code findings by analyzer
-(`DESIGN-analytics.md` § Pages of the catalog's own).
+(`design-docs/analytics.md` § Pages of the catalog's own).
 
 | Rule | |
 |---|---|
@@ -599,7 +599,7 @@ series, by state. The analytics catalog draws it as Code findings by analyzer
 
 `PUT …/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment` gives a
 code finding to a person or a team, or hands it back to nobody, as a finding is
-assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
+assigned (`design-docs/access.md` § Assignment, § Teams; REQ-34).
 
 | Rule | |
 |---|---|
@@ -611,14 +611,14 @@ assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 | A code finding past its end of life is refused with 409 | § End of life |
 | A code finding recorded as a flaw, included in disclosure or not, is refused with 409, and its page offers no holder | It is closed work for its holder, and its flaw is assigned instead |
 | A code finding seen on a build where it was not open when it was assigned starts unassigned there | As a finding arriving under an assigned component does |
-| Losing the reading a code finding needs, deactivation and a handover move code findings with everything else, but for the code finding recorded as a flaw below | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
-| A team's assignment rules place code findings nobody holds, and no code finding recorded as a flaw | `DESIGN-access.md` § Assignment rules. Whoever triages internal work in the product reads and previews them |
-| The lists of held work list a code finding, one row per code finding, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-kinds.md` § Consumers). A code finding is listed to readers of internal work in the product. A row names the analyzer's rule and opens the code finding's page |
+| Losing the reading a code finding needs, deactivation and a handover move code findings with everything else, but for the code finding recorded as a flaw below | One act whatever the work is (`design-docs/kinds.md` § Consumers) |
+| A team's assignment rules place code findings nobody holds, and no code finding recorded as a flaw | `design-docs/access.md` § Assignment rules. Whoever triages internal work in the product reads and previews them |
+| The lists of held work list a code finding, one row per code finding, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`design-docs/kinds.md` § Consumers). A code finding is listed to readers of internal work in the product. A row names the analyzer's rule and opens the code finding's page |
 | The unassigned list leaves out a code finding's sightings in releases past their end of life | Nobody may take a code finding seen only there, and the code finding queue narrowed to work nobody holds leaves it out the same way (§ End of life) |
 | A code finding recorded as a flaw leaves the lists of held work, included in disclosure or not | Its flaw is what is judged, fixed and disclosed, and the flaw is held and listed as itself. The code finding recorded as a flaw is closed work for its holder |
 | Handing somebody's work to another person leaves a code finding recorded as a flaw with them, and asks nothing about it. Releasing their work releases it | It is listed to nobody, so moving it hands over nothing, and a recipient who may not read it is not refused for it |
 | The code finding's page and every row of the queue and its file name who holds it | The page names the holder on its build while it is open there; a row names the holder of the finding it shows |
-| The person given it is told "a code finding assigned", at internal visibility | `DESIGN-notifications.md` § Code finding notices |
+| The person given it is told "a code finding assigned", at internal visibility | `design-docs/notifications.md` § Code finding notices |
 
 ## Weakness families
 
@@ -641,7 +641,7 @@ and 121 from three tools. They agree about its family.
 | A weakness's family is the nearest class up its primary parents in the catalog's research view, or itself where it is a class or a pillar | CWE-121, 122, 126, 787 and 788 are all CWE-119, and so are use after free and double free |
 | A pillar is the family of no weakness under it. A weakness reaching a pillar with no class between takes the weakness just under the pillar | The catalog files a null dereference, a condition always true and an obsolete function directly under CWE-710, and 26 cppcheck and clang rules shared that family. cppcheck names a `sizeof` on a pointer CWE-467 and clang names the same `malloc` CWE-131, the base above it under CWE-682 |
 | A weakness the catalog does not place is its own family | A newer catalog than the one committed assigns numbers this one does not know |
-| The hierarchy is read from the published catalog by `make weakness-names` and committed with the names | `DESIGN-build.md` § Make targets. Nobody types a thousand parents |
+| The hierarchy is read from the published catalog by `make weakness-names` and committed with the names | `design-docs/build.md` § Make targets. Nobody types a thousand parents |
 | A clang checker reporting several kinds of flaw names each | unix.Malloc reports leaks, double frees and uses after free under one name, so it is a memory-safety rule and groups in the resource family and the bounds family both |
 | A rule whose tags name a weakness is classified by its tags alone | The tool's own word about its rule outranks a table about it |
 
@@ -694,7 +694,7 @@ at least one.
 ## Flaw records
 
 A confirmed code finding is recorded as a flaw found here (REQ-19), through the path
-every recorded flaw takes (`DESIGN-findings.md` § Recorded flaws), and linked
+every recorded flaw takes (`design-docs/findings.md` § Recorded flaws), and linked
 to it. The code finding is then recorded as a flaw: its flaw is what is judged, fixed and
 disclosed.
 
@@ -708,11 +708,11 @@ flaw record is offered, and `POST` on the same address records it.
 | A flaw record is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal code finding and writes the private flaw |
 | The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A code finding is carried by its occurrence rather than by versions |
 | The flaw and the link are written in one transaction, which reads again that the code finding is confirmed and not recorded as a flaw | A retry is asked the question again (REQ-71) |
-| A flaw record changes the stamp of the decision standing at the code finding, matched on the stamp it read, as every write to a decision does (`DESIGN-database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the flaw record would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
+| A flaw record changes the stamp of the decision standing at the code finding, matched on the stamp it read, as every write to a decision does (`design-docs/database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the flaw record would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
 | A code finding recorded as a flaw takes no decision, and no decision about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a decision out | The flaw's decisions replace the code finding's, and a confirmation withdrawn under a code finding recorded as a flaw leaves a flaw nobody confirmed |
 | Recording as a flaw, an inclusion in disclosure, a removal from it and a withdrawn flaw record are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
 
-| The flaw records the code finding it was recorded from, the component the offer ranked first, and the builds it proposed: every build the code finding was seen in, and the builds holding the chosen component that the series never analyzed | `DESIGN-findings.md` § Recorded flaws. The record outlasts the link, so a flaw whose flaw record was undone still says where it came from |
+| The flaw records the code finding it was recorded from, the component the offer ranked first, and the builds it proposed: every build the code finding was seen in, and the builds holding the chosen component that the series never analyzed | `design-docs/findings.md` § Recorded flaws. The record outlasts the link, so a flaw whose flaw record was undone still says where it came from |
 | The flaw's page names its code finding to a reader who reads the flaw there and the code finding in full, and to nobody else | An internal-only code finding is internal, and a reader of the private flaw has not been given it (REQ-42) |
 
 ### Flaw record offer
@@ -790,7 +790,7 @@ included one out.
 | Each code finding is confirmed again: the link goes, the decision confirming it stands, and it returns to the queue's lists of held work with whoever held it | Undoing takes back the recording and leaves the decision that it is real |
 | An included code finding is read by its internal readers alone again | A code finding with no case to be in is the internal material it always was |
 | Every grant of the code findings ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
-| The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a flaw record somebody undid should not have been recorded, and a flaw record made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
+| The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a flaw record somebody undid should not have been recorded, and a flaw record made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`design-docs/findings.md` § Affected build sets) |
 | The flaw keeps the record of its code finding, marked undone with who, when and why | What was recorded and taken back stays on the record |
 | It is written in one transaction that reads each flaw record again and deletes it only as read | An inclusion, a disclosure or a run describing the code finding since is a lost race, asked again (REQ-71) |
 | It is recorded in the administrative trail once per code finding, each under that code finding's own name, as each grant it ends is | It changes who reads the code findings and what the flaw is |
@@ -800,8 +800,8 @@ included one out.
 A flaw recorded from a code finding is offered as fixed on each build it is open on
 where its code finding is no longer detected, with the first run there that did not see
 it and, where a person closed the code finding as fixed, the run they named. A person
-closes the flaw there (`DESIGN-findings.md` § Closure by a person), and the
-advisory names the build fixed from that closure (`DESIGN-remediation.md`
+closes the flaw there (`design-docs/findings.md` § Closure by a person), and the
+advisory names the build fixed from that closure (`design-docs/remediation.md`
 § The advisory).
 
 | Rule | |
@@ -814,7 +814,7 @@ advisory names the build fixed from that closure (`DESIGN-remediation.md`
 
 `…/code-findings/{occurrence}/collaborators` lists, adds and removes people brought into
 one code finding recorded as a flaw, as case collaborators are brought into one flaw
-(REQ-43, `DESIGN-access.md` § Case collaborators).
+(REQ-43, `design-docs/access.md` § Case collaborators).
 
 | Rule | |
 |---|---|
@@ -839,14 +839,14 @@ as any other is.
 | A declared path holds itself and every path under it, compared exactly | `src/vendor/zlib` holds `src/vendor/zlib/inflate.c` and not `src/vendor/zlibx/a.c`; paths are case-sensitive |
 | The declaration read is the newest run's to see the code finding | The run's description of the checkout is the one the code finding's path was read against, as its repositories are |
 | A run's list that does not read as a list of paths declares nothing | The upload writes a list of paths from the top of the checkout, and nothing else is a declaration |
-| The code finding's evidence, its flaw record offer, its row in the queue and the queue's file say it is third-party | A person recording as a flaw the flaw reports it to the upstream it came from. Its advisory or VEX then reaches the product's builds through the supplier and upstream paths (`DESIGN-ingest.md` § Supplier advisories) |
+| The code finding's evidence, its flaw record offer, its row in the queue and the queue's file say it is third-party | A person recording as a flaw the flaw reports it to the upstream it came from. Its advisory or VEX then reaches the product's builds through the supplier and upstream paths (`design-docs/ingest.md` § Supplier advisories) |
 | A third-party code finding is still recorded as a flaw here | The flaw ships in the product's builds until the upstream's fix arrives, and recording it is what tracks that |
 
 ## End of life
 
 A code finding seen only in releases past their end of life is kept as it stands, and
 nothing about it is deleted (REQ-15). When a release reaches its end of life
-is in `DESIGN-data-model.md` § End of support.
+is in `design-docs/data-model.md` § End of support.
 
 | Rule | |
 |---|---|
@@ -859,7 +859,7 @@ is in `DESIGN-data-model.md` § End of support.
 | A decision already standing at it is still agreed to or withdrawn | The decision is one somebody made, and an approval is of what was read (REQ-28) |
 | A code finding already recorded as a flaw is still included in or taken out of its flaw's disclosure | The inclusion is about the flaw, which is judged on its own builds |
 | Its evidence says it is past its end of life | The page offers none of the refused controls |
-| A retired branch, tag or variant takes no run (§ The upload), so it stops producing sightings, and its code findings stay listed with the product | `DESIGN-data-model.md` § Catalog retirement. Retiring closes off what arrives, and keeps what was found |
+| A retired branch, tag or variant takes no run (§ The upload), so it stops producing sightings, and its code findings stay listed with the product | `design-docs/data-model.md` § Catalog retirement. Retiring closes off what arrives, and keeps what was found |
 
 ## Receipts
 
@@ -884,7 +884,7 @@ tell whoever reads the build that somebody without access tried.
 A receipt counts code findings and never names one. A pipeline key reads the receipts
 of a build it may send to; a person reads them where they read internal
 findings in the product, since the counts are of internal findings. A
-pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
+pipeline key's other reads are unchanged (`design-docs/access.md` § Subject kinds).
 Anybody else is answered as for a build nothing was sent to, before the
 build's runs are looked up, so the answer is the same whether or not the build
 holds any (REQ-42).
@@ -996,16 +996,16 @@ it is about.
 
 | Rule | |
 |---|---|
-| One binary, pure Go with cgo off, for Linux, macOS and Windows on amd64 and arm64 | It runs where the analyzer runs. `DESIGN-packaging.md` § Release assets names the archives |
+| One binary, pure Go with cgo off, for Linux, macOS and Windows on amd64 and arm64 | It runs where the analyzer runs. `design-docs/packaging.md` § Release assets names the archives |
 | The archives are covered by the release's checksum file and its signature | The same verification as every other asset |
 | No Authenticode signature and no notarization | A pipeline fetches the binary by a command, which neither check stops. One downloaded through a browser on macOS or Windows is held by the system until a person allows it |
-| CI runs the client's tests on macOS and Windows when one of its sources moved | `DESIGN-build.md` § CI jobs. The fingerprints of one function written with each line ending are pinned to hashes worked out by hand, so a system computing them differently fails there |
+| CI runs the client's tests on macOS and Windows when one of its sources moved | `design-docs/build.md` § CI jobs. The fingerprints of one function written with each line ending are pinned to hashes worked out by hand, so a system computing them differently fails there |
 
 ## Not built
 
 | Part | State |
 |---|---|
-| Code findings over time | Not built. Statistics include no code finding (`DESIGN-kinds.md` § Consumers), so no report says how long a code finding took to be judged or fixed, or how a series' counts moved. What a product's code findings stand at now is counted by series (§ Code findings by series). Approval quality and the exception report read code finding decisions: a code finding's dismissal standing on one person is a control that did not hold (`DESIGN-analytics.md` § Approval quality) |
+| Code findings over time | Not built. Statistics include no code finding (`design-docs/kinds.md` § Consumers), so no report says how long a code finding took to be judged or fixed, or how a series' counts moved. What a product's code findings stand at now is counted by series (§ Code findings by series). Approval quality and the exception report read code finding decisions: a code finding's dismissal standing on one person is a control that did not hold (`design-docs/analytics.md` § Approval quality) |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 
@@ -1035,4 +1035,4 @@ it is about.
 | A renamed file's results open as new code findings | Every key holds the path, so the code findings under the old name go no longer detected and nothing carries their decisions to the new name |
 | Every code finding of a series' first run is in the queue | A vulnerability scanner's first scan has no baseline either, and starting to analyze a codebase leaves what it already holds to be triaged and fixed. A codebase analyzed for the first time puts every result in front of a triager at once, and the order and the suppression rules are what thin it |
 | An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |
-| A code finding sorts after every finding in the lists of held work | They are ordered by urgency, and a code finding carries none. The rail's Unassigned entry opens the findings list, which holds no code finding (`DESIGN-kinds.md` § Consumers): an unassigned code finding is listed by the unassigned list's read, and named unheld in the code finding queue |
+| A code finding sorts after every finding in the lists of held work | They are ordered by urgency, and a code finding carries none. The rail's Unassigned entry opens the findings list, which holds no code finding (`design-docs/kinds.md` § Consumers): an unassigned code finding is listed by the unassigned list's read, and named unheld in the code finding queue |

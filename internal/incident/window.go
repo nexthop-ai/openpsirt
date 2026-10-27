@@ -170,7 +170,7 @@ var ErrCountedFrom = refusal.New("another window in force counts from this one")
 // counts from is in force, covers its products, and leads back to no loop,
 // and nothing counting from a window is left uncovered by changing or
 // retiring it. Each write here checks those by reading rows it does not
-// write, and a transaction is not a lock (`DESIGN-database.md` § Reads a
+// write, and a transaction is not a lock (`design-docs/database.md` § Reads a
 // write depends on). So every declaration counting from another window, every
 // change and every retirement first writes every window in force, unchanged.
 // Two of them wait for each other, and the second reads what the first

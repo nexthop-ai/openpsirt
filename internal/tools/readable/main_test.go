@@ -52,7 +52,7 @@ func TestWhichFilesAreReadAsText(t *testing.T) {
 		{"web/src/app/App.tsx", true},
 		{"web/scripts/tokens.mjs", true},
 		{"web/src/styles/tokens.css", true},
-		{"DESIGN-access.md", true},
+		{"design-docs/access.md", true},
 		{"deploy/helm/openpsirt/values.yaml", true},
 		{"go.mod", true},
 		{"go.sum", true},

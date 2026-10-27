@@ -18,7 +18,7 @@ import (
 //
 // A component nothing can match reports no findings, which is also what a
 // component with none reports. Each reason is a shape the scanner was measured
-// answering nothing for; DESIGN-analytics.md § Unmatched components holds the
+// answering nothing for; design-docs/analytics.md § Unmatched components holds the
 // measurements.
 type Unmatchable string
 

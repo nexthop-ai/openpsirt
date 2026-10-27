@@ -6,8 +6,8 @@ documents generated from what was decided.
 Satisfies REQ-15, REQ-19, REQ-24, REQ-28, REQ-33, REQ-34, REQ-35, REQ-36, REQ-39.
 
 Neighboring pieces: the escalation view, per-item time remaining and the SLA
-compliance rate are in `DESIGN-analytics.md`; the assignment model is in
-`DESIGN-access.md`, which defines the party a thing is assigned to.
+compliance rate are in `design-docs/analytics.md`; the assignment model is in
+`design-docs/access.md`, which defines the party a thing is assigned to.
 
 ## Contents
 
@@ -58,7 +58,7 @@ reporting a fix that shipped in nobody's release.
 A flaw recorded by hand is the exception (REQ-19). No scan reports one, so there
 is no second opinion to check a declaration against, and refusing the
 declaration leaves the finding open forever. That class is closed by a person,
-with who, when and why on the record. `DESIGN-findings.md` carries the shape.
+with who, when and why on the record. `design-docs/findings.md` carries the shape.
 
 ## The unit
 
@@ -157,7 +157,7 @@ it opens, and there is no floor for a slow pipeline.
 | The issue keeps the earliest day any report states | Stored on the issue, and only ever moved earlier, by a statement of its own. Two reports stating different days leave the earlier whichever arrives first |
 | A scan with no listing day learns exploitation at its own start | The moment every issue a database held before the day was read counts from |
 | A listing day filled or moved earlier re-clocks the issue | Every open exploited finding of the issue counting from a later moment is moved onto the day, in every build, and its deadline worked out again. Once per issue: after it, nothing counts from later |
-| A severity word filled in re-clocks the issue in every product holding it | The deadline of each open finding is worked out again from when it opened, by the product's rating in force with the new word as its fallback (`DESIGN-findings.md` § Report merging) |
+| A severity word filled in re-clocks the issue in every product holding it | The deadline of each open finding is worked out again from when it opened, by the product's rating in force with the new word as its fallback (`design-docs/findings.md` § Report merging) |
 | A finding with no deadline keeps none when re-clocked | A tag, a release past end of life and a missing fix are off the clock whatever the moment is. A rating moving, a word filled in, an incident and an issue becoming exploited each re-clock only what sits on a release that moves and is in support |
 | A recount reasons at the store's clock | One moment per recount, read from the clock every other write reads, so a fix date is weighed the same way by a recount and by the scan beside it |
 
@@ -239,7 +239,7 @@ compliance rate. Three of the reasons already have somewhere to be seen — the
 line is stated wherever a list hides something, a tag's findings are read at the
 release, and what upstream has done is a column of the findings list and a
 filter over it. End-of-life does not, so releases out of support are a report of
-their own; `DESIGN-analytics.md` holds it.
+their own; `design-docs/analytics.md` holds it.
 
 A tag was built once and is what somebody received. No work will land in it
 whatever a date says, so a deadline on one is unmeetable the moment it is
@@ -478,7 +478,7 @@ Three states, derived on every read and set by nobody.
 | Only the decision that made a commitment withdraws it | A promise naming fewer builds withdraws its own commitments on the rest and keeps those another decision made, whose occurrences still stand on them. A second decision promising a build already committed is refused, naming the decision that stands, even where it states the same version and date: its occurrences would rest on a date only the first decision moves |
 | There is no "replanned" | Re-promising writes a new date and the standing promise is the one read. A state nothing can distinguish from another is a word rather than a fact |
 | Where several promises stand over one component in one build, one of them is reported whole | A promise naming a version before one naming none, then the latest date, then the later decision. Its date and its version are read together: the latest date beside the lowest version string pairs two promises nobody made |
-| A lapsed promise returns the upgrade, not its findings | One item, to whoever is carrying it — reported as a party only where one party holds all of what is still open under it, addressed by its identity or team name with its display name beside it, as `DESIGN-api.md` § Addresses and labels sets out. Answering the findings again one at a time is what the bulk promise was made instead of |
+| A lapsed promise returns the upgrade, not its findings | One item, to whoever is carrying it — reported as a party only where one party holds all of what is still open under it, addressed by its identity or team name with its display name beside it, as `design-docs/api.md` § Addresses and labels sets out. Answering the findings again one at a time is what the bulk promise was made instead of |
 | A finding returns on its own only when the package moved and it did not close | The decision at an occurrence is keyed on the upstream version it was made against, so the existing key distinguishes "the plan was wrong about specifics" from "the plan did not happen" |
 
 Stored rather than derived, these would be a third opinion capable of being wrong
@@ -509,7 +509,7 @@ conversation. What is not built is the tracker hand-off — opening or updating 
 item in whatever system that link points at.
 
 The signed outbound request (REQ-46) is a different thing and it is built;
-`DESIGN-notifications.md` owns it, including the egress controls and the one
+`design-docs/notifications.md` owns it, including the egress controls and the one
 place a private address is deliberately permitted. Recorded here as unbuilt, it
 read as there being no egress path at all, so the most review-worthy egress in
 the deployment sat behind a document saying it did not exist.
@@ -529,7 +529,7 @@ Two destinations are built. The documents that have gone out are written as a
 static directory somebody else's web server serves, which `The provider
 directory` below describes; and where the deployment publishes, it serves them
 itself, beside a VEX document per issue and per branch or tag, which
-`DESIGN-publishing.md` describes. Nothing is sent anywhere, and no adapter to
+`design-docs/publishing.md` describes. Nothing is sent anywhere, and no adapter to
 anybody's platform exists. The rules below are what those adapters would be,
 kept here because the document they are about exists and the shape it would be
 published in is what makes its content right.
@@ -564,7 +564,7 @@ It names the issues it covers and the products each of those is covered in.
 | One covering nothing is its minter's alone | Covering nothing it satisfies every narrowing there is, and its title is prose somebody typed that goes on to be the document's. The same holds for one whose issues were all taken off |
 | What went out is read at what it named | An issuance names the flaws the advisory covered when it went out. The report of what went out, the documents a directory serves, the list of one advisory's issuances, whether it changed since, its editorial status and the revision history of a document generated now are all shown only to a reader who may see what every issuance named and every flaw the advisory covers now. A reader who may not is told the advisory does not exist, so emptying or re-pointing an advisory after it went out discloses nothing |
 | An issue taken off leaves its record | Who removed a flaw from a document is a question a deleted row does not answer. Naming it again revives that record rather than writing a second, which is also what keeps the pair unique |
-| A flaw recorded from a code finding is fixed in a build where a person closed it there, and the flaw's page offers each build its code finding is no longer detected on, from the first run that did not see it | The code finding's absence is the evidence and the closure is the statement (`DESIGN-analysis.md` § Fixed in) |
+| A flaw recorded from a code finding is fixed in a build where a person closed it there, and the flaw's page offers each build its code finding is no longer detected on, from the first run that did not see it | The code finding's absence is the evidence and the closure is the statement (`design-docs/analysis.md` § Fixed in) |
 | The flaws offered for a product are every one recorded there, open or fixed | An advisory is usually written after the fix lands, so a list of what is still open offers nothing for the flaw it is about. The list is the rows naming one accepts — recorded by a person, at a visibility the reader may see, in a product they triage — with how many of each are still open |
 
 An advisory is the rare, deliberate document. A vendor does not notify a
@@ -737,7 +737,7 @@ customer — which is the reason the two-person approval on those decisions exis
 | Ours is the default | Putting a supplier's word under this deployment's name is a choice somebody makes on purpose, and configuring a supplier is not that choice |
 | A supplier's statement is said only while it stands, under the guard a patch stands under | The component still ships, no occurrence of a component of that name and package identifier is open against the issue, the statement that closed it has not been set aside, and nothing has been recorded at the occurrence since: an occurrence the build later patched is said as fixed |
 | A supplier's statement is said as `not_affected`, with the supplier's justification where the format defines it, and an impact statement naming the publisher, the document and the product | A customer sees whose judgment it is, and this deployment passes on the supplier's word rather than asserting it as its own analysis. A justification the format does not define is left out rather than published under this deployment's name, and the impact statement satisfies the format without one |
-| Only a statement that said not affected is passed on | An upstream's statement that a component is fixed closes occurrences too (`DESIGN-upstream.md`), and is not a statement that it is unaffected |
+| Only a statement that said not affected is passed on | An upstream's statement that a component is fixed closes occurrences too (`design-docs/upstream.md`), and is not a statement that it is unaffected |
 | A component two suppliers' statements closed occurrences of is said by neither | Each spoke for their own product, and the format names the component once |
 | An agreed decision and a supplier's statement never speak about one issue in one component | A decision is said only of a component with an occurrence open, and a statement only of one with none |
 | A build with more statements than one document carries is refused, not truncated | There is no second request for the rest, so a document that stopped at a ceiling would say "nothing is claimed about this" by omission about everything past it — to every customer running a scanner, which is the one thing a document of dismissals must never say. The ceiling is well above anything real, and reaching it names the build and the number |
@@ -841,7 +841,7 @@ defines for a CSAF provider. This deployment writes files into a store an
 operator configured; their web server serves them. Nothing here answers a
 request for one, and nothing in the application can reach the package that
 writes them. The documents this deployment serves itself are a surface of
-their own (`DESIGN-publishing.md`), and a deployment may have both: an advisory
+their own (`design-docs/publishing.md`), and a deployment may have both: an advisory
 then states the address this deployment serves it at, and the directory is a
 copy.
 
@@ -882,7 +882,7 @@ deployment publishes. There is no subscriber list, no per-CVE notification and
 nothing to keep in sync: a reader fetches the list, reads until the dates stop
 being new to them, and that is the whole of it. The destinations an
 administrator configures are a different thing and are for this deployment's
-own notifications, which `DESIGN-notifications.md` describes.
+own notifications, which `design-docs/notifications.md` describes.
 
 A document states the address it is published at, and the directory writes it
 under that address. Both come from one rule, applied to what the document
@@ -924,12 +924,12 @@ its own product is a vendor, which is what the format wants to be told.
 The tracker hand-off (REQ-36). What exists is the link somebody typed, stored
 and never fetched; what is missing is opening or updating an item in the system
 it points at. The signed outbound request is built and is described in
-`DESIGN-notifications.md`.
+`design-docs/notifications.md`.
 
 Every adapter that would send an advisory to somebody's platform, which is the
 whole of Publication above. What exists is `The provider directory`: files
 written where an operator pointed, for their own web server; and the documents
-this deployment serves itself (`DESIGN-publishing.md`).
+this deployment serves itself (`design-docs/publishing.md`).
 
 Signatures in the static directory. The documents this deployment serves
 itself are signed where an operator configured a key; the directory writer

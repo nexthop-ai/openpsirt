@@ -101,7 +101,7 @@ Engine-specific code is confined to these places:
 | Listing the tables of the harness's SQLite schema | SQLite keeps its schema in a catalog of its own. The servers are asked the same question through the information schema |
 | Commit durability on the harness servers | A global setting on the two MySQL-protocol servers, relaxed so the suite runs faster. PostgreSQL asks per session in the connection string, so it has nothing to branch on |
 | Refreshing planner statistics before a measurement | A server refreshes its statistics once about a tenth of a table has changed, and a measurement queries seconds after a bulk load, before that happens. It asks the way a start asks, through the row below |
-| Emptying a database for a measurement | Truncating gives a table new storage, and the engines spell it differently: PostgreSQL truncates every table in one statement, and MySQL and MariaDB one table a statement, refusing a table another references unless the session's foreign key checks are suspended. SQLite copies a migrated file per test and has nothing to truncate. `DESIGN-build.md` § Measurement databases has the measurement |
+| Emptying a database for a measurement | Truncating gives a table new storage, and the engines spell it differently: PostgreSQL truncates every table in one statement, and MySQL and MariaDB one table a statement, refusing a table another references unless the session's foreign key checks are suspended. SQLite copies a migrated file per test and has nothing to truncate. `design-docs/build.md` § Measurement databases has the measurement |
 | Reading a table's layout beside a measurement | PostgreSQL keeps a table's pages and each column's correlation in catalogs of its own. MySQL and MariaDB report a table's size through the information schema, in bytes of a page size each server sets |
 | Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and is asked at start and after every scan. A server is asked once at start: PostgreSQL spells it `ANALYZE` with `SKIP_LOCKED` and the MySQL-protocol servers `ANALYZE TABLE` under a session bound on waiting for a lock, each table named from the catalog, which PostgreSQL keeps in one of its own and the others in the information schema. § Planner statistics has the measurement |
 | Reading the planner's estimate of a table in a test | Each engine keeps its estimates somewhere of its own: PostgreSQL in its catalog, MySQL and MariaDB in InnoDB's statistics tables, SQLite in a table of its own |
@@ -411,11 +411,11 @@ row moves. § Indexes says what each index serves.
 
 Migration 43. It adds the image version table, moves what v0.8.0 stored for
 a container image to an image identified by its name
-(`DESIGN-data-model.md` § Container images), and folds each destination's
+(`design-docs/data-model.md` § Container images), and folds each destination's
 name into the key it is matched under. It stores a claim's reasoning once,
 keys a build's claim on it, and keys a reference on its address as given. A
 delivery to a destination gains when its latest attempt began
-(`DESIGN-notifications.md` § Delivery); a delivery v0.8.0 recorded holds none,
+(`design-docs/notifications.md` § Delivery); a delivery v0.8.0 recorded holds none,
 which reads as no attempt in flight.
 
 | Step | What it does |
@@ -436,12 +436,12 @@ which reads as no attempt in flight.
 | Findings and labels are pointed at the kept component | Both the component a finding is against and what pulls it in. A label the merged image carried twice for one issue in one product keeps the first added |
 | The findings are read and moved once for every image | Read for the occurrences decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
 | The other components are removed | Nothing points at them any more |
-| Each destination's name is folded | The name becomes its lower-case key and the spelling typed is kept beside it (`DESIGN-notifications.md` § Outbound HTTP). Two names one kind held that fold to one key stay two. One still in use keeps the key before a retired one, then the one already spelled as the key, then the earliest. The other takes the key followed by its own number, and that numbered key is also the name it is listed under, so retiring it by the name shown reaches it. On MySQL and MariaDB in a transaction of its own between the image version table and the merge, which asks whether the column is there before adding it, so a start after one stopped part way folds rather than failing on the column |
+| Each destination's name is folded | The name becomes its lower-case key and the spelling typed is kept beside it (`design-docs/notifications.md` § Outbound HTTP). Two names one kind held that fold to one key stay two. One still in use keeps the key before a retired one, then the one already spelled as the key, then the earliest. The other takes the key followed by its own number, and that numbered key is also the name it is listed under, so retiring it by the name shown reaches it. On MySQL and MariaDB in a transaction of its own between the image version table and the merge, which asks whether the column is there before adding it, so a start after one stopped part way folds rather than failing on the column |
 | A delivery gains when its latest attempt began | A column that takes a null, added where the table stands on every engine, after the destinations are folded. On MySQL and MariaDB in a transaction of its own between the fold and the merge, which asks whether the column is there first, so a start after one stopped part way steps over it |
-| A patch repository records when its last visit ended | No visit v0.8.0 recorded has an end, so each counts as having held the pass for no time until it is visited again (`DESIGN-findings.md` § Host share) |
-| A graph node records the source package its build stated | Each node v0.8.0 recorded takes the source package and version of the component it holds, which is what a scanner was given for it. On v0.8.0 that value can be another product's statement, and an upgraded node keeps it: a moving line's next scan writes what the build itself states, and a tag, never uploaded again, keeps filling from it (`DESIGN-data-model.md` § Duplicate descriptions) |
+| A patch repository records when its last visit ended | No visit v0.8.0 recorded has an end, so each counts as having held the pass for no time until it is visited again (`design-docs/findings.md` § Host share) |
+| A graph node records the source package its build stated | Each node v0.8.0 recorded takes the source package and version of the component it holds, which is what a scanner was given for it. On v0.8.0 that value can be another product's statement, and an upgraded node keeps it: a moving line's next scan writes what the build itself states, and a tag, never uploaded again, keeps filling from it (`design-docs/data-model.md` § Duplicate descriptions) |
 | A finding no longer records when it last moved | Nothing read it. SQLite rebuilds the table from v0.9.0's declaration and the others drop the column. On MySQL and MariaDB in a transaction of its own, which asks whether the column is there first, so a start after one stopped part way steps over it |
-| A recorded flaw's rating moves to the product that recorded it | The recorded rating table is made by v0.9.0's declaration. Where an issue holds a flaw a person entered, its severity word, and the score, vector and scheme that name no publisher, become each recording product's recorded rating, and the word is put in force there where nothing rates the issue already. Where a feed's score holds the row, the record's score is the newest rating beside it that names no publisher. The issue row's word, its unsourced score and its unsourced ratings are emptied. A scanned issue that absorbed a record in a merge keeps its word, score and ratings except where they equal the absorbed record's, which v0.8.0's merge copied onto it: those move as a record's do. Another product's finding of an issue emptied this way reads no word, and keeps the deadline v0.8.0 worked out, until a report of the issue fills a word and re-clocks it (`DESIGN-findings.md` § Report merging). On MySQL and MariaDB the table and the move each take a transaction of their own, last: the next start steps over the table, and each statement of the move over what it moved |
+| A recorded flaw's rating moves to the product that recorded it | The recorded rating table is made by v0.9.0's declaration. Where an issue holds a flaw a person entered, its severity word, and the score, vector and scheme that name no publisher, become each recording product's recorded rating, and the word is put in force there where nothing rates the issue already. Where a feed's score holds the row, the record's score is the newest rating beside it that names no publisher. The issue row's word, its unsourced score and its unsourced ratings are emptied. A scanned issue that absorbed a record in a merge keeps its word, score and ratings except where they equal the absorbed record's, which v0.8.0's merge copied onto it: those move as a record's do. Another product's finding of an issue emptied this way reads no word, and keeps the deadline v0.8.0 worked out, until a report of the issue fills a word and re-clocks it (`design-docs/findings.md` § Report merging). On MySQL and MariaDB the table and the move each take a transaction of their own, last: the next start steps over the table, and each statement of the move over what it moved |
 
 The rules an identity, a fold key and a live key are worked out by are copied
 into the migration rather than called, so a later change to the application
@@ -465,7 +465,7 @@ leaves 34 image components, 340 image versions and 20,400 edges. `make measure`
 re-runs it. The time is mostly rewriting the findings, which grow with images
 times stamps, so a deployment with a month of nightly history takes three times
 as long. A process applying it answers its health check on `/healthz`
-throughout (`DESIGN-packaging.md` § Starting and stopping), so a platform
+throughout (`design-docs/packaging.md` § Starting and stopping), so a platform
 checking that path lets it finish. A check on `/readyz` fails for as long as
 the upgrade runs, and a platform that ends the process on it undoes the
 upgrade on every engine.
@@ -509,8 +509,8 @@ stopped attempt already did.
 ### The v0.10.0 upgrade
 
 Migration 44. No row moves. § Indexes says what each index serves,
-`DESIGN-publishing.md` what the published documents are, and
-`DESIGN-upstream.md` what an upstream is.
+`design-docs/publishing.md` what the published documents are, and
+`design-docs/upstream.md` what an upstream is.
 
 | Table | Gains | Every engine |
 |---|---|---|
@@ -532,7 +532,7 @@ is 21 to 29 MB beside a 306 MB table.
 
 ### The v0.11.0 upgrade
 
-Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
+Migration 45, the untagged release's own. `design-docs/findings.md` § The case
 says what a report's case holds.
 
 It renames the triage and incident records, the standing rules, the supplier
@@ -668,7 +668,7 @@ A release's migrations are frozen by `make release-freeze`, on a branch from
 the head of `main` that lands before the tag, and the release workflow refuses
 a tag whose release is not frozen, by `make release-check`, before it builds
 anything.
-`DESIGN-packaging.md` § The release procedure says where the two sit.
+`design-docs/packaging.md` § The release procedure says where the two sit.
 
 | Step | What happens |
 |---|---|
@@ -1101,7 +1101,7 @@ only in-memory lock stops a single process migrating twice.
 
 | Coordination | Mechanism |
 |---|---|
-| Two workers taking one job | A conditional update. Row locking sits beside it for throughput and is not the guarantee — see `DESIGN-queue.md` |
+| Two workers taking one job | A conditional update. Row locking sits beside it for throughput and is not the guarantee — see `design-docs/queue.md` |
 | Two replicas migrating at startup | A database-level lock with a bounded wait |
 | Two scans of one build | The apply takes the build's own row first, so the second waits rather than interleaving |
 | Two uploads checking the room left | The upload's transaction writes a fresh value into one fixed lock row before it sums what is held, so the second waits, and on a cluster the two writes conflict at certification. A write of the value already held is matched and not written on MySQL and MariaDB, so it never reaches certification |
@@ -1173,7 +1173,7 @@ and the caller retries a request that changed nothing.
 | Inside the act | Why |
 |---|---|
 | A job queued for what was written | The job and the rows it describes commit together. Queued after the commit, a failure to queue is reported as the write failing once the write has landed, or the rows stand with nothing ever picking them up |
-| Work handed back when somebody stops reading it | Done after the write that took the reading away, a failure leaves the reading gone and the work with somebody who can no longer open it, and asking again answers that there is no such grant before it reaches the hand-back. It is bounded by how much the people and teams that write named were holding (`DESIGN-access.md` § Lost reading) |
+| Work handed back when somebody stops reading it | Done after the write that took the reading away, a failure leaves the reading gone and the work with somebody who can no longer open it, and asking again answers that there is no such grant before it reaches the hand-back. It is bounded by how much the people and teams that write named were holding (`design-docs/access.md` § Lost reading) |
 
 | Job | A full queue |
 |---|---|
@@ -1184,7 +1184,7 @@ and the caller retries a request that changed nothing.
 | Outside the act | Why |
 |---|---|
 | The deadline rewrite a policy change forces | Bounded by how much is open, measured at nineteen seconds against 441,108 findings, which is longer than a request |
-| A read made to name things in the answer | `DESIGN-api.md` § Refusal shape holds the rule |
+| A read made to name things in the answer | `design-docs/api.md` § Refusal shape holds the rule |
 
 A store handed a transaction joins it rather than refusing. Three spellings
 exist:
@@ -1435,8 +1435,8 @@ The indexes on the finding, decision occurrence and notification tables that ser
 | Deadlines running out | Closed, the build's claim, deadline | The deadline report across the deployment, which names no build: 248 ms through it, 343 to 392 ms without it |
 | Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason, holder | The findings list and its total, and the backlog trend, each from the index alone. Over 375,843 findings, with the last two columns and without them: the trend grouped in the database reads 578 pages and 16,500, and takes 88 ms and 172 ms; the index is 4.6 MB and 4.2 MB |
 | Occurrences waiting, by decision | State, decision | The review queue's page and its count, with 33,150 occurrences waiting among 133,549. With the index and without it: the page 22 ms and 81 ms, the count 22 ms and 40 ms |
-| What a run changed | Build, the run that opened a finding, issue, component, visibility, the run that closed it; and the same with the two runs swapped | The opened and closed counts on a page of receipts, from the index alone. A run's own screen also reads each finding's rating and exploitation, which the index does not hold, so it reads the table. The build code findings. Led by the run, MySQL and MariaDB read a page whose runs opened most of the build through the component index and the table: 1.04 s and 599 ms for the count, against 231 ms and 237 ms in this order. MySQL a year in is the one case the other order wins, 134 ms against 467 ms. `DESIGN-ingest.md` § Receipt cost has the page on all four engines |
-| Who is being told | Kind, cleared, person | The notify sweep's read of who holds an open condition of each kind, once per kind. Kind and an open row are the prefix on all four engines, the null included, and MySQL and MariaDB group the people from the index without sorting them. With 152,859 open conditions over 204 people, without the index and with it: PostgreSQL 46 ms and 0.33 ms a read, averaged over every kind; the kind holding every row 106 ms and 15 ms on MySQL, 22 ms and 17 ms on MariaDB, 36 ms and 12 ms on SQLite; all 28 kinds once 2.9 s and 18 ms on MySQL. `DESIGN-notifications.md` § Delivery has the sweep |
+| What a run changed | Build, the run that opened a finding, issue, component, visibility, the run that closed it; and the same with the two runs swapped | The opened and closed counts on a page of receipts, from the index alone. A run's own screen also reads each finding's rating and exploitation, which the index does not hold, so it reads the table. The build code findings. Led by the run, MySQL and MariaDB read a page whose runs opened most of the build through the component index and the table: 1.04 s and 599 ms for the count, against 231 ms and 237 ms in this order. MySQL a year in is the one case the other order wins, 134 ms against 467 ms. `design-docs/ingest.md` § Receipt cost has the page on all four engines |
+| Who is being told | Kind, cleared, person | The notify sweep's read of who holds an open condition of each kind, once per kind. Kind and an open row are the prefix on all four engines, the null included, and MySQL and MariaDB group the people from the index without sorting them. With 152,859 open conditions over 204 people, without the index and with it: PostgreSQL 46 ms and 0.33 ms a read, averaged over every kind; the kind holding every row 106 ms and 15 ms on MySQL, 22 ms and 17 ms on MariaDB, 36 ms and 12 ms on SQLite; all 28 kinds once 2.9 s and 18 ms on MySQL. `design-docs/notifications.md` § Delivery has the sweep |
 
 The measurements are PostgreSQL 16 with one processor, run on one database at a
 time, except where a row names another engine. The widest of these keys is the
@@ -1531,7 +1531,7 @@ The schema is built once per test binary, not once per test. On SQLite a file is
 migrated on first use and copied per test; on each server the binary leases a
 slot of the schema, and the database the slot holds, for as long as it runs.
 The database is named for the schema and the slot, and is kept for the next
-binary of any package. `DESIGN-build.md` § Test databases holds the rules.
+binary of any package. `design-docs/build.md` § Test databases holds the rules.
 
 | Rule | |
 |---|---|
@@ -1636,7 +1636,7 @@ and the granularity are open questions.
   defaults. The price is an estimate, and a statement that runs in 30 ms can be
   priced past the line and spend 150 ms compiling. A condition about a group
   written in its `HAVING` is the known case, and is asked over the grouped
-  statement instead (`DESIGN-triage.md` § Act placement).
+  statement instead (`design-docs/triage.md` § Act placement).
 - Index key length is tightest on MySQL, and package identifiers get long.
   Index a hash, not the raw string.
 - Timestamp semantics differ between engines. Store UTC and be explicit about

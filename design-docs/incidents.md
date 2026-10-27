@@ -46,8 +46,8 @@ Satisfies REQ-32 and REQ-77.
 | Only the third is a reportable event | It is also the one nothing computes |
 | A feed's exploitation flag is evidence that an issue deserves attention | It is a statement about the world, and says nothing about whether this deployment's product was the thing exploited |
 | The first and the third are kept apart in name as well as in meaning | Both are called exploited, both press for action, and one of them arrives automatically. Reading the first as the third is the failure this area exists to prevent |
-| On screen the third is the filled badge, "Incident", and the first the outline, "Known exploited" | The rarer, attested fact is the louder one. `DESIGN-interface.md` § The ordering signals holds the rest |
-| Each is a column of its own on a finding | `DESIGN-findings.md` § Urgency has why the stored order cannot tell them apart |
+| On screen the third is the filled badge, "Incident", and the first the outline, "Known exploited" | The rarer, attested fact is the louder one. `design-docs/interface.md` § The ordering signals holds the rest |
+| Each is a column of its own on a finding | `design-docs/findings.md` § Urgency has why the stored order cannot tell them apart |
 
 ## Stored facts
 
@@ -57,12 +57,12 @@ asks, which is why they are stored rather than worked out again.
 | | |
 |---|---|
 | That this product was exploited through an issue, here | Person-recorded, append-only, on any finding regardless of kind. An inherited flaw used against our product is the case, and it needs no flaw of our own |
-| An attack through no issue anybody has published | Recorded as a flaw found here, carried by the build itself, and the record kept against that flaw. A compromised build or update channel is the case: the flaw sits at the build's root, one occurrence across every variant (`DESIGN-findings.md` § Recorded flaws), so the record needs no kind of its own |
+| An attack through no issue anybody has published | Recorded as a flaw found here, carried by the build itself, and the record kept against that flaw. A compromised build or update channel is the case: the flaw sits at the build's root, one occurrence across every variant (`design-docs/findings.md` § Recorded flaws), so the record needs no kind of its own |
 | The moment it became known | What a window counts from, directly or through the notices given after it. Stated rather than taken from the clock, because somebody learns of an attack before they reach a screen |
 | The grounds | What is being asserted and how it is known. Nothing re-checks the record, so this is the whole of what a later reader has |
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out. § Notices outside |
 | The releases that carry the fix | Person-stated, each a tag of the product, added as each is cut and withdrawn where named in error. § Fix releases |
-| Clearing an incident | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `DESIGN-findings.md` § Merged issues holds the rule |
+| Clearing an incident | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `design-docs/findings.md` § Merged issues holds the rule |
 
 The record is against an issue and one product, the shape an assessment has. An
 occurrence would be wrong twice over: the attack is a fact about the product rather
@@ -89,13 +89,13 @@ A decision gives way to a fact, and never the other way round. A person who
 watched this product be attacked is not the one to give way to a decision that it
 was never affected.
 
-`DESIGN-triage.md` § Decisions against an incident holds the rules that
+`design-docs/triage.md` § Decisions against an incident holds the rules that
 asymmetry produces.
 
 ## Order
 
 A record puts this product's open findings of the issue above everything a feed
-can say about it (REQ-32). `DESIGN-findings.md` § Urgency holds the packing,
+can say about it (REQ-32). `design-docs/findings.md` § Urgency holds the packing,
 the other four signals, and what the record does to the minimum severity and the
 deadline.
 
@@ -123,7 +123,7 @@ window, or the release of the fix.
 | An end is worked out when asked, from the window as it stands | Changing a window's length moves every incident's end with it, which is what changing it means |
 | The clock runs from the moment the record says the attack became known, from the first notice on the incident naming the window it counts from, or from the release of the fix | It is not the remediation deadline and is not derived from it. A later stage of a report counts from an earlier notice, and both moments are already recorded |
 | A window counts from one moment | One counting from a notice and from the fix at once is refused |
-| The release of the fix is the earliest release date stated for a tag the record names, at the start of that day in UTC | A release date is a calendar day. `DESIGN-data-model.md` § Release dates holds what one is |
+| The release of the fix is the earliest release date stated for a tag the record names, at the start of that day in UTC | A release date is a calendar day. `design-docs/data-model.md` § Release dates holds what one is |
 | The day a tag was declared does not stand in for its release date | A tag is declared so scans can be filed against it, usually before the release. Its declaration says nothing about when the fix went out |
 | A window counting from the fix with no named tag carrying a stated date has no start and no end | The handling a window waiting on a notice has, for the same reason |
 | A release date still to come is a start that has not arrived | The window shows when it starts, and nothing is near, passed or raised before then |
@@ -133,7 +133,7 @@ window, or the release of the fix.
 | It counts only from a window in force that applies to every product it does | A notice names a window only on a product the window applies to, so a product outside it would hold a window that never starts. A reader who may read the one may read the other |
 | Not from itself, and not from a window counting back to it | A loop of windows each waiting on another's notice never starts |
 | A window another counts from is neither retired nor narrowed past it | Either would leave the other waiting on a notice nobody can record. Refused, naming the window to change first |
-| The remediation computation is not reused | That deadline stops where nothing upstream would close the finding, which is exactly the population a flaw of our own falls into, so reuse leaves the response window with no clock at all. `DESIGN-remediation.md` § Deadlines has why that rule is right where it is |
+| The remediation computation is not reused | That deadline stops where nothing upstream would close the finding, which is exactly the population a flaw of our own falls into, so reuse leaves the response window with no clock at all. `design-docs/remediation.md` § Deadlines has why that rule is right where it is |
 | Declared once for the deployment | What a deployment answers to is a fact about the organization running it. Declared per product, one rule would be restated for every product it covers |
 | Its products are named only to whoever may know they exist | The list of windows is readable by anybody signed in, and the list of products is itself a statement about what an organization ships. A window limited to products the reader may not know exist is left out of what they read |
 
@@ -219,18 +219,18 @@ filter over the overdue list, and never reached by one.
 Each window raises a condition from the moment it starts until a notice names
 it, a second once its warning has come where it names one, and a third once its
 end has passed. Each says the time, what the window counts from, and that no
-notice is recorded. `DESIGN-notifications.md` § Response window notices holds who
+notice is recorded. `design-docs/notifications.md` § Response window notices holds who
 hears and when each clears.
 
 ## Bulk acts
 
-No act over many issues reaches a standing record. `DESIGN-triage.md` § Decisions
+No act over many issues reaches a standing record. `design-docs/triage.md` § Decisions
 against an incident holds the rules.
 
 | | |
 |---|---|
-| No bulk dismissal and no bulk deferral | `DESIGN-triage.md` § Decisions against an incident |
-| No vanishing under a minimum severity | The record puts its findings in a band above everything a feed can say, and the minimum severity admits either exploitation signal. `DESIGN-findings.md` § Urgency |
+| No bulk dismissal and no bulk deferral | `design-docs/triage.md` § Decisions against an incident |
+| No vanishing under a minimum severity | The record puts its findings in a band above everything a feed can say, and the minimum severity admits either exploitation signal. `design-docs/findings.md` § Urgency |
 | No bulk clearing | A record is cleared one at a time, with a reason and a name |
 | The list a bulk decision is picked from marks an attacked issue | A selection reaching one is refused whole, so the list says which issue that is before anything is sent |
 

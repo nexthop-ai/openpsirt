@@ -28,11 +28,11 @@ var (
 	named   = regexp.MustCompile("`internal/([a-z][a-z0-9/]*)/`")
 )
 
-// buildDocument returns DESIGN-build.md, which is the one document that
+// buildDocument returns design-docs/build.md, which is the one document that
 // enumerates the tree and the gate.
 func buildDocument(t *testing.T) string {
 	t.Helper()
-	body, err := os.ReadFile(filepath.Join("..", "..", "DESIGN-build.md")) //nolint:gosec // this repository's own document
+	body, err := os.ReadFile(filepath.Join("..", "..", "design-docs", "build.md")) //nolint:gosec // this repository's own document
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,14 +115,14 @@ func TestTheLayoutTableNamesEveryPackage(t *testing.T) {
 	}
 	unnamed, gone := layoutGaps(found, buildDocument(t), func(dir string) bool { return dirs[dir] })
 	if len(unnamed) > 0 {
-		t.Errorf("under internal and named nowhere in DESIGN-build.md, so somebody looking for %s finds no row:\n  %s",
+		t.Errorf("under internal and named nowhere in design-docs/build.md, so somebody looking for %s finds no row:\n  %s",
 			plural(len(unnamed)), strings.Join(unnamed, "\n  "))
 	}
 	// The other direction, which is the one that rots quietly: a package is
 	// renamed, the row that named it stays, and the table sends a reader
 	// somewhere that is not there while every check stays green.
 	if len(gone) > 0 {
-		t.Errorf("named by DESIGN-build.md and not under internal, so the table sends a reader to %s:\n  %s",
+		t.Errorf("named by design-docs/build.md and not under internal, so the table sends a reader to %s:\n  %s",
 			plural(len(gone)), strings.Join(gone, "\n  "))
 	}
 }
@@ -177,18 +177,18 @@ func TestTheGateTheMakefileAndTheDocumentNameTheSameTargets(t *testing.T) {
 		t.Fatal("the gate prints no targets, so this checked nothing")
 	}
 	if gaps.described == 0 {
-		t.Fatal("DESIGN-build.md names no make target, so this checked nothing")
+		t.Fatal("design-docs/build.md names no make target, so this checked nothing")
 	}
 	if len(gaps.unknown) > 0 {
 		t.Errorf("printed by the gate and defined by no target, so the gate would ask make for %s:\n  %s",
 			plural(len(gaps.unknown)), strings.Join(gaps.unknown, "\n  "))
 	}
 	if len(gaps.undescribed) > 0 {
-		t.Errorf("run by the gate and described nowhere in DESIGN-build.md, which reads as a remnant:\n  %s",
+		t.Errorf("run by the gate and described nowhere in design-docs/build.md, which reads as a remnant:\n  %s",
 			strings.Join(gaps.undescribed, "\n  "))
 	}
 	if len(gaps.invented) > 0 {
-		t.Errorf("described in DESIGN-build.md and defined by no target, so typing %s gets nothing:\n  %s",
+		t.Errorf("described in design-docs/build.md and defined by no target, so typing %s gets nothing:\n  %s",
 			plural(len(gaps.invented)), strings.Join(gaps.invented, "\n  "))
 	}
 }

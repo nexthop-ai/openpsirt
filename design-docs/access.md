@@ -112,18 +112,18 @@ as an analyzer's code findings (REQ-14). Analysis results are its first users.
 | Its roles are granted like every other read and triage role | Per product, across every product, or from a group mapping. The people working analyzer output work a high volume of noise and the private team works few embargoed cases, and neither is handed the other's material |
 | `internal-read` alone lists the product and nothing open against it but internal findings | It is a read role like the other two, so the product is one its holder may know exists, and a capability granted beside it reaches something |
 | The anonymous subject reads no internal work | It reads disclosed work in a publishing product, and internal work is never disclosed. Described under [anybody at all](#anybody-at-all) |
-| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A code finding included in a flaw's disclosure stays internal, and the case reaches it and the decisions at its occurrence as one of the flaw's readers (`DESIGN-analysis.md` § Disclosure inclusion) |
-| A code finding included in its flaw's disclosure is read whole by everybody who read it before, and with the decisions at its occurrence by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the inclusion adds readers. Taking it out of disclosure takes back only the readers the inclusion added (`DESIGN-analysis.md` § Disclosure inclusion) |
-| A code finding collaborator is granted one code finding recorded as a flaw while its flaw is undisclosed, and reads its evidence alone | A grant of one code finding is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, whether or not the code finding was included (`DESIGN-analysis.md` § Code finding collaborators) |
+| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A code finding included in a flaw's disclosure stays internal, and the case reaches it and the decisions at its occurrence as one of the flaw's readers (`design-docs/analysis.md` § Disclosure inclusion) |
+| A code finding included in its flaw's disclosure is read whole by everybody who read it before, and with the decisions at its occurrence by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the inclusion adds readers. Taking it out of disclosure takes back only the readers the inclusion added (`design-docs/analysis.md` § Disclosure inclusion) |
+| A code finding collaborator is granted one code finding recorded as a flaw while its flaw is undisclosed, and reads its evidence alone | A grant of one code finding is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, whether or not the code finding was included (`design-docs/analysis.md` § Code finding collaborators) |
 | `internal-triage` triages nothing about a product as a whole: an assignment rule, assignment, a rating, an incident, a response window, an inventory upload | Each is about what the product's builds ship, which internal triage reads none of |
-| Approving at internal visibility needs its holder to read internal work and hold the approver capability | A decision there is about a code finding, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Code finding triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
+| Approving at internal visibility needs its holder to read internal work and hold the approver capability | A decision there is about a code finding, and its second person is somebody granted the right to agree (`design-docs/analysis.md` § Code finding triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
 | A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
 
 No consumer of vulnerability findings includes analysis results. The findings
 lists, reports, exports, published documents and the interface's screens read
 none; the code finding screens read code findings. A person sends an
 analyzer run where they hold `internal-triage` on the product, since every
-result opens internal. `DESIGN-kinds.md`
+result opens internal. `design-docs/kinds.md`
 § Consumers holds which kinds each consumer reads.
 
 ## Breadth of view
@@ -148,7 +148,7 @@ no read role, which an assignment gives content to.
 | The notification's own check stays beside it | A different check at a different moment. A channel that leaks only when another rule is wrong is a channel nobody notices is leaking |
 | The narrowing is not a switch an administrator turns on | It is what not granting reading already meant. There is no fourth state where somebody holds reading and is narrowed anyway |
 | **Administering the catalog is not reading it, for the set that narrows findings** | Two questions, answered by two rules: which products somebody may know exist, which an administrator may know all of, and which products' findings they read, which is only where they hold a read role. Asked as the first, an administrator holding nothing but a capability on a product read every disclosed finding in it — and a non-administrator holding the same grant was correctly excluded, which is what makes it a widening rather than a policy |
-| What a flaw recorded in another product wrote onto a shared issue is withheld from a reader who may not read that record: its summary, names and addresses. Its rating is never written there | The issue row is one row for every product holding the issue. `DESIGN-findings.md` § Recorded words on a shared issue holds the rule and every reader it binds, and § The rating in force holds where a recorded rating lives |
+| What a flaw recorded in another product wrote onto a shared issue is withheld from a reader who may not read that record: its summary, names and addresses. Its rating is never written there | The issue row is one row for every product holding the issue. `design-docs/findings.md` § Recorded words on a shared issue holds the rule and every reader it binds, and § The rating in force holds where a recorded rating lives |
 | The report endpoints need no check added | Every query carries a subject and narrows in the data layer, so narrowing the subject narrows every trend, rate, bar and total with it. A check bolted onto a report is the per-handler enforcement this area exists to avoid |
 
 ## The upward tree
@@ -254,7 +254,7 @@ yourself is still doing it.
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
-| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever its reported problem (`DESIGN-findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
+| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever its reported problem (`design-docs/findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
 
 ### Assignment by narrowing
 
@@ -332,7 +332,7 @@ holder who cannot open it.
 |---|---|
 | A person keeps undisclosed and internal work where they read it, and disclosed work while they hold any role in the product | Disclosed work travels with its assignment. Anything else left with somebody who cannot open it is in no list at all |
 | A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | The rule a hand assignment to a team asks (§ Teams) |
-| A report goes where undisclosed work goes | A report is read under undisclosed reading (`DESIGN-findings.md` § Report visibility) |
+| A report goes where undisclosed work goes | A report is read under undisclosed reading (`design-docs/findings.md` § Report visibility) |
 | Code findings go by the same rule as findings | A code finding is work at its visibility like any other |
 | It goes back to nobody, and no sweep is queued | Exactly as when somebody leaves. The unassigned list holds it until somebody takes it, and an assignment rule places it when a rule is next recorded in the product. Queuing a sweep would let a full queue refuse a withdrawal of access |
 | Asked of whoever the write named, and of every team they are on | A team holds work only while a member reads it, so a member's reading going can strand the team's queue |
@@ -419,7 +419,7 @@ Recorded by an administrator, as a date on the person.
 | Their roles are left where they are | What somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it from memory. What stops them is the date |
 | Read once, where every way in already passes | A session, a personal token and a group-bound sign-in all resolve by identity. A second spelling of the check is a second rule to keep in step with the first |
 | **Every question of the form "may this person do this" excludes them** | The grants are left in place on purpose, so a query reading only grants answers that somebody who has left is still cleared. Three did: two of them decide whether an undisclosed finding may be handed to a person or a team, where the assignment itself is the disclosure, and the third decides whether their work is released |
-| Nobody who has left is told anything | Every audience a sweep derives starts from the people still here, a recorded event for them records nothing, and mail, digests and direct chat messages skip them, including what was opened before they left. `DESIGN-notifications.md` § Delivery |
+| Nobody who has left is told anything | Every audience a sweep derives starts from the people still here, a recorded event for them records nothing, and mail, digests and direct chat messages skip them, including what was opened before they left. `design-docs/notifications.md` § Delivery |
 | A departed administrator does not satisfy the startup check | Otherwise configuration can map no group to admin and the deployment starts cleanly with nobody able to administer it — which is the state that check exists to prevent |
 | Naming somebody in configuration readmits them | It is the documented way back into a deployment nobody can administer, and nothing else clears the date. Done there rather than wherever a person is recorded: an administrator re-recording a departed colleague must not silently readmit them |
 | Sessions are ended rather than left to expire | Roles are re-read at sign-in, so withdrawing one takes effect then. This is what makes leaving immediate instead |
@@ -514,10 +514,10 @@ numbers are shown because the gap between them is the thing worth knowing.
 | How many one pass places is a setting | A bulk write is bounded and the bound belongs where an operator can move it: a pass too large holds a connection through the whole of it, and one too small leaves a fifty-thousand-finding product re-queuing twenty-five times. It was a constant in the sweeper and a second constant in the writer — two numbers for one bound — under a comment declining the decision without citing it |
 | The preview is narrowed like every other count (REQ-42, REQ-43) | Read unnarrowed, the gap between the preview and the same person's findings list is exactly the amount of undisclosed work. Somebody who may see nothing is told nothing rather than zero |
 | A rule may place vulnerability reports instead of findings | Such a rule names no package and no place, since a report sits at neither, and either key on it is refused. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when it is added. Its preview counts the product's open reports and those nobody holds, where the asker reads the product's reports and as zero elsewhere |
-| A rule places code findings as well as findings | A code finding is matched by the component it sits in, like any finding, and is one piece of work in the preview. A code finding past its end of life is neither placed nor counted, because it is kept as it stands (`DESIGN-analysis.md` § End of life) |
+| A rule places code findings as well as findings | A code finding is matched by the component it sits in, like any finding, and is one piece of work in the preview. A code finding past its end of life is neither placed nor counted, because it is kept as it stands (`design-docs/analysis.md` § End of life) |
 | A rule places work only at a visibility one member of its team reads | The rule a hand assignment to the team asks (§ Teams). It is asked of each occurrence, so an undisclosed or internal occurrence nobody on the team reads stays with nobody while the disclosed occurrences beside it are placed, and is picked up from the unassigned list by somebody who reads it. A team of nobody is placed nothing |
 | The preview names no team, and counts what the asker reads | It takes the keys alone. Work at a visibility nobody on the team reads is counted and then not placed |
-| A rule places no code finding recorded as a flaw | It is closed work for its holder, and its flaw is placed as itself (`DESIGN-analysis.md` § Code finding assignment). The preview counts none |
+| A rule places no code finding recorded as a flaw | It is closed work for its holder, and its flaw is placed as itself (`design-docs/analysis.md` § Code finding assignment). The preview counts none |
 | A rule places only work nobody holds | A human assignment always wins. A rule able to override one would perform the assigner's act continuously on behalf of whoever wrote it, with nobody holding the right at the moment it happened |
 | That nobody holds an occurrence is re-checked at the moment of the write | The batch reads which findings a rule matches and then writes them by identifier; an assignment landing between the two is somebody's |
 | Rules are ordered, first match wins, and the finding records which rule placed it | An unwritten precedence rule is forgettable, and "where did this come from" is asked months later |
@@ -567,7 +567,7 @@ subject is exactly what a leak looks like from the outside.
 
 The exported methods of the finding, triage and graph stores that query and
 take no subject are each named, with which of the three they are, in a list a
-gate holds them to (`make subjected`, `DESIGN-build.md` § Make targets). A
+gate holds them to (`make subjected`, `design-docs/build.md` § Make targets). A
 method querying through a helper of its own package counts as querying.
 
 Anything else takes a subject. What an assignment rule would catch and which words
@@ -708,7 +708,7 @@ being applied correctly to it.
 | A key's scope is constraints, not a path | The product is always required; release and variant are independent, and either, both or neither may be pinned. Every constraint present must match |
 | A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its whole build |
 | A key reads back the receipts of the builds it may upload to and nothing else | The same holds for the documents sent there and what each upload changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Every receipt of the build, whichever key sent it: a rotated key, or a second key on the build, is answered with another sender's scan when it re-sends the same bytes. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many other builds there are |
-| A key reads back the receipts of the analyzer runs sent to the builds it may upload to | A receipt counts the code findings a run opened and saw and names none. A person reads the same receipts where they read internal findings in the product, since the counts are of internal findings (`DESIGN-analysis.md` § Receipts) |
+| A key reads back the receipts of the analyzer runs sent to the builds it may upload to | A receipt counts the code findings a run opened and saw and names none. A person reads the same receipts where they read internal findings in the product, since the counts are of internal findings (`design-docs/analysis.md` § Receipts) |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 | A key's name is stored folded and matched exactly, the way a username is | An administrator types it to make the key and again to withdraw it. A name taken in other capitals is refused as taken, and one that is only spaces is refused as naming nothing |
 | A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so a receipt credits the key that sent it. Withdrawing by name reaches the key in force |
@@ -729,7 +729,7 @@ cookie resolves to it.
 | Which products publish takes no subject | It is what builds this subject, and it is the deployment's configuration, the same for everybody who asks |
 | A signed-in person does not read the published documents through it | They read findings through the API, where their own grants answer; the store of published documents refuses anybody but this subject and the deployment itself |
 
-`DESIGN-publishing.md` says what is read and served.
+`design-docs/publishing.md` says what is read and served.
 
 ## Provider sign-in
 
@@ -802,7 +802,7 @@ it re-resolves the issuer's name each time.
 | The return address is stated in configuration, not taken from the request | Otherwise it is whatever a caller claimed the host was. A deployment that configured a provider without stating its address does not start |
 | Every request out carries one User-Agent, set where every request passes | A receiver sees one name and somewhere to read about it, and a caller that forgets to set it sends the library's default |
 | An address an administrator configured, a webhook or a chat server, goes through the same client without the address check | https only, no user in the address, no redirect followed. It was typed by the operator rather than read from a document, and REQ-69 lets it reach wherever that is |
-| An upstream an administrator named goes through the same client pinned to its host, without the address check | Its description and feeds name further addresses, and any naming another host is refused before anything is resolved; the host itself is reached wherever it is, as an address typed by the operator is (`DESIGN-upstream.md` § Requests) |
+| An upstream an administrator named goes through the same client pinned to its host, without the address check | Its description and feeds name further addresses, and any naming another host is refused before anything is resolved; the host itself is reached wherever it is, as an address typed by the operator is (`design-docs/upstream.md` § Requests) |
 | An answer read back from a provider is bounded | A profile is a few hundred bytes; a body that never ends is a sign-in that allocates until the process dies |
 
 ## Trusted-header sign-in
@@ -822,7 +822,7 @@ username header and claim to be an administrator outright. Both the header name
 and the separator are configured, because neither is standardized.
 
 The sources are also the proxies whose forwarded client the published
-documents count a rate against (`DESIGN-publishing.md`), so a deployment names
+documents count a rate against (`design-docs/publishing.md`), so a deployment names
 its proxies once. Where it publishes, they may be named with no header: the
 sources are then read for that alone, and every address is still refused as a
 source.
@@ -1244,7 +1244,7 @@ record, because it is the same question one layer up.
 |---|---|
 | Both values are kept, and absent is not empty | "Who raised the minimum severity to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
 | Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
-| Every row names its actor: a person, configuration, a merge, or an upgrade | Configuration is the deployment's startup configuration. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, adds and removes the group mappings in `OPENPSIRT_GROUP_ROLES`, and sets where roles come from to match, and records nothing else. A merge is a scan merging two issues its report named together, and records only a rating claim it withdrew or an incident it cleared, because another stood in its place in the same product (`DESIGN-findings.md` § Merged issues). An upgrade is the one to v0.5.0, which recorded only a key it withdrew because another key holds its folded name, or a token it withdrew because another of its owner's does. No migration this tree carries writes one. None is a person. A row by a person names the person |
+| Every row names its actor: a person, configuration, a merge, or an upgrade | Configuration is the deployment's startup configuration. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, adds and removes the group mappings in `OPENPSIRT_GROUP_ROLES`, and sets where roles come from to match, and records nothing else. A merge is a scan merging two issues its report named together, and records only a rating claim it withdrew or an incident it cleared, because another stood in its place in the same product (`design-docs/findings.md` § Merged issues). An upgrade is the one to v0.5.0, which recorded only a key it withdrew because another key holds its folded name, or a token it withdrew because another of its owner's does. No migration this tree carries writes one. None is a person. A row by a person names the person |
 | Configuration records a name when it starts or stops naming somebody | Administration moved with nobody in the application having moved it. A start naming the same people as the last records nothing, because nothing moved |
 | The record is written in the transaction that makes the change | Both are one act. Written afterwards, a change could succeed while the record of it silently failed, and a trail that is sometimes missing a line answers an auditor's question wrongly rather than not at all |
 | A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
@@ -1324,7 +1324,7 @@ ninety days after the report was received (REQ-37). A flaw found here carries
 none, because nobody outside is counting down to a publication, and neither does
 a public finding. A claim from outside ruled a duplicate of a flaw found here
 gives it one, counted from when that claim arrived, or brings an existing one
-earlier (`DESIGN-findings.md` § Judgment). The point of having one
+earlier (`design-docs/findings.md` § Judgment). The point of having one
 is that it gives the embargo an end somebody outside could hold this deployment
 to.
 
@@ -1395,7 +1395,7 @@ Three acts a person asks for, and two a ruling records, recorded apart.
 | **Extension** | The embargo ends later. The unilateral case: the fix slipped |
 | **Shortening** | The embargo ends sooner. The coordinated case: a coordinator or a peer vendor is publishing on a date of their own, or the detail leaked |
 | **Disclosure** | The embargo ends today and the issue is public. § Issue disclosure holds its rules |
-| **Duplicate** | A report from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the report. `DESIGN-findings.md` § Judgment holds its rules |
+| **Duplicate** | A report from outside, ruled a duplicate of a flaw found here, started the end or brought it earlier. Names the ruling and the report. `design-docs/findings.md` § Judgment holds its rules |
 | **Duplicate undone** | That ruling was withdrawn and the end put back where the rest of the record leaves it, which may be no end at all |
 
 A movement a ruling records takes no reason of its own. It carries the

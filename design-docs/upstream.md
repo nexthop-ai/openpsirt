@@ -8,10 +8,10 @@ upstream's own build is offered for review.
 Satisfies REQ-31, REQ-42, REQ-68, REQ-69, REQ-71, REQ-84.
 
 Neighboring pieces: what this deployment publishes, and how it says whom a
-statement holds for, is in `DESIGN-publishing.md`; the evidence layer every
-third party's statement lands in is in `DESIGN-triage.md` § Evidence from
-publishers; the closure a statement makes is in `DESIGN-findings.md` § Closure
-reasons; the outbound client is in `DESIGN-access.md`.
+statement holds for, is in `design-docs/publishing.md`; the evidence layer every
+third party's statement lands in is in `design-docs/triage.md` § Evidence from
+publishers; the closure a statement makes is in `design-docs/findings.md` § Closure
+reasons; the outbound client is in `design-docs/access.md`.
 
 ## Contents
 
@@ -98,7 +98,7 @@ waiting is queued to be scanned again.
 ## Statements recorded
 
 An upstream's document lands where every third party's statement lands
-(`DESIGN-triage.md` § Evidence from publishers), as one document among many,
+(`design-docs/triage.md` § Evidence from publishers), as one document among many,
 replaced by its own name.
 
 | The document names | Recorded as |
@@ -110,7 +110,7 @@ replaced by its own name.
 
 This deployment's own CSAF VEX document says the first shape for a statement
 whose reason holds for anybody, and the second for one whose reason is the
-build's (`DESIGN-publishing.md` § Statement scope), and names OpenPSIRT as the
+build's (`design-docs/publishing.md` § Statement scope), and names OpenPSIRT as the
 engine that generated it.
 
 | Rule | |

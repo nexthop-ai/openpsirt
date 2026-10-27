@@ -7,7 +7,7 @@ REQ-40, REQ-41, REQ-42, REQ-43, REQ-54, REQ-55, REQ-56, REQ-57, REQ-58,
 REQ-59, REQ-60, REQ-61, REQ-64, REQ-65, REQ-67, and the half of REQ-69 that is
 shown rather than collected.
 
-The markdown rules are in `DESIGN-text.md`. What is not built is named at the
+The markdown rules are in `design-docs/text.md`. What is not built is named at the
 end rather than left to be found by clicking.
 
 ## Contents
@@ -106,7 +106,7 @@ reload while working when navigated to.
 One table names every address the page answers: the pattern the router
 matches for each screen, and the query parameters a link may set on it. The
 router is built from it. So is every address the interface builds, and the
-server's notification links are tested against it (`DESIGN-notifications.md`
+server's notification links are tested against it (`design-docs/notifications.md`
 § Links).
 
 | Rule | |
@@ -366,7 +366,7 @@ Every figure opens the list it counts, narrowed the way the figure was counted �
 the aging buckets and both deadline tiles. A number nobody can act on from where
 they read it sends somebody to build the same question by hand, and the question
 they build is not always the same one. A figure counting anything closed opens
-nothing, because the findings list holds what is open (`DESIGN-analytics.md`).
+nothing, because the findings list holds what is open (`design-docs/analytics.md`).
 
 ## The findings list
 
@@ -587,11 +587,11 @@ back in its own order rather than refusing.
 | **The row is carried with its key** | Acting on a selection then acts on what was selected rather than on the part of it the current page happens to hold. Holding keys alone, the queue counted every ticked decision in its button and approved only the ones on screen, dropping the rest with no message |
 | **Changing the question clears the selection** | A selection is made out of a population, so replacing the population replaces what was selected. Kept across a filter change, the bar went on counting rows chosen under one question while none of them was listed — and acting wrote against all of them. Every change goes through the one function that holds the rule, including removing a single chip: today every chip only ever widens, so the rule held by a property of the chips rather than by construction |
 | **A figure about a selection counts what the selection holds** | The bulk decision screen sums rows written across every page it has seen, not the page in hand, because the selection outlives the page and the figure is what the ceiling is read against. The line under the list names whichever of the two limits the selection is past: issues, or findings written |
-| **The bulk decision form asks before skipping what is decided** | A box, unticked, reading "Skip occurrences already decided". Ticked, the result lists each occurrence left out with a link to the decision standing there (`DESIGN-triage.md` § Decided occurrences). Unticked, a decided occurrence refuses the bulk decision and the refusal names the decision standing there |
+| **The bulk decision form asks before skipping what is decided** | A box, unticked, reading "Skip occurrences already decided". Ticked, the result lists each occurrence left out with a link to the decision standing there (`design-docs/triage.md` § Decided occurrences). Unticked, a decided occurrence refuses the bulk decision and the refusal names the decision standing there |
 | **Approving a selection leaves ticked what was refused and what was ticked meanwhile** | The approvals run one at a time, and the selection can change while they do. What was acted on and agreed to goes; what was refused stays unless it was unticked while the loop ran; what was ticked while it ran stays |
 | **A list switched or narrowed starts at its own beginning** | A page into one list is past the end of a shorter one. Where an address still lands past the end, the pager is drawn rather than a statement that the list is empty |
 | **Select-all and deselect-all are inverses** | Ticking the header box took this page and unticking it took every page, so the two did different amounts of work in opposite directions |
-| **Assigning a selection in one product is one request** | The picked rows travel together, and the server resolves them against the same filter the list is read with. A refusal is the whole act's, so nothing is left half assigned and the selection stays as it was. Rows a colleague holds and the caller may not take stay selected, with a count saying how many Across products each row is still its own request, under the loop below (`DESIGN-access.md` § Assignment by narrowing) |
+| **Assigning a selection in one product is one request** | The picked rows travel together, and the server resolves them against the same filter the list is read with. A refusal is the whole act's, so nothing is left half assigned and the selection stays as it was. Rows a colleague holds and the caller may not take stay selected, with a count saying how many Across products each row is still its own request, under the loop below (`design-docs/access.md` § Assignment by narrowing) |
 | **Select all takes every row the filter matches** | Offered on the batch bar in one product once something is ticked, and counted by the list's total rather than the pages seen. It names no rows: the server assigns what the filter matches when the act lands. A changed filter ends it, as it clears a selection |
 | **A loop over a selection survives a refusal** | Each row is its own act, so one refusal leaves the rest to be tried and the failures stay selected with a count saying how many. Unguarded, the first refusal abandoned everything after it, left the selection reading its original size, and skipped the control that undoes what did land |
 | Searching is submitted rather than sent per keystroke | Each is a query over every open finding in the build, and a half-typed word is not a question worth asking. It matches anywhere in a component's name, ignoring capitals |
@@ -701,7 +701,7 @@ planned upgrades read from the triager's end rather than the coordinator's. Keye
 ## The component screen
 
 The page is a source package at the version it was built at: the fold
-`DESIGN-data-model.md` defines. It has a row per build shipping it, with the
+`design-docs/data-model.md` defines. It has a row per build shipping it, with the
 binaries that build ships from it, what is open across them, where it could go,
 the earliest deadline among what is open, and what has already been promised.
 The issue count is the way through to the findings list, filtered to every
@@ -740,9 +740,9 @@ and the act hangs off it.
 | Where to read about the package is built from its identifier | An identifier already names the ecosystem and the name within it, and each ecosystem has one address where a package is read about. Nothing is fetched and nothing is stored — the same way the issue records are worked out. An ecosystem with no address offers none rather than a guess, and a name is encoded into the path because it came out of a scan file |
 | The graph is answered for one build, picked from the rows above | An edge is a fact about one build: the same library is pulled in by different things in different builds. A link naming a build arrives on it, so the tree opens the component on the graph somebody was already looking at |
 | What the product's upstream says about the component is a card of its own | Every statement standing about a component of this name, at any version: the issue, the version, what it says, and the statement's mark, link and decline control. Drawn only where the upstream says something |
-| A container image lists the versions each build stated for it | An image is identified by its name and carries no version of its own (`DESIGN-data-model.md` § Container images), so what each build stamped it with, newest first, is listed beside the package with the dates each was stated across. The first five are shown and the rest counted, because a nightly build stamps a new one every night |
+| A container image lists the versions each build stated for it | An image is identified by its name and carries no version of its own (`design-docs/data-model.md` § Container images), so what each build stamped it with, newest first, is listed beside the package with the dates each was stated across. The first five are shown and the rest counted, because a nightly build stamps a new one every night |
 
-It is where an upgrade is promised, on the terms `DESIGN-triage.md` sets: the
+It is where an upgrade is promised, on the terms `design-docs/triage.md` sets: the
 releases it is for, the version, the date, the reason, and who carries it.
 
 ### Component screen reads
@@ -855,7 +855,7 @@ decide. A write-up is what somebody triaging reads first, and a third party's
 claim about the finding is read against it rather than before it.
 
 A patch link carries the branches its commit is on, once its repository has
-been asked (`DESIGN-findings.md` § Patch branches): three by name in version
+been asked (`design-docs/findings.md` § Patch branches): three by name in version
 order, the rest as a count, all of them on hover. A commit its repository does
 not hold says so. A link not yet looked up carries nothing, because "not yet"
 is not a fact about the patch.
@@ -875,7 +875,7 @@ An upstream's statement carries what it is here, beside the publisher: applying
 here by itself, offered for review, or declined; a link to the document the
 upstream published, where the address is one to send a reader to; and, for
 somebody who triages, a control that declines it or takes that back
-(`DESIGN-upstream.md` § Declined statements).
+(`design-docs/upstream.md` § Declined statements).
 
 A publisher's claim carries the version it was made about. A supplier's
 advisory names the version that carries the fix, which is not the version
@@ -925,7 +925,7 @@ The three are distinct answers. Drawn alike, "nothing recorded what pulls this
 in" stands over records that name the consumer, and the third draws an empty
 name read off the end of a chain that is not there.
 
-One row per occurrence, however many rows a finding holds there. `DESIGN-findings.md`
+One row per occurrence, however many rows a finding holds there. `design-docs/findings.md`
 owns that rule.
 
 | Rule | |
@@ -1045,7 +1045,7 @@ far, because recording the distance keeps a component once per path to it:
 | Rule | |
 |---|---|
 | Every row is ordered on the number that describes it | For a branch, what is open beneath it; for a leaf, its own count. What opens still comes before what does not, so the structure of a build is on the first screen |
-| The header says how many components the scanner cannot match, and opens the list of them | Such a component is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some. The count and the list are one definition, `DESIGN-analytics.md` § Unmatched components |
+| The header says how many components the scanner cannot match, and opens the list of them | Such a component is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some. The count and the list are one definition, `design-docs/analytics.md` § Unmatched components |
 | What nothing in the build pulls in hangs from the root | The build contains it, and nothing else does. The root's own count is everything beneath it and beneath those, as one set. A real switch image arrives with 60,935 components, 1,358 edges and none from its root; drawn from the root's edges alone, that tree is empty |
 | A level is drawn whole | An honest inventory has tens of components at a level. The remaining cap is high and exists for the inventory that is not honest — a real image has been seen with 5,270 components directly under its root |
 | Arriving from a finding opens the tree on the component, with every parent expanded | The chain travels in the link rather than being walked upward here. Where a level is past its cap, the step on the path is kept whatever its position: a link that opens a tree without the component it was opened for shows the one thing it exists to show |
@@ -1104,7 +1104,7 @@ it covers. The card carries the reasoning as it stands, how many records the dec
 wrote, how many locations and builds it reaches, whether it was approved before
 and came back, and how long the finding has been put off.
 
-`DESIGN-triage.md` says what the queue holds and on what terms. The screen has
+`design-docs/triage.md` says what the queue holds and on what terms. The screen has
 a tab per list, and two about the reader's own decisions:
 
 | Tab | Holds | A card offers |
@@ -1131,7 +1131,7 @@ Every tab carries its count, read from its own list without the filters.
 | **A To reaffirm tab lists the reader's own lapsed decisions** | Work handed back, which the lapse message links to. One row per decision with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many occurrences and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every decision shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like every other tab |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 | **Rulings on vulnerability reports waiting for approval sit underneath, with the rating and date-movement sections** | A ruling rejecting a report or declaring it out of scope waits for a second person, and this is where somebody goes to be one. Its own section, because a ruling is about claims somebody sent rather than about code. Listed across the products the reader may read reports in, and narrowed with the rest where the address names a product |
-| **What upstreams offer for review sits underneath, with the other sections** | One entry per statement and open finding it speaks about: the issue and component, which opens the finding, where the statement starts a decision; the build; what the upstream says; and the statement's mark, link and decline control. Across the products the reader reads, narrowed with the rest where the address names a product, and drawn only where something is offered (`DESIGN-upstream.md` § Offers for review) |
+| **What upstreams offer for review sits underneath, with the other sections** | One entry per statement and open finding it speaks about: the issue and component, which opens the finding, where the statement starts a decision; the build; what the upstream says; and the statement's mark, link and decline control. Across the products the reader reads, narrowed with the rest where the address names a product, and drawn only where something is offered (`design-docs/upstream.md` § Offers for review) |
 | **A section named in the address is brought into view** | The ratings, the disclosure dates and the rulings each carry a name, and a link to one of them lands on it |
 
 The queue narrows to one product, which is what a figure on the home screen
@@ -1140,7 +1140,7 @@ the heading names it.
 
 A row of filters above the queue narrows it further: who proposed a decision, an
 age of seven, thirty or ninety days, a severity, an outcome and a release
-(`DESIGN-triage.md` § Queue filters). Each rides in the address, so a link
+(`design-docs/triage.md` § Queue filters). Each rides in the address, so a link
 somebody sends is the same list, and changing one clears the selection. The
 exports carry the same filters, so a file taken from a narrowed screen is the
 narrowed backlog, and carry the list and the Mine only box too. The filters sit
@@ -1161,7 +1161,7 @@ their own sections of the queue.
 
 One decision, whole, and every act at that grain: revise, withdraw, comment,
 agree, send it back, hold rows back, and say where the work is happening.
-`DESIGN-triage.md` says what a decision is and what the read answers.
+`design-docs/triage.md` says what a decision is and what the read answers.
 
 | Rule | |
 |---|---|
@@ -1175,7 +1175,7 @@ agree, send it back, hold rows back, and say where the work is happening.
 | **Reaffirming is not here** | It is a decision about one occurrence in one build, and this screen is about an argument that may cover many. It happens on the finding, where the occurrences are |
 | It says whom a published statement holds for | Beside the outcome, and marked as coming from the reason where the decision states none |
 
-Which acts are offered follows the act-and-needs table in `DESIGN-triage.md`,
+Which acts are offered follows the act-and-needs table in `design-docs/triage.md`,
 rather than being restated here: offering a button that would refuse somebody
 is worse than offering nothing, and a second copy of the rule is a copy that
 disagrees. A copy saying revising and withdrawing are the author's, where the
@@ -1257,8 +1257,8 @@ is what the screen is about.
 | The catalog says what each entry holds | Products carry their branch, tag and variant counts, what is open against them and when they were last scanned; branches and tags carry what they came from; variants carry whether they ship to customers. A list of names alone makes somebody open every row. Every count is issues at components, the way the findings list counts |
 | **What is open is counted when it is asked for** | It is counted over the findings and is the whole cost of a catalog read: 0.39s for a list of two products against 1ms for a liveness probe, and 0.39s against 0.24s for a product holding 8,839 findings against one holding 28. The three screens that draw the column ask for it; the pickers that read the same lists for their names do not, and were paying it on every open. **Absent rather than zero where nobody asked** — these screens render a missing number as "0", and a variant holding twenty-five reported as clean is the failure the count was added to fix |
 | A product row says what it triages from | An administrator changes it there. Everybody sees it because it explains a number, and "deployment's" is shown rather than the deployment's current word, because following it and stating it are different things |
-| A product row says whether its documents are published | A box an administrator ticks, and a word for everybody else. What publishing serves is `DESIGN-publishing.md`'s |
-| A product row opens the upstream it trusts | An administrator's row action opens a drawer: the upstream as trusted, how reading it is going, a key it offers in place of the trusted one, a control to stop trusting it, and a field to name one. Naming one is two steps, check and then trust, so the key documents will be checked against is shown before anything is read. What an upstream is, is `DESIGN-upstream.md`'s |
+| A product row says whether its documents are published | A box an administrator ticks, and a word for everybody else. What publishing serves is `design-docs/publishing.md`'s |
+| A product row opens the upstream it trusts | An administrator's row action opens a drawer: the upstream as trusted, how reading it is going, a key it offers in place of the trusted one, a control to stop trusting it, and a field to name one. Naming one is two steps, check and then trust, so the key documents will be checked against is shown before anything is read. What an upstream is, is `design-docs/upstream.md`'s |
 | A product row opens its repository settings | An administrator's row action, offered to nobody else. § The repositories screen holds the screen |
 | A product, a release and a variant are each corrected and retired from the list that declares them | An administrator edits a name, or takes the thing out of use, from the row. The release list of variants is what a release was built as rather than what the product declares, so it carries no control: correcting one thing in two places is how the two come to disagree |
 | A product's edit offers both of its names and says which one is fixed by publication | The name scans and documents use, and the name screens show. They move independently and only the first can be refused, so offering them together with one sentence beside them is what makes the difference visible at the moment somebody types |
@@ -1301,7 +1301,7 @@ carries the two builds picked there, and picks its own pair the same way.
 ### The Uploads screen
 
 One build's uploads, a tab per kind, each tab reading that kind's own list.
-What each list holds is `DESIGN-ingest.md` § Upload listing.
+What each list holds is `design-docs/ingest.md` § Upload listing.
 
 | Tab | Holds |
 |---|---|
@@ -1330,7 +1330,7 @@ What each list holds is `DESIGN-ingest.md` § Upload listing.
 ### The repositories screen
 
 One product's repository settings, reached from its row in the products
-table. What the settings are and how they are checked is `DESIGN-analysis.md`
+table. What the settings are and how they are checked is `design-docs/analysis.md`
 § Repository settings.
 
 | Rule | |
@@ -1442,7 +1442,7 @@ publishes may be evidence and may never be presentation.
 ## Vulnerability reports
 
 One product's reports, reached from the product page and from the two notices
-that name a report. `DESIGN-findings.md` § Reports holds what a report is and
+that name a report. `design-docs/findings.md` § Reports holds what a report is and
 § Dispositions what a ruling does; this is how the screens draw them.
 
 | Rule | |
@@ -1475,13 +1475,13 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | Files are attached from the report's page and held at once | A file attached into the text of a message, a note or the reported problem is held on the report the same way, and listed with the rest |
 | The reporter card on an issue carries its report's correspondence and notes, and links the report | Read under the report rule, so absent for somebody who may not read reports. Writing to either is offered where the reader works reports |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a report duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
-| The audit log draws one card per decision | The issue, the outcome, the state in one word, what it is about or how many components, and how many occurrences it covers, with the states counted where they differ. The issue opens the decision page, and "Findings there now" opens the findings list narrowed to the decision and the states asked for. `DESIGN-analytics.md` § Dismissals and last uploads holds what is counted |
+| The audit log draws one card per decision | The issue, the outcome, the state in one word, what it is about or how many components, and how many occurrences it covers, with the states counted where they differ. The issue opens the decision page, and "Findings there now" opens the findings list narrowed to the decision and the states asked for. `design-docs/analytics.md` § Dismissals and last uploads holds what is counted |
 | Rulings sit beside the decisions in the audit log, over its products and period | A ruling is a decision somebody could be asked to account for, and an auditor asks about a period. Beside the triage decisions rather than among them: a ruling is about a report rather than a finding and takes none of their filters. Printed with them, without the controls |
 | The change history sits below the decisions in the audit log, over its period, and narrows to one kind of change | The decision filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
 
 ## Security testing
 
-The Security testing screen lists a product's code findings, reached from the product page. `DESIGN-analysis.md` holds
+The Security testing screen lists a product's code findings, reached from the product page. `design-docs/analysis.md` holds
 what a code finding is, where it stands and what a suppression rule covers; this is how
 the screens draw them.
 
@@ -1503,22 +1503,22 @@ the screens draw them.
 | A reader who does not triage internal material sees no control that writes | The same rule as Vulnerability reports |
 | A code finding's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work, which is where a code finding is held until its flaw is disclosed, and is not offered past end of life. Choosing applies to every build the code finding is open on |
 | The queue's rows name who holds each code finding | A team carries the word team beside its name |
-| A code finding past its end of life says so beside its state and offers no decision, Record as a flaw or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). Include in disclosure on a code finding already recorded as a flaw stays |
-| A code finding in code its run declared third-party reads Third-party beside its state, on its page and on its row in the Security testing screen, and Record as a flaw says to report the flaw upstream | The flaw is the upstream's (`DESIGN-analysis.md` § Third-party code). Record as a flaw is still offered, and what declared it is said on hover |
+| A code finding past its end of life says so beside its state and offers no decision, Record as a flaw or fixed control | The server refuses each (`design-docs/analysis.md` § End of life). Include in disclosure on a code finding already recorded as a flaw stays |
+| A code finding in code its run declared third-party reads Third-party beside its state, on its page and on its row in the Security testing screen, and Record as a flaw says to report the flaw upstream | The flaw is the upstream's (`design-docs/analysis.md` § Third-party code). Record as a flaw is still offered, and what declared it is said on hover |
 | The suppression rules screen lists every suppression rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
 | Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |
 | A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |
 | A confirmed code finding offers Record as a flaw to somebody who triages internal material and undisclosed work | The components offered are cards, most likely first, each saying where it came from; a build that does not hold the one picked is unticked and cannot be ticked |
-| The first component is picked for the person unless it only resembles the code finding's directory | A resembling name is a guess, so with nothing confirmed or placed nothing is picked (`DESIGN-analysis.md` § Flaw record offer) |
+| The first component is picked for the person unless it only resembles the code finding's directory | A resembling name is a guess, so with nothing confirmed or placed nothing is picked (`design-docs/analysis.md` § Flaw record offer) |
 | A build holding the component picked that nothing analyzes is listed unticked beside the builds the code finding was seen in, and may be ticked | It ships the code, and is a guess about a build the analyzer never read (REQ-19) |
 | Include in disclosure is one toggle, off by default, and turned on lists what goes public with the flaw before it is sent | Its hover: "Publishes the path, the analyzer's messages, and the decisions and comments on this finding with the flaw; until then, people on the flaw's case can read it." Under Disclosed with the flaw: each author's notes in full, the analyzer's messages and paths, and whether source snippets are published |
 | The preview and the toggle's hover say who public is | "Once the flaw is disclosed, readable by everyone signed in with public access to this product. Not included in published VEX or CSAF." |
 | A code finding recorded as a flaw reads Recorded as a flaw, and shows its flaw, linked, in place of the decision | It reads Internal only or Included in disclosure, the second with "Included in its flaw's disclosure" on hover. Include in disclosure and Take out of disclosure are one button while the flaw is undisclosed, and its collaborators are listed beside it. An internal-only code finding lists what including it discloses above the button |
 | Withdraw flaw is offered beside Include in disclosure while the flaw is undisclosed, and asks why | It closes the flaw on every build, which hover says before it is asked for |
 | A recorded flaw's page shows the code finding it came from, to a reader who reads the code finding | The rule and place, linked to the code finding, its state, the component suggested, the builds proposed, and whether its flaw record was withdrawn. On a build where its code finding is no longer detected, Fixed here starts from the build that did not see it, and a person closes it |
-| The Security testing screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
+| The Security testing screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`design-docs/analysis.md` § Queue file) |
 | A series in the address narrows the Security testing screen, and is named in its heading | Each figure of Code findings by analyzer opens the list of its series and state |
-| Unassigned only narrows the Security testing screen to the code findings nobody holds, kept in the address and named in its heading | The findings list holds no code finding, so unheld code findings are found here. It holds across the tabs, the counts and the file (`DESIGN-analysis.md` § Code finding queue) |
+| Unassigned only narrows the Security testing screen to the code findings nobody holds, kept in the address and named in its heading | The findings list holds no code finding, so unheld code findings are found here. It holds across the tabs, the counts and the file (`design-docs/analysis.md` § Code finding queue) |
 | Code findings by analyzer asks for no count from somebody who does not read internal material in the product | It says code findings are internal. A table of zeros reads as an analyzer finding nothing |
 
 ## Disclosure and advisories
@@ -1531,7 +1531,7 @@ running out with every movement of an embargo on it, disclosure included.
 | A finding says whether it is disclosed, wherever it is shown (REQ-40) | Somebody holding private reading could not tell which rows they must not talk about, which makes the embargo a property of the database rather than of anybody's behavior. An undisclosed recorded flaw drew as "Unrated · Undecided · 1 location", which is what any other row draws |
 | A group is undisclosed when *any* of its occurrences is | One embargoed occurrence among fifty makes the whole of it embargoed for anybody deciding what may be said about it, and the earliest date is the one that matters. Both read as aggregates rather than off whichever row sorted first — counted, because a maximum of the visibility word answers "public" for exactly the mixed group the question is about, and the list then drew no marker on a row holding an undisclosed occurrence |
 | The standing notice is unmissable on the finding page (REQ-40) | A notice somebody has to look for is one that has not been given. It sits above everything, on the screen where a person is about to write something down, and it names the places a disclosure actually happens: a ticket, a commit message, a chat. The row's chip is the secondary signal |
-| A screen lists what is approaching disclosure (REQ-38) | Soonest first with what is past due at the top, and a date moved from it. That list is itself a disclosure and is narrowed the way `DESIGN-access.md` describes — a product somebody may not read undisclosed work in contributes nothing to it, not even a count |
+| A screen lists what is approaching disclosure (REQ-38) | Soonest first with what is past due at the top, and a date moved from it. That list is itself a disclosure and is narrowed the way `design-docs/access.md` describes — a product somebody may not read undisclosed work in contributes nothing to it, not even a count |
 | A row on that screen is one issue in one product | The unit an embargo is moved and disclosed in. Its Where names the product, the components and every build in scope that carries it, the variant said once where the builds share it, and Occurrences totals the findings across those builds. The issue links to the issue's own page, which lists every build. The row, its open form and the answer to an act are keyed on the product and the issue together |
 | The screen answers for the scope picked | The picker's product, branch and variant are sent with the request, and the subtitle names them, or says every product where none is picked |
 | The screen offers "Record a reported flaw" | Recording a flaw sent in from outside starts a date, as a report from outside ruled a duplicate of a flaw found here does, so the screen links to that form with the source answered. Offered to whoever may record an undisclosed flaw in the scope's product, or in any product where none is picked. It is not labelled as starting a disclosure, because Disclose on this screen makes an issue public |
@@ -1547,7 +1547,7 @@ running out with every movement of an embargo on it, disclosure included.
 ### The advisory
 
 An advisory has screens of its own: Published advisories, the list of every one
-this deployment minted, and one advisory whole. `DESIGN-remediation.md` § The advisory holds what an
+this deployment minted, and one advisory whole. `design-docs/remediation.md` § The advisory holds what an
 advisory is and § Editorial state holds who may agree.
 
 | Rule | |
@@ -1562,7 +1562,7 @@ advisory is and § Editorial state holds who may agree.
 | Starting one names its first flaw | The list's control asks for a product and a flaw, then mints the name and names the flaw on it. An advisory covering nothing generates no document, so one started empty is a name with nothing behind it. A name minted before the naming was refused is kept for the next attempt, so a mistyped identifier spends no second number. The screen keeps it, so closing the card and opening it again keeps it too, and so does picking another product on a flaw's own panel |
 | A flaw is typed as well as picked | One picker serves starting an advisory and naming a further flaw on one. The list offered is every flaw recorded in the chosen product, open or fixed, without what the advisory already names there, and a fixed one says so. A read that failed says so and leaves the typing, because an empty picker reads as "this product has none", which is the one thing a failed read did not say |
 | The picker says when it is holding less than what is there | It stops at the endpoint's own maximum, and a truncated list otherwise reads as the whole of what a product holds |
-| Retitling and taking a flaw off are on the compose panel | They are the other two acts that open an edition, so each takes back every agreement standing, which is said beside the control. `DESIGN-remediation.md` § Editions and agreement holds the rule |
+| Retitling and taking a flaw off are on the compose panel | They are the other two acts that open an edition, so each takes back every agreement standing, which is said beside the control. `design-docs/remediation.md` § Editions and agreement holds the rule |
 | Each release is listed under the compose panel with what the document states about it | Its status, the decision it stands under with its reason, and the builds that decision was made on, or "not recorded". A release of a variant none of those builds is says "Another variant", because the decision reached it by matching versions in a build configured another way. Another branch or tag of a variant it was made on is the same configuration and says nothing |
 | A release a decision moves off affected can be marked affected, and a mark cleared | Beside the release, with the cost said on hover: either opens an edition. Offered only where the decisions move it, because a mark on a release they leave affected changes nothing |
 | A release whose status moved since the agreement says so | "Changed since approval", on the release, against every agreement standing. The agreement stands, because the decision that moved it had a second person of its own |
@@ -1575,7 +1575,7 @@ advisory is and § Editorial state holds who may agree.
 #### Published VEX
 
 One build's published VEX has a screen of its own, reached from the release's
-customer documents. `DESIGN-remediation.md` § The VEX document holds what it
+customer documents. `design-docs/remediation.md` § The VEX document holds what it
 says and § Issuance records what recording keeps.
 
 | Rule | |
@@ -1603,7 +1603,7 @@ this product on it, read what it generates, and open it.
 ## The Incidents screen
 
 One card per standing incident.
-`DESIGN-incidents.md` holds what the card's parts are.
+`design-docs/incidents.md` holds what the card's parts are.
 
 | Rule | |
 |---|---|
@@ -1759,7 +1759,7 @@ row they had open are not a draft.
 | The identity read keeps the identity it held | A refetch refused for want of a session raises the way back in over the screen and keeps who was signed in, and a refetch that fails keeps the screen. Only a first read answers "nobody is signed in" or draws the failure in place of the frame |
 | A sign-in carries the address it began at, query as well as path | A findings list *is* its filters, and coming back to the same path with none of them is coming back to a different screen |
 | Re-authenticating without leaving the page is not what this does | The requirement allows for that: where a redirect is unavoidable, the draft is saved first and the person returns to what they were writing. It is unavoidable here — a provider sign-in is a redirect to somebody else's host, which cannot be framed and increasingly cannot be done silently in a hidden frame either |
-| Where the address is checked is the server, not here | A sign-in that sends a browser wherever a parameter says makes this deployment's own domain vouch for somebody else's page; see `DESIGN-access.md` |
+| Where the address is checked is the server, not here | A sign-in that sends a browser wherever a parameter says makes this deployment's own domain vouch for somebody else's page; see `design-docs/access.md` |
 
 ## File attachment
 
@@ -1967,7 +1967,7 @@ What this deployment is doing, rather than what it has found.
 | What a full queue needs is both numbers | An operator adds workers or raises the limit, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the limit is a state rather than a proportion |
 | A resolved issue is counted at the severity it held while it was open | The step it left in no longer has one, and counting it as unrated would make every answered critical disappear from the answered column |
 | The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
-| Patch branch lookups are shown in the order the pass works: Now, Next, Failed, and Done folded away | A host that stops answering leaves labels missing from findings, and nothing on a finding says so. Now carries the step and a bar of commits looked up against those due, and the panel asks again every ten seconds while a visit is under way. Next is numbered. A failure's first line shows, the whole on hover, with when it is retried. Every repository is reachable, a page at a time; `DESIGN-findings.md` § Patch branches holds what each part means |
+| Patch branch lookups are shown in the order the pass works: Now, Next, Failed, and Done folded away | A host that stops answering leaves labels missing from findings, and nothing on a finding says so. Now carries the step and a bar of commits looked up against those due, and the panel asks again every ten seconds while a visit is under way. Next is numbered. A failure's first line shows, the whole on hover, with when it is retried. Every repository is reachable, a page at a time; `design-docs/findings.md` § Patch branches holds what each part means |
 
 ## The administration screens
 
@@ -2008,12 +2008,12 @@ said so.
 | **The band a row is drawn in and the word it says are two answers** | They differ for exactly the two words a scanner reports below low. Both rank inside the low band everywhere that sorts and filters, so that is the color; what the row says is what was rated. Folded together, "rated negligible" read as "Unrated" — which tells a reader nobody has looked at a finding somebody looked at and dismissed |
 | Known-exploited is its own badge, not a replacement for the severity word | Replacing it answers one question by destroying another: an exploited medium is still a medium, and the reader needs both facts to see why it sits above an unexploited high |
 | The feed's flag reads "Known exploited", on the badge and on every caption, column and tile that counts it | The same words the findings filter uses. A bare "Exploited" reads as an attack on this product |
-| An incident is a badge of its own, filled; the feed's flag is an outline of the same color | The record is the rarer fact and the one a person attested. The feed's flag arrives on its own on many rows, so the louder form on it reads as "we are under attack" across a whole list. `DESIGN-incidents.md` § Three conflated facts holds the distinction |
+| An incident is a badge of its own, filled; the feed's flag is an outline of the same color | The record is the rarer fact and the one a person attested. The feed's flag arrives on its own on many rows, so the louder form on it reads as "we are under attack" across a whole list. `design-docs/incidents.md` § Three conflated facts holds the distinction |
 | The feed's badge says on hover that it is not, on its own, a sign this product was attacked | The one misreading the outline does not prevent by itself |
 | Where both apply, the record's badge comes first | Read left to right, the fact about this product code findings |
 | Every row the server marks with the record draws its badge, and every caption counting the feed's flag counts the record beside it where there is one | A row showing the feed's flag alone, where the record is in hand, says less about this product than the server did |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |
-| The word is what compares down a column | Two schemes weigh reachability and impact differently, so a column of numbers from both is not a ranking. `DESIGN-findings.md` § One ladder for every scheme holds the whole of it |
+| The word is what compares down a column | Two schemes weigh reachability and impact differently, so a column of numbers from both is not a ranking. `design-docs/findings.md` § One ladder for every scheme holds the whole of it |
 | Where this product has rated something itself, that is what orders its list, and both ratings are shown | Being able to say a published rating is wrong is pointless if everything that sorts and filters then ignores us. The world's stays beside it, because a rating of ours standing where the world's goes reads as the world's. The list that spans products reads each row against its own product's rating, because a rating belongs to one (REQ-29) |
 
 ## Units, dates and copy

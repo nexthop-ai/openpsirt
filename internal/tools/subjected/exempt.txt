@@ -1,5 +1,5 @@
 # Store methods that query with no subject, each with the reason it takes none.
-# One per line: package.Type.Method, a space, and the reason. DESIGN-access
+# One per line: package.Type.Method, a space, and the reason. design-docs/access
 # § Store methods with no subject holds the three kinds of reason there are.
 
 finding.Store.Apply A background pass: it records what a scanner run found, for the deployment.

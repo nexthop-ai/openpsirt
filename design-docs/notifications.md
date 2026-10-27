@@ -61,7 +61,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A reconcile writes a batch of rows a statement | One sweep can open, restate or clear every condition one person holds at once, and a statement a row is a round trip a row. Opening 152,859 `decision-waiting` conditions for 204 people took 700.9 and 704.4 s a row at a time, and 7.0 to 8.0 s a batch at a time, on PostgreSQL 16 at one processor over a 1 ms link. A sweep that changes nothing takes 7.0 to 7.5 s there |
 | A restated condition is written by a statement carrying every row's new sentence | Each row of a batch says something different, so the statement chooses each column's value by the row's identifier |
 | Who may do what is read once per sweep | Every condition reads the same people and grants, and administrators are the same people read again |
-| A role across every product counts in every audience as a role on each product | An audience worked out from per-product grants alone treats somebody reading through an estate role as nobody, so a report they hold is told to the product's triagers instead (`DESIGN-access.md` § A role across every product) |
+| A role across every product counts in every audience as a role on each product | An audience worked out from per-product grants alone treats somebody reading through an estate role as nobody, so a report they hold is told to the product's triagers instead (`design-docs/access.md` § A role across every product) |
 | Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a decision to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
 ## Triggers and kinds
@@ -88,9 +88,9 @@ true is cleared, and running the same pass twice changes nothing.
 | A reporter writing back | event | A message recorded as received on a report, to the report's audience (§ Report audience), apart from whoever recorded it. Undisclosed |
 | A message sent to a reporter | event | A message recorded as sent on a report, to the report's audience, apart from whoever recorded it. Undisclosed |
 | A note on a report | event | To the report's audience, apart from its author and anybody it names, who is told of the mention instead. An edit tells the names its new text holds, and nobody else. Undisclosed |
-| An issue somebody holds disclosed | event | To every person holding an occurrence of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
+| An issue somebody holds disclosed | event | To every person holding an occurrence of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `design-docs/access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
-| Somebody granted one code finding recorded as a flaw | event | The same reason, for a grant of one code finding (`DESIGN-analysis.md` § Code finding collaborators) |
+| Somebody granted one code finding recorded as a flaw | event | The same reason, for a grant of one code finding (`design-docs/analysis.md` § Code finding collaborators) |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
 | An analyzer run that marked much of a build no longer detected | event | Below, under analyzer alerts |
@@ -108,7 +108,7 @@ the one exception is below: an upload that changed much of what a build is made
 of.
 
 Work handed back because its holder stopped reading it notifies nobody, as no
-hand-back does (`DESIGN-access.md` § Lost reading). It leaves the holder's
+hand-back does (`design-docs/access.md` § Lost reading). It leaves the holder's
 counts, the absence alert and their digest at the next sweep, and waits in the
 unassigned list.
 
@@ -129,7 +129,7 @@ one in a single package, one function per destination.
 | Rule | |
 |---|---|
 | Built in one place | An address spelled by hand elsewhere in the server is a test failure. A link built by hand is the link nothing holds to the interface's routes |
-| Held to the interface's route table | Every builder is called with names holding every separator an address has, and each result is matched against the table the interface's router is built from, query parameters included (`DESIGN-interface.md` § The route table). A builder added without a sample fails the same test |
+| Held to the interface's route table | Every builder is called with names holding every separator an address has, and each result is matched against the table the interface's router is built from, query parameters included (`design-docs/interface.md` § The route table). A builder added without a sample fails the same test |
 | Each part escaped for where it lands | A path segment escaped as one, a query value as one. A product or issue name holding a slash otherwise opens a screen about something else |
 | An address naming a part of dots alone is the front page | A browser resolves "." and ".." before the request is sent, percent-encoded or not, so no escaping keeps the link on its screen. Every builder is also called with "." and "..", and the route check refuses a segment of dots |
 | A private notification's message carries the front page | The rule in § Outbound content. The front page's address comes from the same package |
@@ -216,7 +216,7 @@ found, and each is about internal work, so it is withheld on the terms of
 | The usual gap is the median of the newest ten | One long weekend or a burst of reruns does not move it, and a pipeline that moved from weekly to nightly is judged by what it does now |
 | A series with fewer than three applied runs on a build is never quiet | Two runs are one gap, which is a guess |
 | Builds retired at any level, and releases past their end of life, are left out | Nobody analyzes them on purpose |
-| The thresholds of a sharp drop are the analyzer drop share and floor, both passed | `DESIGN-analysis.md` § Run application |
+| The thresholds of a sharp drop are the analyzer drop share and floor, both passed | `design-docs/analysis.md` § Run application |
 
 ## Code finding notices
 
@@ -245,11 +245,11 @@ line is withheld as internal (§ The notification list).
 | A decision's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
 | A code finding sent back links to the code finding | A rule names no finding page |
 | Agreeing to a dismissal of a code finding tells nobody, and withdrawing one tells only where it was agreed to | An approval is what was asked for. A withdrawal puts work back in the queue, and a dismissal nobody agreed to never took it out |
-| A flaw record or an inclusion names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of an internal-only code finding's case (`DESIGN-analysis.md` § Disclosure inclusion) |
+| A flaw record or an inclusion names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of an internal-only code finding's case (`design-docs/analysis.md` § Disclosure inclusion) |
 | A code finding assigned names the analyzer's rule, its path and line, and the build it was assigned from | The line is internal work, and names no more than the code finding's page |
 | A code finding assigned is withheld as internal while it is open at internal visibility | Its recipient reads it at every visibility it holds, and a reader of disclosed work reads no internal row |
 | A suppression rule waiting for approval is one condition per rule | It dismisses nothing while it waits, so every code finding it names stays in the queue, and one approval answers all of them |
-| Code findings in a team's queue are counted one per occurrence, for each team and product, apart from the team's other queued work, and the condition names the team | A code finding is one piece of work at its occurrence (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
+| Code findings in a team's queue are counted one per occurrence, for each team and product, apart from the team's other queued work, and the condition names the team | A code finding is one piece of work at its occurrence (`design-docs/kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
 | A code finding a decision stands on, or one recorded as a flaw, is not waiting | A decision is somebody judging it, and a code finding recorded as a flaw is closed work for its holder |
 | Assignment to a team reaches a code finding notice through the team's queue alone | A flaw record, an inclusion and an assignment are each one act about one code finding, told to the people the table names. A series alert is about a series, which no team holds |
 
@@ -358,7 +358,7 @@ sent when it does not reaches somebody who was not looking.
 |---|---|
 | The vulnerability data has stopped moving | Nothing failed. Every scan since answers as confidently as ever against what was known a month ago, and a finding newer data would have opened has not |
 | Something is hidden with nobody's agreement | Anything that hides risk needs a second person, so one standing with none means the write path was got around |
-| An upstream cannot be read | Raised once the last read of the upstream a product trusts failed and nothing has been read for longer than two read intervals, so one failed read the next answers raises nothing; names the product, the address, the last error and when it was last read. Cleared by a read succeeding, which tells whoever held it, once, that it is read again, or by the upstream no longer being trusted (`DESIGN-upstream.md` § Failure notices) |
+| An upstream cannot be read | Raised once the last read of the upstream a product trusts failed and nothing has been read for longer than two read intervals, so one failed read the next answers raises nothing; names the product, the address, the last error and when it was last read. Cleared by a read succeeding, which tells whoever held it, once, that it is read again, or by the upstream no longer being trusted (`design-docs/upstream.md` § Failure notices) |
 | A supplier has stopped answering | One that stopped and one that published nothing look the same everywhere but the supplier's own panel. Raised once a configured supplier has gone unread past a setting, a week by default and never shorter than two scan intervals; cleared by a read succeeding, the supplier being withdrawn or its product being retired, since a retired product's suppliers are never read again |
 | One pair is agreeing to most of a product's work | The second person is there, and in form only. Not a report that must be empty, and it carries thresholds for that reason: below them one pair doing everything is what a small team looks like |
 
@@ -469,12 +469,12 @@ cycle.
 |---|---|
 | One per person per sweep, counting their rows | A version bump lapses many decisions at once, and one message per decision is a channel nobody reads. A sweep lapses in bounded batches, and who to tell is gathered over all of them, so a person whose rows span batches is still told once |
 | A sweep that fails part way still tells | The batches before the failure are committed, and a lapse nobody hears of is the outcome the message exists to prevent |
-| Says why: the code moved, or the issue was rated worse | The two ask different things of the person re-affirming. `DESIGN-triage.md` § Lapse marking holds both |
+| Says why: the code moved, or the issue was rated worse | The two ask different things of the person re-affirming. `design-docs/triage.md` § Lapse marking holds both |
 | Links to the review queue's To reaffirm tab | The work is re-affirming every decision that lapsed, not reading one of them. A link to one of three hundred leaves the rest to be found |
 | Sent by the scan's sweep and by a rating put in or out of force here | The two places a decision lapses by its own proposer's work coming back |
 
 A merge that ends one of two answers in a product tells the product's
-triagers rather than whoever made it. `DESIGN-findings.md` § Merged issues
+triagers rather than whoever made it. `design-docs/findings.md` § Merged issues
 holds the rules.
 
 | Merge message | |
@@ -555,7 +555,7 @@ these hold for the notification area, mail and chat alike.
 
 | Rule | |
 |---|---|
-| A day is the UTC day a moment falls on | One moment is one day to every reader, whatever zone the server's clock is in, and it is the day the interface shows for it (`DESIGN-interface.md`) |
+| A day is the UTC day a moment falls on | One moment is one day to every reader, whatever zone the server's clock is in, and it is the day the interface shows for it (`design-docs/interface.md`) |
 | A time within a day is to the minute in UTC, and says UTC | A response window ends at an hour, and a time with no zone reads as the reader's own |
 
 ## The notification list
@@ -609,7 +609,7 @@ of this table's rules are.
 |---|---|
 | A sweep reconciles everybody it has told, not only everybody it should tell | Reconcile makes one person's open set exactly what it is handed, so somebody never handed a list is never reconciled and their alert stands after the thing was answered. This arises the moment who hears about something depends on who holds it |
 | Who it has told is read for the kind being derived | Two conditions one argument apart reading the same list leaves anybody who is neither an administrator nor currently holding the thing never handed a list and never reconciled. One call for every condition is what stops a third from spelling it a third way |
-| Who it has told is read through an index on the kind, whether a row is open, and the person | A sweep asks it once per kind, and every other index on the table leads with the person. Without it each asking reads the whole table, cleared rows included. With 152,859 open conditions over 204 people on PostgreSQL, a steady sweep takes 5.0 to 5.2 s without the index and 4.3 to 4.4 s with it, and a sweep opening 85,869 conditions 401 to 404 s either way. `DESIGN-database.md` § Indexes has the read on each engine |
+| Who it has told is read through an index on the kind, whether a row is open, and the person | A sweep asks it once per kind, and every other index on the table leads with the person. Without it each asking reads the whole table, cleared rows included. With 152,859 open conditions over 204 people on PostgreSQL, a steady sweep takes 5.0 to 5.2 s without the index and 4.3 to 4.4 s with it, and a sweep opening 85,869 conditions 401 to 404 s either way. `design-docs/database.md` § Indexes has the read on each engine |
 | A sweep with no administrator recorded still derives everything that is not an administrator's | Returning early skips the per-person conditions as well, and every alert a triager holds then stands with nothing able to resolve it. Only the conditions addressed to administrators alone depend on there being one |
 | Nobody who has left is in any audience | Their grants and administrator flag stay in place on purpose, so an audience read from grants alone would keep naming them. Every sweep starts from the people still here, an event for somebody who has left records nothing, and the mail, digest and direct-chat sweeps skip them in the query, which covers rows opened before they left |
 | Nobody is told they were unassigned | A name being removed is not an action directed at the person who held it, and a queue that gets shorter says so already |
@@ -653,7 +653,7 @@ request-forgery primitive unless governed:
 | https only | The body is authenticated and not encrypted, and what it says is what somebody is being told about a vulnerability |
 | A redirect is refused, never followed | A redirect asks this deployment to send a signed request somewhere else. A receiver that moved should be reconfigured, which is visible |
 | A private address is allowed | The one place this differs from a sign-in provider's endpoints. A provider's address arrives in a discovery document from outside; this one was typed by the operator, whose chat server is reasonably on their own network |
-| The request goes through the process's one outbound client | Its configured form, which carries every control above and the User-Agent every request out carries. `DESIGN-access.md` § Outbound provider fetches. A second client built here is one a change to the shared refusals misses |
+| The request goes through the process's one outbound client | Its configured form, which carries every control above and the User-Agent every request out carries. `design-docs/access.md` § Outbound provider fetches. A second client built here is one a change to the shared refusals misses |
 
 | Rule | Reason |
 |---|---|
@@ -670,7 +670,7 @@ request-forgery primitive unless governed:
 | What a sweep reads is what this destination has not settled | Read as "everything not cleared", the window is the oldest two hundred, and an event is never cleared because only a condition is. Past two hundred events the same two hundred are re-read every cycle and nothing created afterwards is ever carried, with no error, no log and no counter |
 | A destination's kind is a kind some notification is of, or every kind | A mistyped kind would be listed as configured and working and never receive anything, so it is refused naming the kinds there are |
 | A destination's reason is why the last delivery that settled failed | Nothing once one has gone since, because the destination works again |
-| A destination's name is matched folded and shown as typed | An administrator types it, so the key it is unique under and retired by is the name folded to lower case, written where it is stored, and the spelling typed is kept beside it for the listing. Two names differing in capitals are one destination. Migration 43 folds the names v0.8.0 stored; two that fold to one key under one kind stay two, as `DESIGN-database.md` § Migrations says, and the one given a numbered key is listed under it |
+| A destination's name is matched folded and shown as typed | An administrator types it, so the key it is unique under and retired by is the name folded to lower case, written where it is stored, and the spelling typed is kept beside it for the listing. Two names differing in capitals are one destination. Migration 43 folds the names v0.8.0 stored; two that fold to one key under one kind stay two, as `design-docs/database.md` § Migrations says, and the one given a numbered key is listed under it |
 | A destination's kind is normalized where it is written | Stored as typed and compared loosely, a destination added under one spelling is retired by another only by accident, and one believed retired goes on receiving everything it takes, undisclosed findings included |
 | Reading and changing where things go is refused in the data layer | It is this table's own rule and the rest of them live there (REQ-42 and REQ-43). What an operator's question needs is named field by field rather than embedding the row, so the signing secret cannot reach a caller that forgets to drop it |
 
@@ -845,7 +845,7 @@ happens to have spoken about.
 
 A response window a deployment declares runs from the moment an incident says
 its product was attacked, from the first notice for the window it counts from, or from the
-release of a fix the record names (REQ-77). `DESIGN-incidents.md` holds the windows and the
+release of a fix the record names (REQ-77). `design-docs/incidents.md` holds the windows and the
 notices; what is said about them is here.
 
 | Rule | Reason |

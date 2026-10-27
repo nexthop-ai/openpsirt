@@ -24,7 +24,7 @@ const Baseline = 41
 // Numbered as v0.7.0's last migration, so a database v0.7.0 or v0.8.0 built
 // has it recorded already and applies only what follows. A database an
 // earlier release built records a version below it, and is refused before
-// anything runs (DESIGN-database.md § The baseline).
+// anything runs (design-docs/database.md § The baseline).
 //
 // The baseline files beside this one hold each table's declaration, with the
 // reasoning for its shape. v0.7.0's record of the schema it built on each

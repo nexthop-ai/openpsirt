@@ -8,7 +8,7 @@ import { issueAt } from "../app/routes";
 import { LINK_SCHEMES } from "./schemes";
 
 // The API returns no markup, so this carries the half of the policy that
-// travels with rendering (DESIGN-text.md). The other half — what may be submitted at all, which links survive, what a
+// travels with rendering (design-docs/text.md). The other half — what may be submitted at all, which links survive, what a
 // reference resolves to — still runs on the server before anything is stored,
 // because it needs data and authorization checks no browser holds.
 //
@@ -216,7 +216,7 @@ function anchor(node: Element) {
     //
     // One finding referring to another is ordinary, the submission check
     // accepts it, and deleting the anchor while leaving the text is the
-    // disagreement DESIGN-text.md records as the one nothing reports:
+    // disagreement design-docs/text.md records as the one nothing reports:
     // accepted when it was written, no longer a link when anybody read it.
     //
     // Resolved against this page rather than matched against a pattern,

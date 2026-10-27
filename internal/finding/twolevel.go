@@ -18,7 +18,7 @@ import (
 // integers — the issue and the component — and only those partial groups are
 // joined to the component and grouped again on the fold. A fold is a handful
 // of components at most, so the second grouping sorts thousands of rows rather
-// than hundreds of thousands. DESIGN-findings.md § Two-level grouping holds the
+// than hundreds of thousands. design-docs/findings.md § Two-level grouping holds the
 // measurement.
 //
 // Every aggregate a group reports or is filtered on decomposes exactly. A

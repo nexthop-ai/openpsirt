@@ -7,9 +7,9 @@ per issue, and an OpenVEX document per branch or tag.
 Satisfies REQ-31, REQ-37, REQ-39, REQ-42, REQ-43, REQ-63, REQ-69, REQ-74.
 
 Neighboring pieces: what an advisory and the VEX document of one build say is
-in `DESIGN-remediation.md`; the subject anybody at all reads as is in
-`DESIGN-access.md`; the routes beside the API are in `DESIGN-api.md`; how
-another deployment reads these documents is in `DESIGN-upstream.md`.
+in `design-docs/remediation.md`; the subject anybody at all reads as is in
+`design-docs/access.md`; the routes beside the API are in `design-docs/api.md`; how
+another deployment reads these documents is in `design-docs/upstream.md`.
 
 ## Contents
 
@@ -44,7 +44,7 @@ product publishes, and the document is about disclosed work in that product
 The deployment's own address is required to publish, over https, with a
 publisher's name and namespace: every address a document states is built from
 it, and every document names the publisher. A deployment that also writes the
-static directory of `DESIGN-remediation.md` keeps writing it; an advisory then
+static directory of `design-docs/remediation.md` keeps writing it; an advisory then
 states the address this deployment serves it at, and the directory is a copy.
 
 A key that does not read, is locked with no passphrase or the wrong one, or
@@ -94,7 +94,7 @@ each states when the newest was released.
 
 An advisory is served from the bytes that went out, read through the same rule
 the static directory reads them by: the newest revision of each advisory whose
-label lets it travel (`DESIGN-remediation.md` § The provider directory).
+label lets it travel (`design-docs/remediation.md` § The provider directory).
 
 | Rule | |
 |---|---|
@@ -105,7 +105,7 @@ label lets it travel (`DESIGN-remediation.md` § The provider directory).
 ## Statements and statuses
 
 What is stated about one build is what somebody decided: the document of one
-build (`DESIGN-remediation.md` § The VEX document), with a decision that an issue
+build (`design-docs/remediation.md` § The VEX document), with a decision that an issue
 applies and stays stated outright. A component nobody has judged gets no
 statement, so a scanner reports it as it would without these documents.
 
@@ -147,7 +147,7 @@ as it stands (REQ-31).
 
 | Rule | |
 |---|---|
-| A decision may state its scope | Stated when the decision is proposed, and part of what the second person agrees to. Changing it is proposing again, as changing any part of a decision is (`DESIGN-triage.md`) |
+| A decision may state its scope | Stated when the decision is proposed, and part of what the second person agrees to. Changing it is proposing again, as changing any part of a decision is (`design-docs/triage.md`) |
 | A stated scope wins either way | Narrowed to this build, a statement whose reason holds for anybody is stated about the build; widened, one whose reason is the build's is stated about the component |
 | A component is stated alone only where every build agrees | Within one document, every statement about the component as a whole holds for anybody and says the same thing, or each is stated about its own build. One build calling it not affected while another has the issue open there is a contradiction, and a reader is told the cautious half |
 | A statement about one occurrence is always stated beneath the component that pulls it in | Other occurrences of the same component disagree with it, which is why it is about one occurrence |

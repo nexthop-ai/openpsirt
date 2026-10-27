@@ -28,7 +28,7 @@
 
 ## 1. Purpose
 
-What OpenPSIRT must cover. Not how it covers it — that is in the `DESIGN-*.md`
+What OpenPSIRT must cover. Not how it covers it — that is in the `design-docs/*.md`
 documents, which name the requirements they satisfy. What is left to build is
 in `TODO.md`.
 

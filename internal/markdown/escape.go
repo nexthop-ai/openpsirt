@@ -18,7 +18,7 @@ import "strings"
 // A character is escaped where it can open syntax, and left alone where it
 // cannot. A release note is also read as source, and `1\.2\.3` for every
 // version would make the plain reading wrong to protect a rendering that does
-// not need it. DESIGN-text.md § Rendered and escaped text lists what is
+// not need it. design-docs/text.md § Rendered and escaped text lists what is
 // escaped and where.
 //
 // The first character is judged as though the string began a line, because

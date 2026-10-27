@@ -153,7 +153,7 @@ A remote image fires from the browser of everybody who reads the text, from
 inside the network, reporting to whoever wrote it who is reading which finding
 and when. On an undisclosed finding that is a disclosure channel. A file attached
 here is fetched through a path that authorizes the reader — see
-`DESIGN-attachments.md`.
+`design-docs/attachments.md`.
 
 ## Representation
 
@@ -188,10 +188,10 @@ interface escapes what it shows, and the two origins stay distinguishable so a
 renderer can tell which it is holding.
 
 The server puts third-party text into two documents of its own: the release
-note and the issue document, both served as markdown (`DESIGN-analytics.md`).
+note and the issue document, both served as markdown (`design-docs/analytics.md`).
 Each value there that did not pass the submission policy is escaped as it is
 written, so a renderer shows it as the text it is. A webhook's subject and
-text are escaped by the same rule, line by line (`DESIGN-notifications.md`).
+text are escaped by the same rule, line by line (`design-docs/notifications.md`).
 
 | Escaped | Where | Opens |
 |---|---|---|

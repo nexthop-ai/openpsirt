@@ -36,62 +36,62 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | Path | Holds |
 |---|---|
 | `cmd/openpsirt/` | The binary. Flag parsing, configuration, server lifecycle |
-| `cmd/openpsirt-upload/` | The upload client a pipeline runs. See `DESIGN-analysis.md` § Upload client |
+| `cmd/openpsirt-upload/` | The upload client a pipeline runs. See `design-docs/analysis.md` § Upload client |
 | `internal/version/` | What this build is. Values injected at link time |
 | `internal/config/` | Settings, read from the environment with working defaults |
-| `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `DESIGN-api.md` § File organization |
+| `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `design-docs/api.md` § File organization |
 | `internal/httpapi/core/` | What every area of the API shares: the dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies more than one area answers with |
 | `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/analyticsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, decisions, reports, advisories, administration |
 | `internal/httpapi/httpapitest/`, `internal/httpapi/refusaltest/` | The test harness the areas share — a server over a seeded cast — and the checks each area runs over its own refusal mappers |
-| `internal/database/` | Opening, identifying and validating a database. See `DESIGN-database.md` |
+| `internal/database/` | Opening, identifying and validating a database. See `design-docs/database.md` |
 | `internal/database/migrate/` | The migration runner and the locks around it |
 | `internal/database/migrate/migrations/` | The migrations |
 | `internal/schema/` | Applies this application's schema. Exists so that using the runner registers the migrations |
 | `internal/dbtest/` | Runs a test against every database available to it |
-| `internal/catalog/` | Products, branches and tags, and variants. See `DESIGN-data-model.md` |
-| `internal/ingest/` | Arriving scans. See `DESIGN-ingest.md` |
-| `internal/queue/` | Durable background work. See `DESIGN-queue.md` |
-| `internal/sbom/`, `internal/scanner/` | Reading an inventory and scanning it. See `DESIGN-ingest.md` |
-| `internal/docread/` | Reading a document somebody else wrote as a bounded stream, for every reader of one. See `DESIGN-ingest.md` |
-| `internal/sarif/` | Reading an analyzer's SARIF and placing its results in the checkout. See `DESIGN-analysis.md` |
-| `internal/series/` | Runs of one analysis across builds: their order, whether each is comparable, and what each saw. See `DESIGN-kinds.md` |
-| `internal/analysis/` | Applying an analyzer's run to its build as findings of the analysis kind. See `DESIGN-analysis.md` |
-| `internal/sourcelink/` | What a product says about its repositories, and the source addresses built from it. See `DESIGN-analysis.md` |
-| `internal/uploadclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `DESIGN-analysis.md` § Upload client |
-| `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `DESIGN-data-model.md`, `DESIGN-findings.md` |
-| `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `DESIGN-findings.md` § Merged issues |
-| `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |
-| `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector, and the band a score falls in. A computation with no database, which findings, advisories and the API each call. See `DESIGN-findings.md` |
-| `internal/triage/`, `internal/advisory/` | Decisions, approvals, and the CSAF document. See `DESIGN-triage.md` |
-| `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
-| `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
-| `internal/weblink/` | The addresses into the interface that the server hands out, held to the interface's route table. See `DESIGN-notifications.md` § Links |
-| `internal/incident/` | The response windows a deployment counts after an incident, the notices given, and the shelf over both. See `DESIGN-incidents.md` |
+| `internal/catalog/` | Products, branches and tags, and variants. See `design-docs/data-model.md` |
+| `internal/ingest/` | Arriving scans. See `design-docs/ingest.md` |
+| `internal/queue/` | Durable background work. See `design-docs/queue.md` |
+| `internal/sbom/`, `internal/scanner/` | Reading an inventory and scanning it. See `design-docs/ingest.md` |
+| `internal/docread/` | Reading a document somebody else wrote as a bounded stream, for every reader of one. See `design-docs/ingest.md` |
+| `internal/sarif/` | Reading an analyzer's SARIF and placing its results in the checkout. See `design-docs/analysis.md` |
+| `internal/series/` | Runs of one analysis across builds: their order, whether each is comparable, and what each saw. See `design-docs/kinds.md` |
+| `internal/analysis/` | Applying an analyzer's run to its build as findings of the analysis kind. See `design-docs/analysis.md` |
+| `internal/sourcelink/` | What a product says about its repositories, and the source addresses built from it. See `design-docs/analysis.md` |
+| `internal/uploadclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `design-docs/analysis.md` § Upload client |
+| `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `design-docs/data-model.md`, `design-docs/findings.md` |
+| `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `design-docs/findings.md` § Merged issues |
+| `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `design-docs/findings.md` |
+| `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector, and the band a score falls in. A computation with no database, which findings, advisories and the API each call. See `design-docs/findings.md` |
+| `internal/triage/`, `internal/advisory/` | Decisions, approvals, and the CSAF document. See `design-docs/triage.md` |
+| `internal/access/`, `internal/signin/` | Subjects and sign-in. See `design-docs/access.md` |
+| `internal/notify/` | Notifications. See `design-docs/notifications.md` |
+| `internal/weblink/` | The addresses into the interface that the server hands out, held to the interface's route table. See `design-docs/notifications.md` § Links |
+| `internal/incident/` | The response windows a deployment counts after an incident, the notices given, and the shelf over both. See `design-docs/incidents.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
-| `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
-| `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |
-| `internal/saved/` | A narrowing of a list somebody kept, and the decision it prepares. See `DESIGN-remediation.md` |
-| `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
-| `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `DESIGN-remediation.md` |
-| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, and the lists a provider serves, which the directory writes and the published surface serves. The supplier reader reads the fields it uses under the names these declare. See `DESIGN-remediation.md` |
-| `internal/publish/` | The security documents served to anybody: what each states, the revisions kept, and the pass that writes them. See `DESIGN-publishing.md` |
-| `internal/httpapi/published/` | The surface that serves them, beside the API rather than in it. See `DESIGN-publishing.md` |
-| `internal/signing/` | Signing what is published with the key an operator supplied. See `DESIGN-publishing.md` |
-| `internal/supplier/` | The publishers whose advisories are read on a schedule, and what a pass over one takes. See `DESIGN-ingest.md` |
-| `internal/upstream/` | The upstream a product trusts, and the pass that reads its VEX documents. See `DESIGN-upstream.md` |
-| `internal/cverecord/` | The CVE record snapshot: fetching it, reading it, and what a record says about a component's version. See `DESIGN-findings.md` § CVE record ranges and `DESIGN-ingest.md` § CVE records |
-| `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `DESIGN-findings.md` |
-| `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `DESIGN-remediation.md` |
-| `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
-| `internal/typedname/` | The one form a name somebody typed is stored and matched in, for every store that keys a row on one. See `DESIGN-data-model.md` |
+| `internal/attach/` | Files that hang off an issue, and what may be served back. See `design-docs/attachments.md` |
+| `internal/trail/` | What somebody changed about how this deployment works. See `design-docs/access.md` |
+| `internal/saved/` | A narrowing of a list somebody kept, and the decision it prepares. See `design-docs/remediation.md` |
+| `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `design-docs/remediation.md` |
+| `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `design-docs/remediation.md` |
+| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, and the lists a provider serves, which the directory writes and the published surface serves. The supplier reader reads the fields it uses under the names these declare. See `design-docs/remediation.md` |
+| `internal/publish/` | The security documents served to anybody: what each states, the revisions kept, and the pass that writes them. See `design-docs/publishing.md` |
+| `internal/httpapi/published/` | The surface that serves them, beside the API rather than in it. See `design-docs/publishing.md` |
+| `internal/signing/` | Signing what is published with the key an operator supplied. See `design-docs/publishing.md` |
+| `internal/supplier/` | The publishers whose advisories are read on a schedule, and what a pass over one takes. See `design-docs/ingest.md` |
+| `internal/upstream/` | The upstream a product trusts, and the pass that reads its VEX documents. See `design-docs/upstream.md` |
+| `internal/cverecord/` | The CVE record snapshot: fetching it, reading it, and what a record says about a component's version. See `design-docs/findings.md` § CVE record ranges and `design-docs/ingest.md` § CVE records |
+| `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `design-docs/findings.md` |
+| `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `design-docs/remediation.md` |
+| `internal/outward/` | The one HTTP client this process reaches the internet with. See `design-docs/access.md` |
+| `internal/typedname/` | The one form a name somebody typed is stored and matched in, for every store that keys a row on one. See `design-docs/data-model.md` |
 | `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes or characters without splitting a character |
-| `internal/redact/` | An address that may carry a credential, as text safe to log or refuse with. See `DESIGN-access.md` § Secrets and logs |
-| `internal/refusal/` | A sentence a caller may read, told apart from a fault whose text is withheld. See `DESIGN-api.md` |
-| `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
-| `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `DESIGN-remediation.md` |
+| `internal/redact/` | An address that may carry a credential, as text safe to log or refuse with. See `design-docs/access.md` § Secrets and logs |
+| `internal/refusal/` | A sentence a caller may read, told apart from a fault whose text is withheld. See `design-docs/api.md` |
+| `internal/webui/` | The built interface, embedded. See `design-docs/interface.md` |
+| `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `design-docs/remediation.md` |
 | `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the commands the makefile runs: the gates that are not linters, and the release, rehearsal and image-inventory tools |
-| `web/` | The interface source. See `DESIGN-interface.md` |
-| `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
+| `web/` | The interface source. See `design-docs/interface.md` |
+| `deploy/helm/openpsirt/` | The chart. See `design-docs/packaging.md` |
 | `docs/` | The published documentation site |
 | `assets/` | Logo files |
 | `tools/` | One module per Go tool the gate and the image run, each requiring that tool at one version. See § Tool pins |
@@ -167,8 +167,8 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make clang-checkers` | Fails naming each clang static analyzer checker for C the weakness table has not looked at. Run against each new clang release. `CLANG` names the binary |
 | `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
 | `make check-packaging` | The container image and the Helm chart. Needs `$(DOCKER)` — docker unless set — and helm, and says so where it has neither. `make dist` refuses to run without them, because it gates the image it builds |
-| `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `DESIGN-packaging.md` |
-| `make release-freeze VERSION=vX.Y.Z` | The record of a release's migrations: the schema they build on every engine, then each file and its digest, then the check below. Run on a branch from the head of `main`, with the four engines up, and landed before the tag. See `DESIGN-database.md` § Release records |
+| `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `design-docs/packaging.md` |
+| `make release-freeze VERSION=vX.Y.Z` | The record of a release's migrations: the schema they build on every engine, then each file and its digest, then the check below. Run on a branch from the head of `main`, with the four engines up, and landed before the tag. See `design-docs/database.md` § Release records |
 | `make release-check VERSION=vX.Y.Z` | That the release a tag names was frozen and the tree still ships what it froze. The release workflow runs it before it builds anything |
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
@@ -307,7 +307,7 @@ is the half of REQ-75 an action cannot meet.
 
 Two workflows beside this one report no build of their own. `PR` is the
 aggregator that waits for every check here and is the only one the ruleset
-names; `Release` runs on a tag and is described in `DESIGN-packaging.md`.
+names; `Release` runs on a tag and is described in `design-docs/packaging.md`.
 Both declare `merge_group:` as this one does — a workflow that does not
 contributes no check to a queue entry, and the aggregator cannot tell that
 from one that has not started.
@@ -347,8 +347,8 @@ checks.
 | Prettier | Formatting, for TypeScript and CSS. The counterpart to `gofmt` |
 | Stylelint | CSS correctness: unknown properties, duplicate selectors, notation. Nothing about whitespace |
 | `npm run classes` | Three questions about class names, below |
-| `npm run lint`, after ESLint | A query's data defaulted to an empty list in a file that never consults that read's failure: its error, `known`, a count, a failure line beside a picker, or handing it whole to the component that draws a read's three arms. A read allowed to be quiet carries `silent-read:` and its reason. `DESIGN-interface.md` § A read that failed holds the rule |
-| `npm run copy` | A paragraph, hint or empty-state detail on a screen putting more than 20 words up at once. `DESIGN-interface.md` § Screen copy says what it measures |
+| `npm run lint`, after ESLint | A query's data defaulted to an empty list in a file that never consults that read's failure: its error, `known`, a count, a failure line beside a picker, or handing it whole to the component that draws a read's three arms. A read allowed to be quiet carries `silent-read:` and its reason. `design-docs/interface.md` § A read that failed holds the rule |
+| `npm run copy` | A paragraph, hint or empty-state detail on a screen putting more than 20 words up at once. `design-docs/interface.md` § Screen copy says what it measures |
 | Query keys, in the web tests | An invalidation whose key no read's key starts with. The query cache matches an invalidation by prefix, so a key nothing reads refreshes nothing, and a control that saved looks as though it did not. Compared as far as each key is literal |
 
 The web tests run each file in a VM context of its own, inside a child process
@@ -428,7 +428,7 @@ An address into the interface that no route answers, or one put together
 outside the route module. A web test reads every module for both, and holds
 every query parameter the route table lists to a read on the screen that route
 renders; a Go test holds every link the server builds to the same table and
-fails on one spelled outside its package. `DESIGN-interface.md` § The route
+fails on one spelled outside its package. `design-docs/interface.md` § The route
 table has the rules.
 
 ## Database engines
@@ -1087,7 +1087,7 @@ They are not the only routes answering without a credential; the sign-in paths
 and the interface's assets do too, and none of those reads anything from the
 database about what this deployment holds (REQ-43). The published security
 documents are the one surface that does, as anybody at all
-(`DESIGN-publishing.md`).
+(`design-docs/publishing.md`).
 
 ## Documentation
 
@@ -1097,7 +1097,7 @@ Built with mkdocs-material and published to GitHub Pages, with sets versioned by
 | Set | Published by |
 |---|---|
 | `main` | Every push to `main` |
-| Each release, by version | The release workflow, which also moves `latest` to the newest release (`DESIGN-packaging.md` § The release procedure) |
+| Each release, by version | The release workflow, which also moves `latest` to the newest release (`design-docs/packaging.md` § The release procedure) |
 
 | Rule | |
 |---|---|
@@ -1148,7 +1148,7 @@ A test in `internal/docs` fails on a release version written by hand in
 compatibility notes on it and on the site say that a database built by any
 release is upgraded in place, which holds while every release's migrations are
 kept, and that one a release candidate built is recreated, because a
-candidate's migration can be fixed before the release (`DESIGN-database.md`
+candidate's migration can be fixed before the release (`design-docs/database.md`
 § Migrations).
 
 ### Scanner pins

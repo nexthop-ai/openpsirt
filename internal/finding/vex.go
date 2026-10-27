@@ -663,7 +663,7 @@ func placedAbove(one Statement, above []graph.Component) bool {
 //
 // A claim against a source tree is kept however it was named: with no package
 // identifier at all, and with one of the generic type. The two are the same
-// claim and the matching rules match them the same way (DESIGN-ingest.md), so
+// claim and the matching rules match them the same way (design-docs/ingest.md), so
 // narrowing the generic spelling away here hides the evidence for a
 // suppression already applied — the finding is gone and what a publisher said
 // about it is not on the page.

@@ -109,7 +109,7 @@ there are replicas, and the pairing the chart can see it refuses at render time.
 ## CVE record snapshot
 
 The CVE record snapshot is kept on the scanner's data volume, in a directory of
-its own inside the scanner's (`DESIGN-ingest.md` § CVE records). The chart names
+its own inside the scanner's (`design-docs/ingest.md` § CVE records). The chart names
 it from the scanner's directory, after anything given in `extraEnv`, so the two
 cannot name different volumes. The directory is made on the first fetch, so the
 image makes nothing for it.
@@ -117,7 +117,7 @@ image makes nothing for it.
 ## Repository copies
 
 Labeling a patch link with the branches that hold its commit keeps copies of
-repositories (REQ-78). `DESIGN-findings.md` § Patch branches holds how they are
+repositories (REQ-78). `design-docs/findings.md` § Patch branches holds how they are
 used; this is where they live.
 
 | Rule | |
@@ -141,7 +141,7 @@ excess by killing the larger of the two.
 | Rule | |
 |---|---|
 | The limit is sized for both processes | Sized for the server alone, a scan is what dies. The failure reads as a run that failed while the pod stays up, so nothing points at the limit |
-| The server's share is the ingest budget | About 250 MB for one document being read, which `DESIGN-ingest.md` sets and every bound of it is configurable. Raising those bounds raises the limit |
+| The server's share is the ingest budget | About 250 MB for one document being read, which `design-docs/ingest.md` sets and every bound of it is configurable. Raising those bounds raises the limit |
 | The scanner's share is not bounded by anything here | It is somebody else's program, and its report is bounded only once it has been written. What it needs to produce one is a number this project has not measured |
 | Importing the vulnerability database is the largest single draw | It happens on every start where the data is not kept, so a deployment that restarts pays that peak repeatedly. Keeping the data is what takes it off the common path |
 | A first copy of a large repository is the other large draw, and the chart says so beside the limit | Off unless patch branches are turned on. Measured for the kernel's stable tree: 1.3 GB fetched whole from git.kernel.org, 0.6 GB where the host sends commits alone. Either can coincide with a scan, so the operator documentation asks for 4 GiB before turning it on for the first |
@@ -233,7 +233,7 @@ upgrading response below.
 | Every refusal that reads no database comes before the port opens | The sign-in providers and the address they return to, the stores, the interface, the queue's sizes against the scanner's timeout, and the signing key. A bad value is refused in seconds rather than after a migration |
 | A refusal after the port opened closes it and exits 1 | The refusals that read the schema come after the migration: the administrators, the group mappings, and a sign-in provider other than the one identities were bound under |
 | An address somebody else holds is refused as the port opens, before the migration | A start that cannot serve does not spend a migration finding out |
-| A stop signal during the start ends it and exits 0, before the port opens or after | It reaches the migration, or a wait for another process's, through its context, and the error a stopped step answers is logged. On PostgreSQL and SQLite the migration's transaction rolls back, and on MySQL and MariaDB the schema is left part changed (`DESIGN-database.md` § Migrations that stop half way). The next start applies it again |
+| A stop signal during the start ends it and exits 0, before the port opens or after | It reaches the migration, or a wait for another process's, through its context, and the error a stopped step answers is logged. On PostgreSQL and SQLite the migration's transaction rolls back, and on MySQL and MariaDB the schema is left part changed (`design-docs/database.md` § Migrations that stop half way). The next start applies it again |
 | A subcommand this does not know is refused | Ignored, a typo in a job meant to apply migrations starts a server instead, against whatever schema is there |
 | Ten background loops run beside the server; two of them may be absent | The mail sender where no channel is configured, and the attachment sweeper where no store is. Every other pass runs whatever a deployment has — a list rather than ten guarded starts, so what runs can be read without opening the package behind each one |
 | Every exit waits for the background work, including a failure to serve | Each pass begins with a timer that fires at once, so returning early leaves them mid-query while the deferred close takes the database away, and an orderly failure becomes failed scans and jobs retried for no reason |
@@ -454,7 +454,7 @@ with its leading `v` removed (REQ-01 and REQ-02).
 | Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. Everything else here supports it. `linux/amd64` today — see below |
 | Helm chart | `openpsirt-<version>.tgz`, pushed to `oci://ghcr.io/nexthop-ai/charts` | The registry that already holds the image, rather than an index somebody has to host and keep |
 | Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. The interface is inside the binary, so the archive serves the same pages the image does. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
-| Upload client archive | `openpsirt-upload_<version>_<system>_<arch>.tar.gz`, and `.zip` for Windows | The upload client with `LICENSE` and `NOTICE`, for Linux, macOS and Windows on amd64 and arm64. Cross-compiled with cgo off. A Windows archive is a zip, the archive Windows opens without a tool of its own, and the release check opens each one to find the program. Covered by the checksum file and its signature like every other asset. See `DESIGN-analysis.md` § Upload client |
+| Upload client archive | `openpsirt-upload_<version>_<system>_<arch>.tar.gz`, and `.zip` for Windows | The upload client with `LICENSE` and `NOTICE`, for Linux, macOS and Windows on amd64 and arm64. Cross-compiled with cgo off. A Windows archive is a zip, the archive Windows opens without a tool of its own, and the release check opens each one to find the program. Covered by the checksum file and its signature like every other asset. See `design-docs/analysis.md` § Upload client |
 | Binary inventory | `openpsirt_<version>.cdx.json` | What the binary ships: the modules it was linked from and the interface it embeds |
 | Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | What the image ships. One per architecture, because it is read off an assembled filesystem |
 | Upload client inventory | `openpsirt-upload_<version>_<system>_<arch>.cdx.json` | What one upload client binary ships: the modules it was linked from, the standard library among them, read off the binary. One per archive, because a binary's inventory names the system and architecture it was built for. The release check refuses one naming another system or architecture, or listing no standard library |
@@ -560,7 +560,7 @@ A release is a tag, on a commit that froze the release's migrations.
 Everything after the tag is the `Release` workflow.
 
 1. Rehearse the upgrade from every earlier release the baseline upgrades, on
-   each engine. `DESIGN-database.md` § Upgrade rehearsal says what it checks.
+   each engine. `design-docs/database.md` § Upgrade rehearsal says what it checks.
 
    ```
    make engines-up
@@ -570,7 +570,7 @@ Everything after the tag is the `Release` workflow.
    ```
 
 2. Freeze the migrations, on a branch from the head of `main`, and land the
-   record through a pull request. `DESIGN-database.md` § Release records says
+   record through a pull request. `design-docs/database.md` § Release records says
    what it holds.
 
    ```
@@ -656,7 +656,7 @@ Compatibility begins at 1.0 (REQ-76). Below it the API and the schema are both
 alpha: a release exercises the whole publication path and undertakes nothing
 about upgrading from one to the next, and the schema is not collapsed into one
 initial migration until then. The collapse keeps an upgrade from the last 0.x
-release (`DESIGN-database.md` § Migrations). What says so is the major version rather
+release (`design-docs/database.md` § Migrations). What says so is the major version rather
 than a suffix on the tag, which is why `0.1.0` is published as a release and
 moves the aliases — `latest` has to name something, and while every version is
 alpha the newest one is still what somebody asking for the current version
@@ -669,7 +669,7 @@ should get.
 | Pinning the base means nothing moves it either | Past a base's end-of-life its packages receive no security backports, and a base, a scanner and an inventory tool each fall behind unnoticed. Dependabot watches what a `FROM` line names, which is the base images and the Go toolchain. The scanner and the inventory tool are watched by nobody: each is a version and a checksum in a build argument, which nothing reads as a dependency |
 | Two builds of one commit can differ | The packages inside the base are upgraded at build time. Accepted because the image carries an inventory of itself, so what shipped is recorded rather than assumed |
 | The packaging gate has one implementation | Written twice, once in the Makefile and once in the workflow, neither copy is a superset of the other. CI runs the target |
-| Pinned pairs are compared rather than trusted | `DESIGN-build.md` § Pinned pairs lists them. The same check catches a build argument given two different defaults, which makes a binary report one version and its inventory another |
+| Pinned pairs are compared rather than trusted | `design-docs/build.md` § Pinned pairs lists them. The same check catches a build argument given two different defaults, which makes a binary report one version and its inventory another |
 | The binary archives are a convenience, not the product | REQ-02 says this ships as an image and a chart, and a binary run bare has none of the chart's render-time refusals in front of it. Linux amd64 and arm64 only: nothing in the design targets another platform, and an archive nobody tests is a support surface rather than a release. The upload client is the one program built for macOS and Windows, because it runs on a build host, and CI tests it on both |
 | `make dist` reads one image inventory, for the architecture it runs on | Cataloging a foreign filesystem means running foreign binaries under emulation. The workflow publishes one per architecture it pushes; a developer who wants the other names it and waits |
 | Text written ahead of time names a setting by its variable whatever the source | A log line, a hint on a screen, the API reference and a recorded history entry are written without knowing which source a deployment uses. Each keeps the variable's name, which the configuration page pairs with the key |

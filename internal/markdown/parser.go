@@ -32,7 +32,7 @@ import (
 //
 // A sanitizer, its policy, its language allowlist and a render entry point
 // lived here and were reached by nothing that runs. A rule improved in them
-// next year would have changed nothing for anybody, while `DESIGN-text.md`
+// next year would have changed nothing for anybody, while `design-docs/text.md`
 // said sanitizing happened on every render — which is the shape somebody
 // ticks a checklist against. The document says what happens now, and this
 // file holds only what the submission check needs.

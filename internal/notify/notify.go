@@ -865,7 +865,7 @@ func (s *Store) Waiting(ctx context.Context, subject access.Subject,
 // could read the finding it names. A notification is a message addressed to
 // somebody under a rule this deployment wrote down, and the audiences those
 // rules name are roles, cases and — for embargo notices alone — administrators
-// (`DESIGN-notifications.md`). So the withdrawal that has to take a line away
+// (`design-docs/notifications.md`). So the withdrawal that has to take a line away
 // is the withdrawal of the reason it arrived.
 //
 // Four ways a row is readable, and a private row carries a product because the
@@ -888,7 +888,7 @@ func readable(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	}
 	if subject.Admin {
 		// Reading their own. An embargo notice names administrators among its
-		// audiences (`DESIGN-notifications.md`), so a line addressed to one is
+		// audiences (`design-docs/notifications.md`), so a line addressed to one is
 		// theirs to read whatever they hold on the product it is about.
 		return q
 	}

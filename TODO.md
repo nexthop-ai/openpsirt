@@ -9,7 +9,7 @@ Everything still in scope, not built, and not yet filed as a GitHub issue.
 |---|---|
 | Each item has an identifier, `TODO-` and a number | Conversation and pull request descriptions cite an item by it |
 | An identifier is never changed or reused | A finished item is deleted and its number retired |
-| Code, comments, commit messages and design documents do not cite this file or its identifiers | Anything durable moves to `REQUIREMENTS.md` or a `DESIGN-*.md` before an item is deleted |
+| Code, comments, commit messages and design documents do not cite this file or its identifiers | Anything durable moves to `REQUIREMENTS.md` or a `design-docs/*.md` before an item is deleted |
 
 Each item says what exists today, what is missing or wrong, the work to do,
 and what it waits on. Code paths are left out: they move, and the design
@@ -111,7 +111,7 @@ The owner has chosen to wait on each of these.
 | Today | When patch branches are on, OpenPSIRT clones every repository a patch link names, commits only, and asks git which branches contain each linked commit. The branch names label the link |
 | Problem | A GitHub repository linked by one or two commits is still cloned in full and kept on disk to answer one question |
 | Work | For GitHub and GitLab repositories with few linked commits, ask the host's API which branches hold each commit and skip the clone. Keep cloning for other hosts and heavily linked repositories |
-| Waits on | The owner. `DESIGN-findings.md` states that a code host's API is never asked, because the same answer from two routes is two things to keep right, so building this reverses a written rule. It also needs API tokens and handling of rate limits |
+| Waits on | The owner. `design-docs/findings.md` states that a code host's API is never asked, because the same answer from two routes is two things to keep right, so building this reverses a written rule. It also needs API tokens and handling of rate limits |
 
 ### TODO-11 Repository mirrors
 
@@ -151,7 +151,7 @@ A decision in `REQUIREMENTS.md` is in force and nothing implements it.
 | Today | Nothing is purged or partitioned. Expired sessions are deleted, and a nightly branch's inventory documents are deleted once read. An unchanged scan writes nothing, so history grows with change rather than with the calendar |
 | Problem | History tables grow without bound. REQ-73 requires aging data out by dropping whole partitions, because a large delete on a table that size is an outage |
 | Work | Export high-volume history to a compressed file, then drop it a whole partition at a time |
-| Waits on | Which column to partition on and at what granularity, both undecided (`DESIGN-database.md`). SQLite has no partitions, and MySQL and MariaDB refuse foreign keys on a partitioned table. Partition names would need an allowlist like any other SQL identifier |
+| Waits on | Which column to partition on and at what granularity, both undecided (`design-docs/database.md`). SQLite has no partitions, and MySQL and MariaDB refuse foreign keys on a partitioned table. Partition names would need an allowlist like any other SQL identifier |
 
 ### TODO-16 Issue publication dates
 
@@ -182,7 +182,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Today | Releases publish binaries for amd64 and arm64, and a container image for amd64 only. The chart says so |
 | Problem | An operator on arm64 nodes, such as AWS Graviton or Ampere, cannot run the image |
 | Work | Publish one multi-architecture image per tag covering amd64 and arm64, signed, with an image inventory per architecture |
-| Waits on | Nothing. `DESIGN-packaging.md` § Not built names the Dockerfile change. The release pipeline is the larger part: it builds into the local Docker daemon and reads inventories out of the image, and a multi-architecture image needs buildx and a push instead |
+| Waits on | Nothing. `design-docs/packaging.md` § Not built names the Dockerfile change. The release pipeline is the larger part: it builds into the local Docker daemon and reads inventories out of the image, and a multi-architecture image needs buildx and a push instead |
 
 ### TODO-19 Distribution package descriptions
 
@@ -217,7 +217,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 |---|---|
 | Today | Advisories are written as CSAF 2.0, which has fields for CVSS 2, 3.0 and 3.1 scores and none for 4.0. The document carries the first CVSS 3.0 or 3.1 score found for each flaw. CSAF 2.1, which adds a 4.0 field, is a committee draft at OASIS |
 | Problem | A flaw rated only under CVSS 4.0 publishes no score at all, although the application shows it. A flaw rated only under CVSS 2 publishes none either, although CSAF 2.0 has a field for it |
-| Work | Two steps. Now: carry a CVSS 2 score in its field, and give a flaw rated only under 4.0 a note with the version, base score, severity and vector (`DESIGN-remediation.md` § Not built). Once CSAF 2.1 is a standard: write advisories as 2.1, move scores into its metrics structure with 4.0 in its own field and drop the note, change the TLP label for public documents from WHITE to CLEAR, let a flaw name several weakness types, and check documents against a 2.1 validator. An advisory issued before the move will not regenerate byte for byte afterwards |
+| Work | Two steps. Now: carry a CVSS 2 score in its field, and give a flaw rated only under 4.0 a note with the version, base score, severity and vector (`design-docs/remediation.md` § Not built). Once CSAF 2.1 is a standard: write advisories as 2.1, move scores into its metrics structure with 4.0 in its own field and drop the note, change the TLP label for public documents from WHITE to CLEAR, let a flaw name several weakness types, and check documents against a 2.1 validator. An advisory issued before the move will not regenerate byte for byte afterwards |
 | Waits on | Nothing for the first step. CSAF 2.1 becoming an OASIS standard for the second |
 
 ### TODO-23 Advisory-wide notes

@@ -115,8 +115,8 @@ func TestACopyOfTheCheckoutInsideItIsNotRead(t *testing.T) {
 	// every file a second time, and a gate that fails on one copy fails on all.
 	tree(t, map[string]string{
 		"internal/a.go": "package a",
-		".claude/worktrees/agent-1/internal/a.go":   "package a",
-		".claude/worktrees/agent-1/DESIGN-build.md": "# Build",
+		".claude/worktrees/agent-1/internal/a.go":        "package a",
+		".claude/worktrees/agent-1/design-docs/build.md": "# Build",
 	})
 
 	var seen []string

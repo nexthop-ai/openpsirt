@@ -40,7 +40,7 @@ declared before anything may name them.
 | Occurrence | A component and what directly pulled it in |
 | Finding | One component at one occurrence in one build. Twelve occurrences is twelve findings (REQ-17) |
 | Group | One issue at one component across every occurrence it sits at. The row the findings list returns, and the thing somebody decides about |
-| Report | A problem somebody reported to us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`DESIGN-findings.md` § Reports) |
+| Report | A problem somebody reported to us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`design-docs/findings.md` § Reports) |
 
 Each word names one thing, and the unit a scan is filed against is called a
 build wherever it is named. The finding-versus-group distinction is the
@@ -112,8 +112,8 @@ deployment, in two places:
 
 | Effect | Detail |
 |---|---|
-| No deadline | A finding on a release out of support carries none. The overdue figure would otherwise fill permanently with releases nobody will fix. See `DESIGN-triage.md` |
-| Silence is expected | A build that stops being scanned is not reported as quiet (REQ-52). It is still listed and still states how long it has been: "not scanned, and that is fine" and "not listed" are different answers. See `DESIGN-ingest.md` |
+| No deadline | A finding on a release out of support carries none. The overdue figure would otherwise fill permanently with releases nobody will fix. See `design-docs/triage.md` |
+| Silence is expected | A build that stops being scanned is not reported as quiet (REQ-52). It is still listed and still states how long it has been: "not scanned, and that is fine" and "not listed" are different answers. See `design-docs/ingest.md` |
 
 The comparison is spelled once, in the catalog, because the same fact decides
 both effects and what a screen says.
@@ -363,7 +363,7 @@ a commit or a content digest.
 | A build states one image name at one version, or it is no image by name | One component is one node in a build, so two images of one name side by side cannot both be the name. Each keeps its version in its identity, as a package does, and records no image version. apko describes every layer of an image as an image named `image`, and a build can ship a base image beside an image built on it |
 | A build stating the name once again moves it to the name | Once, the way a version moving would: the version-identified node closes and the image's node opens |
 | Every other component keeps its version in its identity | An upgrade inside an image still closes the old node and supersedes its findings |
-| The scanner is given an image as stored | Its name and its identifier with no version. A report is matched back to a component by identity, and no vulnerability data is published against an image's build stamp: the scanner was measured matching nothing for the `oci` type (`DESIGN-analytics.md` § Unmatched components) |
+| The scanner is given an image as stored | Its name and its identifier with no version. A report is matched back to a component by identity, and no vulnerability data is published against an image's build stamp: the scanner was measured matching nothing for the `oci` type (`design-docs/analytics.md` § Unmatched components) |
 | A VEX statement names an image as the build stamped it | The product a statement names inside the build, and a component a statement is about, is read with the build's open image version. A product named with no version is one a reader cannot match |
 | A claim or a statement naming an image at a version is placed against the version the build states | The component row carries no version to compare it with, so the version the build states now is read from its image versions |
 
@@ -488,8 +488,8 @@ scoped to one product. So across reports the rule is scoped to one product.
 | A claim the build makes is matched against what its scanner was given | A claim matched against the row and a finding matched against the node disagree, and the build's own claim about a source tree stops covering a binary another product described first |
 | What a build did not state is taken from what other builds of the same product stated, earliest first | One product's builds describe one package one way, and a qualifier a later build states for it is what the product means by it |
 | Nothing stated is overwritten | A qualifier is compared key by key without regard to capitals. Two builds disagreeing is not something a reader can settle, so the build's own statement stands |
-| The supplier and the license are filled in on the row where it has none | `DESIGN-findings.md` § Component suppliers. Neither reaches a scanner |
-| The repository a build states a component is built from is held on its node, without a credential or query, and never filled in from another build | It places an analyzer's result on the build that stated it (`DESIGN-analysis.md` § Placement), and a repository another build named is a guess about this one |
+| The supplier and the license are filled in on the row where it has none | `design-docs/findings.md` § Component suppliers. Neither reaches a scanner |
+| The repository a build states a component is built from is held on its node, without a credential or query, and never filled in from another build | It places an analyzer's result on the build that stated it (`design-docs/analysis.md` § Placement), and a repository another build named is a guess about this one |
 
 The fold key is worked out once, when the component is first stored, and does
 not move. A later report stating a distribution or a source package is held on
@@ -545,7 +545,7 @@ documents a build sent, true as they are read.
 | Counted by name | An upgrade is one dependency that moved. Counted by component it is one arrival and one departure, so a build that upgraded three things reports six |
 | A name at two versions at once is one entry | A vendored tree ships one routinely, and one copy going is that name at fewer versions |
 | The root is excluded from both sides | It is not one of the build's components, its version is not stored, and its name differs per variant |
-| An image held by name is at no version on either side | Its version is not part of what it is, so a rebuilt image is no change. What each build stated is listed on the component screen (`DESIGN-interface.md` § The component screen) |
+| An image held by name is at no version on either side | Its version is not part of what it is, so a rebuilt image is no change. What each build stated is listed on the component screen (`design-docs/interface.md` § The component screen) |
 | The earliest scan applied to a build has none | It is the first picture rather than a change to one |
 | Worked out when asked, never stored | The rows that answer it are the rows applying the scan already wrote (REQ-20) |
 
@@ -635,7 +635,7 @@ thing above is the root, the component's name stands alone, because the root's
 name differs per variant.
 
 A finding of the analysis kind has an occurrence of its own, minted from its series
-and the result's match key and carried by matching (`DESIGN-analysis.md`
+and the result's match key and carried by matching (`design-docs/analysis.md`
 § Matching). It sits at a component as every finding does.
 
 A chain of names from the top down is the other form. Measured against a real
@@ -691,7 +691,7 @@ root, against 0.018 s.
 
 | Limit | Detail |
 |---|---|
-| An image with no package identifier in a database v0.8.0 built is not recognized by the upgrade | v0.8.0 kept nothing saying the format called it a container. Its next upload stores it by name, once, as a version moving would (`DESIGN-database.md` § The v0.9.0 upgrade) |
+| An image with no package identifier in a database v0.8.0 built is not recognized by the upgrade | v0.8.0 kept nothing saying the format called it a container. Its next upload stores it by name, once, as a version moving would (`design-docs/database.md` § The v0.9.0 upgrade) |
 | An image's version is shown on the component screen alone | The tree, the findings list, an occurrence's chain and the comparisons show an image with no version, which is what it is stored as |
 | Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a decision is keyed on the versions in hand and asked again when they move |
 | A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |

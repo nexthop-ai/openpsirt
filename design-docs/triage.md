@@ -6,8 +6,8 @@ Satisfies REQ-17, REQ-18, REQ-23, REQ-24, REQ-25, REQ-26, REQ-27, REQ-28,
 REQ-29, REQ-30, REQ-31, REQ-32, REQ-33, REQ-35, REQ-40, REQ-43, REQ-53,
 REQ-57, REQ-65, REQ-66.
 
-The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
-`DESIGN-analytics.md`.
+The text rules are in `design-docs/text.md`; the reports these numbers feed are in
+`design-docs/analytics.md`.
 
 ## Contents
 
@@ -67,7 +67,7 @@ made in is not part of the key.
 |---|---|
 | A later release inherits by lookup, not by copy | Nothing to synchronize, so nothing drifts |
 | A variant inherits exactly when its code matches | A variant whose chain differs computes a different key and fails to match. No extra test |
-| The builds a decision was made on are recorded beside it, outside the key | The build on screen when it was proposed, and every build the person chose beside it on the reach sheet. A build the decision reaches by lookup is never recorded: telling that build apart from the ones it was made on is what the record is for. An advisory flags a release of a variant its covering decision was not made on, and whoever prepares one marks it affected where the code differs there (`DESIGN-remediation.md` § The CSAF document) |
+| The builds a decision was made on are recorded beside it, outside the key | The build on screen when it was proposed, and every build the person chose beside it on the reach sheet. A build the decision reaches by lookup is never recorded: telling that build apart from the ones it was made on is what the record is for. An advisory flags a release of a variant its covering decision was not made on, and whoever prepares one marks it affected where the code differs there (`design-docs/remediation.md` § The CSAF document) |
 
 The match is an index lookup on every screen that asks whether anything stands
 here, so the two version columns are bounded where the component columns they
@@ -88,7 +88,7 @@ sweeps and nothing runs on a timer.
 |---|---|
 | Only the upstream version counts | `10.5.4` to `10.6` lapses a decision; a packaging revision does not. A shipped package is rebuilt constantly, and a rebuild is not somebody's reasoning becoming wrong |
 | A version change mid-chain needs no rule of its own | It either changes the direct consumer of something, which lapses that decision, or it does not |
-| A rebuilt container image lapses nothing beneath it | An image is identified by its name and stores no version (`DESIGN-data-model.md` § Container images), so a decision about a package inside one is keyed on no version for what pulls it in. A package inside that moves lapses its own decision as any upgrade does |
+| A rebuilt container image lapses nothing beneath it | An image is identified by its name and stores no version (`design-docs/data-model.md` § Container images), so a decision about a package inside one is keyed on no version for what pulls it in. A package inside that moves lapses its own decision as any upgrade does |
 | A carried patch does not lapse a decision | A producer that fixes by patching moves no version this can see. For one that patches heavily, a decision may never be automatically re-examined however much the code moves |
 | A decision's age travels with it everywhere it appears | The compensating control for the line above. An eight-year-old decision should look like one |
 | A deferral runs out on a date, not on a version | A bump does not change a decision about priority, and a calendar does not change one about applicability. The finding returns to the queue marked as deferred rather than as new |
@@ -102,7 +102,7 @@ decision made about a leaf.
 ## Outcomes
 
 These are the outcomes about a vulnerability. A code finding takes its own, which
-`DESIGN-analysis.md` § Code finding triage holds.
+`design-docs/analysis.md` § Code finding triage holds.
 
 | Outcome | Means |
 |---|---|
@@ -171,7 +171,7 @@ recurs at every point release.
 ### The standing set
 
 Corrections in force are read from the audit log with its filters set: the
-outcome, and what applies now. `DESIGN-analytics.md` holds the audit log and
+outcome, and what applies now. `design-docs/analytics.md` holds the audit log and
 the one other question it is asked this way.
 
 Asking for what applies now is not asking for what was approved. A decision is
@@ -216,7 +216,7 @@ Arguing, agreeing and reading are separate questions.
 
 | Rule | |
 |---|---|
-| A triager may approve somebody else's decision about disclosed or undisclosed work | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative. A decision about a code finding takes the approver capability (`DESIGN-analysis.md` § Code finding triage) |
+| A triager may approve somebody else's decision about disclosed or undisclosed work | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative. A decision about a code finding takes the approver capability (`design-docs/analysis.md` § Code finding triage) |
 | Reading is the finding's own visibility and nothing else (REQ-43) | Asking whether the reader could decide or approve was narrower: a reader saw "deferred" with no way to see why, and on a real deployment somebody holding private reading opened a finding and was told none of its 91 decision rows existed |
 | Writing is named apart from reading in the code | They are separate rules. Adding a comment had leaned on the reading rule, so widening one would let a reader comment on a decision they may not argue about |
 | Every check reads the product and visibility from the row | Never from what a caller stated |
@@ -243,7 +243,7 @@ rewrites that copy in the same act that turns the findings public, and nothing
 else under a finding holds one. An occurrence is written public where its issue
 has no undisclosed finding left in the product when the row is written, because
 the visibility a proposal carries is read before the write and a disclosure may
-land between the two. `DESIGN-access.md` § Issue disclosure holds the act.
+land between the two. `design-docs/access.md` § Issue disclosure holds the act.
 
 ## Readback
 
@@ -261,8 +261,8 @@ holds the ones nobody has agreed to yet.
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
 | Undoing a bulk approval takes back only the agreements the person undoing gave | A batch is named by whoever gives it, so two reviewers may each hold one of the same name. Undoing one is not a way to withdraw another reviewer's agreement |
 | A decision it reaches only part of is left alone whole | The agreement is one row keyed on the decision, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
-| A decision about a code finding recorded as a flaw is left alone whole | Its flaw is judged instead, and nothing else changes the decision (`DESIGN-analysis.md` § Flaw records) |
-| A code finding recorded as a flaw is in no list of held work | Its flaw is held and listed as itself, so the code finding is closed work for its holder (`DESIGN-analysis.md` § Code finding assignment) |
+| A decision about a code finding recorded as a flaw is left alone whole | Its flaw is judged instead, and nothing else changes the decision (`design-docs/analysis.md` § Flaw records) |
+| A code finding recorded as a flaw is in no list of held work | Its flaw is held and listed as itself, so the code finding is closed work for its holder (`design-docs/analysis.md` § Code finding assignment) |
 | What an undo reports is what returned to waiting | A decision another agreement still stands on, and one that has ended, is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
@@ -296,7 +296,7 @@ what became of it, what it wrote, and what it covers now.
 | Refused whole or answered whole | Shown half, a reader would be told about words whose other half is about a finding they may not see |
 | A list showing the rows a reader may read leaves off the reasoning of a decision they may read only part of | The audit log, the list of decision occurrences, one occurrence read alone, and the earlier, similar and elsewhere decisions beside a finding each show a row its reader may read. The reasoning on it is about every occurrence of the decision, so it is shown only where they may read them all |
 | A case grant reaches it | Somebody brought into one issue is offered its decisions by every list they can reach, and a decision offered and then refused reads as a fault rather than as a rule |
-| The flaw's readers reach a decision at an included code finding's occurrence while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the code finding, and the same narrowing adds its decisions (`DESIGN-analysis.md` § Disclosure inclusion) |
+| The flaw's readers reach a decision at an included code finding's occurrence while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the code finding, and the same narrowing adds its decisions (`design-docs/analysis.md` § Disclosure inclusion) |
 | The counts are narrowed to findings the reader may see | A decision somebody may read can match findings they may not, and a count is the leak even where no row is shown |
 
 ## Decisions
@@ -600,11 +600,11 @@ by its reason, and a decision waiting for two reasons is in both.
 | A decision the code moved out from under is in none of the lists | It is its author's to re-affirm, and the To reaffirm list holds it (§ Whole-action re-affirmation) |
 | An expired deferral or a missed fix date is anybody's in the product | Any triager may decide it again, and the proposer is often the one who does |
 | A promise with a passed date stays in force | A commitment has no expiry of its own, so the passed date is the only sign it did not hold |
-| Moving a promise withdraws every agreement on it | § Commitment changes in `DESIGN-remediation.md` |
+| Moving a promise withdraws every agreement on it | § Commitment changes in `design-docs/remediation.md` |
 
 A rating of an issue and a movement of a disclosure date wait for a second
 person too. Neither is a decision, and each is listed apart from the three
-(`DESIGN-interface.md` § The review queue).
+(`design-docs/interface.md` § The review queue).
 
 The count beside the queue and a product's count of what waits in it take
 their decisions from the approval list alone.
@@ -701,8 +701,8 @@ record a second beside it.
 | **Live, not ever** | A withdrawn or lapsed decision covers nothing and stops holding the occurrence the moment it stops applying. Otherwise one lapse walls an occurrence off permanently |
 | **Per combination, not per occurrence** | The versions are part of what a decision is about, so a decision about one version and a decision about the next are different decisions and both stand |
 | Enforced by the database, not by a check | The key is held while a decision is live and set to null once it is not, under a unique index. Null values do not collide in a unique index on any of the four engines, which is what makes a rule applying to only some rows portable. A read-then-write check is exactly the shape two simultaneous proposals both walk through, and the test drives that case |
-| The same holds for a rating of an issue | Keyed on the issue, held from the moment an assessment is proposed, released when it is withdrawn. Six proposals at once leave one assessment standing; removing the constraint lets all six through. A merge of two issues that each held one in a product withdraws the one with less standing, naming the merge rather than a person, as `DESIGN-findings.md` § Merged issues holds |
-| The key names the issue a decision is read as | A decision filed under an issue that merged into another holds its key under the other, and a new decision is filed under the issue that stands. `DESIGN-findings.md` § Merged issues says how a merge settles the keys |
+| The same holds for a rating of an issue | Keyed on the issue, held from the moment an assessment is proposed, released when it is withdrawn. Six proposals at once leave one assessment standing; removing the constraint lets all six through. A merge of two issues that each held one in a product withdraws the one with less standing, naming the merge rather than a person, as `design-docs/findings.md` § Merged issues holds |
+| The key names the issue a decision is read as | A decision filed under an issue that merged into another holds its key under the other, and a new decision is filed under the issue that stands. `design-docs/findings.md` § Merged issues says how a merge settles the keys |
 
 Revising keeps the old words readable, takes back the approval given for them,
 returns the decision to the queue and records who wrote the new version. Two
@@ -715,7 +715,7 @@ other stands on the record as agreed.
 ## Decisions against an incident
 
 A product may record an incident: that it was exploited through an issue.
-`DESIGN-incidents.md` holds the incident; what it does to decisions is here.
+`design-docs/incidents.md` holds the incident; what it does to decisions is here.
 
 | Rule | |
 |---|---|
@@ -755,7 +755,7 @@ loose somewhere else.
 |---|---|
 | A product with no opinion **inherits rather than copies** | A product that stated the deployment's current minimum severity would stop following the next time the deployment changed its mind, and nobody would see that happen. Clearing a product's minimum severity is its own act |
 | Stating one is administration | The same authority that sets the deployment's. It hides findings, which is the act every other part of this gates |
-| Moving either minimum severity rewrites what is stored | Away from the request and one replica at a time — see `DESIGN-queue.md` |
+| Moving either minimum severity rewrites what is stored | Away from the request and one replica at a time — see `design-docs/queue.md` |
 
 ## Issue assessments
 
@@ -1011,7 +1011,7 @@ The act's time is the writing, and the act reads back no identifier of a
 row it writes. A row's cost is the act less the read, over the 204,000
 rows. On PostgreSQL the difference from the other three is the `decision_occurrence`
 table's four foreign keys, each checked with a query per row:
-[DESIGN-database.md § Bulk inserts](DESIGN-database.md#bulk-inserts) has the measurement.
+[design-docs/database.md § Bulk inserts](database.md#bulk-inserts) has the measurement.
 
 The row with the refresh held off is the measurement run against PostgreSQL
 alone, with `ALTER SYSTEM SET autovacuum = off` and `SELECT pg_reload_conf()`
@@ -1052,7 +1052,7 @@ the review queue's To reaffirm tab, which lists the reader's own lapsed decision
 A decision with a withdrawn row is neither listed there nor offered on its page:
 its author took it back, and a withdrawal leaves a row that had already lapsed
 as it was. A row at a code finding past its end of life is not re-made, and a decision
-with no other row is neither listed nor offered (`DESIGN-analysis.md` § End of
+with no other row is neither listed nor offered (`design-docs/analysis.md` § End of
 life). The act sits on the decision, or on several decisions from that tab
 (§ Re-affirmation across decisions).
 
@@ -1114,7 +1114,7 @@ every stored one wrong. The rewrite happens away from the request.
 | A replica that loses the race waits rather than skipping | A policy somebody just changed has to be applied |
 
 The other event that makes a stored deadline wrong is the issue becoming known to
-be exploited, which is in `DESIGN-findings.md`.
+be exploited, which is in `design-docs/findings.md`.
 
 ## Lapse marking
 
@@ -1148,7 +1148,7 @@ what rated worse means.
 | Swept when a rating is put in force here, agreed to or withdrawn | Withdrawing a milder rating puts the published one back, which can be worse |
 | Proposed decisions lapse as well as approved ones | Agreed to afterwards, a decision made against the lower rating would stand on a baseline that is already wrong |
 | Compared per decision, per issue, per product | The rating in force is each product's own |
-| The proposer is told why | `DESIGN-notifications.md` § Decision outcomes |
+| The proposer is told why | `design-docs/notifications.md` § Decision outcomes |
 | Why a decision lapsed is worked out when it is read, not stored | A version that no longer matches anything open and a rating in a higher band are both facts about the present. Both can hold |
 | Failing to mark is reported and not fatal | The decision stands until the next scan with the issue open sweeps again |
 | A decision covering nothing open in its product is not marked | Its proposer would be told a finding is open again where none is, and re-affirming it would find nothing to re-make |
@@ -1157,8 +1157,8 @@ what rated worse means.
 A decision also lapses when a report merges two issues and it is one of two live
 decisions at one occurrence, the one with less standing. The merge records which
 decision stands in its place, and the lapse is written in the transaction that
-applies the report. `DESIGN-findings.md` § Merged issues holds the rule, and
-`DESIGN-notifications.md` § Decision outcomes says who is told.
+applies the report. `design-docs/findings.md` § Merged issues holds the rule, and
+`design-docs/notifications.md` § Decision outcomes says who is told.
 
 What has **stopped standing** is one question to the decision list, and two to
 the review queue. A lapsed decision and a deferral whose date has passed are
@@ -1282,7 +1282,7 @@ and 2.3 s on PostgreSQL.
 | Who may read it is asked of the decision, not of the comment | Asking twice is one question with two answers waiting to disagree |
 | Nobody else may edit somebody's words | An edit anybody could make is a forgery with a timestamp |
 | Being allowed near the decision is settled before anything about the comment is said back (REQ-42) | The row has to be read first, because the decision it hangs off cannot be known otherwise, but no answer turns on what was in it until the asker has been let in. Refusing on authorship first made "that is not your comment" and "there is no such comment" two different answers, so anybody holding triage anywhere could walk the identifiers |
-| Every field somebody types into runs through the same policy before storage | The reasoning, a revision of it, a comment and a note. `DESIGN-text.md` says what that policy is |
+| Every field somebody types into runs through the same policy before storage | The reasoning, a revision of it, a comment and a note. `design-docs/text.md` says what that policy is |
 
 ## Notes on an issue
 
@@ -1316,7 +1316,7 @@ They are not merged, and cannot be. A decision is keyed on its occurrences and a
 an issue, so one record cannot hold both — and the decision's record stays exactly
 what people wrote about the decision, which is what lets an approval point at one
 revision of a justification (REQ-28). Where each is drawn is
-`DESIGN-interface.md` § The finding screen.
+`design-docs/interface.md` § The finding screen.
 
 Something true of one copy and not another is a comment, not a note. "We do
 not call that function in the vendored build" is about a decision at an occurrence,
@@ -1327,7 +1327,7 @@ and it has a home there already.
 Three kinds of document arrive, and the layer is named for what it holds
 rather than for any of them (REQ-31): a publisher's VEX statement set, a
 supplier's security advisory about their own products, and a VEX document an
-upstream this product trusts publishes (`DESIGN-upstream.md`). The screen says "what
+upstream this product trusts publishes (`design-docs/upstream.md`). The screen says "what
 publishers say" and the field is named the same, because a name taken from one
 format is wrong about the other every time the other arrives.
 
@@ -1341,7 +1341,7 @@ distribution says, and what we decided — three statements, not one collapsed
 answer.
 
 A statement's reasoning is stored once however many components it names, cut
-to the same bound, the way a build's claim's is (`DESIGN-findings.md` §
+to the same bound, the way a build's claim's is (`design-docs/findings.md` §
 Build-declared claims). Its file name is made safe and bounded the way an
 attachment's is, because every statement the document makes carries it.
 
@@ -1349,7 +1349,7 @@ A supplier's statement about its own product closes the finding at the occurrenc
 that product occupies (REQ-31), applied by the run beside the build's own
 patches and the issue's CVE record. So does an upstream's statement holding for
 anybody shipping the component, at that component and version (REQ-84,
-`DESIGN-upstream.md` § Statements applied). Every other statement is shown and
+`design-docs/upstream.md` § Statements applied). Every other statement is shown and
 offered as a prefill, and closes nothing.
 
 ### Supplier statements applied
@@ -1387,7 +1387,7 @@ A statement whose product is a build's root speaks for the build's producer,
 whichever way it arrived (REQ-11). Sent with the inventory, it is recorded as
 the build's claim when the scan is read. In a document uploaded on its own, it
 is recorded by the run as a claim of the build taken from that statement. Both
-are applied alike: `DESIGN-findings.md` § Build-declared claims holds what each
+are applied alike: `design-docs/findings.md` § Build-declared claims holds what each
 status does.
 
 | Rule | |
@@ -1398,7 +1398,7 @@ status does.
 | A claim taken from a statement closes when the statement is set aside or revised away, or the root moves to another version | It is kept in step by the run, before the build's claims are read. A scan restates the claims it sent and never these |
 | The claim names the statement it was taken from | Whose document it is stays readable on the finding |
 | A statement about a component inside the build, uploaded on its own, is that component's supplier's | § Supplier statements applied holds what it closes |
-| The same statement sent with the inventory is the build's claim, applied beneath that component | The build is speaking. A supplier's statement is replaced by the publisher's next document across the whole product, and every build of a product sends one by the same author, so read as a supplier's each build would set aside the last one's. `DESIGN-ingest.md` § Build-declared suppressions holds where it applies |
+| The same statement sent with the inventory is the build's claim, applied beneath that component | The build is speaking. A supplier's statement is replaced by the publisher's next document across the whole product, and every build of a product sends one by the same author, so read as a supplier's each build would set aside the last one's. `design-docs/ingest.md` § Build-declared suppressions holds where it applies |
 
 ### Evidence placement
 
@@ -1424,7 +1424,7 @@ they are an afternoon; unfound, they are retyped one decision at a time.
 | The statements are resolved once, never asked per row | There are far fewer statements than findings, so the cheap direction is to work out which pairs the statements name, once, and join the list to that. Distinct on the pair, by `UNION` rather than `UNION ALL`, so joining cannot multiply a finding by the number of statements about it |
 | The issue's identifier is folded on write, like every other typed name | A published identifier arrives in whatever case its reporter chose and a statement arrives folded, so without a folded column the two could only be compared through a function — and a function on the indexed side is an index nobody can use |
 | Only what stands narrows | A statement set aside stops answering the filter, while the superseded row stays readable: an approval granted on the strength of it has to remain explicable |
-| What a later upload sets aside is the document's own kind | A statement set is a publisher's whole answer, so a later one replaces it. An advisory is one announcement among the hundreds a publisher issues, so it replaces the advisory of the same name and leaves the rest standing. `DESIGN-ingest.md` § Supplier advisories holds the rule |
+| What a later upload sets aside is the document's own kind | A statement set is a publisher's whole answer, so a later one replaces it. An advisory is one announcement among the hundreds a publisher issues, so it replaces the advisory of the same name and leaves the rest standing. `design-docs/ingest.md` § Supplier advisories holds the rule |
 | The same bytes arriving again change nothing | A superseded claim is what tells everyone holding an approved decision that cited it that the publisher has changed what they published. Re-syncing a publisher's directory is the ordinary operation once advisories arrive one per issue, so a pass that rewrote every claim would raise that notice every time and mean nothing by it |
 | A statement is shown against the package it names, not against the name it carries | A component in the graph is called by its short name, so a statement is stored and matched under that — and a short name is not a package. Two registries and two namespaces hold different packages under one, so a publisher's statement about a scoped npm package appeared against every component called `parser`, from anywhere, with that publisher's name on it. The type and the namespace are compared, never the version: a statement says which versions it is about in its own terms |
 | The version a statement was made about is shown beside what it said | A supplier's advisory names the version that carries the fix, which is not the version shipped here, so a status shown alone says the opposite of what it means. It is stored rather than read back out of the identifier, because a publisher that states products and no identifier states the version as the branch its product sits in |
@@ -1452,7 +1452,7 @@ at or before the moment the decision is being made.
 
 The refusal names the date as the UTC day it falls on, whatever offset the
 request wrote it with and whatever zone the server's clock is in. It is the day
-the interface shows for the same moment (`DESIGN-interface.md`).
+the interface shows for the same moment (`design-docs/interface.md`).
 
 Checked where every write path inherits it rather than at each of them, which
 is how the two acts that build a decision without going through the ordinary
@@ -1554,7 +1554,7 @@ approves it (REQ-27).
 | The reasoning is required where an outcome is | A prefill with an empty argument is a button that proposes a dismissal saying nothing. Nothing prepared is nothing carried |
 | Saving over a name takes the old prefill with it | The act is deciding what that name means now, and one that survived would fire on a filter somebody had made ordinary |
 | It proposes nothing by itself, and the screen says so | Picking the filter fills the decision form; submitting it is a person's act, and the record carries their name |
-| A deferral is prepared as a length, never a date | Required where the outcome is a deferral and refused where it is not: a deferral with no length fills a form that cannot be submitted, and a length beside any other outcome is a value nothing reads. `DESIGN-interface.md` says how the length becomes a date |
+| A deferral is prepared as a length, never a date | Required where the outcome is a deferral and refused where it is not: a deferral with no length fills a form that cannot be submitted, and a length beside any other outcome is a value nothing reads. `design-docs/interface.md` says how the length becomes a date |
 | What a filter prepares passes the rules a decision passes | The same submission gate, called rather than restated: an outcome that is recognized, a reason where the outcome takes one and none where it does not, and the markdown policy on the reasoning. A prefill the decision store refuses is a refusal that lands when somebody presses the button rather than when they saved the thing that fills it in |
 | A prefill cannot state that mitigations already exist | That reason asks what stops it, in words, and a filter carries no such text. Refused where it is prepared rather than accepted and then refused on submission |
 | How many filters one person keeps is capped, and the list is bounded by the same number | Many acts writing one row each fill a table the way one act writing many does, and the panel reads every row it finds on every open. `saved.max-per-person` is the setting, and it counts every filter the person keeps |
@@ -1598,7 +1598,7 @@ reasoning at all.
 ## Statement scope
 
 Whom a statement published from a decision holds for: anybody shipping the
-component at that version, or this product's own build. `DESIGN-publishing.md`
+component at that version, or this product's own build. `design-docs/publishing.md`
 holds what it decides in a published document and what the reason decides
 where a decision states none.
 
@@ -1619,7 +1619,7 @@ where a decision states none.
 | Nothing refuses a deferral for being long | The cumulative threshold is the whole of the refusal. The pattern is reported instead, at `/v1/deferrals/repeated`: one item deferred three times is a decision, and forty of them is a policy nobody wrote down. A deliberate absence of a rule rather than a gap |
 
 A deferred item is never published as not-affected. The VEX document takes no
-deferral (`DESIGN-remediation.md` § The VEX document), so a deferral is absent
+deferral (`design-docs/remediation.md` § The VEX document), so a deferral is absent
 rather than published as anything, and silence in that format already reads as
 affected.
 

@@ -77,7 +77,7 @@ inferred from a rule, so adding a route never adds an exception.
 | `/v1/sign-in` | The providers an operator configured. A sign-in page draws a button per provider and cannot ask for that list while holding nothing |
 | `/v1/sign-in/…` | Redirects to a provider, or refuses. What it reads and writes is its own: the sign-in key, the session, and the account a first arrival needs. A route added here is checked against that rather than assumed harmless |
 | The interface | The built assets. They contain no data; everything drawn in them is fetched with a credential. A path naming a directory of them is answered with the page, never a listing |
-| `/.well-known/csaf/…`, `/openvex/…` | The security documents of the products that publish, read as anybody at all. No credential is looked at, GET and HEAD are the only methods, and a deployment publishing nothing answers every path as one nothing is published at. `DESIGN-publishing.md` holds the rest |
+| `/.well-known/csaf/…`, `/openvex/…` | The security documents of the products that publish, read as anybody at all. No credential is looked at, GET and HEAD are the only methods, and a deployment publishing nothing answers every path as one nothing is published at. `design-docs/publishing.md` holds the rest |
 
 The published documents are not in the API document. Their shapes and their
 paths are the standards' — the provider description, the feed, the documents
@@ -473,7 +473,7 @@ is no markup representation and no parameter requesting one.
 A caller receives the source and renders it themselves. The server has already
 refused what its policy forbids at submission (REQ-67), so the text is known-good
 under the rules in force when it was written; rules written since are the
-renderer's to apply. The rules are in `DESIGN-text.md`.
+renderer's to apply. The rules are in `design-docs/text.md`.
 
 A moment is stated in UTC, in RFC 3339, in a response and in its file alike. A
 driver hands back a time in the process's own zone, so a moment is converted

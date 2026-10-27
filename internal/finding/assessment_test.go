@@ -603,7 +603,7 @@ func TestAnIssueThisProductDoesNotCarryCannotBeRatedInIt(t *testing.T) {
 	// A rating belongs to a product and says how a component is used there,
 	// so an issue the product does not carry is not its to rate. Getting ahead
 	// of an issue before it arrives was the deployment-wide shape's, and
-	// DESIGN-triage.md records it as given up.
+	// design-docs/triage.md records it as given up.
 	//
 	// Refused in the words a name nobody has used gets, so the route cannot be
 	// walked to find out which issues a product ships. And refused by every

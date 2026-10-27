@@ -30,7 +30,7 @@ text.
 | Recognized from the parsed document, not by searching the text | A reference inside a fenced block or code span is being shown rather than made |
 
 This is the one scheme added to what a link may use beside `http`, `https` and
-`mailto`. An image may use no other — see `DESIGN-text.md`.
+`mailto`. An image may use no other — see `design-docs/text.md`.
 
 ## Attachment subjects
 
@@ -77,7 +77,7 @@ Asking only the second collapses "no undisclosed findings in this product" and
 another product reads as public here. Any reader of any product could then
 confirm whether a name exists anywhere in the deployment, one request at a time.
 
-For a file on a report, the report's own answer, which `DESIGN-findings.md`
+For a file on a report, the report's own answer, which `design-docs/findings.md`
 § Report visibility holds: the right to read work nobody has announced in that
 product, whether or not the claim has been judged. The record and what
 arrived with it have one answer rather than two.
@@ -210,7 +210,7 @@ attach to the issue or the report, in the words the handler refuses in, and the
 request is bounded at the maximum file size plus a megabyte for the form around
 the file. A request declaring more is refused unread, and one that does not
 declare its length is cut off at the bound. An upload takes a place among the
-uploads one server reads at once, which `DESIGN-ingest.md` § Request handling
+uploads one server reads at once, which `design-docs/ingest.md` § Request handling
 describes.
 
 Both bounds are checked twice: before anything is carried, so an upload that
@@ -223,7 +223,7 @@ would both fit and both commit. Each writing transaction first writes a fresh
 value into one fixed row of the lease table, which nothing takes as a lease;
 the write is what makes the next upload wait for this one to commit before it
 reads the total, and what two cluster nodes conflict on
-(`DESIGN-database.md` § Replica coordination). Uploads are serialized per deployment while a quota
+(`design-docs/database.md` § Replica coordination). Uploads are serialized per deployment while a quota
 or a share is set, and each holds the lock for two reads and an insert.
 
 Attaching is triage work rather than read work. Tested as a read — whether the

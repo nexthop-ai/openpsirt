@@ -43,7 +43,7 @@ const headingWords = 6
 
 func designDocuments(t *testing.T) map[string]string {
 	t.Helper()
-	return documents(t, filepath.Join("..", "..", "DESIGN-*.md"))
+	return documents(t, filepath.Join("..", "..", "design-docs", "*.md"))
 }
 
 // everyDocument is every markdown file the Spec register covers: the design

@@ -67,7 +67,7 @@ measures churn:
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
 | `invalid` | A record taken back as a mistake was never present. The backlog trend leaves it out of every open set as well |
 | `unaffected` | The issue's CVE record states the release was never affected. Left out of every open set the same way |
-| `disclaimed` | A supplier states the product the occurrence sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing in the build changed, so nothing was fixed, and the release is counted as having held the issue, whatever the statement says: the occurrence is in the open sets up to its closure, and in the releases an issue was in (`DESIGN-findings.md` § Closure reasons) |
+| `disclaimed` | A supplier states the product the occurrence sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing in the build changed, so nothing was fixed, and the release is counted as having held the issue, whatever the statement says: the occurrence is in the open sets up to its closure, and in the releases an issue was in (`design-docs/findings.md` § Closure reasons) |
 
 The other five — removed, upgraded, revised, patched, and a recorded flaw
 declared fixed — are counted.
@@ -222,7 +222,7 @@ builds, and this is a document going to a customer.
 | Fixes are grouped by what was done, not by the issue | One kernel upgrade closes 917 issues at once, and a bullet per issue states the same version pair 917 times in a document going to a customer — while the part a reader is looking for, which version to move to, is the part that repeats. The move is stated once and the issues it closed are listed under it |
 | A group is the component with its closure reason and its version pair | Two upgrades of one component in one comparison are two different answers to "what do I move to", and folding on the component alone states one of them over both |
 | A bullet carries the score, whether it is known exploited, and where it is written up | The name and the word do not say whether the upgrade is taken tonight or next month, and all three are already held. The address goes through the rule an address stored beside a decision does, because this document leaves the building and a scheme a reader's machine acts on is not something to hand them. It is written in angle brackets, where only an absolute address is a link and anything else opens markup, so it names `http`, `https` or `mailto` or is left out |
-| Every name, version, identifier and severity word is escaped where it is written, and so are the build names and the scanner and database versions | Each was chosen by an upstream author, a scanner or whoever uploaded the build, and the note is rendered by a customer's viewer. Escaped, `[Download the fix](https://…)` as a component name is a name and never a link, an image, markup or a heading. Only a character that can open syntax where it sits is escaped, so `6.12.41-1` reads as written in the source too — `DESIGN-text.md` § Rendered and escaped text holds the rule |
+| Every name, version, identifier and severity word is escaped where it is written, and so are the build names and the scanner and database versions | Each was chosen by an upstream author, a scanner or whoever uploaded the build, and the note is rendered by a customer's viewer. Escaped, `[Download the fix](https://…)` as a component name is a name and never a link, an image, markup or a heading. Only a character that can open syntax where it sits is escaped, so `6.12.41-1` reads as written in the source too — `design-docs/text.md` § Rendered and escaped text holds the rule |
 | The description is not in the bullet | One upgrade closes hundreds of issues and they are listed under it, so a sentence apiece is a document nobody reads to the end. The description is behind the link, which is what the link is for |
 | An empty section is not written | A heading with nothing under it is a question about whether something is missing |
 | A release that fixed nothing says so, in a sentence | Answering nothing at all is indistinguishable from a truncated response, the wrong pair of builds and a request that went astray. A sentence is not a heading over nothing, so the rule above still holds: what comes back names the two builds and what measured them, and carries no section |
@@ -424,7 +424,7 @@ had.
 | It narrows to one product, or to one team's people | Without a scope there are no per-team figures, so a manager asking how their own people are doing reads the deployment's numbers with their name on them |
 | A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A decision belongs to whoever argued it, which is the rule the audit log dates by — narrowed by the approver, a team's time to agree would be about decisions its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
 | A team with nobody on it measures nothing | A narrowing that silently widens to the deployment is the one mistake a narrowing must not make |
-| Asked about a team, only an administrator is given the per-person rows | Rows narrowed to a team name its members, and membership is an administrator's to know (DESIGN-access § Teams). Anybody else is given the team's totals |
+| Asked about a team, only an administrator is given the per-person rows | Rows narrowed to a team name its members, and membership is an administrator's to know (design-docs/access § Teams). Anybody else is given the team's totals |
 
 ## Repeated deferrals
 
@@ -435,7 +435,7 @@ three times is a judgment where forty of them is a policy nobody wrote down.
 
 Counted over the decisions rather than the findings they cover: how often is how
 many decisions put the occurrence off, and how long is the time it was put off for,
-counted the way the deferral threshold counts it (`DESIGN-triage.md` § The
+counted the way the deferral threshold counts it (`design-docs/triage.md` § The
 deferral threshold). A withdrawn or lapsed deferral counts for the part that
 ran, and stretches that overlap count once.
 
@@ -454,7 +454,7 @@ kernel or a runtime rather than a whole image.
 
 A carried patch shows here as a step down in the open count. A patch that names
 what it resolves closes the finding as patched on the scan that first carries it
-(`DESIGN-findings.md` § Build-declared claims), and a patch that moves the shipped
+(`design-docs/findings.md` § Build-declared claims), and a patch that moves the shipped
 version closes it as revised. In a list of what is open now the row is simply
 gone.
 
@@ -533,7 +533,7 @@ assembled differently every time.
 | Markdown, served as markdown | The same reason the release note is: the point of it is that it goes straight into a reply |
 | Nothing of yours affected is a document, not a refusal | "Are you affected by this" could be answered yes and never no, and the second is the answer an inquiry is usually asking for |
 | An identifier nobody has seen and one that sits only in products you cannot read produce the same document | Told apart, the pair says which issues this deployment holds, one guess at a time |
-| The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The issue row is shared, and a recorded flaw writes its summary, minted name and addresses onto it. `DESIGN-findings.md` § Recorded words on a shared issue holds the rule every reader asks |
+| The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The issue row is shared, and a recorded flaw writes its summary, minted name and addresses onto it. `design-docs/findings.md` § Recorded words on a shared issue holds the rule every reader asks |
 | Every address in it goes through the rule an address stored beside a decision goes through, and names `http`, `https` or `mailto` | It is a document somebody forwards, and a scheme a reader's machine acts on is not something to hand them. Inside angle brackets anything but an absolute address opens markup, and a space, an ASCII control character or a bracket ends the address and makes the rest of the line markdown, so an address carrying one is left out |
 | Everything else in it that did not pass the submission policy is escaped where it is written | The identifier, description, severity and aliases come from feeds, the component, version and fixed-in version from scan files, and product and person names are not markdown. A reasoning passed the policy when it was typed and is written as it was |
 | It is bounded, and says when the list is a page of a longer one | An issue at a widely vendored component carries hundreds of decision occurrences, and what this is for is being read |
@@ -555,7 +555,7 @@ that query should return nothing, and a row in it is a control that failed.
 That is why nobody has to open it to find out. The same question is asked as
 a condition and told to administrators when it stops answering nothing —
 because a report that is empty every time is one nobody opens, and it is then
-read only after something has already gone wrong. `DESIGN-notifications.md`
+read only after something has already gone wrong. `design-docs/notifications.md`
 § Reports that must come back empty holds the rest, including why the
 condition carries a count and a link and never these rows.
 
@@ -566,7 +566,7 @@ and an approval from a role since withdrawn is correct behavior, so neither
 raises anything. The same two people agreeing is what a small team looks like,
 so the pairs section raises a condition only past two thresholds: a share of a
 product's agreements, among at least a set number of people who may approve.
-Both are settings a product may override. `DESIGN-notifications.md` § Concentrated
+Both are settings a product may override. `design-docs/notifications.md` § Concentrated
 approval pairs holds the rule, and why a pair counted without the
 second threshold would be an alert nobody can clear (REQ-49). Each pair's share
 is of every decision a standing agreement covers, counted apart from the list,
@@ -627,7 +627,7 @@ The audit log lists one entry per decision. Its file is one row per occurrence.
 | The per-occurrence list stays | The reports overview reads the newest dismissals from it, and an issue's document lists the decision occurrences about that issue |
 
 What is being scanned, and when each build was last seen, is its own view. The
-shape is in `DESIGN-ingest.md`. A product silently dropping out of scanning is
+shape is in `design-docs/ingest.md`. A product silently dropping out of scanning is
 the failure that quietly makes everything else wrong: every number on every
 screen goes on looking reasonable, and each describes a build nobody has looked
 at since.
@@ -755,7 +755,7 @@ Deadline compliance and the disposition register have sections above.
 | Effort by component | The subjects of the decisions in a period, most argued first, with what came out of them. Effort by subject, above, holds the rest |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
-| Code findings by analyzer | How many static analysis code findings each analyzer series of one product holds in each state, across every build of the product. Each figure opens the code finding list for its series and state. Read only by somebody holding `internal-read` on the product; anybody else is told code findings are internal and is answered no count. `DESIGN-analysis.md` § Code findings by series holds what is counted |
+| Code findings by analyzer | How many static analysis code findings each analyzer series of one product holds in each state, across every build of the product. Each figure opens the code finding list for its series and state. Read only by somebody holding `internal-read` on the product; anybody else is told code findings are internal and is answered no count. `design-docs/analysis.md` § Code findings by series holds what is counted |
 | Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible. Its issue and product counts are the ones that document states, beside the title it carried; an issue taken off the advisory since is still named in what readers hold. An issuance recorded without its bytes is counted from the advisory's coverage today |
 
 An issuance carries no visibility of its own, so a row of the last of those is
@@ -780,7 +780,7 @@ as that answer rather than as an absence.
 The standing corrections are the audit log with its other filters set: the wrong
 matches that apply now. Every other decision lapses when the code moves, so
 each comes back round to somebody; a correction does not, and the only way to
-read the set is to ask for it. `DESIGN-triage.md` § Corrections holds what one
+read the set is to ask for it. `design-docs/triage.md` § Corrections holds what one
 is.
 
 Applying now is not the same question as having been approved. A decision is
@@ -836,7 +836,7 @@ in one level, every open row grouped on the fold directly:
 The cost in one level is the sort on the fold, a 64-character key, over every
 open row. The planned upgrades are grouped in two levels, by integers first and by the
 fold over the partial groups;
-[DESIGN-findings.md § Two-level grouping](DESIGN-findings.md#two-level-grouping)
+[design-docs/findings.md § Two-level grouping](findings.md#two-level-grouping)
 holds the form and its measurement.
 
 `make measure` takes the same measurement over the form in force, on every
@@ -885,15 +885,15 @@ stops is one somebody reads as whole.
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own decisions; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The audit log's file lists only agreements that still stand, and states separately whether a second person has one |
 | The audit log's file includes decisions about code findings | It writes what the audit log shows, under the same visibility (REQ-50) |
-| The code finding queue's file is the queue, under the queue's visibility | A row is a code finding the reader reads whole, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
-| A findings list's file holds, below its findings, every open code finding of the same selection, in the queue's order and under the queue's visibility (REQ-50) | The finding exports include every kind the reader reads (`DESIGN-kinds.md` § Consumers). Readers of disclosed or undisclosed work alone read no code finding, and their files hold none |
+| The code finding queue's file is the queue, under the queue's visibility | A row is a code finding the reader reads whole, and no row carries source text (`design-docs/analysis.md` § Queue file) |
+| A findings list's file holds, below its findings, every open code finding of the same selection, in the queue's order and under the queue's visibility (REQ-50) | The finding exports include every kind the reader reads (`design-docs/kinds.md` § Consumers). Readers of disclosed or undisclosed work alone read no code finding, and their files hold none |
 | The open code findings a decision waits on are held, and the code findings open only in releases past their end of life are not | The file's findings rows hold a finding a decision waits on, and the list leaves releases past their end of life out unless asked, which narrows the code findings out |
 | The cross-product file holds each product's queue in turn, by product name | Each product's queue is its own read, under its own visibility |
 | A findings file narrowed by any filter but the order holds no code finding, and states that it holds none | A code finding carries no rating, component, upstream, decision or deadline, so every filter asks what a code finding does not carry. A filter added to the list narrows the code findings out without anything naming it |
 | Three filters keep the code findings: the minimum severity widened, work no promised upgrade covers, and branches in support | Every code finding answers each the same way. The last is what the list reads when no release question is asked, and the screen writes all three into the address it exports |
 | A file states which code findings it holds | Without it, an empty code finding list in a file reads as a product with no code findings |
 | A code finding row is a row of the findings file's columns. The rule is the issue, and the opened date, branch or tag and variant are the newest build's, as the queue lists it. The columns after the variant are a code finding's: whether the row is a code finding, the path, line, function and message. Every other column is empty on a code finding, and the code finding columns are empty on every other row | One header keeps a file one table, and a reader filters the code findings by one column. A code finding has no rating, component or decision to fill the rest with |
-| The disposition register holds no code finding | It is the Register consumer's, which states what a build ships beside its VEX document (`DESIGN-kinds.md` § Consumers) |
+| The disposition register holds no code finding | It is the Register consumer's, which states what a build ships beside its VEX document (`design-docs/kinds.md` § Consumers) |
 
 ## Settings
 

@@ -23,7 +23,7 @@ updates:
   # The images the container is built from.
   #
   # "Nothing watches the base, the scanner or the inventory tool" is written
-  # into DESIGN-packaging.md's limits, next to the measurement that found all
+  # into design-docs/packaging.md's limits, next to the measurement that found all
   # three two or more releases behind in one week. Past a base's end of life
   # its packages receive no security backports, and pinning without watching
   # is how that happened.
