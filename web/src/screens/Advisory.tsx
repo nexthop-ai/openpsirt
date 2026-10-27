@@ -69,7 +69,7 @@ export function Advisory() {
   return (
     <>
       <nav aria-label="Breadcrumb" className="hint" style={{ marginBottom: 8 }}>
-        <Link to="/advisories">Advisories</Link> / {advisory}
+        <Link to="/advisories">Published advisories</Link> / {advisory}
       </nav>
 
       <div className="screen-head">

@@ -312,7 +312,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* What this deployment has said about its own flaws. Beside
               Disclosure deadlines because an embargo reaching its date is one
               of the three things an advisory gets written for. */}
-            <Rail to="/advisories" icon="advisory" label="Advisories" />
+            <Rail to="/advisories" icon="advisory" label="Published advisories" />
           </>
         )}
         <Group name="manage" label="Manage" shut={shut} onToggle={toggleGroup} />

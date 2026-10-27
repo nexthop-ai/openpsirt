@@ -236,7 +236,7 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the audit log. The audit log is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
+| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the published advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.
@@ -1541,8 +1541,8 @@ running out with every movement of an embargo on it, disclosure included.
 
 ### The advisory
 
-An advisory has screens of its own: a list of every one this deployment minted,
-and one advisory whole. `DESIGN-remediation.md` § The advisory holds what an
+An advisory has screens of its own: Published advisories, the list of every one
+this deployment minted, and one advisory whole. `DESIGN-remediation.md` § The advisory holds what an
 advisory is and § Editorial state holds who may agree.
 
 | Rule | |

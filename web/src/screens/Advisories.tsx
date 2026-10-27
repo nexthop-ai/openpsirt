@@ -55,7 +55,7 @@ export function Advisories() {
     <>
       <div className="screen-head">
         <h2>
-          Advisories <span className="n">{(total ?? items.length).toLocaleString()}</span>
+          Published advisories <span className="n">{(total ?? items.length).toLocaleString()}</span>
         </h2>
         <p>What this deployment has said about its own flaws, newest first.</p>
         {mayStart && (
