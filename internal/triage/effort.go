@@ -89,7 +89,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	onArgs = append(onArgs, readableArgs...)
 	grouped := func() *bun.SelectQuery {
 		q := s.db.NewSelect().
-			TableExpr(finding.Decisions).
+			TableExpr(finding.DecisionOccurrences).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 			// The argument, which is where an outcome lives.
 			Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
@@ -109,7 +109,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// rows. Every figure below counts distinct identifiers for that
 			// reason: what is being counted is acts, and an act is one row of the
 			// decision_occurrence table however many builds share the occurrence it names.
-			Join(`LEFT JOIN "finding" AS "pf" ON `+finding.DecisionAtOccurrence("pf")+`
+			Join(`LEFT JOIN "finding" AS "pf" ON `+finding.DecisionOccurrenceOf("pf")+`
 			AND "pf"."target_id" IN (SELECT "et"."id" FROM "target" AS "et"
 				JOIN "stream" AS "es" ON "es"."id" = "et"."stream_id"
 				WHERE "es"."product_id" = "de"."product_id")

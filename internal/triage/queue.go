@@ -273,7 +273,7 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 		q = q.Where(`"de"."vulnerability_id" IN (?)`,
 			q.NewSelect().TableExpr(`"vulnerability" AS "mv"`).
 				Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "mv"."issue_id"`).
-				Join(rating.For(rating.OnDecision)).
+				Join(rating.For(rating.OnDecisionOccurrence)).
 				Column("mv.id").
 				Where(rating.EffectiveExpr+" IN (?)", bun.List(f.Severities)))
 	}
@@ -300,7 +300,7 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		Where(finding.DecisionFiledAt("de", "f")).
+		Where(finding.DecisionOccurrenceFiledAt("de", "f")).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
@@ -442,9 +442,9 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, decis
 		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision occurrence on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtOccurrence("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
@@ -504,7 +504,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisio
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
@@ -598,9 +598,9 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisio
 	known := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision occurrence on the outside, as buildsCovered has it.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtOccurrence("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).

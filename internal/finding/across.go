@@ -597,7 +597,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	// per issue and occurrence, so an occurrence under two promises is still
 	// one.
 	promises := s.db.NewSelect().
-		TableExpr(Decisions).
+		TableExpr(DecisionOccurrences).
 		Join(`JOIN (?) AS "rk" ON "rk"."id" = "de"."decision_id"`, ranked).
 		ColumnExpr(`"dv"."issue_id" AS "issue_id"`).
 		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).

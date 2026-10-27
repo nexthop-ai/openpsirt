@@ -245,7 +245,7 @@ type stampedDecision struct {
 func decisionsAt(ctx context.Context, db bun.IDB, productID, findingID int64) ([]stampedDecision, error) {
 	var out []stampedDecision
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "decision_occurrence" AS "dc" ON `+finding.DecisionFiledAt("dc", "f")).
+		Join(`JOIN "decision_occurrence" AS "dc" ON `+finding.DecisionOccurrenceFiledAt("dc", "f")).
 		Join(`JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"`).
 		Join(`LEFT JOIN "decision_stamp" AS "cst" ON "cst"."decision_id" = "sc"."id"`).
 		ColumnExpr(`DISTINCT "sc"."id", COALESCE("cst"."stamp", 0) AS "stamp"`).

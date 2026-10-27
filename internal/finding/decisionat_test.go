@@ -117,8 +117,8 @@ func TestTheDetectorFindsACorrelationSpelledOut(t *testing.T) {
 		}
 	}
 	composed := []string{
-		"WHERE `+DecisionAt(\"?\")+`",
-		"WHERE `+finding.DecisionAtOccurrence(\"f\")+`",
+		"WHERE `+DecisionOccurrenceAt(\"?\")+`",
+		"WHERE `+finding.DecisionOccurrenceOf(\"f\")+`",
 		"ColumnExpr(`dv.issue_id AS \"vulnerability_id\"`)",
 		`JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`,
 		`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "ri"."issue_id"`,
@@ -186,7 +186,7 @@ func TestEveryDecisionIsCorrelatedToItsFindingThroughOneSpelling(t *testing.T) {
 		t.Fatal("no occurrence comparison was found anywhere, so the detector read nothing")
 	}
 	for _, at := range found {
-		t.Errorf("%s correlates a decision to a finding by hand; compose finding.DecisionAt or its family", at)
+		t.Errorf("%s correlates a decision to a finding by hand; compose finding.DecisionOccurrenceAt or its family", at)
 	}
 	var stale []string
 	for file, pairs := range notADecisionAtAFinding {

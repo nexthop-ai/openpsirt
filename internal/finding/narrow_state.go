@@ -72,7 +72,7 @@ const (
 	NotPlanned PlannedFilter = "unplanned"
 )
 
-// DecisionAt is the one spelling of a decision occurrence `de`, read beside
+// DecisionOccurrenceAt is the one spelling of a decision occurrence `de`, read beside
 // `dv` through Decisions, being about the finding `f`: the same product, the
 // same issue and the same occurrence.
 //
@@ -86,16 +86,16 @@ const (
 // stream it has joined, or the decision's own product where the query is
 // already narrowed to it. Anything else is a programming error, because it is
 // placed in the statement as written.
-func DecisionAt(product string) string {
+func DecisionOccurrenceAt(product string) string {
 	switch product {
 	case "?", `"st"."product_id"`, `"de"."product_id"`:
 	default:
-		panic("finding.DecisionAt: " + product + " is not a product the statement names")
+		panic("finding.DecisionOccurrenceAt: " + product + " is not a product the statement names")
 	}
-	return `"de"."product_id" = ` + product + " AND " + DecisionAtOccurrence("f")
+	return `"de"."product_id" = ` + product + " AND " + DecisionOccurrenceOf("f")
 }
 
-// DecisionAtOccurrence is the issue and the occurrence of DecisionAt without
+// DecisionOccurrenceOf is the issue and the occurrence of DecisionOccurrenceAt without
 // the product, for a statement that holds the product another way: the
 // finding's build joined to the decision's product, a build of it bound, or the
 // decision's product compared beside it. A statement holding the product in no
@@ -104,19 +104,19 @@ func DecisionAt(product string) string {
 // finding is the alias the statement gives the finding, from the ones code
 // names. Anything else is a programming error, because it is placed in the
 // statement as written.
-func DecisionAtOccurrence(finding string) string {
+func DecisionOccurrenceOf(finding string) string {
 	return decidedOccurrenceIn(`"dv"."issue_id"`, `"de"."occurrence_identity"`, finding)
 }
 
-// DecisionFiledAt is DecisionAtOccurrence for a statement that reads a decision
+// DecisionOccurrenceFiledAt is DecisionOccurrenceOf for a statement that reads a decision
 // occurrence without the issue it is filed under, so the issue is asked through
 // SameIssue. occurrence is `de` or `dc`, the aliases code gives a decision
 // occurrence.
-func DecisionFiledAt(occurrence, finding string) string {
+func DecisionOccurrenceFiledAt(occurrence, finding string) string {
 	switch occurrence {
 	case "de", "dc":
 	default:
-		panic("finding.DecisionFiledAt: " + occurrence + " is not a decision occurrence the statement names")
+		panic("finding.DecisionOccurrenceFiledAt: " + occurrence + " is not a decision occurrence the statement names")
 	}
 	findingAlias(finding)
 	return SameIssue(`"`+finding+`"."vulnerability_id"`, `"`+occurrence+`"."vulnerability_id"`) +
@@ -364,7 +364,7 @@ func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products [
 		// state, and the rest require the key.
 		needed, args, into = `("de"."state" = ? OR "de"."live_key" IS NOT NULL)`, []any{"lapsed"}, &filter.placedIssues
 	}
-	q := s.db.NewSelect().TableExpr(Decisions).
+	q := s.db.NewSelect().TableExpr(DecisionOccurrences).
 		ColumnExpr(`"dv"."issue_id"`).Distinct().
 		Where(needed, args...)
 	if !all {

@@ -231,9 +231,9 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, decisionID 
 		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision occurrence on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtOccurrence("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
@@ -308,7 +308,7 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, decision
 		// The decision occurrence on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every finding.
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionFiledAt("de", "f")).
+		Where(finding.DecisionOccurrenceFiledAt("de", "f")).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).

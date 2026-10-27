@@ -143,7 +143,7 @@ func (s *Store) refuseOthersDecisions(ctx context.Context, subject access.Subjec
 	if err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).

@@ -537,9 +537,9 @@ type evidenceRow struct {
 //
 // Ordered rather than aggregated, so that every column read through it names
 // the same row.
-var standingHere = `FROM ` + Decisions + `
+var standingHere = `FROM ` + DecisionOccurrences + `
 	JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
-	WHERE ` + DecisionAt("?") + `
+	WHERE ` + DecisionOccurrenceAt("?") + `
 	  AND "de"."live_key" IS NOT NULL
 	  AND ` + KeyMatches + `
 	ORDER BY CASE WHEN "cl"."outcome" = '` + OutcomeMismatched + `'

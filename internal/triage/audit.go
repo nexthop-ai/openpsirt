@@ -124,7 +124,7 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 		kinds, args := kindsOf(kind.Decisions, "cf")
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON "cc"."id" = "cf"."component_id"`+
-			` WHERE `+finding.DecisionFiledAt("de", "cf")+` AND "cc"."name_folded" = ?`+
+			` WHERE `+finding.DecisionOccurrenceFiledAt("de", "cf")+` AND "cc"."name_folded" = ?`+
 			` AND `+kinds+`)`,
 			append([]any{graph.Folded(f.Component)}, args...)...)
 	}
@@ -140,7 +140,7 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
 			JOIN "target" AS "bt" ON "bt"."id" = "bf"."target_id"
 			JOIN "stream" AS "bs" ON "bs"."id" = "bt"."stream_id"
-			WHERE ` + finding.DecisionFiledAt("de", "bf") + `
+			WHERE ` + finding.DecisionOccurrenceFiledAt("de", "bf") + `
 			  AND "bf"."target_id" = ? AND "bs"."product_id" = "de"."product_id"`
 		args := []any{f.TargetID}
 		kinds, kindArgs := kindsOf(kind.Decisions, "bf")
@@ -436,8 +436,8 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 	}
 	earliest := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		Join(finding.DecisionIssue).
-		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionAtOccurrence("f2")).
+		Join(finding.DecisionOccurrenceIssue).
+		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionOccurrenceOf("f2")).
 		Join(`JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"`).
 		Join(`JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"`).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).

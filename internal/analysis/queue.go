@@ -24,7 +24,7 @@ import (
 // judged is not work for the next person to take.
 var waitingDecision = `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 	WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL
-	  AND ` + finding.DecisionFiledAt("dc", "f") + `
+	  AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `
 	  AND "dc"."state" = '` + string(triage.Proposed) + `'
 	  AND "dc"."needs_approval" = TRUE AND "dc"."sent_back_at" IS NULL)`
 

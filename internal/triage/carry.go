@@ -208,14 +208,14 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toTarget, occurrenceID int
 	err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		// The issue the row is read as, which is the one the new line holds.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
 			AS "visibility"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
 			kindArgs...)...).
@@ -255,7 +255,7 @@ func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.Se
 		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"
-			WHERE "f"."target_id" = ? AND ` + finding.DecisionAtOccurrence("f") + ` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND ` + finding.DecisionOccurrenceOf("f") + ` AND "f"."closed_at" IS NULL
 				AND ` + kinds + `
 			ORDER BY ` + finding.ComponentUpstreamExpr + `, ` + finding.ConsumerUpstreamExpr + `
 			LIMIT 1), '')`
@@ -395,7 +395,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		// The issue each row is read as, which is the one the new line holds.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// The argument, which is where the outcome lives.
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
@@ -410,7 +410,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// The new line's contents at that occurrence, if anything.
 		ColumnExpr(`COALESCE((SELECT MIN("c"."name") FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
 			AS "component"`, append([]any{toTarget}, kindArgs...)...).
 		// Both versions, because a row is keyed on both: a build whose
@@ -419,14 +419,14 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Apply(versionsOnLine(toTarget, "now_at", "consumer_now")).
 		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer_was"`).
 		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`)
 			AS "still_there"`, append([]any{toTarget}, kindArgs...)...).
 		// The visibility the occurrence lands at, read as occurrenceOnLine reads it.
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
 			AS "landing"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
 			kindArgs...)...).
@@ -437,7 +437,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."visibility" IN (?)`, bun.List(readable)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
-			WHERE "g"."target_id" = ? AND `+finding.DecisionAtOccurrence("g")+` AND `+gKinds+`)`,
+			WHERE "g"."target_id" = ? AND `+finding.DecisionOccurrenceOf("g")+` AND `+gKinds+`)`,
 			append([]any{fromTarget}, gKindArgs...)...).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -539,7 +539,7 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, occurrence
 	if err := s.db.NewSelect().Model(&deferrals).Relation("Decision").
 		Column("vulnerability_id", "occurrence_identity", "proposed_at", "state", "ended_at").
 		Where(`"de"."product_id" = ?`, productID).
-		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
+		Where(finding.FiledUnderAny(filed.DecisionOccurrenceIssue), bun.List(issues)).
 		Where(`"de"."occurrence_identity" IN (?)`, bun.List(identities)).
 		Where(`"decision"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones for the span they were in force, as the

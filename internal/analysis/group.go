@@ -146,7 +146,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
-			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionFiledAt("dc", "f")+`)`,
+			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionOccurrenceFiledAt("dc", "f")+`)`,
 			productID).
 		Where(`NOT `+ruled, productID).
 		Where(`NOT `+handedOff, productID).

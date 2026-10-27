@@ -104,9 +104,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		// equality that matches ten rows when it matches every open row in
 		// the deployment, and probed the decision occurrences once per row: 0.46 s to
 		// describe a page of thirty-two, against 0.1 ms the other way round.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtOccurrence("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -244,9 +244,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 	if err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		// The decision occurrence on the outside, as above.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtOccurrence("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).

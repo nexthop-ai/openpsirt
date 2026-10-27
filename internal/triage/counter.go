@@ -89,12 +89,12 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	elsewhere := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."occurrence_identity") AS "places"`).
-		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
+		Where(finding.FiledUnderAny(filed.DecisionOccurrenceIssue), bun.List(issues)).
 		Where(`"de"."state" = ?`, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).
 		GroupExpr(`"dv"."issue_id", "cl"."outcome"`)
@@ -140,7 +140,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 			CROSS JOIN "decision_occurrence" AS "de"
 			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 			WHERE "de"."vulnerability_id" = "dv"."id"
-			  AND ` + finding.DecisionAt(`"st"."product_id"`) + `
+			  AND ` + finding.DecisionOccurrenceAt(`"st"."product_id"`) + `
 			  AND "de"."live_key" IS NOT NULL
 			  AND ` + finding.KeyMatches + `)`).
 		GroupExpr(`"st"."product_id", "f"."occurrence_identity"`)

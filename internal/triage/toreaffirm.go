@@ -242,7 +242,7 @@ func (s *Store) movedUnder(ctx context.Context, rows []DecisionOccurrence) (map[
 			` JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`+
 			` WHERE "st"."product_id" = "de"."product_id" AND "f"."closed_at" IS NULL`+
 			` AND `+kinds+
-			` AND `+finding.DecisionFiledAt("de", "f")+` AND `+finding.VersionsMatch+`)`, args...).
+			` AND `+finding.DecisionOccurrenceFiledAt("de", "f")+` AND `+finding.VersionsMatch+`)`, args...).
 		Scan(ctx, &still); err != nil {
 		return nil, fmt.Errorf("read which of these the code moved under: %w", err)
 	}

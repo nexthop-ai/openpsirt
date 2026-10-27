@@ -200,19 +200,19 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		onArgs = append(onArgs, readArgs...)
 	}
 	q := s.db.NewSelect().
-		TableExpr(finding.Decisions).
+		TableExpr(finding.DecisionOccurrences).
 		// The finding this was a decision about, for when it was first seen and
 		// how it was rated. Joined on the same three columns a row is
 		// matched by, and left-joined: a decision about an occurrence that has since
 		// closed still happened, and dropping it would make the figures
 		// flatter exactly where work was finished.
-		Join(`LEFT JOIN "finding" AS "f" ON `+finding.DecisionAtOccurrence("f")+` `+sameProduct, onArgs...).
+		Join(`LEFT JOIN "finding" AS "f" ON `+finding.DecisionOccurrenceOf("f")+` `+sameProduct, onArgs...).
 		Join(`LEFT JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// Rated as the product that made the decision rates it, which is the
 		// band every other surface groups this issue under. Read from the
 		// published word alone, a product that re-rated an issue measured its
 		// own turnaround under a severity nobody there uses.
-		Join(rating.For(rating.OnDecision)).
+		Join(rating.For(rating.OnDecisionOccurrence)).
 		Join(`LEFT JOIN "decision_approval" AS "da" ON "da"."decision_id" = "de"."decision_id"
 			AND "da"."withdrawn_at" IS NULL`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).

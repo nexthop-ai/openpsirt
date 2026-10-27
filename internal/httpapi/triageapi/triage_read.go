@@ -147,7 +147,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		Stopped bool               `query:"stopped" doc:"Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up"`
 		Limit   int                `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset  int                `query:"offset" minimum:"0"`
-	}) (*DecisionsOutput, error) {
+	}) (*DecisionOccurrencesOutput, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -183,7 +183,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what was decided could not be read", err)
 		}
-		out := &DecisionsOutput{}
+		out := &DecisionOccurrencesOutput{}
 		out.Body.Items = details
 		out.Body.Total = total
 		return out, nil

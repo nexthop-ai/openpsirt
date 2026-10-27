@@ -307,7 +307,7 @@ func standingOccurrences(ctx context.Context, db bun.IDB, productID int64,
 	standing, held := InForce()
 	issues, ids := database.InAnyOf(`"dv"."issue_id"`, issueIDs)
 	q := db.NewSelect().
-		TableExpr(Decisions).
+		TableExpr(DecisionOccurrences).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"de"."occurrence_identity" AS "occurrence_identity"`).

@@ -94,7 +94,7 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 				continue
 			}
 			var rows []int64
-			q := tx.NewSelect().TableExpr(finding.Decisions).
+			q := tx.NewSelect().TableExpr(finding.DecisionOccurrences).
 				ColumnExpr(`"de"."id"`).
 				Where(`"de"."decision_id" = ?`, group.DecisionID).
 				Where(`"de"."product_id" = ?`, group.ProductID).
@@ -169,7 +169,7 @@ func coversSomething(q *bun.SelectQuery) *bun.SelectQuery {
 		` JOIN "stream" AS "stc" ON "stc"."id" = "tgc"."stream_id"`+
 		` WHERE "stc"."product_id" = "de"."product_id" AND "fc"."closed_at" IS NULL`+
 		` AND `+kinds+
-		` AND `+finding.DecisionAtOccurrence("fc")+
+		` AND `+finding.DecisionOccurrenceOf("fc")+
 		` AND `+finding.VersionsMatch+`)`, args...)
 }
 
@@ -192,11 +192,11 @@ type ratedWorseGroup struct {
 // per occurrence, and the rating it is compared with is the same for all of them.
 func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([]ratedWorseGroup, error) {
 	q := tx.NewSelect().
-		TableExpr(finding.Decisions).
+		TableExpr(finding.DecisionOccurrences).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		// Rated as the issue the row is read as.
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
-		Join(rating.For(rating.OnDecision)).
+		Join(rating.For(rating.OnDecisionOccurrence)).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."vulnerability_id" AS "vulnerability_id"`).
@@ -215,7 +215,7 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 		q = q.Where(`"de"."product_id" = ?`, where.ProductID)
 	}
 	if len(where.Vulnerabilities) > 0 {
-		q = q.Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(where.Vulnerabilities))
+		q = q.Where(finding.FiledUnderAny(filed.DecisionOccurrenceIssue), bun.List(where.Vulnerabilities))
 	}
 	if where.OpenIn > 0 {
 		kinds, args := kindsOf(kind.VersionCarry, "fo")

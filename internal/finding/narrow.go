@@ -686,8 +686,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	if f.ProposedAfter != nil {
 		where, args := f.product()
-		q = q.Where(`EXISTS (SELECT 1 FROM `+Decisions+`
-			WHERE `+DecisionAt(where)+`
+		q = q.Where(`EXISTS (SELECT 1 FROM `+DecisionOccurrences+`
+			WHERE `+DecisionOccurrenceAt(where)+`
 			  AND "de"."proposed_at" > ?)`, append(args, *f.ProposedAfter)...)
 	}
 	if f.LikelihoodAtLeast > 0 {
@@ -756,7 +756,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		held := `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."decision_id" = ?
 			  AND "dc"."product_id" = ` + where + `
-			  AND ` + DecisionFiledAt("dc", "f")
+			  AND ` + DecisionOccurrenceFiledAt("dc", "f")
 		asked := append([]any{f.Decision}, args...)
 		if states := trimmed(f.DecisionStates); len(states) > 0 {
 			held += ` AND "dc"."state" IN (?)`

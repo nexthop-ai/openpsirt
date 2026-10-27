@@ -126,7 +126,7 @@ func (s *Store) deferredWith(ctx context.Context, occurrences []DecisionOccurren
 	var deferrals []DecisionOccurrence
 	if err := narrow(s.db.NewSelect().Model(&deferrals).Relation("Decision")).
 		Where(`"de"."product_id" IN (?)`, bun.List(productIDs)).
-		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(asked)).
+		Where(finding.FiledUnderAny(filed.DecisionOccurrenceIssue), bun.List(asked)).
 		Where(`"decision"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones included, for the span they were in force.
 		// Excluded outright, the threshold was defeated by taking a deferral

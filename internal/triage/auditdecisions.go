@@ -130,7 +130,7 @@ func (s *Store) AuditDecisions(ctx context.Context, subject access.Subject, f Fi
 		Proposed *time.Time `bun:"proposed"`
 	}
 	if err := matching().
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`COUNT(*) AS "decisions"`).
 		ColumnExpr(`COUNT(DISTINCT "dv"."issue_id") AS "issues"`).
@@ -176,8 +176,8 @@ func (s *Store) AuditDecisions(ctx context.Context, subject access.Subject, f Fi
 	// the findings the reader may read: a name read off a finding they may not
 	// is the disclosure, even as a count.
 	components := matching().
-		Join(finding.DecisionIssue).
-		Join(`JOIN "finding" AS "f" ON `+finding.DecisionAtOccurrence("f")).
+		Join(finding.DecisionOccurrenceIssue).
+		Join(`JOIN "finding" AS "f" ON `+finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).

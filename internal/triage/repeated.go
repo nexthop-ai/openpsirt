@@ -100,7 +100,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 	// put off is the stretches its deferrals held it, with overlaps counted
 	// once, and a union of intervals has no portable spelling in SQL.
 	q := s.db.NewSelect().
-		TableExpr(finding.Decisions).
+		TableExpr(finding.DecisionOccurrences).
 		// The issue each deferral is read as, so an occurrence put off under two
 		// names that merged is one occurrence put off.
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
@@ -109,7 +109,7 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		// The report is per product already, and a rating belongs to one — so
 		// the word beside a repeated deferral is the word the team doing the
 		// deferring holds.
-		Join(rating.For(rating.OnDecision)).
+		Join(rating.For(rating.OnDecisionOccurrence)).
 		// The argument, which is where the outcome and the date live.
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		// Grouped on the product's identifier and the issue's, with the names

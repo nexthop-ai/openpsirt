@@ -50,7 +50,7 @@ func (s *Store) Applying(ctx context.Context, at Occurrence) (*DecisionOccurrenc
 	// deferral stops standing on a date that is held there too.
 	query := s.db.NewSelect().Model(occurrence).Relation("Decision").
 		Where(`"de"."product_id" = ?`, at.ProductID).
-		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), at.VulnerabilityID).
 		Where(`"de"."occurrence_identity" = ?`, at.OccurrenceIdentity).
 		// Approved, or proposed and never needing agreement, and not one
 		// that was sent back — asked of the one spelling rather than written
@@ -120,7 +120,7 @@ func (s *Store) PreviouslyAt(ctx context.Context, subject access.Subject, at Occ
 	// With the argument each row applied, which is what is offered back.
 	if err := readableBy(s.db.NewSelect().Model(&previous).Relation("Decision"), subject, "de").
 		Where(`"de"."product_id" = ?`, at.ProductID).
-		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), at.VulnerabilityID).
 		Where(`"de"."occurrence_identity" = ?`, at.OccurrenceIdentity).
 		Order("de.id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided here before: %w", err)

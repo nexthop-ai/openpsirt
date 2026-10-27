@@ -419,9 +419,9 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 		}
 	} else if err := tx.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtOccurrence("f")).
+		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).

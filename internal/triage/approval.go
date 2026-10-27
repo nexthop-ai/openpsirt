@@ -678,8 +678,8 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	// the approval is served back, so an unnarrowed count discloses how many
 	// undisclosed findings sit behind a decision to somebody who may not read one.
 	covered, err := s.db.NewSelect().
-		TableExpr(finding.Decisions).
-		Join(`JOIN "finding" AS "f" ON `+finding.DecisionAtOccurrence("f")).
+		TableExpr(finding.DecisionOccurrences).
+		Join(`JOIN "finding" AS "f" ON `+finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).

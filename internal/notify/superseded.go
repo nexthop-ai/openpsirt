@@ -48,9 +48,9 @@ type supersededAbout struct {
 
 // supersededSaid is how a telling words each kind of decision.
 var supersededSaid = map[finding.DisplacedKind]string{
-	finding.DisplacedDecision: "two decisions in %s disagreed about one occurrence",
-	finding.DisplacedRating:   "two ratings of it in %s disagreed",
-	finding.DisplacedAttack:   "two records of %s being attacked through it gave different dates",
+	finding.DisplacedDecisionOccurrence: "two decisions in %s disagreed about one occurrence",
+	finding.DisplacedRating:             "two ratings of it in %s disagreed",
+	finding.DisplacedAttack:             "two records of %s being attacked through it gave different dates",
 }
 
 func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) error {
@@ -75,7 +75,7 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			ColumnExpr(`"va"."identifier" AS "absorbed"`).
 			ColumnExpr(`"vk"."identifier" AS "kept"`).
 			Where(`"p"."id" = ?`, one.ProductID)
-		if one.Kind == finding.DisplacedDecision {
+		if one.Kind == finding.DisplacedDecisionOccurrence {
 			// Withheld where either decision is: the one that stands is what
 			// the link opens, and the one that lapsed is what the message
 			// is about.
@@ -97,7 +97,7 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			continue
 		}
 		link := weblink.DecisionOccurrence(one.StandingID)
-		if one.Kind != finding.DisplacedDecision {
+		if one.Kind != finding.DisplacedDecisionOccurrence {
 			link = weblink.Issue(about.Kept)
 		}
 		body := fmt.Sprintf("%s merged into %s, and "+said+". The one with more standing "+

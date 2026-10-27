@@ -395,7 +395,7 @@ func (s *Store) registerJoins(productID int64,
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// The one decision on the record at the occurrence, or none, filed under
 		// any issue read as the finding's.
-		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+		Join(`LEFT JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
 			AND `+onTheRecordHere, productID).
 		Join(`LEFT JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`)
 }

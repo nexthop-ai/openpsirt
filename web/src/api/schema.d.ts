@@ -8964,11 +8964,11 @@ export interface components {
             /** @description The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers */
             reasoning: string;
         };
-        DecisionsOutputBody: {
+        DecisionOccurrencesOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DecisionsOutputBody.json
+             * @example https://example.com/schemas/DecisionOccurrencesOutputBody.json
              */
             readonly $schema?: string;
             items: components["schemas"]["DecisionOccurrenceDetail"][] | null;
@@ -16419,7 +16419,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DecisionsOutputBody"];
+                    "application/json": components["schemas"]["DecisionOccurrencesOutputBody"];
                 };
             };
             /** @description Error */

@@ -116,7 +116,7 @@ func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility,
 	reader Reader) *bun.SelectQuery {
 
 	return q.
-		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+		Join(`LEFT JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
 			AND "de"."state" = 'approved'
 			AND "de"."live_key" IS NOT NULL
 			AND "de"."visibility" IN (?)
@@ -162,7 +162,7 @@ func WhollyAffected(q *bun.SelectQuery, productID int64, visible []access.Visibi
 	bound := append([]any{productID}, args...)
 	bound = append(bound, bun.List(visible))
 	return q.
-		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+		Join(`LEFT JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
 			AND `+standing+`
 			AND "de"."live_key" IS NOT NULL
 			AND "de"."visibility" IN (?)

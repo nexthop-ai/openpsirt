@@ -82,7 +82,7 @@ func (s *Store) StandingAt(ctx context.Context, subject access.Subject, productI
 	// is shown: the outcome, the justification, the dates.
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Decision"), subject, "de").
 		Where(`"de"."product_id" = ?`, productID).
-		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), issueID).
 		Where(`"de"."live_key" IN (?)`, bun.List(keys)).
 		Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what stands here: %w", err)
@@ -216,7 +216,7 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 	// With the argument each row applied, which is what is offered back.
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Decision"), subject, "de").
 		Where(`"de"."product_id" = ?`, productID).
-		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), issueID).
 		Where(`"de"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(`"de"."state" IN (?, ?)`, Withdrawn, LapsedState).
 		// Bounded, newest first. This is the whole history of what was
@@ -284,7 +284,7 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	var rows []DecisionOccurrence
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Decision"), subject, "de").
 		Where(`"de"."product_id" = ?`, productID).
-		Where("NOT ("+finding.FiledUnder(filed.DecisionIssue)+")", issueID).
+		Where("NOT ("+finding.FiledUnder(filed.DecisionOccurrenceIssue)+")", issueID).
 		Where(`"de"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(`"decision"."outcome" = ?`, NotApplicable).
 		Where(`"de"."state" = ?`, Approved).
@@ -322,7 +322,7 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		// Counted as the issues the rows are read as, so two names a report
 		// merged are one issue.
-		Join(finding.DecisionIssue).
+		Join(finding.DecisionOccurrenceIssue).
 		ColumnExpr(`COUNT(DISTINCT "dv"."issue_id") AS "issues"`).
 		Where(`"de"."decision_id" IN (?)`, bun.List(order)).
 		GroupExpr(`"de"."decision_id"`).
@@ -391,7 +391,7 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 	var rows []DecisionOccurrence
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Decision"), subject, "de").
 		Where(`"de"."product_id" <> ?`, productID).
-		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), issueID).
 		Where(`"de"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(`"de"."state" = ?`, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).

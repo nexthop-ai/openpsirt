@@ -103,7 +103,7 @@ func standsAs(product string, state decisionState) string {
 	return `EXISTS (SELECT 1 FROM "finding" AS "f2"
 			JOIN "component" AS "c" ON "c"."id" = "f2"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f2"."consumer_id"
-			JOIN (` + Decisions + `) ON ` + DecisionAtOccurrence("f2") + `
+			JOIN (` + DecisionOccurrences + `) ON ` + DecisionOccurrenceOf("f2") + `
 			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 			WHERE "f2"."id" = "f"."id"
 			  AND "de"."product_id" = ` + product + `
@@ -119,9 +119,9 @@ func standsAs(product string, state decisionState) string {
 // name. Quoting it at the joint is what puts it back inside a rule something
 // checks.
 func decidedAs(product string, state decisionState) string {
-	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM ` + Decisions + `
+	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM ` + DecisionOccurrences + `
 			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
-			WHERE ` + DecisionAt(product) + `
+			WHERE ` + DecisionOccurrenceAt(product) + `
 			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`
 }
 
@@ -178,9 +178,9 @@ func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
 func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQuery {
 	return q.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		Join(DecisionIssue).
+		Join(DecisionOccurrenceIssue).
 		Join(`CROSS JOIN `+source, args...).
-		Where(DecisionAtOccurrence("f2")).
+		Where(DecisionOccurrenceOf("f2")).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(coversAsked)
 }

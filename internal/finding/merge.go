@@ -54,14 +54,14 @@ func FiledUnder(column filed.Column) string { return filed.Under(column) }
 // placeholder.
 func FiledUnderAny(column filed.Column) string { return filed.UnderAny(column) }
 
-// Decisions is every decision occurrence `de` beside `dv`, the issue it was
+// DecisionOccurrences is every decision occurrence `de` beside `dv`, the issue it was
 // filed under.
 //
 // A decision occurrence is related to a finding through `dv.issue_id`, because
 // the issue a decision occurrence was filed under may since have merged into
 // the one the finding holds. Written as a join, so every engine reaches the
 // decision occurrences of a finding through an index on each side.
-const Decisions = `"vulnerability" AS "dv" JOIN "decision_occurrence" AS "de" ON "de"."vulnerability_id" = "dv"."id"`
+const DecisionOccurrences = `"vulnerability" AS "dv" JOIN "decision_occurrence" AS "de" ON "de"."vulnerability_id" = "dv"."id"`
 
 // LiveKey is what a live decision occurrence is about, hashed: the product, the
 // issue, the occurrence, and both upstream versions it was made against — or
@@ -90,10 +90,10 @@ func LiveKey(productID, issueID int64, occurrence, componentUpstream, consumerUp
 	return hex.EncodeToString(sum[:])
 }
 
-// DecisionIssue joins `dv`, the issue a decision occurrence `de` was filed
+// DecisionOccurrenceIssue joins `dv`, the issue a decision occurrence `de` was filed
 // under, to a query that starts from the decision occurrences. The issue it is
 // read as is `dv.issue_id`.
-const DecisionIssue = `JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`
+const DecisionOccurrenceIssue = `JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`
 
 // SameIssue is the condition that the finding issue column holds the issue a
 // row filed under the issue in filed is read as. A finding is always filed

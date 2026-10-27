@@ -39,7 +39,7 @@ func States() []State {
 var standingOutcome = `(SELECT MAX("sc"."outcome") FROM "decision_occurrence" AS "dc"
 	JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"
 	WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL
-	  AND ` + finding.DecisionFiledAt("dc", "f") + `
+	  AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `
 	  AND ("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL)))`
 
 // handedOff is whether the lead under "f" in the product bound was handed off.

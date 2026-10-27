@@ -292,11 +292,11 @@ func TestAMergeMeetingTwoDecisionsThatDisagreeKeepsTheApprovedOneAndTellsTheTria
 			t.Errorf("the proposed decision it disagreed with is %s, want lapsed",
 				after[waiting.ID].State)
 		}
-		var why []finding.SupersededDecision
+		var why []finding.SupersededOccurrence
 		if err := f.db.DB.NewSelect().Model(&why).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if len(why) != 1 || why[0].DecisionID != waiting.ID || why[0].StandingID != agreed.ID ||
+		if len(why) != 1 || why[0].DecisionOccurrenceID != waiting.ID || why[0].StandingID != agreed.ID ||
 			!why[0].Disagreed {
 			t.Errorf("the lapse is recorded as %+v", why)
 		}

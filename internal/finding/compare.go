@@ -562,7 +562,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		// reaches an alias that is joined after it, which SQLite allows and
 		// MySQL and MariaDB refuse. Both joins are inner, so the two are the
 		// same question asked in the one place every engine agrees on.
-		Join(`JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+		Join(`JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt("?")+`
 			AND `+inForce+` AND "de"."live_key" IS NOT NULL`, append([]any{productID}, held...)...).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(KeyMatches).

@@ -46,17 +46,17 @@ func (d liveDecision) outranks(other liveDecision) bool {
 	return d.ID > other.ID
 }
 
-// SupersededDecision is a live decision a merge took out of force because
+// SupersededOccurrence is a live decision a merge took out of force because
 // another live decision stood at the same occurrence under the other name.
-type SupersededDecision struct {
+type SupersededOccurrence struct {
 	bun.BaseModel `bun:"table:decision_occurrence_superseded,alias:ds"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
-	// DecisionID is the decision occurrence that lapsed and StandingID the one
+	// DecisionOccurrenceID is the decision occurrence that lapsed and StandingID the one
 	// that stands in its place.
-	DecisionID int64 `bun:"decision_occurrence_id,notnull"`
-	StandingID int64 `bun:"standing_id,notnull"`
-	MergeID    int64 `bun:"merge_id,notnull"`
+	DecisionOccurrenceID int64 `bun:"decision_occurrence_id,notnull"`
+	StandingID           int64 `bun:"standing_id,notnull"`
+	MergeID              int64 `bun:"merge_id,notnull"`
 	// Disagreed is whether the two said different things. A disagreement is
 	// told to the product's triagers.
 	Disagreed bool `bun:"disagreed,notnull"`
@@ -80,8 +80,8 @@ type DisplacedKind string
 
 // The records a merge settles by standing.
 const (
-	// DisplacedDecision is a live decision at one occurrence.
-	DisplacedDecision DisplacedKind = "decision"
+	// DisplacedDecisionOccurrence is a live decision at one occurrence.
+	DisplacedDecisionOccurrence DisplacedKind = "decision"
 	// DisplacedRating is a rating claim in one product.
 	DisplacedRating DisplacedKind = "rating"
 	// DisplacedAttack is a record of the product being exploited through the
@@ -112,7 +112,7 @@ func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int
 		ColumnExpr(`"de"."id", "de"."product_id", "de"."vulnerability_id", "de"."occurrence_identity"`).
 		ColumnExpr(`"de"."component_upstream_version", "de"."consumer_upstream_version"`).
 		ColumnExpr(`"de"."state", "de"."proposed_at", "cl"."outcome"`).
-		Where(FiledUnder(filed.DecisionIssue), kept).
+		Where(FiledUnder(filed.DecisionOccurrenceIssue), kept).
 		Where(`"de"."live_key" IS NOT NULL`).
 		OrderExpr(`"de"."id"`).
 		Scan(ctx, &live); err != nil {
@@ -218,8 +218,8 @@ func (v *Vulnerabilities) supersede(ctx context.Context, set []liveDecision, mer
 			Where(`"id" = ?`, d.ID).Exec(ctx); err != nil {
 			return fmt.Errorf("lapse decision occurrence %d, which a merge superseded: %w", d.ID, err)
 		}
-		record := &SupersededDecision{
-			DecisionID: d.ID, StandingID: winner.ID, MergeID: mergeID,
+		record := &SupersededOccurrence{
+			DecisionOccurrenceID: d.ID, StandingID: winner.ID, MergeID: mergeID,
 			Disagreed: d.Outcome != winner.Outcome,
 		}
 		if _, err := v.db.NewInsert().Model(record).Exec(ctx); err != nil {
@@ -228,7 +228,7 @@ func (v *Vulnerabilities) supersede(ctx context.Context, set []liveDecision, mer
 		lapsed[d.ID] = true
 		if record.Disagreed {
 			v.displaced = append(v.displaced, Displaced{
-				Kind: DisplacedDecision, ProductID: d.ProductID,
+				Kind: DisplacedDecisionOccurrence, ProductID: d.ProductID,
 				RecordID: d.ID, StandingID: winner.ID, MergeID: mergeID,
 			})
 		}

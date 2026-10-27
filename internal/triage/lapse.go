@@ -71,7 +71,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."closed_at" IS NULL`).
 			Apply(ofKinds(kind.VersionCarry, "f")).
-			Where(finding.DecisionAtOccurrence("f"))
+			Where(finding.DecisionOccurrenceOf("f"))
 	}
 
 	// Any open finding in the row's product, in any build, still at the
@@ -87,7 +87,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where(`"st"."product_id" = "de"."product_id"`).
 			Where(`"f"."closed_at" IS NULL`).
 			Apply(ofKinds(kind.VersionCarry, "f")).
-			Where(finding.DecisionAtOccurrence("f")).
+			Where(finding.DecisionOccurrenceOf("f")).
 			Where(finding.VersionsMatch)
 	}
 
@@ -97,7 +97,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// row recorded against no version matches a component stating none.
 	lapsable := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().Model((*DecisionOccurrence)(nil)).
-			Join(finding.DecisionIssue).
+			Join(finding.DecisionOccurrenceIssue).
 			ColumnExpr(`"de"."id"`).
 			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 			// A decision about the match rather than about the version does not

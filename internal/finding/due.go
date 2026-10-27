@@ -281,9 +281,9 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 		  AND "cl"."outcome" = ?`
 		args = append(args, outcome)
 	}
-	return `EXISTS (SELECT 1 FROM ` + Decisions + `
+	return `EXISTS (SELECT 1 FROM ` + DecisionOccurrences + `
 		JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
-		WHERE ` + DecisionAt(product) + `
+		WHERE ` + DecisionOccurrenceAt(product) + `
 		  AND ` + KeyMatches + `
 		  AND ` + standing + `
 		  AND ("cl"."deferred_until" IS NULL OR "cl"."deferred_until" > ?)` + narrowed + `)`,

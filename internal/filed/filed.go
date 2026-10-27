@@ -22,8 +22,8 @@ type Column string
 const (
 	// Issue is the column on a statement over one table, unqualified.
 	Issue Column = `"vulnerability_id"`
-	// DecisionIssue is a decision's issue.
-	DecisionIssue Column = `"de"."vulnerability_id"`
+	// DecisionOccurrenceIssue is a decision occurrence's issue.
+	DecisionOccurrenceIssue Column = `"de"."vulnerability_id"`
 	// ReportIssue is the issue a flaw report stands for.
 	ReportIssue Column = `"fr"."vulnerability_id"`
 	// ExploitedIssue is the issue a record of exploitation here is about.

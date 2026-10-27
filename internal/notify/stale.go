@@ -438,10 +438,10 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		Where(`"f"."assigned_at" <= ?`, since).
 		Where(`"tm"."retired_at" IS NULL`).
 		Where("NOT EXISTS (?)", w.db.NewSelect().
-			TableExpr(finding.Decisions).
+			TableExpr(finding.DecisionOccurrences).
 			Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 			ColumnExpr("1").
-			Where(finding.DecisionAt(`"st"."product_id"`)).
+			Where(finding.DecisionOccurrenceAt(`"st"."product_id"`)).
 			Where(`"de"."live_key" IS NOT NULL`).
 			Where(finding.KeyMatches)).
 		GroupExpr(`"tm"."id", "tm"."display_name", "tm"."name", "st"."product_id", "f"."vulnerability_id", "f"."component_id"`)
@@ -589,7 +589,7 @@ func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[
 			WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."product_id" = "st"."product_id" AND "dc"."live_key" IS NOT NULL
-			AND ` + finding.DecisionFiledAt("dc", "f") + `)`).
+			AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `)`).
 		GroupExpr(`"tm"."id", "tm"."display_name", "tm"."name", "st"."product_id", "f"."occurrence_identity"`)
 
 	if err := w.db.NewSelect().

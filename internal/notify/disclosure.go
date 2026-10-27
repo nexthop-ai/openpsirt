@@ -82,7 +82,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 	}
 	undisclosed, private := access.AnyWithheld(`"de"."visibility"`)
 	err := w.db.NewSelect().
-		TableExpr(finding.Decisions).
+		TableExpr(finding.DecisionOccurrences).
 		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "de"."from_statement_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 		// The issue the decision is read as, which is the one a reader finds

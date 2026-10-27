@@ -107,8 +107,8 @@ func registerComments(api huma.API, in core.Deps) {
 	})
 }
 
-// DecisionsOutput is a page of decision occurrences, with how many there are behind it.
-type DecisionsOutput struct {
+// DecisionOccurrencesOutput is a page of decision occurrences, with how many there are behind it.
+type DecisionOccurrencesOutput struct {
 	Body struct {
 		Items []core.DecisionOccurrenceDetail `json:"items"`
 		Total int                             `json:"total"`
