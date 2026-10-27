@@ -34,7 +34,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 
 ## Declaration, not completion
 
-A fix is declared and never completed. A judgment promising work states which
+A fix is declared and never completed. A decision promising work states which
 releases it is for; whether the fix arrived is answered by the next scan of each
 of those releases (REQ-35).
 
@@ -42,7 +42,7 @@ The stored row is the declaration and nothing else: which build, which fold, who
 said so, and when. There is no state column, no completed-at, and nothing to
 move along.
 
-A declaration arrives with the judgment that argued for it, from the two
+A declaration arrives with the decision that argued for it, from the two
 outcomes that promise work — a bump, recorded against the component, and a
 backport, recorded against the issue. There is no way to record where a fix
 will land without saying what was decided. Bare intent carries no version, no
@@ -94,19 +94,19 @@ saying otherwise is a plan a coordinator cannot read.
 
 | Where it came from | How it changes |
 |---|---|
-| A judgment somebody agreed to | Through the act that revises the claim, which withdraws every agreement on it and returns its rows to the queue. A reason is required, and the revisions are where what was promised in October survives being changed in November |
+| A decision somebody agreed to | Through the act that revises it, which withdraws every agreement on it and returns its rows to the queue. A reason is required, and the revisions are where what was promised in October survives being changed in November |
 | Intent nobody argued for | The row is edited |
 
 Changing the version or the date under a standing agreement is refused, naming
-the claim to revise. An approver agreed to a version by a date; rewriting either
+the decision to revise. An approver agreed to a version by a date; rewriting either
 half quietly would leave the agreement standing over a promise nobody read,
 which is the failure REQ-28 exists to prevent.
 
 | Rule | |
 |---|---|
 | **The gate is worked out again** | Moving the date moves the thing the gate is about. Withdrawing the agreements and leaving the rows recorded as needing nobody put a promise first made inside the deadline back in force at any later date somebody chose — in force, suppressing what it covered, and listed in no queue |
-| It is measured over what the claim covers now | The builds come from the commitments the claim wrote and the places from its own rows, read inside the transaction that writes. A deadline moves when the policy or the rating moves, so the one it was made against is not the one it is judged by |
-| A promised patch moves by its date alone | It has no version. It writes no commitments, so its builds are the ones holding an open finding the claim covers now |
+| It is measured over what the decision covers now | The builds come from the commitments the decision wrote and the occurrences from its own rows, read inside the transaction that writes. A deadline moves when the policy or the rating moves, so the one it was made against is not the one it is judged by |
+| A promised patch moves by its date alone | It has no version. It writes no commitments, so its builds are the ones holding an open finding the decision covers now |
 | A date already past is refused | It says the work will have happened before now |
 | The reasoning goes through the text policy | Every path that stores typed text runs it before storing, and this one reached the write through an inner act that did not |
 
@@ -196,7 +196,7 @@ whose purpose is noticing what is running out.
 
 A deadline nobody can meet is not a deadline, which is the one statement the
 four after `not-rated` make. Where upstream has released nothing there is no version to take, and
-the only act that stops the clock is a person recording a judgment — which is
+the only act that stops the clock is a person recording a decision — which is
 the act the deadline exists to ask for and cannot be the answer to. An overdue
 list carrying rows no upgrade would answer is one people stop reading, and what
 they stop reading is the rest of it.
@@ -266,7 +266,7 @@ its clock starts when it is first given a severity (REQ-33).
 | The clock starts at the first severity | A flaw recorded with one starts at the recording. One recorded without one carries no deadline, and starts when a rating is first put in force for it in that product |
 | The start is stored on the finding | A rating withdrawn and made again moves the window and keeps the start. Restarted, a flaw near its date is given a fresh window by being re-rated, which is a deferral nobody agreed to |
 | Everything else is the rule above | Exploitation learned later and a fix arriving move it the way they move a scanned finding |
-| A recorded flaw is recounted on its own | Recorded flaws are few, one row per place in each build, so they are rewritten row by row rather than in the bands a scan's findings are |
+| A recorded flaw is recounted on its own | Recorded flaws are few, one row per occurrence in each build, so they are rewritten row by row rather than in the bands a scan's findings are |
 
 ## Pending upgrades
 
@@ -290,7 +290,7 @@ as the upgrade succeeded.
 
 What each row reports is what is still open under it, counted from the findings
 rather than from anything written down: the distinct issues the upgrade would
-close here, and how many places those sit at. Nothing is declared done by hand — a
+close here, and how many occurrences those sit at. Nothing is declared done by hand — a
 build is clear when it stops holding them.
 
 ## Upstream currency
@@ -474,12 +474,12 @@ Three states, derived on every read and set by nobody.
 
 | Rule | Reason |
 |---|---|
-| The date is on the commitment, and the claim that argued for it is a citation | What somebody decided and what a release is waiting on are one fact. Changing it goes through the claim, so the two cannot come to disagree |
-| Only the claim that made a commitment withdraws it | A promise naming fewer builds withdraws its own commitments on the rest and keeps those another claim made, whose decisions still stand on them. A second claim promising a build already committed is refused, naming the claim that stands, even where it states the same version and date: its decisions would rest on a date only the first claim moves |
+| The date is on the commitment, and the decision that argued for it is a citation | What somebody decided and what a release is waiting on are one fact. Changing it goes through the decision, so the two cannot come to disagree |
+| Only the decision that made a commitment withdraws it | A promise naming fewer builds withdraws its own commitments on the rest and keeps those another decision made, whose occurrences still stand on them. A second decision promising a build already committed is refused, naming the decision that stands, even where it states the same version and date: its occurrences would rest on a date only the first decision moves |
 | There is no "replanned" | Re-promising writes a new date and the standing promise is the one read. A state nothing can distinguish from another is a word rather than a fact |
-| Where several promises stand over one component in one build, one of them is reported whole | A promise naming a version before one naming none, then the latest date, then the later claim. Its date and its version are read together: the latest date beside the lowest version string pairs two promises nobody made |
+| Where several promises stand over one component in one build, one of them is reported whole | A promise naming a version before one naming none, then the latest date, then the later decision. Its date and its version are read together: the latest date beside the lowest version string pairs two promises nobody made |
 | A lapsed promise returns the upgrade, not its findings | One item, to whoever is carrying it — reported as a party only where one party holds all of what is still open under it, addressed by its identity or team name with its display name beside it, as `DESIGN-api.md` § Addresses and labels sets out. Answering the findings again one at a time is what the bulk promise was made instead of |
-| A finding returns on its own only when the package moved and it did not close | A decision is keyed on the upstream version it was made against, so the existing key distinguishes "the plan was wrong about specifics" from "the plan did not happen" |
+| A finding returns on its own only when the package moved and it did not close | The decision at an occurrence is keyed on the upstream version it was made against, so the existing key distinguishes "the plan was wrong about specifics" from "the plan did not happen" |
 
 Stored rather than derived, these would be a third opinion capable of being wrong
 about both the scans and the calendar.
@@ -502,8 +502,8 @@ evidence.
 
 ## External links
 
-A claim carries a link to work happening elsewhere, and nothing is sent to
-it (REQ-36): the link is stored and read by people. One link per claim rather
+A decision carries a link to work happening elsewhere, and nothing is sent to
+it (REQ-36): the link is stored and read by people. One link per decision rather
 than one per release, because the conversation about a promise is one
 conversation. What is not built is the tracker hand-off — opening or updating an
 item in whatever system that link points at.
@@ -518,7 +518,7 @@ the deployment sat behind a document saying it did not exist.
 |---|---|
 | Nothing fetches what a link points at | A tool that fetched an address a person typed is a request-forgery primitive. Stored as text, shown as a link, encoded on the way out |
 | Sent empty, it is cleared | A stale link sends somebody to a ticket that closed for a different reason |
-| Anybody who may argue about a claim may point it somewhere | A link is a note about where the conversation is rather than a judgment |
+| Anybody who may argue about a decision may point it somewhere | A link is a note about where the conversation is rather than a decision |
 
 Assigning notifies; planning does not (REQ-34). Somebody is told when work is put
 on them. Saying which releases the work is meant to reach is done to the work.
@@ -612,7 +612,7 @@ from when each flaw was named on it and taken off.
 | An agreement records what each release stood at when it was given | A decision approved or lapsing afterwards moves a release's status and the agreement stands, because the decision had a second person of its own. The advisory screen says "changed since approval" against every agreement standing, and whether the document differs from what last went out is asked of the settled digest as before |
 | Opening an edition takes back every agreement standing on the one it replaced | The record says a second person did once agree, and to which edition |
 | Changing what an advisory says needs a triage role on every product it covers | An advisory is read whole or not at all, so what it says about one product is part of the same document as what it says about another. Retitling, agreeing, taking an agreement back, naming or removing a flaw, and recording that it went out all ask for it |
-| The roles that may agree are the triage pair rather than the approver role a claim takes | Agreeing to an advisory is agreeing to a statement about every product it covers, which is what the triage roles are held per product for |
+| The roles that may agree are the triage pair rather than the approver role a decision takes | Agreeing to an advisory is agreeing to a statement about every product it covers, which is what the triage roles are held per product for |
 | Neither the person who started the advisory nor the author of the edition standing may agree to it | Whoever started it chose the name a reader cites it by and, in the ordinary case, the flaws it covers. There is no override, so a deployment with one person publishes no advisory — the control working rather than a gap in it |
 | The author of the edition standing is everybody who wrote an edition back to the one that set its title | A change to what the advisory covers opens an edition that carries the title forward and is written by whoever made the change. Asked of that edition alone, the title's own author could agree to words they wrote |
 | Taking an agreement back is an act of anybody who may change what the advisory says, and takes back every agreement standing | What it stops is the document going out rather than one person's opinion of it, so it needs no agreement of its own |
@@ -635,14 +635,14 @@ Nothing is sent anywhere.
 | The publisher is deployment configuration, not an administrator's setting | It is the identity of the organization running this. Both a name and a namespace are required, because a document naming no publisher is not a CSAF document |
 | Generating or recording a document with no publisher configured answers 409; any other failure is a fault | The missing publisher is the store's own refusal, matched by identity. Reading what has gone out needs no publisher, so its failures are faults wherever none is configured |
 | A document about an undisclosed flaw travels no further, whatever its editorial state | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either. The distribution label is what carries this; the tracking status says where the document is in its life |
-| The label is decided from every place of each issue in its product | One undisclosed place makes the issue embargoed there, whichever place was recorded first or which the reader sees. A reader who may not read undisclosed work in that product is not shown the advisory at all: listing it, opening it by name and generating its document refuse together, because a listing that admits it beside a document that refuses says undisclosed work exists |
+| The label is decided from every occurrence of each issue in its product | One undisclosed occurrence makes the issue embargoed there, whichever occurrence was recorded first or which the reader sees. A reader who may not read undisclosed work in that product is not shown the advisory at all: listing it, opening it by name and generating its document refuse together, because a listing that admits it beside a document that refuses says undisclosed work exists |
 | Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
-| A release whose every open place stands under approved, live decisions with one outcome states what they say | The rule the VEX document of a build reads, through the one query both documents use. Not applicable or a wrong match, with its reason, is known not affected; already fixed is fixed; will not fix stays known affected, and says no fix is planned. A release partly covered stays known affected, because the document has no finer grain than the release |
-| Where the decisions at a release differ, the earliest speaks | The claim that has stood longest, as in the VEX document. Its reason and its mitigation are read off that one decision |
+| A release whose every open occurrence stands under approved, live decisions with one outcome states what they say | The rule the VEX document of a build reads, through the one query both documents use. Not applicable or a wrong match, with its reason, is known not affected; already fixed is fixed; will not fix stays known affected, and says no fix is planned. A release partly covered stays known affected, because the document has no finer grain than the release |
+| Where the decisions at a release differ, the earliest speaks | The decision that has stood longest, as in the VEX document. Its reason and its mitigation are read off that one decision |
 | A decision is read at the visibilities the findings are | A decision carries the visibility of the finding it was made about, and the document is read at what its reader may see |
 | A finding taken back as invalid is left out | Narrowing the builds a flaw is filed against closes a build's finding that way, and that build never shipped the flaw. Named as fixed, it reads as a release somebody upgrades to |
-| A superseded closure is never a fix | The version moved and the flaw came with it, so the row that superseded it speaks for the place. A release whose only closures are superseded, with nothing open, is stated as known affected: nothing after that closure says the flaw left |
+| A superseded closure is never a fix | The version moved and the flaw came with it, so the row that superseded it speaks for the occurrence. A release whose only closures are superseded, with nothing open, is stated as known affected: nothing after that closure says the flaw left |
 | A release can be marked affected whatever its decisions say | A decision reaches every build whose versions match (REQ-25), so one made about a variant where the code is compiled out also covers a variant where it is compiled in. The person preparing the advisory sees the builds the decision was made on beside each release, and a release of a variant none of them is, reached only by lookup, is flagged. Another branch or tag of a variant it was made on is the same configuration and is not flagged, or nearly every release would carry the warning. A decision recording no build is shown as not recorded and flags nothing |
 | Every date the document states is a date and a time | The standard defines each of them that way, and a validator run with format assertions refuses a bare day — which is a document a customer's tooling drops, the failure that looks like nothing happening. A schema check run without them passes it, so the two disagree about a document nobody would accept. A settled digest taken while a date was spelled as a bare day does not match again, which REQ-76 is what covers |
 | Every object's keys are written in alphabetical order | The standard's optional sorting test reads every key at every depth. The order is imposed on the bytes, as generated and as kept, rather than on how the fields are declared, and the framework's schema link is left off the one route that answers with the document, since it is a key the standard does not define. A settled digest taken before the keys were sorted does not match again, which REQ-76 is what covers |
@@ -663,13 +663,13 @@ somebody deciding whether to act.
 | References | The issue's write-up and everywhere else a report points, each address once, and last the address this document is published at | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's. Its own address is stated only where the deployment has said where its documents are reachable, because a reader's tooling follows a self reference and one pointing at nothing is worse than none — and it is built from the same rule the directory writes the file under, so the two cannot name different files |
 | Scores | The version 3 rating, scored here from its vector, stated for every release the flaw is or was in. A release known not affected carries none | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. The standard's score object has a field for version 2 and version 3, and version 4 arrives with the standard's next version — so an issue rated under both states its version 3 rating, and one rated under version 4 alone states none rather than a number in the wrong place. The ratings a report stated are asked newest first, then the vector a flaw assessed here was given. The vector stated is the base vector inside the one held: metrics outside the base set are accepted and not checked, and a validator refuses a metric name or value the specification does not define |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
-| Remediations | Stated for the releases that still carry the flaw, and the details name the releases that are fixed. A release known not affected is named in neither. A release every open place of which stands under approved decisions that it will not be fixed takes `no_fix_planned` instead, and a `mitigation` carrying what stops the flaw where the decision named it, never the reasoning. It is not offered the fixed releases: beside "no fix is planned" for the same release, a vendor fix reads as the two contradicting each other, and moving to another line is the reader's decision rather than a remediation of this one | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
+| Remediations | Stated for the releases that still carry the flaw, and the details name the releases that are fixed. A release known not affected is named in neither. A release every open occurrence of which stands under approved decisions that it will not be fixed takes `no_fix_planned` instead, and a `mitigation` carrying what stops the flaw where the decision named it, never the reasoning. It is not offered the fixed releases: beside "no fix is planned" for the same release, a vendor fix reads as the two contradicting each other, and moving to another line is the reader's decision rather than a remediation of this one | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
 | Flags | The reason of the decision a release known not affected stands under, one flag per reason naming its releases | The five reasons a decision records are the standard's five flag labels, so nothing is translated |
 | Impact | What stops the flaw, from the same decision, one statement per mitigation naming its releases, and absent where the decision named none | The mitigation is the half somebody holding the release can act on. The decision's reasoning is never read into a document: it is the argument a triager put to a second person here |
 | Distribution | Whether anything it covers is still held back — RED while anything is, WHITE otherwise | Handing a document about a flaw nobody outside has been told about to somebody who may pass it on is the disclosure the embargo exists to hold, and that is true of a document at any point in its editorial life. The labels are the standard's four, which is why a disclosed document is WHITE rather than the word the protocol renamed it to |
 
 An address a report supplied goes through the rule an address stored beside a
-claim goes through, and a custom application scheme is dropped rather than
+decision goes through, and a custom application scheme is dropped rather than
 published. It is leaving the deployment, into tooling that follows it.
 
 The weakness is stated in the catalog's own words. The standard carries a
@@ -698,7 +698,7 @@ component the document is about, where it declared one.
 ## The VEX document
 
 Assembled from approved `not-applicable`, `mismatched` and `already-fixed`
-claims (REQ-39), from `wont-fix` claims that say what a holder can do
+decisions (REQ-39), from `wont-fix` decisions that say what a holder can do
 instead, and from the patches the build declares, for one product, stream and
 variant.
 
@@ -707,27 +707,27 @@ Two documents describe a build, chosen when one is generated.
 | Kind | Carries |
 |---|---|
 | Ours | What this deployment agreed to, and the patches the build declares. The default |
-| With suppliers | Ours, and beside it what a supplier states about its own product, in the supplier's name, where the statement closed every place of a component in the build |
+| With suppliers | Ours, and beside it what a supplier states about its own product, in the supplier's name, where the statement closed every occurrence of a component in the build |
 
 A customer running their own scanner against a shipped image asks "which of these
 are you not affected by" more often than they ask for an advisory. Generating it
 puts this deployment's dismissals in writing, machine-readable, in front of every
-customer — which is the reason the two-person approval on those claims exists.
+customer — which is the reason the two-person approval on those decisions exists.
 
 | Rule | Reason |
 |---|---|
 | OpenVEX rather than the CSAF profile | It is the format this deployment already reads. One document shape to get right, and one deployment's output can be another's input |
-| Approved claims only, besides the build's own patches and, in the document carrying them, suppliers' statements | A proposal is one person's opinion and this document is the deployment's word to a customer |
+| Approved decisions only, besides the build's own patches and, in the document carrying them, suppliers' statements | A proposal is one person's opinion and this document is the deployment's word to a customer |
 | A patch the build declares is said as `fixed` | The build's word on its own patches is applied without a decision here (REQ-11). The finding it covers is closed as patched, and a customer's scanner still matches the upstream version, so without the statement the scanner reports it as affected |
-| A patch is said only while it stands | The component still ships in the build, no place of a component of that name and package identifier is open against the issue, and the build still declares the patch. A build that drops the patch has the statement drop with it, before any scan reopens the finding |
+| A patch is said only while it stands | The component still ships in the build, no occurrence of a component of that name and package identifier is open against the issue, and the build still declares the patch. A build that drops the patch has the statement drop with it, before any scan reopens the finding |
 | The impact statement carries what stops the flaw, never the reasoning | The reasoning is the argument a triager put to a second person here, addressed to a reader who can see the record it argues against. Published it is this deployment's review of itself, machine-readable, in front of every customer running a scanner. The mitigation is the half somebody holding the build can act on |
 | Where no mitigation was named the field is absent | Only one recognized reason asks for a mitigation, so most statements carry none. The justification beside it is what the format asks for, and silence says less wrongly than the wrong text |
 | An outcome with no status of its own fails the document | Each outcome a document states maps to one status by name, and the outcomes a covering read selects are one list that a test holds to the statuses. An outcome reaching the document unlisted is a fault, answered as one, rather than published under a default, because the only safe default on a published document is silence |
 | A deferral is absent rather than exported as anything | Publishing it as not-affected would assert we assessed something as harmless when we had only postponed it. Silence already reads as affected in this format |
-| A claim that will not be fixed is published as affected, and only where it names what to do instead | It is the truth about such a flaw: it is there and it is staying. Nothing else says so about a third-party component — no scan closes a standing property of a shipped feature, and an advisory states "no fix planned" only for a flaw recorded here — so under silence it reaches a customer never. The format requires an action on an affected statement, so a claim with nothing to offer has nothing to publish, and left out it falls through to the silence that already reads as affected |
-| The mitigation goes in a different field depending on the status | On a claim that something does not apply it is why, beside the category a machine reads. On one that will not be fixed it is what to do instead. An affected statement carrying a not-affected justification says both things at once |
+| A decision that will not be fixed is published as affected, and only where it names what to do instead | It is the truth about such a flaw: it is there and it is staying. Nothing else says so about a third-party component — no scan closes a standing property of a shipped feature, and an advisory states "no fix planned" only for a flaw recorded here — so under silence it reaches a customer never. The format requires an action on an affected statement, so a decision with nothing to offer has nothing to publish, and left out it falls through to the silence that already reads as affected |
+| The mitigation goes in a different field depending on the status | On a decision that something does not apply it is why, beside the category a machine reads. On one that will not be fixed it is what to do instead. An affected statement carrying a not-affected justification says both things at once |
 | Public findings only | Asking for the undisclosed ones is a preview for somebody who may read them, and refused for anybody who may not |
-| The statement is about the build, with the component underneath, or about the consumer where it is stated place by place | A VEX statement is about a thing somebody has, and what they have is the image |
+| The statement is about the build, with the component underneath, or about the consumer where it is stated occurrence by occurrence | A VEX statement is about a thing somebody has, and what they have is the image |
 | The build is named by the package identifier its inventory gave its root | A scanner reading the inventory and the document together matches the product against the root, and a deployment loading both reads a statement about the root as the build's own claim. The build's names stand in where the inventory gave its root no package identifier |
 | A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |
 | Every statement carries the other names its issue answers to (REQ-18) | A customer holds identifiers their own scanner produced, matched under the name *its* database uses. The primary is not repeated among the aliases |
@@ -735,27 +735,27 @@ customer — which is the reason the two-person approval on those claims exists.
 | Ordered here rather than by the engine | Two documents generated from the same state are byte-for-byte identical |
 | Each kind is a document of its own, with its own identifier and its own revisions | A toggle on one document would have a reader watch statements vanish and return as whoever generated it chose, which reads as a retraction nobody made |
 | Ours is the default | Putting a supplier's word under this deployment's name is a choice somebody makes on purpose, and configuring a supplier is not that choice |
-| A supplier's statement is said only while it stands, under the guard a patch stands under | The component still ships, no place of a component of that name and package identifier is open against the issue, the statement that closed it has not been set aside, and nothing has been recorded at the place since: a place the build later patched is said as fixed |
+| A supplier's statement is said only while it stands, under the guard a patch stands under | The component still ships, no occurrence of a component of that name and package identifier is open against the issue, the statement that closed it has not been set aside, and nothing has been recorded at the occurrence since: an occurrence the build later patched is said as fixed |
 | A supplier's statement is said as `not_affected`, with the supplier's justification where the format defines it, and an impact statement naming the publisher, the document and the product | A customer sees whose judgment it is, and this deployment passes on the supplier's word rather than asserting it as its own analysis. A justification the format does not define is left out rather than published under this deployment's name, and the impact statement satisfies the format without one |
-| Only a statement that said not affected is passed on | An upstream's statement that a component is fixed closes places too (`DESIGN-upstream.md`), and is not a statement that it is unaffected |
-| A component two suppliers' statements closed places of is said by neither | Each spoke for their own product, and the format names the component once |
-| An agreed claim and a supplier's statement never speak about one issue in one component | A claim is said only of a component with a place open, and a statement only of one with none |
+| Only a statement that said not affected is passed on | An upstream's statement that a component is fixed closes occurrences too (`DESIGN-upstream.md`), and is not a statement that it is unaffected |
+| A component two suppliers' statements closed occurrences of is said by neither | Each spoke for their own product, and the format names the component once |
+| An agreed decision and a supplier's statement never speak about one issue in one component | A decision is said only of a component with an occurrence open, and a statement only of one with none |
 | A build with more statements than one document carries is refused, not truncated | There is no second request for the rest, so a document that stopped at a ceiling would say "nothing is claimed about this" by omission about everything past it — to every customer running a scanner, which is the one thing a document of dismissals must never say. The ceiling is well above anything real, and reaching it names the build and the number |
 
-A statement about the build is made only where every open place agrees, and
+A statement about the build is made only where every open occurrence agrees, and
 agrees the same way. An advisory asks the same of each release, through the same
-query. A component commonly sits at several places, so a dismissal agreed at
-one of them is not a claim about the component: published as one it is a
+query. A component commonly sits at several occurrences, so a dismissal agreed at
+one of them is not a statement about the component: published as one it is a
 machine-readable "not affected" about something that is affected, sent to every
 customer running a scanner against the image.
 
-Where several places were decided in separate sittings the document states the
-earliest: the claim that has stood longest and the one a reader can check
-against the record. Grouping on the words and the moment emitted the same claim
+Where several occurrences were decided in separate sittings the document states the
+earliest: the decision that has stood longest and the one a reader can check
+against the record. Grouping on the words and the moment would emit the same decision
 twice.
 
 The earliest decision is picked first, and then read. A minimum per column with
-nothing tying the columns to one row composes a statement from two claims: with
+nothing tying the columns to one row composes a statement from two decisions: with
 "component_not_present" and "inline_mitigations_already_exist / bound to the
 management VLAN" both standing at a component, the machine-readable category
 comes from one and the impact statement from the other, and the published
@@ -764,23 +764,23 @@ control that protects it. That is a composite no record ever held, going to
 every customer running a scanner. The group answers with the earliest
 decision's identifier, and its words are read by that identifier.
 
-### Statements about one place
+### Statements about one occurrence
 
-Where a component's places disagree, each place a decision covers is stated on
+Where a component's occurrences disagree, each occurrence a decision covers is stated on
 its own: the consumer that pulls the component in is the product, and the
 component is beneath it. "libnl inside libswsscommon 1.0.0: not affected".
 
 | Rule | |
 |---|---|
-| A place is stated only where every open place of the component beneath its consumer, at any depth, is decided the same way | A reader applies a statement about a product beneath that product, a supplier's statement included (REQ-31). Stated while a place deeper under the consumer is open, it answers that place too |
-| The earliest decision among those places speaks | As it does for a whole component |
+| An occurrence is stated only where every open occurrence of the component beneath its consumer, at any depth, is decided the same way | A reader applies a statement about a product beneath that product, a supplier's statement included (REQ-31). Stated while an occurrence deeper under the consumer is open, it answers that occurrence too |
+| The earliest decision among those occurrences speaks | As it does for a whole component |
 | A consumer whose package identifier names no version names no product | A statement naming a product at no version is about every release of it, and a reader applies it nowhere |
-| A place the build holds directly is never stated alone | It has no consumer, and the only product it could name is the build, which a reader applies across the whole build |
-| One statement per consumer, however many places beneath it agree | A place deeper under the consumer is stated about its own consumer as well, where the rule holds there |
-| A place is stated on its own from an agreed decision, never from a patch the build declares | A patch is said about a whole component. A fix the build states beneath one of its products closes only the places beneath it, so where another place of the component is open the fix is not published at all |
+| An occurrence the build holds directly is never stated alone | It has no consumer, and the only product it could name is the build, which a reader applies across the whole build |
+| One statement per consumer, however many occurrences beneath it agree | An occurrence deeper under the consumer is stated about its own consumer as well, where the rule holds there |
+| An occurrence is stated on its own from an agreed decision, never from a patch the build declares | A patch is said about a whole component. A fix the build states beneath one of its products closes only the occurrences beneath it, so where another occurrence of the component is open the fix is not published at all |
 
-Places dismissed for different reasons — one not applicable, one already fixed —
-are no statement about the component. Each is stated about its own place, where
+Occurrences dismissed for different reasons — one not applicable, one already fixed —
+are no statement about the component. Each is stated about its own occurrence, where
 the rule above holds there.
 
 ### Identity and revisions
@@ -818,7 +818,7 @@ and could not increment its version, both of which CSAF validators check.
 | The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
 | A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
-| Recording that a VEX document went out asks for the triage role on the product | The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved, so no further agreement is asked for |
+| Recording that a VEX document went out asks for the triage role on the product | The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the decision was approved, so no further agreement is asked for |
 | The public document is what is recorded, never the preview | The preview carries work nobody has announced, and a record of it going out would say this deployment published that work |
 | Whether a document moved since it last went out is answered beside it | The settled digest of what would be generated now against the one kept with the last issuance, for an advisory and for a VEX document alike. No answer where nothing has gone out, or where no publisher is configured and nothing can be generated to compare |
 
@@ -949,7 +949,7 @@ on is assembled from the flaws the advisory covers.
 | | |
 |---|---|
 | A bump is keyed on where it is going as well as where it comes from | Pending upgrades grouped on the first two fields and took the third from whichever row made the bucket, so two bundles at 5.9.0 and 5.9.2 rendered as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
-| A fix declared for a product covers its builds without being written per build | A decision's live key names the place and not the build, so a product shipping the same component in two builds produced two identical proposals and the second collided with the unique index, rolling back the whole declaration. The proposals are made distinct before they are written |
-| A statement about a group speaks for the group | The outbound format has no place granularity, so a dismissal covering some of a group is not published as covering all of it |
-| Only a claim made where a build was in hand records one | A claim from before the builds were kept, and one made where no build was on screen, records none. The advisory says so and flags nothing, because a guess from where the place sat names every variant holding the same code, which is the case the flag exists for |
+| A fix declared for a product covers its builds without being written per build | A decision occurrence's live key names the occurrence and not the build, so a product shipping the same component in two builds produced two identical proposals and the second collided with the unique index, rolling back the whole declaration. The proposals are made distinct before they are written |
+| A statement about a group speaks for the group | The outbound format has no occurrence granularity, so a dismissal covering some of a group is not published as covering all of it |
+| Only a decision made where a build was in hand records one | A decision from before the builds were kept, and one made where no build was on screen, records none. The advisory says so and flags nothing, because a guess from where the occurrence sat names every variant holding the same code, which is the case the flag exists for |
 | The provider directory is read whole on every pass | Every document that has gone out is read, and the ones that may be published are written again. An advisory is the rare, deliberate document — single or low double digits a year — so the pass is a read that finds nothing new nearly every time it runs, and a record of what the store already holds would be a second copy of what the store is |

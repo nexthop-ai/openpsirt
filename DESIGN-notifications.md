@@ -20,7 +20,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
 - [Work arriving by rule](#work-arriving-by-rule)
-- [Claim outcomes](#claim-outcomes)
+- [Decision outcomes](#decision-outcomes)
 - [The digest](#the-digest)
 - [Outbound content](#outbound-content)
 - [Dates and times](#dates-and-times)
@@ -44,8 +44,8 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 
 | Kind | Ends when | Examples |
 |---|---|---|
-| Event | The person acknowledges it | You were assigned this; your claim was sent back; somebody named you |
-| Condition | It stops being true | A build stopped being scanned; a claim is waiting for approval |
+| Event | The person acknowledges it | You were assigned this; your decision was sent back; somebody named you |
+| Condition | It stops being true | A build stopped being scanned; a decision is waiting for approval |
 
 A condition names what it is about, and the pass that derives conditions
 reconciles rather than appends: what is true is opened, what has stopped being
@@ -58,27 +58,27 @@ true is cleared, and running the same pass twice changes nothing.
 | A standing condition states what is true now | A condition's sentence carries a count, and a row written once and left alone reports the number it had when somebody first looked. The row stays the same row and the sentence changes. So do its link, whether it is undisclosed, and the product and issue it is about, because every read narrows by those |
 | Everybody holding a condition is handed a list each sweep, even an empty one | A condition clears only by being left off a list. Somebody who stops being an administrator, or the last administrator demoted, would otherwise go on being told about products and people they no longer read |
 | Somebody holding none of a kind and found none is not reconciled for it | There is nothing to open and nothing to clear, and reconciling is a transaction per person per kind |
-| A reconcile writes a batch of rows a statement | One sweep can open, restate or clear every condition one person holds at once, and a statement a row is a round trip a row. Opening 152,859 claim-waiting conditions for 204 people took 700.9 and 704.4 s a row at a time, and 7.0 to 8.0 s a batch at a time, on PostgreSQL 16 at one processor over a 1 ms link. A sweep that changes nothing takes 7.0 to 7.5 s there |
+| A reconcile writes a batch of rows a statement | One sweep can open, restate or clear every condition one person holds at once, and a statement a row is a round trip a row. Opening 152,859 `claim-waiting` conditions for 204 people took 700.9 and 704.4 s a row at a time, and 7.0 to 8.0 s a batch at a time, on PostgreSQL 16 at one processor over a 1 ms link. A sweep that changes nothing takes 7.0 to 7.5 s there |
 | A restated condition is written by a statement carrying every row's new sentence | Each row of a batch says something different, so the statement chooses each column's value by the row's identifier |
 | Who may do what is read once per sweep | Every condition reads the same people and grants, and administrators are the same people read again |
 | A role across every product counts in every audience as a role on each product | An audience worked out from per-product grants alone treats somebody reading through an estate role as nobody, so a report they hold is told to the product's triagers instead (`DESIGN-access.md` § A role across every product) |
-| Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a claim to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
+| Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a decision to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
 ## Triggers and kinds
 
 | Trigger | Kind | Notes |
 |---|---|---|
 | Work arriving | event | The category that deserves interrupting somebody for |
-| A claim sent back | event | It goes straight back into its author's queue, so silence leaves it sitting |
+| A decision sent back | event | It goes straight back into its author's queue, so silence leaves it sitting |
 | Somebody named you | event | A name after an `@`, resolved when the text is saved |
-| An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue returning a claim that sets it aside to the queue. The second reaches somebody who was not in the exchange at all, so without it the claim simply reappears in their queue with no explanation |
+| An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue returning a decision that sets it aside to the queue. The second reaches somebody who was not in the exchange at all, so without it the decision simply reappears in their queue with no explanation |
 | A decision the code moved under | event | It hands work back to somebody who did nothing to cause it |
-| A merge meeting two judgments that disagree in one product | event | Two decisions at one place, two rating claims, or two records of being attacked dated differently. To everybody who triages the product. The merge keeps one and ends the other, and nobody chooses which. Below |
+| A merge meeting two answers that disagree in one product | event | Two decisions at one occurrence, two rating claims, or two records of being attacked dated differently. To everybody who triages the product. The merge keeps one and ends the other, and nobody chooses which. Below |
 | An approval an edit withdrew | event | To everybody whose standing agreement a revision of the reasoning or a moved promise took back, once each, and never to whoever made the edit. Without it an approver goes on relying on an agreement the record no longer holds (REQ-24, REQ-28) |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |
 | An embargo whose date arrived | condition | Reaching the date discloses nothing (REQ-37). Clears when the date moves or the finding is disclosed |
-| A claim waiting for a second person | condition | To whoever may approve it, never to its proposer. A ruling on reports waiting for its approval is the same condition |
-| A claim sent back and not revised | condition | The event told them at the moment it was sent back; an event cannot report that it has since been ignored |
+| A decision waiting for a second person | condition | To whoever may approve it, never to its proposer. A ruling on reports waiting for its approval is the same condition |
+| A decision sent back and not revised | condition | The event told them at the moment it was sent back; an event cannot report that it has since been ignored |
 | A deferral running out | condition | Before the date. What follows the date is the finding arriving back as late work |
 | Work sitting in a team queue | condition | Per team and product, with a count. Open reports in the queue are a condition of their own, to the members who read the product's reports, because a report is undisclosed and folded into the findings' count it would withhold the whole queue from a member who reads only disclosed work |
 | Somebody away still holding work | condition | Below |
@@ -88,7 +88,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A reporter writing back | event | A message recorded as received on a report, to the report's audience (§ Report audience), apart from whoever recorded it. Undisclosed |
 | A message sent to a reporter | event | A message recorded as sent on a report, to the report's audience, apart from whoever recorded it. Undisclosed |
 | A note on a report | event | To the report's audience, apart from its author and anybody it names, who is told of the mention instead. An edit tells the names its new text holds, and nobody else. Undisclosed |
-| An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
+| An issue somebody holds disclosed | event | To every person holding an occurrence of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
@@ -117,7 +117,7 @@ unassigned list.
 The channel that always exists. A self-hosted operator who never configured mail
 would otherwise have every operational alert sent into a void.
 
-Everyone has one. A triager sees work arriving, a proposer sees a claim sent
+Everyone has one. A triager sees work arriving, a proposer sees a decision sent
 back, an approver sees what waits on them, an administrator sees that the tool
 itself is unwell. What differs by role is the content, not the mechanism.
 
@@ -220,7 +220,7 @@ found, and each is about internal work, so it is withheld on the terms of
 
 ## Lead notices
 
-A claim on a lead is told on the terms of every other claim: waiting for a
+A decision on a lead is told on the terms of every other decision: waiting for a
 second person, sent back and left, rows of it set aside, lapsed, an agreement an
 edit took back, an agreement taken back with its batch, and a mention in its
 notes. Its rows are internal work, so each
@@ -228,29 +228,29 @@ line is withheld as internal (§ The notification list).
 
 | Notice | Kind | To | Clears |
 |---|---|---|---|
-| A claim on a lead waiting for a second person | condition | Whoever may approve at internal visibility: the approver capability and `internal-read`, never its proposer | Approved, sent back or withdrawn |
-| A claim on a lead sent back and left | condition | Its author, while they read internal work | Revised or withdrawn |
+| A decision on a lead waiting for a second person | condition | Whoever may approve at internal visibility: the approver capability and `internal-read`, never its proposer | Approved, sent back or withdrawn |
+| A decision on a lead sent back and left | condition | Its author, while they read internal work | Revised or withdrawn |
 | A dismissal of a lead lapsed by a probable pairing | event | Its proposer, once per run, after the run commits | Acknowledged |
-| An agreement to a claim on a lead taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
+| An agreement to a decision on a lead taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
 | A lead handed off as a flaw | event | The product's internal triagers, never whoever handed it off. The flaw recorded tells what recording any flaw tells | Acknowledged |
 | A handed-off lead moved into its flaw's case, or taken back out | event | The product's internal triagers, never whoever moved it | Acknowledged |
 | A lead's agreed dismissal or not-a-security-issue ruling withdrawn, putting it back in the queue | event | The product's internal triagers, never whoever withdrew it | Acknowledged |
 | A lead assigned | event | The person given it, while they read it at every visibility it is open at. Never a team, never whoever gave it out, and nobody for handing one back | Acknowledged |
 | A standing rule on leads outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or covering less |
-| A standing rule on leads waiting for its approval | condition | Whoever may approve at internal visibility, never its proposer, once it has waited the period a claim waits | Approved or retired |
+| A standing rule on leads waiting for its approval | condition | Whoever may approve at internal visibility, never its proposer, once it has waited the period a decision waits | Approved or retired |
 | Leads sitting in a team's queue | condition | The team's members who read the product's internal work, after the period queued work waits | Taken by a person, judged, handed off or closed |
 
 | Rule | Reason |
 |---|---|
-| A claim's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
+| A decision's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
 | A lead sent back links to the lead | A rule names no finding page |
 | Agreeing to a dismissal of a lead tells nobody, and withdrawing one tells only where it was agreed to | An approval is what was asked for. A withdrawal puts work back in the queue, and a dismissal nobody agreed to never took it out |
 | A hand-off or a move names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of a kept lead's case (`DESIGN-analysis.md` § Keep or move) |
 | A lead assigned names the analyzer's rule, its path and line, and the build it was assigned from | The line is internal work, and names no more than the lead's page |
 | A lead assigned is withheld as internal while it is open at internal visibility | Its recipient reads it at every visibility it holds, and a reader of disclosed work reads no internal row |
 | A standing rule waiting for approval is one condition per rule | It dismisses nothing while it waits, so every lead it names stays in the queue, and one approval answers all of them |
-| Leads in a team's queue are counted one per place, for each team and product, apart from the team's other queued work, and the condition names the team | A lead is one piece of work at its place (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
-| A lead a claim stands on, or one handed off as a flaw, is not waiting | A claim is somebody judging it, and a handed-off lead is closed work for its holder |
+| Leads in a team's queue are counted one per occurrence, for each team and product, apart from the team's other queued work, and the condition names the team | A lead is one piece of work at its occurrence (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
+| A lead a decision stands on, or one handed off as a flaw, is not waiting | A decision is somebody judging it, and a handed-off lead is closed work for its holder |
 | Team routing reaches a lead notice through the team's queue alone | A hand-off, a move and an assignment are each one act about one lead, told to the people the table names. A series alert is about a series, which no team holds |
 
 ## Staleness conditions
@@ -260,22 +260,22 @@ occurred, which nothing driven by an event can do.
 
 | Condition | Told to |
 |---|---|
-| A claim waiting for approval | Whoever may approve every place it covers — the approver capability or triage at each visibility among them, over reading all of them — never its proposer |
+| A decision waiting for approval | Whoever may approve every occurrence it covers — the approver capability or triage at each visibility among them, over reading all of them — never its proposer |
 | A ruling on reports waiting for approval | Whoever may triage undisclosed work in that product, never its proposer |
 | A deferral whose end is approaching | The proposer |
-| A claim sent back and untouched | The proposer |
+| A decision sent back and untouched | The proposer |
 | Work sitting in a team queue | The people on that team. Leads in it, to the members who read internal work (§ Lead notices) |
 | A report nobody has answered | Whoever may triage undisclosed work in that product |
 
 Each of the waits carries its own period, which is a setting. A period each
-rather than one shared: a claim waiting on a second person is somebody else's
+rather than one shared: a decision waiting on a second person is somebody else's
 turn, one sent back is the author's own, a deferral needs enough warning to do
 the work again before it lapses, and a queue is nobody's turn at all. An
 unanswered report carries no period — the answer to how long that may go
 unanswered is "not at all".
 
-A claim sent back and a deferral ending link to the review queue narrowed to
-the reader's own claims, which the approver queue leaves out. Every link to the
+A decision sent back and a deferral ending link to the review queue narrowed to
+the reader's own decisions, which the approver queue leaves out. Every link to the
 queue asks only for narrowings the queue reads; one it does not read opens it on
 its default.
 
@@ -285,7 +285,7 @@ points at the report.
 
 Both reach the report's audience (§ Report audience).
 
-A ruling waiting for approval takes the period a waiting claim does, because it
+A ruling waiting for approval takes the period a waiting decision does, because it
 is the same thing: one act setting something aside, which takes effect only
 once somebody else agrees. One alert per ruling, however many reports it
 covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
@@ -307,19 +307,19 @@ owned nor unowned, so it sits in a gap where it looks handled and is not.
 
 A deferral that is not in force has no end to announce. The notice states that a
 date is coming, what it covers, and that the finding returns as work when it
-passes — every clause false about a claim still waiting for a second person. The
+passes — every clause false about a decision still waiting for a second person. The
 sweep asks the same "is this in force" test the compliance rate and the outcome
 filter ask, spelled once for all three.
 
-Sitting still means undecided, by the same test every screen uses: a claim
+Sitting still means undecided, by the same test every screen uses: a decision
 standing at the versions the code holds now. The expression is shared with the
 findings list.
 
-The queue is counted per team and product; the others per claim. A claim is one
+The queue is counted per team and product; the others per decision. A decision is one
 person's action and one thing to read, however many rows it wrote. A queue is a
 population: one routing rule places thousands of findings in a sweep. Within it
-the unit is an issue in a component, whatever its places' visibility, and the
-condition is undisclosed where any of those places is.
+the unit is an issue in a component, whatever its occurrences' visibility, and the
+condition is undisclosed where any of those occurrences is.
 
 ## Report audience
 
@@ -380,7 +380,7 @@ than about anybody's work.
 | A deferral or a promise to act counts where the gate asked for a second person | Both hide risk and both are approved conditionally, on where the date sits against the deadline already set. A short deferral standing alone is the rule working; one past the threshold needed agreement as surely as a dismissal did, and asking which outcome it was saw none of them |
 | The gate's verdict is read, never a caller's | A proposal's own answer is re-worked against the policy in force when the write lands, so nothing a caller asserts reaches the record |
 | Whether somebody agreed is asked of the record | No approval from anybody other than the proposer, and none taken back. A flag there would be the row's own account of itself, and the failure this exists to find is a row the write path should never have produced |
-| A claim still waiting for its second person is not this | It suppresses nothing and hides nothing while it waits, and somebody is looking at it |
+| A decision still waiting for its second person is not this | It suppresses nothing and hides nothing while it waits, and somebody is looking at it |
 | Counted across every product and the whole record | The condition is about the deployment. What the report behind the link shows is narrowed to what its reader holds, so an administrator granted no product reads the count and an empty page — the same answer their dashboard gives, and the reason the link asks for everything rather than the quarter the sheet opens on |
 
 ### Concentrated approval pairs
@@ -388,14 +388,14 @@ than about anybody's work.
 | Rule | Reason |
 |---|---|
 | Raised where one pair's share of a product's agreements reaches a threshold, among at least a set number of people who may approve | Two thresholds, both met. A share alone is permanently true in a team of two, which is an alert nobody can clear (REQ-49). The count of people who may approve is what makes the pattern a choice. A share of a hundred is one pair giving every agreement, and is raised |
-| Only over at least ten agreed claims in the period | A fixed floor. Below it a share is a handful of acts: one agreed claim is a hundred percent, and each claim ageing out moves the share across the threshold and back, raising and mailing a new condition each time |
+| Only over at least ten agreed decisions in the period | A fixed floor. Below it a share is a handful of acts: one agreed decision is a hundred percent, and each decision ageing out moves the share across the threshold and back, raising and mailing a new condition each time |
 | Each threshold is a deployment setting a product may override | Teams differ in size by product. A product's own value follows the triage line's shape: cleared, it follows the deployment rather than copying its current value |
 | A pair is two people, whichever proposed | The pattern is two people each agreeing to what the other proposes. Counted by direction, the pair it exists to find reads as two halves under the threshold |
-| Counted in claims | A claim over sixty places is one thing proposed and one agreed to |
+| Counted in decisions | A decision over sixty occurrences is one thing proposed and one agreed to |
 | Over the last ninety days of proposals | The approval quality report's own period, so the report the link opens holds what raised it. What it asks about is how agreement is given now; a pattern a team has moved away from is not a control failing today. Older agreements are left out of the whole as well as of the pair, so a spread-out past does not hide a concentrated present |
-| People who may approve are counted, not people who did | One pair doing everything while others who may approve do nothing is the case itself. A triager may approve somebody else's claim, and so may somebody holding the approver capability, each only where they may read |
+| People who may approve are counted, not people who did | One pair doing everything while others who may approve do nothing is the case itself. A triager may approve somebody else's decision, and so may somebody holding the approver capability, each only where they may read |
 | Keyed on the product and the two people | A pair that stays dominant stays one condition, and a different pair taking over is a different one |
-| It names the two people and the share, never the counts behind it | Which pair is the fact. It goes to every administrator, and a product's volume of agreed work follows visibility (REQ-42, REQ-43). The claims they agreed to are on the report the link opens |
+| It names the two people and the share, never the counts behind it | Which pair is the fact. It goes to every administrator, and a product's volume of agreed work follows visibility (REQ-42, REQ-43). The decisions they agreed to are on the report the link opens |
 
 ### Data that stopped moving
 
@@ -434,7 +434,7 @@ screen becomes unreadable, and how every switch ends up left at its default. Wha
 already applies still applies: an undisclosed arrival contributes a number and
 not a name.
 
-## Claim outcomes
+## Decision outcomes
 
 Approval stays silent. The gap silence leaves is closed with a view rather than
 more mail, and that requires the view to record outcomes. A queue whose tabs
@@ -444,7 +444,7 @@ identically, as the row disappearing.
 The view carries what happened, as a separate question asked by a separate
 statement rather than the queue with a filter.
 
-A claim has no state of its own; its rows do, so the word is read from the rows
+A decision has no state of its own; its rows do, so the word is read from the rows
 every time. A stored word would need every path that approves, withdraws, sends
 back or lapses one to update it.
 
@@ -453,12 +453,12 @@ several ways.
 
 | Word | Why it is distinct |
 |---|---|
-| Undone | Drawn apart from waiting though the claim is waiting in both, because somebody had agreed and the proposer is entitled to find that surprising |
-| Several ways | An approver agreeing to most of a bulk set and setting some aside leaves a claim that is genuinely two things |
+| Undone | Drawn apart from waiting though the decision is waiting in both, because somebody had agreed and the proposer is entitled to find that surprising |
+| Several ways | An approver agreeing to most of a bulk set and setting some aside leaves a decision that is genuinely two things |
 
 An undo and a lapse each notify. Neither is an expected outcome: an undo
 reverses something the proposer was relying on, and a lapse hands the work back
-having taken a judgment out of force.
+having taken a decision out of force.
 
 The lapse message is wired at the deployment rather than inside the scan. What a
 scan does and how anybody hears about it are separate concerns, and this package
@@ -467,20 +467,20 @@ cycle.
 
 | Lapse message | |
 |---|---|
-| One per person per sweep, counting their rows | A version bump lapses many claims at once, and one message per claim is a channel nobody reads. A sweep lapses in bounded batches, and who to tell is gathered over all of them, so a person whose rows span batches is still told once |
+| One per person per sweep, counting their rows | A version bump lapses many decisions at once, and one message per decision is a channel nobody reads. A sweep lapses in bounded batches, and who to tell is gathered over all of them, so a person whose rows span batches is still told once |
 | A sweep that fails part way still tells | The batches before the failure are committed, and a lapse nobody hears of is the outcome the message exists to prevent |
 | Says why: the code moved, or the issue was rated worse | The two ask different things of the person re-affirming. `DESIGN-triage.md` § Lapse marking holds both |
-| Links to the review queue's To reaffirm tab | The work is re-affirming every claim that lapsed, not reading one of them. A link to one decision of three hundred leaves the rest to be found |
-| Sent by the scan's sweep and by a rating put in or out of force here | The two places a claim lapses by its own proposer's work coming back |
+| Links to the review queue's To reaffirm tab | The work is re-affirming every decision that lapsed, not reading one of them. A link to one of three hundred leaves the rest to be found |
+| Sent by the scan's sweep and by a rating put in or out of force here | The two places a decision lapses by its own proposer's work coming back |
 
-A merge that ends one of two judgments in a product tells the product's
+A merge that ends one of two answers in a product tells the product's
 triagers rather than whoever made it. `DESIGN-findings.md` § Merged issues
 holds the rules.
 
 | Merge message | |
 |---|---|
 | Sent only where the two say different things: another outcome, another rating, another date of attack | Two that agree collapse to one, and nothing the product reads changes |
-| To everybody who triages the product: at private visibility where either decision is private, and for a rating claim or a record of being attacked, unless a finding of the issue in the product is disclosed | The tool chooses between two people's judgments by standing, so the choice is the product's to look at. The message names both issues and links to the one that stands, so it is as private as the more private of the two. A judgment about the whole issue has no visibility of its own |
+| To everybody who triages the product: at private visibility where either decision is private, and for a rating claim or a record of being attacked, unless a finding of the issue in the product is disclosed | The tool chooses between two people's answers by standing, so the choice is the product's to look at. The message names both issues and links to the one that stands, so it is as private as the more private of the two. An answer about the whole issue has no visibility of its own |
 | Names both issues and the product, and links to the decision that stands, or for the other two to the issue | That is where the one that ends can be compared with the one that stands |
 | Sent by the scan that merges the issues, once the scan has applied, to each person in turn | What a scan does and how anybody hears about it are wired together at the deployment, as the lapse message is. One person not told leaves the rest told |
 
@@ -509,7 +509,7 @@ what somebody may do, not what they want to read.
 | A digest with nothing in it is not sent, and the clock still moves | A daily "nothing" is how somebody stops opening the daily message. Leaving the mark unmoved would make a quiet week report itself as new the following Monday |
 | A digest that cannot be assembled moves the clock | On the rule a refusing mailbox follows: it is tried tomorrow rather than every minute, and a batch of them cannot crowd out a reader it can serve |
 | A first digest reports nothing under "nobody owns" | There is no "since" to measure against |
-| **"Nobody owns" is about the assignee alone** | It counts what is open and unassigned, including what somebody has claimed and what is waiting for approval — 8,400 rows against 7,471 for the equivalent findings narrowing on one real build, with a pending approval at the top. Narrowing it would change what people are sent, so the screen asking the same question narrows its own list instead and counts from that |
+| **"Nobody owns" is about the assignee alone** | It counts what is open and unassigned, including what somebody has proposed a decision on and what is waiting for approval — 8,400 rows against 7,471 for the equivalent findings narrowing on one real build, with a pending approval at the top. Narrowing it would change what people are sent, so the screen asking the same question narrows its own list instead and counts from that |
 | One message is bounded, and says so | What is over the bound stays in the application, and the message says how many of how many it listed. Without that a holder of four hundred things reads "fifty pieces of work assigned to you" as a statement of fact, with nothing to tell it apart from a message about fifty |
 
 It names what has been disclosed and gives numbers for what has not. A public
@@ -574,7 +574,7 @@ name are what a later read has to ask about.
 | It names a product where this person reads undisclosed work now | The role is the reason it arrived, so withdrawing the role is what takes it away |
 | It is about internal work, in a product where this person reads internal work now | A reader of undisclosed work reads no internal finding, so a line about one is withheld from them on the same terms |
 | It names an issue they were brought onto, one case at a time | A case grant is a pair. Widening it to the product would hand a collaborator the rest of that product's embargo list, which is the whole of what the grant is not |
-| It is about a handed-off lead they were granted, one lead at a time | A lead grant is a pair of a product and a place, and the line granting it is about that lead, so it is the one line the grant reaches |
+| It is about a handed-off lead they were granted, one lead at a time | A lead grant is a pair of a product and an occurrence, and the line granting it is about that lead, so it is the one line the grant reaches |
 | They administer the deployment | Administering is not reading, and every other read here says so — but the embargo notice names administrators as an audience of its own, and a message sent under that rule and withheld under this one is written for somebody who cannot open it. An administrator grants roles, so it hands them nothing they could not hand themselves |
 
 Filtered, never deleted. Destroying the row destroys the record that somebody
@@ -613,7 +613,7 @@ of this table's rules are.
 | A sweep with no administrator recorded still derives everything that is not an administrator's | Returning early skips the per-person conditions as well, and every alert a triager holds then stands with nothing able to resolve it. Only the conditions addressed to administrators alone depend on there being one |
 | Nobody who has left is in any audience | Their grants and administrator flag stay in place on purpose, so an audience read from grants alone would keep naming them. Every sweep starts from the people still here, an event for somebody who has left records nothing, and the mail, digest and direct-chat sweeps skip them in the query, which covers rows opened before they left |
 | Nobody is told they were unassigned | A name being removed is not an action directed at the person who held it, and a queue that gets shorter says so already |
-| A failure to tell somebody is logged, not returned | The assignment happened and the claim was sent back; answering the caller with an error invites a retry that does the first thing twice |
+| A failure to tell somebody is logged, not returned | The assignment happened and the decision was sent back; answering the caller with an error invites a retry that does the first thing twice |
 | More than one process sweeps | The chart ships two replicas, each running its own watch. The unique index makes a duplicate one row, and the pass treats a duplicate as the answer already being there — without that it would abort, and every administrator after the one it failed on would be told nothing that cycle |
 | A batch refused for a duplicate is opened again a row at a time | The other process opened one row of it, and the rest are still true. Each statement stands on a savepoint, because PostgreSQL refuses everything after a failed statement in the same transaction |
 | **A duplicate is recognized as one, and every other failure is reported** | Read as "somebody has this one" whatever went wrong, a lost connection during a sweep answers "already claimed" for every destination and the cycle reports nothing sent and nothing failed — which is what a quiet queue looks like, so an operator cannot tell them apart |
@@ -709,8 +709,8 @@ which, and a test holds the table against the list of kinds.
 
 | Kind of notification | Examples | Where it goes |
 |---|---|---|
-| Somebody's own | Assigned, named in a note, a claim sent back or waiting on them, an approval withdrawn or undone, a decision that lapsed, brought into a case, an issue they hold disclosed, a deferral running out | To them directly. Never to a channel |
-| Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, a judgment a merge of two issues superseded, the vulnerability data stale, a supplier silent, an upstream failing or read again | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
+| Somebody's own | Assigned, named in a note, a decision sent back or waiting on them, an approval withdrawn or undone, a decision that lapsed, brought into a case, an issue they hold disclosed, a deferral running out | To them directly. Never to a channel |
+| Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, an answer a merge of two issues superseded, the vulnerability data stale, a supplier silent, an upstream failing or read again | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
 | Shared, undisclosed | An embargo approaching or due, an obligation window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
 
 | Person's setting | Default | Effect |
@@ -747,8 +747,8 @@ cleared for it directly. The deployment's channel is the one an administrator
 set up to hear everything, and it carries the fact and a link, as a webhook
 does.
 
-A queue holding one undisclosed place among many is undisclosed as a whole, so
-a team channel says nothing about it until the last undisclosed place leaves.
+A queue holding one undisclosed occurrence among many is undisclosed as a whole, so
+a team channel says nothing about it until the last undisclosed occurrence leaves.
 
 | Destination rule | Reason |
 |---|---|
@@ -823,8 +823,8 @@ clear differently, and a single alert would go on saying "coming" after the date
 had passed. The approaching one clears when the date arrives, at which point the
 other opens, or when the embargo is extended past the lead time.
 
-Each is one condition per place the finding sits at, because the link and
-whoever holds the work are per place. A condition naming several names is
+Each is one condition per occurrence the finding sits at, because the link and
+whoever holds the work are per occurrence. A condition naming several names is
 identified by each name with its length, so two sets of names that join to the
 same text are two conditions.
 
@@ -838,7 +838,7 @@ evidence.
 
 "Cited" is recorded rather than inferred. A decision started from a VEX
 statement carries which statement that was. Inferring it from the issue and the
-component would raise an alert about every decision at a place a publisher
+component would raise an alert about every decision at an occurrence a publisher
 happens to have spoken about.
 
 ## Obligation notices

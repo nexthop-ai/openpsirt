@@ -40,7 +40,7 @@ refused at upload.
 
 An issue in the product is the unit a decision, an embargo and a comment
 already use. Not the finding row: text is written against a decision, a
-decision covers every place an issue sits at, and binding a file to one of
+decision covers every occurrence an issue sits at, and binding a file to one of
 forty-eight rows would make it unreachable the day that row closed while its
 siblings stayed open.
 

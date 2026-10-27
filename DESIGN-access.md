@@ -21,7 +21,7 @@ REQ-44, REQ-45, REQ-56, REQ-63, REQ-68, REQ-69's server half.
 - [Teams](#teams)
 - [Routing rules](#routing-rules)
 - [Store methods with no subject](#store-methods-with-no-subject)
-- [Judgments about an issue](#judgments-about-an-issue)
+- [Decisions about an issue](#decisions-about-an-issue)
 - [Subject kinds](#subject-kinds)
 - [Anybody at all](#anybody-at-all)
 - [Provider sign-in](#provider-sign-in)
@@ -112,11 +112,11 @@ as an analyzer's leads (REQ-14). Analysis results are its first users.
 | Its roles are granted like every other read and triage role | Per product, across every product, or from a group mapping. The people working analyzer output work a high volume of noise and the private team works few embargoed cases, and neither is handed the other's material |
 | `internal-read` alone lists the product and nothing open against it but internal findings | It is a read role like the other two, so the product is one its holder may know exists, and a capability granted beside it reaches something |
 | The anonymous subject reads no internal work | It reads disclosed work in a publishing product, and internal work is never disclosed. Described under [anybody at all](#anybody-at-all) |
-| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A lead moved into a flaw's case stays internal, and the case reaches it and the claims at its place as one of the flaw's readers (`DESIGN-analysis.md` § Keep or move) |
-| A lead moved into its flaw's case is read whole by everybody who read it before, and with the claims at its place by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the move adds readers. Undoing the move takes back only the readers it added (`DESIGN-analysis.md` § Keep or move) |
+| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A lead moved into a flaw's case stays internal, and the case reaches it and the decisions at its occurrence as one of the flaw's readers (`DESIGN-analysis.md` § Keep or move) |
+| A lead moved into its flaw's case is read whole by everybody who read it before, and with the decisions at its occurrence by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the move adds readers. Undoing the move takes back only the readers it added (`DESIGN-analysis.md` § Keep or move) |
 | A lead collaborator is granted one handed-off lead while its flaw is undisclosed, and reads its evidence alone | A grant of one lead is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, kept lead or moved (`DESIGN-analysis.md` § Lead collaborators) |
 | `internal-triage` triages nothing about a product as a whole: routing, assignment, a rating, a record of an attack, an obligation, an inventory upload | Each is about what the product's builds ship, which internal triage reads none of |
-| Approving at internal visibility needs its holder to read internal work and hold the approver capability | A claim there is about a lead, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Lead triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
+| Approving at internal visibility needs its holder to read internal work and hold the approver capability | A decision there is about a lead, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Lead triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
 | A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
 
 No consumer of vulnerability findings includes analysis results. The findings
@@ -199,7 +199,7 @@ spellings answer alike, for every kind of credential including one holding
 nothing.
 
 Nobody learns which issues exist either. Every route shaped "this issue, at this
-place" resolved the name first and checked what it reached second. On two of
+occurrence" resolved the name first and checked what it reached second. On two of
 them the second check was not a refusal at all: a fix target answered an empty
 list and an assignment answered "done" while writing nothing, so those two
 disclosed by succeeding.
@@ -211,7 +211,7 @@ rather than checked at each route, because the leak is the *ordering*. The
 identifier carries no sequence, so the names cannot be walked or counted even
 before a route is asked.
 
-A route taking a list of names — one judgment about many issues, an
+A route taking a list of names — one decision about many issues, an
 assignment of rows somebody picked — goes through the list form of the same
 resolver, one statement per batch. A name filed only where the caller may not
 read a finding of it in this product is answered in the words a name nobody
@@ -249,8 +249,8 @@ yourself is still doing it.
 | Assigner is held alongside triage, not instead of it | The role widens what a triager may do with work; on its own it assigns nothing, because handing around findings in a product you may not argue about is not a narrower version of triaging it. Enforced at the endpoint and again at the store, with the session answer carrying the same conjunction so an interface does not draw a control that always fails |
 | Who may *be* assigned is visibility, not a grant of its own | |
 | The write that moves the rows refuses a hand-off the caller may not make | Every path that hands work over reaches that write, so a path that forgot to check first still moves nothing |
-| Whether the recipient may read the work is asked inside the write's transaction | Asked at every visibility open there, each of which they must read. A scan recording an undisclosed place between a separate read and the write would hand the new row over unasked. The single assignment, a lead's assignment, assignment by narrowing and an upgrade's holder all ask it there |
-| A finding is assigned for a whole group at once | One issue in one component, however many places. Assigning one place and not another is not something anybody means to do |
+| Whether the recipient may read the work is asked inside the write's transaction | Asked at every visibility open there, each of which they must read. A scan recording an undisclosed occurrence between a separate read and the write would hand the new row over unasked. The single assignment, a lead's assignment, assignment by narrowing and an upgrade's holder all ask it there |
+| A finding is assigned for a whole group at once | One issue in one component, however many occurrences. Assigning one occurrence and not another is not something anybody means to do |
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
@@ -415,7 +415,7 @@ Recorded by an administrator, as a date on the person.
 | Rule | Reason |
 |---|---|
 | A date, not a flag | "When" is the whole of what an audit asks after a departure, and a boolean cannot answer it |
-| Never a deletion | The record names them as the proposer of judgments and the approver of others, and an assignment may point at them. Deleting the row would either break those or rewrite what happened |
+| Never a deletion | The record names them as the proposer of decisions and the approver of others, and an assignment may point at them. Deleting the row would either break those or rewrite what happened |
 | Their roles are left where they are | What somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it from memory. What stops them is the date |
 | Read once, where every way in already passes | A session, a personal token and a group-bound sign-in all resolve by identity. A second spelling of the check is a second rule to keep in step with the first |
 | **Every question of the form "may this person do this" excludes them** | The grants are left in place on purpose, so a query reading only grants answers that somebody who has left is still cleared. Three did: two of them decide whether an undisclosed finding may be handed to a person or a team, where the assignment itself is the disclosure, and the third decides whether their work is released |
@@ -482,7 +482,7 @@ precedence rule nobody would remember.
 |---|---|
 | Team names are answered to anybody, membership to an administrator | Routing work to a team means naming one; who is on a team is the same question as who is here |
 | A team assignment is a queue, not a holding | Work routed to a team is unheld until a person takes it, and taking it is the ordinary act of picking up unowned work — triage alone, no dispatch right. *Filling* the queue is dispatching. The alternative marks rows as held by the team, and hundreds then read as owned while nobody has looked at them |
-| Routing asks that at least one member may read it, not every member | Asked at every visibility the open places carry, of one member reading each of them, so one undisclosed place among fifty makes the whole undisclosed for this purpose. Disclosed work travels with the assignment, so for it a member reading the product at either visibility is enough. Requiring every member turns routing pressure into access pressure; requiring nobody leaves work showing as held in every administrative view and sitting in nobody's list. A rule's sweep asks it of each place (§ Routing rules) |
+| Routing asks that at least one member may read it, not every member | Asked at every visibility the open occurrences carry, of one member reading each of them, so one undisclosed occurrence among fifty makes the whole undisclosed for this purpose. Disclosed work travels with the assignment, so for it a member reading the product at either visibility is enough. Requiring every member turns routing pressure into access pressure; requiring nobody leaves work showing as held in every administrative view and sitting in nobody's list. A rule's sweep asks it of each occurrence (§ Routing rules) |
 | The queue is narrowed per viewer, counts included | A badge reading "Kernel team · 14" shown to everybody says two embargoed items exist. Asserted by a matrix test rather than assumed from the row query being right |
 | A team gives up the work in its queue that no remaining member reads | Asked whenever who is on it, or what one of them reads, changes (§ Lost reading). Retiring a team empties it, so its whole queue goes back |
 | Retiring a team keeps its row and does not free its name | Work already routed has to keep resolving to something a screen can name. Declaring that name again brings the team back, because declaring is idempotent everywhere else and the alternative was a refusal citing a team the person asking cannot see |
@@ -492,7 +492,8 @@ precedence rule nobody would remember.
 A rule matches on component identity as well as a place in the tree. The
 upstream name is the key that matters: one rule naming a source package catches
 every binary package built from it. A kernel is one source package appearing at
-many places under many consumers, so a subtree rule would need a line per place
+many occurrences under many consumers, so a subtree rule would need a line per
+occurrence
 and would still miss tomorrow's.
 
 Either key may be a pattern, and `*` is the only metacharacter. A rule that can
@@ -514,11 +515,11 @@ numbers are shown because the gap between them is the thing worth knowing.
 | The preview is narrowed like every other count (REQ-42, REQ-43) | Read unnarrowed, the gap between the preview and the same person's findings list is exactly the amount of undisclosed work. Somebody who may see nothing is told nothing rather than zero |
 | A rule may place vulnerability reports instead of findings | Such a rule names no package and no place, since a report sits at neither, and either key on it is refused. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when it is added. Its preview counts the product's open reports and those nobody holds, where the asker reads the product's reports and as zero elsewhere |
 | A rule places leads as well as findings | A lead is matched by the component it sits in, like any finding, and is one piece of work in the preview. A lead past its end of life is neither placed nor counted, because it is kept as it stands (`DESIGN-analysis.md` § End of life) |
-| A rule places work only at a visibility one member of its team reads | The rule a hand assignment to the team asks (§ Teams). It is asked of each place, so an undisclosed or internal place nobody on the team reads stays with nobody while the disclosed places beside it are placed, and is picked up from the unassigned list by somebody who reads it. A team of nobody is placed nothing |
+| A rule places work only at a visibility one member of its team reads | The rule a hand assignment to the team asks (§ Teams). It is asked of each occurrence, so an undisclosed or internal occurrence nobody on the team reads stays with nobody while the disclosed occurrences beside it are placed, and is picked up from the unassigned list by somebody who reads it. A team of nobody is placed nothing |
 | The preview names no team, and counts what the asker reads | It takes the keys alone. Work at a visibility nobody on the team reads is counted and then not placed |
 | A rule places no lead handed off as a flaw | It is closed work for its holder, and its flaw is placed as itself (`DESIGN-analysis.md` § Lead assignment). The preview counts none |
 | A rule places only work nobody holds | A human assignment always wins. A rule able to override one would perform the assigner's act continuously on behalf of whoever wrote it, with nobody holding the right at the moment it happened |
-| Not holding a place is re-checked at the moment of the write | The batch reads which findings a rule matches and then writes them by identifier; an assignment landing between the two is somebody's |
+| That nobody holds an occurrence is re-checked at the moment of the write | The batch reads which findings a rule matches and then writes them by identifier; an assignment landing between the two is somebody's |
 | Rules are ordered, first match wins, and the finding records which rule placed it | An unwritten precedence rule is forgettable, and "where did this come from" is asked months later |
 | The order is settled | The ordinal is one past the highest under ordinary isolation, so two rules created at the same moment take the same number. Ties break by identifier rather than letting two rules swap places between batches |
 | Writing a rule asks for the assigner right | Reading the rules asks only for triage, because knowing where work goes is part of working it |
@@ -534,7 +535,7 @@ width; a key longer than that width could never match and is refused when the
 rule is written.
 
 Turning a rule on is a bulk write. One rule naming a source package sweeps
-thousands of existing unowned issues across every place each sits at, so the
+thousands of existing unowned issues across every occurrence each sits at, so the
 bound is counted on rows written rather than on the request. The sweep is queued
 work in bounded batches, and a batch that fills its bound queues itself again
 rather than looping in the worker. The next batch is queued before the batch's
@@ -606,8 +607,8 @@ ordering taken over a visibility column anywhere in the source.
 
 | Question | Asked at |
 |---|---|
-| An act on one finding — a claim, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |
-| Approving somebody else's claim | Reading at the claim's visibility, with the approver capability or triage there, and the capability alone at internal visibility. The session answer says which visibilities, so a screen offers it only where it succeeds |
+| An act on one finding — a decision, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |
+| Approving somebody else's decision | Reading at the decision's visibility, with the approver capability or triage there, and the capability alone at internal visibility. The session answer says which visibilities, so a screen offers it only where it succeeds |
 | An act about the product rather than one finding — a routing rule, a rating, a scan sent by hand, a record of being exploited, taking unowned work | Triage at any visibility. The finding-level question narrows further wherever there is a finding to ask it of |
 | Taking unowned work, handing back your own | Rows at a visibility they read, and a disclosed row of their own whatever they read, because the assignment carried it to them |
 | Reading or publishing a VEX document, and what has gone out | Public reading to read, public triage to publish. A document is disclosed work alone, and a row saying one went out is as much a disclosure as the document |
@@ -615,7 +616,7 @@ ordering taken over a visibility column anywhere in the source.
 | An advisory, draft or issued | Every issue it covers at a visibility read in that issue's product |
 | A list, count or export spanning products | Per product and per visibility: whichever of the three the grants on each product say. The assignment carry reaches the work list alone |
 
-## Judgments about an issue
+## Decisions about an issue
 
 A rating of an issue belongs to one product and reaches every build of it
 (REQ-29). The role is held on that product, like every other act that changes
@@ -671,7 +672,7 @@ finding, not of the product.
 
 ### Notes on an issue
 
-A note records no judgment, and it is read and written under the rule the
+A note records no decision, and it is read and written under the rule the
 rating beside it follows: the product, and the issue's visibility in it
 (REQ-29, REQ-43).
 
@@ -680,7 +681,7 @@ rating beside it follows: the product, and the issue's visibility in it
 | Reading asks whether the reader may read a finding of that issue in that product | A product the reader holds nothing on answers as an issue that is not there, in the words an unused name gets |
 | Writing asks for triage on that product, at the same visibility | Saying something on the record about work is part of arguing about it, and reading the product is not |
 | A collaborator brought into one case may read and write on that issue | The pair they were brought in on is the whole of what they reach, and a note about it is inside that pair |
-| An issue with one undisclosed place in that product is undisclosed for the whole thread | A note is one thread for the issue, so it cannot be public for some of its places and private for others. The stricter direction is the safe one |
+| An issue with one undisclosed occurrence in that product is undisclosed for the whole thread | A note is one thread for the issue, so it cannot be public for some of its occurrences and private for others. The stricter direction is the safe one |
 | Only the author may change one | An edit anybody could make is a forgery with a timestamp |
 | A mention in a note reaches only people who may read what it is about | The same query the editor's picker uses, so a mention cannot tell somebody that an issue exists in a product they may not open |
 
@@ -1166,7 +1167,7 @@ question widened by a case the subject was brought into.
 
 | Read | Answer to a subject that reads nothing there |
 |---|---|
-| Findings, places, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the tags in use | Refused |
+| Findings, occurrences, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the tags in use | Refused |
 | What each run opened and closed | Refused, for an empty list of runs as well |
 | The receipts list | The receipts, with no counts of what each run changed. The receipts are about what the pipeline sends; the counts are a report on findings |
 
@@ -1264,7 +1265,7 @@ that is neither.
 | | |
 |---|---|
 | **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
-| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as editing a report, recording a message to or from its reporter, assigning it, or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
+| **Leaves none, deliberately** | A triage decision and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as editing a report, recording a message to or from its reporter, assigning it, or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because
 absorbing a route that should leave a row is the failure the walk exists to
@@ -1367,18 +1368,18 @@ the extensions and shortenings with the act `disclosure`.
 | Rule | Reason |
 |---|---|
 | The unit is one issue in one product | The unit an embargo date is kept and moved in |
-| Every place turns public, open and closed | A closed place still carries comments and decisions, and REQ-40 opens the whole record |
-| Every decision about the issue in the product turns public | A decision carries its finding's visibility so that the row answers who may reach it |
+| Every occurrence turns public, open and closed | A closed occurrence still carries comments and decisions, and REQ-40 opens the whole record |
+| Every decision occurrence about the issue in the product turns public | A decision occurrence carries its finding's visibility so that the row answers who may reach it |
 | Nothing else is rewritten | Comments, notes, attachments, assignments and an advisory's distribution label read the finding's visibility when asked |
-| A decision written after the place was read follows | Its visibility is read from the issue inside the write, so a disclosure landing between the read and the write leaves no private row behind |
+| A decision's row written after the occurrence was read follows | Its visibility is read from the issue inside the write, so a disclosure landing between the read and the write leaves no private row behind |
 | A flaw with no date always needs a second person | A flaw found here has no end anybody agreed to, so the disclosure is the whole decision |
 | One way | Nothing turns a disclosed issue undisclosed again, and a later extension or shortening finds nothing to move |
 | One disclosure waits at a time | A second request that would also wait is refused while the first waits. One that takes effect at once is not, and the one waiting leaves the queue |
-| The end is read from the open places | The places a movement reads and moves. A closed place's date is read only where nothing is open |
+| The end is read from the open occurrences | The occurrences a movement reads and moves. A closed occurrence's date is read only where nothing is open |
 | The disclosure date is cleared | A public finding carries none. The movement keeps where the embargo stood |
 | The embargo's history is public once disclosed | Every movement and its reason is part of the record that disclosing opens. Before that, only somebody reading undisclosed work in the product reads it |
 | A disclosure waiting for agreement changes nothing | The same rule as every other movement |
-| Whoever holds a place is told, apart from the person whose act made it public | What they write about it is public from then on. People only: a place in a team's queue has nobody to tell |
+| Whoever holds an occurrence is told, apart from the person whose act made it public | What they write about it is public from then on. People only: an occurrence in a team's queue has nobody to tell |
 | A movement left waiting when the issue is disclosed leaves the queue | It can no longer be agreed to |
 
 ## Disclosure-date movements
@@ -1425,8 +1426,8 @@ agreed to and leaves the list.
 There is somewhere to be the second person. A request over the threshold could
 be read on the finding it belongs to and nowhere else, so the only way to find
 one was to already know it existed. The requests waiting appear on the review
-queue as their own list rather than as claims: what is agreed to here is not a
-claim about code.
+queue as their own list rather than as decisions: what is agreed to here is not a
+decision about code.
 
 That list is a disclosure too, so it is narrowed in the query. A request of your
 own is shown and marked and cannot be agreed to — hiding it would leave somebody
@@ -1462,9 +1463,9 @@ private access.
 | Whoever reads the product the case is in manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo. A collaborator is not that reader: the grant is one issue, so it carries the finding and not the list of who else was brought in |
 | The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator is refused the path to the component their own case sits in, and the finding answers as though it were not there |
 | Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faults on the row the grant exists to open |
-| How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same place, held at a version the decision would not already cover. Asked product-wide they refuse the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the screens offering to carry a judgment across builds fault on the one finding the grant exists to open |
+| How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same occurrence, held at a version the decision would not already cover. Asked product-wide they refuse the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the screens offering to carry a decision across builds fault on the one finding the grant exists to open |
 | Resolving a build's names admits a collaborator; reading what that build holds does not | The names their own issue sits at have to resolve, or the grant refuses them the one thing it gave. So every read reached through that lookup puts the product-wide question for itself, and a document about the whole build is not a question about one named issue |
-| A claim is asked about each of its rows' own issue | So a collaborator reads the claims about their case, argues and revises their own, and comments on them, and is refused a claim with any row about another issue. Agreeing still asks the product-wide question |
+| A decision is asked about each of its rows' own issue | So a collaborator reads the decisions about their case, argues and revises their own, and comments on them, and is refused a decision with any row about another issue. Agreeing still asks the product-wide question |
 | Whether a collaborator may resolve a product's names is one rule | Every lookup that admits them asks it — a build, an issue's attachments, a product for an issue-scoped route — so no lookup refuses the grant the others honor |
 | What was filed against a build is withheld | The receipts and the documents a build kept are about the whole build. A collaborator asking for them is answered as a stranger is, before any name past the product resolves, so the answer says nothing about which builds were declared or scanned |
 | That every read past it does put the question is checked | A sentence beside the resolver is not enforcement: a read asking whether a single issue is undisclosed and never whether the subject may read the product hands a collaborator on one case the approved statements for the whole build. A gate reads where a resolved build is used, and reports one handed to something that carries no subject where nothing refused first |

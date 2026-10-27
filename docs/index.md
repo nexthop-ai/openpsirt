@@ -51,7 +51,7 @@ bare commits. OpenPSIRT reads the repository and tells you which commit is the
 fix for 6.1, 6.6, 6.12, 6.16 and the mainline, so each maintained branch gets
 the patch it needs.
 
-Judgments travel with the code. A decision made on one release carries to every
+Decisions travel with the code. One made on one release carries to every
 other release, tag and variant that ships the same dependency chain, so the
 same question is answered once. When a supplier states that its product is not
 affected, every finding reached only through that product closes, and opens
@@ -61,8 +61,8 @@ again if the statement changes.
 
 Every number OpenPSIRT reports can be traced to the evidence behind it.
 
-A finding is a component at a specific place in a specific build, so a judgment
-holds exactly where it was made, and a judgment about risk lapses when the code
+A finding is a component at one occurrence in a specific build, so a decision
+holds exactly where it was made, and a decision about risk lapses when the code
 under it moves.
 Identity is derived from content, never from identifiers a scan file happens
 to carry, so the same component is recognized from one build to the next and

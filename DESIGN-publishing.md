@@ -98,33 +98,33 @@ label lets it travel (`DESIGN-remediation.md` § The provider directory).
 
 | Rule | |
 |---|---|
-| Read as anybody at all | The read of what went out is narrowed by the clauses every reader's is: every issue the advisory covers, now and when it went out, at a disclosed place in a product the reader reads. Anybody at all reads only the products that publish, so an advisory covering one product that does not is not served |
+| Read as anybody at all | The read of what went out is narrowed by the clauses every reader's is: every issue the advisory covers, now and when it went out, at a disclosed occurrence in a product the reader reads. Anybody at all reads only the products that publish, so an advisory covering one product that does not is not served |
 | Only what may travel | A revision labeled RED, about a flaw nobody outside has been told about, is never served, whatever came after it |
 | An advisory states the address it is served at, where it is | Generated where the deployment publishes and every product it covers publishes and is in use, the address it states for itself is this surface's; otherwise the static directory's, where one is written, or none, since this surface would answer it with nothing. Issued bytes never change, so an advisory issued before its products published keeps the address it went out with |
 
 ## Statements and statuses
 
 What is stated about one build is what somebody decided: the document of one
-build (`DESIGN-remediation.md` § The VEX document), with a claim that an issue
+build (`DESIGN-remediation.md` § The VEX document), with a decision that an issue
 applies and stays stated outright. A component nobody has judged gets no
 statement, so a scanner reports it as it would without these documents.
 
 | Status | Stated where | What it carries |
 |---|---|---|
-| Not affected | Every open place of the component stands under an approved, live claim that it does not apply or that the match was wrong | The claim's reason, and what stops it where the claim named it |
-| Fixed | The same, for a claim that the fix is already here, and where a patch the build declares closed it | Nothing more |
-| Affected | Every open place stands under a claim in force that the issue applies, will be fixed, or will not be | What a holder can do where the claim named it; otherwise that no fix is planned, where every claim says it will not be fixed, or that none is available yet |
+| Not affected | Every open occurrence of the component stands under an approved, live decision that it does not apply or that the match was wrong | The decision's reason, and what stops it where the decision named it |
+| Fixed | The same, for a decision that the fix is already here, and where a patch the build declares closed it | Nothing more |
+| Affected | Every open occurrence stands under a decision in force that the issue applies, will be fixed, or will not be | What a holder can do where the decision named it; otherwise that no fix is planned, where every decision says it will not be fixed, or that none is available yet |
 
 | Rule | |
 |---|---|
-| Nothing is stated about a component nobody judged | An issue open and undecided, a deferral, and a claim still waiting on a second person state nothing. A document about an issue with no statement left is not served |
-| Under investigation is never stated | No claim records that somebody is looking at an issue: a deferral says when somebody will look again rather than that anybody is looking, and a claim waiting on a second person is one person's opinion |
+| Nothing is stated about a component nobody judged | An issue open and undecided, a deferral, and a decision still waiting on a second person state nothing. A document about an issue with no statement left is not served |
+| Under investigation is never stated | No decision records that somebody is looking at an issue: a deferral says when somebody will look again rather than that anybody is looking, and a decision waiting on a second person is one person's opinion |
 
 | Rule | |
 |---|---|
 | Disclosed findings only | Read at the public visibility, in a product anybody at all reads. A flaw of ours nobody has disclosed is in no statement, no document, no list and no count (REQ-37) |
 | No other name and no description of an issue a flaw held back wrote onto | Where a flaw of ours recorded about an issue sits out of anybody's reach — undisclosed, or in a product that does not publish — the issue's other names and its description are left out: the flaw wrote its minted name and its summary onto the issue row every product shares |
-| A claim in force states affected | Saying an issue applies hides nothing, so a claim of it needs nobody; the statuses that hide risk come from approved claims only, as in the document of one build |
+| A decision in force states affected | Saying an issue applies hides nothing, so a decision of it needs nobody; the statuses that hide risk come from approved decisions only, as in the document of one build |
 | A supplier's statement about its own product is not passed on | Passing on a supplier's word under this deployment's name is the document carrying suppliers' statements, which somebody chooses |
 | Each build is read at what it last scanned | Every branch and tag in use, as every variant in use, once it has been scanned. A build out of support is still published, because a reader still runs it (REQ-15) |
 | A build stating more than one document of a build carries is refused | The product's documents are not worked out on that pass, and stay as they last were. The pass logs it |
@@ -147,10 +147,10 @@ as it stands (REQ-31).
 
 | Rule | |
 |---|---|
-| A claim may state its scope | Stated when the claim is proposed, and part of what the second person agrees to. Changing it is proposing again, as changing any part of a claim is (`DESIGN-triage.md`) |
+| A decision may state its scope | Stated when the decision is proposed, and part of what the second person agrees to. Changing it is proposing again, as changing any part of a decision is (`DESIGN-triage.md`) |
 | A stated scope wins either way | Narrowed to this build, a statement whose reason holds for anybody is stated about the build; widened, one whose reason is the build's is stated about the component |
 | A component is stated alone only where every build agrees | Within one document, every statement about the component as a whole holds for anybody and says the same thing, or each is stated about its own build. One build calling it not affected while another has the issue open there is a contradiction, and a reader is told the cautious half |
-| A statement about one place is always stated beneath the component that pulls it in | Other places of the same component disagree with it, which is why it is about one place |
+| A statement about one occurrence is always stated beneath the component that pulls it in | Other occurrences of the same component disagree with it, which is why it is about one occurrence |
 
 ## The CSAF VEX document
 
@@ -166,12 +166,12 @@ issue, in everything the product ships.
 | Status | A component holding for anybody is listed by its own product identifier; anything else by the relationship. A product listed under two statuses keeps the more cautious |
 | Flags | The reason for every product not affected, one flag per reason |
 | Threats | What stops the flaw, for a product not affected where somebody named it |
-| Remediations | For an affected product, that no fix is planned or none is available, and what to do where the claim named it |
+| Remediations | For an affected product, that no fix is planned or none is available, and what to do where the decision named it |
 | Identifiers | The CVE where the issue has one among its names, and every other name, by the prefix it carries |
 | Notes | What the issue is, in the words of whoever reported it, or its name where nobody said |
 | References | The address the document is served at |
 | Distribution | TLP WHITE, which is the standard's word for what TLP 2.0 calls CLEAR |
-| Tracking status | Final: every statement in it stands on a claim already agreed or on a fact a scan recorded |
+| Tracking status | Final: every statement in it stands on a decision already agreed or on a fact a scan recorded |
 
 A product identifier is built from names: `<product>:<branch>:<variant>` for a
 build, the package identifier for a component, and the two joined by `|` for a
@@ -187,7 +187,7 @@ scanned: what a scanner holding one build asks of it.
 |---|---|
 | A statement holding for anybody names the component as the product, alone | A reader applies it to the component wherever it ships |
 | A statement holding for this build names the build as the product, with the component beneath it | The build is named by the package identifier its inventory gave itself, or by its names where it gave none |
-| A statement about one place names the component pulling it in, with this one beneath it | As the document of one build does |
+| A statement about one occurrence names the component pulling it in, with this one beneath it | As the document of one build does |
 | One statement however many variants say it | Stated from when it was first true |
 | Its identifier is the address it is served at | A reader keeps documents by it |
 | `version`, `timestamp` and `last_updated` | The revision held, when the first revision was released, and when this one was |
@@ -258,7 +258,7 @@ is not there; nothing else is decided.
 
 A document is an issue somebody decided about, so the number of documents
 grows with the decisions rather than with what a scanner reports. A pass reads
-every build's claims whatever is published, which is most of what it costs.
+every build's decisions whatever is published, which is most of what it costs.
 
 ## Not built
 
@@ -273,7 +273,7 @@ every build's claims whatever is published, which is most of what it costs.
 | | |
 |---|---|
 | The rate is per replica | Held in each process rather than in the database, so the request it limits writes nothing |
-| A document is as current as the last pass | Up to five minutes behind a claim agreed or a scan landing. Turning a product off and narrowing the statuses take effect at once, because what may be served is asked on every request |
+| A document is as current as the last pass | Up to five minutes behind a decision agreed or a scan landing. Turning a product off and narrowing the statuses take effect at once, because what may be served is asked on every request |
 | Every document of a product is worked out on every pass | 3.3 s on the image above, nearly all of it reading what stands; a record of what moved would be a second copy of what the findings already say (REQ-74) |
-| The scope of a statement about one place is not published | A place is stated beneath the component pulling it in whatever the claim's scope, because the other places of the component disagree |
+| The scope of a statement about one occurrence is not published | An occurrence is stated beneath the component pulling it in whatever the decision's scope, because the other occurrences of the component disagree |
 | A signature is made per request | Signing at the pass and keeping the signature would make it a stored copy of something worked out from the bytes and the key |

@@ -41,7 +41,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/config/` | Settings, read from the environment with working defaults |
 | `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `DESIGN-api.md` § File organization |
 | `internal/httpapi/core/` | What every area of the API shares: the dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies more than one area answers with |
-| `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/reportsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, claims and decisions, reports, advisories, administration |
+| `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/reportsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, decisions, reports, advisories, administration |
 | `internal/httpapi/httpapitest/`, `internal/httpapi/refusaltest/` | The test harness the areas share — a server over a seeded cast — and the checks each area runs over its own refusal mappers |
 | `internal/database/` | Opening, identifying and validating a database. See `DESIGN-database.md` |
 | `internal/database/migrate/` | The migration runner and the locks around it |
@@ -62,7 +62,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `DESIGN-findings.md` § Merged issues |
 | `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |
 | `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector, and the band a score falls in. A computation with no database, which findings, advisories and the API each call. See `DESIGN-findings.md` |
-| `internal/triage/`, `internal/advisory/` | Judgments, approvals, and the CSAF document. See `DESIGN-triage.md` |
+| `internal/triage/`, `internal/advisory/` | Decisions, approvals, and the CSAF document. See `DESIGN-triage.md` |
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
 | `internal/weblink/` | The addresses into the interface that the server hands out, held to the interface's route table. See `DESIGN-notifications.md` § Links |
@@ -70,7 +70,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
 | `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
 | `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |
-| `internal/saved/` | A narrowing of a list somebody kept, and the claim it prepares. See `DESIGN-remediation.md` |
+| `internal/saved/` | A narrowing of a list somebody kept, and the decision it prepares. See `DESIGN-remediation.md` |
 | `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
 | `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `DESIGN-remediation.md` |
 | `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, and the lists a provider serves, which the directory writes and the published surface serves. The supplier reader reads the fields it uses under the names these declare. See `DESIGN-remediation.md` |

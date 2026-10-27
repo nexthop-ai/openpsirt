@@ -76,7 +76,7 @@ across products have something to compare.
 
 ### The two-person control
 
-A judgment is proposed by one person and agreed to by another, and approving
+A decision is proposed by one person and agreed to by another, and approving
 your own is refused, so one person cannot demonstrate this. The demo opens a
 door per person, and two browser windows are two people:
 
@@ -100,13 +100,13 @@ make demo DEMO_CAST="8091:ana:public-read,public-triage,approver \
 | `make demo-status` | What it found, and every door |
 | `make demo-down` | Stops it |
 | `make demo-reset` | Starts over, keeping the scanner's vulnerability database, which is large and slow to fetch |
-| `make demo-triage` | A few judgments once the scans have landed: a dismissal, a deferral and a backport proposed by one of the cast and agreed to by another, plus an upgrade carried by a team |
+| `make demo-triage` | A few decisions once the scans have landed: a dismissal, a deferral and a backport proposed by one of the cast and agreed to by another, plus an upgrade carried by a team |
 | `make demo-vex` | A VEX document attributed to a distribution, written from what the scans actually found |
 | `make demo-flaw` | One flaw in what this deployment ships, recorded by hand and undisclosed |
 | `make dev` | This machine's binary plus the interface's own dev server, for editing the interface and watching it reload |
 
 - A demo where every figure reads zero demonstrates nothing. Without
-  `demo-triage` the review queue, the record of judgments, how long triage is
+  `demo-triage` the review queue, the record of decisions, how long triage is
   taking and what is planned are all empty, and the screens answering those
   questions look broken rather than idle. It records through the cast's own
   doors, because one person proposing and a second agreeing is the control the

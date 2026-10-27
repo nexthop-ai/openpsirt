@@ -18,7 +18,7 @@ database built by a release candidate or any other earlier build is recreated.
 | Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default. A supplier's statement that its own product is not affected closes the finding inside that product |
 | Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |
 | Access | Roles per product or across every product, public, private and internal as separate grants, enforced in the data layer |
-| Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections, and a review queue listed by the reason each claim waits. Static analysis leads in a queue of their own, ordered by what is likely real, with their evidence and source links, standing rules that dismiss by rule or path, grouping across analyzers, and hand-off of a confirmed lead as a flaw recorded here |
+| Triage | Decisions, approval, revision history, comments, bulk decisions, standing corrections, and a review queue listed by the reason each decision waits. Static analysis leads in a queue of their own, ordered by what is likely real, with their evidence and source links, standing rules that dismiss by rule or path, grouping across analyzers, and hand-off of a confirmed lead as a flaw recorded here |
 | Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public. A report from outside ruled a duplicate of a flaw found here starts the flaw's disclosure date |
 | Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
@@ -35,7 +35,7 @@ database built by a release candidate or any other earlier build is recreated.
 |---|---|
 | Ingest | Findings from a fuzzer, and a producer's own vulnerability report uploaded beside an inventory |
 | Patch branches | Asking a forge's API in place of cloning, and fetching through an outbound HTTP proxy |
-| Triage | Narrowing a judgment to some of the places it covers |
+| Triage | Narrowing a decision to some of the occurrences it covers |
 | Disclosure | Coordinating an embargo with a peer vendor or a coordinator |
 | Advisories | Sending one anywhere, signing the provider directory, a CVSS 4.0 score in the document, and prose of the deployment's own beyond the title |
 | Remediation | Opening or updating an item in an external tracker; a link somebody typed is stored. One view of a promise to upgrade across every build it names |

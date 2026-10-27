@@ -625,7 +625,7 @@ refused at startup.
 
 | Where it goes | What it carries |
 |---|---|
-| A person, directly | What is their own — work assigned to them, a note naming them, a claim sent back — and what is about a product or a team where no channel carries it. On by default; each person can turn it off, or ask for what the channels carry as well |
+| A person, directly | What is their own — work assigned to them, a note naming them, a decision sent back — and what is about a product or a team where no channel carries it. On by default; each person can turn it off, or ask for what the channels carry as well |
 | A team's channel | What is about work in that team's queue |
 | A product's channel | What is about that product and no team's channel carries |
 | The deployment's channel | What is about anything and no narrower channel carries |
@@ -1017,10 +1017,10 @@ its documents are signed with; trusting it confirms that key.
 |---|---|
 | Not affected or fixed, for anybody shipping the component, in a document OpenPSIRT generated | Closes the findings of that issue on that component, at exactly that version, the next time a build is scanned. Shown on the finding with the upstream's name and a link to its document |
 | The same shape in a document other software generated | Offered in the review queue, as below. CSAF has no word for whom a statement holds for, so only this deployment's own convention is read as saying it |
-| One depending on the upstream's own build | Offered in the review queue beside each open finding it speaks about. Accepting it proposes an ordinary claim citing it, which goes through approval |
+| One depending on the upstream's own build | Offered in the review queue beside each open finding it speaks about. Accepting it proposes an ordinary decision citing it, which goes through approval |
 | Anything else | Evidence beside the finding |
 
-A place somebody here decided about is left as they decided. Anybody who may
+An occurrence somebody here decided about is left as they decided. Anybody who may
 triage the product can decline one statement, which stops it closing anything
 or being offered; stopping trusting the upstream sets aside everything it said.
 Each of these, and the upstream withdrawing a statement, opens what it closed:
@@ -1231,7 +1231,7 @@ and one that failed says why at the end.
 |---|---|---|---|
 | `OPENPSIRT_SCANNER_MAX_OUTPUT` | `scanner.max_output` | How large one report may be. The load-bearing bound: every count below is bounded by it | 256 MB |
 | `OPENPSIRT_SCANNER_MAX_COMPLAINT` | `scanner.max_complaint` | How much of what a scanner said while running is kept, from the end | 1 MB |
-| `OPENPSIRT_SCANNER_MAX_MATCHES` | `scanner.max_matches` | How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
+| `OPENPSIRT_SCANNER_MAX_MATCHES` | `scanner.max_matches` | How many matches one report may state. One match becomes as many findings as its component has occurrences, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
 | `OPENPSIRT_SCANNER_MAX_REFERENCES` | `scanner.max_references` | How many addresses one match may point at. Bounded separately because the two multiply | 1,000 |
 
 ## Memory and the scanner's database
@@ -1366,9 +1366,9 @@ on.
 
 | Change | What to do |
 |---|---|
-| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands | The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check `/healthz` for whether to keep the process, as the chart does ([Health checks](#health-checks)), or set `autoMigrate: false` and run `openpsirt migrate up` before deploying |
+| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a decision made beneath it stands | The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 decision occurrences, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check `/healthz` for whether to keep the process, as the chart does ([Health checks](#health-checks)), or set `autoMigrate: false` and run `openpsirt migrate up` before deploying |
 | On PostgreSQL the upgrade indexes each column pointing at an image's components and nodes while it merges them, and removes those indexes when it is done. v0.10.1 and earlier read the whole finding table for every component the merge removed, which stalled the upgrade on a database larger than the server's memory | Nothing. An index made by hand on `finding.component_id`, `finding.consumer_id`, `finding_tag.component_id`, `graph_node.component_id` or `graph_edge.parent_id` to get past a stalled upgrade is harmless, and may be dropped once the upgrade is done |
-| A live judgment beneath an image is keyed on the image with no version | Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed |
+| A live decision beneath an image is keyed on the image with no version | Nothing. Where two live decisions at one occurrence differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed |
 | Findings a rebuild closed before the upgrade stay closed | Nothing. They are history, listed in the register with the reason they closed |
 | A name some build held at two versions at once is not merged in any build, and a build holding two images of one name at once keeps them apart by version, as before | Nothing. A build that holds such a name once moves it to the name on its next upload, once: the image's node closes and opens, the findings beneath it close and open again, and judgments beneath it lapse and are asked again |
 | An image the inventory states with no package identifier is not found by the upgrade | Nothing. The next upload of each build stores it by name, which closes the old node and opens the new one once, as a version moving would |
@@ -1380,9 +1380,9 @@ on.
 | A claim in a build is keyed on its explanation. A build that changes only the explanation closes the claim and opens a new one. v0.8.0 kept the first explanation and wrote nothing | Nothing. The upgrade keys every stored claim on its explanation, so nothing closes on the first scan after it |
 | A NUL character in a query parameter, a path value, a form field, or a string or key in a JSON body is refused with a 400 naming the input. v0.8.0 dropped it from most inputs | A client sending one sends the text without it. The contents of an uploaded file are not checked |
 | The query of a PostgreSQL `OPENPSIRT_DATABASE_URL` is read the way `libpq` reads it. A `+` is a plus sign, where v0.8.0 read it as a space. A raw space, an `=` inside a value, or a `%` not followed by two hex digits is refused at startup, where v0.8.0 dropped the pair or read it. A key given twice takes its last value, where v0.8.0 took its first | Percent-encode each of them in a value: a space as `%20`, `=` as `%3D`, `%` as `%25`. `options=-c%20statement_timeout%3D5000`, not `options=-c+statement_timeout=5000`, and a base64 password parameter ending `==` as `%3D%3D`. Give each key once |
-| A component's name, version and package identifier are held without control characters. A stored component with one in any of them is a different component on the next scan | Nothing. Its findings close and reopen once, on the next scan of each build holding it, and judgments beneath it are asked again |
+| A component's name, version and package identifier are held without control characters. A stored component with one in any of them is a different component on the next scan | Nothing. Its findings close and reopen once, on the next scan of each build holding it, and decisions beneath it are asked again |
 | A build's scanner is given the distribution, the source package and the other package-identifier qualifiers that builds of its own product stated for a component. v0.8.0 filled them onto the component row every product shares, from whichever product stated them first | State each component's distribution and source package in every build's inventory. On a branch's first scan after the upgrade, a component its own product never described that way loses the matches another product's description gave it, and those findings close as unexplained. A tag is not scanned from a new inventory, and keeps the description the upgrade copied onto its nodes, which on v0.8.0 may be another product's |
-| Compliance, cumulative deferral, the triage measures and time to fix are worked out again. A deferral counts for the time it held, with overlaps once; a send-back and a wait count once per claim; an issue fixed in two products is one fix | Nothing. A figure read before the upgrade may differ from the same period read after it |
+| Compliance, cumulative deferral, the triage measures and time to fix are worked out again. A deferral counts for the time it held, with overlaps once; a send-back and a wait count once per decision; an issue fixed in two products is one fix | Nothing. A figure read before the upgrade may differ from the same period read after it |
 | Every day and moment the API answers is in UTC. v0.8.0 answered some in the database server's zone | Nothing where the database server runs in UTC. Otherwise a due date or a disclosure date near midnight reads one day off from what v0.8.0 answered |
 | A CSAF document states the base vector inside the vector held, in the specification's order. v0.8.0 published the vector as held, metrics outside the base set included | Nothing. An advisory v0.8.0 issued from such a vector reads as changed since it went out; issue it again to send the corrected document |
 | A flaw recorded here is rated by the product that recorded it, and its rating is no longer on the issue every product holding it reads. The upgrade moves it there | Nothing. Where another product holds the same issue, its findings read no severity word from the record, and keep the deadline v0.8.0 worked out from it until the next scan reporting the issue with a word works it out again |
@@ -1394,7 +1394,7 @@ on.
 | Change | What to do |
 |---|---|
 | This deployment can serve its own security documents to anybody, with `OPENPSIRT_PUBLISH`. Off by default, and off for every product | Nothing, unless you want it: [Published documents](#published-documents) |
-| A claim may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No claim the upgrade carries states one, and the reason decides | Nothing |
+| A decision may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No decision the upgrade carries states one, and the reason decides | Nothing |
 | A path below `/.well-known/csaf/` or `/openvex/` is answered by this deployment, with a 404 where it publishes nothing. v0.9.0 answered it with the interface's page | Nothing, unless a proxy in front of the deployment serves something of its own at either path: it now reaches this deployment where the proxy passes it on |
 
 ### From v0.10.0
@@ -1424,6 +1424,32 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | The SBOM upload, the list of uploads and the read of what an upload changed keep answering at their former addresses under `/v1/products/{product}/streams/{stream}/variants/{variant}/scans`, with no removal planned | Nothing. A build pipeline needs no edit |
 | `/v1/decisions/{id}` is one decision, which v0.10.2 answered at `/v1/claims/{id}`. The row of a decision at one occurrence, which v0.10.2 answered at `/v1/decisions/{id}`, is at `/v1/decision-occurrences/{id}` | A client reading such a row by its identifier asks `/v1/decision-occurrences/{id}`, because the former address answers a different record |
 | The findings lists take `label`, `below_minimum_severity`, `decision` and `decision_state` in place of `tag`, `below_floor`, `claim` and `claim_state`. `GET /v1/advisories` takes `issue` in place of `vulnerability` | Rename them in the request. A former name is refused with 400, naming it |
+| Response and request fields use the words the interface uses: a claim is a decision, a decision's row at one occurrence is a decision occurrence, and a place is an occurrence | Rename the fields a client reads or sends, as [Renamed API fields](#renamed-api-fields) lists. A request carrying a former field name is refused with 422, naming it |
+| The CSV and JSON downloads name their columns the same way: `claim` is `decision`, `place` is `occurrence`, `places` is `occurrences`, and a count of a decision's rows beside a count of occurrences is `rows`. The file of somebody's own decisions downloads as `my-decisions` | Rename the columns a script reads |
+| The findings lists and the planned upgrades sort by `occurrences` in place of `places` | Ask for `sort=occurrences`. A saved filter kept with `sort=places` asks for a sort that is refused, so save it again with the new one |
+| The interface's addresses for a decision are `/decisions/{id}`, for a decision occurrence `/decision-occurrences/{id}`, and for a bulk decision `…/components/{component}/bulk-decision`. A link to `/claims/{id}` in an earlier notification opens no screen | Follow the link from the decision's record instead |
+| A decision's kind `together`, the notification kinds `claim-waiting` and `claim-lapsed`, and the setting `triage.together-cap` keep those names | Nothing |
+| The upgrade renames the triage tables and columns. Each rename waits up to three seconds for a table another session holds, then waits again, logging `a rename is waiting for a table something else holds` with what holds it | Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end |
+
+#### Renamed API fields
+
+| Former field | Field |
+|---|---|
+| `claim` | `decision` |
+| `claims` | `decisions` |
+| `claim_id` | `decision_id` |
+| `previous_claim_id` | `previous_decision_id` |
+| `returned_claim` | `returned_decision` |
+| `decision`, a decision's row at one occurrence | `decision_occurrence` |
+| `decision_id`, that row's identifier | `decision_occurrence_id` |
+| `decision_ids` | `decision_occurrence_ids` |
+| `decisions`, a list of such rows | `decision_occurrences` |
+| `decisions`, a count of such rows | `occurrences`, or `rows` beside a count of occurrences |
+| `place` | `occurrence` |
+| `places` | `occurrences` |
+| `place_limit` | `occurrence_limit` |
+
+A notice's `places`, the places it named, keeps its name.
 
 #### Renamed API paths
 
