@@ -1544,3 +1544,70 @@ under it absent from the table keeps the rest of its address.
 | `/v1/scanning.{format}` | `/v1/last-uploads.{format}` |
 | `/v1/work/set-aside` | `/v1/failed-jobs` |
 | `/v1/work/set-aside/{id}/retry` | `/v1/failed-jobs/{id}/retry` |
+
+#### Renamed operations
+
+A client generated from the API document names its functions by operation, so
+these functions are renamed. Two former identifiers now name another
+operation: `get-decision` reads a decision, which v0.10.2 named `get-claim`,
+and `reaffirm-decision` reaffirms everything one decision covers, which
+v0.10.2 named `reaffirm-claim`.
+
+| Former operation | Operation |
+|---|---|
+| `add-advisory-source` | `add-supplier-advisory-feed` |
+| `add-routing-rule` | `add-assignment-rule` |
+| `amend-stream` | `amend-branch-or-tag` |
+| `approve-claim` | `approve-decision` |
+| `change-obligation-window` | `change-response-window` |
+| `clear-exploited-here` | `clear-incident` |
+| `comment-on-claim` | `comment-on-decision` |
+| `decide-together` | `decide-in-bulk` |
+| `declare-obligation-window` | `declare-response-window` |
+| `declare-stream` | `declare-branch-or-tag` |
+| `export-fix-bundles` | `export-planned-upgrades` |
+| `export-match-coverage` | `export-unmatched-components` |
+| `export-my-claims` | `export-my-decisions` |
+| `export-pending-upgrades` | `export-build-planned-upgrades` |
+| `export-scanning` | `export-last-uploads` |
+| `get-claim` | `get-decision` |
+| `get-decision` | `get-decision-occurrence` |
+| `get-match-coverage` | `list-unmatched-components` |
+| `get-pending-upgrades` | `list-build-planned-upgrades` |
+| `get-vex-issued` | `get-published-vex` |
+| `list-advisory-sources` | `list-supplier-advisory-feeds` |
+| `list-audit-claims` | `list-audit-decisions` |
+| `list-claim-approvals` | `list-decision-approvals` |
+| `list-claim-comments` | `list-decision-comments` |
+| `list-claim-revisions` | `list-decision-revisions` |
+| `list-decisions` | `list-decision-occurrences` |
+| `list-fix-bundles` | `list-planned-upgrades` |
+| `list-my-claims` | `list-my-decisions` |
+| `list-obligation-windows` | `list-response-windows` |
+| `list-obligations` | `list-incidents` |
+| `list-patch-branch-progress` | `list-patch-branch-lookups` |
+| `list-routing-rules` | `list-assignment-rules` |
+| `list-scanning` | `list-last-uploads` |
+| `list-set-aside-work` | `list-failed-jobs` |
+| `list-streams` | `list-branches-and-tags` |
+| `list-tags` | `list-labels` |
+| `list-vex-issuances` | `list-published-vex` |
+| `point-claim-elsewhere` | `point-decision-elsewhere` |
+| `preview-routing-rule` | `preview-assignment-rule` |
+| `reaffirm-claim` | `reaffirm-decision` |
+| `reaffirm-decision` | `reaffirm-finding-decision` |
+| `record-exploited-here` | `record-incident` |
+| `record-vex-issued` | `record-published-vex` |
+| `retire-obligation-window` | `retire-response-window` |
+| `retire-routing-rule` | `retire-assignment-rule` |
+| `retire-stream` | `retire-branch-or-tag` |
+| `retry-set-aside-work` | `retry-failed-job` |
+| `revise-claim` | `revise-decision` |
+| `send-claim-back` | `send-decision-back` |
+| `set-product-triage-floor` | `set-product-minimum-severity` |
+| `set-stream-end-of-life` | `set-branch-or-tag-end-of-life` |
+| `split-claim` | `split-decision` |
+| `tag-finding` | `label-finding` |
+| `untag-finding` | `unlabel-finding` |
+| `withdraw-advisory-source` | `withdraw-supplier-advisory-feed` |
+| `withdraw-claim` | `withdraw-decision` |
