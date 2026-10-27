@@ -63,7 +63,13 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 
 | Document | Covers | Terms |
 |---|---|---|
-| [database](design-docs/database.md) | Engines, migrations, locking and portability | supported engines, engine-specific code, migrations, identifier quoting, affected-row counts, retryable transactions, reads a write depends on, bulk inserts, indexes |
-| [queue](design-docs/queue.md) | Background work as rows in the application's database | job structure, exclusive handout, failure handling, leases, backlog refusal |
+| [database](design-docs/database.md) | Supported engines, where engine-specific code lives, connections, and the test harness | version floors, engine-specific code, make confined, engine detection, connection encryption, connection pool, statement preparation, SQLite settings, test harness, failing commit, partitioning |
+| [database-migrations](design-docs/database-migrations.md) | Creating and moving the schema forward | migrate up, schema version, baseline, forward only, migrations that stop half way, release records, release freeze, upgrade rehearsal, migration lock |
+| [database-upgrades](design-docs/database-upgrades.md) | What each release's upgrade migration does | release upgrades, v0.8.0, v0.9.0 image merge, v0.10.0, v0.11.0 renames, stored values, SQLite rebuild |
+| [database-queries](design-docs/database-queries.md) | Query rules the four engines impose | identifier quoting, reserved words, make reserved, silently wrong query shapes, LIKE escaping, case folding, affected-row counts, recursion bound, collation, text truncation, bulk inserts |
+| [database-transactions](design-docs/database-transactions.md) | Coordination through the database and transactions that survive a cluster | replica coordination, retryable transactions, savepoints, one act one transaction, joining a transaction, reads a write depends on, decision stamp, absence and failure |
+| [database-schema](design-docs/database-schema.md) | Indexes, statistics and column rules | redundant indexes, hot indexes, vacuum settings, planner statistics, column widths, columns no query reads |
+| [database-measurements](design-docs/database-measurements.md) | Benchmark runs behind the database rules | statement preparation modes, bulk insert cost, v0.9.0 upgrade time, v0.11.0 phase times, index reads |
+| [queue](design-docs/queue.md) | Background work as rows, and leases for once-only passes | job structure, exclusive handout, failure handling, failed jobs, claim renewal, hold ceiling, passes on a timer, leases, backlog refusal, queue bounds, transaction boundary |
 | [build](design-docs/build.md) | Repository layout, the gate, and what stops a change reaching `main` | make targets, gate tiers, CI jobs, test databases, tool pins, static analysis, licenses, self-inventory |
 | [packaging](design-docs/packaging.md) | The container image, the Helm chart, and releases | image structure, bundled scanner, pod sizing, configuration sources, network policy, secret sources, signing and provenance, release procedure |

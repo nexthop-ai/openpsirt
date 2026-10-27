@@ -1,7 +1,7 @@
 # Work queue
 
 Background work held as rows in the application's own database, and the
-selection of one replica for work that must happen once.
+leases that pick one replica for work that must happen once.
 
 Satisfies REQ-03, REQ-06, REQ-69.
 
@@ -21,217 +21,200 @@ Satisfies REQ-03, REQ-06, REQ-69.
 
 ## Job structure
 
-A job is a row. Work survives a restart, and a worker that dies mid-job leaves
-the job claimed until the claim goes stale.
+A job is a row, so work survives a restart and an upload is answered before it
+is parsed (REQ-06). A worker that dies mid-job leaves the job claimed until the
+claim goes stale.
 
 | Field | Holds |
 |---|---|
 | Kind | Which worker may claim it |
-| Reference | The thing being worked on |
+| Reference | The thing worked on |
 | State | Queued, claimed, done, or failed |
 
-A job holds no payload. The reference points at the subject, so the queue stays
-small however large that subject is.
-
-Kinds are constants defined with the queue rather than with the worker that runs
-them: read a scan, scan for vulnerabilities, sweep the assignment rules. A kind is
-also stored in the row, so renaming one leaves queued work that nothing claims.
+| Rule | Reason |
+|---|---|
+| A job holds no payload | The queue stays small however large its subject |
+| Kinds are defined with the queue: read a scan, scan for vulnerabilities, sweep the assignment rules, apply an analyzer's run | A producer and a worker are different packages |
+| A kind is stored in the row | Renaming one leaves queued work nothing claims |
 
 ## Exclusive handout
 
-Two workers never receive the same job. The guarantee is a **conditional
-update**: the claiming statement repeats the conditions that made the job
-claimable, so it succeeds only if the job is still claimable. A second worker's
-update matches nothing. This behaves identically on all four engines.
+Two workers never receive the same job, on any engine and any number of
+replicas (REQ-03).
 
-`FOR UPDATE SKIP LOCKED` is a throughput measure and not the guarantee. Without
-it every worker selects the oldest job and all but one performs a round trip for
-nothing. SQLite uses none: every transaction takes the file's write lock as it
-begins, so the surrounding transaction already excludes every other claim.
-
-A worker claims only its own kind, as part of the claim rather than as a check
-afterwards.
+| Rule | Reason |
+|---|---|
+| The claim is a conditional update repeating the conditions that made the job claimable | A second worker's update matches nothing, identically on all four engines |
+| `FOR UPDATE SKIP LOCKED` sits beside it on the servers | Throughput only: without it every worker selects the oldest job and all but one make a wasted round trip |
+| SQLite uses no locking clause | Every transaction takes the file's write lock as it begins, which already excludes every other claim |
+| A worker claims only its own kind, inside the claim | |
 
 ## Failure handling
 
 | Behavior | Reason |
 |---|---|
-| Retry with a growing delay | A briefly unavailable dependency is not hammered while it recovers |
-| A limit on attempts | A job that can never succeed would otherwise retry forever and crowd out work that could |
-| A failed job is kept, never deleted | The row is kept with its last error, which is the evidence of why it failed |
-| The limit is charged on the reclaim as well as on a reported failure | A worker that is killed reports nothing, so the only record of the attempt is the count the claim itself incremented. Charged only where a worker reports, a job that kills its worker is reclaimed for ever and the failed state is never reached |
-| A claim that can no longer be reclaimed is failed by a pass of its own | A job left in the claimed state reads everywhere else as work somebody is doing, and a worker that died is not something any act by a person is the moment to notice. Folded into the claim instead, it is a range update every worker runs on every poll over the rows every other worker is claiming — which on MySQL deadlocks six workers against one another rather than handing out work |
-| One replica buries | Every replica running the same range update is the same contention between processes that folding it into the claim caused between workers |
-| Work abandoned by its worker records that, in place of the reason nobody reported | Downstream it is the same failure. Somebody reading the row has to be able to tell "this failed" from "nothing was left alive to say" |
-| Work that cannot start yet is put back untried, with a delay and the reason | Something it needs has not arrived, which is not a failure of the work. The attempt the claim counted is given back, so waiting never fails a job, and the reason is kept where a failure's would be |
+| Retry with a growing delay | A briefly unavailable dependency is not hammered |
+| A limit on attempts | A job that can never succeed would crowd out work that could |
+| A failed job is kept with its last error, never deleted | The row is the evidence of why it failed |
+| The limit is charged on the reclaim as well as on a reported failure | A killed worker reports nothing, so the count its claim incremented is the only record. Otherwise a job that kills its worker is reclaimed for ever |
+| A claim that can no longer be reclaimed is failed by a pass of its own, on one replica | Left claimed, it reads as work in progress. Folded into the claim, it is a range update every worker runs on every poll, which on MySQL deadlocks six workers; on every replica it is the same contention between processes |
+| Work abandoned by its worker records that in place of a reason | A reader tells "this failed" from "nothing was left alive to say" |
+| Work that cannot start yet is put back untried, with a delay and the reason | Something it needs has not arrived. The attempt is given back, so waiting never fails a job, and the reason sits where a failure's would |
 
 ### Failed jobs
 
-Failed jobs have an operator surface: a list of what stopped and why, and a
-way to put one back.
+Failed jobs have an operator surface: a list of what stopped and why, and a way
+to put one back.
 
 | Rule | Reason |
 |---|---|
-| What is listed is failed jobs; what is waiting is counted | A list of waiting work invites acting on a state that moves underneath the reader, and a failed job has stopped moving by definition. A *count* of what is waiting moves too and nothing acts on one — it says whether the queue is filling up, which is the other way this goes wrong and which nothing else answered |
-| What is waiting is counted per kind, against the bound | The bound is per kind, so counted across the queue one producer's own backlog hides behind everybody else's empty queues — and what an operator does about a full queue needs both numbers |
-| Work held by a worker that has stopped reporting counts as waiting | It is work waiting for whoever takes it next. Counted as running, a queue in the middle of a reclaim cycle reads as empty |
-| Reading any of it is administration | What a worker reported is not one of the deployment's own records: a failed parse quotes the cause it was given, and that can carry a component name or a package address out of an SBOM the reader holds nothing on |
-| Putting a job back starts its attempts again | Whoever does it has decided the cause is dealt with. A job returned with one attempt left fails again on the next transient failure |
-| The last error survives being put back | It is the evidence of the previous run, and the decision to try again is not a reason to destroy it |
-| Only a failed job is put back | Returning a running job hands the same work to two workers, which on an ingest looks like real change rather than an error |
-| The listing is capped | A read on an interactive route carries a bound, and a deployment whose queue has gone wrong is where the list is longest |
+| Failed jobs are listed; waiting work is counted | Waiting work moves under a reader, and a count says whether the queue is filling |
+| Waiting work is counted per kind, against the bound | The bound is per kind, so a total hides one producer's backlog |
+| Work held by a worker that stopped reporting counts as waiting | Counted as running, a queue mid-reclaim reads as empty |
+| Reading any of it is administration | A failed parse quotes its cause, which can carry a component name or package address the reader holds nothing on |
+| Putting a job back starts its attempts again | Whoever does it decided the cause is dealt with |
+| The last error survives being put back | It is the previous run's evidence |
+| Only a failed job is put back | Returning a running job hands the work to two workers, which on an ingest looks like real change |
+| The listing is capped | A deployment whose queue has gone wrong has the longest list |
 
 ## Claim renewal
 
-The claim timeout bounds how long a worker may go silent, not how long a job may
-take. A running worker renews its claim on an interval well inside the timeout,
-so several renewals may fail before the claim is at risk.
+The claim timeout bounds how long a worker may go silent, not how long a job
+may take. A running worker renews its claim on an interval well inside the
+timeout, so several renewals may fail before the claim is at risk.
 
 | Event | Behavior |
 |---|---|
-| Renewal refused, another worker holds the job | The work is canceled and the worker is told the claim was lost, not that the work failed |
-| Renewal fails for any other reason | Reported and retried next interval. The claim is not lost until the timeout passes with nothing landing |
-| The job ends | Renewal stops first and the worker waits for it, so nothing else writes to the job while the ending is written |
-| Settling a job is one sequence, owned by the queue | Opening a context that outlives a cancellation, recording the ending against it, telling a stale claim apart from a write that failed, and noticing a takeover. Written out in each worker down to the comment paragraph, the copies disagree, and a third worker is a third reading of the rule for a job finished by a worker that no longer holds it |
-| What a worker does about its own failure is passed in | It is the one respect the workers genuinely differ: the reader records the failure against the scan as well as the job, and must not on a cancellation or where the job went to another worker. Passed as a closure rather than a flag, so the difference is visible where it is made |
-| The claim went stale while the work ran | Only the claim holder finishes a job: the finishing statement carries the claim's condition. A refused finish is reported as "no longer held" and logged |
-| Shutdown mid-job | The job is handed back as a failed attempt. The writes recording an ending run under their own context, detached from the cancellation and bounded by a few seconds |
-| The work never returns | Renewal stops at a ceiling on the whole hold, the work is canceled, and the attempt is recorded as this job's failure |
+| Renewal refused because another worker holds the job | The work is canceled and the worker told the claim was lost, not that the work failed |
+| Renewal fails for any other reason | Reported and retried next interval. The claim is lost only when the timeout passes with nothing landing |
+| The job ends | Renewal stops first and the worker waits for it, so nothing else writes the job while the ending is written |
+| The claim went stale while the work ran | The finishing statement carries the claim's condition, so only the holder finishes. A refused finish is reported as "no longer held" and logged |
+| Shutdown mid-job | The job is handed back as a failed attempt. The ending writes run on their own context, detached from the cancellation and bounded by a few seconds |
+| The work never returns | Renewal stops at the ceiling on one hold, the work is canceled, and the attempt is this job's failure |
+
+| Rule | Reason |
+|---|---|
+| Settling a job is one sequence owned by the queue | A context outliving the cancellation, the ending recorded on it, a stale claim told from a failed write, a takeover noticed. Per-worker copies disagree |
+| What a worker does about its own failure is passed in as a closure | The workers differ there alone: the reader records a failure against the scan as well, except on a cancellation or a takeover |
 
 ### The ceiling on one hold
 
-Renewal is bounded in total, not only per renewal.
-
 | Rule | Reason |
 |---|---|
-| One claim is renewed for at most a fixed span, four claim timeouts by default | Renewal otherwise has two exits — the work finishing and the claim being taken away — so a worker wedged inside its unit of work renews for ever |
-| The claim timeout does not cover this | It bounds a worker going silent, and a wedged worker is not silent: it is renewing on time and reporting nothing |
-| What the ceiling costs where it is too low | Legitimate work is cut off mid-run, which is the same hazard the claim timeout carries, so the ceiling exceeds the longest single unit of work by a wide margin |
-| A ceiling reached is logged at the level an operator sees | A worker that reached it is not coming back, and nothing else here says so |
-| It is recorded as this job's failed attempt, not as a handover | Nobody else holds the job. Counting the attempt is what eventually sets the job aside rather than handing it to a succession of workers that each wedge in turn |
-| A subprocess is given a delay to release the pipes once it is killed | Killing a process does not close a pipe a helper it spawned still holds, and waiting on the copy blocks past the deadline that killed it — which is how a worker wedges in the first place |
-
-Zero is no ceiling, for work whose caller states that it has no upper bound. No caller in this deployment builds a queue that way: every bound comes from a setting, and a setting refuses zero.
-That is asked for rather than arrived at by omission.
+| One claim is renewed for at most a fixed span, four claim timeouts by default | A worker wedged inside its work otherwise renews for ever, since renewal ends only on finishing or losing the claim |
+| The claim timeout does not cover this | A wedged worker renews on time |
+| The ceiling far exceeds the longest single unit of work | Too low, it cuts legitimate work off mid-run |
+| A ceiling reached is logged at the level an operator sees | The worker is not coming back, and nothing else says so |
+| It is recorded as this job's failed attempt, never a handover | Nobody else holds the job, and counting it eventually fails a job that wedges every worker |
+| A killed subprocess is given a delay to release its pipes | A helper it spawned can hold a pipe open, and waiting on the copy blocks past the deadline, which is how a worker wedges |
+| Zero is no ceiling, for a caller whose work has no upper bound | No caller here builds a queue that way: every bound comes from a setting, which refuses zero |
 
 ## Passes on a timer
 
-One shape, in one place: a first tick at once, then the interval; a
-non-positive interval takes the pass's own default; the context ends the loop.
+One implementation runs every periodic pass: a first tick at once, then the
+interval; a non-positive interval takes the pass's default; the context ends
+the loop.
 
 | Rule | Reason |
 |---|---|
-| The first tick is immediate | A process that has just started is the moment a sweep is most worth running, because whatever accumulated while it was down is waiting |
-| Reporting stays with each pass | They log different things — what was collected, what was sent and what failed, a line per unit of work. A helper that owned the logging would be the call site written out again with a worse vocabulary |
-| A failed pass is logged and the loop goes on | A pass that cannot run is not a reason to stop serving, and what it failed to do is still there next time |
-
-One implementation, not one per pass. Written out per pass, the copies diverge
-over what nothing tests: whether the log line carries the trace context, how
-goroutines that would otherwise wake together on a cold start are spread, and
-where a measurement or a first-run delay sits. Each is an edit per copy, and a
-missed one diverges in silence.
+| The first tick is immediate | Whatever accumulated while the process was down is waiting |
+| Reporting stays with each pass | Each logs different things |
+| A failed pass is logged and the loop goes on | What it failed to do is still there next time |
+| One implementation | Copies diverge over what nothing tests: trace context in the log line, spreading goroutines on a cold start, where a measurement or first-run delay sits |
 
 ## Leases
 
-A pass that runs on a timer runs on every replica, because no replica is a
-leader. Discrete work is settled by claiming its row; a recurring pass has no
-row, so it takes a **lease** on the name of the work under the same conditional
-update.
+A pass on a timer runs on every replica, since none is a leader (REQ-03).
+Discrete work is settled by claiming its row; a recurring pass has no row, so
+it takes a **lease** on the work's name under the same conditional update.
 
 | Property | Behavior |
 |---|---|
 | Expiry | A lease lapses rather than only being handed back |
-| Retention | The holder keeps it by asking for it again each cycle |
-| Release | Handed back on a clean shutdown, by every pass that takes one, once its last cycle has ended, whether the stop arrived during a cycle or between two. A deadline rewrite a request started runs off the request, so it is ended once the server stops taking requests, and the shutdown waits for it to hand its lease back within the same grace. The release runs on a bounded context of its own, because the pass's has ended |
-| Holder | The worker's name: the host and the process an operator reads, and random characters that tell apart two processes sharing both. Replicas on the host's network share its name, and in a container every process is the first |
-| First use | The lease's row is made inside the transaction that takes it, written so that a row another replica made first is left alone. A cluster refuses that write at commit like any other, and the take goes again |
-| Duration | Outlasts a cycle of the work, sized from how often the pass runs rather than how often its subject recurs, so a replica that stops without handing it back holds the work for a few passes. Not renewed mid-pass. A process restarted in place after a crash is a new holder, so it waits out every lease the crashed one held: up to the mail and webhook leases' full length, at one replica as at many |
+| Retention | The holder asks for it again each cycle |
+| Release | Handed back on a clean shutdown by every pass that takes one, once its last cycle has ended, whether the stop came during a cycle or between two, on a bounded context of its own. A deadline rewrite a request started is ended once the server stops taking requests, and the shutdown waits for its release within the same grace |
+| Holder | The host and process an operator reads, plus random characters, since replicas on the host network share a name and every container process is the first |
+| First use | The row is made inside the taking transaction, leaving a row another replica made alone. A cluster refusing that at commit makes the take go again |
+| Duration | Outlasts a cycle, sized from how often the pass runs, so a replica stopping without release holds the work a few passes. Not renewed mid-pass. A process restarted in place after a crash is a new holder and waits out every lease the old one held, up to the mail and webhook leases' full length |
 
 | Work shape | On losing the race | Passes |
 |---|---|---|
-| May be skipped | Does nothing this cycle, asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; setting aside work whose worker never came back |
-| Must happen | Waits for its turn, then applies. A take that fails is a turn missed and is asked again at the next poll; the wait ends only with its context | Rewriting deadlines after a policy change. One process runs one rewrite at a time per database, and the changes arriving during it are one more run after it, which reads the newest policy |
+| May be skipped | Does nothing this cycle and asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; failing work whose worker never came back |
+| Must happen | Waits for its turn, then applies. A failed take is a missed turn, asked again at the next poll; the wait ends only with its context | Rewriting deadlines after a policy change. One process runs one rewrite at a time per database, and changes arriving meanwhile are one more run reading the newest policy |
 
-Work that waits reads what it decides from **after** its turn comes. Anything
-the work decides from is fetched inside the thing that serializes it.
+Work that waits reads what it decides from after its turn comes, inside what
+serializes it.
 
-One row of the table is a lock rather than a lease. An upload writes a fresh
-value into it inside its transaction to serialize the check of the room left,
-and nothing takes it
+One row of the lease table is a lock that nothing takes as a lease: an upload
+writes a fresh value into it to serialize the check of room left
 (`design-docs/attachments.md` § Quota and removal).
 
 ## Backlog refusal
 
-New work is refused once the queue for its kind is deeper than a limit an
-administrator sets. The caller is told to retry.
+New work is refused once its kind's queue is deeper than a limit an
+administrator sets, and the caller is told to retry.
 
 | Rule | Reason |
 |---|---|
-| Counted per kind | The cap exists so a runaway producer cannot push everyone else's work behind its own. Counted across every kind it does the opposite: the producer that filled the queue keeps its place while every other producer is refused, so a bulk change to the assignment rules refuses every scan upload in the deployment |
-| The depth counts work held by a worker that has stopped reporting | Counting only what is waiting reads a queue in the middle of a reclaim cycle as empty: every row sits in the claimed state, held by workers that died, and the one number an operator has says there is nothing to do |
-| A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
-| Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
-| Back-pressure rather than an exact bound | Producers adding at the same moment each count what has committed, so the backlog can pass the limit by as many as are adding at once. An exact bound takes a lock per kind, which is spelled per engine |
-| An upload refused for a full queue raises an alert | It names the build and says the limit and how to raise it. The refusal is the moment data may be lost, because the producer may not retry, and it is an event rather than a level, so no threshold is needed. A deep queue that still takes work is a busy night and alerts nobody. Not built: the refusal is answered 503 and is neither logged nor recorded as a refused upload, and the System screen marks the kind at its limit |
+| Counted per kind | The cap keeps a runaway producer from pushing everyone behind it. Counted across kinds, a bulk change to the assignment rules would refuse every scan upload |
+| The depth counts work held by a worker that stopped reporting | Mid-reclaim every row is claimed by dead workers, and a waiting count reads empty |
+| A stored setting, read as work is queued | The refusal lands on a build server, and its remedy cannot be a new binary or a restart |
+| Back-pressure, not an exact bound | Producers adding at once each count what committed, so the backlog can pass the limit by as many as are adding. An exact bound takes a lock per kind, spelled per engine |
+| An upload refused for a full queue raises an alert naming the build, the limit, and how to raise it | The producer may not retry, so the refusal is where data may be lost. A deep queue still taking work alerts nobody. Not built: the refusal is answered 503, neither logged nor recorded as a refused upload, and the System screen marks the kind at its limit |
 
 ## Configurable bounds
 
-Five bounds are read from the environment as the process starts. How deep the
-queue may get is the sixth and is a stored setting.
-
-| Bound | What it decides |
+| Bound | Decides |
 |---|---|
 | Attempts | How many times a job is tried before it fails |
-| Claim timeout | How long a claim is honored with nothing heard from the worker holding it |
+| Claim timeout | How long a claim is honored with nothing heard from its holder |
 | Heartbeat | How often a running job renews its claim |
-| The ceiling on one hold | How long one claim may be renewed for altogether |
+| The ceiling on one hold | How long one claim may be renewed altogether |
 | Backoff | How long a failed job waits, multiplied by the attempt |
+| Queue depth | When new work of a kind is refused (§ Backlog refusal) |
 
 | Rule | Reason |
 |---|---|
-| The environment, not a stored setting | The settings store reads the database, so the database and the queue cannot read a setting without inverting that import. What it costs is that changing one needs a restart, which is said here rather than discovered |
-| How deep the queue may get is the exception | That refusal lands on a build server, and the operator meeting it needs a remedy that is not a restart |
-| Zero or negative is refused rather than taken | The rule every setting is held to. So "no ceiling on one hold" cannot be asked for from the environment: it is what a caller whose work has no upper bound of its own would state where the queue is built, and no caller here does |
-| Two pairs are compared as the process starts | A heartbeat no shorter than the claim timeout hands running work to a second worker; a hold ceiling no larger than the claim timeout cancels work that is running normally. Both read as a fault in the work rather than in the configuration, so the process refuses to start and names the pair |
-| The defaults live where the queue is built | Every reader takes them from there rather than carrying its own, so two spellings cannot disagree. The configuration reference prints them in its Default column as it does for every other setting, which is the one restatement and the one an operator reads; the chart carries none, and a deployment that wants one sets the environment variable |
+| The first five are read from the environment at start | The settings store reads the database, so the queue reading it inverts that import. A change needs a restart |
+| Queue depth is a stored setting | Its refusal lands on a build server |
+| Zero or negative is refused | The rule every setting is held to, so "no ceiling" cannot be asked for from the environment |
+| The process refuses to start when the heartbeat is not shorter than the claim timeout, or the hold ceiling not larger, naming the pair | The first hands running work to a second worker; the second cancels normal work. Both would read as a fault in the work |
+| The defaults live where the queue is built, and the configuration reference prints them | One spelling. The chart carries none; a deployment wanting one sets the environment variable |
 
 ## Failure records
 
-A job that failed keeps the reason, bounded.
-
 | Rule | Reason |
 |---|---|
-| The reason is capped | It comes from whatever failed — a parser, a scanner's output, a driver — and is handed back to whoever asks about their upload. Unbounded, one job writes as much as its cause felt like saying into a column every reader of that job carries |
-| The cap cuts on a character boundary | A cut at a byte offset splits a multi-byte character and leaves a tail three of the four engines refuse to store, so the bound meant to keep a write small is what makes it fail |
-| The cap is generous and the cut is marked | The first lines of a parser's complaint are what make it actionable. The worker's own log line carries the whole of it either way |
+| A failed job's reason is capped (REQ-69) | It comes from a parser, a scanner's output or a driver, and is handed to whoever asks about their upload |
+| The cap cuts on a character boundary | A cut inside a multi-byte character leaves a tail three engines refuse, failing the write the cap protects |
+| The cap is generous and the cut is marked | The first lines make a complaint actionable. The worker's log line carries the whole |
 
 ## Transaction boundary
 
 The caller states whether a job commits with the rows it is about.
 
-| Mode | Used for | Failure mode it prevents |
+| Mode | Used for | Failure it prevents |
 |---|---|---|
-| Commit with the rows | Work describing something the same transaction wrote, such as an upload | A job committed alone can be claimed before its rows exist; rows committed without their job are work nobody picks up |
-| Queue on its own | Work no write of the same act describes: a build the periodic pass finds due, the next batch of a assignment sweep, an overtaken scan read again | None needed. Nothing was written beside it, so a failure to queue is returned to whatever asked and leaves no rows waiting on a job |
+| Commit with the rows | Work describing what the same transaction wrote, such as an upload | A job committed alone can be claimed before its rows exist; rows committed alone wait on nothing |
+| Queue on its own | Work no write of the act describes: a build the periodic pass finds due, the next batch of an assignment sweep, an overtaken scan read again | None: a failure to queue returns to the asker and leaves no rows waiting |
 
-Every write the queue makes of its own — queueing, claiming, renewing,
-finishing, failing, setting aside, putting back, and taking or handing back a
-lease — goes through the retry helper rather than running as a statement on its
-own.
+Every write the queue makes, queueing, claiming, renewing, finishing, failing,
+putting back, and taking or releasing a lease, runs through the retry helper
+(`design-docs/database-transactions.md` § Retryable transactions).
 
 | Rule | Reason |
 |---|---|
-| A cluster refuses at commit, not at the statement | See `design-docs/database.md` § Retryable transactions. A write outside a transaction cannot be retried at all: the failure arrives where there is nothing left to go again |
-| Finishing is the write where it costs most | Reported up rather than retried, a job that finished is recorded by its caller as failed and handed out again. The work runs twice, which on an ingest looks like real change |
-| An ending whose commit was refused asks the row rather than assuming | A second attempt covers both "somebody else holds it now" and "the commit succeeded and the answer never arrived". A finish reads as done; a failure and a postponement read as unclaimed, with their own reason; a job put back reads as no longer failed, where an earlier attempt matched it. Reporting a lost claim for an ending that landed has the caller record a takeover that did not happen, and reporting a job as not failed after it was put back tells an operator their act did nothing |
-| A lease take that is refused would read as losing a race | A replica told it lost a race it never ran stops sweeping, with nothing logged, on every replica at once |
-| The moment a write compares against is read inside each attempt | A retry runs after a pause. A claim judging staleness by the moment before the first attempt misses a job that went stale during it, and a lease taken again runs short by the pause |
+| No queue write runs as a bare statement | A cluster refuses at commit, and a write outside a transaction cannot be retried |
+| Finishing is retried, never reported up | Reported up, a finished job is recorded failed and handed out again, and the work runs twice |
+| An ending whose commit was refused asks the row | It covers a takeover and a commit whose answer was lost. A finish reads as done; a failure and a postponement as unclaimed with their reason; a put-back as no longer failed. Assuming wrongly records a takeover that never happened, or tells an operator their act did nothing |
+| A refused lease take is retried, never read as a lost race | A replica told it lost a race stops sweeping, silently, on every replica at once |
+| The moment a write compares against is read inside each attempt | A retry runs after a pause. A stale moment misses a job that went stale meanwhile, and shortens a retaken lease by the pause |
 
 ## Limits
 
-| | |
+| Limit | Detail |
 |---|---|
-| Two workers can run one job | The conditional update cannot prevent it: from the database's point of view the second claim is legitimate, because the row says the holder has not been heard from. The renewal interval bounds the window |
-| The claim timeout is not shortened to match the renewal interval | On SQLite a renewal is a write, and writes take turns on the file's one write lock, so a renewal waits behind the job's own transaction and a long transaction can hold it for minutes. On that engine a renewal cannot succeed at all while the work holds the lock, so the claim timeout is not a safety margin there — it is the bound, and it has to exceed the longest single unit of work a deployment runs. Past it the claim goes stale, and once the work's own transaction commits a second worker's claim succeeds and the job runs twice, which on an ingest looks like real change. The renewal is kept because it is the whole of the protection on the other three engines |
-| No queue library is used | The mature Go queues either tie to one database engine or require a separate service — one would cut engine support from four to one, the other adds a component to every deployment |
-| Row locking is verified as non-load-bearing | The exclusivity test runs twice on every engine, once with the locking clause and once without it, and the second arm is the one that fails when the conditional update stops repeating the state it expects: with locking in place the same defect passes, because locking hides it. The switch is reachable only from the package's test surface, never from an option a deployment can set |
+| Two workers can run one job | The second claim is legitimate to the database when the holder has not been heard from. The renewal interval bounds the window |
+| On SQLite the claim timeout is the bound on one unit of work | A renewal is a write and waits behind the job's own transaction on the file's one write lock, so it cannot land while the work holds the lock. The timeout must exceed the longest unit of work; past it, a second worker claims once the transaction commits and the job runs twice. The timeout is not shortened to the renewal interval for this reason; renewal protects the other three engines |
+| No queue library is used | The mature Go queues tie to one engine or need a separate service |
+| Row locking is verified as not load-bearing | The exclusivity test runs on every engine with the locking clause and without it, and the arm without it fails when the conditional update stops repeating its state; locking hides that defect. The switch is reachable only from the package's tests |
