@@ -17,7 +17,7 @@ Satisfies REQ-02, REQ-03, REQ-49, and the probe behavior REQ-72 requires.
 
 ## Chart probes
 
-| Probe | Question | Path |
+| Probe | Checks | Path |
 |---|---|---|
 | Startup | The port has opened | `/healthz` |
 | Liveness | The process is running | `/healthz` |
@@ -25,100 +25,99 @@ Satisfies REQ-02, REQ-03, REQ-49, and the probe behavior REQ-72 requires.
 
 | Rule | Reason |
 |---|---|
-| Liveness does not depend on the database | A restart cannot fix an unreachable database, and a probe failing on one adds a restart loop to the outage |
-| The startup probe allows ten minutes by default | `/healthz` answers from the moment the port opens and throughout a migration (`design-docs/packaging.md` § Starting and stopping), so this bounds what precedes the port: connecting to the database and the refusals reading none, sign-in provider discovery and the store checks among them. The start-up deadline ends a hang there first |
-| The image's own health check, which Docker acts on and Kubernetes ignores, runs `openpsirt health` | It reads the configuration the server reads and asks `/healthz` where `OPENPSIRT_ADDR` says the server listens, on loopback where that names every interface, never through a proxy |
-| `openpsirt health` takes `--config` as every command does; the image's check passes none | A container configured by file replaces the check with one naming the file. Left alone, it reads the environment and asks port 8080 |
+| Liveness ignores the database | A restart cannot fix it, and would add a restart loop to an outage |
+| The startup probe allows ten minutes by default | `/healthz` answers from port opening through a migration (`design-docs/packaging.md` § Starting and stopping), so this bounds the database connection, the database-free refusals, provider discovery and store checks. The start-up deadline ends a hang first |
+| The image's health check, used by Docker and ignored by Kubernetes, runs `openpsirt health` | It reads the server's configuration and asks `/healthz` where `OPENPSIRT_ADDR` listens, on loopback for every interface, never through a proxy |
+| `openpsirt health` takes `--config`; the image's check passes none | A file-configured container replaces the check with one naming the file; otherwise it asks port 8080 |
 
 ## Platform health checks
 
 | Check | Path | Reason |
 |---|---|---|
-| Whether to keep the process | `/healthz` | It answers while the schema is applied; a check failing during a migration ends it part way, and the next process starts it over |
-| Whether to send it traffic | `/readyz` | It answers only once the router serves, and while the database answers |
+| Keep the process | `/healthz` | It answers during a migration, which a failing check would cut short and restart |
+| Send it traffic | `/readyz` | It answers once the router serves and while the database answers |
 
-A load balancer whose one health check decides both, such as an AWS Application
-Load Balancer in front of ECS, is pointed at `/healthz`. A process applying the
-schema then receives traffic and answers with the upgrading response.
+A load balancer with one check for both, such as an AWS Application Load
+Balancer in front of ECS, uses `/healthz`, and a migrating process answers its
+traffic with the upgrading response.
 
 ## Chart security context
 
 | Rule | Reason |
 |---|---|
-| Non-root, read-only root filesystem, every capability dropped, the default seccomp profile, no service-account token | The application never talks to the Kubernetes API |
-| `/tmp` is a size-limited `emptyDir`, sized for the uploads one server reads at once | `upload.max-concurrent` of the largest request a route takes: four of 512 MiB at the shipped values, which the shipped 3 GiB holds with room for other scratch |
-| The pod's termination grace is twice the process's shutdown grace | The process drains requests for that long, then waits as long again for a worker mid-scan |
-| A SQLite URL with more than one replica is refused at render | Every replica serves, reads and scans, coordinated through the database (REQ-03), and SQLite is a file in one pod. The chart sees only a URL in values; for one in an operator's Secret the process warns at startup that SQLite is not a production engine |
-| A single-pod SQLite trial keeps its file under `/var/lib/openpsirt`, the one directory the chart mounts for a SQLite URL, on a bounded scratch volume or a named claim | A SQLite URL in values naming any other path, a directory beneath it included, is refused at render, since the process would crash-loop creating the file |
-| A claim named for SQLite beside a URL held in a Secret is refused | The chart cannot read that URL and would mount nothing |
-| No other install gets the volume | A server database keeps nothing on the pod |
+| Non-root, read-only root filesystem, all capabilities dropped, default seccomp, no service-account token | The application never calls the Kubernetes API |
+| `/tmp` is a size-limited `emptyDir` for one server's concurrent uploads | `upload.max-concurrent` of the largest request: four of 512 MiB at the shipped values, inside the shipped 3 GiB |
+| Termination grace is twice the process's shutdown grace | Requests drain, then a mid-scan worker gets as long again |
+| A SQLite URL with more than one replica is refused at render | Replicas coordinate through the database (REQ-03), and SQLite is one pod's file. |
+| A SQLite trial keeps its file under `/var/lib/openpsirt`, mounted for a SQLite URL on bounded scratch or a named claim; another path in values, a subdirectory included, is refused at render | The process would crash-loop creating the file |
+| A claim named for SQLite beside a URL held in a Secret is refused | The chart cannot read the URL and would mount nothing |
+| No other install gets the volume | |
 
 ## Network policy
 
-Sign-in by a trusted header is believed by address alone, usually the pod
-network every pod is on, so a trusted-header install renders a NetworkPolicy
-admitting only the ingress controller.
+A trusted header is believed by source address, usually the whole pod network,
+so a trusted-header install renders a NetworkPolicy admitting only the ingress
+controller.
 
 | Rule | Reason |
 |---|---|
-| Rendered whenever a trusted header is named, unless turned off | Off, any pod can send the header to the Service and sign in as anybody, the bootstrap administrators included |
-| Admits the ingress controller by namespace and pod labels, both configurable, and any further peers named | The defaults are ingress-nginx's labels. A host-network controller needs an address block, and a metrics scraper a namespace of its own |
-| The controller's defaults apply only where neither label map is set, applied in the template | Helm merges an operator's map into a default map, which would keep ingress-nginx's labels beside another controller's and admit nobody |
-| A controller named by its pods alone is refused at render | A pod selector alone selects the policy's own namespace, never the controller's, and pod labels matched in every namespace are labels anybody creating a pod can set, so that pod could assert the header |
-| The controller's admission can be turned off, keeping the further peers | A host-network controller is named by address, and its labels admit nothing |
-| Anything reaching the Service directly is refused unless named as a further peer | A pipeline uploading with a key from inside the cluster is one |
-| The install notes warn about the header in every trusted-header install, with or without an ingress | An ingress is where the header's sources are widest |
-| A policy is enforced only by a network plugin supporting it, and the kubelet's probes come from the node, which most plugins admit | |
+| Rendered whenever a trusted header is named, unless turned off | Off, any pod can sign in as anybody, bootstrap administrators included |
+| Admits the controller by namespace and pod labels, both configurable, and further named peers | Defaults are ingress-nginx's labels. A host-network controller needs an address block; a metrics scraper its namespace |
+| The controller defaults apply only where neither label map is set, in the template | Helm merges an operator's map into defaults, mixing two controllers' labels |
+| A controller named by pod labels alone is refused at render; the policy renders only where trusted-header sign-in is on, so the refusal applies there alone | A pod selector alone matches the policy's own namespace, and pod labels across namespaces are settable by anyone creating a pod, who could then assert the header |
+| The controller's admission can be turned off, keeping the further peers | A host-network controller is named by address |
+| Direct traffic to the Service is refused unless from a further peer | Such as a pipeline uploading from inside the cluster |
+| The install notes warn about the header in every trusted-header install | An ingress widens the header's sources |
 
 ## Render-time refusals
 
-Each fails at render with a sentence naming the problem, because manifests that
-cannot work fail later as a crash-looping pod.
+Each fails at render with a sentence naming the problem, instead of a
+crash-looping pod.
 
 | Refused | Reason |
 |---|---|
-| Both a managed Secret and a chart-created one for the database URL, or neither | There must be exactly one |
-| No bootstrap admin | Nobody can administer the deployment |
-| No sign-in provider | Naming a bootstrap admin grants a role and admits nobody |
-| A provider with no base URL | A provider returns somebody to an address and compares it against its registration |
-| A trusted header with no sources | Anybody can set it |
-| A mail server with no sending address, an address with no server, or a password with no username | Half-configured mail comes up healthy and sends nothing (REQ-02). Mail is opt-in, so this costs a deployment wanting none nothing (REQ-49) |
-| A sign-in provider with no client secret | The process refuses to start without one |
-| An OIDC provider with no username claim | The same, with no default: what an authorization is redeemed against is the operator's question |
-| A secret given both ways at once | The chart writes no Secret when one is named, so the values file's would be ignored silently |
-| SQLite behind more than one replica | A second replica starts with an empty database of its own |
-| A chart-made scanner cache claim every replica mounts and only one node can | The replicas elsewhere stay Pending, a deployment that never becomes ready |
-| A scanner cache claim given both ways at once | The chart makes none when one is named |
-| A network policy for a trusted header that admits nobody | It refuses the proxy setting the header, which is every sign-in |
+| Both a managed and a chart-created Secret for the database URL, or neither | Exactly one |
+| No bootstrap admin | Nobody can administer |
+| No sign-in provider | A bootstrap admin admits nobody alone |
+| A provider with no base URL | It returns somebody to an address its registration checks |
+| A trusted header with no sources | Anybody could set it |
+| A mail server with no sending address, an address with no server, or a password with no username | Half-configured mail sends nothing while healthy (REQ-02); mail is opt-in, so this costs nothing (REQ-49) |
+| A provider with no client secret | The process would not start |
+| An OIDC provider with no username claim | The same, with no default: only the operator knows the claim |
+| A secret given both ways | The values file's would be silently ignored |
+| SQLite behind more than one replica | A second replica gets an empty database |
+| A chart-made scanner cache claim mounted by every replica that only one node can mount | The others stay Pending forever |
+| A scanner cache claim given both ways | |
+| A trusted-header network policy admitting nobody | It refuses the proxy, which is every sign-in |
 
 | Rule | Reason |
 |---|---|
-| Each refusal is tested by asserting it fires, and the count examined is printed | A loop that checked nothing reads like one finding nothing wrong |
-| A legal install resolves every `secretKeyRef` it renders against the Secrets the same install creates, read from the render | A hand-written list would give a new secret source no row and stay green on the defect |
+| Each refusal is tested firing, and the count examined printed | A loop checking nothing reads like one finding nothing |
+| A legal install resolves every `secretKeyRef` it renders against the Secrets it creates, read from the render | A hand-written list would miss a new secret source |
 
 ## Secret sources
 
-The database URL, both client secrets and the mail password answer one pair of
-rules, differing only in the Secret's name and key.
+The database URL, both client secrets and the mail password follow one rule
+set.
 
 | Value | Read from |
 |---|---|
-| Set in the values | A Secret the chart creates, under a key of the chart's own |
+| Set in the values | A chart-created Secret, under the chart's key |
 | A Secret the operator names | That Secret, under the key named beside it |
-| Both | Refused at render; one would be ignored |
-| Neither, for the mail password | Nothing; mail is opt-in and a server may want no credentials |
-| Neither, for a sign-in provider | Refused at render; the process refuses to start without one |
+| Both | Refused at render |
+| Neither, for the mail password | Nothing; a mail server may want no credentials |
+| Neither, for a sign-in provider | Refused at render |
 
 | Rule | Reason |
 |---|---|
-| The operator's key name is read only where they also name the Secret | The chart's Secret holds the value under the chart's key, and asking for the operator's renders a pod that never starts |
-| A Secret is written only while what reads it is configured; clearing a provider's issuer removes its Secret | One left behind holds a live credential nothing reads |
-| The database URL always comes from a Secret, named or created from a value | The values file states that a password put there enters the release history. Mail credentials are in the chart for the same reason |
-| Bootstrap admins are applied at every startup, and the install notes say so | They are the recovery path: lose administrative access, add yourself, upgrade |
+| The operator's key name is read only with the operator's Secret | In the chart's Secret it names a missing key, and the pod never starts |
+| A Secret exists only while its reader is configured; clearing a provider's issuer removes it | A leftover holds a live credential |
+| The database URL always comes from a Secret, named or chart-created; the values file warns a password there enters the release history | Mail credentials follow suit |
+| Bootstrap admins are applied at every startup, as the install notes say | The recovery path: add yourself and upgrade |
 
 ## Limits
 
 | Limit | Detail |
 |---|---|
-| A SQLite URL in an operator's own Secret is not checked against the replica count | The chart cannot read it; the process warns at startup |
-| A ReadWriteOnce claim the chart did not make is not refused for shared repository copies | The chart cannot see its access mode |
+| A SQLite URL in an operator's Secret is not checked against the replica count | The chart cannot read it; the process warns at startup that SQLite is not a production engine |
+| The network policy is enforced only by a plugin supporting it | Kubelet probes come from the node, which most plugins admit |
