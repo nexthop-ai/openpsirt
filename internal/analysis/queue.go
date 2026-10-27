@@ -6,6 +6,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -65,9 +66,17 @@ const SAST Method = "sast"
 // methodKinds is the kind of finding each method records.
 var methodKinds = map[Method]kind.Kind{SAST: kind.Analysis}
 
-// Methods is every method the code finding queue narrows by, in the order a
-// filter offers them.
-func Methods() []string { return []string{string(SAST)} }
+// Methods is every method the code finding queue narrows by, sorted, which is
+// the order a filter offers them. Read from methodKinds, so a method the queue
+// cannot narrow by is never offered.
+func Methods() []string {
+	out := make([]string, 0, len(methodKinds))
+	for method := range methodKinds {
+		out = append(out, string(method))
+	}
+	slices.Sort(out)
+	return out
+}
 
 // CodeFindingAssignees is every word the code finding queue asks who holds a code finding in: the
 // findings list's word for work nobody holds.
