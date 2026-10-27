@@ -377,9 +377,14 @@ func (r renamer) name(n nameRename) error {
 	case aPrimaryKey:
 		return nil
 	case aForeignKey:
-		if err := r.mysqlForeignKey(n); err != nil {
+		// The index first. MySQL drops the index it made for a foreign key
+		// along with the key when the key is declared again, and builds one
+		// under the new name, which reads every row; an index renamed first
+		// is no longer the key's own and serves the new key as it stands.
+		if err := r.mysqlIndex(n); err != nil {
 			return err
 		}
+		return r.mysqlForeignKey(n)
 	}
 	return r.mysqlIndex(n)
 }
