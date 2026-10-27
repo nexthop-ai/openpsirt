@@ -24,8 +24,9 @@ const (
 
 // seedWordsV0100 writes, in a v0.10.0 database, a row holding each stored
 // word v0.11.0 renames: a bulk claim, a notification and a destination of
-// each renamed kind, a kept filter naming the renamed words, and the bulk
-// action limit under its v0.10.0 name.
+// each renamed kind, a notification linking a decision's row and one linking
+// a claim, a kept filter naming the renamed words, and the bulk action limit
+// under its v0.10.0 name.
 func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	declared, err := world.Declare(ctx, db)
@@ -51,6 +52,11 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 		exec(`INSERT INTO "outbound" ("name", "display_name", "kind", "url", "secret", "created_by",
 			"created_at", "platform") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			"hook", "hook", kind, "https://example.com/"+string(rune('a'+i)), "", person, at, "webhook")
+	}
+	for _, link := range []string{"/decisions/34", "/claims/7"} {
+		exec(`INSERT INTO "notification" ("person_id", "kind", "lifetime", "about", "body", "link",
+			"private", "together", "attempts", "created_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			person, "sent-back", "event", "about-"+link, "Sent back.", link, false, "", 0, at)
 	}
 	exec(`INSERT INTO "saved_filter" ("person_id", "name", "query", "created_at") VALUES (?, ?, ?, ?)`,
 		person, "waiting", savedV0100, at)
@@ -84,6 +90,12 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'decision-lapsed'`, 1},
 		{"a destination of a v0.10.0 kind",
 			`SELECT COUNT(*) FROM "outbound" WHERE "kind" IN ('claim-waiting', 'claim-lapsed')`, 0},
+		{"a link to a decision's row at its new address",
+			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/decision-occurrences/34'`, 1},
+		{"a link to a decision's row at its v0.10.0 address",
+			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/decisions/34'`, 0},
+		{"a link to a decision, left for the interface to forward",
+			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/claims/7'`, 1},
 		{"the limit under its new name", `SELECT COUNT(*) FROM "application_setting"
 			WHERE "name" = 'triage.bulk-decision-cap' AND "value" = '250'`, 1},
 		{"the limit under its v0.10.0 name",
@@ -131,7 +143,7 @@ func TestAV0100DatabaseTakesTheV0110StoredWords(t *testing.T) {
 func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
 	for _, step := range []string{
 		"decision.bulk", "notification.decision-lapsed", "outbound.decision-waiting",
-		"saved_filter", "application_setting",
+		"notification.link", "saved_filter", "application_setting",
 	} {
 		t.Run(step, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

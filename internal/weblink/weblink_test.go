@@ -376,6 +376,12 @@ func TestNoAddressIsSpelledOutsideThisPackage(t *testing.T) {
 				if base := filepath.Base(path); base == "weblink" || base == "httpapitest" {
 					return filepath.SkipDir
 				}
+				// A migration rewrites the addresses an earlier release
+				// stored, which stay as that release spelled them whatever
+				// the route table says now.
+				if filepath.Base(path) == "migrations" {
+					return filepath.SkipDir
+				}
 				return nil
 			}
 			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {

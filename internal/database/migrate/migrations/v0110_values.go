@@ -42,7 +42,8 @@ var errValuesStopped = errors.New("the stored words were stopped part way")
 
 // valuesV0110 gives every stored word the triage renames reach its v0.11.0
 // spelling: a decision's kind, the kinds of notification and destination,
-// the address a kept filter opens and a setting's name. It runs after the
+// the link a notification holds to a decision's row, the address a kept
+// filter opens and a setting's name. It runs after the
 // renames, against the tables as v0.11.0 names them.
 //
 // Every step changes only rows still holding a v0.10.0 word, so a start that
@@ -56,7 +57,8 @@ func valuesV0110(ctx context.Context, tx bun.Tx) error {
 
 // valuesV0110Stopping rewrites as valuesV0110 does, and stops once the step
 // named stopAfter has run: an upgrade that stopped there. A step is named by
-// the word it writes, by "saved_filter" or by "application_setting".
+// the word it writes, by "notification.link", by "saved_filter" or by
+// "application_setting".
 func valuesV0110Stopping(ctx context.Context, tx bun.Tx, stopAfter string) error {
 	for _, v := range valuesRewrittenV0110 {
 		column := `"` + v.column + `"`
@@ -67,6 +69,12 @@ func valuesV0110Stopping(ctx context.Context, tx bun.Tx, stopAfter string) error
 		if stopAfter == v.table+"."+v.to {
 			return errValuesStopped
 		}
+	}
+	if err := notificationLinksV0110(ctx, tx); err != nil {
+		return err
+	}
+	if stopAfter == "notification.link" {
+		return errValuesStopped
 	}
 	if err := savedFiltersV0110(ctx, tx); err != nil {
 		return err
@@ -79,6 +87,31 @@ func valuesV0110Stopping(ctx context.Context, tx bun.Tx, stopAfter string) error
 	}
 	if stopAfter == "application_setting" {
 		return errValuesStopped
+	}
+	return nil
+}
+
+// notificationLinksV0110 points each notification linking a decision's row at
+// one occurrence at that row's v0.11.0 address. v0.10.0 linked the row at
+// /decisions/{id}, which v0.11.0 gives the decision, so the link would open a
+// different record. A link to /claims/{id} is left to the interface, which
+// forwards it. Only the v0.10.0 address is matched, so a start after one that
+// stopped part way rewrites no link twice.
+func notificationLinksV0110(ctx context.Context, tx bun.Tx) error {
+	var rows []struct {
+		ID   int64  `bun:"id"`
+		Link string `bun:"link"`
+	}
+	if err := tx.NewRaw(`SELECT "id", "link" FROM "notification" WHERE "link" LIKE '/decisions/%' ORDER BY "id"`).
+		Scan(ctx, &rows); err != nil {
+		return fmt.Errorf("read the notifications linking a decision's row: %w", err)
+	}
+	for _, row := range rows {
+		link := "/decision-occurrences/" + strings.TrimPrefix(row.Link, "/decisions/")
+		if _, err := tx.ExecContext(ctx, `UPDATE "notification" SET "link" = ? WHERE "id" = ?`,
+			link, row.ID); err != nil {
+			return fmt.Errorf("rewrite notification %d's link: %w", row.ID, err)
+		}
 	}
 	return nil
 }

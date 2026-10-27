@@ -576,6 +576,7 @@ its own after the renames.
 |---|---|---|
 | A bulk decision's `kind` on `decision` | `together` | `bulk` |
 | `kind` on `notification` and `outbound` | `claim-waiting`, `claim-lapsed` | `decision-waiting`, `decision-lapsed` |
+| A notification's `link` to a decision's row at one occurrence | `/decisions/{id}` | `/decision-occurrences/{id}` |
 | A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
 | The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
 
@@ -584,6 +585,7 @@ its own after the renames.
 | Each step writes only rows still holding a v0.10.0 value | A second start changes what the first did not reach, and nothing twice. On MySQL and MariaDB the renames committed the upgrade's transaction, so each statement here commits as it runs |
 | PostgreSQL and SQLite rewrite inside the upgrade's one transaction | A failure leaves every value as it was |
 | A kept filter is rewritten in Go, one part of its query string at a time | A word matched in SQL also matches inside a value. Every other part stays byte for byte, because the list recognizes a kept filter as open by comparing addresses |
+| Only a link at the v0.10.0 address of a decision's row is rewritten | v0.11.0 gives that address to the decision, so the link would open another record. A link to `/claims/{id}` is forwarded by the interface |
 | The setting's row moves only where none is under the new name | A row under the new name outranks the former one |
 | The setting is read under its former name while the new one is unset, and each start logs a warning naming both | A v0.10.0 binary still running after the upgrade writes the former name |
 | A waiting condition's identity keeps the words v0.10.0 hashed | An open condition is matched by that hash, and a new one would notify everybody again |
@@ -608,8 +610,8 @@ measured.
 | A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
 | The same, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
 | A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
-| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a kept filter naming the renamed words and the bulk action limit | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
-| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
+| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a kept filter naming the renamed words and the bulk action limit | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
+| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
 
 ### Release records
 
