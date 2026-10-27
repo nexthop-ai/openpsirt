@@ -29,7 +29,8 @@ binaries alone.
 | Its save | 38 to 47 s | 7 to 10 s |
 | The linter, no results / results for the same tree | 74 to 75 s | 1.4 s |
 
-The linter's results are 0.7 MB as stored. With the Go build cache inside the
+The linter's results are 0.7 MB as stored; on four local cores one changed file
+costs 9 to 12 s against 42 s with no results. With the Go build cache inside the
 image layers, the compile step's layer was 441 MB and the bill-of-materials
 step's 499 MB per commit, and each run exported about 420 MB of blobs no later
 run read; mounted, the same steps are 39 MB and 131 kB, the binary and the
@@ -61,6 +62,10 @@ Rules in `design-docs/build-tests.md` § The race pass.
 | PostgreSQL | 59.6 s | 33.5 s |
 | MySQL | 18.5 s | 12.0 s |
 | MariaDB | 16.9 s | 12.0 s |
+
+The default one-second exit sleep costs 1.02 s against 0.015 s for a package
+whose tests take milliseconds, the better part of a minute across the tree on a
+runner running the pass one package at a time.
 
 An empty test spends 57 ms under the detector against 4.4 ms without, 48% of it
 in the engine parsing the schema and 16 to 22% in the pointer checks.
