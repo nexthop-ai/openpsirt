@@ -132,7 +132,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `query:"product" doc:"Only advisories covering something in this product"`
-		Vulnerability string `query:"vulnerability" doc:"Only advisories covering this issue"`
+		Vulnerability string `query:"issue" doc:"Only advisories covering this issue"`
 		Limit         int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 		Offset        int    `query:"offset" minimum:"0" default:"0"`
 	}) (*core.ListOutput[AdvisoryListedBody], error) {
@@ -283,7 +283,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "drop-advisory-issue", Method: http.MethodDelete,
-		Path:    "/v1/advisories/{advisory}/issues/{product}/{vulnerability}",
+		Path:    "/v1/advisories/{advisory}/issues/{product}/{issue}",
 		Summary: "Take an issue off an advisory",
 		Description: "Removes one issue in one product from this advisory.\n\n" +
 			"Nothing here asks whether the advisory has gone out. An issuance records what " +
@@ -293,7 +293,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 	}, core.AnyPerson, namesAFlaw, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory      string `path:"advisory"`
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 	}) (*struct{}, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {

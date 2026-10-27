@@ -223,7 +223,7 @@ func registerAudit(api huma.API, in core.Deps) {
 	registerAuditClaims(api, in)
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-audit", Method: http.MethodGet, Path: "/v1/audit",
-		Summary: "List judgments with who made them and who agreed",
+		Summary: "List decisions with who made them and who agreed",
 		Description: "Every judgment recorded in a period, newest first, with what it was " +
 			"about, the reasoning it rests on, who proposed it and when, and who agreed and " +
 			"when — including agreements later taken back.\n\n" +
@@ -329,8 +329,8 @@ func statedScope(claim *triage.Claim) core.StatementScope {
 
 func registerAuditClaims(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-audit-claims", Method: http.MethodGet, Path: "/v1/audit/claims",
-		Summary: "List judgments by claim",
+		OperationID: "list-audit-claims", Method: http.MethodGet, Path: "/v1/audit/decisions",
+		Summary: "List the audit log by decision",
 		Description: "The record one claim at a time, newest first: every claim with a decision " +
 			"the filters match, once, however many places it covers.\n\n" +
 			"Takes every filter the per-decision record takes, with the same meaning. A claim is " +

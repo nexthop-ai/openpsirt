@@ -65,7 +65,7 @@ export function useLeads(
     queryKey: ["leads", product, asked],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/leads", {
+        await api.GET("/v1/products/{product}/code-findings", {
           params: {
             path: { product },
             query: {
@@ -92,8 +92,11 @@ export function useLeadSeries(product: string): UseQueryResult<LeadSeries[]> {
     enabled: product !== "",
     queryKey: ["leads", product, "by-series"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/lead-series", { params: { path: { product } } }))
-        .items ?? [],
+      unwrap(
+        await api.GET("/v1/products/{product}/code-finding-series", {
+          params: { path: { product } },
+        }),
+      ).items ?? [],
     retry: false,
   });
 }
@@ -103,9 +106,12 @@ export function useLead(build: Build, place: string): UseQueryResult<Evidence> {
     queryKey: ["lead", build.product, build.stream, build.variant, place],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}", {
-          params: { path: { ...build, place } },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}",
+          {
+            params: { path: { ...build, occurrence: place } },
+          },
+        ),
       ),
     retry: false,
   });
@@ -117,8 +123,8 @@ export function useDecideLead(build: Build, place: string) {
     mutationFn: async (body: Body<"LeadDecisionBody">) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision",
-          { params: { path: { ...build, place } }, body },
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision",
+          { params: { path: { ...build, occurrence: place } }, body },
         ),
       ),
     onSuccess: after,
@@ -131,8 +137,11 @@ export function useFixLead(build: Build, place: string) {
     mutationFn: async ({ because, fixedIn }: { because: string; fixedIn: number }) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/fixed",
-          { params: { path: { ...build, place } }, body: { because, fixed_in: fixedIn } },
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed",
+          {
+            params: { path: { ...build, occurrence: place } },
+            body: { because, fixed_in: fixedIn },
+          },
         ),
       ),
     onSuccess: after,
@@ -147,9 +156,9 @@ export function useAssignLead(build: Build, place: string) {
     mutationFn: async (held: { kind: "person" | "team"; identity: string } | null) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment",
           {
-            params: { path: { ...build, place } },
+            params: { path: { ...build, occurrence: place } },
             body:
               held === null
                 ? {}
@@ -167,8 +176,11 @@ export function useLeadRules(product: string): UseQueryResult<LeadRule[]> {
   return useQuery({
     queryKey: ["lead-rules", product],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/lead-rules", { params: { path: { product } } }))
-        .items ?? [],
+      unwrap(
+        await api.GET("/v1/products/{product}/suppression-rules", {
+          params: { path: { product } },
+        }),
+      ).items ?? [],
   });
 }
 
@@ -177,7 +189,7 @@ export function useProposeLeadRule(product: string) {
   return useMutation({
     mutationFn: async (body: Body<"Propose-lead-ruleRequest">) =>
       unwrap(
-        await api.POST("/v1/products/{product}/lead-rules", {
+        await api.POST("/v1/products/{product}/suppression-rules", {
           params: { path: { product } },
           body,
         }),
@@ -191,7 +203,7 @@ export function useApproveLeadRule(product: string) {
   return useMutation({
     mutationFn: async (id: number) =>
       unwrap(
-        await api.POST("/v1/products/{product}/lead-rules/{id}/approval", {
+        await api.POST("/v1/products/{product}/suppression-rules/{id}/approval", {
           params: { path: { product, id } },
         }),
       ),
@@ -204,7 +216,7 @@ export function useRetireLeadRule(product: string) {
   return useMutation({
     mutationFn: async (id: number) =>
       unwrap(
-        await api.DELETE("/v1/products/{product}/lead-rules/{id}", {
+        await api.DELETE("/v1/products/{product}/suppression-rules/{id}", {
           params: { path: { product, id } },
         }),
       ),
@@ -224,8 +236,8 @@ export function useHandoffOffer(build: Build, place: string, wanted: boolean) {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off",
-          { params: { path: { ...build, place } } },
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw",
+          { params: { path: { ...build, occurrence: place } } },
         ),
       ),
     enabled: wanted,
@@ -251,8 +263,8 @@ export function useHandOff(build: Build, place: string) {
     mutationFn: async (body: Handing) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off",
-          { params: { path: { ...build, place } }, body },
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw",
+          { params: { path: { ...build, occurrence: place } }, body },
         ),
       ),
     onSuccess: after,
@@ -268,8 +280,8 @@ export function useUndoHandOff(build: Build, place: string) {
     mutationFn: async (because: string) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off/withdrawal",
-          { params: { path: { ...build, place } }, body: { because } },
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal",
+          { params: { path: { ...build, occurrence: place } }, body: { because } },
         ),
       ),
     onSuccess: after,
@@ -279,13 +291,13 @@ export function useUndoHandOff(build: Build, place: string) {
 export function useMoveLead(build: Build, place: string) {
   const after = useAfterHandoff();
   const path =
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/move" as const;
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure" as const;
   return useMutation({
     mutationFn: async (move: boolean) =>
       unwrap(
         move
-          ? await api.PUT(path, { params: { path: { ...build, place } } })
-          : await api.DELETE(path, { params: { path: { ...build, place } } }),
+          ? await api.PUT(path, { params: { path: { ...build, occurrence: place } } })
+          : await api.DELETE(path, { params: { path: { ...build, occurrence: place } } }),
       ),
     onSuccess: after,
   });

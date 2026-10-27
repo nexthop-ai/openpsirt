@@ -76,8 +76,8 @@ export function AffectedBuilds({
   const set = useMutation({
     mutationFn: async (picked: string[]) =>
       unwrap(
-        await api.PUT("/v1/products/{product}/issues/{vulnerability}/builds", {
-          params: { path: { product, vulnerability } },
+        await api.PUT("/v1/products/{product}/issues/{issue}/builds", {
+          params: { path: { product, issue: vulnerability } },
           body: {
             builds: picked.map((each) => {
               const { stream, variant } = fromBuildKey(each);

@@ -55,16 +55,19 @@ export function MatchCoverage() {
     queryKey: ["match-coverage", product, stream, variant, reason, offset],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage", {
-          params: {
-            path: { product, stream, variant },
-            query: {
-              ...(reason ? { reason: reason as never } : {}),
-              limit: PAGE,
-              offset,
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components",
+          {
+            params: {
+              path: { product, stream, variant },
+              query: {
+                ...(reason ? { reason: reason as never } : {}),
+                limit: PAGE,
+                offset,
+              },
             },
           },
-        }),
+        ),
       ),
   });
 
@@ -181,7 +184,7 @@ function fileAt(
   reason: string,
 ): string {
   return linkedFile(
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage.{format}",
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}",
     format,
     {
       path: at,

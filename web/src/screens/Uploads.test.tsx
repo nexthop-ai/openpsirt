@@ -16,7 +16,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const SCANS = "/v1/products/{product}/streams/{stream}/variants/{variant}/scans";
+const SCANS = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms";
 
 function receipt(state: string) {
   return { scan_id: 1, received_at: "2026-10-01T00:00:00Z", state };
@@ -59,7 +59,7 @@ describe("the page of receipts", () => {
   });
 });
 
-const UPLOADS = "/v1/products/{product}/streams/{stream}/variants/{variant}/uploads";
+const UPLOADS = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads";
 const PATTERN = "/products/:product/streams/:stream/variants/:variant/uploads/:type?";
 
 // The screen at an address, with the kinds of upload the server lists.
@@ -115,7 +115,7 @@ describe("the tabs", () => {
     expect(tabs.find((tab) => tab.getAttribute("aria-selected") === "true")?.textContent).toBe(
       "VEX documents0",
     );
-    expect(asked).toContain("/v1/products/{product}/vex-statements");
+    expect(asked).toContain("/v1/products/{product}/vex-documents");
     expect(asked).not.toContain(SCANS);
   });
 
@@ -161,7 +161,7 @@ describe("the tabs", () => {
     ][];
     const offsets = (path: string) =>
       calls.filter(([at]) => at === path).map(([, init]) => init?.params?.query?.offset);
-    expect(offsets("/v1/products/{product}/vex-statements")).toEqual([0, 50]);
+    expect(offsets("/v1/products/{product}/vex-documents")).toEqual([0, 50]);
     expect(offsets("/v1/products/{product}/supplier-advisories")).toEqual([0]);
   });
 
@@ -169,7 +169,7 @@ describe("the tabs", () => {
     const { asked } = await opened("/sarif", [{ type: "sbom", total: 0 }]);
     expect(asked).toContain(SCANS);
     expect(asked).not.toContain(
-      "/v1/products/{product}/streams/{stream}/variants/{variant}/analyses",
+      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
     );
   });
 });

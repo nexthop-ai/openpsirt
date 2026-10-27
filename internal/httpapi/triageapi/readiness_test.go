@@ -23,7 +23,7 @@ func TestReadinessSaysWhatIsBlocking(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/readiness"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/readiness"
 		ready := func(t *testing.T) struct {
 			Blockers int `json:"blockers"`
 			Blocking []struct {
@@ -89,7 +89,7 @@ func TestBlockingRowsOfOneComponentAreToldApart(t *testing.T) {
 			} `json:"blocking"`
 		}
 		httpapitest.Read(t, r, "private-triage",
-			"/v1/products/mine/streams/master/variants/broadcom/readiness", &out)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/readiness", &out)
 
 		if len(out.Blocking) != 2 {
 			t.Fatalf("one issue at two versions of one component is %d rows", len(out.Blocking))
@@ -145,7 +145,7 @@ func TestReadinessForATagNotYetBuiltSaysNothingHasBeenScanned(t *testing.T) {
 					}
 				}
 
-				const at = "/v1/products/mine/streams/v2.5.0/variants/broadcom/readiness"
+				const at = "/v1/products/mine/branches-and-tags/v2.5.0/variants/broadcom/readiness"
 				answered := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, "")
 				if answered.Code != http.StatusOK {
 					t.Fatalf("readiness for a tag not yet built answered %d: %s", answered.Code,

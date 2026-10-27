@@ -181,10 +181,10 @@ func registerTriage(api huma.API, in core.Deps) {
 			"- `approval`, the default: claims waiting for a second person, limited to what " +
 			"you may approve every row of. Your own are not here, because approving your own " +
 			"is refused. Approve, send back or set rows aside with " +
-			"`POST /v1/claims/{id}/approval` and `POST /v1/claims/{id}/send-back`.\n" +
+			"`POST /v1/decisions/{id}/approval` and `POST /v1/decisions/{id}/send-back`.\n" +
 			"- `expired-deferral`: deferrals whose date has passed.\n" +
 			"- `missed-fix-date`: promised upgrades and patches whose date has passed with the " +
-			"finding still open. Change the promise with `PUT /v1/claims/{id}/promise`.\n\n" +
+			"finding still open. Change the promise with `PUT /v1/decisions/{id}/promise`.\n\n" +
 			"The last two list claims you may decide on every row of, your own included, and " +
 			"are answered by a new decision. A decision the code moved out from under is in " +
 			"none of them; its author finds it in `GET /v1/to-reaffirm`.\n\n" +
@@ -270,7 +270,7 @@ func registerTriage(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "repromise-upgrade", Method: http.MethodPut,
-		Path:    "/v1/claims/{id}/promise",
+		Path:    "/v1/decisions/{id}/promise",
 		Summary: "Change a promised upgrade or patch",
 		Description: "Changes the version a promised upgrade moves to, or the date a promised " +
 			"upgrade or patch is promised by, on the claim and on every commitment it wrote. " +
@@ -314,8 +314,8 @@ func registerTriage(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "split-claim", Method: http.MethodPost, Path: "/v1/claims/{id}/split",
-		Summary: "Hold part of a claim back",
+		OperationID: "split-claim", Method: http.MethodPost, Path: "/v1/decisions/{id}/split",
+		Summary: "Hold part of a decision back",
 		Description: "Moves the rows named into a claim of their own, belonging to you, carrying " +
 			"the argument they were made under and sitting with you rather than in the review " +
 			"queue. Revise it to give them an argument of their own.\n\n" +
@@ -355,8 +355,8 @@ func registerTriage(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-my-claims", Method: http.MethodGet, Path: "/v1/my-claims",
-		Summary: "List the outcomes of your own claims",
+		OperationID: "list-my-claims", Method: http.MethodGet, Path: "/v1/my-decisions",
+		Summary: "List the outcomes of your own decisions",
 		Description: "Returns the claims you proposed, newest first, with what happened to " +
 			"each: still waiting, sent back, approved, withdrawn, lapsed, an agreement " +
 			"undone, or several of those where a claim's rows ended differently.\n\n" +
@@ -429,8 +429,8 @@ func registerTriage(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "revise-claim", Method: http.MethodPut, Path: "/v1/claims/{id}/reasoning",
-		Summary: "Update a claim's justification",
+		OperationID: "revise-claim", Method: http.MethodPut, Path: "/v1/decisions/{id}/reasoning",
+		Summary: "Update a decision's justification",
 		Description: "Replaces the justification text with a new revision. Earlier revisions are " +
 			"kept and remain readable.\n\n" +
 			"A claim is one argument however many places it covers, so this revises all of it. " +
@@ -460,11 +460,11 @@ func registerTriage(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "withdraw-claim", Method: http.MethodDelete, Path: "/v1/claims/{id}",
-		Summary: "Withdraw a triage claim",
+		OperationID: "withdraw-claim", Method: http.MethodDelete, Path: "/v1/decisions/{id}",
+		Summary: "Withdraw a triage decision",
 		Description: "Withdraws the claim so none of it applies to any finding. A claim is one " +
 			"argument however many places it covers, so this takes back all of it; holding part " +
-			"of one back is setting rows aside, at `POST /v1/claims/{id}/approval`. The record " +
+			"of one back is setting rows aside, at `POST /v1/decisions/{id}/approval`. The record " +
 			"is kept — a withdrawn claim reads as proposed, approved, then withdrawn. " +
 			"Requires no approval.",
 		Tags:          []string{"Triage"},
@@ -532,8 +532,8 @@ func registerTriage(api huma.API, in core.Deps) {
 		})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "comment-on-claim", Method: http.MethodPost, Path: "/v1/claims/{id}/comments",
-		Summary: "Add a comment to a claim",
+		OperationID: "comment-on-claim", Method: http.MethodPost, Path: "/v1/decisions/{id}/comments",
+		Summary: "Add a comment to a decision",
 		Description: "Adds a markdown comment to a claim. Comments are separate from the " +
 			"justification and never affect an approval, so an approved claim can be annotated " +
 			"at any time.\n\n" +
@@ -576,7 +576,7 @@ func registerTriage(api huma.API, in core.Deps) {
 // placeDecisionPath the decision made there. Every route about a place names it
 // through PlacePath.
 const (
-	placePathPrefix   = "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}"
+	placePathPrefix   = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}"
 	placeDecisionPath = placePathPrefix + "/decision"
 )
 
@@ -585,8 +585,8 @@ type PlacePath struct {
 	Product       string `path:"product"`
 	Stream        string `path:"stream"`
 	Variant       string `path:"variant"`
-	Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
-	Place         string `path:"place" doc:"The place, as the findings list gives it"`
+	Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
+	Place         string `path:"occurrence" doc:"The place, as the findings list gives it"`
 }
 
 func registerProposing(api huma.API, in core.Deps) {

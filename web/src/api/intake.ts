@@ -154,8 +154,8 @@ export function useDuplicates(product: string, vulnerability: string) {
     queryKey: ["duplicates", product, vulnerability],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/issues/{vulnerability}/duplicates", {
-          params: { path: { product, vulnerability } },
+        await api.GET("/v1/products/{product}/issues/{issue}/duplicates", {
+          params: { path: { product, issue: vulnerability } },
         }),
       ),
     // Refused to anybody who may not work reports, which is an answer.
@@ -421,8 +421,8 @@ export function useDuplicateStarts(
     enabled: product !== "" && issue !== "" && reports.length > 0,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure", {
-          params: { path: { product, vulnerability: issue }, query: { report: reports } },
+        await api.GET("/v1/products/{product}/issues/{issue}/duplicate-disclosure", {
+          params: { path: { product, issue }, query: { report: reports } },
         }),
       ),
     retry: false,

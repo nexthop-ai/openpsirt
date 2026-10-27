@@ -89,7 +89,7 @@ export function Disclosing() {
     queryKey: ["disclosing", scope, days, offset],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/disclosing", {
+        await api.GET("/v1/disclosure-deadlines", {
           params: {
             query: { ...scope, ...(days ? { within: Number(days) } : {}), limit: PAGE, offset },
           },
@@ -107,20 +107,17 @@ export function Disclosing() {
     mutationFn: async (at: { product: string; vulnerability: string }) =>
       unwrap(
         act === "disclosure"
-          ? await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure", {
-              params: { path: at },
+          ? await api.POST("/v1/products/{product}/issues/{issue}/disclosure", {
+              params: { path: { product: at.product, issue: at.vulnerability } },
               body: { reason: because },
             })
           : act === "shortening"
-            ? await api.POST(
-                "/v1/products/{product}/issues/{vulnerability}/disclosure/shortening",
-                {
-                  params: { path: at },
-                  body: { until, reason: because },
-                },
-              )
-            : await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure/extension", {
-                params: { path: at },
+            ? await api.POST("/v1/products/{product}/issues/{issue}/disclosure/shortening", {
+                params: { path: { product: at.product, issue: at.vulnerability } },
+                body: { until, reason: because },
+              })
+            : await api.POST("/v1/products/{product}/issues/{issue}/disclosure/extension", {
+                params: { path: { product: at.product, issue: at.vulnerability } },
                 body: { until, reason: because },
               }),
       ),

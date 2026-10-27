@@ -23,7 +23,7 @@ func TestWhatACommentSaidBeforeIsKept(t *testing.T) {
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 			`{"body":"Checked against the vendor's patch list."}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", made.Code, made.Body.String())
@@ -87,7 +87,7 @@ func TestWhatACommentSaidBeforeIsKept(t *testing.T) {
 				Body string `json:"body"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/comments", claim), &discussion)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/comments", claim), &discussion)
 		if len(discussion.Items) != 1 || !strings.Contains(discussion.Items[0].Body, "wrong package") {
 			t.Errorf("the comment reads as %+v", discussion.Items)
 		}

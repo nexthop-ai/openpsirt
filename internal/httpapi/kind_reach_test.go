@@ -66,7 +66,7 @@ func TestAVersionMovingLapsesNoDecisionAboutALead(t *testing.T) {
 		claims := map[string]int64{}
 		for _, issue := range []string{"CVE-2026-CURL1", "CVE-2026-CURL2"} {
 			decided := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-				"/v1/products/mine/streams/master/variants/broadcom/components/libcurl4t64/decisions",
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/libcurl4t64/bulk-decision",
 				`{"vulnerabilities":["`+issue+`"],"outcome":"not-applicable",`+
 					`"justification":"vulnerable_code_cannot_be_controlled_by_adversary",`+
 					`"selected_by":"the transfer path","reasoning":"Nothing an attacker sends reaches it."}`)
@@ -157,7 +157,7 @@ func TestTheInventoryScreensCountNoLead(t *testing.T) {
 					Findings  int    `json:"findings"`
 				} `json:"items"`
 			}
-			httpapitest.Read(t, r, "reader", "/v1/products/mine/streams/master/variants/broadcom/components", &top)
+			httpapitest.Read(t, r, "reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/components", &top)
 			total := 0
 			for _, item := range top.Items {
 				total += item.Findings
@@ -271,7 +271,7 @@ func TestAnAdvisoryNamesNoReleaseOfALead(t *testing.T) {
 func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		at := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 		queued := func() int {
 			t.Helper()
 			total := 0
@@ -279,7 +279,7 @@ func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
 				var queue struct {
 					Total int `json:"total"`
 				}
-				httpapitest.Read(t, r, "internal-triager", "/v1/products/mine/leads?state="+state, &queue)
+				httpapitest.Read(t, r, "internal-triager", "/v1/products/mine/code-findings?state="+state, &queue)
 				total += queue.Total
 			}
 			return total

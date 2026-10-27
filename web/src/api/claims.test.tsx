@@ -32,7 +32,7 @@ describe("an act on a claim, once it lands", () => {
     });
     expect(sent).toEqual([
       [
-        "/v1/claims/{id}/approval",
+        "/v1/decisions/{id}/approval",
         {
           params: { path: { id: 7 } },
           body: { batch: "tuesday", except: [3], because: "not this one" },
@@ -46,7 +46,7 @@ describe("an act on a claim, once it lands", () => {
     const { sent, invalidated } = await acted(useRejectClaim, { id: 7, because: "too broad" });
     expect(sent).toEqual([
       [
-        "/v1/claims/{id}/send-back",
+        "/v1/decisions/{id}/send-back",
         { params: { path: { id: 7 } }, body: { because: "too broad" } },
       ],
     ]);
@@ -61,7 +61,7 @@ describe("an act on a claim, once it lands", () => {
     });
     expect(sent).toEqual([
       [
-        "/v1/claims/{id}/split",
+        "/v1/decisions/{id}/split",
         {
           params: { path: { id: 7 } },
           body: { rows: [11, 12], because: "a different argument" },

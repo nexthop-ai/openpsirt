@@ -202,6 +202,7 @@ inputs.
 | REQ-63 | Documentation is published, versioned, and built from the same specification the application serves. The application serves no documentation, and its only routes that need no sign-in are the security documents an operator chooses to publish | A route that needs no sign-in is one more thing to defend, so there is only one kind of it, and it is off until somebody turns it on |
 | REQ-64 | Findings are answerable across every product a caller may see, and one page answers for an issue | "A critical just landed in openssl — which of our products ship an affected version" |
 | REQ-65 | Markdown is what a person writes and what the API returns, with what each reference resolved to traveling beside it. A reference to a person or to an attached file is resolved; a vulnerability identifier is its own address and is not | An integrator can lay out markdown; resolving a mention needs data and checks they do not hold. An identifier needs neither, so resolving one would be work done on their behalf that they can do without asking |
+| REQ-86 | The path build pipelines upload an inventory to, and the path they read its changes from, keep answering at the address they had before the paths were renamed, with no removal planned | Pipelines are the one integration in use, and a rename that breaks every build's upload costs more than an alias does |
 
 ### 3.15 Security
 

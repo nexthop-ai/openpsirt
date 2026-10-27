@@ -47,26 +47,23 @@ export function Collaborators({
       grants="Grants read and comment on this issue only. Cannot agree to claims."
       list={async () =>
         unwrap(
-          await api.GET("/v1/products/{product}/issues/{vulnerability}/collaborators", {
-            params: { path: { product, vulnerability } },
+          await api.GET("/v1/products/{product}/issues/{issue}/collaborators", {
+            params: { path: { product, issue: vulnerability } },
           }),
         )
       }
       add={async (identity) =>
         unwrap(
-          await api.PUT("/v1/products/{product}/issues/{vulnerability}/collaborators/{identity}", {
-            params: { path: { product, vulnerability, identity } },
+          await api.PUT("/v1/products/{product}/issues/{issue}/collaborators/{identity}", {
+            params: { path: { product, issue: vulnerability, identity } },
           }),
         )
       }
       remove={async (identity) =>
         unwrap(
-          await api.DELETE(
-            "/v1/products/{product}/issues/{vulnerability}/collaborators/{identity}",
-            {
-              params: { path: { product, vulnerability, identity } },
-            },
-          ),
+          await api.DELETE("/v1/products/{product}/issues/{issue}/collaborators/{identity}", {
+            params: { path: { product, issue: vulnerability, identity } },
+          }),
         )
       }
     />
@@ -230,7 +227,7 @@ export function Assignee({
     mutationFn: async (held: Held | null) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/assignment",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment",
           {
             params: whereOf(at),
             body:
@@ -301,9 +298,9 @@ export function Resolve({
     mutationFn: async () =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/resolve",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/resolve",
           {
-            params: { path: { ...at, vulnerability } },
+            params: { path: { ...at, issue: vulnerability } },
             body: { because: because.trim() },
           },
         ),
@@ -387,8 +384,8 @@ export function Attachments({
     queryKey: ["attachments", about],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/issues/{vulnerability}/attachments", {
-          params: { path: about },
+        await api.GET("/v1/products/{product}/issues/{issue}/attachments", {
+          params: { path: { product: about.product, issue: about.vulnerability } },
         }),
       ),
   });
@@ -506,7 +503,7 @@ export function Marks({
     queryKey: ["tags", at.product],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/tags", {
+        await api.GET("/v1/products/{product}/labels", {
           params: { path: { product: at.product } },
         }),
       ),
@@ -514,12 +511,12 @@ export function Marks({
   });
 
   const where = whereOf(at);
-  const path = (tag: string) => ({ ...where.path, tag });
+  const path = (tag: string) => ({ ...where.path, label: tag });
   const mark = useMutation({
     mutationFn: async (tag: string) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/tags/{tag}",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
           { params: { path: path(tag), query: where.query } },
         ),
       ),
@@ -533,7 +530,7 @@ export function Marks({
     mutationFn: async (tag: string) =>
       unwrap(
         await api.DELETE(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/tags/{tag}",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
           { params: { path: path(tag), query: where.query } },
         ),
       ),

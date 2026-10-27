@@ -458,7 +458,7 @@ A producer writing complete SARIF posts it directly:
 
 ```bash
 curl --fail-with-body --retry 5 -X POST \
-  "$OPENPSIRT_URL/v1/products/sonic/streams/main/variants/broadcom/analyses" \
+  "$OPENPSIRT_URL/v1/products/sonic/branches-and-tags/main/variants/broadcom/analyses" \
   -H "Authorization: Bearer $OPENPSIRT_KEY" \
   -F "sarif=@ruff.sarif" \
   -F "series=ruff" \

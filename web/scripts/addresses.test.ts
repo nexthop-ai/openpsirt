@@ -53,7 +53,7 @@ describe("an address put together from parts", () => {
 
   it("is not reported where it is an address of the API", () => {
     expect(found(`const file = apiBuildPath(at) + "/vex";`)).toEqual([]);
-    expect(found("const file = `${apiBuildPath(at)}/pending-upgrades.${format}`;")).toEqual([]);
+    expect(found("const file = `${apiBuildPath(at)}/planned-upgrades.${format}`;")).toEqual([]);
     expect(
       found("const base = apiBuildPath(at) + `/vex`;\nconst one = `${base}/issuance/${v}`;"),
     ).toEqual([]);

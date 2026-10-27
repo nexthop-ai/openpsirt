@@ -49,7 +49,7 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 		record := r.AttackedAt(t, time.Now().UTC().Add(-2*time.Hour))
 
 		var seen shelf
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		if len(seen.Items) != 1 || len(seen.Items[0].Windows) != 2 {
 			t.Fatalf("the shelf holds %+v, want one incident with two windows", seen)
 		}
@@ -66,7 +66,7 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 		}
 
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/exploited-here/%d/told", record),
+			fmt.Sprintf("/v1/incidents/%d/told", record),
 			fmt.Sprintf(`{"recipient":"ENISA","told_at":%q,"said":"An attack.","window":%d}`,
 				time.Now().UTC().Add(-time.Hour).Format(time.RFC3339), early),
 		); got.Code != http.StatusCreated {
@@ -77,7 +77,7 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 			t.Errorf("after the early warning was answered, the running ones are %v", open)
 		}
 
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		if !seen.Items[0].Windows[0].Answered {
 			t.Error("the answered window does not read as answered on the shelf")
 		}
@@ -97,20 +97,20 @@ func TestANoticeNamesNoWindowItsReaderMayNotRead(t *testing.T) {
 		early := r.Declared(t, "Early warning", 24)
 		record := r.AttackedAt(t, time.Now().UTC().Add(-2*time.Hour))
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/exploited-here/%d/told", record),
+			fmt.Sprintf("/v1/incidents/%d/told", record),
 			fmt.Sprintf(`{"recipient":"ENISA","told_at":%q,"said":"An attack.","window":%d}`,
 				time.Now().UTC().Add(-time.Hour).Format(time.RFC3339), early),
 		); got.Code != http.StatusCreated {
 			t.Fatalf("recording a notice answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			fmt.Sprintf("/v1/obligation-windows/%d", early),
+			fmt.Sprintf("/v1/response-windows/%d", early),
 			`{"name":"Early warning","hours":24,"products":["theirs"]}`); got.Code != http.StatusOK {
 			t.Fatalf("limiting the window answered %d: %s", got.Code, got.Body.String())
 		}
 
 		var seen shelf
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		if len(seen.Items) != 1 || len(seen.Items[0].Told) != 1 {
 			t.Fatalf("the shelf holds %+v, want one incident with one notice", seen)
 		}
@@ -145,7 +145,7 @@ func TestNoWindowIsWatchedUntilADeploymentDeclaresOne(t *testing.T) {
 		r.AttackedAt(t, time.Now().UTC().Add(-30*time.Hour))
 
 		var seen shelf
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		if len(seen.Items) != 1 || len(seen.Items[0].Windows) != 0 {
 			t.Errorf("with no window declared the shelf holds %+v", seen)
 		}
@@ -163,7 +163,7 @@ func TestTheShelfIsNotReadBySomebodyWhoMayNotBeToldOfTheIssue(t *testing.T) {
 		r.AttackedAt(t, time.Now().UTC().Add(-time.Hour))
 
 		var seen shelf
-		httpapitest.Read(t, r, "outsider", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "outsider", "/v1/incidents", &seen)
 		if len(seen.Items) != 0 {
 			t.Errorf("somebody with nothing on the product was shown %+v", seen)
 		}
@@ -182,11 +182,11 @@ func TestAnAttackThroughAnUndisclosedIssueReachesOnlyWhoMayReadIt(t *testing.T) 
 		r.AttackedAt(t, time.Now().UTC().Add(-time.Hour))
 
 		var seen shelf
-		httpapitest.Read(t, r, "triager", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "triager", "/v1/incidents", &seen)
 		if len(seen.Items) != 0 {
 			t.Errorf("a public triager was shown an undisclosed attack: %+v", seen)
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		if len(seen.Items) != 1 {
 			t.Errorf("a private triager was shown %d incidents, want the one", len(seen.Items))
 		}
@@ -230,7 +230,7 @@ func TestARunningWindowStopsBeingSaidWhenItsWindowOrItsRecordGoes(t *testing.T) 
 		}
 
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
-			fmt.Sprintf("/v1/obligation-windows/%d", early), ""); got.Code != http.StatusNoContent {
+			fmt.Sprintf("/v1/response-windows/%d", early), ""); got.Code != http.StatusNoContent {
 			t.Fatalf("retiring answered %d: %s", got.Code, got.Body.String())
 		}
 		open := r.Alerts(t, "private-triage", "obligation-open")
@@ -239,7 +239,7 @@ func TestARunningWindowStopsBeingSaidWhenItsWindowOrItsRecordGoes(t *testing.T) 
 		}
 
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete,
-			fmt.Sprintf("/v1/exploited-here/%d", record),
+			fmt.Sprintf("/v1/incidents/%d", record),
 			`{"because":"The captures were of a different deployment."}`,
 		); got.Code != http.StatusNoContent {
 			t.Fatalf("clearing answered %d: %s", got.Code, got.Body.String())
@@ -262,7 +262,7 @@ func TestANoticeNamingAPassedWindowClearsIt(t *testing.T) {
 		}
 
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/exploited-here/%d/told", record),
+			fmt.Sprintf("/v1/incidents/%d/told", record),
 			fmt.Sprintf(`{"recipient":"ENISA","told_at":%q,"said":"An attack.","window":%d}`,
 				time.Now().UTC().Add(-time.Hour).Format(time.RFC3339), early),
 		); got.Code != http.StatusCreated {
@@ -279,7 +279,7 @@ func TestTheListABulkJudgmentIsPickedFromMarksAnAttackedIssue(t *testing.T) {
 	// whole, so the list it is picked from says which issue that is.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/components/libnl-3-200/issues"
 		var picked struct {
 			Items []struct {
@@ -311,7 +311,7 @@ func TestTheWindowsInForceAreReadByAnybodySignedIn(t *testing.T) {
 				Hours int    `json:"hours"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/obligation-windows", &windows)
+		httpapitest.Read(t, r, "triager", "/v1/response-windows", &windows)
 		if len(windows.Items) != 2 || windows.Items[0].Name != "Early warning" {
 			t.Errorf("the windows read as %+v, want both, shortest first", windows.Items)
 		}
@@ -324,26 +324,26 @@ func TestAWindowOrANoticeRefusedSaysWhy(t *testing.T) {
 		r.Scanned(t)
 		r.Declared(t, "Early warning", 24)
 		record := r.AttackedAt(t, time.Now().UTC().Add(-time.Hour))
-		told := fmt.Sprintf("/v1/exploited-here/%d/told", record)
+		told := fmt.Sprintf("/v1/incidents/%d/told", record)
 		now := time.Now().UTC().Format(time.RFC3339)
 
 		for _, tc := range []struct {
 			what, who, method, path, body string
 			want                          int
 		}{
-			{"a second window under one name", "admin", http.MethodPost, "/v1/obligation-windows",
+			{"a second window under one name", "admin", http.MethodPost, "/v1/response-windows",
 				`{"name":"EARLY WARNING","hours":48}`, http.StatusConflict},
 			{"a window nobody declared changed", "admin", http.MethodPut,
-				"/v1/obligation-windows/9999", `{"name":"Late","hours":48}`, http.StatusNotFound},
+				"/v1/response-windows/9999", `{"name":"Late","hours":48}`, http.StatusNotFound},
 			{"a window nobody declared retired", "admin", http.MethodDelete,
-				"/v1/obligation-windows/9999", "", http.StatusNotFound},
+				"/v1/response-windows/9999", "", http.StatusNotFound},
 			{"a triager declaring a window", "private-triage", http.MethodPost,
-				"/v1/obligation-windows", `{"name":"Mine","hours":48}`, http.StatusForbidden},
+				"/v1/response-windows", `{"name":"Mine","hours":48}`, http.StatusForbidden},
 			{"a notice naming no window in force", "private-triage", http.MethodPost, told,
 				`{"recipient":"ENISA","told_at":"` + now + `","said":"An attack.","window":9999}`,
 				http.StatusUnprocessableEntity},
 			{"a notice about a record nobody kept", "private-triage", http.MethodPost,
-				"/v1/exploited-here/9999/told",
+				"/v1/incidents/9999/told",
 				`{"recipient":"ENISA","told_at":"` + now + `","said":"An attack."}`,
 				http.StatusNotFound},
 			{"a notice with no moment", "private-triage", http.MethodPost, told,
@@ -387,7 +387,7 @@ func TestAWindowWarnsBeforeItsEndWhereItNamesAWarning(t *testing.T) {
 		}
 
 		var seen shelf
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		nearOnShelf := map[string]bool{}
 		for _, due := range seen.Items[0].Windows {
 			nearOnShelf[due.Window.Name] = due.Near
@@ -430,7 +430,7 @@ func TestAWindowLimitedToAnotherProductDoesNotRunForThisOne(t *testing.T) {
 		r.AttackedAt(t, time.Now().UTC().Add(-2*time.Hour))
 
 		var seen shelf
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		if len(seen.Items) != 1 || len(seen.Items[0].Windows) != 1 ||
 			seen.Items[0].Windows[0].Window.Name != "Ours" {
 			t.Fatalf("the shelf holds %+v, want the window naming this product alone", seen)
@@ -444,7 +444,7 @@ func TestAWindowLimitedToAnotherProductDoesNotRunForThisOne(t *testing.T) {
 
 func TestAWindowNamingAProductNobodyDeclaredIsRefusedWhole(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows",
 			`{"name":"Half known","hours":24,"products":["mine","nowhere"]}`)
 		if got.Code != http.StatusUnprocessableEntity || !strings.Contains(got.Body.String(), "nowhere") {
 			t.Fatalf("a window naming an undeclared product answered %d: %s", got.Code, got.Body.String())
@@ -454,7 +454,7 @@ func TestAWindowNamingAProductNobodyDeclaredIsRefusedWhole(t *testing.T) {
 				Name string `json:"name"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/obligation-windows", &listed)
+		httpapitest.Read(t, r, "admin", "/v1/response-windows", &listed)
 		if len(listed.Items) != 0 {
 			t.Errorf("the refused window was stored: %+v", listed.Items)
 		}
@@ -481,7 +481,7 @@ func TestAWindowNamesOnlyTheProductsItsReaderMayKnowExist(t *testing.T) {
 			} `json:"items"`
 		}
 		var theirs listing
-		httpapitest.Read(t, r, "private-triage", "/v1/obligation-windows", &theirs)
+		httpapitest.Read(t, r, "private-triage", "/v1/response-windows", &theirs)
 		got := map[string][]string{}
 		for _, one := range theirs.Items {
 			got[one.Name] = one.Products
@@ -497,7 +497,7 @@ func TestAWindowNamesOnlyTheProductsItsReaderMayKnowExist(t *testing.T) {
 		}
 
 		var all listing
-		httpapitest.Read(t, r, "admin", "/v1/obligation-windows", &all)
+		httpapitest.Read(t, r, "admin", "/v1/response-windows", &all)
 		if len(all.Items) != 3 {
 			t.Errorf("an administrator sees %d windows, want every one", len(all.Items))
 		}
@@ -506,7 +506,7 @@ func TestAWindowNamesOnlyTheProductsItsReaderMayKnowExist(t *testing.T) {
 
 func TestChangingAWindowReplacesItsWarningAndProducts(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows",
 			`{"name":"Early warning","hours":24,"lead_hours":6,"products":["mine"]}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d", got.Code)
@@ -523,7 +523,7 @@ func TestChangingAWindowReplacesItsWarningAndProducts(t *testing.T) {
 			t.Fatalf("the declared window reads %+v", window)
 		}
 		changed := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			fmt.Sprintf("/v1/obligation-windows/%d", window.ID),
+			fmt.Sprintf("/v1/response-windows/%d", window.ID),
 			`{"name":"Early warning","hours":24}`)
 		if changed.Code != http.StatusOK {
 			t.Fatalf("changing answered %d: %s", changed.Code, changed.Body.String())
@@ -548,7 +548,7 @@ func TestChangingAWindowReplacesItsWarningAndProducts(t *testing.T) {
 				Products  []string `json:"products"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/obligation-windows", &stored)
+		httpapitest.Read(t, r, "admin", "/v1/response-windows", &stored)
 		if len(stored.Items) != 1 || stored.Items[0].LeadHours != 0 ||
 			len(stored.Items[0].Products) != 0 {
 			t.Errorf("a change sending no warning and no products stored %+v", stored.Items)

@@ -23,7 +23,7 @@ func TestWorkNobodyOwnsCanBeFoundAndGivenToSomebody(t *testing.T) {
 	// looking, so not in anybody's own.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
 		var waiting struct {
@@ -102,7 +102,7 @@ func TestSomethingUndisclosedReachesOnlyWhoMayReadIt(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		// The identity holding private triage and the assigner right,
 		// because giving work to somebody else asks for both and this
@@ -168,7 +168,7 @@ func TestTheAssignerRightAloneHandsNobodyAnything(t *testing.T) {
 	// TestSomebodyWhoMayNotTriageIsToldNothingAboutWhoHasAnAccount.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "dispatcher", http.MethodPut, at,
@@ -204,7 +204,7 @@ func TestSomebodyWhoMayNotTriageIsToldNothingAboutWhoHasAnAccount(t *testing.T) 
 	// of the organization, to somebody who may only read the product.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		held := httpapitest.AsPerson(t, r, "dispatcher", http.MethodPut, at, `{"person":"reader"}`)
 		nobody := httpapitest.AsPerson(t, r, "dispatcher", http.MethodPut, at,
@@ -223,7 +223,7 @@ func TestOnlyAnAdministratorMovesSomebodyElsesWork(t *testing.T) {
 	// matters when they have gone.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at,
 			`{"person":"reader"}`); got.Code != http.StatusNoContent {
@@ -256,7 +256,7 @@ func TestHandingWorkOverDoesNotDiscloseItToTheRecipient(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		ctx := t.Context()
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, at,
 			`{"person":"private-triage"}`); got.Code != http.StatusNoContent {
@@ -299,7 +299,7 @@ func TestWithdrawingSomebodysLastRoleHandsBackWhatTheyHeld(t *testing.T) {
 	// shared one, and assigned to somebody who can no longer open it.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {
@@ -355,7 +355,7 @@ func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) 
 	// finding, and planning an upgrade across a component.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
 		// "triager" holds triage and deliberately not the right to give work
@@ -393,7 +393,7 @@ func TestATeamsQueueCanBeOpened(t *testing.T) {
 			`{"name":"platform","display_name":"Platform","members":["triager"]}`); made.Code >= 300 {
 			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 		}
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at,
 			`{"team":"platform"}`); got.Code != http.StatusNoContent {
@@ -449,7 +449,7 @@ func TestDeactivatingAgainHandsBackWhatIsStillHeld(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		r.Scanned(t)
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {

@@ -72,7 +72,7 @@ func registerRulings(api huma.API, in core.Deps) {
 			"a date earlier past the movement threshold waits for a second person, as a " +
 			"shortening does. " +
 			"Withdrawing the ruling puts the date back where it set it. " +
-			"`GET /v1/products/{product}/issues/{vulnerability}/duplicate-disclosure` says the " +
+			"`GET /v1/products/{product}/issues/{issue}/duplicate-disclosure` says the " +
 			"date first.\n\n" +
 			"Every report named has to be in this product, not accepted as an issue, and " +
 			"under no ruling, or nothing is " +
@@ -266,7 +266,7 @@ func registerRulings(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-duplicate-reports", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/duplicates",
+		Path:    "/v1/products/{product}/issues/{issue}/duplicates",
 		Summary: "List vulnerability reports that duplicate an issue",
 		Description: "Every report in this product ruled a duplicate of this issue, with the " +
 			"ruling in force. What arrived with each is listed on the report's own " +
@@ -275,7 +275,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", core.PrivateRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 	}) (*core.ListOutput[ReportBody], error) {
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
@@ -303,7 +303,7 @@ func registerRulings(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "preview-duplicate-disclosure", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure",
+		Path:    "/v1/products/{product}/issues/{issue}/duplicate-disclosure",
 		Summary: "Preview the disclosure date a duplicate ruling starts",
 		Description: "The disclosure date ruling these reports a duplicate of this issue would " +
 			"give it here, without ruling anything.\n\n" +
@@ -319,7 +319,7 @@ func registerRulings(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product       string   `path:"product"`
-		Vulnerability string   `path:"vulnerability"`
+		Vulnerability string   `path:"issue"`
 		Report        []string `query:"report,explode" minItems:"1" maxItems:"10000" maxLength:"191" doc:"The references of the reports the ruling would cover. Repeatable"`
 	}) (*struct{ Body DuplicateDisclosureBody }, error) {
 		subject, product, err := productForReports(ctx, in, input.Product)

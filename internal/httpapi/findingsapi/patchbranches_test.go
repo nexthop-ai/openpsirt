@@ -35,7 +35,7 @@ func TestPatchBranchProgressComesInTheOrderTheRepositoriesAreVisited(t *testing.
 			}
 		}
 
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodGet, "/v1/patch-branches?limit=200", "")
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodGet, "/v1/patch-branch-lookups?limit=200", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("answered %d: %s", got.Code, got.Body.String())
 		}

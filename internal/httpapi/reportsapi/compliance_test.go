@@ -84,8 +84,8 @@ func TestADeferralIsNotCountedAsAFailure(t *testing.T) {
 		// proposal, and one person takes their own work off the report.
 		until := time.Now().UTC().AddDate(0, 0, 300).Format(time.DateOnly)
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
 			`{"outcome":"deferred","deferred_until":"`+until+
 				`","reasoning":"Scheduled for the next release."}`)
 		if made.Code != http.StatusCreated {

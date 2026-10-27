@@ -20,9 +20,7 @@ const who = {
 
 // Where the top search lands for a term, given how the issue route answers.
 async function searched(term: string, issue: Answer): Promise<string> {
-  serve((path) =>
-    path === "/v1/issues/{vulnerability}" ? issue : { data: { items: [], total: 0 } },
-  );
+  serve((path) => (path === "/v1/issues/{issue}" ? issue : { data: { items: [], total: 0 } }));
   mount.render(screen(<Shell who={who}>{null}</Shell>, "/start"));
   await settle();
   const box = mount

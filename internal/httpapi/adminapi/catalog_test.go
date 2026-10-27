@@ -151,9 +151,9 @@ func TestRedeclaringSomethingDifferentlyIsRefused(t *testing.T) {
 	// meaning anything.
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name": "2.4.0", "kind": "tag"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "2.4.0", "kind": "tag"}`)
 
-		code, body := d.post(t, "/v1/products/sonic/streams", `{"name": "2.4.0", "kind": "branch"}`)
+		code, body := d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "2.4.0", "kind": "branch"}`)
 		if code != http.StatusConflict {
 			t.Fatalf("a tag redeclared as a branch returned %d, want 409", code)
 		}
@@ -168,7 +168,7 @@ func TestAVariantShipsUnlessItSaysOtherwise(t *testing.T) {
 	// leaving the field out must not read as a denial.
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name": "master", "kind": "branch"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "master", "kind": "branch"}`)
 
 		_, body := d.post(t, "/v1/products/sonic/variants", `{"name": "broadcom"}`)
 		item, _ := body["item"].(map[string]any)
@@ -187,7 +187,7 @@ func TestAVariantShipsUnlessItSaysOtherwise(t *testing.T) {
 
 func TestDeclaringUnderSomethingUndeclaredSaysWhichPart(t *testing.T) {
 	twoCatalog(t, func(t *testing.T, d *declaring) {
-		code, body := d.post(t, "/v1/products/sonic/streams", `{"name": "master", "kind": "branch"}`)
+		code, body := d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "master", "kind": "branch"}`)
 		if code != http.StatusNotFound {
 			t.Fatalf("a stream under an undeclared product returned %d, want 404", code)
 		}
@@ -201,14 +201,14 @@ func TestATagRecordsTheBranchItWasCutFrom(t *testing.T) {
 	// It is what lets a branch be compared against its last release.
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name": "master", "kind": "branch"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "master", "kind": "branch"}`)
 
-		code, _ := d.post(t, "/v1/products/sonic/streams",
+		code, _ := d.post(t, "/v1/products/sonic/branches-and-tags",
 			`{"name": "2.4.0", "kind": "tag", "parent": "master"}`)
 		if code != http.StatusCreated {
 			t.Fatalf("declaring a tag cut from a branch returned %d", code)
 		}
-		code, body := d.post(t, "/v1/products/sonic/streams",
+		code, body := d.post(t, "/v1/products/sonic/branches-and-tags",
 			`{"name": "2.5.0", "kind": "tag", "parent": "nonexistent"}`)
 		if code != http.StatusNotFound {
 			t.Errorf("a tag cut from an undeclared branch returned %d, want 404: %v", code, body)
@@ -222,7 +222,7 @@ func TestWhatHasBeenDeclaredCanBeListed(t *testing.T) {
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
 		d.post(t, "/v1/products", `{"name": "onie"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name": "master", "kind": "branch"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "master", "kind": "branch"}`)
 		d.post(t, "/v1/products/sonic/variants", `{"name": "broadcom"}`)
 
 		_, body := d.get(t, "/v1/products")
@@ -230,7 +230,7 @@ func TestWhatHasBeenDeclaredCanBeListed(t *testing.T) {
 		if len(items) != 2 {
 			t.Errorf("listed %d products, want 2", len(items))
 		}
-		_, body = d.get(t, "/v1/products/sonic/streams")
+		_, body = d.get(t, "/v1/products/sonic/branches-and-tags")
 		items, _ = body["items"].([]any)
 		if len(items) != 1 {
 			t.Errorf("listed %d streams, want 1", len(items))
@@ -248,7 +248,7 @@ func TestADeclaredTargetCanBeUploadedAgainst(t *testing.T) {
 	// resolves. Testing them apart would let the names diverge.
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name": "master", "kind": "branch"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "master", "kind": "branch"}`)
 		d.post(t, "/v1/products/sonic/variants", `{"name": "broadcom"}`)
 
 		// Sent by hand rather than by a pipeline, which is triage work
@@ -259,7 +259,7 @@ func TestADeclaredTargetCanBeUploadedAgainst(t *testing.T) {
 		// filing a build against it is not, so the second one is
 		// granted rather than assumed.
 		d.grants(t, d.admin, "sonic", access.PublicTriage)
-		req := httpapitest.Upload(t, "/v1/products/sonic/streams/master/variants/broadcom/scans",
+		req := httpapitest.Upload(t, "/v1/products/sonic/branches-and-tags/master/variants/broadcom/sboms",
 			httpapitest.Inventory(httpapitest.Nowish(), "libc6"))
 		req.Header.Set(httpapitest.TestHeader, d.admin)
 		httpapitest.FromOurOwnPage(req)
@@ -325,7 +325,7 @@ func TestAProductStatesWhatItTriagesAndCanStopSayingSo(t *testing.T) {
 			t.Errorf("a product nobody has set a line on reports %q", word)
 		}
 
-		code, body := d.put(t, "/v1/products/sonic/triage-floor", `{"floor": "high"}`)
+		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": "high"}`)
 		if code != http.StatusNoContent {
 			t.Fatalf("stating a line returned %d, want 204: %v", code, body)
 		}
@@ -337,7 +337,7 @@ func TestAProductStatesWhatItTriagesAndCanStopSayingSo(t *testing.T) {
 			t.Errorf("another product picked up the line as %q", word)
 		}
 
-		code, body = d.put(t, "/v1/products/sonic/triage-floor", `{"floor": ""}`)
+		code, body = d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": ""}`)
 		if code != http.StatusNoContent {
 			t.Fatalf("clearing a line returned %d, want 204: %v", code, body)
 		}
@@ -400,7 +400,7 @@ func TestALineAProductCannotHoldIsRefused(t *testing.T) {
 	// that silently reverted.
 	twoCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		code, body := d.put(t, "/v1/products/sonic/triage-floor", `{"floor": "catastrophic"}`)
+		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": "catastrophic"}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("a line nobody recognizes returned %d, want 422: %v", code, body)
 		}
@@ -415,7 +415,7 @@ func TestALineAProductCannotHoldIsRefused(t *testing.T) {
 
 func TestStatingALineOnAProductNobodyDeclaredSaysSo(t *testing.T) {
 	twoCatalog(t, func(t *testing.T, d *declaring) {
-		code, body := d.put(t, "/v1/products/nowhere/triage-floor", `{"floor": "high"}`)
+		code, body := d.put(t, "/v1/products/nowhere/minimum-severity", `{"floor": "high"}`)
 		if code != http.StatusNotFound {
 			t.Fatalf("a line on an undeclared product returned %d, want 404: %v", code, body)
 		}
@@ -442,7 +442,7 @@ func (d *declaring) endOfLifeOf(t *testing.T, product string) string {
 // releaseEndOfLife reads back a release's date and whether it is the product's.
 func (d *declaring) releaseEndOfLife(t *testing.T, product, stream string) (string, bool) {
 	t.Helper()
-	_, body := d.get(t, "/v1/products/"+product+"/streams")
+	_, body := d.get(t, "/v1/products/"+product+"/branches-and-tags")
 	items, _ := body["items"].([]any)
 	for _, each := range items {
 		row, _ := each.(map[string]any)
@@ -464,8 +464,8 @@ func TestSomethingSaysWhenItGoesOutOfSupportAndCanTakeItBack(t *testing.T) {
 	// an answer.
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name": "master", "kind": "branch"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name": "2.4.0", "kind": "tag"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "master", "kind": "branch"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "2.4.0", "kind": "tag"}`)
 
 		if held := d.endOfLifeOf(t, "sonic"); held != "" {
 			t.Errorf("a product nobody has dated reports %q", held)
@@ -488,7 +488,7 @@ func TestSomethingSaysWhenItGoesOutOfSupportAndCanTakeItBack(t *testing.T) {
 		}
 
 		// One release says something else.
-		code, body = d.put(t, "/v1/products/sonic/streams/2.4.0/end-of-life", `{"on": "2027-06-01"}`)
+		code, body = d.put(t, "/v1/products/sonic/branches-and-tags/2.4.0/end-of-life", `{"on": "2027-06-01"}`)
 		if code != http.StatusNoContent {
 			t.Fatalf("dating a release returned %d, want 204: %v", code, body)
 		}
@@ -500,7 +500,7 @@ func TestSomethingSaysWhenItGoesOutOfSupportAndCanTakeItBack(t *testing.T) {
 		}
 
 		// And both are reversible.
-		if code, _ := d.put(t, "/v1/products/sonic/streams/2.4.0/end-of-life", `{"on": ""}`); code != http.StatusNoContent {
+		if code, _ := d.put(t, "/v1/products/sonic/branches-and-tags/2.4.0/end-of-life", `{"on": ""}`); code != http.StatusNoContent {
 			t.Fatalf("clearing a release's date returned %d", code)
 		}
 		if held, inherited := d.releaseEndOfLife(t, "sonic", "2.4.0"); held != "2027-03-01" || !inherited {
@@ -538,11 +538,11 @@ func TestTheStreamsListSaysWhatEachTagWasCutFrom(t *testing.T) {
 	// column that shows whether that will work showed nothing.
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name":"sonic"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name":"master","kind":"branch"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name":"v1.0","kind":"tag","parent":"master"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name":"orphan","kind":"tag"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name":"master","kind":"branch"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name":"v1.0","kind":"tag","parent":"master"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name":"orphan","kind":"tag"}`)
 
-		_, body := d.get(t, "/v1/products/sonic/streams")
+		_, body := d.get(t, "/v1/products/sonic/branches-and-tags")
 		items, _ := body["items"].([]any)
 		cutFrom := map[string]string{}
 		for _, each := range items {
@@ -571,16 +571,16 @@ func TestTheStreamsListSaysWhatEachTagWasCutFrom(t *testing.T) {
 func TestATagCutFromARetiredBranchStillNamesIt(t *testing.T) {
 	eachCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name":"sonic"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name":"release-1","kind":"branch"}`)
-		d.post(t, "/v1/products/sonic/streams", `{"name":"v1.0","kind":"tag","parent":"release-1"}`)
-		req := httptest.NewRequest(http.MethodDelete, "/v1/products/sonic/streams/release-1", nil)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name":"release-1","kind":"branch"}`)
+		d.post(t, "/v1/products/sonic/branches-and-tags", `{"name":"v1.0","kind":"tag","parent":"release-1"}`)
+		req := httptest.NewRequest(http.MethodDelete, "/v1/products/sonic/branches-and-tags/release-1", nil)
 		httpapitest.FromOurOwnPage(req)
 		req.Header.Set(httpapitest.TestHeader, d.admin)
 		if code, body := d.do(t, req); code >= 300 {
 			t.Fatalf("retiring the branch answered %d: %v", code, body)
 		}
 
-		_, body := d.get(t, "/v1/products/sonic/streams")
+		_, body := d.get(t, "/v1/products/sonic/branches-and-tags")
 		items, _ := body["items"].([]any)
 		found := false
 		for _, each := range items {
@@ -606,18 +606,18 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 	// chart is an accident of administration: a release recorded late orders
 	// after ones that came out before it.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/streams",
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/branches-and-tags",
 			`{"name":"v2.0","kind":"tag"}`); made.Code >= 300 {
 			t.Fatalf("declaring the tag answered %d: %s", made.Code, made.Body.String())
 		}
-		const at = "/v1/products/mine/streams/v2.0/release"
+		const at = "/v1/products/mine/branches-and-tags/v2.0/release"
 
 		// Cut from itself, and cut from another tag: both are refused rather
 		// than stored, because one is a comparison that never returns and the
 		// other is a line that does not exist.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPut, at,
 			`{"released_on":"2026-03-31","cut_from":"v2.0"}`), http.StatusUnprocessableEntity)
-		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/streams",
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/branches-and-tags",
 			`{"name":"v1.9","kind":"tag"}`); made.Code >= 300 {
 			t.Fatalf("declaring a second tag answered %d: %s", made.Code, made.Body.String())
 		}
@@ -635,7 +635,7 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 				ReleasedOn string `json:"released_on"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/products/mine/streams", &streams)
+		httpapitest.Read(t, r, "admin", "/v1/products/mine/branches-and-tags", &streams)
 		var one struct {
 			Name       string `json:"name"`
 			Parent     string `json:"parent"`
@@ -657,7 +657,7 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 			`{"released_on":"2026-03-31","cut_from":"master"}`); got.Code >= 300 {
 			t.Errorf("saying the same parent again answered %d", got.Code)
 		}
-		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/streams",
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/branches-and-tags",
 			`{"name":"other","kind":"branch"}`); made.Code >= 300 {
 			t.Fatalf("declaring a second branch answered %d: %s", made.Code, made.Body.String())
 		}
@@ -681,7 +681,7 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 				ReleasedOn string `json:"released_on"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/products/mine/streams", &after)
+		httpapitest.Read(t, r, "admin", "/v1/products/mine/branches-and-tags", &after)
 		for _, row := range after.Items {
 			if row.Name != "v2.0" {
 				continue

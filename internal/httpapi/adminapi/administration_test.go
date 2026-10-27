@@ -127,10 +127,10 @@ func TestGrantingARoleDoesNotAskWhetherItWorks(t *testing.T) {
 
 		// And the role is a real one, not a body that merely parsed: she can
 		// reach the product it was held against, and nothing else.
-		if got := r.As(t, "ana", http.MethodGet, "/v1/products/mine/streams"); got != http.StatusOK {
+		if got := r.As(t, "ana", http.MethodGet, "/v1/products/mine/branches-and-tags"); got != http.StatusOK {
 			t.Fatalf("the person just granted a role on mine reads it as %d", got)
 		}
-		if got := r.As(t, "ana", http.MethodGet, "/v1/products/theirs/streams"); got != http.StatusNotFound {
+		if got := r.As(t, "ana", http.MethodGet, "/v1/products/theirs/branches-and-tags"); got != http.StatusNotFound {
 			t.Fatalf("she reads a product she holds nothing on as %d, not 404", got)
 		}
 

@@ -71,7 +71,7 @@ describe("handing rows over", () => {
       product: "sonic",
       stream: "rel",
       variant: "x86",
-      vulnerability: "CVE-2026-0001",
+      issue: "CVE-2026-0001",
       component: "zlib",
     });
     expect(init.body).toEqual({ team: "core" });

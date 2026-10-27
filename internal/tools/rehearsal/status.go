@@ -17,12 +17,13 @@ import (
 )
 
 // statusLine is a build in the release's own status report, with the state
-// of its last scan and what is open.
-var statusLine = regexp.MustCompile(`^\s+(\S+)/streams/(\S+)/variants/(\S+)\s+scan (.*?) · open (\d+) findings`)
+// of its last scan and what is open. A release names a build under streams or
+// under branches-and-tags, whichever its API path said.
+var statusLine = regexp.MustCompile(`^\s+(\S+)/(?:streams|branches-and-tags)/(\S+)/variants/(\S+)\s+scan (.*?) · open (\d+) findings`)
 
 // buildLine is any line of the status report that names a build and its scan,
 // whether or not what follows is a count.
-var buildLine = regexp.MustCompile(`^\s+(\S+)/streams/(\S+)/variants/(\S+)\s+scan `)
+var buildLine = regexp.MustCompile(`^\s+(\S+)/(?:streams|branches-and-tags)/(\S+)/variants/(\S+)\s+scan `)
 
 // parseStatus reads one status report: the open findings per build, whether
 // any scan is still on its way, the builds whose scan failed, and the lines

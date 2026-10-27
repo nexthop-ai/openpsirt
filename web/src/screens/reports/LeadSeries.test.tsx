@@ -10,7 +10,7 @@ const mount = mounted();
 beforeEach(() => window.sessionStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 
-const COUNTS = "/v1/products/{product}/lead-series";
+const COUNTS = "/v1/products/{product}/code-finding-series";
 
 async function drawn(readsInternal: boolean) {
   window.sessionStorage.setItem("openpsirt.scope", JSON.stringify({ product: "sonic" }));

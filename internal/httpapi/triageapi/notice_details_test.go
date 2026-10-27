@@ -43,7 +43,7 @@ func TestAWindowCountingFromANoticeRaisesNothingUntilTheNotice(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		notification := r.Declared(t, "Notification", 72)
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows",
 			fmt.Sprintf(`{"name":"Final report","hours":720,"from":%d}`, notification))
 		if got.Code != http.StatusCreated {
 			t.Fatalf("declaring a window counting from a notice answered %d: %s", got.Code, got.Body.String())
@@ -51,7 +51,7 @@ func TestAWindowCountingFromANoticeRaisesNothingUntilTheNotice(t *testing.T) {
 		record := r.AttackedAt(t, time.Now().UTC().Add(-2*time.Hour))
 
 		var seen staged
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		final := seen.Items[0].Windows[1]
 		if final.Window.Name != "Final report" || final.Window.FromName != "Notification" {
 			t.Fatalf("the second window reads %+v", final)
@@ -66,13 +66,13 @@ func TestAWindowCountingFromANoticeRaisesNothingUntilTheNotice(t *testing.T) {
 
 		told := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/exploited-here/%d/told", record),
+			fmt.Sprintf("/v1/incidents/%d/told", record),
 			fmt.Sprintf(`{"recipient":"A regulator","told_at":%q,"said":"Notified.","window":%d}`,
 				told.Format(time.RFC3339), notification),
 		); got.Code != http.StatusCreated {
 			t.Fatalf("recording a notice answered %d: %s", got.Code, got.Body.String())
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		final = seen.Items[0].Windows[1]
 		if !final.Started || final.StartsAt != told.Format(time.RFC3339) {
 			t.Errorf("after the notice the window reads %+v, want it started at %s", final, told)
@@ -91,7 +91,7 @@ func TestANoticeCarriesItsReferencePlacesAndWordOnMalice(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		record := r.AttackedAt(t, time.Now().UTC().Add(-2*time.Hour))
-		path := fmt.Sprintf("/v1/exploited-here/%d/told", record)
+		path := fmt.Sprintf("/v1/incidents/%d/told", record)
 		at := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
 
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, path,
@@ -119,7 +119,7 @@ func TestANoticeCarriesItsReferencePlacesAndWordOnMalice(t *testing.T) {
 		}
 
 		var seen staged
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		if len(seen.Items[0].Told) != 1 {
 			t.Fatalf("%d notices on the shelf, want 1", len(seen.Items[0].Told))
 		}
@@ -135,13 +135,13 @@ func TestANoticeCarriesItsReferencePlacesAndWordOnMalice(t *testing.T) {
 func TestRetiringAWindowAnotherCountsFromConflictsNamingIt(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		notification := r.Declared(t, "Notification", 72)
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows",
 			fmt.Sprintf(`{"name":"Final report","hours":720,"from":%d}`, notification),
 		); got.Code != http.StatusCreated {
 			t.Fatalf("declaring a window counting from a notice answered %d: %s", got.Code, got.Body.String())
 		}
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
-			fmt.Sprintf("/v1/obligation-windows/%d", notification), "")
+			fmt.Sprintf("/v1/response-windows/%d", notification), "")
 		if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), "Final report") {
 			t.Errorf("retiring a window another counts from answered %d: %s", got.Code, got.Body.String())
 		}

@@ -12,7 +12,7 @@ describe("the front page's coverage figure", () => {
     // Two out of use, one out of support, one declared and never scanned,
     // one gone quiet, six scanned: six of eight are being scanned.
     serve((path) => {
-      if (path === "/v1/scanning") {
+      if (path === "/v1/last-uploads") {
         return {
           data: {
             items: [],

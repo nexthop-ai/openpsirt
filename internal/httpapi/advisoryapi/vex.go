@@ -21,7 +21,7 @@ import (
 func registerVEX(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-vex", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex",
 		Summary: "Generate a VEX document for a build",
 		Description: "Returns an OpenVEX document saying what stands about the third-party " +
 			"components this build ships: every approved `not applicable` and `already fixed` " +
@@ -62,7 +62,7 @@ func registerVEX(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-vex-issuances", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
 		Summary: "List the times a VEX document went out",
 		Description: "What has been published for this build, oldest first: which revision, " +
 			"when, and what the document hashed to at the time.\n\n" +
@@ -120,7 +120,7 @@ func registerVEX(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "record-vex-issued", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
 		Summary: "Record that a VEX document went out",
 		Description: "Records that the document for this build was published: when, by whom, " +
 			"and a digest of the document as it stands now. Answers with the document " +
@@ -173,7 +173,7 @@ func registerVEX(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-vex-issued", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}",
 		Summary: "Read a VEX document that went out",
 		Description: "The OpenVEX document recorded as one revision, byte for byte as it went " +
 			"out. It carries the version it was recorded under and the moment it was " +

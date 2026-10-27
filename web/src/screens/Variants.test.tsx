@@ -23,7 +23,7 @@ async function drawn(at: string, pattern: string, admin = true) {
         data: { identity: "ana", name: "Ana", admin, kind: "person", reach: [], outcomes: [] },
       };
     if (path === "/v1/products/{product}/variants") return { data: { items: ITEMS } };
-    if (path === "/v1/products/{product}/streams/{stream}/variants")
+    if (path === "/v1/products/{product}/branches-and-tags/{stream}/variants")
       return { data: { items: ITEMS } };
     return undefined;
   });
@@ -100,7 +100,7 @@ describe("the variants one release was built as", () => {
       "/products/:product/streams/:stream/variants",
     );
     const asked = (spy.mock.calls as unknown as [string][]).map(([path]) => path);
-    expect(asked).toContain("/v1/products/{product}/streams/{stream}/variants");
+    expect(asked).toContain("/v1/products/{product}/branches-and-tags/{stream}/variants");
     expect(asked).not.toContain("/v1/products/{product}/variants");
     expect(text()).toContain("Retired");
     expect(buttons()).not.toContain("Edit");

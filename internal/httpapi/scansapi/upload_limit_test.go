@@ -43,8 +43,8 @@ func limitedIngest(t *testing.T, limits sbom.Limits, fn func(t *testing.T, f *ht
 		})
 		fn(t, &httpapitest.IngestFixture{
 			Handler: handler, DB: db, Queue: q, Key: secret,
-			Path: "/v1/products/" + fixture.ProductName + "/streams/" + fixture.BranchName +
-				"/variants/" + fixture.CustomerVariant + "/scans",
+			Path: "/v1/products/" + fixture.ProductName + "/branches-and-tags/" + fixture.BranchName +
+				"/variants/" + fixture.CustomerVariant + "/sboms",
 		})
 	})
 }

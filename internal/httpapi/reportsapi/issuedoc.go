@@ -42,7 +42,7 @@ var howManyJudgments = 200
 func registerIssueDocument(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-issue-document", Method: http.MethodGet,
-		Path:    "/v1/issues/{vulnerability}/document",
+		Path:    "/v1/issues/{issue}/document",
 		Summary: "Render everything known about one issue",
 		Description: "What the issue is, every build of yours that carries it, what was " +
 			"decided about each and the reasoning behind it, as markdown — the form a " +
@@ -56,7 +56,7 @@ func registerIssueDocument(api huma.API, in core.Deps) {
 			"refusing — which is what the inquiry is usually asking.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {

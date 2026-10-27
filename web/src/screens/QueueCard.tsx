@@ -68,7 +68,7 @@ export function Dated({
   const repromise = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.PUT("/v1/claims/{id}/promise", {
+        await api.PUT("/v1/decisions/{id}/promise", {
           params: { path: { id: claim.id } },
           body: { ...(upgrade ? { to: to.trim() } : {}), by, reasoning: because },
         }),

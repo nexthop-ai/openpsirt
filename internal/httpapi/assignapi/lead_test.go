@@ -19,7 +19,7 @@ import (
 
 // leadAt is where the seeded lead is addressed on the seeded build.
 func leadAt(place string) string {
-	return "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+	return "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 }
 
 // granted gives one of the cast another role on the seeded product.
@@ -56,7 +56,7 @@ func holderOf(t *testing.T, r *httpapitest.Reach, who, place string) (page, queu
 			heldLead
 		} `json:"items"`
 	}
-	httpapitest.Read(t, r, who, "/v1/products/mine/leads?state=open", &listed)
+	httpapitest.Read(t, r, who, "/v1/products/mine/code-findings?state=open", &listed)
 	for _, row := range listed.Items {
 		if row.Place == place {
 			queue = row.heldLead
@@ -227,7 +227,7 @@ func TestTheLeadFileNamesAHolderAsTheListDoes(t *testing.T) {
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("queueing the lead with the team answered %d: %s", got.Code, got.Body)
 		}
-		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, "/v1/products/mine/leads.csv?state=open", "")
+		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, "/v1/products/mine/code-findings.csv?state=open", "")
 		records, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
 		if err != nil {
 			t.Fatalf("the file is not CSV a strict reader reads: %v\n%s", err, file.Body)
@@ -537,7 +537,7 @@ func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
 		}
 		unheld := func() narrowed {
 			var got narrowed
-			httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?assigned=nobody", &got)
+			httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings?assigned=nobody", &got)
 			return got
 		}
 		if got := unheld(); len(got.Items) != 1 || got.Items[0].Place != place || got.Total != 1 || got.States["open"] != 1 {
@@ -550,7 +550,7 @@ func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
 			t.Errorf("a held lead is in the unheld leads as %+v", got)
 		}
 		var all narrowed
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads", &all)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings", &all)
 		if len(all.Items) != 1 {
 			t.Errorf("the queue unnarrowed is %+v; want the held lead in it", all)
 		}

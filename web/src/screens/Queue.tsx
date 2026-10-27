@@ -140,7 +140,7 @@ export function Queue() {
   // not hold; it has a file of its own.
   const file = (format: "csv" | "json") =>
     mine
-      ? fileAt("/v1/my-claims.{format}", format)
+      ? fileAt("/v1/my-decisions.{format}", format)
       : fileAt("/v1/review-queue.{format}", format, { query: asked });
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);

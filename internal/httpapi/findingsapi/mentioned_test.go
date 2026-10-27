@@ -23,8 +23,8 @@ func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
 
 		// A claim to hang comments off.
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"The parser is never reached."}`)
 		if made.Code != http.StatusCreated {
@@ -41,7 +41,7 @@ func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
 		// A comment naming a colleague who reads this product, and one naming
 		// somebody who does not exist at all.
 		said := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/claims/"+httpapitest.Itoa(claimed.ClaimID)+"/comments",
+			"/v1/decisions/"+httpapitest.Itoa(claimed.ClaimID)+"/comments",
 			`{"body":"@reader could you look at this? @nobody-at-all too, and @triager wrote it."}`)
 		if said.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
@@ -93,7 +93,7 @@ func TestAMentionOnUndisclosedWorkReachesNobodyWhoMayNotSeeIt(t *testing.T) {
 		flaw := r.Embargoed(t)
 		claim, _ := r.Claimed(t, "private-triage", flaw, "libnl-3-200", httpapitest.Dismissal)
 		said := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/claims/"+httpapitest.Itoa(claim)+"/comments",
+			"/v1/decisions/"+httpapitest.Itoa(claim)+"/comments",
 			`{"body":"@reader and @private, could you look at the management socket?"}`)
 		if said.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
@@ -155,7 +155,7 @@ func TestAMentionThatReachedNobodyIsReportedBack(t *testing.T) {
 		_, claim := r.DecidedAt(t, place)
 
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 			`{"body":"@private-triage and @nobody-is-called-this, what do you think?"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())
@@ -174,7 +174,7 @@ func TestAMentionThatReachedNobodyIsReportedBack(t *testing.T) {
 		// A comment naming only people who can read it says nothing, so the
 		// report is a report rather than noise on every write.
 		quiet := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 			`{"body":"@private-triage one more thing."}`)
 		if quiet.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", quiet.Code, quiet.Body.String())
@@ -206,7 +206,7 @@ func TestNamesPastTheMentionCapAreReportedRatherThanDiscarded(t *testing.T) {
 			fmt.Fprintf(&named, " @nobody-%d", i)
 		}
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 			`{"body":"`+named.String()+` what do you think?"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())

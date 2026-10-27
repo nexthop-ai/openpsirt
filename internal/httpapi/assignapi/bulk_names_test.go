@@ -20,8 +20,8 @@ func TestAManyNamedClaimAnswersAnUnseenIssueAsAnUnknownOne(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		r.AlsoHolds(t, "theirs", "master", "mellanox", "CVE-2027-4242")
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/components/linux-image/decisions"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/components/linux-image/bulk-decision"
 		claim := func(name string) (int, string) {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 				`{"vulnerabilities":["CVE-2026-9999","`+name+`"],"outcome":"wont-fix",`+

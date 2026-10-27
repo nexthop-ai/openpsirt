@@ -10,7 +10,7 @@ export function useWithdraw() {
   const done = useAfterClaim();
   return useMutation({
     mutationFn: async ({ id }: { id: number }) =>
-      unwrap(await api.DELETE("/v1/claims/{id}", { params: { path: { id } } })),
+      unwrap(await api.DELETE("/v1/decisions/{id}", { params: { path: { id } } })),
     onSuccess: done,
   });
 }
@@ -20,7 +20,7 @@ export function useRevise() {
   return useMutation({
     mutationFn: async ({ id, reasoning }: { id: number; reasoning: string }) =>
       unwrap(
-        await api.PUT("/v1/claims/{id}/reasoning", {
+        await api.PUT("/v1/decisions/{id}/reasoning", {
           params: { path: { id } },
           body: { reasoning },
         }),
@@ -58,7 +58,7 @@ export function useComment() {
   return useMutation({
     mutationFn: async ({ id, body }: { id: number; body: string }) =>
       unwrap(
-        await api.POST("/v1/claims/{id}/comments", {
+        await api.POST("/v1/decisions/{id}/comments", {
           params: { path: { id } },
           body: { body },
         }),
@@ -87,8 +87,8 @@ export function useNote() {
       body: string;
     }) =>
       unwrap(
-        await api.POST("/v1/products/{product}/issues/{vulnerability}/notes", {
-          params: { path: { product, vulnerability } },
+        await api.POST("/v1/products/{product}/issues/{issue}/notes", {
+          params: { path: { product, issue: vulnerability } },
           body: { body },
         }),
       ),

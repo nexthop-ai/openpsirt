@@ -42,8 +42,8 @@ export function Notes({
     queryKey: ["notes", product, vulnerability],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/issues/{vulnerability}/notes", {
-          params: { path: { product, vulnerability } },
+        await api.GET("/v1/products/{product}/issues/{issue}/notes", {
+          params: { path: { product, issue: vulnerability } },
         }),
       ),
     // Somebody who may not read notes here gets nothing rather than an error

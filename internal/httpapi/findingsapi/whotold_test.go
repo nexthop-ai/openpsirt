@@ -76,7 +76,7 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 		var detail struct {
 			DiscloseAt string `json:"disclose_at"`
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/"+recorded.Identifier+"/components/libnl-3-200", &detail)
 		want := time.Now().UTC().AddDate(0, 0, -14).AddDate(0, 0, 90).Format(time.DateOnly)
 		if detail.DiscloseAt != want {
@@ -139,7 +139,7 @@ func TestACVEAssignedLaterBecomesAnotherNameForTheSameIssue(t *testing.T) {
 			Vulnerability string   `json:"vulnerability"`
 			Aliases       []string `json:"aliases"`
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/"+minted+"/components/libnl-3-200", &detail)
 		if detail.Vulnerability != "CVE-2027-0001" {
 			t.Errorf("the issue is filed under %q, want the CVE", detail.Vulnerability)
@@ -147,7 +147,7 @@ func TestACVEAssignedLaterBecomesAnotherNameForTheSameIssue(t *testing.T) {
 		var byNewName struct {
 			Vulnerability string `json:"vulnerability"`
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2027-0001/components/libnl-3-200", &byNewName)
 		if byNewName.Vulnerability != "CVE-2027-0001" {
 			t.Errorf("the new name does not resolve: %+v", byNewName)

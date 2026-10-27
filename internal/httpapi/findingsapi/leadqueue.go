@@ -144,23 +144,23 @@ func leadCells(row LeadRowBody) []string {
 func registerLeadQueue(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-leads", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/leads",
-		Summary: "List static analysis leads",
-		Description: "Returns one row per lead the product holds, however many builds it is " +
+		Path:    "/v1/products/{product}/code-findings",
+		Summary: "List code findings",
+		Description: "Returns one row per code finding the product holds, however many builds it is " +
 			"on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer " +
 			"reports the same flaw on the build, then the tool's own security severity for the rule, " +
 			"then its precision, then newest first.\n\n" +
-			"With no `state` it is the queue: open leads with no claim waiting for a second " +
-			"person. `state` lists the leads in one state instead. `fixed` lists the leads " +
+			"With no `state` it is the queue: open code findings with no claim waiting for a second " +
+			"person. `state` lists the code findings in one state instead. `fixed` lists the code findings " +
 			"closed on a build and not opened anew there.\n\n" +
-			"`states` counts every lead in the scope by state and `waiting` the open ones " +
-			"left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, " +
-			"so what the list leaves out is counted. The queue also leaves out a lead open only in " +
-			"releases past their end of life, and `past_end_of_life` counts those. A lead seen only in " +
+			"`states` counts every code finding in the scope by state and `waiting` the open ones " +
+			"left out for a waiting claim, and `ruled` the dismissed ones a suppression rule covers, " +
+			"so what the list leaves out is counted. The queue also leaves out a code finding open only in " +
+			"releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in " +
 			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +
 			"it off are refused with 409. " +
 			"`stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps " +
-			"the leads nobody holds on the build each row names, and combines with every other filter. " +
+			"the code findings nobody holds on the build each row names, and combines with every other filter. " +
 			"Supports limit and offset.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
@@ -191,12 +191,12 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-leads", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/leads.{format}",
-		Summary: "Export static analysis leads",
-		Description: "The lead list as a file: every row the same filters would list, not one " +
+		Path:    "/v1/products/{product}/code-findings.{format}",
+		Summary: "Export code findings",
+		Description: "The code finding list as a file: every row the same filters would list, not one " +
 			"page of them, in the same order.\n\n" +
 			"Read with your own visibility, as it is written. No row carries source text.\n\n" +
-			"With no `state` it is the queue, and the file says so. Takes every filter the lead " +
+			"With no `state` it is the queue, and the file says so. Takes every filter the code finding " +
 			"list takes.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {

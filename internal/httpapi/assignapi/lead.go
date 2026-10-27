@@ -24,19 +24,19 @@ import (
 func registerLeadAssigning(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "assign-lead", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment",
-		Summary: "Assign a lead to somebody",
-		Description: "Records who is dealing with this lead.\n\n" +
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment",
+		Summary: "Assign a code finding to somebody",
+		Description: "Records who is dealing with this code finding.\n\n" +
 			"It covers the product, not the build named in the path: what is assigned is the " +
-			"lead on every build of the product it is open on.\n\n" +
+			"code finding on every build of the product it is open on.\n\n" +
 			"Send `person` as an empty string to hand it back to nobody. Send `team` instead to " +
 			"route it to a team, which is a queue rather than a holding: it stays unheld until " +
 			"somebody takes it.\n\n" +
-			"A person is given a lead only where they may read it at its visibility, and a team " +
-			"only where one member may. A lead every release of which is past its end of life " +
-			"is refused with 409, and so is a lead handed off as a flaw: assign the flaw " +
+			"A person is given a code finding only where they may read it at its visibility, and a team " +
+			"only where one member may. A code finding every release of which is past its end of life " +
+			"is refused with 409, and so is a code finding recorded as a flaw: assign the flaw " +
 			"instead.\n\n" +
-			"A lead seen on a build it was not open on when it was assigned starts unassigned there.",
+			"A code finding seen on a build it was not open on when it was assigned starts unassigned there.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "At the lead's visibility. Giving it to somebody else also needs "+
 		"assigner. Taking a lead nobody holds, or handing back your own, does not.",
@@ -44,7 +44,7 @@ func registerLeadAssigning(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 		Body    struct {
 			Person string `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
 			Team   string `json:"team,omitempty" doc:"A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`

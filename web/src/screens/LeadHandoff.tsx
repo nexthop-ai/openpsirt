@@ -127,17 +127,17 @@ function HandedOff({
           list={async () =>
             unwrap(
               await api.GET(
-                "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators",
-                { params: { path: { ...build, place } } },
+                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators",
+                { params: { path: { ...build, occurrence: place } } },
               ),
             )
           }
           add={async (identity) =>
             unwrap(
               await api.PUT(
-                "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators/{identity}",
+                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}",
                 {
-                  params: { path: { ...build, place, identity } },
+                  params: { path: { ...build, occurrence: place, identity } },
                 },
               ),
             )
@@ -145,9 +145,9 @@ function HandedOff({
           remove={async (identity) =>
             unwrap(
               await api.DELETE(
-                "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators/{identity}",
+                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}",
                 {
-                  params: { path: { ...build, place, identity } },
+                  params: { path: { ...build, occurrence: place, identity } },
                 },
               ),
             )

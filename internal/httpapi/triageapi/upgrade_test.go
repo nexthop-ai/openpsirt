@@ -130,7 +130,7 @@ func TestMovingAPromisePastTheDeadlineGatesItAgain(t *testing.T) {
 		// The same promise, a year out.
 		later := time.Now().UTC().Add(365 * 24 * time.Hour).Format(time.DateOnly)
 		moved := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Slipping to next year."}`, later))
 		if moved.Code != http.StatusNoContent {
 			t.Fatalf("moving the promise answered %d: %s", moved.Code, moved.Body.String())
@@ -170,7 +170,7 @@ func TestAPromiseCannotBeMovedOntoADateAlreadyPast(t *testing.T) {
 		}
 		gone := time.Now().UTC().Add(-24 * time.Hour).Format(time.DateOnly)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"Backdated."}`, gone)),
 			http.StatusUnprocessableEntity)
 	})
@@ -200,7 +200,7 @@ func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
 		}
 		later := time.Now().UTC().Add(48 * time.Hour).Format(time.DateOnly)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,`+
 				`"reasoning":"Slipping <script>alert(1)</script>"}`, later)),
 			http.StatusUnprocessableEntity)
@@ -214,7 +214,7 @@ func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
 				Reasoning string `json:"reasoning"`
 			} `json:"argument"`
 		}
-		httpapitest.Read(t, r, "private-triage", fmt.Sprintf("/v1/claims/%d", done.ClaimID), &claim)
+		httpapitest.Read(t, r, "private-triage", fmt.Sprintf("/v1/decisions/%d", done.ClaimID), &claim)
 		if strings.Contains(claim.Argument.Reasoning, "<script>") {
 			t.Errorf("the refused reasoning was stored anyway: %q", claim.Argument.Reasoning)
 		}
@@ -250,7 +250,7 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 
 		later := time.Now().UTC().Add(400 * 24 * time.Hour).Format(time.DateOnly)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The release slipped a month."}`,
 				later)); got.Code >= 300 {
 			t.Fatalf("moving the promise answered %d: %s", got.Code, got.Body.String())
@@ -264,7 +264,7 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 		// too, and says the reasoning changed rather than the promise.
 		r.Agreed(t, done.ClaimID)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", done.ClaimID),
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The same promise, said better."}`,
 				later)); got.Code >= 300 {
 			t.Fatalf("restating the promise answered %d: %s", got.Code, got.Body.String())

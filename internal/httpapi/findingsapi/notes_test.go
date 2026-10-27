@@ -230,7 +230,7 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 		// the same as a working one.
 		r.Decided(t, place)
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999"+
 				"/components/libnl-3-200/assignment",
 			`{"person":"triager"}`); got.Code >= 400 {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())

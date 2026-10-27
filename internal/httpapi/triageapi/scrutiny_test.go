@@ -94,7 +94,7 @@ func TestWhatTwoPeopleAgreedToIsNotReportedAsStandingAlone(t *testing.T) {
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
 

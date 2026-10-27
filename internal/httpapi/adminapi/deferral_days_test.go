@@ -108,7 +108,7 @@ func TestQuietAfterIsAWholeNumberOfDays(t *testing.T) {
 		var scanning struct {
 			QuietAfterDays int `json:"quiet_after_days"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/scanning", &scanning)
+		httpapitest.Read(t, r, "admin", "/v1/last-uploads", &scanning)
 		if scanning.QuietAfterDays != 1 {
 			t.Errorf("quiet after twelve hours publishes %d days, want 1", scanning.QuietAfterDays)
 		}

@@ -48,7 +48,7 @@ async function duplicateOf(issue: string) {
 describe("ruling a report a duplicate", () => {
   it("says the disclosure date it starts before it is submitted", async () => {
     const asked = serve((path) =>
-      path === "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure"
+      path === "/v1/products/{product}/issues/{issue}/duplicate-disclosure"
         ? { data: { disclose_at: "2026-04-10T00:00:00Z" } }
         : { data: {} },
     );
@@ -56,12 +56,12 @@ describe("ruling a report a duplicate", () => {
     expect(mount.host().textContent).toContain("This starts a disclosure date of");
     expect(mount.host().textContent).toContain("on OPENPSIRT-2026-0001.");
     const previews = (asked.mock.calls as unknown as [string, unknown][]).filter(
-      ([path]) => path === "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure",
+      ([path]) => path === "/v1/products/{product}/issues/{issue}/duplicate-disclosure",
     );
     expect(previews).toHaveLength(1);
     expect(previews[0]?.[1]).toMatchObject({
       params: {
-        path: { product: "sonic", vulnerability: "OPENPSIRT-2026-0001" },
+        path: { product: "sonic", issue: "OPENPSIRT-2026-0001" },
         query: { report: ["sonic-R-2026-1"] },
       },
     });
@@ -69,7 +69,7 @@ describe("ruling a report a duplicate", () => {
 
   it("says a date brought in past the threshold waits for somebody else", async () => {
     serve((path) =>
-      path === "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure"
+      path === "/v1/products/{product}/issues/{issue}/duplicate-disclosure"
         ? { data: { disclose_at: "2026-04-10T00:00:00Z", needs_approval: true } }
         : { data: {} },
     );

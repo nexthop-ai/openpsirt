@@ -125,8 +125,8 @@ type ApprovalBody struct {
 
 func registerTriageReading(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-decisions", Method: http.MethodGet, Path: "/v1/decisions",
-		Summary: "List triage decisions",
+		OperationID: "list-decisions", Method: http.MethodGet, Path: "/v1/decision-occurrences",
+		Summary: "List triage decisions by occurrence",
 		Description: "Returns triage decisions on products you may triage, newest first, with " +
 			"the justification text for each.\n\n" +
 			"Filter by `outcome` to list dismissals (`not-applicable`, `mismatched`, " +
@@ -190,14 +190,14 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-decision", Method: http.MethodGet, Path: "/v1/decisions/{id}",
-		Summary: "Get a triage decision",
+		OperationID: "get-decision", Method: http.MethodGet, Path: "/v1/decision-occurrences/{id}",
+		Summary: "Get a triage decision at one occurrence",
 		Description: "Returns one decision with the justification as it currently stands, where " +
 			"it applies, who proposed it and how long it has stood.\n\n" +
 			"What it says — the outcome, the justification, the dates — belongs to the claim " +
 			"it is one row of, at `claim_id`. For the earlier justifications see " +
-			"`GET /v1/claims/{id}/revisions`, and for who agreed to which of them see " +
-			"`GET /v1/claims/{id}/approvals`.",
+			"`GET /v1/decisions/{id}/revisions`, and for who agreed to which of them see " +
+			"`GET /v1/decisions/{id}/approvals`.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
@@ -219,8 +219,8 @@ func registerTriageReading(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-claim", Method: http.MethodGet, Path: "/v1/claims/{id}",
-		Summary: "Get a claim",
+		OperationID: "get-claim", Method: http.MethodGet, Path: "/v1/decisions/{id}",
+		Summary: "Get a decision",
 		Description: "Returns one claim whole: what it says, where it lands, what it covers " +
 			"now, and what became of it.\n\n" +
 			"A claim is one proposer's action however many decisions it wrote, so the " +
@@ -231,9 +231,9 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			"`rows`, `issues` and `places` are what it wrote. `folds`, `packages`, " +
 			"`consumers` and `findings` are what it covers now, which grows as builds " +
 			"appear with nobody acting; what somebody consented to is on the approval, at " +
-			"`GET /v1/claims/{id}/approvals`.\n\n" +
-			"For the earlier justifications see `GET /v1/claims/{id}/revisions` and for the " +
-			"discussion `GET /v1/claims/{id}/comments`.",
+			"`GET /v1/decisions/{id}/approvals`.\n\n" +
+			"For the earlier justifications see `GET /v1/decisions/{id}/revisions` and for the " +
+			"discussion `GET /v1/decisions/{id}/comments`.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only claims you may read every row of."), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
@@ -295,8 +295,8 @@ func registerTriageReading(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-claim-revisions", Method: http.MethodGet,
-		Path:    "/v1/claims/{id}/revisions",
-		Summary: "List a claim's justification history",
+		Path:    "/v1/decisions/{id}/revisions",
+		Summary: "List a decision's justification history",
 		Description: "Returns every revision of the justification, oldest first, with who wrote " +
 			"each and when.\n\n" +
 			"A claim is one argument however many places it covers, so its reasoning is one text " +
@@ -340,8 +340,8 @@ func registerTriageReading(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-claim-approvals", Method: http.MethodGet,
-		Path:    "/v1/claims/{id}/approvals",
-		Summary: "List who approved a claim",
+		Path:    "/v1/decisions/{id}/approvals",
+		Summary: "List who approved a decision",
 		Description: "Returns every approval recorded against this claim, including ones later " +
 			"withdrawn, each naming the revision of the justification it was given for.\n\n" +
 			"An approval carrying `carried_from` was not given for this claim. A " +

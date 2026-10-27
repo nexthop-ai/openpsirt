@@ -30,7 +30,7 @@ func TestOneJudgmentAcrossBuildsIsWrittenWholeOrNotAtAll(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		r.ScannedAlso(t, "mellanox", "3.8.0")
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
 
 		// A build nobody scanned, named beside one somebody did.
@@ -86,7 +86,7 @@ func TestABuildNamedTwiceInOneJudgmentIsRefused(t *testing.T) {
 		r.ScannedWithEvidence(t)
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/decision",
 			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
 				`"also":[{"stream":"master","variant":"broadcom"}]}`)

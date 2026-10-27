@@ -27,9 +27,9 @@ import (
 func registerRetained(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "fetch-scan-document", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/scans/{scan}/documents/{document}",
-		Summary: "Fetch a scan document",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/sboms/{sbom}/documents/{document}",
+		Summary: "Fetch a document an SBOM upload carried",
 		Description: "Returns the bytes as they arrived, byte for byte: the hash on the receipt " +
 			"is over what comes back from here, so a copy can be checked against what was " +
 			"actually read.\n\n" +
@@ -46,7 +46,7 @@ func registerRetained(api huma.API, in core.Deps) {
 		Product  string `path:"product"`
 		Stream   string `path:"stream"`
 		Variant  string `path:"variant"`
-		Scan     int64  `path:"scan" doc:"The upload, as the receipt names it"`
+		Scan     int64  `path:"sbom" doc:"The upload, as the receipt names it"`
 		Document int64  `path:"document" doc:"The document, as the receipt names it"`
 	}) (*huma.StreamResponse, error) {
 		// Resolved the way the receipts list resolves the build: somebody

@@ -33,12 +33,12 @@ export function useHandOver({
     mutationFn: async (to: { row: Row; who: string; team: boolean }) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/assignment",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment",
           {
             params: {
               path: {
                 ...buildOf(to.row),
-                vulnerability: to.row.vulnerability ?? "",
+                issue: to.row.vulnerability ?? "",
                 component: to.row.component ?? "",
               },
               query: whichOf(to.row),

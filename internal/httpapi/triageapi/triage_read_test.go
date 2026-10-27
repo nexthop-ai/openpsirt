@@ -23,7 +23,7 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 		id, claim := r.DecidedAt(t, place)
 
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 			`{"body":"Re-checked against 3.7.0; still true."}`); got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())
 		}
@@ -44,7 +44,7 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 			Reasoning  string `json:"reasoning"`
 			ProposedBy string `json:"proposed_by"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", id), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", id), &detail)
 		if detail.Decision.State != "approved" {
 			t.Errorf("the decision reads as %q after being approved", detail.Decision.State)
 		}
@@ -68,7 +68,7 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 				WrittenBy string `json:"written_by"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/revisions", claim), &revisions)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/revisions", claim), &revisions)
 		if len(revisions.Items) != 1 || revisions.Items[0].WrittenBy != "triager" {
 			t.Errorf("the reasoning history reads as %+v", revisions.Items)
 		}
@@ -79,7 +79,7 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 				ApprovedBy string `json:"approved_by"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/approvals", claim), &approvals)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/approvals", claim), &approvals)
 		if len(approvals.Items) != 1 || approvals.Items[0].ApprovedBy != "reviewer" {
 			t.Fatalf("who agreed reads as %+v", approvals.Items)
 		}
@@ -95,7 +95,7 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 				WrittenBy string `json:"written_by"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/comments", claim), &comments)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/comments", claim), &comments)
 		if len(comments.Items) != 1 || comments.Items[0].WrittenBy != "triager" {
 			t.Errorf("the discussion reads as %+v", comments.Items)
 		}
@@ -119,7 +119,7 @@ func TestWhatWasDismissedCanBeListed(t *testing.T) {
 			} `json:"items"`
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/decisions?outcome=not-applicable", &listed)
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences?outcome=not-applicable", &listed)
 		if listed.Total != 1 || len(listed.Items) != 1 {
 			t.Fatalf("%d dismissals listed, want 1", listed.Total)
 		}
@@ -132,7 +132,7 @@ func TestWhatWasDismissedCanBeListed(t *testing.T) {
 		var none struct {
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/decisions?outcome=wont-fix", &none)
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences?outcome=wont-fix", &none)
 		if none.Total != 0 {
 			t.Errorf("filtering by an outcome nothing has returned %d", none.Total)
 		}
@@ -141,16 +141,16 @@ func TestWhatWasDismissedCanBeListed(t *testing.T) {
 		var waiting, agreed struct {
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/decisions?state=proposed", &waiting)
-		httpapitest.Read(t, r, "triager", "/v1/decisions?state=approved", &agreed)
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences?state=proposed", &waiting)
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences?state=approved", &agreed)
 		if waiting.Total != 1 || agreed.Total != 0 {
 			t.Errorf("before agreement %d wait and %d are agreed, want 1 and 0",
 				waiting.Total, agreed.Total)
 		}
 		r.Agreed(t, claim)
 		waiting.Total, agreed.Total = 0, 0
-		httpapitest.Read(t, r, "triager", "/v1/decisions?state=proposed", &waiting)
-		httpapitest.Read(t, r, "triager", "/v1/decisions?state=approved", &agreed)
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences?state=proposed", &waiting)
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences?state=approved", &agreed)
 		if waiting.Total != 0 || agreed.Total != 1 {
 			t.Errorf("after agreement %d wait and %d are agreed, want 0 and 1",
 				waiting.Total, agreed.Total)
@@ -203,7 +203,7 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 				Builds []string `json:"builds"`
 			} `json:"ended"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", claim), &whole)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", claim), &whole)
 
 		if whole.Claim.ID != claim || whole.Claim.Kind != "finding" {
 			t.Errorf("the claim reads as %+v", whole.Claim)
@@ -251,7 +251,7 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 
 		// Agreed to, and the claim says so as a whole with who did it.
 		r.Agreed(t, claim)
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", claim), &whole)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", claim), &whole)
 		if whole.Happened != "approved" || whole.By != "reviewer" {
 			t.Errorf("an agreed claim reads as %q by %q", whole.Happened, whole.By)
 		}
@@ -269,10 +269,10 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 		// Withdrawn, it reaches nothing now, and what it reached when it was
 		// withdrawn is reported apart.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodDelete,
-			fmt.Sprintf("/v1/claims/%d", claim), ""); got.Code >= 300 {
+			fmt.Sprintf("/v1/decisions/%d", claim), ""); got.Code >= 300 {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", claim), &whole)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", claim), &whole)
 		if whole.Findings != 0 || len(whole.Builds) != 0 {
 			t.Errorf("a withdrawn claim reaches %d findings in %v now", whole.Findings, whole.Builds)
 		}
@@ -301,15 +301,15 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 		// Holding the approver capability and nothing to read it against
 		// reaches nothing, which is what makes a capability a capability.
 		if got := httpapitest.AsPerson(t, r, "approver", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusNotFound {
+			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{}`); got.Code != http.StatusNotFound {
 			t.Errorf("an approver with no visibility approved: %d", got.Code)
 		}
 		for _, path := range []string{
-			fmt.Sprintf("/v1/decisions/%d", id),
-			fmt.Sprintf("/v1/claims/%d", claim),
-			fmt.Sprintf("/v1/claims/%d/revisions", claim),
-			fmt.Sprintf("/v1/claims/%d/approvals", claim),
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decision-occurrences/%d", id),
+			fmt.Sprintf("/v1/decisions/%d", claim),
+			fmt.Sprintf("/v1/decisions/%d/revisions", claim),
+			fmt.Sprintf("/v1/decisions/%d/approvals", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 		} {
 			if got := httpapitest.AsPerson(t, r, "approver", http.MethodGet, path, ""); got.Code != http.StatusNotFound {
 				t.Errorf("%s answered %d to somebody who reads nothing, want 404", path, got.Code)
@@ -319,11 +319,11 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 		// Somebody who may read the finding reads its record, all four parts
 		// of it, though they may argue about none of it.
 		for _, path := range []string{
-			fmt.Sprintf("/v1/decisions/%d", id),
-			fmt.Sprintf("/v1/claims/%d", claim),
-			fmt.Sprintf("/v1/claims/%d/revisions", claim),
-			fmt.Sprintf("/v1/claims/%d/approvals", claim),
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decision-occurrences/%d", id),
+			fmt.Sprintf("/v1/decisions/%d", claim),
+			fmt.Sprintf("/v1/decisions/%d/revisions", claim),
+			fmt.Sprintf("/v1/decisions/%d/approvals", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 		} {
 			got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, path, "")
 			if got.Code != http.StatusOK {
@@ -337,7 +337,7 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 		var listed struct {
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "reader", "/v1/decisions", &listed)
+		httpapitest.Read(t, r, "reader", "/v1/decision-occurrences", &listed)
 		if listed.Total == 0 {
 			t.Error("a reader was told no decisions exist")
 		}
@@ -347,7 +347,7 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 		// The decision's own sentence, so a route that moved and answers 404
 		// for itself does not pass for the refusal.
 		wrote := httpapitest.AsPerson(t, r, "reader", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 			`{"body":"a reader should not be able to write this"}`)
 		httpapitest.RefusedWith(t, wrote, http.StatusNotFound)
 		if !strings.Contains(wrote.Body.String(), "no decision is recorded there") {
@@ -370,24 +370,24 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, path := range []string{
-			fmt.Sprintf("/v1/decisions/%d", id),
-			fmt.Sprintf("/v1/claims/%d", claim),
-			fmt.Sprintf("/v1/claims/%d/revisions", claim),
-			fmt.Sprintf("/v1/claims/%d/approvals", claim),
-			fmt.Sprintf("/v1/claims/%d/comments", claim),
+			fmt.Sprintf("/v1/decision-occurrences/%d", id),
+			fmt.Sprintf("/v1/decisions/%d", claim),
+			fmt.Sprintf("/v1/decisions/%d/revisions", claim),
+			fmt.Sprintf("/v1/decisions/%d/approvals", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", claim),
 		} {
 			if got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, path, ""); got.Code != http.StatusNotFound {
 				t.Errorf("%s answered %d on an undisclosed finding to somebody who reads "+
 					"only disclosed ones, want 404", path, got.Code)
 			}
 		}
-		httpapitest.Read(t, r, "reader", "/v1/decisions", &listed)
+		httpapitest.Read(t, r, "reader", "/v1/decision-occurrences", &listed)
 		if listed.Total != 0 {
 			t.Errorf("a public reader was told %d undisclosed decisions exist", listed.Total)
 		}
 		// And somebody who reads undisclosed work still reads it.
 		if got := httpapitest.AsPerson(t, r, "private", http.MethodGet,
-			fmt.Sprintf("/v1/decisions/%d", id), ""); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decision-occurrences/%d", id), ""); got.Code != http.StatusOK {
 			t.Errorf("a private reader was refused an undisclosed decision: %d", got.Code)
 		}
 	})
@@ -400,8 +400,8 @@ func TestWhatAppliesToAFindingIsReadableWithItsHistory(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
 		_, claim := r.DecidedAt(t, place)
-		path := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/decision", place)
+		path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
 
 		var before struct {
 			Standing   *struct{} `json:"standing"`
@@ -462,7 +462,7 @@ func TestTheAPIReturnsMarkdownAndNeverMarkup(t *testing.T) {
 		id, _ := r.DecidedAt(t, place)
 
 		var body map[string]any
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", id), &body)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", id), &body)
 		if body["reasoning"] == "" || body["reasoning"] == nil {
 			t.Error("the answer carries no text at all")
 		}
@@ -475,7 +475,7 @@ func TestTheAPIReturnsMarkdownAndNeverMarkup(t *testing.T) {
 		// And there is no way to ask for markup: a request for it names a
 		// parameter no operation takes, and is refused as that.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			fmt.Sprintf("/v1/decisions/%d?html=true", id), ""), http.StatusBadRequest)
+			fmt.Sprintf("/v1/decision-occurrences/%d?html=true", id), ""), http.StatusBadRequest)
 	})
 }
 
@@ -507,7 +507,7 @@ func TestStoredTextComesBackExactlyAsWritten(t *testing.T) {
 		var body struct {
 			Reasoning string `json:"reasoning"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", id), &body)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", id), &body)
 		if body.Reasoning != hostile {
 			t.Errorf("the source came back altered:\n got %q\nwant %q", body.Reasoning, hostile)
 		}
@@ -548,7 +548,7 @@ func TestAFindingCarriesEverythingNeededToActOnIt(t *testing.T) {
 				Consumer string `json:"consumer"`
 			} `json:"places"`
 		}
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
 
 		for what, got := range map[string]string{
@@ -625,8 +625,8 @@ func TestABulkClaimCoversWhatTheClaimantCanSeeAndNoMore(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
-			"/components/libnl-3-200/decisions"
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/components/libnl-3-200/bulk-decision"
 		body := `{"vulnerabilities":["CVE-2026-9999"],"outcome":"wont-fix",` +
 			`"selected_by":"everything at this component","reasoning":"Not worth the churn."}`
 
@@ -678,7 +678,7 @@ func TestAPlaceNamesTheClaimStandingOnIt(t *testing.T) {
 				Claim    int64  `json:"claim"`
 			} `json:"places"`
 		}
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200"
 		httpapitest.Read(t, r, "reader", at, &detail)
 		if len(detail.Places) == 0 {
@@ -691,8 +691,8 @@ func TestAPlaceNamesTheClaimStandingOnIt(t *testing.T) {
 		}
 
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+detail.Places[0].Place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+detail.Places[0].Place+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 				`"reasoning":"The parser is never reached."}`)
 		if made.Code != http.StatusCreated {
@@ -759,7 +759,7 @@ func TestTheBulkBoundIsChargedAsEachBuildResolves(t *testing.T) {
 		// build resolves, the act is refused on the bound before anything
 		// tries to resolve that one; charged afterwards, every named build is
 		// resolved first and the answer is about the build instead.
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
@@ -788,7 +788,7 @@ func TestADecisionReadBackSaysWhetherItWaitsForASecondPerson(t *testing.T) {
 				NeedsApproval *bool  `json:"needs_approval"`
 			} `json:"decision"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", dismissed), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", dismissed), &detail)
 		if detail.Decision.State != "proposed" {
 			t.Fatalf("the dismissal reads as %q, want proposed", detail.Decision.State)
 		}
@@ -818,8 +818,8 @@ func TestADecisionNeedingNobodyReadsBackWithoutAWait(t *testing.T) {
 	// in force when made, and its decision says nothing waits on it.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
-		at := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/decision", place)
+		at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"affected","reasoning":"We ship the vulnerable parser."}`)
 		if got.Code != http.StatusCreated {
@@ -838,7 +838,7 @@ func TestADecisionNeedingNobodyReadsBackWithoutAWait(t *testing.T) {
 				NeedsApproval bool   `json:"needs_approval"`
 			} `json:"decision"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ID), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", made.ID), &detail)
 		if detail.Decision.State != "proposed" || detail.Decision.NeedsApproval {
 			t.Errorf("an affected answer reads back as %+v, want proposed and waiting on nobody",
 				detail.Decision)
@@ -851,7 +851,7 @@ func TestABuildNamedTwiceInAnotherSpellingIsRefused(t *testing.T) {
 	// the path's "master" is the same build named twice.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
@@ -888,18 +888,18 @@ func TestTheApprovalListKeepsWhatWasTakenBackAndNamesTheBatch(t *testing.T) {
 
 		// Revising the words withdraws the agreement to the old ones.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			fmt.Sprintf("/v1/decisions/%d/reasoning", claim),
 			`{"reasoning":"Re-checked the call sites; still not reached."}`); got.Code != http.StatusOK {
 			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim),
+			fmt.Sprintf("/v1/decisions/%d/approval", claim),
 			`{"batch":"october-review"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving under a batch answered %d: %s", got.Code, got.Body.String())
 		}
 
 		var listed approvalsListed
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/approvals", claim), &listed)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/approvals", claim), &listed)
 		if len(listed.Items) != 2 {
 			t.Fatalf("the claim lists %d approvals, want the withdrawn one and the live one: %+v",
 				len(listed.Items), listed.Items)
@@ -932,13 +932,13 @@ func TestAReaffirmedClaimsApprovalNamesTheOneItWasCarriedFrom(t *testing.T) {
 		claimed := r.AgreedThenLapsed(t)
 
 		var earlier approvalsListed
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/approvals", claimed), &earlier)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/approvals", claimed), &earlier)
 		if len(earlier.Items) != 1 {
 			t.Fatalf("the lapsed claim lists %d approvals, want 1", len(earlier.Items))
 		}
 
 		again := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Checked again at 8.6.0; the transfer path is still not reached."}`)
 		if again.Code != http.StatusCreated {
 			t.Fatalf("re-affirming answered %d: %s", again.Code, again.Body.String())
@@ -951,7 +951,7 @@ func TestAReaffirmedClaimsApprovalNamesTheOneItWasCarriedFrom(t *testing.T) {
 		}
 
 		var carried approvalsListed
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/approvals", restored.ClaimID), &carried)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/approvals", restored.ClaimID), &carried)
 		if len(carried.Items) != 1 || carried.Items[0].CarriedFrom != earlier.Items[0].ID ||
 			carried.Items[0].ApprovedBy != "reviewer" {
 			t.Errorf("the re-affirmed claim's approvals read %+v, want one carried from %d",

@@ -10,7 +10,8 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const ROUTE = "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage";
+const ROUTE =
+  "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components";
 
 async function drawn(total = 2, at = "/products/sonic/streams/master/variants/arm/match-coverage") {
   const spy = serve((path) =>

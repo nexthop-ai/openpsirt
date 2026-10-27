@@ -60,7 +60,11 @@ export function useStreams(
     queryKey: ["streams", product],
     enabled: enabled && !!product,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
+      unwrap(
+        await api.GET("/v1/products/{product}/branches-and-tags", {
+          params: { path: { product } },
+        }),
+      ),
   });
 }
 
@@ -73,7 +77,7 @@ export function useStreamsResolving(product: string): UseQueryResult<{ items: St
     enabled: !!product,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams", {
+        await api.GET("/v1/products/{product}/branches-and-tags", {
           params: { path: { product }, query: { retired: true } },
         }),
       ),
@@ -116,7 +120,7 @@ export function useReleaseVariants(
     enabled: open && !!product && !!stream,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants", {
+        await api.GET("/v1/products/{product}/branches-and-tags/{stream}/variants", {
           params: { path: { product, stream } },
         }),
       ),

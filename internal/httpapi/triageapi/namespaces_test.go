@@ -13,7 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-const twoNamespacesAt = "/v1/products/mine/streams/master/variants/broadcom"
+const twoNamespacesAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 
 func TestAPackageUnderTwoNamespacesIsReachedByNamingOne(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -94,12 +94,12 @@ func namedRoutes() []namedRoute {
 	return []namedRoute{
 		{"the finding", http.MethodGet, finding + "?version=3.7.0", "", true},
 		{"the reach", http.MethodGet, finding + "/reach?version=3.7.0", "", true},
-		{"a tag", http.MethodPut, finding + "/tags/waiting-on-vendor?version=3.7.0", "", true},
+		{"a tag", http.MethodPut, finding + "/labels/waiting-on-vendor?version=3.7.0", "", true},
 		{"an assignment", http.MethodPut, finding + "/assignment?version=3.7.0", `{}`, true},
 		{"a decision", http.MethodPost, finding + "/decision?version=3.7.0",
 			`{"outcome":"wont-fix","reasoning":"Not worth it."}`, true},
 		{"the issues at the component", http.MethodGet, component + "/issues?version=3.7.0", "", false},
-		{"a decision about the component", http.MethodPost, component + "/decisions?version=3.7.0",
+		{"a decision about the component", http.MethodPost, component + "/bulk-decision?version=3.7.0",
 			`{"vulnerabilities":["CVE-2026-9999"],"outcome":"wont-fix",` +
 				`"selected_by":"everything here","reasoning":"Not worth it."}`, false},
 	}
@@ -186,7 +186,7 @@ func TestAListNarrowedBeneathAComponentTakesTheNamespace(t *testing.T) {
 func TestTheListsLinkingToAFindingSayWhichComponentItIs(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ShipsUnderTwoNamespaces(t, httpapitest.SeededLib, httpapitest.SeededTwin)
-		build := "/v1/products/mine/streams/master/variants/broadcom"
+		build := "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 		finding := build + "/findings/CVE-2026-9999/components/libnl-3-200"
 		// Before anything is handed out, the unassigned list holds both.
 		unassigned := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/unassigned?product=mine", "")
@@ -224,7 +224,7 @@ func TestTheListsLinkingToAFindingSayWhichComponentItIs(t *testing.T) {
 		for _, list := range []struct{ what, who, path, want string }{
 			// A claim and a blocking row stand for a place, which both
 			// components share, so each names one of them.
-			{"the decisions", "triager", "/v1/decisions?product=mine", `"namespace":"`},
+			{"the decisions", "triager", "/v1/decision-occurrences?product=mine", `"namespace":"`},
 
 			{"the tree of one's own work", "triager", build + "/components/mine", ""},
 		} {

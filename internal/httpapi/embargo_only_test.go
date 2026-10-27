@@ -76,8 +76,8 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 		// Arguing about the disclosed finding is refused: the product is one
 		// they triage in, and the finding is not one they may read.
 		made := httpapitest.AsPerson(t, r, "embargo-triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"The parser is never reached."}`)
 		httpapitest.RefusedWith(t, made, http.StatusNotFound)

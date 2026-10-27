@@ -24,7 +24,8 @@ export function Decision() {
 
   const decision = useQuery({
     queryKey: ["decision", id],
-    queryFn: async () => unwrap(await api.GET("/v1/decisions/{id}", { params: { path: { id } } })),
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/decision-occurrences/{id}", { params: { path: { id } } })),
   });
 
   if (decision.isPending) return <Loading />;

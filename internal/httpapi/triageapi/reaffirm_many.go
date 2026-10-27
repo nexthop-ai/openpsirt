@@ -46,7 +46,7 @@ type ToReaffirmOutput struct {
 func registerReaffirmMany(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-to-reaffirm", Method: http.MethodGet, Path: "/v1/to-reaffirm",
-		Summary: "List your lapsed claims",
+		Summary: "List your lapsed decisions",
 		Description: "Returns the claims you proposed that lapsed and that nothing has replaced, " +
 			"the most recently written first: the claims that are yours to re-affirm. " +
 			"`product` narrows them to one product.\n\n" +
@@ -110,7 +110,7 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "reaffirm-many", Method: http.MethodPost, Path: "/v1/reaffirmations",
-		Summary: "Re-affirm several lapsed claims",
+		Summary: "Re-affirm several lapsed decisions",
 		Description: "Re-makes each claim named, as one act with one reasoning. Name claims from " +
 			"`GET /v1/to-reaffirm`.\n\n" +
 			"Each claim is re-made whole, exactly as re-affirming it alone does: every lapsed " +

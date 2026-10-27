@@ -56,7 +56,7 @@ const ANA: Who = {
 
 describe("a secondary read that fails", () => {
   it("says which builds went quiet could not be read", async () => {
-    failing("/v1/scanning");
+    failing("/v1/last-uploads");
     mount.render(
       screen(<Uploads />, "/products/sonic/streams/master/variants/x/uploads", `${BUILD}/uploads`),
     );
@@ -65,7 +65,7 @@ describe("a secondary read that fails", () => {
   });
 
   it("says the windows could not be read rather than that none are declared", async () => {
-    failing("/v1/obligation-windows");
+    failing("/v1/response-windows");
     mount.render(screen(<Exploited />));
     await settle();
     const text = mount.host().textContent ?? "";
@@ -74,7 +74,7 @@ describe("a secondary read that fails", () => {
   });
 
   it("says the builds to compare could not be read", async () => {
-    failing("/v1/products/{product}/streams");
+    failing("/v1/products/{product}/branches-and-tags");
     mount.render(
       screen(
         <InventoryCompare />,
@@ -87,7 +87,7 @@ describe("a secondary read that fails", () => {
   });
 
   it("says the exploited figure could not be read rather than drawing no tile", async () => {
-    failing("/v1/obligations");
+    failing("/v1/incidents");
     mount.render(screen(<Home who={ANA} />));
     await settle();
     const tile = Array.from(mount.host().querySelectorAll(".kpi")).find((each) =>
@@ -98,7 +98,7 @@ describe("a secondary read that fails", () => {
   });
 
   it("says how long a build may go quiet could not be read rather than a week", async () => {
-    failing("/v1/scanning");
+    failing("/v1/last-uploads");
     mount.render(screen(<Home who={ANA} />));
     await settle();
     const text = mount.host().textContent ?? "";
@@ -115,7 +115,7 @@ describe("a secondary read that fails", () => {
   });
 
   it("says no build is flagged quiet where the setting could not be read", async () => {
-    failing("/v1/scanning");
+    failing("/v1/last-uploads");
     mount.render(screen(<Products who={{ ...ANA, admin: true }} />));
     await settle();
     expect(mount.host().textContent).toContain(
@@ -148,7 +148,7 @@ describe("a secondary read that fails", () => {
   });
 
   it("says who approved a decision is unknown rather than that nobody had to", async () => {
-    failing("/v1/claims/{id}/approvals");
+    failing("/v1/decisions/{id}/approvals");
     mount.render(
       screen(
         <Standing
@@ -237,7 +237,7 @@ describe("a secondary read that fails", () => {
   });
 
   it("says a claim's revisions could not be read rather than drawing none", async () => {
-    failing("/v1/claims/{id}/revisions");
+    failing("/v1/decisions/{id}/revisions");
     mount.render(screen(<Revisions claimId={4} />));
     await settle();
     expect(mount.host().textContent).toContain("The revision history could not be read.");
@@ -245,8 +245,8 @@ describe("a secondary read that fails", () => {
 
   it("says who approved a revision is unknown rather than that nobody did", async () => {
     serve((asked) => {
-      if (asked === "/v1/claims/{id}/approvals") return { status: 503 };
-      if (asked === "/v1/claims/{id}/revisions") {
+      if (asked === "/v1/decisions/{id}/approvals") return { status: 503 };
+      if (asked === "/v1/decisions/{id}/revisions") {
         return { data: { items: [{ id: 1, ordinal: 1, body: "Unreachable." }] } };
       }
       return { data: { items: [], total: 0 } };

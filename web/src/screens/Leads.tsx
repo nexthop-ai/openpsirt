@@ -46,7 +46,7 @@ export function Leads() {
 
   // The list on screen as a file: the same narrowing, every row of it.
   const file = (format: "csv" | "json") =>
-    fileAt("/v1/products/{product}/leads.{format}", format, {
+    fileAt("/v1/products/{product}/code-findings.{format}", format, {
       path: { product },
       query: leadsQuery({ state, stream, variant, series, assigned }),
     });

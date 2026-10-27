@@ -42,7 +42,7 @@ type OursOutput struct {
 func registerUpward(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-my-components", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 			"/components/mine",
 		Summary: "Show the chains your own findings sit on",
 		Description: "The build's dependency graph, seen upward from your own work: from each " +

@@ -95,7 +95,7 @@ func uploaded(in core.Deps, file huma.FormFile, read func(io.Reader) error) (str
 func registerVexImport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "upload-vex-statements", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/vex-statements",
+		Path:    "/v1/products/{product}/vex-documents",
 		Summary: "Upload a VEX document",
 		Description: "Takes one OpenVEX document of what a distribution or an upstream " +
 			"security team has published about components this product ships.\n\n" +

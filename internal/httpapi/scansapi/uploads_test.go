@@ -18,7 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/series"
 )
 
-const seededAt = "/v1/products/mine/streams/master/variants/broadcom"
+const seededAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 
 // uploadKinds reads the seeded build's uploads as somebody, or as the
 // pipeline key where nobody is named.
@@ -81,7 +81,7 @@ func TestABuildsUploadsListEachKindItsReaderMayRead(t *testing.T) {
 		if code := r.As(t, "admin", http.MethodPost, "/v1/products/mine/variants"); code != http.StatusCreated {
 			t.Fatalf("declaring a variant answered %d", code)
 		}
-		const fresh = "/v1/products/mine/streams/master/variants/declared-by-the-test"
+		const fresh = "/v1/products/mine/branches-and-tags/master/variants/declared-by-the-test"
 		for who, want := range map[string][]string{
 			"reader":          {"sbom", "vex", "supplier-advisory"},
 			"internal-reader": {"sbom", "sarif", "vex", "supplier-advisory"},

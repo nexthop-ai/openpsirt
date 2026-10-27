@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-const leadDecisionAt = "/v1/products/mine/streams/master/variants/broadcom/leads/%s/decision"
+const leadDecisionAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/%s/decision"
 
 func TestADismissedLeadStatesAReasonAndWaitsForASecondPerson(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -36,7 +36,7 @@ func TestADismissedLeadStatesAReasonAndWaitsForASecondPerson(t *testing.T) {
 		if !decided.NeedsApproval || decided.Reason != "false_positive" || decided.Justification != "" {
 			t.Fatalf("recorded %+v; want a reason, waiting for a second person", decided)
 		}
-		approval := fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID)
+		approval := fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID)
 		// Agreeing to internal material takes reading it as well as the
 		// right to agree.
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost, approval, `{}`); got.Code != http.StatusNotFound {
@@ -65,11 +65,11 @@ func TestAClaimAboutALeadIsAgreedToOnlyByAnApprover(t *testing.T) {
 		var claim struct {
 			Internal bool `json:"internal"`
 		}
-		httpapitest.Read(t, r, "internal-reviewer", fmt.Sprintf("/v1/claims/%d", decided.ClaimID), &claim)
+		httpapitest.Read(t, r, "internal-reviewer", fmt.Sprintf("/v1/decisions/%d", decided.ClaimID), &claim)
 		if !claim.Internal {
 			t.Error("a claim about a lead does not say it is internal")
 		}
-		approval := fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID)
+		approval := fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID)
 		// Triaging internal material is not the right to agree to it.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, approval, `{}`),
 			http.StatusNotFound)
@@ -121,7 +121,7 @@ func TestAVulnerabilityOutcomeIsRefusedOnALead(t *testing.T) {
 func TestALeadOutcomeIsRefusedOnAVulnerability(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
-		at := "/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999/places/" + place + "/decision"
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999/occurrences/" + place + "/decision"
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"confirmed","reasoning":"real"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a lead outcome on a vulnerability answered %d: %s", got.Code, got.Body)
@@ -135,7 +135,7 @@ func leadState(t *testing.T, r *httpapitest.Reach, place string) string {
 	var got struct {
 		State string `json:"state"`
 	}
-	httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &got)
+	httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &got)
 	return got.State
 }
 
@@ -155,7 +155,7 @@ func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
 			t.Errorf("a lead whose dismissal waits for a second person is %q; want it open", got)
 		}
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
 		if got := leadState(t, r, place); got != "dismissed" {
 			t.Errorf("a lead whose dismissal was agreed to is %q; want dismissed", got)
 		}
@@ -165,7 +165,7 @@ func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
 func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		lead := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 		at := lead + "/fixed"
 		body := httpapitest.FixedBody(t, r, lead, "the bounds check landed")
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, body),
@@ -212,7 +212,7 @@ func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 func TestAFixedLeadNamesARunOfItsBuildThatDidNotSeeIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		lead := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 		var saw int64
 		if err := r.DB.DB.NewSelect().TableExpr(`"series_run" AS "sr"`).ColumnExpr(`MIN("sr"."id")`).
 			Scan(t.Context(), &saw); err != nil {
@@ -254,7 +254,7 @@ func TestADismissalLapsesWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 			t.Fatal(err)
 		}
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
 
 		// The same line again pairs on the whole key, and the dismissal stands.
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRunAt(12))
@@ -268,7 +268,7 @@ func TestADismissalLapsesWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 		}
 		// Re-affirmed by its author, it stands again on the agreement it had.
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", decided.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", decided.ClaimID),
 			`{"reasoning":"still freed by the caller after the move"}`); got.Code != http.StatusCreated {
 			t.Fatalf("re-affirming answered %d: %s", got.Code, got.Body)
 		}
@@ -310,7 +310,7 @@ type leadsListed struct {
 func leadsOf(t *testing.T, r *httpapitest.Reach, who, query string) leadsListed {
 	t.Helper()
 	var got leadsListed
-	httpapitest.Read(t, r, who, "/v1/products/mine/leads"+query, &got)
+	httpapitest.Read(t, r, who, "/v1/products/mine/code-findings"+query, &got)
 	return got
 }
 
@@ -355,7 +355,7 @@ func TestALeadsEvidenceNamesItsRuleAndTheClaimStandingAtIt(t *testing.T) {
 			Decision *core.DecisionBody `json:"decision"`
 		}
 		var before evidence
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &before)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &before)
 		if before.Rule != "clang-tidy/leak" || before.Decision != nil {
 			t.Fatalf("the evidence before any claim is %+v; want the rule and no claim", before)
 		}
@@ -366,14 +366,14 @@ func TestALeadsEvidenceNamesItsRuleAndTheClaimStandingAtIt(t *testing.T) {
 			t.Fatal(err)
 		}
 		var after evidence
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &after)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &after)
 		if after.Decision == nil || after.Decision.ClaimID != decided.ClaimID || !after.Decision.NeedsApproval {
 			t.Errorf("the evidence names the claim %+v; want claim %d, waiting", after.Decision, decided.ClaimID)
 		}
 		// A claim withdrawn stands nowhere.
-		httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, fmt.Sprintf("/v1/claims/%d", decided.ClaimID), ``)
+		httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, fmt.Sprintf("/v1/decisions/%d", decided.ClaimID), ``)
 		var withdrawn evidence
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &withdrawn)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &withdrawn)
 		if withdrawn.Decision != nil {
 			t.Errorf("the evidence names a withdrawn claim %+v", withdrawn.Decision)
 		}
@@ -386,7 +386,7 @@ func TestTheRecordStatesALeadsReasonAsAReason(t *testing.T) {
 		decided := decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
 		var record struct {
 			Items []struct {
 				Outcome       string `json:"outcome"`
@@ -426,12 +426,12 @@ func TestALeadSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKeptAsItSta
 		var evidence struct {
 			Ended bool `json:"past_end_of_life"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &evidence)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &evidence)
 		if !evidence.Ended {
 			t.Error("the lead's evidence does not say its releases are past their end of life")
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/leads/"+place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks"}`), http.StatusConflict)
 
 		ended(nil)
@@ -453,7 +453,7 @@ func TestWithdrawingAnAgreedDismissalOfALeadReopensIt(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
-		claim := fmt.Sprintf("/v1/claims/%d", decided.ClaimID)
+		claim := fmt.Sprintf("/v1/decisions/%d", decided.ClaimID)
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, claim+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
@@ -481,7 +481,7 @@ func TestWithdrawingAnAgreedDismissalOfALeadReopensIt(t *testing.T) {
 func TestAFixedLeadNamesOnlyAnAppliedComparableRunOfItsSeriesOnItsBuild(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		lead := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		lead := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 		now := time.Now().UTC()
 		httpapitest.ApplyRun(t, r, now.Add(-2*time.Hour), httpapitest.LeadRun(false))
 		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))

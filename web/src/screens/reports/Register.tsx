@@ -82,12 +82,15 @@ export function Register() {
     queryKey: ["register", where, narrowed, offset],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/register", {
-          params: {
-            path: where,
-            query: { limit: PAGE, offset, ...narrowed },
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register",
+          {
+            params: {
+              path: where,
+              query: { limit: PAGE, offset, ...narrowed },
+            },
           },
-        }),
+        ),
       ),
   });
 
@@ -479,7 +482,7 @@ function fileAt(
   asked: URLSearchParams,
 ): string {
   return linkedFile(
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/register.{format}",
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register.{format}",
     format,
     { path: at, query: asked },
   );

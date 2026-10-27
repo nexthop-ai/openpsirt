@@ -42,9 +42,9 @@ type ListedInventoryChanges = core.ListOutput[InventoryChangeBody]
 // comparison read twice: an alert about a build that changed sharply is an
 // alarm pointing at nothing without somewhere to go and look.
 func registerInventoryChanges(api huma.API, in core.Deps) {
-	huma.Register(api, core.Requiring(huma.Operation{
+	core.RegisterWithFormer(api, core.Requiring(huma.Operation{
 		OperationID: "list-inventory-changes", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/changes",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/changes",
 		Summary: "List what an upload changed about a build's inventory",
 		Description: "Returns the component names this upload added, removed and moved to " +
 			"different versions, against the upload read before it. Removals first, then " +
@@ -59,7 +59,7 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 		Product string          `path:"product"`
 		Stream  string          `path:"stream"`
 		Variant string          `path:"variant"`
-		Scan    int64           `path:"scan" doc:"The upload, as a receipt names it"`
+		Scan    int64           `path:"sbom" doc:"The upload, as a receipt names it"`
 		Change  core.ChangeKind `query:"change" doc:"One kind of change alone"`
 		Limit   int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
 		Offset  int             `query:"offset" minimum:"0" doc:"The number skipped"`
@@ -100,7 +100,7 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 			})
 		}
 		return out, nil
-	})
+	}, core.FormerUploadChanges)
 }
 
 // InventoryDifferenceBody is one name two builds hold differently.

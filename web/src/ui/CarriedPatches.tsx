@@ -44,7 +44,7 @@ export function CarriedPatches({
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/carried-patches",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried-patches",
           {
             params: {
               path: at,

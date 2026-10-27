@@ -19,7 +19,7 @@ func TestTheReviewQueueTakesItsFiltersFromTheAddress(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/components/linux-image/decisions",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/linux-image/bulk-decision",
 			`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"wont-fix",`+
 				`"selected_by":"the drivers","reasoning":"Not built for this image."}`); got.Code !=
 			http.StatusCreated {

@@ -23,7 +23,7 @@ type FixNamed struct {
 func registerFixes(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "name-fix-release", Method: http.MethodPost,
-		Path:    "/v1/exploited-here/{id}/fixes",
+		Path:    "/v1/incidents/{id}/fixes",
 		Summary: "Name a release carrying the fix",
 		Description: "Records that a tag of the record's product carries the fix for the " +
 			"attack. Name each tag as it is cut; a tag declared before any scan of it is " +
@@ -73,7 +73,7 @@ func registerFixes(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "withdraw-fix-release", Method: http.MethodDelete,
-		Path:    "/v1/exploited-here/{id}/fixes/{fix}",
+		Path:    "/v1/incidents/{id}/fixes/{fix}",
 		Summary: "Withdraw a release named as carrying the fix",
 		Description: "Takes back a tag named in error. The naming stays readable with who " +
 			"withdrew it and when, and the tag may be named again. A window starting from " +

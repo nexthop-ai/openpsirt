@@ -43,10 +43,10 @@ describe("the scope panel on a screen that needs a build", () => {
 // as one variant.
 function catalog(path: string): Answer | undefined {
   if (path === "/v1/products") return { data: { items: [{ name: "sonic" }] } };
-  if (path === "/v1/products/{product}/streams")
+  if (path === "/v1/products/{product}/branches-and-tags")
     return { data: { items: [{ name: "master", kind: "branch" }] } };
   if (path === "/v1/products/{product}/variants") return { data: { items: [{ name: "arm" }] } };
-  if (path === "/v1/products/{product}/streams/{stream}/variants")
+  if (path === "/v1/products/{product}/branches-and-tags/{stream}/variants")
     return { data: { items: [{ name: "arm" }, { name: "old", retired: true }] } };
   return { data: { items: [] } };
 }

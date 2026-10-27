@@ -346,7 +346,7 @@ func TestAScanFromTheFutureIsRefusedAsABadRequest(t *testing.T) {
 
 func TestAnUndeclaredTargetSaysWhichPartIsMissing(t *testing.T) {
 	twoIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
-		req := f.Sending(httpapitest.Upload(t, "/v1/products/sonic/streams/master/variants/mellanox/scans",
+		req := f.Sending(httpapitest.Upload(t, "/v1/products/sonic/branches-and-tags/master/variants/mellanox/sboms",
 			httpapitest.Inventory(time.Now().UTC().Add(-time.Hour), "libc6")))
 		rec := httptest.NewRecorder()
 		f.Handler.ServeHTTP(rec, req)

@@ -48,36 +48,36 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			path    string
 		}{
 			{"productNamedVisibly", "/v1/products/mine/findings"},
-			{"locatedVisibly", "/v1/products/mine/streams/master/variants/broadcom/components"},
-			{"locatedVisibly", "/v1/products/mine/streams/master/variants/broadcom/match-coverage"},
-			{"targetRow", "/v1/products/mine/streams/master/variants/broadcom/scans"},
-			{"issueHere", "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+			{"locatedVisibly", "/v1/products/mine/branches-and-tags/master/variants/broadcom/components"},
+			{"locatedVisibly", "/v1/products/mine/branches-and-tags/master/variants/broadcom/unmatched-components"},
+			{"targetRow", "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"},
+			{"issueHere", "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 				"CVE-2026-9999/components/libnl-3-200"},
 			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
 			// Arms that answer per route rather than through the helper: a
 			// run, a person, a token, a notification.
-			{"a run on a build", "/v1/products/mine/streams/master/variants/broadcom/runs/1"},
+			{"a run on a build", "/v1/products/mine/branches-and-tags/master/variants/broadcom/runs/1"},
 			{"a token of your own", "/v1/tokens"},
 			{"a branch named in a selection",
 				"/v1/products/mine/findings?stream=master"},
 			{"a document a build sent",
-				"/v1/products/mine/streams/master/variants/broadcom/scans/1/documents/1"},
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms/1/documents/1"},
 			{"productNamed", "/v1/products/mine/findings/components"},
 			{"the package kinds a product holds", "/v1/products/mine/findings/package-kinds"},
 			{"the package kinds across products", "/v1/findings/package-kinds"},
-			{"the catalog's own reader", "/v1/products/mine/streams"},
+			{"the catalog's own reader", "/v1/products/mine/branches-and-tags"},
 			{"the build lookup a document is generated from",
-				"/v1/products/mine/streams/master/variants/broadcom/vex"},
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"},
 			// Lookups that fill in part of an answer, where a failure must
 			// not read as a name that reaches nothing or a field that holds
 			// nothing.
 			{"a build's readiness",
-				"/v1/products/mine/streams/master/variants/broadcom/readiness"},
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/readiness"},
 			{"an issue's attachments", "/v1/products/mine/issues/CVE-2026-9999/attachments"},
 			{"the limits the interface draws with", "/v1/session/me"},
-			{"a product the record narrows to", "/v1/decisions?product=mine"},
+			{"a product the record narrows to", "/v1/decision-occurrences?product=mine"},
 			{"the chains your own work sits on",
-				"/v1/products/mine/streams/master/variants/broadcom/components/mine"},
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/mine"},
 		} {
 			req := httptest.NewRequest(http.MethodGet, c.path, nil)
 			req.Header.Set(httpapitest.TestHeader, "reader")
@@ -151,7 +151,7 @@ func TestAFailedReadWithNoPublisherIsAFault(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		handler := overAClosedDatabaseAs(t, r, &counting{}, publisher.Named{})
 		req := httptest.NewRequest(http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/vex/issuance", nil)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/vex/issuance", nil)
 		req.Header.Set(httpapitest.TestHeader, "reader")
 		httpapitest.FromOurOwnPage(req)
 		rec := httptest.NewRecorder()

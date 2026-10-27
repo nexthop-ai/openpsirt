@@ -51,9 +51,12 @@ export function AnalysisRuns({ build }: { build: Build }) {
     queryKey: ["analyses", product, stream, variant, offset],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/analyses", {
-          params: { path: { product, stream, variant }, query: { limit: PAGE, offset } },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
+          {
+            params: { path: { product, stream, variant }, query: { limit: PAGE, offset } },
+          },
+        ),
       ),
     // Asked again only while a run on the page is still to be read.
     refetchInterval: (query) =>
@@ -155,7 +158,7 @@ export function AnalysisRuns({ build }: { build: Build }) {
 
 // What each kind of document is called, and the path its list is read from.
 const DOCUMENTS = {
-  vex: { none: "No VEX documents uploaded.", path: "/v1/products/{product}/vex-statements" },
+  vex: { none: "No VEX documents uploaded.", path: "/v1/products/{product}/vex-documents" },
   "supplier-advisory": {
     none: "No supplier advisories.",
     path: "/v1/products/{product}/supplier-advisories",

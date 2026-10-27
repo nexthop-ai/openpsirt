@@ -92,9 +92,12 @@ export function Catalog() {
               <div>
                 A <b>VEX document</b> for <b>{at.stream}</b> · <b>{at.variant}</b> —{" "}
                 <a
-                  href={linkTo("/v1/products/{product}/streams/{stream}/variants/{variant}/vex", {
-                    path: { product: at.product, stream: at.stream, variant: at.variant },
-                  })}
+                  href={linkTo(
+                    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex",
+                    {
+                      path: { product: at.product, stream: at.stream, variant: at.variant },
+                    },
+                  )}
                 >
                   OpenVEX
                 </a>

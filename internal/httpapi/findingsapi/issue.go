@@ -66,7 +66,7 @@ type IssueOutput struct {
 // times.
 func registerIssue(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-issue", Method: http.MethodGet, Path: "/v1/issues/{vulnerability}",
+		OperationID: "get-issue", Method: http.MethodGet, Path: "/v1/issues/{issue}",
 		Summary: "List findings for one issue across every product",
 		Description: "Every build that carries this issue, across every product you may see, " +
 			"with how far it has been decided in each.\n\n" +
@@ -84,7 +84,7 @@ func registerIssue(api huma.API, in core.Deps) {
 			"Answers by any name the issue goes by.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Limit         int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
 	}) (*IssueOutput, error) {
 		subject, err := core.Reading(ctx)

@@ -109,7 +109,7 @@ type saidOnTheFinding struct {
 func (r *Reach) WhatPublishersSay(t *testing.T) saidOnTheFinding {
 	t.Helper()
 	var detail saidOnTheFinding
-	Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+	Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 		"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
 	return detail
 }
@@ -326,7 +326,7 @@ func (r *Reach) Vexed(t *testing.T, who, publisher, document string) *httptest.R
 // publisher in the query only where one is given.
 func (r *Reach) VexedAs(t *testing.T, who, publisher, filename, document string) *httptest.ResponseRecorder {
 	t.Helper()
-	at := "/v1/products/mine/vex-statements"
+	at := "/v1/products/mine/vex-documents"
 	if publisher != "" {
 		at += "?publisher=" + publisher
 	}
@@ -372,7 +372,7 @@ func (r *Reach) Alerts(t *testing.T, who, kind string) []string {
 	return r.Told(t, who, kind)
 }
 
-const ABuild = "/v1/products/mine/streams/master/variants/broadcom/vex"
+const ABuild = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 // RecordedIssuance records that the document for the build went out and
 // answers with what was recorded.

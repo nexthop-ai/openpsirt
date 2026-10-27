@@ -20,7 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-const leadRulesAt = "/v1/products/mine/lead-rules"
+const leadRulesAt = "/v1/products/mine/suppression-rules"
 
 // leadRuleRead is a standing rule as somebody reads it.
 type leadRuleRead struct {

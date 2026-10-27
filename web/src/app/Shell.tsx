@@ -571,8 +571,8 @@ function Search({ at }: { at: Scoped }) {
         setLooking(true);
         setUnread(false);
         void api
-          .GET("/v1/issues/{vulnerability}", {
-            params: { path: { vulnerability: term }, query: { limit: 1 } },
+          .GET("/v1/issues/{issue}", {
+            params: { path: { issue: term }, query: { limit: 1 } },
           })
           .then((answer) => {
             setLooking(false);

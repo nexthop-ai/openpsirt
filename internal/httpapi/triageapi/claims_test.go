@@ -67,20 +67,20 @@ func TestAClaimIsApprovedAsOneAndByAnotherPerson(t *testing.T) {
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusConflict {
+			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{}`); got.Code != http.StatusConflict {
 			t.Errorf("the proposer approving their own claim answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			"/v1/claims/999999/approval", `{}`); got.Code != http.StatusNotFound {
+			"/v1/decisions/999999/approval", `{}`); got.Code != http.StatusNotFound {
 			t.Errorf("approving a claim that is not there answered %d", got.Code)
 		}
 		if got := httpapitest.AsPerson(t, r, "reader", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusNotFound {
+			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{}`); got.Code != http.StatusNotFound {
 			t.Errorf("somebody who may not approve answered %d, want the same as not there", got.Code)
 		}
 
 		got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{"batch":"tuesday"}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{"batch":"tuesday"}`)
 		if got.Code != http.StatusOK {
 			t.Fatalf("approving the claim answered %d: %s", got.Code, got.Body.String())
 		}
@@ -114,7 +114,7 @@ func TestABulkClaimCarriesItsOutliersAndTheyCanBeSetAside(t *testing.T) {
 		r.ScannedTwoIssues(t)
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/components/linux-image/decisions",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/linux-image/bulk-decision",
 			`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_present",`+
 				`"selected_by":"undecided, description contains \"driver\"",`+
@@ -167,7 +167,7 @@ func TestABulkClaimCarriesItsOutliersAndTheyCanBeSetAside(t *testing.T) {
 
 		// Set it aside: the other is approved, this one goes back.
 		got = httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", made.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/approval", made.ClaimID),
 			fmt.Sprintf(`{"except":[%d],"because":"Netfilter is not a driver, and it is exploited."}`, o.Rows[0].DecisionID))
 		if got.Code != http.StatusOK {
 			t.Fatalf("approving with a row set aside answered %d: %s", got.Code, got.Body.String())
@@ -183,7 +183,7 @@ func TestABulkClaimCarriesItsOutliersAndTheyCanBeSetAside(t *testing.T) {
 		// The row set aside is the proposer's again, in a claim of its own,
 		// with the reason on it.
 		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			fmt.Sprintf("/v1/claims/%d/comments", done.ReturnedClaim), "")
+			fmt.Sprintf("/v1/decisions/%d/comments", done.ReturnedClaim), "")
 		var said struct {
 			Items []struct {
 				Body string `json:"body"`
@@ -267,7 +267,7 @@ func TestAQueueEntryAndADecisionSayWhatTheyAreAbout(t *testing.T) {
 		}
 		check("the queue entry", queue.Items[0].Finding)
 
-		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet, fmt.Sprintf("/v1/decisions/%d", ids[0]), "")
+		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet, fmt.Sprintf("/v1/decision-occurrences/%d", ids[0]), "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("reading the decision answered %d: %s", got.Code, got.Body.String())
 		}
@@ -289,7 +289,7 @@ func TestAProposerHoldsPartOfTheirOwnClaimBack(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/components/linux-image/decisions",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/linux-image/bulk-decision",
 			`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_present",`+
 				`"selected_by":"undecided, description contains \"driver\"",`+
@@ -308,11 +308,11 @@ func TestAProposerHoldsPartOfTheirOwnClaimBack(t *testing.T) {
 		// Somebody who did not make it cannot hold part of it back: that is
 		// setting rows aside, and setting rows aside agrees to the rest.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/split", made.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/split", made.ClaimID),
 			fmt.Sprintf(`{"rows":[%d],"because":"Not this one."}`, made.IDs[0])), http.StatusNotFound)
 
 		got = httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/split", made.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/split", made.ClaimID),
 			fmt.Sprintf(`{"rows":[%d],"because":"This one is the driver after all."}`, made.IDs[0]))
 		if got.Code != http.StatusCreated {
 			t.Fatalf("holding a row back answered %d: %s", got.Code, got.Body.String())
@@ -333,7 +333,7 @@ func TestAProposerHoldsPartOfTheirOwnClaimBack(t *testing.T) {
 				Body string `json:"body"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/comments", held.ClaimID), &said)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d/comments", held.ClaimID), &said)
 		if len(said.Items) != 1 || said.Items[0].Body != "This one is the driver after all." {
 			t.Errorf("the reason did not travel with the rows: %+v", said.Items)
 		}
@@ -357,7 +357,7 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 		// One act restores both, with one reasoning and no second person: two
 		// people already agreed, and nothing about the issue has changed.
 		again := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Checked again at 8.6.0; the transfer path is still not reached."}`)
 		if again.Code != http.StatusCreated {
 			t.Fatalf("re-affirming the claim answered %d: %s", again.Code, again.Body.String())
@@ -408,7 +408,7 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 		// approver doing it becomes proposer of the new claim while their own
 		// earlier agreement is carried onto it.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Looks fine to me."}`), http.StatusNotFound)
 	})
 }
@@ -437,7 +437,7 @@ func TestAClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testing.T) 
 			t.Fatal(err)
 		}
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/theirs/streams/master/variants/mellanox"+
+			"/v1/products/theirs/branches-and-tags/master/variants/mellanox"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"Not compiled into that build."}`)
@@ -455,10 +455,10 @@ func TestAClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testing.T) 
 		// A claim that exists and one that does not, asked by somebody who may
 		// see neither. The two answers have to be the same answer.
 		invisible := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", theirClaim.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", theirClaim.ClaimID),
 			`{"reasoning":"Still true."}`)
 		absent := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/claims/999999/reaffirmation", `{"reasoning":"Still true."}`)
+			"/v1/decisions/999999/reaffirmation", `{"reasoning":"Still true."}`)
 		if invisible.Code != absent.Code {
 			t.Errorf("a claim elsewhere answered %d and a missing one %d",
 				invisible.Code, absent.Code)

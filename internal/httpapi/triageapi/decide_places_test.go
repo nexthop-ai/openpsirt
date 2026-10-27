@@ -19,7 +19,7 @@ func TestAJudgmentCoversThePlacesItNamesAndRefusesOneTheFindingIsNotAt(t *testin
 	// does not quietly cover five.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedShared(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-1/components/libyang"
 		first := finding.PlaceIdentity("libyang", "docker-a")
 		second := finding.PlaceIdentity("libyang", "docker-b")

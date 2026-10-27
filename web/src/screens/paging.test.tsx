@@ -53,7 +53,7 @@ describe("the disclosing screen", () => {
   it("starts a narrowed list at its beginning", async () => {
     const asked: unknown[] = [];
     serve((path, init) => {
-      if (path === "/v1/disclosing") {
+      if (path === "/v1/disclosure-deadlines") {
         asked.push((init as { params: { query: { offset: number } } }).params.query.offset);
         return { data: { items: [], total: 250 } };
       }

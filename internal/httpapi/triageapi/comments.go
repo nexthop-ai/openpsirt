@@ -19,8 +19,8 @@ import (
 func registerComments(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-claim-comments", Method: http.MethodGet,
-		Path:    "/v1/claims/{id}/comments",
-		Summary: "List comments on a claim",
+		Path:    "/v1/decisions/{id}/comments",
+		Summary: "List comments on a decision",
 		Description: "Returns the comments on a claim, oldest first, with who wrote each and " +
 			"when. A comment that has been edited also carries when it was last changed.\n\n" +
 			"Comments are separate from the justification and never affect an approval.",

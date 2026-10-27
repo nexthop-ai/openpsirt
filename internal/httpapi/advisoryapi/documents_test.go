@@ -54,7 +54,7 @@ func TestEveryUploadOfADocumentIsListedWithWhoSentItAndWhatBecameOfIt(t *testing
 		}
 
 		var vex documents
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-statements", &vex)
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-documents", &vex)
 		if vex.Total != 3 || len(vex.Items) != 3 {
 			t.Fatalf("the VEX list holds %d of %d; want every upload: %+v", len(vex.Items), vex.Total, vex.Items)
 		}
@@ -94,14 +94,14 @@ func TestEveryUploadOfADocumentIsListedWithWhoSentItAndWhatBecameOfIt(t *testing
 
 		// A page is a page of uploads, and the total is of all of them.
 		var page documents
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-statements?limit=1&offset=1", &page)
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-documents?limit=1&offset=1", &page)
 		if page.Total != 3 || len(page.Items) != 1 || page.Items[0].ReceivedAt != second.ReceivedAt {
 			t.Errorf("the second page of one reads %+v of %d; want debian's second upload", page.Items, page.Total)
 		}
 
 		// Another product holds none of them.
 		var theirs documents
-		httpapitest.Read(t, r, "admin", "/v1/products/theirs/vex-statements", &theirs)
+		httpapitest.Read(t, r, "admin", "/v1/products/theirs/vex-documents", &theirs)
 		if theirs.Total != 0 || len(theirs.Items) != 0 {
 			t.Errorf("the other product lists %+v", theirs.Items)
 		}
@@ -115,7 +115,7 @@ func TestTheDocumentsUploadedToAProductAreReadByWhoSeesIt(t *testing.T) {
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
 		}
 		for _, path := range []string{
-			"/v1/products/mine/vex-statements", "/v1/products/mine/supplier-advisories",
+			"/v1/products/mine/vex-documents", "/v1/products/mine/supplier-advisories",
 		} {
 			for who, want := range map[string]int{
 				"reader": http.StatusOK, "internal-reader": http.StatusOK, "admin": http.StatusOK,
@@ -156,7 +156,7 @@ func TestAnUploadTurnedAwayAnywhereItCanBeIsListedAsRefused(t *testing.T) {
 		}
 
 		var vex documents
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-statements", &vex)
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-documents", &vex)
 		if vex.Total != 2 || len(vex.Items) != 2 {
 			t.Fatalf("the VEX list holds %+v; want the two refusals", vex.Items)
 		}
@@ -206,7 +206,7 @@ func TestAnUploadTurnedAwayAnywhereItCanBeIsListedAsRefused(t *testing.T) {
 				} `json:"latest"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/streams/master/variants/broadcom/uploads", &kinds)
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/uploads", &kinds)
 		for _, each := range kinds.Items {
 			if each.Type == "vex" && (each.Latest == nil || each.Latest.Status != "refused" ||
 				each.Latest.Reason != long.Reason) {
@@ -232,7 +232,7 @@ func TestAnUploadShedAtTheSimultaneousLimitIsNotRecordedAsRefused(t *testing.T) 
 		pr, pw := io.Pipe()
 		done := make(chan int)
 		go func() {
-			done <- r.Post(t, "admin", http.MethodPost, "/v1/products/mine/vex-statements?publisher=debian",
+			done <- r.Post(t, "admin", http.MethodPost, "/v1/products/mine/vex-documents?publisher=debian",
 				pr, kind).Code
 		}()
 		if _, err := pw.Write(content[:64]); err != nil {
@@ -248,7 +248,7 @@ func TestAnUploadShedAtTheSimultaneousLimitIsNotRecordedAsRefused(t *testing.T) 
 		}
 
 		var vex documents
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-statements", &vex)
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-documents", &vex)
 		if vex.Total != 1 || len(vex.Items) != 1 || vex.Items[0].Status != "completed" {
 			t.Errorf("the VEX list holds %+v; want the upload taken alone", vex.Items)
 		}

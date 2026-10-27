@@ -43,7 +43,7 @@ describe("the disclosing screen", () => {
   it("opens the form on the one embargo whose row was pressed", async () => {
     serve((path) => {
       if (path === "/v1/session/me") return { data: me };
-      if (path === "/v1/disclosing") {
+      if (path === "/v1/disclosure-deadlines") {
         return { data: { items: [row("sonic"), row("openpsirt")], total: 2 } };
       }
       return { data: { items: [], total: 0 } };
@@ -65,7 +65,7 @@ describe("the disclosing screen", () => {
     const asked: Record<string, unknown>[] = [];
     serve((path, init) => {
       if (path === "/v1/session/me") return { data: me };
-      if (path === "/v1/disclosing") {
+      if (path === "/v1/disclosure-deadlines") {
         asked.push((init as { params: { query: Record<string, unknown> } }).params.query);
         return { data: { items: [], total: 0 } };
       }

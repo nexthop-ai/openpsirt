@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-const leadsAt = "/v1/products/mine/streams/master/variants/broadcom/leads/"
+const leadsAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"
 
 func TestALeadsEvidenceLinksEachPlaceIntoItsSource(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {

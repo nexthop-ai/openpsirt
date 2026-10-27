@@ -3,7 +3,7 @@
 The one surface. Everything a person or a pipeline can do goes through it, and
 the web interface is a client of it.
 
-Satisfies REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67.
+Satisfies REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67, REQ-86.
 
 ## Contents
 
@@ -17,6 +17,7 @@ Satisfies REQ-61, REQ-62, REQ-63, REQ-64, REQ-65, REQ-66, REQ-67.
 - [Sorting and filtering](#sorting-and-filtering)
 - [Issue-keyed and cross-product reads](#issue-keyed-and-cross-product-reads)
 - [Path version](#path-version)
+- [Former upload addresses](#former-upload-addresses)
 - [Declared privileges](#declared-privileges)
 - [Representation](#representation)
 - [Addresses and labels](#addresses-and-labels)
@@ -389,6 +390,23 @@ nobody owns.
 `/v1` is the shape the API will have. Below 1.0 it is not a compatibility
 promise (REQ-76), and a change to a shape is an edit rather than a second
 version standing beside the first.
+
+## Former upload addresses
+
+The SBOM upload, the list of a build's SBOM uploads and the read of what one
+upload changed also answer under
+`/v1/products/{product}/streams/{stream}/variants/{variant}/scans`, the address
+build pipelines called before the paths were renamed (REQ-86). Every other
+renamed path answers at its own address alone, and a former one answers as no
+route, apart from `GET /v1/decisions/{id}`, which now answers one decision.
+
+| Rule | Why |
+|---|---|
+| A former address is the same operation registered a second time | The declaration, the admission before the body is read, the handler and the receipt are one, so the two addresses cannot answer differently |
+| The published document leaves a former address out | A new integration finds one path per operation, and the generated client has one call for it |
+| Nothing marks a former address deprecated, and no removal is planned | Every build script calls it, and a pipeline is the one integration in use |
+| A former address takes the parameter names of the operation it stands for | The handler reads parameters by name; a caller sends values and never sees a name |
+| A test sends each request to both addresses and compares the answers | The same refusal to the same caller, the same receipt for the same inventory, and the same list |
 
 ## Declared privileges
 

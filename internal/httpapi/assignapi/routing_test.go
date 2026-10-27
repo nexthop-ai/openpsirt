@@ -31,7 +31,7 @@ func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
 
 		// One of the four is already somebody's, and stays theirs.
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-CURL1/components/libcurl4t64/assignment",
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
@@ -40,7 +40,7 @@ func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
 		// A rule naming the source package, which catches both binary
 		// packages built from it — the whole point of keying on it.
 		made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"curl to the curlers","team":"curlers","upstream":"curl"}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("adding a rule answered %d: %s", made.Code, made.Body.String())
@@ -81,7 +81,7 @@ func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
 			AssignedTo string `json:"assigned_to"`
 			RoutedBy   string `json:"routed_by"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-CURL2/components/libcurl3t64", &detail)
 		if detail.RoutedBy != "curl to the curlers" {
 			t.Errorf("the finding says %q placed it", detail.RoutedBy)
@@ -90,7 +90,7 @@ func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
 		var byHand struct {
 			RoutedBy string `json:"routed_by"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-CURL1/components/libcurl4t64", &byHand)
 		if byHand.RoutedBy != "" {
 			t.Errorf("something a person took names the rule %q", byHand.RoutedBy)
@@ -99,18 +99,18 @@ func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
 		// A triager may see the rules but not write one: a rule hands work to
 		// somebody, which is the act the assigner right names.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"mine","team":"curlers","upstream":"curl"}`), http.StatusForbidden)
 		// Somebody who cannot see the product is told it is not there, for
 		// the rules as for everything else about it.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "outsider", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"mine","team":"curlers","upstream":"curl"}`), http.StatusNotFound)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
-			"/v1/products/mine/routing-rules", ""), http.StatusNotFound)
+			"/v1/products/mine/assignment-rules", ""), http.StatusNotFound)
 		// And a rule that matches nothing is refused rather than recorded.
 		if empty := httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"nothing","team":"curlers"}`); empty.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a rule matching nothing answered %d", empty.Code)
 		}
@@ -128,7 +128,7 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 			`{"name":"curlers","members":["reader"]}`); made.Code != http.StatusCreated {
 			t.Fatal(made.Body.String())
 		}
-		made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost, "/v1/products/mine/routing-rules",
+		made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost, "/v1/products/mine/assignment-rules",
 			`{"name":"curl","team":"curlers","upstream":"curl"}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("adding answered %d: %s", made.Code, made.Body.String())
@@ -142,7 +142,7 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 				Order int    `json:"order"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "assigner", "/v1/products/mine/routing-rules", &rules)
+		httpapitest.Read(t, r, "assigner", "/v1/products/mine/assignment-rules", &rules)
 		if len(rules.Items) != 1 || rules.Items[0].Order != 1 {
 			t.Fatalf("the rules read %+v", rules.Items)
 		}
@@ -159,7 +159,7 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 		placed := before.Items[0].Open
 
 		if gone := httpapitest.AsPerson(t, r, "assigner", http.MethodDelete,
-			"/v1/products/mine/routing-rules/"+httpapitest.Itoa(rules.Items[0].ID),
+			"/v1/products/mine/assignment-rules/"+httpapitest.Itoa(rules.Items[0].ID),
 			""); gone.Code != http.StatusNoContent {
 			t.Fatalf("retiring answered %d: %s", gone.Code, gone.Body.String())
 		}
@@ -177,7 +177,7 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 		// rule not in use: the caller's to know, not a fault.
 		for _, id := range []int64{rules.Items[0].ID, rules.Items[0].ID + 1000} {
 			if again := httpapitest.AsPerson(t, r, "assigner", http.MethodDelete,
-				"/v1/products/mine/routing-rules/"+httpapitest.Itoa(id),
+				"/v1/products/mine/assignment-rules/"+httpapitest.Itoa(id),
 				""); again.Code != http.StatusNotFound {
 				t.Errorf("retiring rule %d, not in use, answered %d: %s", id, again.Code,
 					again.Body.String())
@@ -195,7 +195,7 @@ func TestARuleWhoseTeamIsRetiredStillNamesItAndSaysSo(t *testing.T) {
 			`{"name":"curlers","display_name":"The Curlers"}`); made.Code != http.StatusCreated {
 			t.Fatal(made.Body.String())
 		}
-		if made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost, "/v1/products/mine/routing-rules",
+		if made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost, "/v1/products/mine/assignment-rules",
 			`{"name":"curl","team":"curlers","upstream":"curl"}`); made.Code != http.StatusCreated {
 			t.Fatalf("adding answered %d: %s", made.Code, made.Body.String())
 		}
@@ -207,7 +207,7 @@ func TestARuleWhoseTeamIsRetiredStillNamesItAndSaysSo(t *testing.T) {
 			} `json:"items"`
 		}
 		var live listed
-		httpapitest.Read(t, r, "assigner", "/v1/products/mine/routing-rules", &live)
+		httpapitest.Read(t, r, "assigner", "/v1/products/mine/assignment-rules", &live)
 		if len(live.Items) != 1 || live.Items[0].Team != "curlers" || live.Items[0].TeamRetired {
 			t.Fatalf("before the team is retired the rules read %+v", live.Items)
 		}
@@ -217,7 +217,7 @@ func TestARuleWhoseTeamIsRetiredStillNamesItAndSaysSo(t *testing.T) {
 			t.Fatalf("retiring the team answered %d: %s", gone.Code, gone.Body.String())
 		}
 		var retired listed
-		httpapitest.Read(t, r, "assigner", "/v1/products/mine/routing-rules", &retired)
+		httpapitest.Read(t, r, "assigner", "/v1/products/mine/assignment-rules", &retired)
 		if len(retired.Items) != 1 {
 			t.Fatalf("after the team is retired the rules read %+v", retired.Items)
 		}
@@ -270,7 +270,7 @@ func TestARuleSaysWhatItWouldCatchBeforeItIsSaved(t *testing.T) {
 
 		// And the count of what nobody holds moves when somebody takes one.
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-CURL1/components/libcurl4t64/assignment",
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
@@ -300,13 +300,13 @@ func TestASweepDoesNotStopBecauseSomebodyTookOneRow(t *testing.T) {
 			t.Fatal(made.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-CURL1/components/libcurl4t64/assignment",
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
 		}
 		if made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"curl to the curlers","team":"curlers","upstream":"curl"}`,
 		); made.Code != http.StatusCreated {
 			t.Fatalf("adding a rule answered %d: %s", made.Code, made.Body.String())
@@ -356,7 +356,7 @@ func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
 			t.Fatal(made.Body.String())
 		}
 		if made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"curl to the curlers","team":"curlers","upstream":"curl"}`,
 		); made.Code != http.StatusCreated {
 			t.Fatalf("adding a rule answered %d: %s", made.Code, made.Body.String())
@@ -409,7 +409,7 @@ func TestARuleWhoseSweepCannotBeQueuedIsNotRecorded(t *testing.T) {
 			t.Fatal(err)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"curl to the curlers","team":"curlers","upstream":"curl"}`),
 			http.StatusServiceUnavailable)
 		rules, err := r.DB.DB.NewSelect().Table("routing_rule").Count(ctx)
@@ -434,7 +434,7 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		r.ShipsTwice(t)
 
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200"
 
 		// The finding is readable under the bare name.
@@ -443,7 +443,7 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 		}
 		// So marking it must not answer that it is not there.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			at+"/tags/waiting-on-vendor", ""); got.Code == http.StatusNotFound {
+			at+"/labels/waiting-on-vendor", ""); got.Code == http.StatusNotFound {
 			t.Errorf("marking a finding the same name resolves to answered 404: %s",
 				got.Body.String())
 		} else if got.Code >= 300 && got.Code != http.StatusConflict {
@@ -470,7 +470,7 @@ func TestTheSweeperWorksAWholeBacklogInOneWakeAndReturnsWhenCancelled(t *testing
 			t.Fatal(made.Body.String())
 		}
 		if made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
-			"/v1/products/mine/routing-rules",
+			"/v1/products/mine/assignment-rules",
 			`{"name":"everything to the curlers","team":"curlers","upstream":"curl"}`,
 		); made.Code != http.StatusCreated {
 			t.Fatalf("adding a rule answered %d: %s", made.Code, made.Body.String())
@@ -535,7 +535,7 @@ func waitFor(t *testing.T, done func() bool, what string) {
 func TestSomebodyWhoTriagesLeadsAloneReadsAndPreviewsTheRoutingRules(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
-		const at = "/v1/products/mine/routing-rules"
+		const at = "/v1/products/mine/assignment-rules"
 		for who, want := range map[string]int{"internal-triager": http.StatusOK, "internal-reader": http.StatusForbidden} {
 			for _, path := range []string{at, at + "/preview?beneath=mine"} {
 				if got := httpapitest.AsPerson(t, r, who, http.MethodGet, path, ""); got.Code != want {

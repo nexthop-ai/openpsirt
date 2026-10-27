@@ -108,7 +108,7 @@ function Yours() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/components/mine",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/mine",
           { params: { path: at } },
         ),
       ),
@@ -234,9 +234,12 @@ function Whole() {
     queryKey: ["tree-top", at, term],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/components", {
-          params: { path: at, query: term ? { q: term } : {} },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components",
+          {
+            params: { path: at, query: term ? { q: term } : {} },
+          },
+        ),
       ),
   });
 

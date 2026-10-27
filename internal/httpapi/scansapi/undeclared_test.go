@@ -19,7 +19,7 @@ func TestAScanDocumentNamesTheMissingPartAsTheReceiptsDo(t *testing.T) {
 			{"no-such-branch", "broadcom", "no-such-branch"},
 			{"master", "no-such-variant", "no-such-variant"},
 		} {
-			at := "/v1/products/mine/streams/" + build.stream + "/variants/" + build.variant + "/scans"
+			at := "/v1/products/mine/branches-and-tags/" + build.stream + "/variants/" + build.variant + "/sboms"
 			receipts := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, "")
 			document := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at+"/1/documents/1", "")
 			if document.Code != http.StatusNotFound || receipts.Code != http.StatusNotFound {

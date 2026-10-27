@@ -30,7 +30,7 @@ func TestTheCandidateListSaysHowFarAClaimWouldReach(t *testing.T) {
 			IssueLimit int `json:"issue_limit"`
 			PlaceLimit int `json:"place_limit"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/components/libyang/issues", &page)
 		if page.Total != 2 || len(page.Items) != 2 {
 			t.Fatalf("the component holds %d issues, want its two", page.Total)
@@ -60,7 +60,7 @@ func TestTheCandidateListSaysHowFarAClaimWouldReach(t *testing.T) {
 			Total    int `json:"total"`
 			Findings int `json:"findings"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/components/libyang/issues?contains=nothing-says-this", &narrowed)
 		if narrowed.Total != 0 || narrowed.Findings != 0 {
 			t.Errorf("a term nothing matches leaves %d issues and %d findings",

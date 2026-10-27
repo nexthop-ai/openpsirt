@@ -97,7 +97,7 @@ describe("the period on the record", () => {
     });
     mount.render(screen(<TheRecord />, "/record?from=2026-01-01&to=2026-03-31"));
     await settle();
-    expect(ends["/v1/audit/claims"]).toBe("2026-04-01");
+    expect(ends["/v1/audit/decisions"]).toBe("2026-04-01");
     expect(ends["/v1/administration/changes"]).toBe("2026-04-01");
     const files = Array.from(mount.host().querySelectorAll("a"))
       .map((each) => each.getAttribute("href") ?? "")
@@ -132,7 +132,7 @@ describe("the record's list", () => {
       if (path === "/v1/session/me") {
         return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
       }
-      if (path === "/v1/audit/claims") {
+      if (path === "/v1/audit/decisions") {
         return {
           data: {
             total: 1,

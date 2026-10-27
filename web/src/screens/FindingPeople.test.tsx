@@ -21,6 +21,8 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 const issue = { product: "sonic", vulnerability: "OPENPSIRT-2026-1" };
+// The same issue as the API addresses it.
+const issuePath = { product: "sonic", issue: "OPENPSIRT-2026-1" };
 const at = {
   product: "sonic",
   stream: "master",
@@ -39,7 +41,7 @@ const bodyOf = (sent: Sent) => (sent[1] as { body: unknown }).body;
 describe("the people on a case", () => {
   it("brings in the person typed and takes off the person pressed", async () => {
     serve((path) => {
-      if (path === "/v1/products/{product}/issues/{vulnerability}/collaborators") {
+      if (path === "/v1/products/{product}/issues/{issue}/collaborators") {
         return { data: { items: [{ identity: "bob", name: "Bob", added_by: "ana" }] } };
       }
       if (path === "/v1/products/{product}/mentionable") {
@@ -64,15 +66,15 @@ describe("the people on a case", () => {
     await settle();
     await press(mount.host(), "Add collaborator");
     await settle();
-    expect(put().map(pathOf)).toEqual([{ ...issue, identity: "cy" }]);
+    expect(put().map(pathOf)).toEqual([{ ...issuePath, identity: "cy" }]);
     await press(mount.host(), "×");
     await settle();
-    expect(taken().map(pathOf)).toEqual([{ ...issue, identity: "bob" }]);
+    expect(taken().map(pathOf)).toEqual([{ ...issuePath, identity: "bob" }]);
   });
 
   it("stays quiet for somebody the case is not open to", async () => {
     serve((path) =>
-      path === "/v1/products/{product}/issues/{vulnerability}/collaborators"
+      path === "/v1/products/{product}/issues/{issue}/collaborators"
         ? { status: 403 }
         : { data: { items: [] } },
     );
@@ -106,7 +108,7 @@ describe("closing a recorded flaw by hand", () => {
 describe("the files attached to an issue", () => {
   it("removes a file only with a reason, naming that file", async () => {
     serve((path) =>
-      path === "/v1/products/{product}/issues/{vulnerability}/attachments"
+      path === "/v1/products/{product}/issues/{issue}/attachments"
         ? {
             data: {
               items: [
@@ -156,9 +158,9 @@ describe("the tags on a finding", () => {
         product: "sonic",
         stream: "master",
         variant: "broadcom",
-        vulnerability: "OPENPSIRT-2026-1",
+        issue: "OPENPSIRT-2026-1",
         component: "libnl",
-        tag: "upstream asked",
+        label: "upstream asked",
       },
     ]);
     const remove = mount
@@ -166,7 +168,7 @@ describe("the tags on a finding", () => {
       .querySelector<HTMLButtonElement>('[aria-label="Remove tag triaged"]');
     act(() => remove?.click());
     await settle();
-    expect(removed().map((each) => pathOf(each).tag)).toEqual(["triaged"]);
+    expect(removed().map((each) => pathOf(each).label)).toEqual(["triaged"]);
     expect(changed).toHaveBeenCalledTimes(2);
   });
 
@@ -198,7 +200,7 @@ describe("ending an embargo", () => {
 describe("the notes on an issue", () => {
   it("adds a note to the issue in this product", async () => {
     serve((path) =>
-      path === "/v1/products/{product}/issues/{vulnerability}/notes"
+      path === "/v1/products/{product}/issues/{issue}/notes"
         ? { data: { items: [] } }
         : { data: { items: [] } },
     );
@@ -209,7 +211,7 @@ describe("the notes on an issue", () => {
     change(mount.host().querySelector("textarea"), "Vendor says next week.");
     await press(mount.host(), "Note");
     await settle();
-    expect(sent().map(pathOf)).toEqual([issue]);
+    expect(sent().map(pathOf)).toEqual([issuePath]);
     expect(sent().map(bodyOf)).toEqual([{ body: "Vendor says next week." }]);
   });
 });

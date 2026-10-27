@@ -67,7 +67,9 @@ export function IssueAdvisory({
     enabled: open && product !== "",
     queryKey: ["advisories", product, vulnerability],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/advisories", { params: { query: { product, vulnerability } } })),
+      unwrap(
+        await api.GET("/v1/advisories", { params: { query: { product, issue: vulnerability } } }),
+      ),
     retry: false,
   });
 

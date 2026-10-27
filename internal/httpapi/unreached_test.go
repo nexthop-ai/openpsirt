@@ -42,7 +42,7 @@ func TestTheRoutesNothingReachedAnswerAndRefuse(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 
-		const build = "/v1/products/mine/streams/master/variants/broadcom"
+		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 		for _, c := range []reached{
 			{
 				what: "what is ready to ship", method: http.MethodGet,
@@ -273,7 +273,7 @@ func TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight(t *
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 			flaw.Identifier + "/resolve"
 		const body = `{"because":"The advisory was retracted."}`
 

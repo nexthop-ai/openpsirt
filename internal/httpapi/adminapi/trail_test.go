@@ -164,7 +164,7 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "set-product-triage-floor", what: "the line a product triages at",
-		method: http.MethodPut, path: "/v1/products/mine/triage-floor",
+		method: http.MethodPut, path: "/v1/products/mine/minimum-severity",
 		body: `{"floor":"high"}`, kind: "setting", about: "triage floor of mine",
 	},
 	{
@@ -185,7 +185,7 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "propose-lead-rule", what: "a standing rule for leads", who: "internal-triager",
-		method: http.MethodPost, path: "/v1/products/mine/lead-rules",
+		method: http.MethodPost, path: "/v1/products/mine/suppression-rules",
 		body: `{"prefix":"tests","reason":"used_in_tests","reasoning":"the tests do not ship"}`,
 		kind: "lead-rule", about: "mine · {lead-rule}",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
@@ -200,12 +200,12 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "approve-lead-rule", what: "a standing rule for leads approved", who: "internal-reviewer",
-		method: http.MethodPost, path: "/v1/products/mine/lead-rules/{lead-rule}/approval", body: `{}`,
+		method: http.MethodPost, path: "/v1/products/mine/suppression-rules/{lead-rule}/approval", body: `{}`,
 		kind: "lead-rule", about: "mine · {lead-rule}",
 	},
 	{
 		id: "retire-lead-rule", what: "a standing rule for leads retired", who: "internal-triager",
-		method: http.MethodDelete, path: "/v1/products/mine/lead-rules/{lead-rule}",
+		method: http.MethodDelete, path: "/v1/products/mine/suppression-rules/{lead-rule}",
 		kind: "lead-rule", about: "mine · {lead-rule}",
 	},
 	{
@@ -215,12 +215,12 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "set-stream-end-of-life", what: "a release's support date",
-		method: http.MethodPut, path: "/v1/products/mine/streams/master/end-of-life",
+		method: http.MethodPut, path: "/v1/products/mine/branches-and-tags/master/end-of-life",
 		body: `{"on":"2027-01-01"}`, kind: "support", about: "mine master",
 	},
 	{
 		id: "set-release-details", what: "when a release went out", method: http.MethodPut,
-		path: "/v1/products/mine/streams/master/release",
+		path: "/v1/products/mine/branches-and-tags/master/release",
 		body: `{"released_on":"2026-03-31"}`, kind: "release", about: "mine master",
 	},
 	{
@@ -258,19 +258,19 @@ var administrativeActs = []trailedAct{
 		// On a release and a product nothing else here reads, for the reason
 		// the variant acts above use one nothing is built as.
 		id: "amend-stream", what: "a release renamed", method: http.MethodPatch,
-		path: "/v1/products/spare/streams/old-line", body: `{"name":"retired-line"}`,
+		path: "/v1/products/spare/branches-and-tags/old-line", body: `{"name":"retired-line"}`,
 		kind: "catalog", about: "spare old-line",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
 			httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products", `{"name":"spare"}`)
-			httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/spare/streams",
+			httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/spare/branches-and-tags",
 				`{"name":"old-line","kind":"branch"}`)
 			return httpapitest.AsPerson(t, r, "admin", http.MethodPatch,
-				"/v1/products/spare/streams/old-line", `{"name":"retired-line"}`)
+				"/v1/products/spare/branches-and-tags/old-line", `{"name":"retired-line"}`)
 		},
 	},
 	{
 		id: "retire-stream", what: "a release retired", method: http.MethodDelete,
-		path: "/v1/products/spare/streams/retired-line",
+		path: "/v1/products/spare/branches-and-tags/retired-line",
 		kind: "catalog", about: "spare retired-line",
 	},
 	{
@@ -318,7 +318,7 @@ var administrativeActs = []trailedAct{
 		// a person, so it carries a kind of its own rather than being read as
 		// a role change by anybody filtering the trail.
 		id: "add-routing-rule", what: "a routing rule", who: "assigner",
-		method: http.MethodPost, path: "/v1/products/mine/routing-rules",
+		method: http.MethodPost, path: "/v1/products/mine/assignment-rules",
 		body: `{"name":"kernel things","team":"kernel","beneath":"libnl-3-200"}`,
 		kind: "routing", about: "mine · kernel things",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
@@ -333,7 +333,7 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "retire-routing-rule", what: "a routing rule retired", who: "assigner",
-		method: http.MethodDelete, path: "/v1/products/mine/routing-rules/{rule}",
+		method: http.MethodDelete, path: "/v1/products/mine/assignment-rules/{rule}",
 		kind: "routing", about: "mine · {rule}",
 	},
 	{
@@ -367,7 +367,7 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "add-advisory-source", what: "a supplier to read advisories from",
-		method: http.MethodPost, path: "/v1/products/mine/advisory-sources",
+		method: http.MethodPost, path: "/v1/products/mine/supplier-advisory-feeds",
 		body: `{"name":"ExampleLinux",` +
 			`"url":"https://supplier.example.test/.well-known/csaf/provider-metadata.json"}`,
 		kind: "setting", about: "advisory source · mine · ExampleLinux",
@@ -376,7 +376,7 @@ var administrativeActs = []trailedAct{
 		id: "withdraw-advisory-source", what: "a supplier no longer read",
 		// Withdrawn in other capitals, which the match ignores; the row names
 		// the supplier as it was added.
-		method: http.MethodDelete, path: "/v1/products/mine/advisory-sources/exampleLINUX",
+		method: http.MethodDelete, path: "/v1/products/mine/supplier-advisory-feeds/exampleLINUX",
 		kind: "setting", about: "advisory source · mine · ExampleLinux",
 	},
 	{
@@ -432,25 +432,25 @@ var administrativeActs = []trailedAct{
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
 			seen.lead, seen.flaw = httpapitest.HandedOffLead(t, r, false)
 			return httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-				seen.fill("/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/move"), "")
+				seen.fill("/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/disclosure"), "")
 		},
 	},
 	{
 		id: "unmove-lead", what: "a lead taken back out of its case", who: "lead-handler",
 		method: http.MethodDelete,
-		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/move",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/disclosure",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
 	},
 	{
 		id: "add-lead-collaborator", what: "somebody granted a handed-off lead", who: "lead-handler",
 		method: http.MethodPut,
-		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/collaborators/reader",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/collaborators/reader",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
 		id: "remove-lead-collaborator", what: "a lead grant withdrawn", who: "lead-handler",
 		method: http.MethodDelete,
-		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/collaborators/reader",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/collaborators/reader",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
@@ -458,7 +458,7 @@ var administrativeActs = []trailedAct{
 		// left standing, the one row is the hand-off's own.
 		id: "undo-lead-handoff", what: "a lead's hand-off undone", who: "lead-handler",
 		method: http.MethodPost,
-		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/hand-off/withdrawal",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/withdrawal",
 		body:   `{"because":"handed off against the wrong component"}`,
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
 	},
@@ -527,7 +527,7 @@ var administrativeActs = []trailedAct{
 		// record beside the claims.
 		id: "record-exploited-here", what: "this product exploited through an issue",
 		who: "private-triage", method: http.MethodPost,
-		path: "/v1/products/mine/issues/CVE-2026-9999/exploited-here",
+		path: "/v1/products/mine/issues/CVE-2026-9999/incidents",
 		body: `{"known_at":"2026-09-20T14:00:00Z",` +
 			`"grounds":"A customer sent packet captures of the management socket."}`,
 		kind: "exploited-here", about: "CVE-2026-9999 on mine",
@@ -559,7 +559,7 @@ var administrativeActs = []trailedAct{
 				t.Fatal(err)
 			}
 			return httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-				seen.fill("/v1/exploited-here/{record}/fixes"), `{"release":"v9.0.1"}`)
+				seen.fill("/v1/incidents/{record}/fixes"), `{"release":"v9.0.1"}`)
 		},
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			t.Helper()
@@ -575,13 +575,13 @@ var administrativeActs = []trailedAct{
 	{
 		id: "withdraw-fix-release", what: "a tag carrying the fix withdrawn",
 		who: "private-triage", method: http.MethodDelete,
-		path: "/v1/exploited-here/{record}/fixes/{fix}",
+		path: "/v1/incidents/{record}/fixes/{fix}",
 		kind: "exploited-here", about: "CVE-2026-9999 on mine, fix release",
 	},
 	{
 		id: "clear-exploited-here", what: "a record of being exploited cleared",
 		who: "private-triage", method: http.MethodDelete,
-		path: "/v1/exploited-here/{record}",
+		path: "/v1/incidents/{record}",
 		body: `{"because":"The captures were of a different deployment."}`,
 		kind: "exploited-here", about: "CVE-2026-9999 on mine",
 	},
@@ -589,7 +589,7 @@ var administrativeActs = []trailedAct{
 		// A window decides what every standing attack is watched against,
 		// which is the layer a setting sits in.
 		id: "declare-obligation-window", what: "a window after an attack",
-		method: http.MethodPost, path: "/v1/obligation-windows",
+		method: http.MethodPost, path: "/v1/response-windows",
 		body: `{"name":"Early warning","hours":24}`,
 		kind: "setting", about: "Obligation window Early warning",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
@@ -605,13 +605,13 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "change-obligation-window", what: "a window after an attack changed",
-		method: http.MethodPut, path: "/v1/obligation-windows/{window}",
+		method: http.MethodPut, path: "/v1/response-windows/{window}",
 		body: `{"name":"Early warning","hours":36}`,
 		kind: "setting", about: "Obligation window Early warning",
 	},
 	{
 		id: "retire-obligation-window", what: "a window after an attack retired",
-		method: http.MethodDelete, path: "/v1/obligation-windows/{window}",
+		method: http.MethodDelete, path: "/v1/response-windows/{window}",
 		kind: "setting", about: "Obligation window Early warning",
 	},
 	{
@@ -1054,7 +1054,7 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 		// neither is read by the grant that reads the records.
 		for _, path := range []string{
 			"/v1/products/mine/findings", "/v1/products/mine/builds",
-			"/v1/work/set-aside", "/v1/outbound",
+			"/v1/failed-jobs", "/v1/outbound",
 		} {
 			got := httpapitest.AsPerson(t, r, "auditor", http.MethodGet, path, "")
 			if got.Code != http.StatusForbidden && got.Code != http.StatusNotFound {

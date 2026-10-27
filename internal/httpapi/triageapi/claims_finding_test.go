@@ -20,7 +20,7 @@ func TestAFindingReportsItsDecisionsAndWhatMayCarryToIt(t *testing.T) {
 	// be carried here.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		at := "/v1/products/mine/streams/master/variants/broadcom/findings/%s/components/linux-image"
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/%s/components/linux-image"
 
 		read := func(vulnerability string) (body []byte) {
 			t.Helper()
@@ -118,7 +118,7 @@ func TestAFindingReportsItsDecisionsAndWhatMayCarryToIt(t *testing.T) {
 
 		// Sent back, the finding says so and says why.
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/send-back", made.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/send-back", made.ClaimID),
 			`{"because":"Name the kconfig option."}`); got.Code != http.StatusNoContent {
 			t.Fatalf("sending the claim back answered %d: %s", got.Code, got.Body.String())
 		}
@@ -130,7 +130,7 @@ func TestAFindingReportsItsDecisionsAndWhatMayCarryToIt(t *testing.T) {
 			t.Errorf("a claim sent back does not say so on the finding: %+v", f.Standing)
 		}
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodDelete,
-			fmt.Sprintf("/v1/claims/%d", made.ClaimID), ""); got.Code != http.StatusNoContent {
+			fmt.Sprintf("/v1/decisions/%d", made.ClaimID), ""); got.Code != http.StatusNoContent {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())
 		}
 		if err := json.Unmarshal(read("CVE-2026-1000"), &f); err != nil {
@@ -186,7 +186,7 @@ func TestAFindingsRowSaysHowFarItIsDecidedAndWhetherItCameBack(t *testing.T) {
 			t.Errorf("a proposed claim reads as %q, sent back %v", state, back)
 		}
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/send-back", claim), `{"because":"Which encoder?"}`); got.Code != http.StatusNoContent {
+			fmt.Sprintf("/v1/decisions/%d/send-back", claim), `{"because":"Which encoder?"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("sending back answered %d: %s", got.Code, got.Body.String())
 		}
 		if state, back := row(); state != "waiting" || !back {
@@ -200,14 +200,14 @@ func TestAFindingsRowSaysHowFarItIsDecidedAndWhetherItCameBack(t *testing.T) {
 		}
 		// The finding itself is still a build's, and says so in its path.
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200", "")
 		if err := json.Unmarshal(got.Body.Bytes(), &ids); err != nil || len(ids.Standing) != 1 {
 			t.Fatalf("the finding reads as %s (%v)", got.Body.String(), err)
 		}
 		// Revised, it is waiting again; approved, it is agreed.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", ids.Standing[0].ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/reasoning", ids.Standing[0].ClaimID),
 			`{"reasoning":"The encoder only. Re-checked the call sites."}`); got.Code != http.StatusOK {
 			// 200 rather than 204: it answers which names in the text reached
 			// nobody, so the author is told a mention did not land.
@@ -254,7 +254,7 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 		}
 
 		// The other team decides, and agrees.
-		at := "/v1/products/theirs/streams/master/variants/mellanox" +
+		at := "/v1/products/theirs/branches-and-tags/master/variants/mellanox" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
 		decided := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
@@ -272,7 +272,7 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 		r.Agreed(t, made.ClaimID)
 
 		// And it is offered on this product's finding, as evidence.
-		here := "/v1/products/mine/streams/master/variants/broadcom" +
+		here := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200"
 		var evidence struct {
 			Elsewhere []struct {

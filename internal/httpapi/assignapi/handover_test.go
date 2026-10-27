@@ -41,7 +41,7 @@ func TestAnUpgradeIsNotHandedToSomebodyWhoMayNotReadWhatItCovers(t *testing.T) {
 		pending := func() int {
 			waiting.Items = nil
 			httpapitest.Read(t, r, "private-dispatcher",
-				"/v1/products/mine/streams/master/variants/broadcom/pending-upgrades", &waiting)
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades", &waiting)
 			return len(waiting.Items)
 		}
 

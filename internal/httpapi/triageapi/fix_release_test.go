@@ -48,12 +48,12 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		ctx := t.Context()
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows",
 			`{"name":"Fix available","hours":336,"from_fix":true}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("declaring a window counting from the fix answered %d: %s", got.Code, got.Body.String())
 		}
-		if refused := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+		if refused := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows",
 			`{"name":"Both","hours":24,"from":1,"from_fix":true}`); refused.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a window counting from a notice and the fix answered %d", refused.Code)
 		}
@@ -61,7 +61,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 
 		var seen fixed
 		seen = fixed{}
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		window := seen.Items[0].Windows[0]
 		if !window.Window.FromFix || window.Started || window.StartsAt != "" {
 			t.Fatalf("with no tag named the window reads %+v, want no start", window)
@@ -83,7 +83,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		path := fmt.Sprintf("/v1/exploited-here/%d/fixes", record)
+		path := fmt.Sprintf("/v1/incidents/%d/fixes", record)
 		if branch := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, path,
 			`{"release":"master"}`); branch.Code != http.StatusUnprocessableEntity {
 			t.Errorf("naming a branch answered %d", branch.Code)
@@ -110,7 +110,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 		}
 
 		seen = fixed{}
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		window = seen.Items[0].Windows[0]
 		if !window.Started || window.StartsAt != releasedOn.Format(time.RFC3339) {
 			t.Errorf("with a dated tag named the window reads %+v, want it started at %s", window, releasedOn)
@@ -133,7 +133,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 			t.Errorf("withdrawing the tag twice answered %d", twice.Code)
 		}
 		seen = fixed{}
-		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		httpapitest.Read(t, r, "private-triage", "/v1/incidents", &seen)
 		window = seen.Items[0].Windows[0]
 		if window.Started || window.StartsAt != "" {
 			t.Errorf("with the tag withdrawn the window reads %+v, want no start", window)

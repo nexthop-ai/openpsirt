@@ -79,10 +79,10 @@ func registerScans(api huma.API, in core.Deps) {
 	// document is generated from these registrations by a process that never
 	// opens one, and an operation missing from the document because of how the
 	// document is generated is the drift generating it exists to prevent.
-	huma.Register(api, core.Requiring(huma.Operation{
+	core.RegisterWithFormer(api, core.Requiring(huma.Operation{
 		OperationID: "upload-scan",
 		Method:      http.MethodPost,
-		Path:        "/v1/products/{product}/streams/{stream}/variants/{variant}/scans",
+		Path:        "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
 		Summary:     "Upload an SBOM and its VEX documents",
 		Description: "Accepts a CycloneDX 1.x, SPDX 2.x or SPDX 3.x SBOM and any number of " +
 			"OpenVEX documents as multipart form fields named `inventory` and " +
@@ -91,7 +91,7 @@ func registerScans(api huma.API, in core.Deps) {
 			"The product, branch and variant must already exist; an upload naming something " +
 			"undeclared is rejected and the error says which part is missing.\n\n" +
 			"Returns 202 before the documents are parsed. A success here means they were " +
-			"accepted for processing, not that they were valid. Poll `GET .../scans` to find out " +
+			"accepted for processing, not that they were valid. Poll `GET .../sboms` to find out " +
 			"whether they parsed and what the scan found.\n\n" +
 			"Answers 503 with `Retry-After` when the deployment is already reading as many " +
 			"uploads as it takes at once; send again after that many seconds.",
@@ -111,7 +111,7 @@ func registerScans(api huma.API, in core.Deps) {
 	}, core.PerProduct, "A pipeline key covering this product, branch and variant sends without any "+
 		"of these, and is how a build sends.", core.TriageRights()...), func(ctx context.Context, input *UploadInput) (*UploadOutput, error) {
 		return upload(ctx, in, input)
-	})
+	}, core.FormerUpload)
 }
 
 func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutput, error) {

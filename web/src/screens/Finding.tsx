@@ -158,9 +158,12 @@ export function Finding() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}",
           {
-            params: { path: at, query: whichOf({ version, ecosystem, namespace }) },
+            params: {
+              path: { product, stream, variant, issue: vulnerability, component },
+              query: whichOf({ version, ecosystem, namespace }),
+            },
           },
         ),
       ),
@@ -189,7 +192,7 @@ export function Finding() {
     queries: standingIds.slice(0, SAMPLE).map((id) => ({
       queryKey: ["decision", id],
       queryFn: async () =>
-        unwrap(await api.GET("/v1/decisions/{id}", { params: { path: { id } } })),
+        unwrap(await api.GET("/v1/decision-occurrences/{id}", { params: { path: { id } } })),
     })),
   });
   // The decision card a submission produced, once the finding is read again
@@ -219,8 +222,18 @@ export function Finding() {
         queryFn: async () =>
           unwrap(
             await api.GET(
-              "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision",
-              { params: { path: { ...at, place: place.place ?? "" } } },
+              "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision",
+              {
+                params: {
+                  path: {
+                    product,
+                    stream,
+                    variant,
+                    issue: vulnerability,
+                    occurrence: place.place ?? "",
+                  },
+                },
+              },
             ),
           ),
       }),

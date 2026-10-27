@@ -19,7 +19,7 @@ describe("an edit to a claim, once it lands", () => {
     });
     expect(sent).toEqual([
       [
-        "/v1/claims/{id}/reasoning",
+        "/v1/decisions/{id}/reasoning",
         { params: { path: { id: 102 } }, body: { reasoning: "Not reachable from the socket." } },
       ],
     ]);
@@ -30,7 +30,7 @@ describe("an edit to a claim, once it lands", () => {
     const { sent, invalidated } = await acted(mount.render, mount.host, "DELETE", useWithdraw, {
       id: 102,
     });
-    expect(sent).toEqual([["/v1/claims/{id}", { params: { path: { id: 102 } } }]]);
+    expect(sent).toEqual([["/v1/decisions/{id}", { params: { path: { id: 102 } } }]]);
     expect(invalidated).toEqual(EVERY_CLAIM_KEY);
   });
 });

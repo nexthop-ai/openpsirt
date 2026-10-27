@@ -19,8 +19,8 @@ import (
 // the claim was recorded as waiting on a second person.
 func decideOn(t *testing.T, r *httpapitest.Reach, place, body string) bool {
 	t.Helper()
-	at := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-		"/findings/CVE-2026-9999/places/%s/decision", place)
+	at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+		"/findings/CVE-2026-9999/occurrences/%s/decision", place)
 	got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at, body)
 	if got.Code != http.StatusCreated {
 		t.Fatalf("recording the promise answered %d: %s", got.Code, got.Body.String())

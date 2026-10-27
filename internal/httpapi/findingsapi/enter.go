@@ -256,8 +256,8 @@ type ResolvedBody struct {
 func registerResolution(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "resolve-finding", Method: http.MethodPost,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/findings/{vulnerability}/resolve",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/findings/{issue}/resolve",
 		Summary: "Close a recorded flaw as fixed in this build",
 		Description: "Closes a flaw somebody recorded here, in one build, because it has been " +
 			"fixed there. Every location of the issue in that build is closed together.\n\n" +
@@ -275,7 +275,7 @@ func registerResolution(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Body          struct {
 			Because string `json:"because" minLength:"1" doc:"The fix"`
 		}
@@ -321,8 +321,8 @@ func registerResolution(api huma.API, in core.Deps) {
 func registerDisclosure(api huma.API, in core.Deps) {
 	huma.Register(api, core.Answering(huma.Operation{
 		OperationID: "list-approaching-disclosure", Method: http.MethodGet,
-		Path:    "/v1/disclosing",
-		Summary: "List what is approaching disclosure",
+		Path:    "/v1/disclosure-deadlines",
+		Summary: "List disclosure deadlines",
 		Description: "Returns issues nobody has announced whose embargo is running out, " +
 			"soonest first, and the ones whose date has already arrived. One item is one " +
 			"issue in one product, the unit an embargo is moved and disclosed in, with the " +
@@ -441,7 +441,7 @@ type PendingMovementBody struct {
 }
 
 func registerMovements(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/issues/{vulnerability}/disclosure"
+	const path = "/v1/products/{product}/issues/{issue}/disclosure"
 
 	// One handler for both acts. What differs between them is the act
 	// recorded, the direction the date has to move and the words on the
@@ -452,7 +452,7 @@ func registerMovements(api huma.API, in core.Deps) {
 	// source.
 	type movingInput = struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Body          struct {
 			Until  string `json:"until" doc:"The date the embargo should end"`
 			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"The reason the date is moving"`
@@ -549,7 +549,7 @@ func registerMovements(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Body          struct {
 			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"The reason the issue is being disclosed"`
 		}
@@ -591,7 +591,7 @@ func registerMovements(api huma.API, in core.Deps) {
 	}, core.PerProduct, "Where you may read undisclosed work, or once the issue is disclosed in the product.",
 		core.DisclosureReadRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 	}) (*core.ListOutput[MovementBody], error) {
 		subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
@@ -854,7 +854,7 @@ type AffectsBody struct {
 func registerAffects(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "set-affected-builds", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/builds",
+		Path:    "/v1/products/{product}/issues/{issue}/builds",
 		Summary: "Set which builds a recorded flaw affects",
 		Description: "Makes the builds this flaw is filed against exactly the ones " +
 			"named.\n\n" +
@@ -870,7 +870,7 @@ func registerAffects(api huma.API, in core.Deps) {
 	}, core.PerProduct, "public-triage where the finding is disclosed, private-triage where it is not.",
 		core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability" doc:"The identifier it was filed under"`
+		Vulnerability string `path:"issue" doc:"The identifier it was filed under"`
 		Body          struct {
 			Builds []struct {
 				Stream  string `json:"stream" minLength:"1"`

@@ -41,12 +41,12 @@ func TestBringingBackWhatWasRetiredIsRecordedLikeRetiringIt(t *testing.T) {
 	// into use, which undoes a retirement the trail records. Who brought it
 	// back is the same question as who retired it.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		done(t, r, http.MethodPost, "/v1/products/mine/streams", `{"name":"v9","kind":"tag"}`)
+		done(t, r, http.MethodPost, "/v1/products/mine/branches-and-tags", `{"name":"v9","kind":"tag"}`)
 		done(t, r, http.MethodPost, "/v1/products/mine/variants", `{"name":"lab"}`)
 		for _, each := range []struct {
 			retire, declare, body, about string
 		}{
-			{"/v1/products/mine/streams/v9", "/v1/products/mine/streams",
+			{"/v1/products/mine/branches-and-tags/v9", "/v1/products/mine/branches-and-tags",
 				`{"name":"v9","kind":"tag"}`, "mine v9"},
 			{"/v1/products/mine/variants/lab", "/v1/products/mine/variants",
 				`{"name":"lab"}`, "mine lab"},
@@ -87,15 +87,15 @@ func TestFillingInWhatATagWasCutFromIsRecorded(t *testing.T) {
 			t.Errorf("filling in what %s was cut from recorded %+v", about, trail.Items)
 		}
 
-		done(t, r, http.MethodPost, "/v1/products/mine/streams", `{"name":"v8","kind":"tag"}`)
+		done(t, r, http.MethodPost, "/v1/products/mine/branches-and-tags", `{"name":"v8","kind":"tag"}`)
 		before := trailCount(t, r)
-		done(t, r, http.MethodPost, "/v1/products/mine/streams",
+		done(t, r, http.MethodPost, "/v1/products/mine/branches-and-tags",
 			`{"name":"v8","kind":"tag","parent":"master"}`)
 		cutFrom(t, trailSince(t, r, before), "mine v8 cut from")
 
-		done(t, r, http.MethodPost, "/v1/products/mine/streams", `{"name":"v7","kind":"tag"}`)
+		done(t, r, http.MethodPost, "/v1/products/mine/branches-and-tags", `{"name":"v7","kind":"tag"}`)
 		before = trailCount(t, r)
-		done(t, r, http.MethodPut, "/v1/products/mine/streams/v7/release",
+		done(t, r, http.MethodPut, "/v1/products/mine/branches-and-tags/v7/release",
 			`{"released_on":"2026-03-31","cut_from":"master"}`)
 		cutFrom(t, trailSince(t, r, before), "mine v7 cut from")
 	})

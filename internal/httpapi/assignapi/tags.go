@@ -21,26 +21,26 @@ import (
 // reasoning text, where nothing can filter on it and an approver reads it as
 // part of the argument.
 func registerTags(api huma.API, in core.Deps) {
-	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-		"/findings/{vulnerability}/components/{component}/tags/{tag}"
+	const at = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		"/findings/{issue}/components/{component}/labels/{label}"
 
 	tagging := func(add bool) func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Component     string `path:"component"`
 		core.ComponentQuery
-		Tag string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
+		Tag string `path:"label" maxLength:"191" doc:"The word, matched without regard to capitals"`
 	}) (*struct{}, error) {
 		return func(ctx context.Context, input *struct {
 			Product       string `path:"product"`
 			Stream        string `path:"stream"`
 			Variant       string `path:"variant"`
-			Vulnerability string `path:"vulnerability"`
+			Vulnerability string `path:"issue"`
 			Component     string `path:"component"`
 			core.ComponentQuery
-			Tag string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
+			Tag string `path:"label" maxLength:"191" doc:"The word, matched without regard to capitals"`
 		}) (*struct{}, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
@@ -67,18 +67,18 @@ func registerTags(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "tag-finding", Method: http.MethodPut, Path: at,
-		Summary: "Tag a finding with a word",
-		Description: "Puts a free-text tag on one issue in one component of this product.\n\n" +
-			"No fixed vocabulary, because none has been earned yet. A tag that becomes " +
+		Summary: "Label a finding",
+		Description: "Puts a free-text label on one issue in one component of this product.\n\n" +
+			"No fixed vocabulary, because none has been earned yet. A label that becomes " +
 			"universal is a signal that it should be promoted to a real concept — \"waiting on " +
 			"vendor\" is a state the tool would want to reason about rather than a string " +
 			"somebody typed.\n\n" +
 			"One issue in one component of one product, not one place and not one build: " +
-			"a kernel flaw at sixty places is one thing somebody is tagging, and a tag is " +
+			"a kernel flaw at sixty places is one thing somebody is labeling, and a label is " +
 			"about the work rather than about a release.\n\n" +
-			"Matched without regard to capitals and shown back as it was typed. Tagging what " +
-			"already carries the tag succeeds and keeps the first spelling.\n\n" +
-			"Tagging is triage, so it asks for the triage right: a tag changes what a " +
+			"Matched without regard to capitals and shown back as it was typed. Labeling what " +
+			"already carries the label succeeds and keeps the first spelling.\n\n" +
+			"Labeling is triage, so it asks for the triage right: a label changes what a " +
 			"filtered list answers, and somebody who may only read should not move work into " +
 			"or out of a saved filter.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
@@ -86,20 +86,20 @@ func registerTags(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "untag-finding", Method: http.MethodDelete, Path: at,
-		Summary: "Take a tag off a finding",
-		Description: "Removes a tag. Taking off one that is not there succeeds and changes " +
+		Summary: "Take a label off a finding",
+		Description: "Removes a label. Taking off one that is not there succeeds and changes " +
 			"nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "", core.TriageRights()...), tagging(false))
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-tags", Method: http.MethodGet, Path: "/v1/products/{product}/tags",
-		Summary: "List a product's tags",
-		Description: "Every tag anybody has used here, most-used first.\n\n" +
+		OperationID: "list-tags", Method: http.MethodGet, Path: "/v1/products/{product}/labels",
+		Summary: "List a product's labels",
+		Description: "Every label anybody has used here, most-used first.\n\n" +
 			"What a filter offers rather than a vocabulary: the list is what people have " +
 			"actually written, which is also the evidence for promoting one of them to a " +
 			"real concept.\n\n" +
-			"Only the words on findings you may read. A tag row carries no visibility of " +
+			"Only the words on findings you may read. A label row carries no visibility of " +
 			"its own, so the list is narrowed by the findings it was written on — reading it " +
 			"is a read act, and writing one is the act that asks for triage.",
 		Tags: []string{"Findings"},

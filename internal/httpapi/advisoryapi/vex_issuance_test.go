@@ -183,7 +183,7 @@ func TestTheVEXDocumentRecordedStatesTheVersionItIsRecordedUnder(t *testing.T) {
 			t.Errorf("a revision nobody recorded answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "auditor", http.MethodGet,
-			"/v1/products/theirs/streams/master/variants/broadcom/vex/issuance/1",
+			"/v1/products/theirs/branches-and-tags/master/variants/broadcom/vex/issuance/1",
 			""); got.Code != http.StatusNotFound {
 			t.Errorf("a stranger reading what went out answered %d: %s",
 				got.Code, got.Body.String())
@@ -232,7 +232,7 @@ func TestAVEXDocumentIsNamedTheSameHoweverTheBuildIsSpelled(t *testing.T) {
 
 		var typed, shouted vexDocument
 		httpapitest.Read(t, r, "triager", httpapitest.ABuild, &typed)
-		httpapitest.Read(t, r, "triager", "/v1/products/MINE/streams/Master/variants/BROADCOM/vex", &shouted)
+		httpapitest.Read(t, r, "triager", "/v1/products/MINE/branches-and-tags/Master/variants/BROADCOM/vex", &shouted)
 		if typed.ID != shouted.ID {
 			t.Errorf("one build is called %q and %q", typed.ID, shouted.ID)
 		}
@@ -262,7 +262,7 @@ func TestRecordingAVEXIssuanceNeedsTheTriageRoleOnTheProduct(t *testing.T) {
 		// Somebody who may not see the product at all is told the build is
 		// not there, which is the answer a name nobody declared gets.
 		if got := httpapitest.AsPerson(t, r, "auditor", http.MethodPost,
-			"/v1/products/theirs/streams/master/variants/broadcom/vex/issuance",
+			"/v1/products/theirs/branches-and-tags/master/variants/broadcom/vex/issuance",
 			""); got.Code != http.StatusNotFound {
 			t.Errorf("a stranger recording an issuance answered %d: %s",
 				got.Code, got.Body.String())
@@ -282,7 +282,7 @@ func TestRecordingAVEXIssuanceNeedsTheTriageRoleOnTheProduct(t *testing.T) {
 				got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "auditor", http.MethodGet,
-			"/v1/products/theirs/streams/master/variants/broadcom/vex/issuance",
+			"/v1/products/theirs/branches-and-tags/master/variants/broadcom/vex/issuance",
 			""); got.Code != http.StatusNotFound {
 			t.Errorf("a stranger listing what went out answered %d: %s",
 				got.Code, got.Body.String())

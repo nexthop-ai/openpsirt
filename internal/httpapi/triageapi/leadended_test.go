@@ -17,7 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-const leadsAtMaster = "/v1/products/mine/streams/master/variants/broadcom/leads/"
+const leadsAtMaster = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"
 
 // endMaster puts the seeded release past its end of life.
 func endMaster(t *testing.T, r *httpapitest.Reach) {
@@ -99,14 +99,14 @@ func TestALeadPastItsEndOfLifeRefusesEveryChangeButAnAgreementAndAMove(t *testin
 			leadsAtMaster+overflow+"/fixed",
 			httpapitest.FixedBody(t, r, leadsAtMaster+overflow, "the bounds check landed")))
 		refusedAsEnded(t, "a hand-off", httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost,
-			leadsAtMaster+overflow+"/hand-off",
+			leadsAtMaster+overflow+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows","move":false}`))
 
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", waiting.ClaimID), `{}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", waiting.ClaimID), `{}`); got.Code != http.StatusOK {
 			t.Errorf("agreeing to a claim standing at a lead past its end of life answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadsAtMaster+kept+"/move", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadsAtMaster+kept+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Errorf("moving a handed-off lead past its end of life answered %d: %s", got.Code, got.Body)
 		}
 	})
@@ -118,7 +118,7 @@ func TestALapsedClaimAtALeadPastItsEndOfLifeIsNotReaffirmed(t *testing.T) {
 		decided := decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"freed by the caller"}`)
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRunAt(12))
 		// Two lines down pairs it on its nearest line, which lapses it.
 		httpapitest.ApplyRun(t, r, time.Now().UTC(), httpapitest.LeadRunAt(14))
@@ -144,12 +144,12 @@ func TestALapsedClaimAtALeadPastItsEndOfLifeIsNotReaffirmed(t *testing.T) {
 		var claim struct {
 			Reaffirmable bool `json:"reaffirmable"`
 		}
-		httpapitest.Read(t, r, "internal-triager", fmt.Sprintf("/v1/claims/%d", decided.ClaimID), &claim)
+		httpapitest.Read(t, r, "internal-triager", fmt.Sprintf("/v1/decisions/%d", decided.ClaimID), &claim)
 		if claim.Reaffirmable {
 			t.Error("a claim at a lead past its end of life alone reads as re-affirmable")
 		}
 		refusedAsEnded(t, "re-affirming a claim", httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", decided.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", decided.ClaimID),
 			`{"reasoning":"still freed by the caller after the move"}`))
 		refusedAsEnded(t, "re-affirming claims together", httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
 			"/v1/reaffirmations",
@@ -187,7 +187,7 @@ func TestAReaffirmationRemakesAClaimOnlyAtLeadsStillInSupport(t *testing.T) {
 		decided := decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the length is checked by the caller"}`)
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
 		if got := decisionsAt(t, r, kin[0]); got != 1 {
 			t.Fatalf("the claim reached its kin %d times; want once, so this checks nothing", got)
 		}

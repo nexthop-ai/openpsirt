@@ -64,7 +64,7 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 			t.Errorf("a reader of both halves reads %+v, want the scanned vulnerability", mine.Items)
 		}
 
-		const build = "/v1/products/mine/streams/master/variants/broadcom"
+		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 		for _, path := range []string{"/v1/products/mine/findings.csv", build + "/register.csv"} {
 			for _, who := range []string{"private", "internal-triager"} {
 				got := httpapitest.AsPerson(t, r, who, http.MethodGet, path, "")

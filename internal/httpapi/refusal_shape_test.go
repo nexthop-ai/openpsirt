@@ -35,7 +35,7 @@ func TestTheRefusalEverybodyMeetsFirstHasTheDocumentedShape(t *testing.T) {
 		// The same fields a refusal from any operation carries.
 		var named map[string]any
 		httpapitest.Read(t, r, "triager", "/v1/products", &named)
-		bad := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/products/nosuch/streams", "")
+		bad := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/products/nosuch/branches-and-tags", "")
 		var other map[string]any
 		if err := json.Unmarshal(bad.Body.Bytes(), &other); err != nil {
 			t.Fatal(err)

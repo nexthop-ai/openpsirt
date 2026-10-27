@@ -23,7 +23,7 @@ func TestAClaimSaysWhereTheWorkIsHappening(t *testing.T) {
 
 		// The claim points at where it is being worked on.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
+			fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
 			`{"elsewhere":"https://tracker.example/PSIRT-42"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("pointing the claim answered %d: %s", got.Code, got.Body.String())
 		}
@@ -32,7 +32,7 @@ func TestAClaimSaysWhereTheWorkIsHappening(t *testing.T) {
 				Elsewhere string `json:"elsewhere"`
 			} `json:"standing"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &standing)
 		if len(standing.Standing) != 1 || standing.Standing[0].Elsewhere == "" {
 			t.Errorf("the finding does not say where the work is: %+v", standing.Standing)
@@ -40,21 +40,21 @@ func TestAClaimSaysWhereTheWorkIsHappening(t *testing.T) {
 
 		// Somebody who may only read it cannot point it anywhere.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
+			fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
 			`{"elsewhere":"https://elsewhere.example/1"}`), http.StatusNotFound)
 
 		// An address nobody should be handed as a link is refused in words
 		// naming it, and is not a fault here.
 		for _, address := range []string{"ms-msdt:calc", "//evil.example/x"} {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-				fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
+				fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
 				fmt.Sprintf(`{"elsewhere":%q}`, address))
 			if got.Code != http.StatusUnprocessableEntity {
 				t.Errorf("pointing the claim at %s answered %d: %s", address, got.Code, got.Body.String())
 			}
 		}
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/elsewhere", claim),
+			fmt.Sprintf("/v1/decisions/%d/elsewhere", claim),
 			`{"elsewhere":"ms-msdt:calc"}`); !strings.Contains(got.Body.String(), "ms-msdt") {
 			t.Errorf("the refusal does not name the scheme: %s", got.Body.String())
 		}

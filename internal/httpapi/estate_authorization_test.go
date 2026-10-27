@@ -25,7 +25,7 @@ func TestARoleHeldEverywhereReachesEveryProductAtItsOwnVisibility(t *testing.T) 
 		// were granted. "theirs" is the product nobody named in their grant.
 		for _, product := range []string{"mine", "theirs"} {
 			if got := r.As(t, "estate-reader", http.MethodGet,
-				"/v1/products/"+product+"/streams"); got != http.StatusOK {
+				"/v1/products/"+product+"/branches-and-tags"); got != http.StatusOK {
 				t.Errorf("a role held everywhere reads %q as %d, not 200", product, got)
 			}
 			// The per-product reader is the contrast: granted on "mine" alone,
@@ -35,7 +35,7 @@ func TestARoleHeldEverywhereReachesEveryProductAtItsOwnVisibility(t *testing.T) 
 				want = http.StatusNotFound
 			}
 			if got := r.As(t, "reader", http.MethodGet,
-				"/v1/products/"+product+"/streams"); got != want {
+				"/v1/products/"+product+"/branches-and-tags"); got != want {
 				t.Errorf("a per-product reader reads %q as %d, not %d", product, got, want)
 			}
 		}

@@ -18,7 +18,7 @@ import (
 // statement beneath the product it names, so it is made only where everything
 // beneath that product was decided the same way.
 
-const placedAt = "/v1/products/mine/streams/master/variants/broadcom/vex"
+const placedAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 // dismissedUnder agrees a dismissal at the places the consumers named pull the
 // library in, the build itself named by the empty string.
@@ -42,8 +42,8 @@ func dismissedUnder(t *testing.T, r *httpapitest.Reach, consumers ...string) {
 		}
 		found++
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+place.Place+"/decision", httpapitest.Dismissal)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+place.Place+"/decision", httpapitest.Dismissal)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding the place under %q answered %d: %s", place.Consumer, made.Code,
 				made.Body.String())

@@ -261,11 +261,11 @@ function TheQueue() {
   const queries = useQueryClient();
   const work = useQuery({
     queryKey: ["set-aside"],
-    queryFn: async () => unwrap(await api.GET("/v1/work/set-aside", {})),
+    queryFn: async () => unwrap(await api.GET("/v1/failed-jobs", {})),
   });
   const retry = useMutation({
     mutationFn: async (id: number) =>
-      unwrap(await api.POST("/v1/work/set-aside/{id}/retry", { params: { path: { id } } })),
+      unwrap(await api.POST("/v1/failed-jobs/{id}/retry", { params: { path: { id } } })),
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["set-aside"] }),
   });
 

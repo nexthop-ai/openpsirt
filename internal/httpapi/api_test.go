@@ -100,7 +100,7 @@ func TestAProcessWithNoDatabaseAnswersEveryRequestButTheProbesInOneSentence(t *t
 			{http.MethodGet, "/v1/unassigned"},
 			{http.MethodGet, "/v1/findings"},
 			{http.MethodGet, "/v1/running-out"},
-			{http.MethodPost, "/v1/products/p/streams/s/variants/v/scans"},
+			{http.MethodPost, "/v1/products/p/branches-and-tags/s/variants/v/sboms"},
 			{http.MethodGet, "/v1/review-queue"},
 			{http.MethodGet, "/v1/version"},
 			{http.MethodGet, "/v1/sign-in"},
@@ -297,7 +297,9 @@ func TestNoTwoOperationsClaimOneMethodAndPath(t *testing.T) {
 	// one entry by the time it is built. So the registrations are counted in
 	// the source and joined against what the document ended up holding: one
 	// swallowed by another leaves the second number short. The source is this
-	// package and every package beneath it, which is where the routes are.
+	// package and every package beneath it, which is where the routes are. A
+	// registration with former addresses counts once, because the document
+	// leaves those addresses out.
 	registered := 0
 	err := filepath.WalkDir(".", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(name, ".go") ||
@@ -308,7 +310,8 @@ func TestNoTwoOperationsClaimOneMethodAndPath(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		registered += strings.Count(string(body), "huma.Register(api")
+		registered += strings.Count(string(body), "huma.Register(api") +
+			strings.Count(string(body), "core.RegisterWithFormer(api")
 		return nil
 	})
 	if err != nil {

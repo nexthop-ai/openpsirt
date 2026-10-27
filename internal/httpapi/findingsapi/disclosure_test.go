@@ -60,7 +60,7 @@ func TestAFindingSaysWhetherItIsDisclosed(t *testing.T) {
 			Undisclosed bool   `json:"undisclosed"`
 			DiscloseAt  string `json:"disclose_at"`
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
 		if !detail.Undisclosed || detail.DiscloseAt == "" {
 			t.Errorf("the finding does not say it is undisclosed: %+v", detail)
@@ -87,7 +87,7 @@ func TestAnEmbargoIsSaidBeforeItsDateNotOnIt(t *testing.T) {
 		// Held by somebody: these go to administrators and to whoever
 		// holds the work, which is who can act on it.
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/assignment",
 			`{"person":"private-triage"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())

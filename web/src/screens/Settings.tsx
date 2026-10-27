@@ -117,7 +117,7 @@ function PatchBranches() {
   const progress = useQuery({
     queryKey: ["patch-branches", "on"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/patch-branches", { params: { query: { limit: 1 } } })),
+      unwrap(await api.GET("/v1/patch-branch-lookups", { params: { query: { limit: 1 } } })),
   });
   return (
     <div className="settingrow">

@@ -74,13 +74,16 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       if (inventory) form.append("inventory", inventory);
       for (const each of suppressions) form.append("suppressions", each);
       return unwrap(
-        await api.POST("/v1/products/{product}/streams/{stream}/variants/{variant}/scans", {
-          params: { path: to },
-          // The client would otherwise serialize this as JSON; a multipart
-          // body is handed to fetch as it is, which sets the boundary itself.
-          body: form as never,
-          bodySerializer: (body) => body as unknown as BodyInit,
-        }),
+        await api.POST(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
+          {
+            params: { path: to },
+            // The client would otherwise serialize this as JSON; a multipart
+            // body is handed to fetch as it is, which sets the boundary itself.
+            body: form as never,
+            bodySerializer: (body) => body as unknown as BodyInit,
+          },
+        ),
       );
     },
     // A refusal is recorded too, so the every-kind counts and marks are asked

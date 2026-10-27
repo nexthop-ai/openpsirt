@@ -233,8 +233,8 @@ export function Editor({
               }),
             )
           : unwrap(
-              await api.POST("/v1/products/{product}/issues/{vulnerability}/attachments", {
-                params: { path: attachTo },
+              await api.POST("/v1/products/{product}/issues/{issue}/attachments", {
+                params: { path: { product: attachTo.product, issue: attachTo.vulnerability } },
                 body: form as never,
                 bodySerializer: (body: unknown) => body as FormData,
               }),

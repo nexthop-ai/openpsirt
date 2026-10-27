@@ -81,7 +81,7 @@ func TestARetiredVariantTakesNoScan(t *testing.T) {
 		// a reason of its own — older than what is filed, or ahead of the
 		// clock — and a check on the status alone passes with the refusal
 		// taken out.
-		req := httpapitest.Upload(t, "/v1/products/mine/streams/master/variants/broadcom/scans",
+		req := httpapitest.Upload(t, "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms",
 			httpapitest.Inventory(httpapitest.Nowish(), "libc6"))
 		httpapitest.FromOurOwnPage(req)
 		req.Header.Set(httpapitest.TestHeader, "triager")
@@ -122,7 +122,7 @@ func TestARetiredVariantTakesNoScan(t *testing.T) {
 				t.Error("a retired variant is still offered as a way the product is built")
 			}
 		}
-		httpapitest.Read(t, r, "admin", "/v1/products/mine/streams/master/variants", &built)
+		httpapitest.Read(t, r, "admin", "/v1/products/mine/branches-and-tags/master/variants", &built)
 		named := false
 		for _, item := range built.Items {
 			named = named || item.Name == "broadcom"
@@ -241,7 +241,7 @@ func TestRenamingIsRefusedOnceAnAdvisoryHasGoneOut(t *testing.T) {
 			body string
 		}{
 			{"the product", "/v1/products/mine", `{"name":"ours"}`},
-			{"the release", "/v1/products/mine/streams/master", `{"name":"main"}`},
+			{"the release", "/v1/products/mine/branches-and-tags/master", `{"name":"main"}`},
 		} {
 			// Fatal rather than an error: a rename that went through leaves
 			// the world under a different name, and every check after it
@@ -275,7 +275,7 @@ func TestARetiredProductOrReleaseTakesNoScan(t *testing.T) {
 		says  string
 		named string
 	}{
-		{"release", "/v1/products/mine/streams/master", "release", "master"},
+		{"release", "/v1/products/mine/branches-and-tags/master", "release", "master"},
 		{"product", "/v1/products/mine", "product", "mine"},
 	} {
 		t.Run(level.name, func(t *testing.T) {
@@ -287,7 +287,7 @@ func TestARetiredProductOrReleaseTakesNoScan(t *testing.T) {
 						level.name, got.Code, got.Body.String())
 				}
 
-				req := httpapitest.Upload(t, "/v1/products/mine/streams/master/variants/broadcom/scans",
+				req := httpapitest.Upload(t, "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms",
 					httpapitest.Inventory(httpapitest.Nowish(), "libc6"))
 				httpapitest.FromOurOwnPage(req)
 				req.Header.Set(httpapitest.TestHeader, "triager")
@@ -314,7 +314,7 @@ func TestARetiredProductOrReleaseTakesNoScan(t *testing.T) {
 func TestOnlyAnAdministratorAmendsAProductOrRelease(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		for _, at := range []string{"/v1/products/mine", "/v1/products/mine/streams/master"} {
+		for _, at := range []string{"/v1/products/mine", "/v1/products/mine/branches-and-tags/master"} {
 			for _, who := range []string{"triager", "reader"} {
 				if got := httpapitest.AsPerson(t, r, who, http.MethodPatch, at,
 					`{"name":"other"}`); got.Code != http.StatusForbidden {
@@ -371,7 +371,7 @@ func TestAnAdvisoryForOneProductDoesNotRefuseAnothersRename(t *testing.T) {
 		// The other product holds the same issue and is named by no published
 		// document, so its names are still ours to correct.
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch,
-			"/v1/products/theirs/streams/master",
+			"/v1/products/theirs/branches-and-tags/master",
 			`{"name":"main"}`); got.Code != http.StatusNoContent {
 			t.Errorf("renaming another product's release answered %d: %s",
 				got.Code, got.Body.String())
@@ -395,7 +395,7 @@ func TestAVEXDocumentRefusesAProductAndReleaseRename(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		httpapitest.RecordedIssuance(t, r, "triager")
 
-		for _, at := range []string{"/v1/products/mine", "/v1/products/mine/streams/master"} {
+		for _, at := range []string{"/v1/products/mine", "/v1/products/mine/branches-and-tags/master"} {
 			got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, at, `{"name":"other"}`)
 			if got.Code != http.StatusConflict {
 				t.Fatalf("renaming %s after a VEX document went out answered %d: %s",
@@ -408,7 +408,7 @@ func TestAVEXDocumentRefusesAProductAndReleaseRename(t *testing.T) {
 
 		// A release is told the remedy that works for it. Retiring and
 		// declaring it again returns this same release under this same name.
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine/streams/master",
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine/branches-and-tags/master",
 			`{"name":"other"}`)
 		if strings.Contains(got.Body.String(), "Retire it and declare") {
 			t.Errorf("a release is told to retire and redeclare: %s", got.Body.String())
@@ -439,7 +439,7 @@ func TestACaseOnlyRenameMovesTheSpellingShown(t *testing.T) {
 				Spelled string `json:"display_name"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/products/mine/streams/master/variants", &built)
+		httpapitest.Read(t, r, "admin", "/v1/products/mine/branches-and-tags/master/variants", &built)
 		if len(built.Items) != 1 {
 			t.Fatalf("the release names %d variants", len(built.Items))
 		}
@@ -475,7 +475,7 @@ func TestRenamingIsRefusedOnceADocumentWasServedToAnybody(t *testing.T) {
 		}
 		for _, refused := range []struct{ what, at, body string }{
 			{"the product", "/v1/products/mine", `{"name":"ours"}`},
-			{"the release", "/v1/products/mine/streams/master", `{"name":"main"}`},
+			{"the release", "/v1/products/mine/branches-and-tags/master", `{"name":"main"}`},
 			{"the variant", "/v1/products/mine/variants/broadcom", `{"name":"bcm"}`},
 		} {
 			got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, refused.at, refused.body)

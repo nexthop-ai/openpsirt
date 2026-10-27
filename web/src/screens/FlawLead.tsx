@@ -24,8 +24,8 @@ export function useFlawLead(product: string, vulnerability: string, enabled = tr
     queryKey: ["finding", "lead", product, vulnerability],
     enabled: enabled && product !== "" && vulnerability !== "",
     queryFn: async () => {
-      const answer = await api.GET("/v1/products/{product}/issues/{vulnerability}/lead", {
-        params: { path: { product, vulnerability } },
+      const answer = await api.GET("/v1/products/{product}/issues/{issue}/code-finding", {
+        params: { path: { product, issue: vulnerability } },
       });
       if (answer.response.status === 404) return null;
       return unwrap(answer);

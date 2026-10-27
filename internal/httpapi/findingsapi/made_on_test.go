@@ -35,7 +35,7 @@ func TestAJudgmentRecordsTheBuildOnScreenAndTheBuildsChosenBesideIt(t *testing.T
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		r.ScannedAlso(t, "mellanox", "3.8.0")
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
@@ -60,7 +60,7 @@ func TestAJudgmentMadeOnOneBuildRecordsThatBuildAlone(t *testing.T) {
 		r.ScannedAlso(t, "mellanox", "3.8.0")
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/decision",
 			`{"outcome":"wont-fix","reasoning":"Not worth it."}`)
 		if got.Code != http.StatusCreated {

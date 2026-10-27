@@ -183,7 +183,7 @@ func HandedOffLead(t *testing.T, r *Reach, move bool) (string, string) {
 func HandedOffLeadHeldBy(t *testing.T, r *Reach, move bool, holder string) (string, string) {
 	t.Helper()
 	place := SeededLead(t, r)
-	at := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+	at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 	if holder != "" {
 		if w := AsPerson(t, r, holder, "PUT", at+"/assignment", `{"person":"`+holder+`"}`); w.Code != 204 {
 			t.Fatalf("%s did not take the lead: %d %s", holder, w.Code, w.Body.String())
@@ -193,7 +193,7 @@ func HandedOffLeadHeldBy(t *testing.T, r *Reach, move bool, holder string) (stri
 		`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); w.Code != 201 {
 		t.Fatalf("the lead was not confirmed: %d %s", w.Code, w.Body.String())
 	}
-	w := AsPerson(t, r, "lead-handler", "POST", at+"/hand-off",
+	w := AsPerson(t, r, "lead-handler", "POST", at+"/flaw",
 		`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks on the early return","move":`+
 			strconv.FormatBool(move)+`}`)
 	if w.Code != 201 {

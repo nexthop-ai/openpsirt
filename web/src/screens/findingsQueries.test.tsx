@@ -41,7 +41,7 @@ describe("the findings list's reads", () => {
     await settle();
     expect(asked).toContainEqual({ path: "/v1/products/{product}/findings", limit: 50 });
     expect(asked).toContainEqual({ path: "/v1/products/{product}/findings/components", limit: 0 });
-    expect(asked).toContainEqual({ path: "/v1/products/{product}/fix-bundles", limit: 0 });
+    expect(asked).toContainEqual({ path: "/v1/products/{product}/planned-upgrades", limit: 0 });
     expect(asked).toHaveLength(3);
   });
 

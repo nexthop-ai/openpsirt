@@ -22,8 +22,8 @@ func TestAPlacePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		place := r.Scanned(t)
-		path := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/decision", place)
+		path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
 		deferred := func() int64 {
 			t.Helper()
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
@@ -52,7 +52,7 @@ func TestAPlacePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
 		}
 		first := deferred()
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodDelete,
-			"/v1/claims/"+httpapitest.Itoa(first), ""); got.Code >= 300 {
+			"/v1/decisions/"+httpapitest.Itoa(first), ""); got.Code >= 300 {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())
 		}
 		second := deferred()

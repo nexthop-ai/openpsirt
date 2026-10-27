@@ -148,7 +148,7 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		at := fmt.Sprintf(
-			"/v1/products/mine/streams/master/variants/broadcom/runs/%d", runID)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/runs/%d", runID)
 
 		read := func(t *testing.T, who string) struct {
 			Scanner         string `json:"scanner"`
@@ -235,7 +235,7 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		missing := fmt.Sprintf(
-			"/v1/products/mine/streams/master/variants/broadcom/runs/%d", theirs)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/runs/%d", theirs)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, missing, ""); got.Code !=
 			http.StatusNotFound {
 			t.Errorf("another build's run read through this one answered %d", got.Code)

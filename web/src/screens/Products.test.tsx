@@ -35,7 +35,7 @@ const SONIC = {
 async function drawn(admin = true) {
   serve((path) => {
     if (path === "/v1/products") return { data: { items: [SONIC] } };
-    if (path === "/v1/scanning") return { data: { items: [], quiet_after_days: 7 } };
+    if (path === "/v1/last-uploads") return { data: { items: [], quiet_after_days: 7 } };
     return undefined;
   });
   const writes = {
@@ -96,7 +96,7 @@ describe("the products an administrator manages", () => {
     );
     await settle();
     const [path, init] = only(writes.put);
-    expect(path).toBe("/v1/products/{product}/triage-floor");
+    expect(path).toBe("/v1/products/{product}/minimum-severity");
     expect(init.body).toEqual({ floor: "high" });
   });
 

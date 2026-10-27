@@ -32,7 +32,7 @@ function serving(rights: { may_hide: boolean; triages_public: boolean }) {
       };
     }
     if (path === "/v1/products") return { data: { items: [{ name: "sonic" }] } };
-    if (path === "/v1/products/{product}/streams") {
+    if (path === "/v1/products/{product}/branches-and-tags") {
       return { data: { items: [{ name: "master", kind: "branch" }] } };
     }
     if (path === "/v1/products/{product}/variants")

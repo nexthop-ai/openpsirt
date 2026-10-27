@@ -39,7 +39,7 @@ type AtComponentBody struct {
 func registerBulk(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-issues-at-component", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 			"/components/{component}/issues",
 		Summary: "List the issues open against one component",
 		Description: "Returns the distinct issues open against this component in this build, " +
@@ -160,9 +160,9 @@ func registerBulk(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide-together", Method: http.MethodPost,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/components/{component}/decisions",
-		Summary: "Record one judgment about several issues at once",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/components/{component}/bulk-decision",
+		Summary: "Record a bulk decision",
 		Description: "Records the same claim against every issue you name: one outcome, one " +
 			"justification, one reasoning, and a separate decision for every place each issue " +
 			"sits at, each keyed and expiring on its own.\n\n" +

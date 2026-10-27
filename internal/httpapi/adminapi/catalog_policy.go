@@ -128,8 +128,8 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "set-product-triage-floor", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/triage-floor",
-		Summary: "Set what a product considers worth triaging",
+		Path:    "/v1/products/{product}/minimum-severity",
+		Summary: "Set a product's minimum severity",
 		Description: "Sets the least severity worth triaging for one product, overriding what " +
 			"the deployment says. Below the line a finding is still recorded, still counted and " +
 			"still reportable, and it carries no deadline — it is out of the working list, not " +
@@ -240,7 +240,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "set-release-details", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/streams/{stream}/release",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/release",
 		Summary: "Set when a release went out and what it was cut from",
 		Description: "Records the day a tag actually shipped, and the branch it was cut " +
 			"from.\n\n" +
@@ -318,7 +318,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "set-stream-end-of-life", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/streams/{stream}/end-of-life",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/end-of-life",
 		Summary: "Set when a branch or tag goes out of support",
 		Description: "Sets the date support ends for one release, overriding what its product " +
 			"says. Past it, nothing on the release carries a remediation deadline and a build " +

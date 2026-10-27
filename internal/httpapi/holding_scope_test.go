@@ -29,7 +29,7 @@ func TestWhatSomebodyHoldsIsReadableInABuildTheyCannotRead(t *testing.T) {
 
 		// The approver in this cast holds the capability and no reading, which
 		// is the identity the rule is about.
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at,
 			`{"person":"approver"}`); got.Code != http.StatusNoContent {

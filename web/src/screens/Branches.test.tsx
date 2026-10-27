@@ -19,7 +19,7 @@ function serving(admin: boolean) {
     if (path === "/v1/session/me") {
       return { data: { identity: "ana", name: "Ana", admin, kind: "person", reach: [] } };
     }
-    if (path === "/v1/products/{product}/streams") {
+    if (path === "/v1/products/{product}/branches-and-tags") {
       return {
         data: {
           items: [

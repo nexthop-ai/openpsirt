@@ -351,8 +351,8 @@ export function Reporter({
     queryKey: ["report", product, vulnerability],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/issues/{vulnerability}/report", {
-          params: { path: { product, vulnerability } },
+        await api.GET("/v1/products/{product}/issues/{issue}/report", {
+          params: { path: { product, issue: vulnerability } },
         }),
       ),
     // No report is the record of this issue, which is every issue a scan
@@ -362,8 +362,8 @@ export function Reporter({
   const alsoKnown = useMutation({
     mutationFn: async (name: string) =>
       unwrap(
-        await api.PUT("/v1/products/{product}/issues/{vulnerability}/aliases/{alias}", {
-          params: { path: { product, vulnerability, alias: name } },
+        await api.PUT("/v1/products/{product}/issues/{issue}/aliases/{alias}", {
+          params: { path: { product, issue: vulnerability, alias: name } },
         }),
       ),
     onSuccess: () => {
@@ -374,8 +374,8 @@ export function Reporter({
   const unnamed = useMutation({
     mutationFn: async (name: string) =>
       unwrap(
-        await api.DELETE("/v1/products/{product}/issues/{vulnerability}/aliases/{alias}", {
-          params: { path: { product, vulnerability, alias: name } },
+        await api.DELETE("/v1/products/{product}/issues/{issue}/aliases/{alias}", {
+          params: { path: { product, issue: vulnerability, alias: name } },
         }),
       ),
     onSuccess: (removed) => {

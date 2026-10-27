@@ -208,11 +208,18 @@ function Readiness({ at }: { at: Scoped }) {
     enabled: whole,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/readiness", {
-          params: {
-            path: { product: at.product ?? "", stream: at.stream ?? "", variant: at.variant ?? "" },
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness",
+          {
+            params: {
+              path: {
+                product: at.product ?? "",
+                stream: at.stream ?? "",
+                variant: at.variant ?? "",
+              },
+            },
           },
-        }),
+        ),
       ),
   });
 
@@ -419,7 +426,7 @@ function Figures({
   // the scope is applied here: a record belongs to a product and no build.
   const shelf = useQuery({
     queryKey: ["obligations"],
-    queryFn: async () => unwrap(await api.GET("/v1/obligations", {})),
+    queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
   });
   // This person's holdings, and what has come back to them: Home answers
   // "what do I do next" as well as "how much is there".
@@ -443,7 +450,7 @@ function Figures({
   const became = useQuery({
     queryKey: ["home", "became", "me"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/my-claims", { params: { query: { limit: BACK_LIMIT } } })),
+      unwrap(await api.GET("/v1/my-decisions", { params: { query: { limit: BACK_LIMIT } } })),
   });
   const queue = useQueueCount(at.product || undefined);
   // The same figures with the scope taken off, so a tile can show what the
@@ -903,7 +910,7 @@ function Lapsed() {
     queryKey: ["home", "stopped", product],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/decisions", {
+        await api.GET("/v1/decision-occurrences", {
           params: { query: { stopped: true, limit: 3, ...product } },
         }),
       ),
@@ -944,7 +951,11 @@ function Lapsed() {
     queryKey: ["home", "stopped", "all"],
     enabled: !!at.product,
     queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions", { params: { query: { stopped: true, limit: 1 } } })),
+      unwrap(
+        await api.GET("/v1/decision-occurrences", {
+          params: { query: { stopped: true, limit: 1 } },
+        }),
+      ),
   });
 
   const stoppedTotal = stopped.data?.total ?? 0;
@@ -1032,7 +1043,7 @@ function Status() {
   const scope = scopeQuery(at);
   const scanning = useQuery({
     queryKey: ["home", "scanning", scope],
-    queryFn: async () => unwrap(await api.GET("/v1/scanning", { params: { query: scope } })),
+    queryFn: async () => unwrap(await api.GET("/v1/last-uploads", { params: { query: scope } })),
   });
   const builds = scanning.data?.items ?? [];
   // The rows in hand, for the three this names. The figures below come from

@@ -136,13 +136,13 @@ func registerWork(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-set-aside-work", Method: http.MethodGet, Path: "/v1/work/set-aside",
-		Summary: "List work that stopped being retried",
-		Description: "Returns background work the queue has set aside, newest first, with why " +
-			"each stopped where anything reported a reason. A job is set aside once it has " +
+		OperationID: "list-set-aside-work", Method: http.MethodGet, Path: "/v1/failed-jobs",
+		Summary: "List failed jobs",
+		Description: "Returns background jobs that failed, newest first, with why " +
+			"each stopped where anything reported a reason. A job fails once it has " +
 			"been tried as many times as it is allowed to be, whether it reported a failure " +
 			"or its worker stopped answering.\n\n" +
-			fmt.Sprintf("At most %d are returned. `total` is how many are set aside in all, so a clipped "+
+			fmt.Sprintf("At most %d are returned. `total` is how many have failed in all, so a clipped "+
 				"page can be told from a complete one.\n\n", queue.SetAsideCeiling) +
 			"`waiting` is what has not stopped: how much of each kind is queued, against the " +
 			"bound that refuses more of it. A queue filling up and a queue that has given up " +
@@ -200,11 +200,11 @@ func registerWork(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "retry-set-aside-work", Method: http.MethodPost,
-		Path:    "/v1/work/set-aside/{id}/retry",
-		Summary: "Retry work that was set aside",
-		Description: "Puts one set-aside job back in the queue for whichever worker takes it " +
+		Path:    "/v1/failed-jobs/{id}/retry",
+		Summary: "Retry a failed job",
+		Description: "Puts one failed job back in the queue for whichever worker takes it " +
 			"next, with its attempts reset to zero and its last error kept.\n\n" +
-			"A job that is not set aside is refused rather than moved.",
+			"A job that has not failed is refused rather than moved.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in2 *struct {
 		ID int64 `path:"id" doc:"The job to put back"`

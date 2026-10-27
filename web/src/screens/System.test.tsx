@@ -29,7 +29,7 @@ const READS: Record<string, Answer> = {
       records: { version: "2026-01-02", moved_at: "2026-01-02T00:00:00Z", stale: true },
     },
   },
-  "/v1/work/set-aside": {
+  "/v1/failed-jobs": {
     data: {
       waiting: [
         { kind: "ingest", waiting: 10, limit: 10 },
@@ -47,7 +47,7 @@ const READS: Record<string, Answer> = {
       total: 3,
     },
   },
-  "/v1/patch-branches": {
+  "/v1/patch-branch-lookups": {
     data: { on: false, looked: 0, commits: 0, links: 0, total: 0, repositories: [] },
   },
   "/v1/upstream/unanswered": {
@@ -82,7 +82,7 @@ describe("the deployment's own state", () => {
     await press(mount.host(), "Put back");
     await settle();
     const [path, init] = only(sent);
-    expect(path).toBe("/v1/work/set-aside/{id}/retry");
+    expect(path).toBe("/v1/failed-jobs/{id}/retry");
     expect(init.params?.path).toEqual({ id: 9 });
     expect(invalidated()).toContain("set-aside");
     expect(text()).toContain("Showing 1 of 3.");

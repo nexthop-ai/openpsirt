@@ -69,7 +69,7 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 			} `json:"said"`
 			Standing []struct{} `json:"standing"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
 		if len(detail.Said) != 1 {
 			t.Fatalf("the finding shows %d VEX statements", len(detail.Said))
@@ -118,7 +118,7 @@ func TestWillNotFixNeverOffersADismissal(t *testing.T) {
 					Offers string `json:"offers"`
 				} `json:"said"`
 			}
-			httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+			httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
 			if len(detail.Said) != 1 {
 				t.Fatalf("%s left %d standing statements", each.status, len(detail.Said))
@@ -202,7 +202,7 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 				ID int64 `json:"id"`
 			} `json:"said"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
 		if len(detail.Said) != 1 || detail.Said[0].ID == 0 {
 			t.Fatalf("the finding offers %+v to cite", detail.Said)
@@ -210,8 +210,8 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 
 		// A dismissal started from it, agreed to by somebody else.
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"Debian says the affected routine is not built.",`+
 				`"from_statement":`+httpapitest.Itoa(detail.Said[0].ID)+`}`)
@@ -226,7 +226,7 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 			t.Fatal(err)
 		}
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/claims/"+httpapitest.Itoa(recorded.ClaimID)+"/approval", `{}`); got.Code >= 300 {
+			"/v1/decisions/"+httpapitest.Itoa(recorded.ClaimID)+"/approval", `{}`); got.Code >= 300 {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -292,7 +292,7 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 		}
 
 		request := httptest.NewRequest(http.MethodPost,
-			"/v1/products/mine/vex-statements?publisher=debian", body)
+			"/v1/products/mine/vex-documents?publisher=debian", body)
 		request.Header.Set("Content-Type", form.FormDataContentType())
 		request.Header.Set(httpapitest.TestHeader, "triager")
 		httpapitest.FromOurOwnPage(request)

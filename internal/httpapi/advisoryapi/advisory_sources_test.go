@@ -26,7 +26,7 @@ func TestOnlyAnAdministratorNamesASupplierToReadAdvisoriesFrom(t *testing.T) {
 	// nothing. That is what the declaration is for, and it is why this is
 	// verified by taking all three out rather than one.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const sources = "/v1/products/mine/advisory-sources"
+		const sources = "/v1/products/mine/supplier-advisory-feeds"
 
 		for _, c := range []struct {
 			who    string
@@ -68,7 +68,7 @@ func TestOnlyAnAdministratorNamesASupplierToReadAdvisoriesFrom(t *testing.T) {
 
 func TestASupplierIsNamedListedAndWithdrawn(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const sources = "/v1/products/mine/advisory-sources"
+		const sources = "/v1/products/mine/supplier-advisory-feeds"
 
 		if got := r.Named(t, "admin", http.MethodPost, sources, publishedAt).Code; got != http.StatusCreated {
 			t.Fatalf("naming a supplier answered %d", got)
@@ -104,7 +104,7 @@ func TestASupplierAddedTwiceUnderOneNameIsAnAnswerRatherThanAFault(t *testing.T)
 	// working exactly as written: the row it collides with is one the caller
 	// can see.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const sources = "/v1/products/mine/advisory-sources"
+		const sources = "/v1/products/mine/supplier-advisory-feeds"
 
 		if got := r.Named(t, "admin", http.MethodPost, sources, publishedAt).Code; got != http.StatusCreated {
 			t.Fatalf("naming a supplier answered %d", got)
@@ -125,7 +125,7 @@ func TestASupplierAddedTwiceUnderOneNameIsAnAnswerRatherThanAFault(t *testing.T)
 
 func TestAWithdrawalMatchesTheNameWithoutRegardToCapitals(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const sources = "/v1/products/mine/advisory-sources"
+		const sources = "/v1/products/mine/supplier-advisory-feeds"
 
 		if got := r.Named(t, "admin", http.MethodPost, sources, publishedAt).Code; got != http.StatusCreated {
 			t.Fatalf("naming a supplier answered %d", got)
@@ -145,7 +145,7 @@ func TestAnAddressThatIsNotAPublishersDirectoryIsRefusedAtTheRequest(t *testing.
 	// which is the only place the message reaches the person who made the
 	// mistake.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const sources = "/v1/products/mine/advisory-sources"
+		const sources = "/v1/products/mine/supplier-advisory-feeds"
 
 		for _, body := range []string{
 			`{"name":"Plain","url":"http://distribution.example.test/provider-metadata.json"}`,
@@ -167,8 +167,8 @@ func TestASupplierIsNamedAgainstOneProductAndNotTheOther(t *testing.T) {
 	// A claim is recorded against a product, so a supplier feeding two is two
 	// rows — and withdrawing one leaves the other standing.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const mine = "/v1/products/mine/advisory-sources"
-		const theirs = "/v1/products/theirs/advisory-sources"
+		const mine = "/v1/products/mine/supplier-advisory-feeds"
+		const theirs = "/v1/products/theirs/supplier-advisory-feeds"
 
 		if got := r.Named(t, "admin", http.MethodPost, mine, publishedAt).Code; got != http.StatusCreated {
 			t.Fatalf("naming a supplier answered %d", got)

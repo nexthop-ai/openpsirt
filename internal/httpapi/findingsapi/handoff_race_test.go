@@ -75,7 +75,7 @@ func TestAHandOffRestampsTheClaimItRestsOn(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, claim, _ := confirmedLead(t, r)
 		before := claimStamp(t, r, claim)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/hand-off",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -93,7 +93,7 @@ func TestAHandOffLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T) {
 		place, claim, target := confirmedLead(t, r)
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "claim", "claim_stamp", 3*time.Second, func() error {
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete,
-				fmt.Sprintf("/v1/claims/%d", claim), ""); got.Code != http.StatusNoContent {
+				fmt.Sprintf("/v1/decisions/%d", claim), ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("the withdrawal answered %d: %s", got.Code, got.Body)
 			}
 			return nil
@@ -122,7 +122,7 @@ func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, claim, _ := confirmedLead(t, r)
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "claim_stamp", 3*time.Second, func() error {
-			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/hand-off",
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
 				`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 				return fmt.Errorf("the hand-off answered %d: %s", got.Code, got.Body)
 			}
@@ -162,7 +162,7 @@ func TestAnUndoneMoveLandingWhileADisclosureAppliesKeepsTheLeadInternal(t *testi
 		place, flaw := httpapitest.HandedOffLead(t, r, true)
 		movement := askToDisclose(t, r, flaw)
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "lead_handoff", 3*time.Second, func() error {
-			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("undoing the move answered %d: %s", got.Code, got.Body)
 			}
 			return nil

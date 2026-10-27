@@ -38,7 +38,7 @@ export function Variants() {
     enabled: !!stream,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants", {
+        await api.GET("/v1/products/{product}/branches-and-tags/{stream}/variants", {
           params: { path: { product, stream }, query: { counts: true } },
         }),
       ),

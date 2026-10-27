@@ -267,7 +267,7 @@ func TestAssignedToMeMeansMineOrMyTeams(t *testing.T) {
 		assign := func(t *testing.T, issue, body string) {
 			t.Helper()
 			got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-				"/v1/products/mine/streams/master/variants/broadcom/findings/"+issue+
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/"+issue+
 					"/components/linux-image/assignment", body)
 			if got.Code != http.StatusNoContent {
 				t.Fatalf("assigning %s answered %d: %s", issue, got.Code, got.Body.String())
@@ -355,7 +355,7 @@ func TestAWithdrawnClaimLeavesTheFindingAsWorkAgain(t *testing.T) {
 		}
 
 		if gone := httpapitest.AsPerson(t, r, "triager", http.MethodDelete,
-			fmt.Sprintf("/v1/claims/%d", claim), ""); gone.Code >= 300 {
+			fmt.Sprintf("/v1/decisions/%d", claim), ""); gone.Code >= 300 {
 			t.Fatalf("withdrawing answered %d: %s", gone.Code, gone.Body.String())
 		}
 		u, w, a, l, all := buckets(t)

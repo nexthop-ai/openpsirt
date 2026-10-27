@@ -32,7 +32,7 @@ export function Elsewhere({
   const point = useMutation({
     mutationFn: async (to: string) =>
       unwrap(
-        await api.PUT("/v1/claims/{id}/elsewhere", {
+        await api.PUT("/v1/decisions/{id}/elsewhere", {
           params: { path: { id } },
           body: { elsewhere: to },
         }),

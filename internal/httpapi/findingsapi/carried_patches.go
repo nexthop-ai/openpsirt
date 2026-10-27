@@ -46,7 +46,7 @@ type CarriedClaimBody struct {
 func registerCarried(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-carried-patches", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 			"/carried-patches",
 		Summary: "List what a build says it deals with itself",
 		Description: "Everything this build has argued about in its own inventories: carried " +

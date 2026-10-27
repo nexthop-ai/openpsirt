@@ -58,7 +58,7 @@ async function drawn(may: { triages_internal?: boolean; agrees_internal?: boolea
           outcomes: [],
         },
       };
-    if (path === "/v1/products/{product}/lead-rules") return { data: { items: RULES } };
+    if (path === "/v1/products/{product}/suppression-rules") return { data: { items: RULES } };
     return undefined;
   });
   mount.render(
@@ -86,7 +86,7 @@ describe("the dismissal rules", () => {
     const sent = accept(() => ({ data: RULES[0] }));
     await press(mount.host(), "Approve");
     await settle();
-    expect(sent()[0]?.[0]).toBe("/v1/products/{product}/lead-rules/{id}/approval");
+    expect(sent()[0]?.[0]).toBe("/v1/products/{product}/suppression-rules/{id}/approval");
   });
 
   it("offers nothing that writes to somebody who only reads", async () => {

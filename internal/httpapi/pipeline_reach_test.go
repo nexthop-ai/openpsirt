@@ -36,13 +36,13 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	// receipts and its uploads, what one upload changed, and a document it kept. The
 	// fixture's scan is the first the build had, so it changed nothing, and
 	// it kept no document by that name.
-	const build = "/v1/products/{product}/streams/{stream}/variants/{variant}"
+	const build = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}"
 	sent := map[string]int{
-		build + "/scans":                             http.StatusOK,
+		build + "/sboms":                             http.StatusOK,
 		build + "/analyses":                          http.StatusOK,
 		build + "/uploads":                           http.StatusOK,
-		build + "/scans/{scan}/changes":              http.StatusOK,
-		build + "/scans/{scan}/documents/{document}": http.StatusNotFound,
+		build + "/sboms/{sbom}/changes":              http.StatusOK,
+		build + "/sboms/{sbom}/documents/{document}": http.StatusNotFound,
 	}
 	parameter := regexp.MustCompile(`\{[^}]+\}`)
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -59,7 +59,7 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 			}
 			at := parameter.ReplaceAllStringFunc(filled(path), func(name string) string {
 				switch name {
-				case "{vulnerability}", "{issue}":
+				case "{issue}":
 					return "CVE-2026-9999"
 				case "{component}":
 					return "libnl-3-200"
@@ -98,7 +98,7 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 				"less than it names", checked, allowed, len(sent))
 		}
 
-		got := r.WithKey(t, r.Key, http.MethodGet, "/v1/products/mine/streams/master/variants/broadcom/analyses")
+		got := r.WithKey(t, r.Key, http.MethodGet, "/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses")
 		if got.Code != http.StatusOK {
 			t.Fatalf("the key reading its receipts answered %d: %s", got.Code, got.Text)
 		}

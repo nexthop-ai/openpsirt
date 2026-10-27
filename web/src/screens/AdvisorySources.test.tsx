@@ -16,7 +16,7 @@ afterEach(() => vi.restoreAllMocks());
 async function adding(already: { name: string; url: string }[]) {
   serve((path) => {
     if (path === "/v1/products") return { data: { items: [{ name: "sonic" }], total: 1 } };
-    if (path === "/v1/products/{product}/advisory-sources") {
+    if (path === "/v1/products/{product}/supplier-advisory-feeds") {
       return { data: { items: already } };
     }
     return { data: { items: [], total: 0 } };

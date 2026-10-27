@@ -31,7 +31,7 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 				Children  int    `json:"children"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/streams/master/variants/broadcom/components", &top)
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/components", &top)
 		if len(top.Items) == 0 {
 			t.Fatal("the build reports pulling nothing in")
 		}
@@ -43,7 +43,7 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 				Component string `json:"component"`
 			} `json:"below"`
 		}
-		httpapitest.Read(t, r, "reader", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/components/libnl-3-200/around", &around)
 		if len(around.Above) == 0 {
 			t.Errorf("nothing pulls libnl-3-200 in, which cannot be true: %+v", around)
@@ -59,7 +59,7 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 			} `json:"items"`
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/components/libnl-3-200/issues", &issues)
 		if issues.Total != 1 || len(issues.Items) != 1 {
 			t.Fatalf("%d issues at the component, want 1", issues.Total)
@@ -74,8 +74,8 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 
 		// One claim across a named set.
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/components/libnl-3-200/decisions",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/components/libnl-3-200/bulk-decision",
 			`{"vulnerabilities":["CVE-2026-9999"],"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_in_execute_path",`+
 				`"selected_by":"searched the reports for \"driver\"",`+
@@ -109,7 +109,7 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 				SelectedBy string `json:"selected_by"`
 			} `json:"decision"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", recorded.IDs[0]), &made)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", recorded.IDs[0]), &made)
 		if made.Decision.SelectedBy == "" {
 			t.Error("a claim recorded as one of many does not say how the set was narrowed")
 		}
@@ -117,8 +117,8 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 		// A deferral with nowhere to say until when is refused rather than
 		// recorded as a postponement with no end.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/components/libnl-3-200/decisions",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/components/libnl-3-200/bulk-decision",
 			`{"vulnerabilities":["CVE-2026-9999"],"outcome":"deferred",`+
 				`"selected_by":"the same search","reasoning":"Not this release."}`,
 		); got.Code != http.StatusUnprocessableEntity {
@@ -128,8 +128,8 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 		// A name nobody here knows says which name, so a person who pasted a
 		// list can fix the list rather than bisect it.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/components/libnl-3-200/decisions",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/components/libnl-3-200/bulk-decision",
 			`{"vulnerabilities":["CVE-2026-9999","CVE-1999-0001"],"outcome":"wont-fix",`+
 				`"selected_by":"a list somebody pasted","reasoning":"Not worth it."}`,
 		); got.Code != http.StatusNotFound ||
@@ -196,7 +196,7 @@ func TestNobodyLearnsWhoHasAnAccountByBeingRefused(t *testing.T) {
 
 		// Assigning is the same shape: reading a product is not being able to
 		// hand its findings around, so the name is never resolved first.
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		known := httpapitest.AsPerson(t, r, "reader", http.MethodPut, at, `{"person":"triager"}`)
 		unknown := httpapitest.AsPerson(t, r, "reader", http.MethodPut, at, `{"person":"nobody-at-all"}`)

@@ -126,10 +126,10 @@ type ReceiptsOutput struct {
 }
 
 func registerReceipts(api huma.API, in core.Deps) {
-	huma.Register(api, core.Requiring(huma.Operation{
+	core.RegisterWithFormer(api, core.Requiring(huma.Operation{
 		OperationID: "list-scans", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans",
-		Summary: "List uploaded scans and their status",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
+		Summary: "List uploaded SBOMs and their status",
 		Description: "Returns uploads newest first, each with its state: `reading` (accepted, not " +
 			"yet parsed), `scanning` (parsed, vulnerability scan pending), `scanned` (complete), " +
 			"or `failed` with the reason.\n\n" +
@@ -296,5 +296,5 @@ func registerReceipts(api huma.API, in core.Deps) {
 			}
 		}
 		return out, nil
-	})
+	}, core.FormerUpload)
 }

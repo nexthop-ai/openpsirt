@@ -29,7 +29,7 @@ type LeadDecisionBody struct {
 // leadDecisionPath is the judgment about one lead, addressed by its place on
 // one build. A rule's name holds a slash, so the lead is addressed by its
 // place alone rather than under its issue.
-const leadDecisionPath = "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision"
+const leadDecisionPath = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision"
 
 // errLeadClosed refuses a judgment about a lead somebody stated was fixed.
 var errLeadClosed = errors.New("closed")
@@ -38,22 +38,22 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide-lead", Method: http.MethodPost,
 		Path:    leadDecisionPath,
-		Summary: "Record a triage decision for a lead",
-		Description: "Records what a lead is: `dismissed`, `not-security` or `confirmed`.\n\n" +
+		Summary: "Record a triage decision for a code finding",
+		Description: "Records what a code finding is: `dismissed`, `not-security` or `confirmed`.\n\n" +
 			"`dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or " +
 			"`mitigated`. A dismissal and `not-security` take effect once somebody else holding " +
 			"`approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.\n\n" +
-			"The decision covers the lead on every stream and variant it is seen on, and every lead " +
+			"The decision covers the code finding on every stream and variant it is seen on, and every code finding " +
 			"another analyzer reports as the same flaw on the build that nothing answers yet, as one " +
-			"claim agreed to once. A lead that " +
-			"is fixed is refused: it opens again where it is seen again. A lead handed off as a flaw " +
+			"claim agreed to once. A code finding that " +
+			"is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw " +
 			"is refused with 409, because its flaw is judged instead.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 		Body    LeadDecisionBody
 	}) (*struct{ Body core.DecisionBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
@@ -132,22 +132,22 @@ type LeadFixedBody struct {
 func registerLeadFixed(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "fix-lead", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/fixed",
-		Summary: "Close a lead as fixed",
-		Description: "Closes a lead on one build because it is fixed there. The lead has to be one " +
-			"the newest comparable run did not see: a lead a run still sees is refused with 409. " +
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed",
+		Summary: "Close a code finding as fixed",
+		Description: "Closes a code finding on one build because it is fixed there. The code finding has to be one " +
+			"the newest comparable run did not see: a code finding a run still sees is refused with 409. " +
 			"`because` says what fixed it, and is required.\n\n" +
-			"`fixed_in` names the build that fixed it, as the run of the lead's series on this build " +
+			"`fixed_in` names the build that fixed it, as the run of the code finding's series on this build " +
 			"that analyzed it: an applied, comparable run built at or after the first run that did not " +
-			"see the lead, which the lead's evidence names as `not_seen_run`. Any other run is refused " +
+			"see the code finding, which the code finding's evidence names as `not_seen_run`. Any other run is refused " +
 			"with 422.\n\n" +
-			"A lead seen again opens anew at the same place.",
+			"A code finding seen again opens anew at the same place.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 		Body    struct {
 			Because string `json:"because" minLength:"1" doc:"What fixed it, in markdown"`
 			FixedIn int64  `json:"fixed_in" minimum:"1" doc:"The run whose build fixed it"`

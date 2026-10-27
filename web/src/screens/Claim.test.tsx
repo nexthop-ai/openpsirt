@@ -25,7 +25,7 @@ describe("re-affirming a lapsed claim from its own page", () => {
   it("refreshes every list the re-made claim joins, the proposer's own among them", async () => {
     serve((path) => {
       if (path === "/v1/session/me") return { data: ANA };
-      if (path === "/v1/claims/{id}") {
+      if (path === "/v1/decisions/{id}") {
         return {
           data: {
             claim: { id: 4, proposed_by: "ana" },
@@ -71,7 +71,7 @@ describe("the stripe on a claim's page", () => {
   it("draws a proposed claim nothing waits on as in force", async () => {
     serve((path) => {
       if (path === "/v1/session/me") return { data: ANA };
-      if (path === "/v1/claims/{id}") {
+      if (path === "/v1/decisions/{id}") {
         return {
           data: {
             claim: { id: 4, proposed_by: "ana" },
@@ -113,7 +113,7 @@ describe("the answer a second person gives", () => {
   async function drawn(claim: object, who: Who) {
     serve((path) => {
       if (path === "/v1/session/me") return { data: who };
-      if (path === "/v1/claims/{id}") return { data: claim };
+      if (path === "/v1/decisions/{id}") return { data: claim };
       return { data: { items: [], total: 0 } };
     });
     const sent = accept(() => ({ data: {} }));
@@ -143,7 +143,7 @@ describe("the answer a second person gives", () => {
     await act(async () => agree()?.click());
     await settle();
     const [path, init] = only(sent);
-    expect(path).toBe("/v1/claims/{id}/approval");
+    expect(path).toBe("/v1/decisions/{id}/approval");
     expect(init.params?.path).toEqual({ id: 4 });
   });
 
@@ -183,7 +183,7 @@ describe("a claim about internal material read by somebody who may not argue it"
     };
     serve((path) => {
       if (path === "/v1/session/me") return { data: reader };
-      if (path === "/v1/claims/{id}") {
+      if (path === "/v1/decisions/{id}") {
         return {
           data: {
             claim: { id: 4, proposed_by: "ana" },
