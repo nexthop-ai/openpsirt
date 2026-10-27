@@ -36,7 +36,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | Path | Holds |
 |---|---|
 | `cmd/openpsirt/` | The binary. Flag parsing, configuration, server lifecycle |
-| `cmd/openpsirt-analysis/` | The upload client a pipeline runs. See `DESIGN-analysis.md` § Upload client |
+| `cmd/openpsirt-upload/` | The upload client a pipeline runs. See `DESIGN-analysis.md` § Upload client |
 | `internal/version/` | What this build is. Values injected at link time |
 | `internal/config/` | Settings, read from the environment with working defaults |
 | `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `DESIGN-api.md` § File organization |
@@ -57,7 +57,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/series/` | Runs of one analysis across builds: their order, whether each is comparable, and what each saw. See `DESIGN-kinds.md` |
 | `internal/analysis/` | Applying an analyzer's run to its build as findings of the analysis kind. See `DESIGN-analysis.md` |
 | `internal/sourcelink/` | What a product says about its repositories, and the source addresses built from it. See `DESIGN-analysis.md` |
-| `internal/analysisclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `DESIGN-analysis.md` § Upload client |
+| `internal/uploadclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `DESIGN-analysis.md` § Upload client |
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `DESIGN-data-model.md`, `DESIGN-findings.md` |
 | `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `DESIGN-findings.md` § Merged issues |
 | `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |

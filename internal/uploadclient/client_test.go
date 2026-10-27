@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package analysisclient
+package uploadclient
 
 import (
 	"bytes"
@@ -390,13 +390,13 @@ func TestTheRunSaysWhatItIs(t *testing.T) {
 	root := sources(t)
 	exit := 0
 	when := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
-	run, _ := built(t, Options{Root: root, Work: root, Built: when, ExitStatus: &exit, Client: "openpsirt-analysis 1.2.3"},
+	run, _ := built(t, Options{Root: root, Work: root, Built: when, ExitStatus: &exit, Client: "openpsirt-upload 1.2.3"},
 		fixture(t, "clang18-a.plist"))
 	if id := str(child(run, "automationDetails"), "id"); id != "clang-sa/default/2026-10-01T02:00:00Z" {
 		t.Errorf("automation %q", id)
 	}
 	props := child(run, "properties")
-	if str(props, propCommit) != "0123abcd" || str(props, propClient) != "openpsirt-analysis 1.2.3" {
+	if str(props, propCommit) != "0123abcd" || str(props, propClient) != "openpsirt-upload 1.2.3" {
 		t.Errorf("properties %v", props)
 	}
 	inv := objects(run, "invocations")

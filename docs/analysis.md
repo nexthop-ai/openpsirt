@@ -1,6 +1,6 @@
 # Analyzer results
 
-A static analyzer's run over a build is sent with `openpsirt-analysis`, the
+A static analyzer's run over a build is sent with `openpsirt-upload`, the
 upload client published with every release. It reads the analyzer's own
 output and the checkout, and sends one run per analyzer per build. Each result
 is recorded as an internal finding of the build, and the run's receipt counts
@@ -13,24 +13,24 @@ either order.
 
 ## The client
 
-Each release attaches `openpsirt-analysis_<version>_<system>_<arch>.tar.gz`
-for Linux and macOS and `openpsirt-analysis_<version>_windows_<arch>.zip` for
+Each release attaches `openpsirt-upload_<version>_<system>_<arch>.tar.gz`
+for Linux and macOS and `openpsirt-upload_<version>_windows_<arch>.zip` for
 Windows, on amd64 and arm64, each beside a CycloneDX inventory of its binary,
-`openpsirt-analysis_<version>_<system>_<arch>.cdx.json`, and all covered by
+`openpsirt-upload_<version>_<system>_<arch>.cdx.json`, and all covered by
 `SHA256SUMS` and its signature, `SHA256SUMS.cosign.bundle`.
 
 | System | `<system>_<arch>` | Program |
 |---|---|---|
-| Linux | `linux_amd64`, `linux_arm64` | `openpsirt-analysis` |
-| macOS | `darwin_amd64`, `darwin_arm64` | `openpsirt-analysis` |
-| Windows | `windows_amd64`, `windows_arm64` | `openpsirt-analysis.exe` |
+| Linux | `linux_amd64`, `linux_arm64` | `openpsirt-upload` |
+| macOS | `darwin_amd64`, `darwin_arm64` | `openpsirt-upload` |
+| Windows | `windows_amd64`, `windows_arm64` | `openpsirt-upload.exe` |
 
 An archive holds one directory, named as the archive is, with the program,
 `LICENSE` and `NOTICE` in it.
 
 ```bash
 base=https://github.com/nexthop-ai/openpsirt/releases/download/v{{ release }}
-client=openpsirt-analysis_{{ release }}_linux_amd64
+client=openpsirt-upload_{{ release }}_linux_amd64
 curl -fsSL -O "$base/$client.tar.gz" -O "$base/SHA256SUMS" -O "$base/SHA256SUMS.cosign.bundle"
 cosign verify-blob \
   --bundle SHA256SUMS.cosign.bundle \
@@ -40,7 +40,7 @@ cosign verify-blob \
 grep " $client.tar.gz\$" SHA256SUMS | shasum -a 256 -c
 tar -xzf "$client.tar.gz"
 export PATH="$PWD/$client:$PATH"
-openpsirt-analysis version
+openpsirt-upload version
 ```
 
 The same lines install it on macOS, with `darwin` in the name. The pipeline
@@ -49,9 +49,9 @@ signature first, as above.
 
 | Command | Does |
 |---|---|
-| `openpsirt-analysis upload …` | Builds the run and sends it, printing the receipt |
-| `openpsirt-analysis write --output FILE …` | Builds the run and stores it, to see what would be sent |
-| `openpsirt-analysis version` | Prints the client's version |
+| `openpsirt-upload upload …` | Builds the run and sends it, printing the receipt |
+| `openpsirt-upload write --output FILE …` | Builds the run and stores it, to see what would be sent |
+| `openpsirt-upload version` | Prints the client's version |
 
 The client reads a path with no starting point as relative to the directory
 it runs in, and does not read the working directory the output states. Run it
@@ -95,7 +95,7 @@ receipt, whatever tool wrote it.
 export OPENPSIRT_URL=https://openpsirt.example.com
 export OPENPSIRT_KEY=…   # the pipeline key
 
-openpsirt-analysis upload \
+openpsirt-upload upload \
   --product sonic --stream main --variant broadcom \
   --series clang-sa \
   --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -183,7 +183,7 @@ jobs:
       OPENPSIRT_URL: ${{ vars.OPENPSIRT_URL }}
       OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
       BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v{{ release }}
-      CLIENT: openpsirt-analysis_{{ release }}_${{ matrix.client }}
+      CLIENT: openpsirt-upload_{{ release }}_${{ matrix.client }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -215,7 +215,7 @@ jobs:
           pip install ruff
           status=0
           ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
-          openpsirt-analysis upload \
+          openpsirt-upload upload \
             --product sonic --stream main --variant ${{ matrix.variant }} \
             --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --rules-file .openpsirt/ruff.rules --exit-status "$status" \
@@ -242,7 +242,7 @@ variables:
   - python3 -m venv .venv && . .venv/bin/activate && pip install ruff
   - status=0; ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
   - >
-    openpsirt-analysis upload
+    openpsirt-upload upload
     --product sonic --stream "$CI_COMMIT_BRANCH" --variant "$VARIANT"
     --series ruff --built "$CI_PIPELINE_CREATED_AT"
     --rules-file .openpsirt/ruff.rules --exit-status "$status"
@@ -250,18 +250,18 @@ variables:
 
 analysis-linux:
   image: python:3
-  variables: {CLIENT: "openpsirt-analysis_{{ release }}_linux_amd64", VARIANT: linux}
+  variables: {CLIENT: "openpsirt-upload_{{ release }}_linux_amd64", VARIANT: linux}
   script: *unix
 
 analysis-macos:
   tags: [saas-macos-medium-m1]
   image: macos-26-xcode-26
-  variables: {CLIENT: "openpsirt-analysis_{{ release }}_darwin_arm64", VARIANT: macos}
+  variables: {CLIENT: "openpsirt-upload_{{ release }}_darwin_arm64", VARIANT: macos}
   script: *unix
 
 analysis-windows:
   tags: [saas-windows-medium-amd64]
-  variables: {CLIENT: "openpsirt-analysis_{{ release }}_windows_amd64", VARIANT: windows}
+  variables: {CLIENT: "openpsirt-upload_{{ release }}_windows_amd64", VARIANT: windows}
   script:
     - |
       Invoke-WebRequest "$env:BASE/$env:CLIENT.zip" -OutFile "$env:CLIENT.zip"
@@ -273,7 +273,7 @@ analysis-windows:
       python -m pip install ruff
       python -m ruff check --output-format sarif --output-file ruff.sarif --exit-zero .
       $status = $LASTEXITCODE
-      openpsirt-analysis upload `
+      openpsirt-upload upload `
         --product sonic --stream "$env:CI_COMMIT_BRANCH" --variant "$env:VARIANT" `
         --series ruff --built "$env:CI_PIPELINE_CREATED_AT" `
         --rules-file .openpsirt/ruff.rules --exit-status $status `
@@ -313,7 +313,7 @@ pipeline {
             steps {
               script {
                 def client = [linux: 'linux_amd64', macos: 'darwin_arm64', windows: 'windows_amd64'][env.VARIANT]
-                withEnv(["CLIENT=openpsirt-analysis_{{ release }}_${client}"]) {
+                withEnv(["CLIENT=openpsirt-upload_{{ release }}_${client}"]) {
                   if (isUnix()) {
                     sh '''
                       curl -fsSL -O "$BASE/$CLIENT.tar.gz" -O "$BASE/SHA256SUMS"
@@ -323,7 +323,7 @@ pipeline {
                       python3 -m venv .venv && . .venv/bin/activate && pip install ruff
                       status=0
                       ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
-                      openpsirt-analysis upload \\
+                      openpsirt-upload upload \\
                         --product sonic --stream main --variant "$VARIANT" \\
                         --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \\
                         --rules-file .openpsirt/ruff.rules --exit-status "$status" \\
@@ -341,7 +341,7 @@ pipeline {
                       python -m ruff check --output-format sarif --output-file ruff.sarif --exit-zero .
                       $status = $LASTEXITCODE
                       $built = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
-                      openpsirt-analysis upload `
+                      openpsirt-upload upload `
                         --product sonic --stream main --variant "$env:VARIANT" `
                         --series ruff --built $built `
                         --rules-file .openpsirt/ruff.rules --exit-status $status `
@@ -392,7 +392,7 @@ pool:
 
 variables:
   BASE: https://github.com/nexthop-ai/openpsirt/releases/download/v{{ release }}
-  CLIENT: openpsirt-analysis_{{ release }}_$(client)
+  CLIENT: openpsirt-upload_{{ release }}_$(client)
 
 steps:
   - checkout: self
@@ -422,7 +422,7 @@ steps:
       pip install ruff
       status=0
       ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
-      openpsirt-analysis upload \
+      openpsirt-upload upload \
         --product sonic --stream "$(Build.SourceBranchName)" --variant "$(variant)" \
         --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --rules-file .openpsirt/ruff.rules --exit-status "$status" \
@@ -534,7 +534,7 @@ not passed:
 ```bash
 go install github.com/securego/gosec/v2/cmd/gosec@latest
 gosec -no-fail -fmt sarif -out gosec.sarif ./...
-openpsirt-analysis upload "${build[@]}" --series gosec \
+openpsirt-upload upload "${build[@]}" --series gosec \
   --rules-file .openpsirt/gosec.rules gosec.sarif
 ```
 
@@ -545,7 +545,7 @@ its linter, so its rules file names the linters enabled:
 curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b "$(go env GOPATH)/bin" "$GOLANGCI_LINT_VERSION"
 status=0
 golangci-lint run --output.sarif.path=golangci-lint.sarif --issues-exit-code=0 ./... || status=$?
-openpsirt-analysis upload "${build[@]}" --series golangci-lint \
+openpsirt-upload upload "${build[@]}" --series golangci-lint \
   --tool-version "$(golangci-lint version --short)" \
   --rules-file .openpsirt/golangci-lint.rules --exit-status "$status" \
   golangci-lint.sarif
@@ -559,7 +559,7 @@ Bandit writes SARIF with its `sarif` extra installed:
 pip install "bandit[sarif]"
 status=0
 bandit -r . -f sarif -o bandit.sarif --exit-zero || status=$?
-openpsirt-analysis upload "${build[@]}" --series bandit \
+openpsirt-upload upload "${build[@]}" --series bandit \
   --rules-file .openpsirt/bandit.rules --exit-status "$status" bandit.sarif
 ```
 
@@ -569,7 +569,7 @@ Ruff:
 pip install ruff
 status=0
 ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
-openpsirt-analysis upload "${build[@]}" --series ruff \
+openpsirt-upload upload "${build[@]}" --series ruff \
   --rules-file .openpsirt/ruff.rules --exit-status "$status" ruff.sarif
 ```
 
@@ -583,7 +583,7 @@ npm install --save-dev @microsoft/eslint-formatter-sarif
 status=0
 npx eslint . -f @microsoft/eslint-formatter-sarif -o eslint.sarif || status=$?
 if [ "$status" -eq 1 ]; then status=0; fi
-openpsirt-analysis upload "${build[@]}" --series eslint \
+openpsirt-upload upload "${build[@]}" --series eslint \
   --rules-file .openpsirt/eslint.rules --exit-status "$status" eslint.sarif
 ```
 
@@ -600,7 +600,7 @@ cargo install clippy-sarif
 set -o pipefail
 status=0
 cargo clippy --message-format=json -- --cap-lints warn | clippy-sarif --output clippy.sarif || status=$?
-openpsirt-analysis upload "${build[@]}" --series clippy \
+openpsirt-upload upload "${build[@]}" --series clippy \
   --tool-version "$(cargo clippy --version)" \
   --rules-file .openpsirt/clippy.rules --exit-status "$status" clippy.sarif
 ```
@@ -612,7 +612,7 @@ SpotBugs, through its Maven plugin:
 ```bash
 status=0
 mvn -B compile com.github.spotbugs:spotbugs-maven-plugin:spotbugs -Dspotbugs.sarifOutput=true || status=$?
-openpsirt-analysis upload "${build[@]}" --series spotbugs \
+openpsirt-upload upload "${build[@]}" --series spotbugs \
   --rules-file .openpsirt/spotbugs.rules --exit-status "$status" \
   target/spotbugsSarif.json
 ```
@@ -629,7 +629,7 @@ documents, one per translation unit, so the units analyzed are counted:
 ```bash
 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 analyze-build --cdb build/compile_commands.json --plist-multi-file -o out
-openpsirt-analysis upload "${build[@]}" --series clang-sa \
+openpsirt-upload upload "${build[@]}" --series clang-sa \
   --compile-commands build/compile_commands.json out/*/*.plist
 ```
 
@@ -642,7 +642,7 @@ cppcheck, as XML version 2, which the client reads:
 status=0
 cppcheck --project=build/compile_commands.json --enable=all \
   --xml --xml-version=2 --output-file=cppcheck.xml || status=$?
-openpsirt-analysis upload "${build[@]}" --series cppcheck \
+openpsirt-upload upload "${build[@]}" --series cppcheck \
   --rules-file .openpsirt/cppcheck.rules --exit-status "$status" cppcheck.xml
 ```
 
@@ -650,7 +650,7 @@ Both in one command name each one's series, and leave out the flags that
 describe one analyzer:
 
 ```bash
-openpsirt-analysis upload "${build[@]}" \
+openpsirt-upload upload "${build[@]}" \
   --series clang=clang-sa --series cppcheck=cppcheck \
   --compile-commands build/compile_commands.json \
   out/*/*.plist cppcheck.xml
@@ -668,7 +668,7 @@ export PATH="$PWD/codeql:$PATH"
 status=0
 codeql database create db-go --language=go --build-mode=autobuild || status=$?
 codeql database analyze db-go --format=sarif-latest --output=codeql-go.sarif || status=$?
-openpsirt-analysis upload "${build[@]}" --series codeql-go \
+openpsirt-upload upload "${build[@]}" --series codeql-go \
   --exit-status "$status" codeql-go.sarif
 ```
 

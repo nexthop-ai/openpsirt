@@ -165,7 +165,7 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 	// rather than a deployment. The upload client is left out too: its names
 	// configure a pipeline, and docs/analysis.md holds them.
 	refusals := goSources(t, "../..", "../../internal/tools", "../../internal/dbtest",
-		"../../web", "../../node_modules", "../../cmd/openpsirt-analysis", "../../internal/analysisclient")
+		"../../web", "../../node_modules", "../../cmd/openpsirt-upload", "../../internal/uploadclient")
 	requireAmong(t, refusals, "../../internal/config/config.go", "../../cmd/openpsirt/main.go")
 
 	// A variable named anywhere in the program is one an operator is being

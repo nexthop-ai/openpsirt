@@ -27,7 +27,7 @@ database built by a release candidate or any other earlier build is recreated.
 | Analytics | Release comparison, trends, deadlines, release readiness, exception reports, and exports as CSV or JSON |
 | Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, Slack and Zulip channels and direct messages, and operational alerts |
 | Web interface | Every screen above, embedded into the binary and served from it |
-| Packaging | A container image and a Helm chart for `linux/amd64`, binary archives for Linux on amd64 and arm64, and the `openpsirt-analysis` upload client for Linux, macOS and Windows on amd64 and arm64 |
+| Packaging | A container image and a Helm chart for `linux/amd64`, binary archives for Linux on amd64 and arm64, and the `openpsirt-upload` upload client for Linux, macOS and Windows on amd64 and arm64 |
 
 ## Not built
 

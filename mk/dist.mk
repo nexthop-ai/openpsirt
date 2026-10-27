@@ -130,11 +130,11 @@ dist-client: dist-version
 	@$(GO) build -modfile=tools/cyclonedx-gomod/go.mod -o $(CLIENT_INVENTORY_TOOL) \
 	  github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod
 	@set -e; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
-	  name=openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch; \
-	  exe=openpsirt-analysis; [ "$$os" != windows ] || exe=openpsirt-analysis.exe; \
+	  name=openpsirt-upload_$(DIST_VERSION)_$${os}_$$arch; \
+	  exe=openpsirt-upload; [ "$$os" != windows ] || exe=openpsirt-upload.exe; \
 	  rm -rf $(DIST_DIR)/$$name; mkdir -p $(DIST_DIR)/$$name; \
 	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath \
-	    -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$$name/$$exe ./cmd/openpsirt-analysis; \
+	    -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$$name/$$exe ./cmd/openpsirt-upload; \
 	  GOOS=$$os GOARCH=$$arch $(CLIENT_INVENTORY_TOOL) bin -json -std \
 	    -version $(DIST_VERSION) -output $(DIST_DIR)/$$name.cdx.json $(DIST_DIR)/$$name/$$exe; \
 	  cp LICENSE NOTICE $(DIST_DIR)/$$name/; \
@@ -256,19 +256,19 @@ dist-verify: dist-version
 	      || $(MAKE) --no-print-directory dist-serves BINARY="$$binary" \
 	      || fail=1; \
 	  done; \
-	  client=openpsirt-analysis_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH); \
+	  client=openpsirt-upload_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH); \
 	  if [ ! -f $(DIST_DIR)/$$client.tar.gz ]; then skipped="$$skipped the upload client (no archive)"; \
 	  else \
 	    tar -C "$$work" -xzf $(DIST_DIR)/$$client.tar.gz; \
-	    said=$$("$$work"/$$client/openpsirt-analysis version | awk '{print $$2}'); \
+	    said=$$("$$work"/$$client/openpsirt-upload version | awk '{print $$2}'); \
 	    [ "$$said" = "$(DIST_VERSION)" ] \
 	      || { echo "the upload client reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
 	  fi; \
 	  for arch in $(DIST_ARCHES); do \
-	    client=openpsirt-analysis_$(DIST_VERSION)_windows_$$arch; \
+	    client=openpsirt-upload_$(DIST_VERSION)_windows_$$arch; \
 	    if [ ! -f $(DIST_DIR)/$$client.zip ]; then skipped="$$skipped the $$arch Windows upload client (no archive)"; \
-	    elif ! unzip -l $(DIST_DIR)/$$client.zip | grep -q " $$client/openpsirt-analysis.exe$$"; then \
-	      echo "$$client.zip does not hold $$client/openpsirt-analysis.exe"; fail=1; \
+	    elif ! unzip -l $(DIST_DIR)/$$client.zip | grep -q " $$client/openpsirt-upload.exe$$"; then \
+	      echo "$$client.zip does not hold $$client/openpsirt-upload.exe"; fail=1; \
 	    fi; \
 	  done; \
 	  chart=$(DIST_DIR)/openpsirt-$(DIST_VERSION).tgz; \
@@ -282,7 +282,7 @@ dist-verify: dist-version
 	    done; \
 	  fi; \
 	  clients=; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
-	    clients="$$clients $(DIST_DIR)/openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch.cdx.json"; \
+	    clients="$$clients $(DIST_DIR)/openpsirt-upload_$(DIST_VERSION)_$${os}_$$arch.cdx.json"; \
 	  done; done; \
 	  for inventory in \
 	    $(DIST_DIR)/openpsirt_$(DIST_VERSION).cdx.json \
@@ -294,7 +294,7 @@ dist-verify: dist-version
 	      || { echo "$$(basename $$inventory) describes $$said and the release is $(DIST_VERSION)"; fail=1; }; \
 	  done; \
 	  for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
-	    inventory=$(DIST_DIR)/openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch.cdx.json; \
+	    inventory=$(DIST_DIR)/openpsirt-upload_$(DIST_VERSION)_$${os}_$$arch.cdx.json; \
 	    [ -f "$$inventory" ] || continue; \
 	    purl=$$(jq -r '.metadata.component.purl' "$$inventory"); \
 	    case "$$purl" in *goarch=$$arch\&goos=$$os\&*) ;; \

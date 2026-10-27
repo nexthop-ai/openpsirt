@@ -86,7 +86,7 @@ export function AnalysisRuns({ build }: { build: Build }) {
       {items.length === 0 ? (
         <Empty
           title="No static analysis runs."
-          detail="A build pipeline sends them with openpsirt-analysis."
+          detail="A build pipeline sends them with openpsirt-upload."
         />
       ) : (
         <Wide>

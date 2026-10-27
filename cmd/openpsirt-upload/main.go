@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Command openpsirt-analysis sends an analyzer's run from a build pipeline
+// Command openpsirt-upload sends an analyzer's run from a build pipeline
 // to OpenPSIRT, as the SARIF the deployment reads best.
 package main
 
@@ -24,15 +24,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/analysisclient"
+	"github.com/nexthop-ai/openpsirt/internal/uploadclient"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
-const usage = `openpsirt-analysis sends an analyzer's run to OpenPSIRT.
+const usage = `openpsirt-upload sends an analyzer's run to OpenPSIRT.
 
-  openpsirt-analysis upload --product P --stream S --variant V --series NAME [flags] OUTPUT...
-  openpsirt-analysis write  --series NAME [flags] --output FILE OUTPUT...
-  openpsirt-analysis version
+  openpsirt-upload upload --product P --stream S --variant V --series NAME [flags] OUTPUT...
+  openpsirt-upload write  --series NAME [flags] --output FILE OUTPUT...
+  openpsirt-upload version
 
 Each OUTPUT is clang plist-multi-file, cppcheck XML version 2, or any tool's
 SARIF 2.1.0, compressed with gzip or not. The address is --url, or
@@ -48,7 +48,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	if err := run(ctx, os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "openpsirt-analysis:", err)
+		fmt.Fprintln(os.Stderr, "openpsirt-upload:", err)
 		os.Exit(1)
 	}
 }
@@ -85,7 +85,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	}
 	switch args[0] {
 	case "version":
-		_, err := fmt.Fprintln(stdout, "openpsirt-analysis", version.Get().Version)
+		_, err := fmt.Fprintln(stdout, "openpsirt-upload", version.Get().Version)
 		return err
 	case "upload", "write":
 	case "help", "-h", "--help":
@@ -99,7 +99,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var (
-		to                               analysisclient.Target
+		to                               uploadclient.Target
 		commit, built, root, out         string
 		toolVersion, saltFile, rulesFile string
 		compileCommands                  string
@@ -135,10 +135,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return errors.New("name the analyzer's output files")
 	}
 
-	opts := analysisclient.Options{
+	opts := uploadclient.Options{
 		Commit: commit, ToolVersion: toolVersion, Snippets: snippets,
 		UnitsExpected: expected.n, UnitsAnalyzed: analyzed.n, ExitStatus: exitStatus.n,
-		Client: "openpsirt-analysis " + version.Get().Version,
+		Client: "openpsirt-upload " + version.Get().Version,
 	}
 	for _, named := range series {
 		tool, name, each := strings.Cut(named, "=")
@@ -205,7 +205,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		rules = append(rules, listed...)
 	}
 
-	inputs := make([]analysisclient.Input, 0, len(files))
+	inputs := make([]uploadclient.Input, 0, len(files))
 	for _, f := range files {
 		info, err := os.Stat(f) //nolint:gosec // G703: the path the pipeline named
 		if err != nil {
@@ -218,9 +218,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
-		inputs = append(inputs, analysisclient.Input{Name: f, Data: data})
+		inputs = append(inputs, uploadclient.Input{Name: f, Data: data})
 	}
-	runs, report, err := analysisclient.Build(ctx, opts, inputs)
+	runs, report, err := uploadclient.Build(ctx, opts, inputs)
 	if err != nil {
 		return err
 	}
@@ -262,8 +262,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	var failed []string
 	client := uploader()
 	for _, r := range runs {
-		answer, err := analysisclient.Send(ctx, client, to, r.Doc,
-			analysisclient.Fields{Rules: rules, ThirdParty: thirdParty})
+		answer, err := uploadclient.Send(ctx, client, to, r.Doc,
+			uploadclient.Fields{Rules: rules, ThirdParty: thirdParty})
 		switch {
 		case err != nil:
 			failed = append(failed, fmt.Sprintf("%s: %v", r.Series, err))

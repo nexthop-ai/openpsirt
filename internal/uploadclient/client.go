@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package analysisclient builds the SARIF a pipeline sends with an analyzer's
+// Package uploadclient builds the SARIF a pipeline sends with an analyzer's
 // run, from the analyzer's own output and the checkout it analyzed.
 //
 // It reads a tool's native output where that carries more than the tool's
@@ -11,7 +11,7 @@
 // placed in the checkout the same way on every operating system, and a
 // content fingerprint for each result. Source text leaves the pipeline only
 // when the pipeline asks for snippets.
-package analysisclient
+package uploadclient
 
 import (
 	"bytes"

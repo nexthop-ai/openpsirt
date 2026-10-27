@@ -887,16 +887,16 @@ holds any (REQ-42).
 
 ## Upload client
 
-`openpsirt-analysis` runs in a pipeline beside the analyzer. It reads the
+`openpsirt-upload` runs in a pipeline beside the analyzer. It reads the
 analyzer's output and the checkout, writes one SARIF run per analyzer holding
 what the deployment cannot learn from the output alone, and sends each as
 § The upload describes.
 
 ```
-openpsirt-analysis upload --product P --stream S --variant V --series [TOOL=]NAME... \
+openpsirt-upload upload --product P --stream S --variant V --series [TOOL=]NAME... \
   [--commit SHA] [--built TIME] [--snippets] [--salt-file FILE] \
   [--third-party PATH]... OUTPUT...
-openpsirt-analysis write --series [TOOL=]NAME... --output FILE OUTPUT...
+openpsirt-upload write --series [TOOL=]NAME... --output FILE OUTPUT...
 ```
 
 `write` builds the same document and stores it rather than sending it, so a
