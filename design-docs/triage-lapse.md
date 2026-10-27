@@ -11,6 +11,7 @@ Satisfies REQ-25, REQ-27, REQ-28, REQ-42.
 - [Re-affirmation](#re-affirmation)
 - [Whole-action re-affirmation](#whole-action-re-affirmation)
 - [Re-affirmation across decisions](#re-affirmation-across-decisions)
+- [Limits](#limits)
 
 ## Lapse marking
 
@@ -146,3 +147,9 @@ release, a point release or a new branch lapses many at once.
 The response says per decision what lapsed, what re-makes it, and whether it
 waits. 300 decisions at two occurrences each take 0.25 s on SQLite and 2.3 s on
 PostgreSQL.
+
+## Limits
+
+| Limit | Detail |
+|---|---|
+| Nobody but its maker carries a lapsed decision's agreement forward | Anybody else proposes it afresh, for a second person, so a decision whose maker has gone loses its agreement at the first lapse |
