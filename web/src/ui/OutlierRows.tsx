@@ -4,10 +4,10 @@
 import { Exploited, ExploitedHere, Severity } from "./Severity";
 import { Wide } from "./Wide";
 
-// One issue a bulk claim covers that does not look like the rest, as the
+// One issue a bulk decision covers that does not look like the rest, as the
 // server lists it.
 type Outlier = {
-  decision_id: number;
+  decision_occurrence_id: number;
   severity?: string;
   vulnerability?: string;
   exploited?: boolean;
@@ -15,9 +15,9 @@ type Outlier = {
   why?: string[] | null;
 };
 
-// OutlierRows is the issues a bulk claim covers that do not look like the rest,
+// OutlierRows is the issues a bulk decision covers that do not look like the rest,
 // each with a box to hold it back and the reasons it stands out. The same
-// table wherever whoever wrote the claim is offered the choice.
+// table wherever whoever wrote the decision is offered the choice.
 export function OutlierRows<Row extends Outlier>({
   rows,
   holding,
@@ -40,12 +40,12 @@ export function OutlierRows<Row extends Outlier>({
         </thead>
         <tbody>
           {rows.map((one) => (
-            <tr key={one.decision_id}>
+            <tr key={one.decision_occurrence_id}>
               <td>
                 <input
                   type="checkbox"
                   aria-label="Hold back"
-                  checked={holding.has(one.decision_id)}
+                  checked={holding.has(one.decision_occurrence_id)}
                   onChange={(event) => onToggle(one, event.target.checked)}
                 />
               </td>

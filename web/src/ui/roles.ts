@@ -51,7 +51,7 @@ const WORDS: Record<Role, { label: string; means: string; grants: boolean }> = {
   },
   approver: {
     label: "Approver",
-    means: "Agree to somebody else's claim. Never their own",
+    means: "Agree to somebody else's decision. Never their own",
     grants: false,
   },
   assigner: {

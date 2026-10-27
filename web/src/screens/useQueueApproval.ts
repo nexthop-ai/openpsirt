@@ -5,7 +5,7 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useAfterClaim, useApproveClaim, type Claim } from "../api/claims";
+import { useAfterDecision, useApproveDecision, type Decision } from "../api/decisions";
 
 // What stays ticked once an approval loop has run: everything it did not act
 // on, as the selection now stands, and of what it acted on only what was
@@ -16,21 +16,21 @@ export function stillPicked<T>(
   refused: string[],
 ): Map<string, T> {
   const left = new Map<string, T>();
-  for (const [key, claim] of now) {
-    if (!acted.has(key) || refused.includes(key)) left.set(key, claim);
+  for (const [key, decision] of now) {
+    if (!acted.has(key) || refused.includes(key)) left.set(key, decision);
   }
   return left;
 }
 
-// Approving the claims ticked on the review queue, under one batch name, and
+// Approving the decisions ticked on the review queue, under one batch name, and
 // taking that batch back.
 //
-// The selection is held by the screen, keyed by claim and holding the claim,
+// The selection is held by the screen, keyed by decision and holding the decision,
 // because it survives paging: an approval acts on everything ticked, wherever
 // it was ticked.
 export function useQueueApproval(
-  picked: Map<string, Claim>,
-  setPicked: Dispatch<SetStateAction<Map<string, Claim>>>,
+  picked: Map<string, Decision>,
+  setPicked: Dispatch<SetStateAction<Map<string, Decision>>>,
 ) {
   const [batch, setBatch] = useState("");
   // The batch just agreed to, which is the only one there is a safe control
@@ -40,8 +40,8 @@ export function useQueueApproval(
   // The rows of a batch refused, so a partial result says so rather than
   // leaving somebody to compare counts.
   const [refused, setRefused] = useState(0);
-  const approveClaim = useApproveClaim();
-  const afterClaim = useAfterClaim();
+  const approveDecision = useApproveDecision();
+  const afterDecision = useAfterDecision();
   const undo = useMutation({
     mutationFn: async (name: string) =>
       unwrap(
@@ -51,22 +51,22 @@ export function useQueueApproval(
       ),
     onSuccess: () => {
       setJustDone("");
-      afterClaim();
+      afterDecision();
     },
   });
 
   async function approvePicked() {
-    // Sequential rather than parallel: each is a separate claim and a refusal
-    // on one does not decide the fate of the rest. Every claim is tried, the
+    // Sequential rather than parallel: each is a separate decision and a refusal
+    // on one does not decide the fate of the rest. Every decision is tried, the
     // selection is left holding what was refused, and the batch name is set
     // whenever one landed, so the undo control appears for those.
     const named = batch.trim();
     const failed: string[] = [];
     let landed = 0;
     const acted = new Set(picked.keys());
-    for (const [key, claim] of picked) {
+    for (const [key, decision] of picked) {
       try {
-        await approveClaim.mutateAsync({ id: claim.id, batch: named || undefined });
+        await approveDecision.mutateAsync({ id: decision.id, batch: named || undefined });
         landed++;
       } catch {
         failed.push(key);
@@ -94,7 +94,7 @@ export function useQueueApproval(
     setJustDone,
     refused,
     setRefused,
-    approveClaim,
+    approveDecision,
     undo,
     approvePicked,
   };

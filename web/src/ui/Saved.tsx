@@ -101,12 +101,12 @@ export function ruleIn(kept: Kept[], params: URLSearchParams): Kept | undefined 
 // longer offers simply stops narrowing by it, which is a slightly wider list
 // rather than a refusal to open one.
 //
-// A rule prepares a claim; a person proposes it. A saved filter can carry
+// A rule prepares a decision; a person proposes it. A saved filter can carry
 // an outcome, a justification, the reasoning and how long a deferral it means;
 // picking it fills the decision form of every finding opened from the list,
-// and a named person submits the claim as their own for a second person to
+// and a named person submits the decision as their own for a second person to
 // approve. It proposes nothing by itself — the wider form was refused because
-// it leaves the approver as the only human judgment on the claim.
+// it leaves the approver as the only human judgment on the decision.
 export function Saved({
   onBuild,
   onPicked,
@@ -135,7 +135,7 @@ export function Saved({
   const [days, setDays] = useState("");
   // What the last save said, until the next act.
   const [said, setSaid] = useState("");
-  // The two outcomes whose claim is which recognized reason applies, and the
+  // The two outcomes whose decision is which recognized reason applies, and the
   // reasons each may state. A correction carries past every version bump, so
   // the three reasons a bump can change are not among the ones it offers.
   const needsJustification = useOutcomes().needsJustification(outcome);
@@ -233,7 +233,7 @@ export function Saved({
           {mine.map((one) => (
             <option key={one.name} value={one.name}>
               {one.name}
-              {one.prepares ? " ·  prepares a claim" : ""}
+              {one.prepares ? " ·  prepares a decision" : ""}
             </option>
           ))}
           {unshown > 0 && (
@@ -297,7 +297,7 @@ export function Saved({
               checked={rule}
               onChange={(event) => setRule(event.target.checked)}
             />
-            <span>And prepare a claim for what it catches</span>
+            <span>And prepare a decision for what it catches</span>
           </label>
           {rule && (
             <>
@@ -318,7 +318,7 @@ export function Saved({
                   <select value={reason} onChange={(event) => setJustification(event.target.value)}>
                     <option value="">Select one</option>
                     {/* From the one list rather than typed out again, so the
-                        same claim reads the same way where it is chosen and
+                        same decision reads the same way where it is chosen and
                         where it is read back, and a reason the vocabulary
                         gains appears here without anybody adding it. Which
                         list it is depends on the outcome: a correction takes
@@ -365,11 +365,11 @@ export function Saved({
               </label>
               <p className="hint" style={{ flexBasis: "100%", margin: 0 }}>
                 {/* The whole of why the narrow form was chosen. A rule that
-                    proposed its own claims would leave the approver as the
+                    proposed its own decisions would leave the approver as the
                     only human judgment on them, and would put a configuration
                     file where a name belongs in the record. */}
                 Proposes nothing. Picking the filter fills the decision form, and <b>you</b> submit
-                the claim as your own.
+                the decision as your own.
               </p>
             </>
           )}

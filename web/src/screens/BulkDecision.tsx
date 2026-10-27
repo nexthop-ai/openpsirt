@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useAfterClaim } from "../api/claims";
+import { useAfterDecision } from "../api/decisions";
 import { notACredential } from "../ui/noautofill";
 import { Icon } from "../ui/Icons";
 import { useMemo, useState } from "react";
@@ -29,7 +29,7 @@ import {
 import { useOutcomes } from "../ui/outcomes";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
-import { claimAt, decisionAt, issueAt } from "../app/routes";
+import { decisionAt, decisionOccurrenceAt, issueAt } from "../app/routes";
 
 // A page of issues at one component. A kernel carries thousands, and a list
 // drawn as if it were all of them says "select all" against a number that is
@@ -39,14 +39,14 @@ const PAGE = 500;
 // The body this screen sends, by the name the API document gives it. Taken
 // from the generated client rather than restated, so a field the server
 // requires cannot be left out of the call and noticed by nobody.
-type Claimed = NonNullable<
+type Asked = NonNullable<
   paths["/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision"]["post"]["requestBody"]
 >["content"]["application/json"];
 
-// The outcomes one bulk claim may record, in the order the form offers them.
+// The outcomes one bulk decision may record, in the order the form offers them.
 // Keyed by the request's own union, so an outcome the endpoint gains or drops
 // is a compile error here rather than an option that is missing or refused.
-const OFFERED: Record<Claimed["outcome"], true> = {
+const OFFERED: Record<Asked["outcome"], true> = {
   "not-applicable": true,
   mismatched: true,
   "wont-fix": true,
@@ -55,25 +55,25 @@ const OFFERED: Record<Claimed["outcome"], true> = {
   "already-fixed": true,
 };
 
-// A place a claim left out because a decision already stands there.
+// An occurrence a decision left out because a decision already stands there.
 type Skipped = Body<"SkippedBody">;
 
-// What the result says about the places a claim left out.
+// What the result says about the occurrences a decision left out.
 export function skippedNotice(n: number): string {
   return n === 1
-    ? "1 place skipped: a decision already stands there."
-    : `${n.toLocaleString()} places skipped: a decision already stands at each.`;
+    ? "1 occurrence skipped: a decision already stands there."
+    : `${n.toLocaleString()} occurrences skipped: a decision already stands at each.`;
 }
 
-// One judgment about many issues at one component. The transpose of the usual
-// grouping: one issue across many places is what a decision already covers,
+// One decision about many issues at one component. The transpose of the usual
+// grouping: one issue across many occurrences is what a decision already covers,
 // and a kernel carrying thousands of issues — most of them in drivers a given
 // image never builds — has no answer at all without this.
 //
-// The claim is ordinary and needs a second person like any other dismissal.
-// It is defensible because it writes a separate decision per issue and
-// per place, each keyed and expiring on its own, rather than one blanket claim.
-export function Together() {
+// The decision is ordinary and needs a second person like any other dismissal.
+// It is defensible because it writes a separate record per issue and
+// per occurrence, each keyed and expiring on its own, rather than one blanket decision.
+export function BulkDecision() {
   const { product = "", stream = "", variant = "", component = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const contains = params.get("contains") ?? "";
@@ -87,7 +87,7 @@ export function Together() {
   const [typed, setTyped] = useState(contains);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const queries = useQueryClient();
-  const after = useAfterClaim();
+  const after = useAfterDecision();
   const opener = useRowOpener();
 
   const at = { product, stream, variant, component };
@@ -95,7 +95,7 @@ export function Together() {
   // under two variants keeps two drafts — and what is kept here is the
   // reasoning a second person is asked to agree to.
   const kind = Object.values(which).join("/");
-  const draftKey = `together:${product}:${stream}:${variant}:${component}${kind ? `:${kind}` : ""}`;
+  const draftKey = `bulk-decision:${product}:${stream}:${variant}:${component}${kind ? `:${kind}` : ""}`;
 
   const issues = useQuery({
     queryKey: ["at-component", at, which, contains, offset],
@@ -115,10 +115,10 @@ export function Together() {
 
   const decide = useMutation({
     // The body the generated client declares, so the two fields the server
-    // requires for a deferral and an already-fixed claim are checked here
-    // rather than refused there. Cast to `never`, the form could send a claim
+    // requires for a deferral and an already-fixed decision are checked here
+    // rather than refused there. Cast to `never`, the form could send a decision
     // missing either and nothing in this file would notice.
-    mutationFn: async (body: Claimed) =>
+    mutationFn: async (body: Asked) =>
       unwrap(
         await api.POST(
           "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision",
@@ -143,7 +143,7 @@ export function Together() {
   // The two limits one answer is held to: issues, which is what the approver
   // reads, and findings written.
   const issueLimit = issues.data?.issue_limit ?? 0;
-  const placeLimit = issues.data?.place_limit ?? 0;
+  const occurrenceLimit = issues.data?.occurrence_limit ?? 0;
 
   // The selection's reach, in rows written rather than issues picked.
   //
@@ -160,7 +160,7 @@ export function Together() {
   if (merged !== items) {
     setMerged(items);
     const next = new Map(reach);
-    for (const each of items) next.set(each.vulnerability ?? "", each.places ?? 0);
+    for (const each of items) next.set(each.vulnerability ?? "", each.occurrences ?? 0);
     setReach(next);
   }
   const everySelected = picked.size > 0 && picked.size === everything;
@@ -170,12 +170,12 @@ export function Together() {
       ? (issues.data?.findings ?? 0)
       : [...picked].reduce((sum, name) => sum + (reach.get(name) ?? 0), 0);
   const overIssues = issueLimit > 0 && picked.size > issueLimit;
-  const overPlaces = placeLimit > 0 && writing > placeLimit;
-  const over = overIssues || overPlaces;
+  const overOccurrences = occurrenceLimit > 0 && writing > occurrenceLimit;
+  const over = overIssues || overOccurrences;
 
   // Everything the filter matches, not everything on the page. Fetched in one
   // request at the largest page the server offers, and repeated until the set
-  // is complete, because a selection assembled a page at a time is a claim
+  // is complete, because a selection assembled a page at a time is a decision
   // somebody meant to make once.
   const all = useQuery({
     enabled: false,
@@ -213,7 +213,8 @@ export function Together() {
         <h2>Bulk decision</h2>
         <p>
           <span className="id">{component}</span> · {product} · {stream} · {variant} — one outcome,
-          one reasoning, a separate record per issue and per place. Nothing here selects for you.
+          one reasoning, a separate record per issue and per occurrence. Nothing here selects for
+          you.
         </p>
       </div>
 
@@ -274,8 +275,8 @@ export function Together() {
             >
               Select all {items.length.toLocaleString()} shown
             </button>
-            {/* The whole narrowed set, not the page. A claim assembled a page
-                at a time is several claims where the person meant one. */}
+            {/* The whole narrowed set, not the page. A decision assembled a page
+                at a time is several decisions where the person meant one. */}
             {everything > items.length && (
               <button
                 type="button"
@@ -302,13 +303,13 @@ export function Together() {
               <b>{writing.toLocaleString()}</b> {writing === 1 ? "finding" : "findings"} would be
               written
               {overIssues && <> · limit {issueLimit.toLocaleString()} issues</>}
-              {overPlaces && <> · limit {placeLimit.toLocaleString()} findings</>}
+              {overOccurrences && <> · limit {occurrenceLimit.toLocaleString()} findings</>}
             </p>
           )}
 
-          {/* The evidence one judgment is being made on, the description
-              the list is narrowed by among it. One click here writes a claim
-              across hundreds of places, so it says at least as much as the
+          {/* The evidence one decision is being made on, the description
+              the list is narrowed by among it. One click here writes a decision
+              across hundreds of occurrences, so it says at least as much as the
               screen for deciding one. */}
           <div className="picklist">
             <Wide>
@@ -338,7 +339,7 @@ export function Together() {
                       EPSS
                     </th>
                     <th>Fixed in</th>
-                    <th className="num">Places</th>
+                    <th className="num">Occurrences</th>
                     <th>Due</th>
                   </tr>
                 </thead>
@@ -382,7 +383,7 @@ export function Together() {
                         <td>
                           {issue.fixed_in ? <span className="id">{issue.fixed_in}</span> : ""}
                         </td>
-                        <td className="num">{issue.places}</td>
+                        <td className="num">{issue.occurrences}</td>
                         <td>{issue.due ? on(issue.due) : <span className="hint">none</span>}</td>
                       </tr>
                     );
@@ -399,14 +400,14 @@ export function Together() {
             onGo={go}
           />
 
-          <Claim
+          <Decision
             narrowed={contains}
             count={picked.size}
-            onClaim={(body) => decide.mutate({ ...body, vulnerabilities: [...picked] })}
+            onDecision={(body) => decide.mutate({ ...body, vulnerabilities: [...picked] })}
             pending={decide.isPending}
             error={decide.error}
             recorded={decide.data?.recorded}
-            claimId={decide.data?.claim_id}
+            decisionId={decide.data?.decision_id}
             skipped={decide.data?.skipped ?? []}
             draftKey={draftKey}
             mentions={{ product }}
@@ -417,25 +418,25 @@ export function Together() {
   );
 }
 
-function Claim({
+function Decision({
   narrowed,
   count,
-  onClaim,
+  onDecision,
   pending,
   error,
   recorded,
-  claimId,
+  decisionId,
   skipped,
   draftKey,
   mentions,
 }: {
   narrowed: string;
   count: number;
-  onClaim: (body: Omit<Claimed, "vulnerabilities">) => void;
+  onDecision: (body: Omit<Asked, "vulnerabilities">) => void;
   pending: boolean;
   error: unknown;
   recorded?: number;
-  claimId?: number;
+  decisionId?: number;
   skipped: Skipped[];
   draftKey: string;
   mentions: { product: string };
@@ -443,7 +444,7 @@ function Claim({
   // Typed against the closed vocabulary the server declares, so a word the
   // form offers that the server does not take is a compile error rather than
   // a refusal somebody reads after pressing submit.
-  const [outcome, setOutcome] = useState<Claimed["outcome"]>("not-applicable");
+  const [outcome, setOutcome] = useState<Asked["outcome"]>("not-applicable");
   const [justification, setJustification] = useState<Justification>(JUSTIFICATIONS[0].value);
   // Prefilled from the narrowing that is on, in the form the approver's
   // outlier check reads back — `contains "driver"` — and still editable, since
@@ -487,9 +488,9 @@ function Claim({
           <span className="l">Outcome</span>
           <select
             value={outcome}
-            onChange={(event) => setOutcome(event.target.value as Claimed["outcome"])}
+            onChange={(event) => setOutcome(event.target.value as Asked["outcome"])}
           >
-            {(Object.keys(OFFERED) as Claimed["outcome"][]).map((each) => (
+            {(Object.keys(OFFERED) as Asked["outcome"][]).map((each) => (
               <option key={each} value={each}>
                 {labeled(each)}
               </option>
@@ -515,7 +516,7 @@ function Claim({
               placeholder="the package version the fix arrived in, as the packager writes it"
             />
             <span className="hint">
-              One version for every issue here. If they differ, this is not one claim.
+              One version for every issue here. If they differ, this is not one decision.
             </span>
           </label>
         )}
@@ -539,10 +540,10 @@ function Claim({
           </label>
         )}
 
-        {/* Recorded with every claim, separately from the reasoning. How a
-            candidate was found is not why the claim is true — "these matched a
+        {/* Recorded with every decision, separately from the reasoning. How a
+            candidate was found is not why the decision is true — "these matched a
             word" is not a defense anybody would accept — but "how were these
-            chosen" is the question asked of a bulk judgment months later. */}
+            chosen" is the question asked of a bulk decision months later. */}
         <label className="field">
           <span className="l">Narrowed by</span>
           <input
@@ -554,7 +555,7 @@ function Claim({
           />
         </label>
 
-        {/* No attach control here, deliberately. One judgment covers many
+        {/* No attach control here, deliberately. One decision covers many
             issues, and a file hangs off one — so there is nothing this could
             attach to that would be true of the rest. */}
         <div className="field">
@@ -575,17 +576,19 @@ function Claim({
             checked={skipDecided}
             onChange={(event) => setSkipDecided(event.target.checked)}
           />
-          Skip places already decided
+          Skip occurrences already decided
         </label>
 
         {error != null && <Failed error={error} what="That could not be recorded." />}
         {typeof recorded === "number" && recorded > 0 && (
           <p className="alert info" role="status">
-            <strong>{recorded.toLocaleString()} records written — one per issue, per place.</strong>
+            <strong>
+              {recorded.toLocaleString()} records written — one per issue, per occurrence.
+            </strong>
             <span>
-              One claim, waiting for a second person.{" "}
-              {claimId ? (
-                <Link to={claimAt(claimId)} className="linkish">
+              One decision, waiting for a second person.{" "}
+              {decisionId ? (
+                <Link to={decisionAt(decisionId)} className="linkish">
                   Open the decision →
                 </Link>
               ) : null}
@@ -597,10 +600,10 @@ function Claim({
             <strong>{skippedNotice(skipped.length)}</strong>
             <ul>
               {skipped.map((each) => (
-                <li key={`${each.vulnerability} ${each.place}`}>
-                  {each.vulnerability} at <span className="id">{each.place}</span> —{" "}
-                  <Link to={decisionAt(each.decision)} className="linkish">
-                    decision {each.decision}
+                <li key={`${each.vulnerability} ${each.occurrence}`}>
+                  {each.vulnerability} at <span className="id">{each.occurrence}</span> —{" "}
+                  <Link to={decisionOccurrenceAt(each.decision_occurrence)} className="linkish">
+                    standing decision
                   </Link>{" "}
                   ({each.state})
                 </li>
@@ -614,7 +617,7 @@ function Claim({
             type="button"
             disabled={!ready || pending}
             onClick={() => {
-              onClaim({
+              onDecision({
                 outcome,
                 ...(needsJustification ? { justification: reason } : {}),
                 ...(needsDate ? { deferred_until: until } : {}),

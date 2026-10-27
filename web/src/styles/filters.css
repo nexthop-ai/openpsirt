@@ -245,10 +245,10 @@
   }
 }
 
-/* The list a bulk judgment is picked out of. Bounded, because a page here is
-   five hundred rows — a kernel carries thousands and assembling one claim a
-   page at a time is eighteen claims where the person meant one — and the form
-   that judgment is typed into has to stay reachable without scrolling past all
+/* The list a bulk decision is picked out of. Bounded, because a page here is
+   five hundred rows — a kernel carries thousands and assembling one decision a
+   page at a time is eighteen decisions where the person meant one — and the form
+   that decision is typed into has to stay reachable without scrolling past all
    of them. */
 .picklist {
   max-height: 420px;

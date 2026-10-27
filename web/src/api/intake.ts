@@ -6,7 +6,7 @@ import { api, type Body } from "./client";
 import { unwrap } from "./queries";
 
 // What arrived, what it was judged to be, and the rulings some of those
-// judgments wait on.
+// decisions wait on.
 //
 // One module, because every act here moves more than one read: a ruling
 // changes the report list, the report, the waiting list and the duplicates an
@@ -22,7 +22,7 @@ export const PAGE = 50;
 
 // Everything an act on a report or a ruling can move. A duplicate ruling moves
 // an issue's disclosure date, and withdrawing one moves it back, so every read
-// carrying that date is among them. A judgment takes a report out of the held
+// carrying that date is among them. A decision takes a report out of the held
 // lists and the holdings counted beside them.
 export function useAfterReport() {
   const queries = useQueryClient();
@@ -486,7 +486,7 @@ export async function uploadReportFile(product: string, reference: string, file:
 // useApprovable is how many rulings this reader may agree to, in one product
 // or across every product: waiting, proposed by somebody else, where they may
 // approve a ruling. What a count of what is pending their approval adds to the
-// claims the review queue counts.
+// decisions the review queue counts.
 export function useApprovable(product?: string): UseQueryResult<number> {
   return useQuery({
     queryKey: ["rulings", "approvable", product ?? ""],

@@ -17,8 +17,8 @@ const settled = { isPending: false, isError: false, error: null };
 const ROW = {
   happened: "waiting",
   by: "bo",
-  claim: { id: 41 },
-  place: { vulnerability: "CVE-2026-1", product: "sonic" },
+  decision: { id: 41 },
+  occurrence: { vulnerability: "CVE-2026-1", product: "sonic" },
   finding: {
     product: "sonic",
     stream: "master",
@@ -28,21 +28,31 @@ const ROW = {
     version: "1.2",
   },
   issues: 3,
-  decisions: 7,
-  places: 7,
+  rows: 7,
+  occurrences: 7,
   when: "2026-01-01T00:00:00Z",
   outliers: {
     rows: [
-      { decision_id: 5, decision_ids: [5, 6], vulnerability: "CVE-2026-2", why: ["exploited"] },
-      { decision_id: 8, decision_ids: [8], vulnerability: "CVE-2026-3", why: ["fix available"] },
+      {
+        decision_occurrence_id: 5,
+        decision_occurrence_ids: [5, 6],
+        vulnerability: "CVE-2026-2",
+        why: ["exploited"],
+      },
+      {
+        decision_occurrence_id: 8,
+        decision_occurrence_ids: [8],
+        vulnerability: "CVE-2026-3",
+        why: ["fix available"],
+      },
     ],
   },
 } as unknown as Body<"BecameBody">;
 
 const text = () => mount.host().textContent ?? "";
 
-describe("the claims somebody proposed", () => {
-  it("holds back every place of an outlier, and only with a reason", async () => {
+describe("the decisions somebody proposed", () => {
+  it("holds back every occurrence of an outlier, and only with a reason", async () => {
     const sent = accept(() => ({ data: {} }));
     mount.render(screen(<Became rows={[ROW]} query={settled} />));
     await settle();
@@ -62,12 +72,12 @@ describe("the claims somebody proposed", () => {
     expect(mount.host().querySelector("textarea")).toBeNull();
   });
 
-  it("says one judgment where a claim covers one issue", async () => {
+  it("says one decision where a decision covers one issue", async () => {
     mount.render(
       screen(<Became rows={[{ ...ROW, issues: 1, outliers: undefined }]} query={settled} />),
     );
     await settle();
-    expect(text()).toContain("one judgment");
+    expect(text()).toContain("one decision");
   });
 
   it("says nothing was proposed", async () => {
@@ -76,7 +86,7 @@ describe("the claims somebody proposed", () => {
   });
 });
 
-describe("what became of a claim", () => {
+describe("what became of a decision", () => {
   it("names each ending, and shows a word it does not know as it arrived", () => {
     mount.render(<Happened word="undone" by="bo" />);
     expect(text()).toBe("Agreement undone by bo");

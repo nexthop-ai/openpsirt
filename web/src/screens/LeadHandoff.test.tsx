@@ -24,7 +24,7 @@ const CONFIRMED = {
   last_seen: "2026-10-01T00:00:00Z",
   open: true,
   state: "confirmed",
-  decision: { claim_id: 4, outcome: "confirmed", reasoning: "", state: "approved" },
+  decision_occurrence: { decision_id: 4, outcome: "confirmed", reasoning: "", state: "approved" },
 };
 
 const OFFER = {
@@ -50,9 +50,9 @@ const OFFER = {
         identity: "ana",
         name: "Ana",
         notes: [
-          { claim: 7, body: "p leaks on the early return", written: "2026-10-01T00:00:00Z" },
+          { decision: 7, body: "p leaks on the early return", written: "2026-10-01T00:00:00Z" },
           {
-            claim: 7,
+            decision: 7,
             comment: true,
             body: "seen on mellanox too",
             written: "2026-10-01T01:00:00Z",
@@ -98,7 +98,7 @@ describe("handing off a lead", () => {
     await drawn(CONFIRMED);
     const sent = accept(() => ({
       status: 201,
-      data: { identifier: "SONIC-2026-000001", component: "zlib", builds: 1, places: 1 },
+      data: { identifier: "SONIC-2026-000001", component: "zlib", builds: 1, occurrences: 1 },
     }));
     pick(mount.host(), "zlib");
     expect(text()).toContain("does not hold it");
@@ -120,7 +120,7 @@ describe("handing off a lead", () => {
     expect(text()).toContain("report the flaw upstream");
     const sent = accept(() => ({
       status: 201,
-      data: { identifier: "SONIC-2026-000001", component: "zlib", builds: 1, places: 1 },
+      data: { identifier: "SONIC-2026-000001", component: "zlib", builds: 1, occurrences: 1 },
     }));
     pick(mount.host(), "zlib");
     change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "inflate overflows");

@@ -25,7 +25,7 @@ async function drawn(state: string, approved = true) {
   mount.render(
     screen(
       <ReasonEditor
-        claimId={12}
+        decisionId={12}
         reasoning="Unreachable."
         state={state}
         approved={approved}
@@ -40,8 +40,8 @@ async function drawn(state: string, approved = true) {
 
 const text = () => mount.host().textContent ?? "";
 
-describe("revising and withdrawing a claim's reasoning", () => {
-  it("says revising withdraws an approval, and sends the new words for this claim", async () => {
+describe("revising and withdrawing a decision's reasoning", () => {
+  it("says revising withdraws an approval, and sends the new words for this decision", async () => {
     const { put, onDone } = await drawn("agreed");
     expect(text()).toContain("Revising withdraws the approval");
     await press(mount.host(), "Revise reasoning");
@@ -59,7 +59,7 @@ describe("revising and withdrawing a claim's reasoning", () => {
     expect(onDone).toHaveBeenCalled();
   });
 
-  it("withdraws the claim named", async () => {
+  it("withdraws the decision named", async () => {
     const { del } = await drawn("waiting", false);
     expect(text()).toContain("Withdrawing needs nobody");
     expect(text()).not.toContain("Revising withdraws the approval");
@@ -68,7 +68,7 @@ describe("revising and withdrawing a claim's reasoning", () => {
     expect(only(del)[1].params?.path).toEqual({ id: 12 });
   });
 
-  it("offers nothing to change on a claim that has ended", async () => {
+  it("offers nothing to change on a decision that has ended", async () => {
     await drawn("withdrawn");
     expect(
       Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent),
@@ -76,15 +76,15 @@ describe("revising and withdrawing a claim's reasoning", () => {
   });
 });
 
-describe("naming somebody in a claim's reasoning", () => {
-  it("offers readers of internal work on a claim about a lead", async () => {
+describe("naming somebody in a decision's reasoning", () => {
+  it("offers readers of internal work on a decision about a lead", async () => {
     const reads = serve((path) =>
       path === "/v1/products/{product}/mentionable" ? { data: { items: [] } } : { data: {} },
     );
     mount.render(
       screen(
         <ReasonEditor
-          claimId={12}
+          decisionId={12}
           reasoning="Unreachable."
           state="waiting"
           approved={false}

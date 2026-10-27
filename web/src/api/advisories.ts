@@ -22,7 +22,7 @@ type AdvisoryRelease = Body<"AdvisoryReleaseBody">;
 
 // Everything an act against an advisory can move.
 //
-// One list, shared by every mutation below, for the reason the claim's own
+// One list, shared by every mutation below, for the reason the decision's own
 // list says: two copies drift, and the half that gets forgotten is the one
 // that reports a control as still holding after the act that took it away.
 //

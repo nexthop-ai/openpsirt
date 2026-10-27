@@ -4,7 +4,7 @@
 import { act } from "react";
 import type { Who } from "../app/session";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Claim } from "./Claim";
+import { Decision } from "./Decision";
 import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
 import { only } from "../test/controls";
 
@@ -21,18 +21,18 @@ const ANA: Who = {
   outcomes: [],
 };
 
-describe("re-affirming a lapsed claim from its own page", () => {
-  it("refreshes every list the re-made claim joins, the proposer's own among them", async () => {
+describe("re-affirming a lapsed decision from its own page", () => {
+  it("refreshes every list the re-made decision joins, the proposer's own among them", async () => {
     serve((path) => {
       if (path === "/v1/session/me") return { data: ANA };
       if (path === "/v1/decisions/{id}") {
         return {
           data: {
-            claim: { id: 4, proposed_by: "ana" },
-            place: { product: "sonic", vulnerability: "CVE-2026-1" },
+            decision: { id: 4, proposed_by: "ana" },
+            occurrence: { product: "sonic", vulnerability: "CVE-2026-1" },
             argument: { outcome: "not-applicable" },
             issues: 1,
-            places: 1,
+            occurrences: 1,
             age_days: 1,
             reaffirmable: true,
           },
@@ -40,9 +40,9 @@ describe("re-affirming a lapsed claim from its own page", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    accept(() => ({ data: { claim_id: 9, waiting: false } }));
+    accept(() => ({ data: { decision_id: 9, waiting: false } }));
     const queries = client();
-    mount.render(screen(<Claim who={ANA} />, "/claims/4", "/claims/:id", queries));
+    mount.render(screen(<Decision who={ANA} />, "/decisions/4", "/decisions/:id", queries));
     await settle();
     const invalidated = watchInvalidations(queries);
     const box = mount
@@ -63,30 +63,30 @@ describe("re-affirming a lapsed claim from its own page", () => {
     );
     await act(async () => button?.click());
     await settle();
-    expect(invalidated()).toEqual(expect.arrayContaining(["claim", "my-claims", "decided"]));
+    expect(invalidated()).toEqual(expect.arrayContaining(["decision", "my-decisions", "decided"]));
   });
 });
 
-describe("the stripe on a claim's page", () => {
-  it("draws a proposed claim nothing waits on as in force", async () => {
+describe("the stripe on a decision's page", () => {
+  it("draws a proposed decision nothing waits on as in force", async () => {
     serve((path) => {
       if (path === "/v1/session/me") return { data: ANA };
       if (path === "/v1/decisions/{id}") {
         return {
           data: {
-            claim: { id: 4, proposed_by: "ana" },
-            place: { product: "sonic", vulnerability: "CVE-2026-1" },
+            decision: { id: 4, proposed_by: "ana" },
+            occurrence: { product: "sonic", vulnerability: "CVE-2026-1" },
             argument: { outcome: "not-applicable" },
             happened: "waiting",
             issues: 1,
-            places: 1,
+            occurrences: 1,
             age_days: 1,
           },
         };
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Claim who={ANA} />, "/claims/4", "/claims/:id", client()));
+    mount.render(screen(<Decision who={ANA} />, "/decisions/4", "/decisions/:id", client()));
     await settle();
     const card = mount.host().querySelector(".card.standing");
     expect(card?.classList.contains("approved")).toBe(true);
@@ -95,29 +95,29 @@ describe("the stripe on a claim's page", () => {
 });
 
 describe("the answer a second person gives", () => {
-  // The claim waits on somebody who agrees to public findings in sonic.
+  // The decision waits on somebody who agrees to public findings in sonic.
   function waiting(proposedBy: string, undisclosed = false, internal = false) {
     return {
-      claim: { id: 4, proposed_by: proposedBy },
-      place: { product: "sonic", vulnerability: "CVE-2026-1" },
+      decision: { id: 4, proposed_by: proposedBy },
+      occurrence: { product: "sonic", vulnerability: "CVE-2026-1" },
       argument: { outcome: "not-applicable" },
       happened: "waiting",
       undisclosed,
       internal,
       issues: 1,
-      places: 1,
+      occurrences: 1,
       age_days: 1,
     };
   }
 
-  async function drawn(claim: object, who: Who) {
+  async function drawn(decision: object, who: Who) {
     serve((path) => {
       if (path === "/v1/session/me") return { data: who };
-      if (path === "/v1/decisions/{id}") return { data: claim };
+      if (path === "/v1/decisions/{id}") return { data: decision };
       return { data: { items: [], total: 0 } };
     });
     const sent = accept(() => ({ data: {} }));
-    mount.render(screen(<Claim who={who} />, "/claims/4", "/claims/:id"));
+    mount.render(screen(<Decision who={who} />, "/decisions/4", "/decisions/:id"));
     await settle();
     return sent;
   }
@@ -138,7 +138,7 @@ describe("the answer a second person gives", () => {
     expect(agree()).toBeUndefined();
   });
 
-  it("offers somebody else who may agree an Agree, and sends it for this claim", async () => {
+  it("offers somebody else who may agree an Agree, and sends it for this decision", async () => {
     const sent = await drawn(waiting("ana"), BO);
     await act(async () => agree()?.click());
     await settle();
@@ -147,15 +147,15 @@ describe("the answer a second person gives", () => {
     expect(init.params?.path).toEqual({ id: 4 });
   });
 
-  it("offers no Agree on an undisclosed claim to somebody who agrees only to public ones", async () => {
+  it("offers no Agree on an undisclosed decision to somebody who agrees only to public ones", async () => {
     await drawn(waiting("ana", true), BO);
     expect(agree()).toBeUndefined();
   });
 
-  // A lead claim is internal, and its second person holds the approver
+  // A lead decision is internal, and its second person holds the approver
   // capability: a private triager is refused it, and an internal approver
   // who triages nothing undisclosed is not.
-  it("offers no Agree on a lead claim to a triager of undisclosed work", async () => {
+  it("offers no Agree on a lead decision to a triager of undisclosed work", async () => {
     const privateTriager: Who = {
       ...BO,
       reach: [{ product: "sonic", agrees_private: true }] as unknown as Who["reach"],
@@ -164,7 +164,7 @@ describe("the answer a second person gives", () => {
     expect(agree()).toBeUndefined();
   });
 
-  it("offers Agree on a lead claim to an approver of internal work", async () => {
+  it("offers Agree on a lead decision to an approver of internal work", async () => {
     const reviewer: Who = {
       ...BO,
       reach: [{ product: "sonic", agrees_internal: true }] as unknown as Who["reach"],
@@ -174,7 +174,7 @@ describe("the answer a second person gives", () => {
   });
 });
 
-describe("a claim about internal material read by somebody who may not argue it", () => {
+describe("a decision about internal material read by somebody who may not argue it", () => {
   async function drawn(may: Record<string, boolean>) {
     const reader: Who = {
       ...ANA,
@@ -186,20 +186,20 @@ describe("a claim about internal material read by somebody who may not argue it"
       if (path === "/v1/decisions/{id}") {
         return {
           data: {
-            claim: { id: 4, proposed_by: "ana" },
-            place: { product: "sonic", vulnerability: "clang-tidy/leak" },
+            decision: { id: 4, proposed_by: "ana" },
+            occurrence: { product: "sonic", vulnerability: "clang-tidy/leak" },
             argument: { outcome: "confirmed" },
             happened: "waiting",
             internal: true,
             issues: 1,
-            places: 1,
+            occurrences: 1,
             age_days: 1,
           },
         };
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Claim who={reader} />, "/claims/4", "/claims/:id", client()));
+    mount.render(screen(<Decision who={reader} />, "/decisions/4", "/decisions/:id", client()));
     await settle();
     const text = mount.host().textContent ?? "";
     const buttons = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);

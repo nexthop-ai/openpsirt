@@ -194,7 +194,7 @@ describe("what signing out takes away", () => {
     belongTo(undefined);
   });
 
-  it("takes the scope and the last judgment, and leaves the preferences", () => {
+  it("takes the scope and the last decision, and leaves the preferences", () => {
     // Seeded in the stores production actually writes them to: a key put in
     // the wrong store survives whatever the clear does, so an assertion over
     // one pins nothing.
@@ -354,7 +354,7 @@ describe("what was chosen, beside what was typed", () => {
     forget("decide:a");
     expect(restore("decide:a")).toBe("");
     // Both halves. Cleared apart, an accepted decision left its outcome behind
-    // to be offered against the next thing decided at the same place.
+    // to be offered against the next thing decided at the same occurrence.
     expect(restoreAnswer("decide:a")).toEqual({});
   });
 

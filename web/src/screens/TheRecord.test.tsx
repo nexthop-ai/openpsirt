@@ -127,7 +127,7 @@ describe("the outcomes the record is filtered by", () => {
 });
 
 describe("the record's list", () => {
-  it("draws one card per claim and links to where its decisions sit", async () => {
+  it("draws one card per decision and links to where its decisions sit", async () => {
     serve((path) => {
       if (path === "/v1/session/me") {
         return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
@@ -138,7 +138,7 @@ describe("the record's list", () => {
             total: 1,
             items: [
               {
-                claim: 7,
+                decision: 7,
                 issue: "CVE-2026-1",
                 issues: 1,
                 product: "mine",
@@ -146,8 +146,8 @@ describe("the record's list", () => {
                 component: "openssl",
                 version: "3.0.2",
                 components: 1,
-                decisions: 40,
-                places: 40,
+                rows: 40,
+                occurrences: 40,
                 outcome: "upgrade-needed",
                 reasoning: "Moving to 3.0.15.",
                 state: "mixed",
@@ -166,21 +166,21 @@ describe("the record's list", () => {
     });
     mount.render(screen(<TheRecord />, "/record?state=approved&state=lapsed"));
     await settle();
-    const cards = mount.host().querySelectorAll(".judgment");
+    const cards = mount.host().querySelectorAll(".audited");
     expect(cards.length).toBe(1);
     const card = cards.item(0);
     const text = card.textContent ?? "";
-    expect(text).toContain("40 places");
+    expect(text).toContain("40 occurrences");
     expect(text).toContain("39 agreed · 1 lapsed");
     const hrefs = Array.from(card.querySelectorAll("a")).map(
       (each) => each.getAttribute("href") ?? "",
     );
-    expect(hrefs).toContain("/claims/7");
+    expect(hrefs).toContain("/decisions/7");
     const there = hrefs.find((href) => href.startsWith("/findings?"));
     expect(there).toBeDefined();
     const asked = new URLSearchParams(there?.split("?")[1]);
-    expect(asked.get("claim")).toBe("7");
-    expect(asked.getAll("claim_state")).toEqual(["approved", "lapsed"]);
+    expect(asked.get("decision")).toBe("7");
+    expect(asked.getAll("decision_state")).toEqual(["approved", "lapsed"]);
   });
 });
 

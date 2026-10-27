@@ -17,7 +17,7 @@ import { Reading } from "../ui/Reading";
 import { Pace, Mix, Ring, Releases, TREND_WEEKS, trendSaid } from "../ui/Charts";
 import { SOON_DAYS } from "./FindingsFilters";
 import { paceReading, mixReading } from "../ui/trend";
-import { claimOf, useQueueCount } from "../api/claims";
+import { decisionOf, useQueueCount } from "../api/decisions";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { Count, known, type Readable } from "../ui/Count";
@@ -35,8 +35,8 @@ import {
 // rather than leaving a page to pass for the answer.
 const OVERDUE_LIMIT = 200;
 
-// The most of a person's own claims the "sent back" tile reads. What became of
-// a claim is derived from its rows rather than stored on them, so there is no
+// The most of a person's own decisions the "sent back" tile reads. What became of
+// a decision is derived from its rows rather than stored on them, so there is no
 // count to ask for — a page is read and what is on it counted, and the tile
 // says so where the page was cut.
 const BACK_LIMIT = 200;
@@ -443,7 +443,7 @@ function Figures({
   // belongs to a product and no build, so it is counted beside the findings
   // rather than among them.
   const reports = useHeldReports({ person: "me" }, at.product);
-  // Sent back is derived from a claim's rows rather than stored on them, so
+  // Sent back is derived from a decision's rows rather than stored on them, so
   // there is no count to ask the server for: a page is read and what is on it
   // is counted, and the tile says "+" where the page was cut. The same
   // treatment the deadline tiles beside it get, for the same reason.
@@ -568,7 +568,7 @@ function Figures({
             {() => `${sentBack.toLocaleString()}${backCut && sentBack > 0 ? "+" : ""}`}
           </Count>
         </span>
-        <span className="d">claims an approver returned</span>
+        <span className="d">decisions an approver returned</span>
       </button>
       {/* Unnarrowed, because the figure is. The list writes three narrowings
           into its own address when the address says nothing, and none of them
@@ -648,7 +648,7 @@ function Figures({
         ) ?? (
           <span
             className="d"
-            title="A claim is decided in a product and no finer, so this counts the whole product"
+            title="A decision is made in a product and no finer, so this counts the whole product"
           >
             {at.stream || at.variant ? `all of ${at.product}` : "waiting on a second person"}
           </span>
@@ -750,7 +750,7 @@ function Pending() {
           style={{ marginLeft: "auto" }}
           title={
             at.stream || at.variant
-              ? "A claim is decided in a product and no finer, so this counts the whole product"
+              ? "A decision is made in a product and no finer, so this counts the whole product"
               : undefined
           }
         >
@@ -786,13 +786,13 @@ function Pending() {
       )}
       <ul>
         {items.map((row) => {
-          const claim = claimOf(row);
+          const decision = decisionOf(row);
           return (
-            <li key={claim.key}>
-              <span className="id">{claim.title}</span>
+            <li key={decision.key}>
+              <span className="id">{decision.title}</span>
               <span className="what">
-                {claim.product} · {claim.outcome}
-                {claim.records > 1 ? ` · ${claim.records.toLocaleString()} records` : ""}
+                {decision.product} · {decision.outcome}
+                {decision.records > 1 ? ` · ${decision.records.toLocaleString()} records` : ""}
               </span>
               {typeof row.age_days === "number" && <span className="when">{row.age_days}d</span>}
             </li>
@@ -1007,7 +1007,7 @@ function Lapsed() {
               lapsed decision
             </Link>
           </strong>
-          <span>The versions they were claims about have moved.</span>
+          <span>The versions they decided about have moved.</span>
         </div>
       )}
       {known(expired) && expiredTotal > 0 && (
@@ -1025,7 +1025,7 @@ function Lapsed() {
         <p className="reading">Nothing has lapsed.</p>
       )}
       <footer>
-        {/* A lapsed claim is its author's to re-affirm, and this is where the
+        {/* A lapsed decision is its author's to re-affirm, and this is where the
             reader's own are. */}
         <Link to={reviewQueueAt({ reaffirm: true })} className="linkish">
           Yours to reaffirm →

@@ -7,14 +7,14 @@ import { linkable } from "./addressable";
 
 // An address from outside this deployment, as somewhere to click.
 //
-// The judgment is here rather than at each caller, because the failure this
+// The check is here rather than at each caller, because the failure this
 // prevents is a caller that forgets: the guard was wired at two of the three
 // screens that draw a person's "where the work is", and the third handed a
 // typed `javascript:` straight to an `href` — a live link for the next person
 // who opened the finding. Two of three is what a rule enforced by memory looks
 // like.
 //
-// An address that fails the judgment is shown and not linked, so nothing
+// An address that fails the check is shown and not linked, so nothing
 // disappears from the page: a reader still sees what was written, and can see
 // that it is not an address.
 export function Outward({

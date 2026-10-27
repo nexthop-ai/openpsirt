@@ -12,7 +12,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const ROWS = [
   {
-    place: "abc",
+    occurrence: "abc",
     rule: "clang/unix.Malloc",
     path: "src/a.c",
     line: 7,

@@ -10,12 +10,12 @@ const mount = mounted();
 
 const rows = [
   {
-    decision_id: 1,
+    decision_occurrence_id: 1,
 
     vulnerability: "CVE-2026-0001",
     why: ["fixable", "off the term"],
   },
-  { decision_id: 2, vulnerability: "CVE-2026-0002", why: [] },
+  { decision_occurrence_id: 2, vulnerability: "CVE-2026-0002", why: [] },
 ];
 
 describe("the rows that do not match the rest", () => {

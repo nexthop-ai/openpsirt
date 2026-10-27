@@ -11,7 +11,7 @@ import { cut } from "./cut";
 // Two kinds of other build, and only one of them is a choice: builds already
 // matching are covered by lookup and are named, not asked about; builds
 // holding the issue at another version are offered, because a tick there
-// is a claim about code nobody has looked at.
+// is a decision about code nobody has looked at.
 //
 // The offer is a version, not a variant, and it says so. The same
 // product built two ways is one piece of work — a matching build is reached by
@@ -23,7 +23,7 @@ import { cut } from "./cut";
 // One screen, not one per entry. Walking them individually makes a routine
 // decision several sheets deep, and the thing being weighed is one line each:
 // does the reasoning hold at that version too. They are unticked to start,
-// because that is the whole control — a tick is the claim.
+// because that is the whole control — a tick is the decision.
 
 export type Other = {
   // One entry per build and version; the build alone is the label.
@@ -32,16 +32,16 @@ export type Other = {
   stream: string;
   variant: string;
   version: string;
-  places: number;
+  occurrences: number;
 };
 
 export type Plan = {
   build: string;
-  // Places, which is what is written: one record each.
+  // Occurrences, which is what is written: one record each.
   covered: number;
   total: number;
   // The same two in consumers, which is what is said: the control narrowing a
-  // judgment works by consumer.
+  // decision works by consumer.
   consumers: number;
   consumersTotal: number;
   matching: string[];
@@ -153,9 +153,9 @@ export function Review({
           <h5>
             This build · <span className="id">{plan.build}</span>
           </h5>
-          {/* Consumers rather than places: what a judgment covers here is
+          {/* Consumers rather than occurrences: what a decision covers here is
               every package of the fold under everything that pulls it in, and
-              narrowing is done by consumer. A place count is a number a
+              narrowing is done by consumer. An occurrence count is a number a
               reader cannot reconcile with the control below it. */}
           <p>
             <b>
@@ -165,8 +165,8 @@ export function Review({
             {plan.covered < plan.total && (
               <>
                 {" "}
-                — {plan.total - plan.covered} {plan.total - plan.covered === 1 ? "place" : "places"}{" "}
-                left open by you
+                — {plan.total - plan.covered}{" "}
+                {plan.total - plan.covered === 1 ? "occurrence" : "occurrences"} left open by you
               </>
             )}
             .
@@ -219,7 +219,7 @@ export function Review({
                         <span className="id">{o.version || "unstated"}</span>{" "}
                         <span className="hint">
                           {o.build === "this build" ? "also in this build" : `in ${o.build}`} ·{" "}
-                          {o.places} {o.places === 1 ? "place" : "places"}
+                          {o.occurrences} {o.occurrences === 1 ? "occurrence" : "occurrences"}
                         </span>
                       </span>
                     </label>
@@ -254,7 +254,7 @@ export function Review({
   } else {
     title = "Confirm";
     const skipped = plan.offered.filter((o) => !applied.has(o.key));
-    const records = plan.covered + chosen.reduce((sum, o) => sum + (o.places || 1), 0);
+    const records = plan.covered + chosen.reduce((sum, o) => sum + (o.occurrences || 1), 0);
     body = (
       <>
         {progress}

@@ -65,11 +65,11 @@ describe("the filters as the server takes them", () => {
     expect(listQuery(new URLSearchParams())).toEqual({ limit: 50, offset: 0 });
   });
 
-  it("sends a claim's states only with the claim", () => {
+  it("sends a decision's states only with the decision", () => {
     expect(
-      listQuery(new URLSearchParams("claim=12&claim_state=lapsed&claim_state=bogus")),
+      listQuery(new URLSearchParams("decision=12&decision_state=lapsed&decision_state=bogus")),
     ).toMatchObject({ decision: 12, decision_state: ["lapsed"] });
-    const alone = listQuery(new URLSearchParams("claim_state=lapsed&claim=soon"));
+    const alone = listQuery(new URLSearchParams("decision_state=lapsed&decision=soon"));
     expect(alone).not.toHaveProperty("decision");
     expect(alone).not.toHaveProperty("decision_state");
   });
@@ -255,7 +255,9 @@ describe("a row's identity", () => {
   });
 
   it("is the same for a row read afresh", () => {
-    expect(identityOf({ ...row, places: 3 } as Row)).toBe(identityOf({ ...row, places: 9 } as Row));
+    expect(identityOf({ ...row, occurrences: 3 } as Row)).toBe(
+      identityOf({ ...row, occurrences: 9 } as Row),
+    );
   });
 });
 
@@ -294,7 +296,7 @@ describe("every order the list offers", () => {
     // the control does not offer is reachable by typing an address and by
     // nothing else, which is what happened to urgency and age.
     expect(Object.keys(ORDERS).sort()).toEqual(
-      ["age", "deadline", "epss", "places", "severity", "urgency"].sort(),
+      ["age", "deadline", "epss", "occurrences", "severity", "urgency"].sort(),
     );
   });
 
@@ -307,7 +309,7 @@ describe("every order the list offers", () => {
     // asks. Age is the same shape: what has sat here longest is the question.
     expect(LEAST_FIRST).toContain("deadline");
     expect(LEAST_FIRST).toContain("age");
-    for (const word of ["severity", "epss", "places", "urgency"] as const) {
+    for (const word of ["severity", "epss", "occurrences", "urgency"] as const) {
       expect(LEAST_FIRST).not.toContain(word);
     }
   });

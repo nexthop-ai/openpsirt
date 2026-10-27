@@ -140,7 +140,7 @@ export function QueueFilters({
           onBlur={() => set("release", release)}
           placeholder="Branch or tag"
           aria-label="Branch or tag name"
-          title="Claims covering an open finding in a branch or tag of this name"
+          title="Decisions covering an open finding in a branch or tag of this name"
           style={{ width: 130 }}
         />
       </form>

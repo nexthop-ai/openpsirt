@@ -1,12 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Notes on the issue in this product, which record no judgment.
+// Notes on the issue in this product, which record no decision.
 //
 // The thread that is here whether or not anybody has decided anything. The
-// comments beside it hang off a claim, and the box for one appears only where
-// a claim already exists, so this is where the first person says anything
-// without recording a judgment.
+// comments beside it hang off a decision, and the box for one appears only where
+// a decision already exists, so this is where the first person says anything
+// without recording a decision.
 //
 // It says what it is about, in words, above the thread. It is read beside
 // a row that may be one of eleven the same issue sits on, so "this issue in
@@ -70,8 +70,8 @@ export function Notes({
         about={about}
         undisclosed={undisclosed}
         word="Note"
-        consequence="Records no judgment"
-        placeholder="Something whoever decides this should know. No judgment recorded."
+        consequence="Records no decision"
+        placeholder="Something whoever decides this should know. No decision recorded."
         draftKey={`note:${product}:${vulnerability}`}
         // silent-read: a write's answer, whose failure the thread draws from `adding`.
         notNotified={note.data?.not_notified ?? []}

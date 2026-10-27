@@ -27,7 +27,7 @@ describe("what a notification is called", () => {
     expect(label("deferral-ending")).toBe("deferral running out");
     expect(label("queue-untaken")).toBe("sitting in a team queue");
     expect(label("approval-undone")).toBe("agreement taken back");
-    expect(label("approval-withdrawn")).toBe("agreed claim changed");
+    expect(label("approval-withdrawn")).toBe("agreed decision changed");
     expect(label("claim-lapsed")).toBe("stopped applying");
     expect(label("merge-superseded")).toBe("superseded by a merge");
     // The kinds that have words only because the table is keyed on the

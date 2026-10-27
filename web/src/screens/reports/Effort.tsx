@@ -30,11 +30,11 @@ const SHOWN = 50;
 // went into, which is the question a planning meeting asks and the one a
 // manager has to answer without any of the others.
 //
-// Counted in claims rather than in the rows they wrote. A claim is one
+// Counted in decisions rather than in the rows they wrote. A decision is one
 // person's act; counting its rows measures how far a component fans out
 // through an image, and the component every image vendors would be the answer
-// every quarter. Both numbers are shown, because ten claims over ten places
-// and one claim over a thousand are different afternoons.
+// every quarter. Both numbers are shown, because ten decisions over ten occurrences
+// and one decision over a thousand are different afternoons.
 export function Effort() {
   const at = useScope();
   const { params, setParams, days, period, when } = useSheetWindow(90);
@@ -74,7 +74,7 @@ export function Effort() {
     <Sheet
       settled={spent.isSuccess}
       name="Effort by component"
-      answers="what the judgments in this period were about."
+      answers="what the decisions in this period were about."
       of={byProduct(at.product)}
       asked={[coveringPeriod(period, days), team ? `team ${team}` : ""].filter(Boolean).join(" · ")}
     >
@@ -114,13 +114,14 @@ export function Effort() {
         <section className="panel">
           <Empty
             title="Nothing was argued in this period."
-            detail="Judgments are dated by when they were proposed, which is when the work happened."
+            detail="Decisions are dated by when they were proposed, which is when the work happened."
           />
         </section>
       ) : (
         <section className="panel">
           <p className="hint" style={{ marginTop: 0 }}>
-            Most argued first. <b>Claims</b> counts acts; <b>places</b> counts what they covered.
+            Most argued first. <b>Decisions</b> counts acts; <b>occurrences</b> counts what they
+            covered.
           </p>
           <Wide>
             <table>
@@ -128,8 +129,8 @@ export function Effort() {
                 <tr>
                   <th>Component</th>
                   <th>Product</th>
-                  <th className="num">Claims</th>
-                  <th className="num">Places</th>
+                  <th className="num">Decisions</th>
+                  <th className="num">Occurrences</th>
                   <th className="num">People</th>
                   <th className="num">Promised</th>
                   <th className="num">Dismissed</th>
@@ -141,14 +142,14 @@ export function Effort() {
                   <tr key={`${row.product} ${row.component}`} className="row">
                     <td className="id">
                       {row.component || (
-                        // A judgment about a place no build carries any more.
+                        // A decision about an occurrence no build carries any more.
                         // The work happened; what it was about is gone.
                         <span className="hint">no longer in any build</span>
                       )}
                     </td>
                     <td>{row.product_name || row.product}</td>
-                    <td className="num">{row.claims.toLocaleString()}</td>
-                    <td className="num hint">{row.decisions.toLocaleString()}</td>
+                    <td className="num">{row.decisions.toLocaleString()}</td>
+                    <td className="num hint">{row.occurrences.toLocaleString()}</td>
                     <td className="num hint">{row.people.toLocaleString()}</td>
                     <td className="num">{row.promised.toLocaleString()}</td>
                     <td className="num">{row.dismissed.toLocaleString()}</td>

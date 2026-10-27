@@ -1,19 +1,19 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// An outcome a claim can carry that has no color of its own.
+// An outcome a decision can carry that has no color of its own.
 //
-// A claim is drawn in the color of what it does: warm where it hides risk,
+// A decision is drawn in the color of what it does: warm where it hides risk,
 // green where it does not. An outcome with no arm falls through to the neutral
-// base, which is the color of a claim that hides nothing — so the one reading
+// base, which is the color of a decision that hides nothing — so the one reading
 // the queue exists to prevent is the one it gives.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Every outcome word the generated client names on any field holding a
-// judgment's outcome. Other fields are called outcome too — what became of an
-// upload is one — so a field counts where it names a judgment's own word.
+// decision's outcome. Other fields are called outcome too — what became of an
+// upload is one — so a field counts where it names a decision's own word.
 export function outcomesIn(schema) {
   const out = new Set();
   const field = /^\s*outcome\??: \(?([^;\n]*)/gm;
@@ -25,9 +25,9 @@ export function outcomesIn(schema) {
   return [...out].sort();
 }
 
-// Every outcome a stylesheet gives a claim a color for.
+// Every outcome a stylesheet gives a decision a color for.
 export function armsIn(css) {
-  return new Set([...css.matchAll(/\.claimed\.([a-z-]+)\s*[,{]/g)].map((each) => each[1]));
+  return new Set([...css.matchAll(/\.decided\.([a-z-]+)\s*[,{]/g)].map((each) => each[1]));
 }
 
 // The outcomes with no arm.

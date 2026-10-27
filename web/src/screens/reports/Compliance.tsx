@@ -74,7 +74,7 @@ export function Compliance() {
         <section className="panel">
           <Empty
             title="Pick a product."
-            detail="A rate has to be about one product, because a place identity carries none."
+            detail="A rate has to be about one product, because an occurrence identity carries none."
           />
         </section>
       ) : rates.isPending ? (
@@ -113,7 +113,7 @@ export function Compliance() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>By severity</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              Issues at components. A group is closed only when no place of it is still open.
+              Issues at components. A group is closed only when no occurrence of it is still open.
             </p>
             <Wide>
               <table>
@@ -180,7 +180,7 @@ export function Compliance() {
               <li>
                 <b>Findings upstream has released no fix for, or has declined to fix.</b> There is
                 no version that would close them, so the only thing that could stop the clock is
-                somebody recording a judgment — which is the act a deadline exists to ask for.
+                somebody recording a decision — which is the act a deadline exists to ask for.
               </li>
               <li>
                 <b>Findings in a release out of support.</b> That pile has a report of its own —{" "}

@@ -374,7 +374,7 @@ function ByPerson({
                 </td>
                 <td className="num">{(row.open ?? 0).toLocaleString()}</td>
                 <td className="num" style={{ color: "var(--faint)" }}>
-                  {(row.places ?? 0).toLocaleString()}
+                  {(row.occurrences ?? 0).toLocaleString()}
                 </td>
                 <td className="num">
                   {(row.overdue ?? 0) > 0 ? (
@@ -463,20 +463,25 @@ function Held({
               <th>Issue</th>
               <th>Component</th>
               <th>Where</th>
-              <th className="num">Locations</th>
+              <th
+                className="num"
+                title="Each way this component enters the build, judged on its own"
+              >
+                Occurrences
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
-              const to = row.place
+              const to = row.occurrence
                 ? leadAt(
                     { product: row.product, stream: row.stream, variant: row.variant },
-                    row.place,
+                    row.occurrence,
                   )
                 : findingOf(row);
               return (
                 <tr
-                  key={`${row.product} ${row.vulnerability} ${row.component} ${row.version} ${row.place ?? ""}`}
+                  key={`${row.product} ${row.vulnerability} ${row.component} ${row.version} ${row.occurrence ?? ""}`}
                   className="row opens"
                   onClick={opener(to)}
                 >
@@ -487,7 +492,7 @@ function Held({
                     <Link to={to} className="id">
                       {row.vulnerability}
                     </Link>{" "}
-                    {row.place && <span className="hint">lead</span>}{" "}
+                    {row.occurrence && <span className="hint">lead</span>}{" "}
                     <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
                   </td>
                   <td>
@@ -507,7 +512,7 @@ function Held({
                       </>
                     )}
                   </td>
-                  <td className="num">{row.places}</td>
+                  <td className="num">{row.occurrences}</td>
                 </tr>
               );
             })}

@@ -7,7 +7,7 @@ import { at } from "../ui/when";
 import { own } from "../ui/own";
 
 import { type Body } from "../api/client";
-import { useSplitClaim } from "../api/claims";
+import { useSplitDecision } from "../api/decisions";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -20,11 +20,11 @@ import { OutlierRows } from "../ui/OutlierRows";
 // The fate of what you proposed.
 //
 // A whole tab of the review queue with its own endpoint, sharing nothing with
-// the claims waiting for a second person but the offset in the address. A
+// the decisions waiting for a second person but the offset in the address. A
 // different question asked of a different list: the cards next door exist to
 // be judged from, and this exists to be read down.
 
-// The fate of each claim this person proposed.
+// The fate of each decision this person proposed.
 //
 // A table rather than cards: the question here is not "should this be agreed
 // to" — it has already been answered — it is "what happened to the things I
@@ -39,13 +39,13 @@ export function Became({
 }) {
   if (query.isPending) return <Loading />;
   if (query.isError) {
-    return <Failed error={query.error} what="The claims you proposed could not be read." />;
+    return <Failed error={query.error} what="The decisions you proposed could not be read." />;
   }
   if (rows.length === 0) {
     return (
       <Empty
         title="You have not proposed anything."
-        detail="A judgment you record appears here with what became of it, whether or not anybody had to agree."
+        detail="A decision you record appears here with what became of it, whether or not anybody had to agree."
       />
     );
   }
@@ -64,7 +64,7 @@ export function Became({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <Mine key={row.claim?.id} row={row} />
+            <Mine key={row.decision?.id} row={row} />
           ))}
         </tbody>
       </table>
@@ -72,19 +72,19 @@ export function Became({
   );
 }
 
-// One claim somebody proposed, and — where it is a bulk claim still being
+// One decision somebody proposed, and — where it is a bulk decision still being
 // argued — what in it does not look like the rest, with a way to hold those
 // rows back.
 //
-// The same signals an approver is shown. An approver reading a bulk claim may
+// The same signals an approver is shown. An approver reading a bulk decision may
 // agree to most of it and set some aside, and so may its author: "this holds
 // for most of them but not those four" is the person best placed to say it.
 function Mine({ row }: { row: Body<"BecameBody"> }) {
-  const split = useSplitClaim();
+  const split = useSplitDecision();
   const [holding, setHolding] = useState<Set<number>>(new Set());
   const [because, setBecause] = useState("");
   const outliers = row.outliers;
-  const claimId = row.claim?.id ?? 0;
+  const decisionId = row.decision?.id ?? 0;
 
   return (
     <>
@@ -95,16 +95,16 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         <td>
           {row.finding ? (
             <Link to={findingOf(row.finding)} className="id">
-              {row.place?.vulnerability}
+              {row.occurrence?.vulnerability}
             </Link>
           ) : (
-            <span className="id">{row.place?.vulnerability}</span>
+            <span className="id">{row.occurrence?.vulnerability}</span>
           )}{" "}
-          <Because code={row.decision?.justification} />
+          <Because code={row.decision_occurrence?.justification} />
         </td>
         <td className="id">{row.finding?.component ?? "—"}</td>
         <td className="hint">
-          {row.place?.product_name || row.place?.product}
+          {row.occurrence?.product_name || row.occurrence?.product}
           {row.finding?.stream && (
             <>
               {" "}
@@ -115,14 +115,16 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         </td>
         <td className="num">
           {/* In the units the queue card uses, said rather than left to
-                    be guessed at: one judgment can be one row or hundreds. */}
+                    be guessed at: one decision can be one row or hundreds. */}
           {(row.issues ?? 0) > 1 ? (
             <>
-              {row.issues} issues · {row.decisions} rows
+              {row.issues} issues · {row.rows} rows
             </>
           ) : (
-            <span title={`${row.places} ${row.places === 1 ? "place" : "places"} underneath`}>
-              one judgment
+            <span
+              title={`${row.occurrences} ${row.occurrences === 1 ? "occurrence" : "occurrences"} underneath`}
+            >
+              one decision
             </span>
           )}
         </td>
@@ -135,7 +137,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
               <header>
                 <h5>Rows that do not match the rest</h5>
                 <span className="hint">
-                  Holding them back makes them a claim of yours. Revise it to say what differs.
+                  Holding them back makes them a decision of yours. Revise it to say what differs.
                 </span>
               </header>
               <OutlierRows
@@ -148,11 +150,11 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                   {split.error != null && (
                     <Failed error={split.error} what="Those rows could not be held back." />
                   )}
-                  <label className="block text-sm" htmlFor={`hold-${claimId}`}>
+                  <label className="block text-sm" htmlFor={`hold-${decisionId}`}>
                     The reason these are different
                   </label>
                   <textarea
-                    id={`hold-${claimId}`}
+                    id={`hold-${decisionId}`}
                     rows={2}
                     value={because}
                     onChange={(event) => setBecause(event.target.value)}
@@ -164,7 +166,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                     disabled={split.isPending || because.trim() === ""}
                     onClick={() =>
                       split.mutate(
-                        { id: claimId, rows: [...holding], because },
+                        { id: decisionId, rows: [...holding], because },
                         {
                           onSuccess: () => {
                             setHolding(new Set());
@@ -186,9 +188,9 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
   );
 }
 
-// One word for what became of a claim, and who did it where a person did.
+// One word for what became of a decision, and who did it where a person did.
 //
-// "Undone" is drawn apart from "waiting" though the claim is waiting in both:
+// "Undone" is drawn apart from "waiting" though the decision is waiting in both:
 // somebody had agreed, and the proposer is entitled to find that surprising.
 export function Happened({ word, by }: { word?: string; by?: string }) {
   const how: Record<Body<"BecameBody">["happened"], { cls: string; said: string }> = {

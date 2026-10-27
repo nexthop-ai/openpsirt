@@ -3,11 +3,11 @@
 
 import type { Body } from "../api/client";
 
-// What became of a claim, in the server's words.
-export type Happened = Body<"ClaimDetail">["happened"];
+// What became of a decision, in the server's words.
+export type Happened = Body<"DecisionDetail">["happened"];
 
-// The stripe down a claim's card, which says its state before anybody reads a
-// word of it, on the claim page and on the finding screen alike.
+// The stripe down a decision's card, which says its state before anybody reads a
+// word of it, on the decision page and on the finding screen alike.
 //
 // | Stripe | Means |
 // |---|---|
@@ -33,7 +33,7 @@ export function stripeOf(happened: Happened | undefined, needsApproval: boolean)
   }
 }
 
-// A claim's stored state as a word of what became of it, for a screen that
+// A decision's stored state as a word of what became of it, for a screen that
 // holds the state rather than the server's reading of it.
 export function happenedOf(state: string | undefined, sentBack: boolean): Happened | undefined {
   switch (state) {

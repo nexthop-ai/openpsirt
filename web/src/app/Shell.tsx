@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useApprovable } from "../api/intake";
-import { useQueueCount } from "../api/claims";
+import { useQueueCount } from "../api/decisions";
 import { notACredential } from "../ui/noautofill";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { initials } from "../ui/initials";
@@ -108,7 +108,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // The counts on the rail.
   const queue = useQueueCount();
   // Rulings on vulnerability reports waiting for this reader, which sit in the
-  // same queue as the claims.
+  // same queue as the decisions.
   const approvable = useApprovable();
   // Across every product a reader can see, like the entry it sits under and
   // unlike the scoped count below: the badge is what the address opens, and
@@ -222,7 +222,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               quiet
             />
             <Rail to="/assignments" icon="people" label="Assignments" />
-            {/* The record of what was judged. Across products because that is how
+            {/* The record of what was decided. Across products because that is how
               it is asked for — an auditor asks about a period, not a build. */}
             <Rail to="/record" icon="ledger" label="The record" />
             {/* The catalog of named reports, and the one place a report is

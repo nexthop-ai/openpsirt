@@ -15,7 +15,7 @@ const at: At = {
 
 // The key decides which reasoning comes back into which form, and the text it
 // carries is what a second person is asked to agree to. Anything it does not
-// name is something two different judgments can share a draft across.
+// name is something two different decisions can share a draft across.
 describe("where a decision's reasoning is kept", () => {
   it("names every part of what is being decided", () => {
     expect(draftKeyFor(at)).toBe("decide:sonic:master:broadcom:CVE-2026-1:stdlib:go1.25.6");
@@ -25,7 +25,7 @@ describe("where a decision's reasoning is kept", () => {
     // A build ships one name at more than one version often enough that this
     // is the ordinary case, not a corner: text typed about `go1.25.6` came
     // back pre-filled against `go1.24.9`, which is different code at a
-    // different number of places.
+    // different number of occurrences.
     expect(draftKeyFor({ ...at, version: "go1.24.9" })).not.toBe(draftKeyFor(at));
   });
 
@@ -47,7 +47,7 @@ describe("where a decision's reasoning is kept", () => {
 });
 
 describe("which outcomes may say what a holder can do", () => {
-  it("requires it where the claim is that something already stops it", () => {
+  it("requires it where the decision is that something already stops it", () => {
     expect(mustMitigate("not-applicable", "inline_mitigations_already_exist")).toBe(true);
     expect(mayMitigate("not-applicable", "inline_mitigations_already_exist")).toBe(true);
   });
@@ -62,12 +62,12 @@ describe("which outcomes may say what a holder can do", () => {
   });
 
   it("offers it nowhere else", () => {
-    // Every other outcome is a claim about priority rather than a claim that
+    // Every other outcome is a decision about priority rather than a decision that
     // something is handled, and the server refuses a mitigation on one.
     for (const outcome of ["affected", "deferred", "already-fixed", "upgrade-needed"]) {
       expect(mayMitigate(outcome, "")).toBe(false);
     }
-    // Not applicable for one of the other recognized reasons is a claim about
+    // Not applicable for one of the other recognized reasons is a decision about
     // code, which lapses when the code moves and needs nothing said about it.
     expect(mayMitigate("not-applicable", "vulnerable_code_not_present")).toBe(false);
   });

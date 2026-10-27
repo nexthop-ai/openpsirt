@@ -169,7 +169,7 @@ export function Branches() {
                 <th>Released</th>
                 <th
                   className="num"
-                  title="Issues open against it, counted at components rather than at every place they sit"
+                  title="Issues open against it, counted at components rather than at every occurrence they sit"
                 >
                   Open
                 </th>

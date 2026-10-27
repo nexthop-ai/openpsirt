@@ -29,9 +29,9 @@ describe("risk standing on one person", () => {
         return {
           data: {
             alone: [
-              { outcome: "dismissed", claims: 1, rows: 1 },
-              { outcome: "not-security", claims: 1, rows: 1 },
-              { outcome: "deferred", claims: 2, rows: 2 },
+              { outcome: "dismissed", decisions: 1, rows: 1 },
+              { outcome: "not-security", decisions: 1, rows: 1 },
+              { outcome: "deferred", decisions: 2, rows: 2 },
             ],
             agreed: 0,
             pairs: [],
@@ -47,7 +47,7 @@ describe("risk standing on one person", () => {
     await settle();
     // The failed half links each outcome to the record; the exceptions do not.
     const failed = Array.from(mount.host().querySelectorAll("a"))
-      .filter((each) => each.textContent === "Claims →")
+      .filter((each) => each.textContent === "Decisions →")
       .map((each) =>
         new URL(each.getAttribute("href") ?? "", "http://x").searchParams.get("outcome"),
       );

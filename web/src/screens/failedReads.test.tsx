@@ -8,7 +8,7 @@ import { InventoryCompare } from "./InventoryCompare";
 import { Exploited } from "./Exploited";
 import { GrantGrid } from "./GrantGrid";
 import { Home } from "./Home";
-import { Revisions, Standing } from "./FindingClaim";
+import { Revisions, Standing } from "./FindingDecision";
 import { Products } from "./Products";
 import { Decide } from "../ui/Decide";
 import { PUBLISHED } from "../test/outcomes";
@@ -136,7 +136,7 @@ describe("a secondary read that fails", () => {
             component: "openssl",
             version: "3.0.2",
           }}
-          places={[{ place: "p1", component: "openssl" }]}
+          occurrences={[{ occurrence: "p1", component: "openssl" }]}
           onDone={() => undefined}
         />,
       ),
@@ -152,21 +152,21 @@ describe("a secondary read that fails", () => {
     mount.render(
       screen(
         <Standing
-          claim={{
-            decision: {
-              claim_id: 4,
+          decision={{
+            decision_occurrence: {
+              decision_id: 4,
               state: "approved",
               needs_approval: false,
               outcome: "not-applicable",
               reasoning: "Unreachable.",
             },
             age_days: 1,
-            place: { place: "p1", product: "sonic", vulnerability: "CVE-2026-1" },
+            occurrence: { occurrence: "p1", product: "sonic", vulnerability: "CVE-2026-1" },
             proposed_at: "2026-10-01T00:00:00Z",
             proposed_by: "bo",
             reasoning: "Unreachable.",
           }}
-          places={[]}
+          occurrences={[]}
           mine={false}
           mayApprove={false}
           onRevised={() => undefined}
@@ -236,9 +236,9 @@ describe("a secondary read that fails", () => {
     expect(text).not.toContain("Nothing is waiting on you.");
   });
 
-  it("says a claim's revisions could not be read rather than drawing none", async () => {
+  it("says a decision's revisions could not be read rather than drawing none", async () => {
     failing("/v1/decisions/{id}/revisions");
-    mount.render(screen(<Revisions claimId={4} />));
+    mount.render(screen(<Revisions decisionId={4} />));
     await settle();
     expect(mount.host().textContent).toContain("The revision history could not be read.");
   });
@@ -251,7 +251,7 @@ describe("a secondary read that fails", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Revisions claimId={4} />));
+    mount.render(screen(<Revisions decisionId={4} />));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("Approvals could not be read");

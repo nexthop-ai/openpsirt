@@ -49,8 +49,10 @@ const Access = retrying(() => import("../screens/Access").then((m) => m.Access))
 const Assignments = retrying(() => import("../screens/Assignments").then((m) => m.Assignments));
 const Queue = retrying(() => import("../screens/Queue").then((m) => m.Queue));
 const Decision = retrying(() => import("../screens/Decision").then((m) => m.Decision));
-const Claim = retrying(() => import("../screens/Claim").then((m) => m.Claim));
-const Together = retrying(() => import("../screens/Together").then((m) => m.Together));
+const DecisionOccurrence = retrying(() =>
+  import("../screens/DecisionOccurrence").then((m) => m.DecisionOccurrence),
+);
+const BulkDecision = retrying(() => import("../screens/BulkDecision").then((m) => m.BulkDecision));
 const Me = retrying(() => import("../screens/Me").then((m) => m.Me));
 const Issue = retrying(() => import("../screens/Issue").then((m) => m.Issue));
 const Teams = retrying(() => import("../screens/Teams").then((m) => m.Teams));
@@ -151,11 +153,11 @@ export function App() {
                 being swallowed by the catch-all below. */}
               <Route path={ROUTES.unassigned} element={<Navigate to={UNOWNED_LIST} replace />} />
               <Route path={ROUTES.findings} element={<Findings />} />
-              {/* One claim, whole, and every act at that grain. A decision's
-                address resolves to it: what a judgment says belongs to the
-                action that made it, not to any one of its rows. */}
-              <Route path={ROUTES.claim} element={<Claim who={who.data} />} />
-              <Route path={ROUTES.decision} element={<Decision />} />
+              {/* One decision, whole, and every act at that grain. An
+                occurrence's address resolves to it: what a decision says
+                belongs to the action that made it, not to any one of its rows. */}
+              <Route path={ROUTES.decision} element={<Decision who={who.data} />} />
+              <Route path={ROUTES.decisionOccurrence} element={<DecisionOccurrence />} />
               {/* One issue, everywhere it sits. Not under a product,
                 because the question it answers spans them. */}
               <Route path={ROUTES.issue} element={<Issue />} />
@@ -174,7 +176,7 @@ export function App() {
               <Route path={ROUTES.buildFindings} element={<Findings />} />
               <Route path={ROUTES.finding} element={<Finding />} />
               <Route path={ROUTES.dependencies} element={<Dependencies />} />
-              <Route path={ROUTES.decide} element={<Together />} />
+              <Route path={ROUTES.bulkDecision} element={<BulkDecision />} />
               <Route path={ROUTES.uploads} element={<Uploads />} />
               <Route path={ROUTES.uploadsOf} element={<Uploads />} />
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />

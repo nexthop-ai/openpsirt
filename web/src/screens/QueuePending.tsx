@@ -5,19 +5,19 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, type Body } from "../api/client";
 
-// AssessmentRow is one claim about how bad an issue is.
+// AssessmentRow is one decision about how bad an issue is.
 type AssessmentRow = Body<"AssessmentBody">;
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
 
-// The two things waiting for a second person that are not claims.
+// The two things waiting for a second person that are not decisions.
 //
 // A movement of a disclosure date and a severity rating both hide risk on one
 // person's say-so unless somebody agrees, which is why they are in the review
-// queue at all — and neither is a claim about code, so neither shares the card, the
-// selection or the batch that the claims use. They are here together because
+// queue at all — and neither is a decision about code, so neither shares the card, the
+// selection or the batch that the decisions use. They are here together because
 // what they have in common is exactly that.
 
 // said is how many there are, or the page length where the server reported no
@@ -41,7 +41,7 @@ export const PENDING_PAGE = 50;
 //
 // The reason is the whole of what is being agreed to. A movement changes a
 // date somebody outside could hold us to, and the only thing distinguishing a
-// judgment from a habit is why — so the reason leads and the dates follow it.
+// decision from a habit is why — so the reason leads and the dates follow it.
 //
 // Which act it is leads the dates, because an embargo ending later and one
 // ending sooner are different things to agree to.

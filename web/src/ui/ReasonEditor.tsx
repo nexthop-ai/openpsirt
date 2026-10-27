@@ -9,15 +9,15 @@ import { Failed } from "./Failed";
 import { Markdown } from "./Markdown";
 import { restore } from "../app/drafts";
 
-// The words a claim rests on, and the two things that can be done to them.
+// The words a decision rests on, and the two things that can be done to them.
 //
-// One control with one set of consequences, drawn by the claim's own screen
+// One control with one set of consequences, drawn by the decision's own screen
 // and by the finding it was made about. Whether Revise and Withdraw are
-// offered is decided here, from the claim's state, so both screens offer the
-// same acts to the same person about the same claim.
+// offered is decided here, from the decision's state, so both screens offer the
+// same acts to the same person about the same decision.
 //
 // Revising keeps the old words readable, takes back the approval given for
-// them, and returns the claim to the queue. Withdrawing needs nobody.
+// them, and returns the decision to the queue. Withdrawing needs nobody.
 
 // The words that are finished, and so have nothing left to revise or withdraw.
 //
@@ -34,15 +34,15 @@ export function revisionStart(draftKey: string, reasoning: string): string {
   return restore(draftKey) || reasoning;
 }
 
-// revisable reports whether a claim in this state may still be revised or
+// revisable reports whether a decision in this state may still be revised or
 // withdrawn. The words are the ones the record uses for what became of a
-// claim, and the ones the API reports as a decision's state.
+// decision, and the ones the API reports as a decision's state.
 export function revisable(state: string): boolean {
   return state !== "" && !FINISHED.has(state);
 }
 
 export function ReasonEditor({
-  claimId,
+  decisionId,
   reasoning,
   state,
   approved,
@@ -53,13 +53,13 @@ export function ReasonEditor({
   internal,
   writes = true,
 }: {
-  claimId: number;
+  decisionId: number;
   reasoning: string;
-  // The claim's fate, as the record words it. Whether revising and
+  // The decision's fate, as the record words it. Whether revising and
   // withdrawing are offered is decided here from that, rather than by each
   // screen deciding for itself.
   state: string;
-  // The consequence line's own words, which differ for a claim somebody has
+  // The consequence line's own words, which differ for a decision somebody has
   // already agreed to.
   approved: boolean;
   about: { product: string; vulnerability: string };
@@ -71,14 +71,14 @@ export function ReasonEditor({
   // Whether it is internal material: a lead's, until its flaw is disclosed.
   internal?: boolean;
   // Whether the reader may revise and withdraw it, which a reader of a moved
-  // lead's claim through its flaw may not.
+  // lead's decision through its flaw may not.
   writes?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(reasoning);
   const revise = useRevise();
   const withdraw = useWithdraw();
-  const draftKey = `revise:${claimId}`;
+  const draftKey = `revise:${decisionId}`;
   const above = spaced ? { marginTop: 12 } : undefined;
 
   return (
@@ -88,7 +88,7 @@ export function ReasonEditor({
           <div className="alert" style={{ marginBottom: 10 }}>
             <strong>Revising the reasoning withdraws the approval</strong>
             <span>
-              The earlier text stays in the revision history. The claim returns to the queue.
+              The earlier text stays in the revision history. The decision returns to the queue.
             </span>
           </div>
           <Editor
@@ -107,7 +107,7 @@ export function ReasonEditor({
               disabled={!text.trim() || revise.isPending}
               onClick={() =>
                 revise.mutate(
-                  { id: claimId, reasoning: text },
+                  { id: decisionId, reasoning: text },
                   {
                     onSuccess: () => {
                       forget(draftKey);
@@ -150,7 +150,7 @@ export function ReasonEditor({
             type="button"
             className="btn quiet"
             disabled={withdraw.isPending}
-            onClick={() => withdraw.mutate({ id: claimId }, { onSuccess: onDone })}
+            onClick={() => withdraw.mutate({ id: decisionId }, { onSuccess: onDone })}
           >
             Withdraw
           </button>

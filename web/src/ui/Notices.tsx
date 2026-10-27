@@ -15,7 +15,7 @@ import { label, waiting } from "./notices";
 // The notices waiting on you, with the count on the way in.
 //
 // Everyone has one, and what appears differs by what they hold rather than by
-// which feature they were given: work arriving, a claim sent back, an approval
+// which feature they were given: work arriving, a decision sent back, an approval
 // an edit withdrew, or — for an administrator — that the tool itself is unwell.
 //
 // It works with nothing configured, which is the point. A deployment that

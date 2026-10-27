@@ -9,18 +9,18 @@ import { mounted } from "../test/mount";
 
 const mount = mounted();
 
-// A place under a consumer, named by the component at its end.
+// An occurrence under a consumer, named by the component at its end.
 function under(consumer: string, component: string): Sitting {
   return {
-    place: `${consumer}/${component}`,
+    occurrence: `${consumer}/${component}`,
     component: "libnl",
     chain: [{ component: "image" }, { component: consumer }, { component }],
   } as Sitting;
 }
 
-// Thirteen places under one consumer, enough for the filter to be offered,
+// Thirteen occurrences under one consumer, enough for the filter to be offered,
 // and one under another.
-const places: Sitting[] = [
+const occurrences: Sitting[] = [
   ...Array.from({ length: 12 }, (_, at) => under("kernel", `module-${at}`)),
   under("kernel", "netfilter"),
   under("sshd", "sshd"),
@@ -34,7 +34,7 @@ function Holding() {
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   return (
     <Covering
-      places={places}
+      occurrences={occurrences}
       excluded={excluded}
       onChange={(next) => {
         left.now = next;
@@ -56,11 +56,11 @@ function groupBox(consumer: string): HTMLInputElement {
   return box;
 }
 
-describe("the places a decision covers", () => {
+describe("the occurrences a decision covers", () => {
   it("leaves out only the rows the filter shows when a group is unticked", async () => {
     left.now = new Set();
     mount.render(<Holding />);
-    await press(mount.host(), "Exclude places…");
+    await press(mount.host(), "Exclude occurrences…");
     change(mount.host().querySelector<HTMLInputElement>(".locfilter"), "netfilter");
     expect(mount.host().querySelector(".grp .cnt")?.textContent).toBe("1 of 1");
     act(() => groupBox("kernel").click());
@@ -71,7 +71,7 @@ describe("the places a decision covers", () => {
   it("covers everything again on Cover all", async () => {
     left.now = new Set();
     mount.render(<Holding />);
-    await press(mount.host(), "Exclude places…");
+    await press(mount.host(), "Exclude occurrences…");
     act(() => groupBox("sshd").click());
     expect([...left.now]).toEqual(["sshd/sshd"]);
     await press(mount.host(), "Cover all");
@@ -79,15 +79,15 @@ describe("the places a decision covers", () => {
     expect(mount.host().textContent).toContain("2 consumers");
   });
 
-  it("leaves out one place from inside an opened group", async () => {
+  it("leaves out one occurrence from inside an opened group", async () => {
     left.now = new Set();
     mount.render(<Holding />);
-    await press(mount.host(), "Exclude places…");
+    await press(mount.host(), "Exclude occurrences…");
     await press(mount.host(), "▸");
-    const place = Array.from(mount.host().querySelectorAll("label.loc")).find(
+    const occurrence = Array.from(mount.host().querySelectorAll("label.loc")).find(
       (each) => each.querySelector(".id")?.textContent === "module-3",
     );
-    act(() => place?.querySelector<HTMLInputElement>("input")?.click());
+    act(() => occurrence?.querySelector<HTMLInputElement>("input")?.click());
     expect([...left.now]).toEqual(["kernel/module-3"]);
     expect(groupBox("kernel").indeterminate).toBe(true);
   });

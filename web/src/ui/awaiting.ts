@@ -29,7 +29,7 @@ export type Asked = {
   needsDate: boolean;
   until: string;
   reasoning: string;
-  // The places the claim would cover. Excluding every one of them leaves
+  // The occurrences the decision would cover. Excluding every one of them leaves
   // a form with every answer and nothing to record.
   covering: number;
 };
@@ -46,6 +46,6 @@ export function waitingFor(asked: Asked): string | null {
   if (asked.needsLanding && asked.lands === "") return "A backport needs the date it lands.";
   if (asked.needsDate && asked.until === "") return "A deferral needs a date.";
   if (asked.reasoning.trim() === "") return "Reasoning is required.";
-  if (asked.covering === 0) return "Every place is excluded, so there is nothing to decide.";
+  if (asked.covering === 0) return "Every occurrence is excluded, so there is nothing to decide.";
   return null;
 }

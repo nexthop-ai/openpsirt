@@ -25,7 +25,7 @@ import {
 } from "./Window";
 import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
-import { recordAt, claimAt } from "../../app/routes";
+import { recordAt, decisionAt } from "../../app/routes";
 
 // The window back. Ninety days is a quarter, which is the period an
 // audit asks about; the others are here because a control question is
@@ -149,9 +149,9 @@ export function Scrutiny() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Claimed</th>
+                        <th>Outcome</th>
                         <th className="num">Acts</th>
-                        <th className="num">Decisions</th>
+                        <th className="num">Occurrences</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -161,11 +161,11 @@ export function Scrutiny() {
                           <td>
                             <Outcome outcome={row.outcome} />
                           </td>
-                          <td className="num">{(row.claims ?? 0).toLocaleString()}</td>
+                          <td className="num">{(row.decisions ?? 0).toLocaleString()}</td>
                           <td className="num">{(row.rows ?? 0).toLocaleString()}</td>
                           <td>
                             <Link to={overTheSame(row.outcome ?? "")} className="linkish">
-                              Claims →
+                              Decisions →
                             </Link>
                           </td>
                         </tr>
@@ -192,9 +192,9 @@ export function Scrutiny() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Claimed</th>
+                      <th>Outcome</th>
                       <th className="num">Acts</th>
-                      <th className="num">Decisions</th>
+                      <th className="num">Occurrences</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -203,7 +203,7 @@ export function Scrutiny() {
                         <td>
                           <Outcome outcome={row.outcome} />
                         </td>
-                        <td className="num">{(row.claims ?? 0).toLocaleString()}</td>
+                        <td className="num">{(row.decisions ?? 0).toLocaleString()}</td>
                         <td className="num">{(row.rows ?? 0).toLocaleString()}</td>
                       </tr>
                     ))}
@@ -228,8 +228,8 @@ export function Scrutiny() {
                     <tr>
                       <th>Proposed by</th>
                       <th>Agreed by</th>
-                      <th className="num">Claims</th>
                       <th className="num">Decisions</th>
+                      <th className="num">Occurrences</th>
                       <th className="num">Share</th>
                     </tr>
                   </thead>
@@ -238,7 +238,7 @@ export function Scrutiny() {
                       <tr key={`${row.proposer} ${row.approver}`} className="row">
                         <td className="id">{row.proposer}</td>
                         <td className="id">{row.approver}</td>
-                        <td className="num">{(row.claims ?? 0).toLocaleString()}</td>
+                        <td className="num">{(row.decisions ?? 0).toLocaleString()}</td>
                         <td className="num">{(row.rows ?? 0).toLocaleString()}</td>
                         <td className="num">{row.share}%</td>
                       </tr>
@@ -264,8 +264,8 @@ export function Scrutiny() {
                       <th>Batch</th>
                       <th>Agreed by</th>
                       <th>When</th>
-                      <th className="num">Claims</th>
                       <th className="num">Decisions</th>
+                      <th className="num">Occurrences</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -274,7 +274,7 @@ export function Scrutiny() {
                         <td className="id">{row.batch}</td>
                         <td className="id">{row.approved_by}</td>
                         <td>{on(row.approved_at)}</td>
-                        <td className="num">{(row.claims ?? 0).toLocaleString()}</td>
+                        <td className="num">{(row.decisions ?? 0).toLocaleString()}</td>
                         <td className="num">{(row.rows ?? 0).toLocaleString()}</td>
                       </tr>
                     ))}
@@ -287,7 +287,7 @@ export function Scrutiny() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>Agreed to before, covering more now</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              Compares what was agreed against what the claim reaches now.
+              Compares what was agreed against what the decision reaches now.
             </p>
             {(got.data?.grew ?? []).length === 0 ? (
               <p className="hint">Nothing covers more than it did when it was agreed to.</p>
@@ -296,8 +296,8 @@ export function Scrutiny() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Claim</th>
-                      <th>Claimed</th>
+                      <th>Decision</th>
+                      <th>Outcome</th>
                       <th>Agreed by</th>
                       <th className="num">Agreed to</th>
                       <th className="num">Covers now</th>
@@ -306,13 +306,13 @@ export function Scrutiny() {
                   <tbody>
                     {(got.data?.grew ?? []).map((row) => (
                       <tr
-                        key={row.claim_id}
+                        key={row.decision_id}
                         className="row opens"
-                        onClick={opener(claimAt(row.claim_id))}
+                        onClick={opener(decisionAt(row.decision_id))}
                       >
                         <td>
-                          <Link to={claimAt(row.claim_id)} className="id">
-                            {row.claim_id}
+                          <Link to={decisionAt(row.decision_id)} className="id">
+                            {row.decision_id}
                           </Link>
                         </td>
                         <td>
@@ -341,24 +341,24 @@ export function Scrutiny() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Claim</th>
+                      <th>Decision</th>
                       <th>Product</th>
-                      <th>Claimed</th>
+                      <th>Outcome</th>
                       <th>Agreed by</th>
                       <th>When</th>
-                      <th className="num">Decisions</th>
+                      <th className="num">Occurrences</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(got.data?.lapsed ?? []).map((row) => (
                       <tr
-                        key={`${row.claim_id} ${row.approved_by}`}
+                        key={`${row.decision_id} ${row.approved_by}`}
                         className="row opens"
-                        onClick={opener(claimAt(row.claim_id))}
+                        onClick={opener(decisionAt(row.decision_id))}
                       >
                         <td>
-                          <Link to={claimAt(row.claim_id)} className="id">
-                            {row.claim_id}
+                          <Link to={decisionAt(row.decision_id)} className="id">
+                            {row.decision_id}
                           </Link>
                         </td>
                         <td>{row.product}</td>

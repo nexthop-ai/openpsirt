@@ -103,7 +103,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           {here.released_on ? (
             <> · released {here.released_on}</>
           ) : (
-            // "released" followed by nothing reads as a claim about the
+            // "released" followed by nothing reads as a statement about the
             // release rather than as a date nobody has recorded.
             <> · no release date recorded</>
           )}

@@ -22,7 +22,7 @@ import { Wide } from "../ui/Wide";
 import { calendarDay, coveringPeriod, endExclusive, stated } from "./reports/Window";
 import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
-import { allFindingsAt, claimAt } from "../app/routes";
+import { allFindingsAt, decisionAt } from "../app/routes";
 import { fileAt as linkedFile } from "../api/links";
 import { reasonSaid } from "./leads";
 
@@ -31,9 +31,9 @@ import { reasonSaid } from "./leads";
 // than behind a narrower search.
 const PAGE = 100;
 
-type Judged = Body<"JudgedClaimBody">;
+type Audited = Body<"AuditedDecisionBody">;
 
-// Nothing ticked is every judgment, so there is no entry for it: "any" is an
+// Nothing ticked is every decision, so there is no entry for it: "any" is an
 // empty set rather than a value somebody picks.
 //
 // Keyed by every outcome the server records, so one it adds is a compile error
@@ -69,10 +69,10 @@ const STATES = [
   ["withdrawn", "withdrawn"],
 ] as const;
 
-// The record of what was judged, for somebody auditing it.
+// The record of what was decided, for somebody auditing it.
 //
 // Its own screen rather than a filter on the findings list, because the unit
-// differs: a finding is a thing that might be wrong, and this is a judgment
+// differs: a finding is a thing that might be wrong, and this is a decision
 // somebody made about one — with who made it, who agreed, and when each
 // happened. The findings list answers "what is open"; this answers "what did
 // you decide, and on whose say-so".
@@ -80,7 +80,7 @@ const STATES = [
 // Built to be printed. An auditor takes a copy away, so the page prints as
 // the record rather than as a screenshot of an application: the shell, the
 // controls and the links go, a header states what was asked for and when it was
-// taken, and a judgment does not break across a page.
+// taken, and a decision does not break across a page.
 export function TheRecord() {
   const [params, setParams] = useSearchParams();
   // Repeated in the address rather than one value each, because "dismissed or
@@ -96,8 +96,8 @@ export function TheRecord() {
   const sent = periodSent(params);
   const alone = params.get("alone") === "true";
   // What applies now, rather than what was once agreed to. Not the same
-  // question the state filter asks: a judgment is approved and lapses when the
-  // code moves out from under it, and a list of approved judgments is a list
+  // question the state filter asks: a decision is approved and lapses when the
+  // code moves out from under it, and a list of approved decisions is a list
   // of history. It is what the standing-corrections view is built on, where
   // the whole point is that nothing expires them.
   const inForce = params.get("in_force") === "true";
@@ -168,7 +168,7 @@ export function TheRecord() {
 
   const rows = record.data?.items ?? [];
   const total = record.data?.total ?? 0;
-  // Said on the printed copy, because a page of judgments with no statement of
+  // Said on the printed copy, because a page of decisions with no statement of
   // what was asked for is a page nobody can check.
   // Every value, not the first of them: a printed sheet saying "dismissed —
   // not applicable" over rows that also hold deferrals is a sheet nobody can
@@ -188,7 +188,7 @@ export function TheRecord() {
     said(OUTCOMES, outcomes),
     said(STATES, states),
     // Printed like the rest, because a sheet headed "wrong match" over rows
-    // that include judgments the code moved out from under is a sheet nobody
+    // that include decisions the code moved out from under is a sheet nobody
     // can check against anything.
     inForce ? "still standing" : "",
     alone ? "no second person agreed" : "",
@@ -203,7 +203,7 @@ export function TheRecord() {
         <h2>
           The record <span className="n">{total.toLocaleString()}</span>
         </h2>
-        <p>Every judgment made, with who made it, who agreed, and when.</p>
+        <p>Every decision made, with who made it, who agreed, and when.</p>
         <span style={{ marginLeft: "auto" }} className="noprint">
           {/* The same answer as a file, narrowed the same way. An
               auditor is given a document rather than a screen, and this was
@@ -236,8 +236,8 @@ export function TheRecord() {
         />
         <Unread of={declared} what="The products could not be read." />
         <Choices
-          label="Judgment"
-          anything="Every judgment"
+          label="Decision"
+          anything="Every decision"
           options={OUTCOMES}
           chosen={outcomes}
           onChange={(chosen) => setMany("outcome", chosen)}
@@ -287,13 +287,13 @@ export function TheRecord() {
       {/* Only on paper. A printed record has to say what it is a record of and
           when it was taken, or nobody reading it later can check it. */}
       <div className="printhead">
-        <h1>OpenPSIRT — record of judgments</h1>
+        <h1>OpenPSIRT — record of decisions</h1>
         <p>
-          {asked} · {total.toLocaleString()} {total === 1 ? "claim" : "claims"} · taken{" "}
+          {asked} · {total.toLocaleString()} {total === 1 ? "decision" : "decisions"} · taken{" "}
           {at(new Date().toISOString())}
         </p>
         {/* Which of them this sheet holds. A printed page that says "1,842
-            claims" over a hundred rows is a page nobody can check against
+            decisions" over a hundred rows is a page nobody can check against
             anything, and the number is the one an auditor quotes. */}
         {total > rows.length && (
           <p>
@@ -312,7 +312,7 @@ export function TheRecord() {
           title={
             alone && onlyDismissals
               ? "No dismissal stands on one person's say-so."
-              : "No judgment matches that."
+              : "No decision matches that."
           }
           detail={
             alone && onlyDismissals
@@ -327,15 +327,15 @@ export function TheRecord() {
           )}
           {alone && !onlyDismissals && (
             <p className="hint">
-              Judgments one person made. Most are allowed. Narrow to a dismissal for the answer that
+              Decisions one person made. Most are allowed. Narrow to a dismissal for the answer that
               should be empty.
             </p>
           )}
           {rows.map((row) => (
-            <Judgment key={row.claim} row={row} states={states} />
+            <Decision key={row.decision} row={row} states={states} />
           ))}
           {/* Printed copies carry the page they are of, because a page of
-              judgments that does not say which page it is cannot be checked
+              decisions that does not say which page it is cannot be checked
               against anything. */}
           <div className="noprint">
             <Paged
@@ -361,7 +361,7 @@ export function TheRecord() {
 // What reports were ruled to be, over the same products and period.
 //
 // Beside the record rather than in it: a ruling is about claims somebody sent
-// rather than findings, and shares none of the filters the judgments above
+// rather than findings, and shares none of the filters the decisions above
 // take. Read under the report rule, so a reader who may work reports nowhere
 // has no section.
 function Ruled() {
@@ -418,12 +418,12 @@ function Ruled() {
 // Beside the record rather than on a screen of its own, because it is the same
 // question one layer up: the deadline windows, the triage floor and a support
 // date each silently rewrite what the record above says, and reading the
-// judgments without being able to see who moved the ground under them is
+// decisions without being able to see who moved the ground under them is
 // reading half of it.
 function Administered() {
   const [params, setParams] = useSearchParams();
   // The period the screen is already reading, rather than a second one of its
-  // own. Who moved the ground under a set of judgments is the same question
+  // own. Who moved the ground under a set of decisions is the same question
   // over the same stretch, and two date controls on one screen is two answers
   // to it.
   const from = params.get("from") ?? "";
@@ -647,7 +647,7 @@ const CHANGE_SAID: Record<ChangeKind, string> = {
 const CHANGE_KINDS = Object.entries(CHANGE_SAID) as [ChangeKind, string][];
 
 // The kind the address narrows the change history to. The record's own
-// filters are named for the judgments, so this one has a name of its own.
+// filters are named for the decisions, so this one has a name of its own.
 // One the server does not take is left out rather than sent to be refused.
 export function changeKind(params: URLSearchParams): ChangeKind | "" {
   const asked = params.get("change") ?? "";
@@ -667,48 +667,48 @@ function changesAt(params: URLSearchParams, format: "csv" | "json"): string {
   return linkedFile("/v1/administration/changes.{format}", format, { query: asked });
 }
 
-// The states a claim's matching decisions are in, as the state filter names
+// The states a decision's matching decisions are in, as the state filter names
 // them.
-function statesSaid(row: Judged): string {
+function statesSaid(row: Audited): string {
   return STATES.map(([state, said]) => [row.states[state], said] as const)
     .filter(([n]) => n > 0)
     .map(([n, said]) => `${n.toLocaleString()} ${said}`)
     .join(" · ");
 }
 
-// Where a claim's decisions sit, as the findings list shows it: every release,
+// Where a decision's occurrences sit, as the findings list shows it: every release,
 // planned or not, and only the states the record is narrowed to.
-function placesOf(row: Judged, states: string[]): string {
+function occurrencesAt(row: Audited, states: string[]): string {
   const query = new URLSearchParams([
-    ["claim", String(row.claim)],
+    ["decision", String(row.decision)],
     ["planned", "either"],
     ["on", "branch"],
     ["on", "tag"],
     ["support", "in-support"],
     ["support", "past-eol"],
   ]);
-  for (const state of states) query.append("claim_state", state);
+  for (const state of states) query.append("decision_state", state);
   return allFindingsAt(query);
 }
 
-// One claim: the argument once, with how much of what was asked it covers.
-function Judgment({ row, states }: { row: Judged; states: string[] }) {
+// One decision: the argument once, with how much of what was asked it covers.
+function Decision({ row, states }: { row: Audited; states: string[] }) {
   const standing = row.approvals?.filter((a) => !a.withdrawn_at) ?? [];
   const withdrawn = row.approvals?.filter((a) => a.withdrawn_at) ?? [];
-  const stands = row.standing > 0 && row.standing === row.decisions;
+  const stands = row.standing > 0 && row.standing === row.rows;
 
   return (
-    <div className="judgment">
+    <div className="audited">
       <header>
-        {/* The claim is where a judgment is read whole. It prints as its own
+        {/* The decision is where a decision is read whole. It prints as its own
             text, so the paper record is unchanged. */}
-        <Link className="id" to={claimAt(row.claim)}>
+        <Link className="id" to={decisionAt(row.decision)}>
           {row.issue}
         </Link>
         {row.issues > 1 && (
           <span className="hint">+{(row.issues - 1).toLocaleString()} issues</span>
         )}
-        <span className={`claimed ${row.outcome}`}>
+        <span className={`decided ${row.outcome}`}>
           <b>{labeled(row.outcome)}</b>
           {row.justification && (
             <span className="why">
@@ -733,7 +733,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
               <span className="id" style={{ color: "var(--faint)" }}>
                 {row.version}
               </span>
-              {row.consumer && row.places === 1 && (
+              {row.consumer && row.occurrences === 1 && (
                 <>
                   {" "}
                   in <span className="id">{row.consumer}</span>
@@ -749,14 +749,15 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
 
         <dt>Covers</dt>
         <dd>
-          <span title={`${row.decisions.toLocaleString()} decisions`}>
-            {row.places.toLocaleString()} {row.places === 1 ? "place" : "places"}
+          <span>
+            {row.occurrences.toLocaleString()}{" "}
+            {row.occurrences === 1 ? "occurrence" : "occurrences"}
           </span>
           {row.state === "mixed" && <span className="hint"> · {statesSaid(row)}</span>}
           {!stands && row.standing > 0 && (
             <span className="hint"> · {row.standing.toLocaleString()} standing</span>
           )}{" "}
-          <Link className="linkish noprint" to={placesOf(row, states)}>
+          <Link className="linkish noprint" to={occurrencesAt(row, states)}>
             Findings there now →
           </Link>
         </dd>
@@ -775,7 +776,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
               <span key={i}>
                 {i > 0 && ", "}
                 <b>{a.by}</b> · {on(a.at)}
-                {/* They read the earlier claim's words, not these. */}
+                {/* They read the earlier decision's words, not these. */}
                 {a.carried && <span className="hint"> (carried forward)</span>}
               </span>
             ))
@@ -817,7 +818,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
           </>
         )}
 
-        {/* The one field that checks an already-fixed claim: what the
+        {/* The one field that checks an already-fixed decision: what the
             packager's own record has to agree with. */}
         {row.fixed_version && (
           <>
@@ -833,7 +834,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
             <dt>Control named</dt>
             <dd>
               {row.mitigation}
-              {/* This is the one claim nothing here can notice going away. */}
+              {/* This is the one statement nothing here can notice going away. */}
               <span className="hint"> — nothing here notices this being removed</span>
             </dd>
           </>

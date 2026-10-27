@@ -1,21 +1,21 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Every query a change to a claim moves, sorted: the review acts in
-// claims.test.tsx and the edits in mutations.test.tsx both settle it.
-export const EVERY_CLAIM_KEY = [
+// Every query a change to a decision moves, sorted: the review acts in
+// decisions.test.tsx and the edits in mutations.test.tsx both settle it.
+export const EVERY_DECISION_KEY = [
   "advisory",
   "advisory-document",
   "advisory-releases",
-  "claim",
   "comments",
   "decided",
   "decision",
+  "decision-occurrence",
   "finding",
   "findings",
   "home",
   "lead",
   "leads",
-  "my-claims",
+  "my-decisions",
   "queue",
 ].sort();

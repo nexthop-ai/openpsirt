@@ -160,7 +160,7 @@ describe("what a document states about a release", () => {
 });
 
 describe("marking a release affected", () => {
-  const covered = { decision: 1, outcome: "not-applicable", made_on: [] };
+  const covered = { decision_occurrence: 1, outcome: "not-applicable", made_on: [] };
 
   it("is offered where a decision moves the release off affected", () => {
     expect(markable({ covered, decided: "known_not_affected" })).toBe(true);

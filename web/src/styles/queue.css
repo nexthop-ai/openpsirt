@@ -52,7 +52,7 @@
   align-items: center;
   flex-wrap: wrap;
 }
-/* The box that puts one claim into a bulk action. Colored like every other
+/* The box that puts one decision into a bulk action. Colored like every other
    control here and left at the size the browser draws it. */
 .qpick {
   accent-color: var(--accent);

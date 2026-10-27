@@ -26,8 +26,8 @@ const EVIDENCE = {
   ],
   related: [],
   kin: [
-    { place: "def", rule: "cppcheck/memleak", path: "src/a.c", line: 8, same: true },
-    { place: "ghi", rule: "codeql/cpp/leak", path: "src/a.c", line: 15, same: false },
+    { occurrence: "def", rule: "cppcheck/memleak", path: "src/a.c", line: 8, same: true },
+    { occurrence: "ghi", rule: "codeql/cpp/leak", path: "src/a.c", line: 15, same: false },
   ],
   last_seen: "2026-10-01T00:00:00Z",
   open: true,
@@ -137,16 +137,16 @@ describe("a lead", () => {
     expect(text()).toContain("at fedcba987654");
   });
 
-  it("offers no judgment to somebody who only reads it", async () => {
+  it("offers no decision to somebody who only reads it", async () => {
     await drawn(false);
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);
   });
 
-  it("names the claim standing at it in place of the form", async () => {
+  it("names the decision standing at it in place of the form", async () => {
     await drawn(true, {
       ...EVIDENCE,
-      decision: {
-        claim_id: 4,
+      decision_occurrence: {
+        decision_id: 4,
         outcome: "dismissed",
         reason: "false_positive",
         reasoning: "",
@@ -154,7 +154,7 @@ describe("a lead", () => {
         state: "proposed",
       },
     });
-    expect(text()).toContain("Claim 4");
+    expect(text()).toContain("Decision 4");
     expect(text()).toContain("Waiting for approval");
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);
   });

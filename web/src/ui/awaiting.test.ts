@@ -50,16 +50,16 @@ describe("what the decision form is waiting for", () => {
     expect(waitingFor({ ...blank, outcome: "affected" })).toBe("Reasoning is required.");
   });
 
-  // Every answer given and nothing to record: a form that would submit a claim
-  // about no place at all.
-  it("says so where every place has been excluded", () => {
+  // Every answer given and nothing to record: a form that would submit a decision
+  // about no occurrence at all.
+  it("says so where every occurrence has been excluded", () => {
     const said = waitingFor({
       ...blank,
       outcome: "affected",
       reasoning: "The service is exposed.",
       covering: 0,
     });
-    expect(said).toBe("Every place is excluded, so there is nothing to decide.");
+    expect(said).toBe("Every occurrence is excluded, so there is nothing to decide.");
   });
 
   it("waits for nothing once every question asked has an answer", () => {

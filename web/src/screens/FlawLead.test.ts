@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { fixedFromLead, type FlawLead } from "./FlawLead";
 
 const LEAD = {
-  place: "abc",
+  occurrence: "abc",
   stream: "master",
   variant: "broadcom",
   rule: "clang/unix.Malloc",

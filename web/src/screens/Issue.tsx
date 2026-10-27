@@ -22,8 +22,8 @@ import { findingAt } from "../app/routes";
 // just landed in openssl — which of our products ship an affected version" is
 // answered here once rather than a product at a time.
 //
-// One row per build and component, not per place: the same component in
-// two builds is two things somebody ships, and sixty places of it in one build
+// One row per build and component, not per occurrence: the same component in
+// two builds is two things somebody ships, and sixty occurrences of it in one build
 // is one piece of work with a count.
 export function Issue() {
   const { vulnerability = "" } = useParams();
@@ -58,7 +58,7 @@ export function Issue() {
   // advisory names a flaw together with the product it is covered in, and
   // this issue may sit in several.
   // Anything of it still undisclosed there is folded in per
-  // product, because one undisclosed place makes the whole of it undisclosed
+  // product, because one undisclosed occurrence makes the whole of it undisclosed
   // for anybody deciding what may be said about it.
   const products = Array.from(
     rows
@@ -85,7 +85,7 @@ export function Issue() {
           {(it?.products ?? 0).toLocaleString()}{" "}
           {(it?.products ?? 0) === 1 ? "product" : "products"} · {(it?.total ?? 0).toLocaleString()}{" "}
           {(it?.total ?? 0) === 1 ? "build" : "builds"} carry it — one row per build and component,
-          however many places each sits at
+          however many occurrences each sits at
         </p>
       </div>
 
@@ -120,7 +120,7 @@ export function Issue() {
 
       {/* What people have written about this issue, a product at a time. The
           thread is here whether or not anybody has decided anything, which is
-          the whole of what separates it from a claim's comments. */}
+          the whole of what separates it from a decision's comments. */}
       {products.length > 0 && (
         <IssueNotes vulnerability={it?.vulnerability ?? ""} products={products} mine={mine} />
       )}
@@ -176,7 +176,7 @@ export function Issue() {
                         </>
                       )}
                     </td>
-                    <td className="num">{row.places}</td>
+                    <td className="num">{row.occurrences}</td>
                     <td>
                       <span className={`state ${decidedAs(row.state).cls}`}>
                         {decidedAs(row.state).word}

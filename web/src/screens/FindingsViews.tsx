@@ -178,7 +178,7 @@ export function ByComponent({
     epss: "how likely the worst of each is to be exploited",
     age: "the oldest thing in each",
     deadline: "the soonest deadline in each",
-    places: "how far each reaches",
+    occurrences: "how far each reaches",
   };
 
   return (
@@ -210,7 +210,7 @@ export function ByComponent({
               </th>
               <th>Upgrade to</th>
               <th className="num">Issues</th>
-              <th className="num">Places</th>
+              <th className="num">Occurrences</th>
               <th style={{ width: 170 }} />
             </tr>
           </thead>
@@ -290,7 +290,7 @@ export function ByComponent({
                       style={{ width: `${Math.min(100, Math.max(share, 2))}%` }}
                     />
                   </td>
-                  <td className="num">{(row.places ?? 0).toLocaleString()}</td>
+                  <td className="num">{(row.occurrences ?? 0).toLocaleString()}</td>
                   <td>
                     {/* The two secondary acts, narrowing among them: the
                         name is the way to the thing itself. */}
@@ -331,7 +331,7 @@ export function ByComponent({
 
 // The request this view makes of the server, apart from the view that draws it.
 //
-// A bump takes six of the list's filters. The rest ask about a place, a
+// A bump takes six of the list's filters. The rest ask about an occurrence, a
 // deadline or an assignee, none of which a bump has. Written once because the
 // toggle above the list counts what switching to this view would show, and a
 // count built from a second narrowing would be a number that disagrees with
@@ -516,11 +516,11 @@ export function ByBump({
   );
 }
 
-// Opening a row is where the judgment is made, not only where it is read.
+// Opening a row is where the decision is made, not only where it is read.
 //
-// The issue's own words, its place, and the decision form — the same form
+// The issue's own words, its occurrence, and the decision form — the same form
 // the finding screen carries, in the same place a reader already is. Nothing
-// about what a claim requires changes: only where it is typed. Answered from
+// about what a decision requires changes: only where it is typed. Answered from
 // the finding's own screen, a page of findings is two journeys per row, with
 // the list read again on each return.
 export function Peek({
@@ -575,17 +575,17 @@ export function Peek({
           The report says nothing beyond the identifier.
         </p>
       )}
-      <ul className="placelist">
-        {(it?.places ?? []).slice(0, 6).map((place) => (
-          <li key={place.place}>
+      <ul className="occurrencelist">
+        {(it?.occurrences ?? []).slice(0, 6).map((occurrence) => (
+          <li key={occurrence.occurrence}>
             <span className="id">
-              {place.consumer
-                ? `under ${place.consumer}`
-                : place.chain?.[0]?.component
-                  ? `under ${place.chain[0].component}`
+              {occurrence.consumer
+                ? `under ${occurrence.consumer}`
+                : occurrence.chain?.[0]?.component
+                  ? `under ${occurrence.chain[0].component}`
                   : "nothing records what pulls this in"}
             </span>
-            {place.decision != null && <span className="note">decided</span>}
+            {occurrence.decision_occurrence != null && <span className="note">decided</span>}
           </li>
         ))}
       </ul>
@@ -595,7 +595,7 @@ export function Peek({
           Everything the form cannot show here is one link away. */}
       <Decide
         at={{ ...at, vulnerability, component, version, ecosystem, namespace }}
-        places={it?.places ?? []}
+        occurrences={it?.occurrences ?? []}
         undisclosed={!!it?.undisclosed}
         onDone={(recorded) => {
           void detail.refetch();

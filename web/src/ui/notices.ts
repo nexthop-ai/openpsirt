@@ -42,9 +42,9 @@ const WORDS: Record<Kind, string> = {
   "approval-undone": "agreement taken back",
   // Told to an approver: what they agreed to was changed, so their
   // agreement stopped counting.
-  "approval-withdrawn": "agreed claim changed",
+  "approval-withdrawn": "agreed decision changed",
   "claim-lapsed": "stopped applying",
-  // Two judgments that disagreed met when two issues merged; one stands.
+  // Two decisions that disagreed met when two issues merged; one stands.
   "merge-superseded": "superseded by a merge",
   "brought-in": "brought into a case",
   disclosed: "disclosed",

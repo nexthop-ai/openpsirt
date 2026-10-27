@@ -9,7 +9,7 @@ import { PENDING_PAGE } from "./QueuePending";
 import { queueNarrowing } from "./QueueFilters";
 import { queueReason, type Reason } from "./queueReasons";
 
-// A page of claims. The queue is read at the grain of a claim, and a claim
+// A page of decisions. The queue is read at the grain of a decision, and a decision
 // is a card with its whole argument, so a page is what fits a sitting.
 export const PAGE = 50;
 
@@ -20,26 +20,26 @@ export const PAGE = 50;
 // tab's count. The filters apply only to the list on screen, so a tab's count
 // is the whole of its list.
 export function useQueueReads(params: URLSearchParams, offset: number) {
-  // Whose claims. The queue proper is what is waiting on the reader; their own
+  // Whose decisions. The queue proper is what is waiting on the reader; their own
   // are a different question, what they proposed that nobody has agreed to,
   // and approving their own is refused.
   const mine = params.get("mine") === "1";
-  // The claims of the reader's that lapsed. A tab of its own because the lapse
+  // The decisions of the reader's that lapsed. A tab of its own because the lapse
   // alert links here: it is work handed back, not a record of what happened.
   const reaffirm = params.get("reaffirm") === "1";
-  // Either of the two tabs about the reader's own claims, where the queue
+  // Either of the two tabs about the reader's own decisions, where the queue
   // proper is only counted.
   const aside = mine || reaffirm;
   // Which of the three lists, where the reader is on one of them.
   const reason = queueReason(params);
-  // Only the reader's own claims, on the two lists that show everybody's.
+  // Only the reader's own decisions, on the two lists that show everybody's.
   const own = params.get("own") === "1";
   // The product, where the address names one. The figure on the home screen
   // is narrowed by the scope picker and links here with it, so the queue
   // answers the question the clicked number did.
   const product = params.get("product") ?? "";
   const within = product ? { product } : {};
-  // What else the queue is narrowed by: who proposed a claim, its age, the
+  // What else the queue is narrowed by: who proposed a decision, its age, the
   // severity it covers, its outcome and the release it covers.
   const narrowing = queueNarrowing(params);
 
@@ -78,7 +78,7 @@ export function useQueueReads(params: URLSearchParams, offset: number) {
   const missed = useQuery(listing("missed-fix-date"));
   const counted = { approval: approvals, "expired-deferral": expired, "missed-fix-date": missed };
   const queue = counted[reason];
-  // The lapsed claims that are this person's to re-affirm, narrowed to the
+  // The lapsed decisions that are this person's to re-affirm, narrowed to the
   // product the address names like the queue beside it.
   const lapsedMine = useQuery({
     queryKey: ["to-reaffirm", reaffirm ? offset : 0, reaffirm, product],
@@ -95,7 +95,7 @@ export function useQueueReads(params: URLSearchParams, offset: number) {
   // approved, withdrawn, lapsed and undone all present there as the row
   // disappearing; this list says which.
   const became = useQuery({
-    queryKey: ["my-claims", mine ? offset : 0, mine],
+    queryKey: ["my-decisions", mine ? offset : 0, mine],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/my-decisions", {
@@ -110,8 +110,8 @@ export function useQueueReads(params: URLSearchParams, offset: number) {
   // the finding it belongs to.
   //
   // The queue is where somebody goes to be a second person. A separate list
-  // rather than a queue card, because what is agreed to is not a claim about
-  // code — it is how long something stays hidden, and nothing about a claim's
+  // rather than a queue card, because what is agreed to is not a decision about
+  // code — it is how long something stays hidden, and nothing about a decision's
   // shape fits it.
   const [embargoAt, setEmbargoAt] = useState(0);
   const [ratingAt, setRatingAt] = useState(0);

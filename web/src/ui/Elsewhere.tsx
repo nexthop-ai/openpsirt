@@ -7,16 +7,16 @@ import { unwrap } from "../api/queries";
 import { Failed } from "./Failed";
 import { Outward } from "./Outward";
 
-// The place a claim is being argued about or worked on outside here, and the
+// The place a decision is being argued about or worked on outside here, and the
 // control that records it.
 //
-// Anybody who may argue about the claim may set it: a link is a note about
-// where the conversation is rather than a judgment, and needing a second
+// Anybody who may argue about the decision may set it: a link is a note about
+// where the conversation is rather than a decision, and needing a second
 // person for it would leave it unset. Nothing is ever fetched from it. The
-// claim page and the finding's claim card draw it alike; what is read again
+// decision page and the finding's decision card draw it alike; what is read again
 // once it is set is the caller's.
 //
-// A reader who may not argue about the claim is told where it is and offered
+// A reader who may not argue about the decision is told where it is and offered
 // no control.
 export function Elsewhere({
   id,

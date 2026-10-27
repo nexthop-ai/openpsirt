@@ -135,12 +135,12 @@
   font-weight: 600;
 }
 
-/* What a claim is claiming, on the review queue's card.
+/* What a decision says, on the review queue's card.
    The outcome is what an approver is agreeing to, so it is a mark of its own
    rather than a clause in the line naming where the finding lives. Colored by
    what it does: dismissals hide risk and read as the warm end, a deferral is
    time, and "affected" is agreement with the world. */
-.claimed {
+.decided {
   display: inline-flex;
   align-items: baseline;
   gap: var(--gap-tight);
@@ -152,56 +152,56 @@
   color: var(--c);
   background: color-mix(in oklab, var(--c) 12%, transparent);
 }
-.claimed b {
+.decided b {
   font-weight: 700;
 }
-.claimed .why {
+.decided .why {
   font-size: 10.5px;
   opacity: 0.85;
 }
-.claimed.not-applicable,
-.claimed.mismatched {
+.decided.not-applicable,
+.decided.mismatched {
   --c: var(--sev-high);
 }
-.claimed.wont-fix {
+.decided.wont-fix {
   --c: var(--sev-high);
 }
-.claimed.deferred {
+.decided.deferred {
   --c: var(--wait);
 }
-.claimed.affected {
+.decided.affected {
   --c: var(--ok);
 }
 /* Every outcome but affected hides risk, which is the distinction this queue
    is built around, and is drawn in a warm color. One falling through to the
-   neutral base draws the same as a claim that hides none. A web test holds
+   neutral base draws the same as a decision that hides none. A web test holds
    every outcome the client names to an arm here. */
-.claimed.already-fixed {
+.decided.already-fixed {
   --c: var(--sev-high);
 }
-.claimed.upgrade-needed {
+.decided.upgrade-needed {
   --c: var(--wait);
 }
-.claimed.patch-needed {
+.decided.patch-needed {
   --c: var(--wait);
 }
-.claimed.dismissed,
-.claimed.not-security {
+.decided.dismissed,
+.decided.not-security {
   --c: var(--sev-high);
 }
-.claimed.confirmed {
+.decided.confirmed {
   --c: var(--ok);
 }
 
-/* One judgment, as an auditor reads it. */
-.judgment {
+/* One decision, as an auditor reads it. */
+.audited {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
   padding: 12px 14px;
   margin-bottom: 10px;
 }
-.judgment > header {
+.audited > header {
   display: flex;
   gap: var(--gap);
   align-items: center;
@@ -233,7 +233,7 @@
   background: var(--accent-soft);
 }
 /* The same card where the act is refused rather than offered — no version
-   fixes any of this, so the work is a judgment. */
+   fixes any of this, so the work is a decision. */
 .card.stuck {
   border-color: var(--warn-line);
   background: var(--warn-wash);
@@ -416,12 +416,12 @@ tr.row.on > td {
   background: var(--raised);
 }
 
-/* The facts grid, a row tighter: a judgment on the audit sheet is one of many
+/* The facts grid, a row tighter: a decision on the audit sheet is one of many
    stacked, and reads as a block. */
-.judgment .facts {
+.audited .facts {
   gap: 3px 12px;
 }
-.judgment .reasoning {
+.audited .reasoning {
   border-top: 1px solid var(--line);
   padding-top: 8px;
   font-size: 13px;

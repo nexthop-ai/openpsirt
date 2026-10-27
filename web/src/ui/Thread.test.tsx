@@ -44,7 +44,7 @@ function drawn(
         mine={(by) => by === "ana"}
         about={{ product: "sonic", vulnerability: "CVE-2026-1" }}
         word="Comment"
-        consequence="Everyone on the claim is told."
+        consequence="Everyone on the decision is told."
         placeholder="Say something"
         draftKey="thread:1"
         notNotified={notNotified}

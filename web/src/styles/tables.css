@@ -233,10 +233,10 @@ button.edited {
   text-decoration: underline dotted;
 }
 
-/* What would make an approver disagree. Beside the claim rather than a page
+/* What would make an approver disagree. Beside the decision rather than a page
    away from it, because a card that shows only the argument for is the rubber
    stamp the queue exists to prevent — and quiet rather than alarming, since
-   none of it says the claim is wrong. */
+   none of it says the decision is wrong. */
 .counter {
   margin-top: 10px;
   padding: 9px 12px;
@@ -338,11 +338,11 @@ button.edited {
   cursor: pointer;
 }
 
-tr.places td {
+tr.occurrences td {
   background: var(--raised);
   padding: 0 12px 12px 44px;
 }
-.placelist {
+.occurrencelist {
   list-style: none;
   margin: 0;
   padding: 8px 0 0;
@@ -350,15 +350,15 @@ tr.places td {
   flex-direction: column;
   gap: 5px;
 }
-.placelist li {
+.occurrencelist li {
   display: flex;
   gap: var(--gap-loose);
   align-items: center;
   font-size: var(--step--1);
 }
-.placelist .id {
+.occurrencelist .id {
   color: var(--ink);
 }
-.placelist .note {
+.occurrencelist .note {
   color: var(--faint);
 }

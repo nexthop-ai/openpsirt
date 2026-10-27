@@ -6,8 +6,13 @@ import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useAfterClaim, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
-import { claimAt, decisionAt, findingOf, issueAt } from "../app/routes";
+import {
+  useAfterDecision,
+  useApproveDecision,
+  useRejectDecision,
+  type Decision,
+} from "../api/decisions";
+import { decisionAt, decisionOccurrenceAt, findingOf, issueAt } from "../app/routes";
 import { notACredential } from "../ui/noautofill";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
@@ -18,26 +23,26 @@ import { Wide } from "../ui/Wide";
 import { issuesIn, toggled } from "./outliers";
 import { promised, wordsFor, type Reason } from "./queueReasons";
 
-// The cards the review queue is drawn in: one per claim, carrying its whole
+// The cards the review queue is drawn in: one per decision, carrying its whole
 // argument and the acts that answer it.
 
-// Who proposed a claim and how long it has stood, which every card says first.
-function Proposal({ claim }: { claim: Claim }) {
+// Who proposed a decision and how long it has stood, which every card says first.
+function Proposal({ decision }: { decision: Decision }) {
   return (
     <>
-      {claim.proposedBy && (
+      {decision.proposedBy && (
         <span>
-          Proposed by <b>{claim.proposedBy}</b>
+          Proposed by <b>{decision.proposedBy}</b>
         </span>
       )}
       <span>
-        Standing <b>{claim.ageDays === 0 ? "today" : `${claim.ageDays} days`}</b>
+        Standing <b>{decision.ageDays === 0 ? "today" : `${decision.ageDays} days`}</b>
       </span>
     </>
   );
 }
 
-// A claim waiting for a new decision rather than an agreement: a deferral
+// A decision waiting for a new decision rather than an agreement: a deferral
 // whose date passed, or a promise whose date passed with the finding open.
 //
 // It says which promise it was and offers the acts that answer it. Both lists
@@ -46,22 +51,22 @@ function Proposal({ claim }: { claim: Claim }) {
 // which puts it in front of a second person again where the new date needs
 // one; either can be decided again on the finding.
 export function Dated({
-  claim,
+  decision,
   reason,
   marked,
 }: {
-  claim: Claim;
+  decision: Decision;
   reason: Reason;
   marked: boolean;
 }) {
-  const f = claim.finding;
+  const f = decision.finding;
   const [moving, setMoving] = useState(false);
-  const upgrade = claim.outcome === "upgrade-needed";
-  const [to, setTo] = useState(claim.upgradeTo);
+  const upgrade = decision.outcome === "upgrade-needed";
+  const [to, setTo] = useState(decision.upgradeTo);
   const [by, setBy] = useState("");
   const [because, setBecause] = useState("");
   const [moved, setMoved] = useState(false);
-  const after = useAfterClaim();
+  const after = useAfterDecision();
   // The queue is read again only once the confirmation is put away. The
   // promise leaves this list when its date moves, and the card carrying the
   // answer would leave with it.
@@ -69,7 +74,7 @@ export function Dated({
     mutationFn: async () =>
       unwrap(
         await api.PUT("/v1/decisions/{id}/promise", {
-          params: { path: { id: claim.id } },
+          params: { path: { id: decision.id } },
           body: { ...(upgrade ? { to: to.trim() } : {}), by, reasoning: because },
         }),
       ),
@@ -79,12 +84,12 @@ export function Dated({
       after();
     },
   });
-  const decideAgain = f ? findingOf(f) : claimAt(claim.id);
+  const decideAgain = f ? findingOf(f) : decisionAt(decision.id);
   const words = wordsFor(reason);
 
   return (
     <article
-      id={`claim-${claim.id}`}
+      id={`decision-${decision.id}`}
       className="qcard lapsedcard"
       style={marked ? { outline: "2px solid var(--accent)", outlineOffset: 2 } : undefined}
     >
@@ -92,31 +97,31 @@ export function Dated({
         {f?.severity && <Severity word={f.severity} />}
         {f?.exploited && <Exploited when />}
         <Link to={decideAgain} className="linkish id">
-          {claim.title}
+          {decision.title}
         </Link>
-        <span className={`claimed ${claim.outcome}`}>
-          <b>{promised(claim) || labeled(claim.outcome)}</b>
+        <span className={`decided ${decision.outcome}`}>
+          <b>{promised(decision) || labeled(decision.outcome)}</b>
         </span>
         <span style={{ color: "var(--muted)" }}>
           {f
             ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
-            : claim.product}
-          {claim.issues > 1 && <> · {claim.issues.toLocaleString()} issues</>}
+            : decision.product}
+          {decision.issues > 1 && <> · {decision.issues.toLocaleString()} issues</>}
         </span>
         <span className="state lapsed" style={{ marginLeft: "auto" }}>
           {words.stated}
         </span>
       </header>
-      {claim.reasoning && (
+      {decision.reasoning && (
         <div className="why">
-          <Markdown source={claim.reasoning} />
+          <Markdown source={decision.reasoning} />
         </div>
       )}
       <div className="qmeta">
-        <Proposal claim={claim} />
-        {claim.builds.length > 0 && (
+        <Proposal decision={decision} />
+        {decision.builds.length > 0 && (
           <span>
-            Covers <b>{claim.builds.join(", ")}</b>
+            Covers <b>{decision.builds.join(", ")}</b>
           </span>
         )}
       </div>
@@ -129,7 +134,7 @@ export function Dated({
           <strong>Promise changed</strong>
           <span>
             Any earlier approval was withdrawn.{" "}
-            <Link to={claimAt(claim.id)} className="linkish">
+            <Link to={decisionAt(decision.id)} className="linkish">
               Open the decision →
             </Link>
           </span>
@@ -160,7 +165,7 @@ export function Dated({
           <Editor
             value={because}
             onChange={setBecause}
-            draftKey={`repromise:${claim.key}`}
+            draftKey={`repromise:${decision.key}`}
             rows={3}
             label="Reason for the change"
             placeholder="Why the date or the version is moving."
@@ -196,52 +201,52 @@ export function Dated({
   );
 }
 
-// A claim waiting for a second person's agreement, with what an approver needs
+// A decision waiting for a second person's agreement, with what an approver needs
 // to judge it: the issue and where it sits, the argument, what it covers and
 // what would make somebody disagree.
 export function Card({
-  claim,
+  decision,
   marked,
   picked,
   onPick,
 }: {
-  claim: Claim;
-  // An arrival sent to this claim in particular.
+  decision: Decision;
+  // An arrival sent to this decision in particular.
   marked: boolean;
   picked: boolean;
   onPick: (on: boolean) => void;
 }) {
-  const approveClaim = useApproveClaim();
-  const rejectClaim = useRejectClaim();
+  const approveDecision = useApproveDecision();
+  const rejectDecision = useRejectDecision();
   const [asking, setAsking] = useState(false);
   const [more, setMore] = useState(false);
-  const f = claim.finding;
+  const f = decision.finding;
   const [because, setBecause] = useState("");
   const [aside, setAside] = useState<Set<number>>(new Set());
-  // Issues, which is what the claim counts: the set aside holds a decision per
-  // place, and one issue can sit at many.
-  const rejecting = issuesIn(claim.outliers?.rows ?? [], aside);
-  const draftKey = `send-back:${claim.key}`;
-  const bulk = claim.kind === "together";
-  const extension = claim.kind === "extension";
-  const busy = approveClaim.isPending || rejectClaim.isPending;
-  const error = approveClaim.error ?? rejectClaim.error;
+  // Issues, which is what the decision counts: the set aside holds a record per
+  // occurrence, and one issue can sit at many.
+  const rejecting = issuesIn(decision.outliers?.rows ?? [], aside);
+  const draftKey = `send-back:${decision.key}`;
+  const bulk = decision.kind === "together";
+  const extension = decision.kind === "extension";
+  const busy = approveDecision.isPending || rejectDecision.isPending;
+  const error = approveDecision.error ?? rejectDecision.error;
 
   function doApprove() {
-    approveClaim.mutate({
-      id: claim.id,
+    approveDecision.mutate({
+      id: decision.id,
       ...(aside.size > 0
         ? {
             except: [...aside],
-            because: "Set aside at approval: these do not match the shape of the claim.",
+            because: "Set aside at approval: these do not match the shape of the decision.",
           }
         : {}),
     });
   }
 
   function doReject() {
-    rejectClaim.mutate(
-      { id: claim.id, because },
+    rejectDecision.mutate(
+      { id: decision.id, because },
       {
         onSuccess: () => {
           forget(draftKey);
@@ -254,8 +259,8 @@ export function Card({
 
   return (
     <article
-      id={`claim-${claim.id}`}
-      className={`qcard${claim.previouslyApproved ? " returning" : ""}${bulk ? " bulkclaim" : ""}${extension ? " extension" : ""}`}
+      id={`decision-${decision.id}`}
+      className={`qcard${decision.previouslyApproved ? " returning" : ""}${bulk ? " bulkdecision" : ""}${extension ? " extension" : ""}`}
       style={marked ? { outline: "2px solid var(--accent)", outlineOffset: 2 } : undefined}
     >
       <header>
@@ -264,23 +269,26 @@ export function Card({
           className="qpick"
           checked={picked}
           onChange={(event) => onPick(event.target.checked)}
-          aria-label="Select this claim"
+          aria-label="Select this decision"
         />
-        {bulk && <span className="bulkmark">Bulk claim</span>}
+        {bulk && <span className="bulkmark">Bulk decision</span>}
         {f?.severity && <Severity word={f.severity} />}
         {f?.exploited && <Exploited when />}
         {/* The issue opens its finding, which carries everything an approver
             could want; the decision record is one link further, from there. */}
-        <Link to={f ? findingOf(f) : decisionAt(claim.decisionId)} className="linkish id">
-          {claim.title}
+        <Link
+          to={f ? findingOf(f) : decisionOccurrenceAt(decision.decisionOccurrenceId)}
+          className="linkish id"
+        >
+          {decision.title}
         </Link>
-        {/* What is being claimed, in a mark of its own ahead of where the
+        {/* What is being decided, in a mark of its own ahead of where the
             finding lives, because it is what an approver agrees to. */}
         <Outcome
-          outcome={claim.outcome}
-          justification={claim.justification}
-          until={claim.deferredUntil}
-          scope={claim.scope}
+          outcome={decision.outcome}
+          justification={decision.justification}
+          until={decision.deferredUntil}
+          scope={decision.scope}
         />
         <span style={{ color: "var(--muted)" }}>
           {f?.component && (
@@ -297,22 +305,22 @@ export function Card({
           )}
           {f
             ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
-            : claim.product}
-          {bulk && claim.issues > 1 && <> · {claim.issues.toLocaleString()} issues</>}
-          {extension && claim.derivedFrom && (
+            : decision.product}
+          {bulk && decision.issues > 1 && <> · {decision.issues.toLocaleString()} issues</>}
+          {extension && decision.derivedFrom && (
             <>
               {" "}
-              · extends <b>#{claim.derivedFrom}</b>
+              · extends <b>#{decision.derivedFrom}</b>
             </>
           )}
         </span>
         <span className="state waiting" style={{ marginLeft: "auto" }}>
-          {extension ? "Extension" : claim.previouslyApproved ? "Approved before" : "Pending"}
+          {extension ? "Extension" : decision.previouslyApproved ? "Approved before" : "Pending"}
         </span>
       </header>
 
       {/* What the issue is and where it sits, before the argument about it:
-          an approver judging a claim without these is judging the prose.
+          an approver judging a decision without these is judging the prose.
           Shown from the scan's own text, escaped, never rendered. */}
       {f && (f.description || f.owner || f.parent) && (
         <div className="about">
@@ -337,11 +345,13 @@ export function Card({
                 )}
               </span>
             )}
-            {typeof f.places === "number" && (
-              <span title={`${f.places} ${f.places === 1 ? "place" : "places"} underneath`}>
-                {f.places} {f.places === 1 ? "consumer" : "consumers"}
+            {typeof f.occurrences === "number" && (
+              <span
+                title={`${f.occurrences} ${f.occurrences === 1 ? "occurrence" : "occurrences"} underneath`}
+              >
+                {f.occurrences} {f.occurrences === 1 ? "consumer" : "consumers"}
                 {typeof f.decided === "number" && f.decided > 0 && (
-                  <> · {f.decided} covered by this claim</>
+                  <> · {f.decided} covered by this decision</>
                 )}
               </span>
             )}
@@ -376,56 +386,56 @@ export function Card({
         </div>
       )}
 
-      {claim.reasoning && (
+      {decision.reasoning && (
         <div className="why">
-          <Markdown source={claim.reasoning} />
+          <Markdown source={decision.reasoning} />
         </div>
       )}
 
       <div className="qmeta">
-        <Proposal claim={claim} />
-        {claim.deferredDays > 0 && (
+        <Proposal decision={decision} />
+        {decision.deferredDays > 0 && (
           <span>
-            Put off <b>{claim.deferredDays} days</b> in total
+            Put off <b>{decision.deferredDays} days</b> in total
           </span>
         )}
-        {claim.selectedBy && (
+        {decision.selectedBy && (
           <span>
-            Narrowed by <b className="mono">{claim.selectedBy}</b>
+            Narrowed by <b className="mono">{decision.selectedBy}</b>
           </span>
         )}
-        {extension && claim.derivedFrom && (
+        {extension && decision.derivedFrom && (
           <span>
-            Rests on <b>#{claim.derivedFrom}</b>
+            Rests on <b>#{decision.derivedFrom}</b>
           </span>
         )}
         <span>
           Writes{" "}
           <b>
-            {claim.records.toLocaleString()} {claim.records === 1 ? "record" : "records"}
+            {decision.records.toLocaleString()} {decision.records === 1 ? "record" : "records"}
           </b>
         </span>
       </div>
 
       {!bulk && (
         <div className="reachrow">
-          {/* What the claim covers, in the unit it was made in: one judgment
-              at one fold, however many places sit underneath. The place count
+          {/* What the decision covers, in the unit it was made in: one decision
+              at one fold, however many occurrences sit underneath. The occurrence count
               is a title rather than a headline — it is what the bulk cap is
               measured against, not a figure an approver reconciles with
               anything else on the card. */}
           <span
             className="r auto"
-            title={`${claim.places} ${claim.places === 1 ? "place" : "places"} underneath`}
+            title={`${decision.occurrences} ${decision.occurrences === 1 ? "occurrence" : "occurrences"} underneath`}
           >
-            <b>one judgment</b> in this build
+            <b>one decision</b> in this build
           </span>
-          {claim.builds.length > 0 && (
+          {decision.builds.length > 0 && (
             <span className="r ask">
               {/* Every build it covers, this one included, which is what the
                   server sends and what the number means. */}
-              <b>{claim.builds.length}</b> {claim.builds.length === 1 ? "build" : "builds"} covered:{" "}
-              {claim.builds.join(", ")}
+              <b>{decision.builds.length}</b> {decision.builds.length === 1 ? "build" : "builds"}{" "}
+              covered: {decision.builds.join(", ")}
             </span>
           )}
           <span className="hint">One approval covers every record; undo reverts them all</span>
@@ -433,34 +443,35 @@ export function Card({
       )}
 
       {/* What would make an approver disagree. Two counts and no
-          argument: nothing here can know a claim is wrong, and what it says is
+          argument: nothing here can know a decision is wrong, and what it says is
           what a careful reader would go and look up — so that not looking is a
           choice rather than an omission. */}
-      {claim.counter && (
+      {decision.counter && (
         <div className="counter">
           <h5>Before approving</h5>
           <ul>
-            {Object.entries(claim.counter.elsewhere ?? {}).map(([outcome, places]) => (
+            {Object.entries(decision.counter.elsewhere ?? {}).map(([outcome, occurrences]) => (
               <li key={outcome}>
-                The same issue is <b>{called(outcome)}</b> at {places}{" "}
-                {places === 1 ? "other place" : "other places"} you can see, already agreed to.
-                {outcome !== claim.outcome && (
+                The same issue is <b>{called(outcome)}</b> at {occurrences}{" "}
+                {occurrences === 1 ? "other occurrence" : "other occurrences"} you can see, already
+                agreed to.
+                {outcome !== decision.outcome && (
                   <>
                     {" "}
-                    This claim says <b>{called(claim.outcome)}</b>.
+                    This decision says <b>{called(decision.outcome)}</b>.
                   </>
                 )}{" "}
-                <Link to={issueAt(claim.title)} className="linkish">
+                <Link to={issueAt(decision.title)} className="linkish">
                   Everywhere it sits →
                 </Link>
               </li>
             ))}
-            {(claim.counter.undecided ?? 0) > 0 && (
+            {(decision.counter.undecided ?? 0) > 0 && (
               <li>
-                <b>{claim.counter.undecided}</b> other{" "}
-                {claim.counter.undecided === 1 ? "issue sits" : "issues sit"} undecided at the same
-                place. A claim in a run is usually right, and a run is also how one gets waved
-                through.
+                <b>{decision.counter.undecided}</b> other{" "}
+                {decision.counter.undecided === 1 ? "issue sits" : "issues sit"} undecided at the
+                same occurrence. A decision in a run is usually right, and a run is also how one
+                gets waved through.
               </li>
             )}
           </ul>
@@ -471,32 +482,32 @@ export function Card({
           from one and one re-made after it lapsed: agreeing to any of them is
           refused over an issue this product was attacked through, and this
           table is where that issue is set aside. */}
-      {claim.outliers && (
+      {decision.outliers && (
         <div className="outliers">
           <header>
             <h5>Outliers</h5>
-            <span className="hint">Rows that do not match the shape of the claim.</span>
+            <span className="hint">Rows that do not match the shape of the decision.</span>
           </header>
           <div className="ostats">
-            {claim.outliers.exploited_here > 0 && (
+            {decision.outliers.exploited_here > 0 && (
               <span className="o bad">
-                <b>{claim.outliers.exploited_here}</b> attacked here
+                <b>{decision.outliers.exploited_here}</b> attacked here
               </span>
             )}
-            <span className={`o${claim.outliers.exploited ? " bad" : ""}`}>
-              <b>{claim.outliers.exploited}</b> known exploited
+            <span className={`o${decision.outliers.exploited ? " bad" : ""}`}>
+              <b>{decision.outliers.exploited}</b> known exploited
             </span>
-            <span className={`o${claim.outliers.severe ? " hot" : ""}`}>
-              <b>{claim.outliers.severe}</b> critical or high
+            <span className={`o${decision.outliers.severe ? " hot" : ""}`}>
+              <b>{decision.outliers.severe}</b> critical or high
             </span>
             <span className="o">
-              <b>{claim.outliers.fixable}</b> have a fix available
+              <b>{decision.outliers.fixable}</b> have a fix available
             </span>
-            <span className={`o${claim.outliers.unmatched ? " hot" : ""}`}>
-              <b>{claim.outliers.unmatched}</b> do not match the narrowing
+            <span className={`o${decision.outliers.unmatched ? " hot" : ""}`}>
+              <b>{decision.outliers.unmatched}</b> do not match the narrowing
             </span>
           </div>
-          {(claim.outliers.rows ?? []).length > 0 && (
+          {(decision.outliers.rows ?? []).length > 0 && (
             <Wide style={{ boxShadow: "none" }}>
               <table>
                 <thead>
@@ -509,15 +520,15 @@ export function Card({
                   </tr>
                 </thead>
                 <tbody>
-                  {(claim.outliers.rows ?? []).map((row) => (
-                    <tr key={row.decision_id}>
+                  {(decision.outliers.rows ?? []).map((row) => (
+                    <tr key={row.decision_occurrence_id}>
                       <td>
-                        {/* Every place of the issue, not one: agreeing to any
+                        {/* Every occurrence of the issue, not one: agreeing to any
                             of them is agreeing to the issue. */}
                         <input
                           type="checkbox"
                           aria-label="Set aside"
-                          checked={aside.has(row.decision_id)}
+                          checked={aside.has(row.decision_occurrence_id)}
                           onChange={(event) => setAside(toggled(aside, row, event.target.checked))}
                         />
                       </td>
@@ -538,17 +549,17 @@ export function Card({
             </Wide>
           )}
           <p className="hint" style={{ margin: "8px 0 0" }}>
-            Selected rows go back to {claim.proposedBy} as a separate item.
+            Selected rows go back to {decision.proposedBy} as a separate item.
           </p>
         </div>
       )}
-      {bulk && !claim.outliers && (
+      {bulk && !decision.outliers && (
         <p className="hint" style={{ margin: 0 }}>
-          One claim over {claim.issues.toLocaleString()} issues, read once and approved once.
+          One decision over {decision.issues.toLocaleString()} issues, read once and approved once.
         </p>
       )}
 
-      {claim.deferredDays > 0 && claim.previouslyApproved && (
+      {decision.deferredDays > 0 && decision.previouslyApproved && (
         <p style={{ margin: 0, fontSize: "var(--step--1)", color: "var(--sev-high)" }}>
           Measured against the total already deferred, not the days being asked.
         </p>
@@ -559,7 +570,7 @@ export function Card({
       {asking ? (
         <div>
           {/* No attach control: a rejection is about what is missing from the
-              reasoning, and a claim may cover many issues, so there is not one
+              reasoning, and a decision may cover many issues, so there is not one
               a file would hang off. */}
           <Editor
             value={because}
@@ -582,7 +593,7 @@ export function Card({
               Cancel
             </button>
             <span className="consequence">
-              Rejected, back to <b>{claim.proposedBy}</b>
+              Rejected, back to <b>{decision.proposedBy}</b>
             </span>
           </div>
         </div>
@@ -590,9 +601,9 @@ export function Card({
         <div className="actions">
           <button type="button" className="btn" disabled={busy} onClick={doApprove}>
             {bulk && aside.size > 0
-              ? `Approve ${(claim.issues - rejecting).toLocaleString()}, reject ${rejecting}`
+              ? `Approve ${(decision.issues - rejecting).toLocaleString()}, reject ${rejecting}`
               : bulk
-                ? `Approve all ${claim.issues.toLocaleString()}`
+                ? `Approve all ${decision.issues.toLocaleString()}`
                 : "Approve"}
           </button>
           <button type="button" className="btn ghost" onClick={() => setAsking(true)}>
@@ -600,7 +611,7 @@ export function Card({
           </button>
           {bulk && (
             <span className="consequence">
-              <b>{claim.records.toLocaleString()}</b> records, each expiring independently
+              <b>{decision.records.toLocaleString()}</b> records, each expiring independently
             </span>
           )}
         </div>
@@ -609,7 +620,7 @@ export function Card({
   );
 }
 
-// The claim itself, said as its own thing: the outcome an approver agrees to,
+// The decision itself, said as its own thing: the outcome an approver agrees to,
 // in its own mark, with the recognized reason beneath it in the vocabulary the
 // record stores.
 function Outcome({
@@ -624,7 +635,7 @@ function Outcome({
   scope?: string;
 }) {
   return (
-    <span className={`claimed ${outcome}`}>
+    <span className={`decided ${outcome}`}>
       <b>{labeled(outcome)}</b>
       {justification && <span className="why mono">{justification}</span>}
       {until && <span className="why">until {until}</span>}

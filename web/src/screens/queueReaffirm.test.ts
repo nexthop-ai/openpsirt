@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 import { reaffirmedNotice, whyLapsed } from "./QueueReaffirm";
 
 describe("reaffirmedNotice", () => {
-  it("says nothing waits where every claim stood", () => {
-    expect(reaffirmedNotice({ claims: 3, waiting: 0 })).toBe("Reaffirmed 3 claims.");
+  it("says nothing waits where every decision stood", () => {
+    expect(reaffirmedNotice({ decisions: 3, waiting: 0 })).toBe("Reaffirmed 3 decisions.");
   });
-  it("counts the claims waiting for a second person", () => {
-    expect(reaffirmedNotice({ claims: 1, waiting: 1 })).toBe(
-      "Reaffirmed 1 claim; 1 waits for a second person.",
+  it("counts the decisions waiting for a second person", () => {
+    expect(reaffirmedNotice({ decisions: 1, waiting: 1 })).toBe(
+      "Reaffirmed 1 decision; 1 waits for a second person.",
     );
   });
 });
@@ -24,7 +24,7 @@ describe("whyLapsed", () => {
       ["Rated worse: medium → high"],
     );
   });
-  it("calls a claim made about an unrated issue unrated", () => {
+  it("calls a decision made about an unrated issue unrated", () => {
     expect(whyLapsed({ code_moved: false, rated_worse: true, now: "critical" })).toEqual([
       "Rated worse: unrated → critical",
     ]);

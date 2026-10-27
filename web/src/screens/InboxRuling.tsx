@@ -263,7 +263,7 @@ export function RulingCard({
 export function WaitingRulings({ product }: { product?: string }) {
   const [offset, setOffset] = useState(0);
   // The rulings this reader may agree to, which is what the badge counts and
-  // what the claims above are: somebody's own proposals wait for somebody else.
+  // what the decisions above are: somebody's own proposals wait for somebody else.
   const listed = useRulingsAcross({
     waiting: true,
     approvable: true,

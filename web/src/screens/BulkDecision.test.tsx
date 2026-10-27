@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Together } from "./Together";
+import { BulkDecision } from "./BulkDecision";
 import { mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
@@ -18,7 +18,7 @@ describe("narrowing a bulk decision", () => {
     const reads = serve(() => ({ data: { items: [], total: 0 } }));
     mount.render(
       screen(
-        <Together />,
+        <BulkDecision />,
         "/products/sonic/streams/master/variants/x/components/openssl/decide?version=1.1.1w&ecosystem=deb",
         "/products/:product/streams/:stream/variants/:variant/components/:component/decide",
       ),
@@ -55,7 +55,7 @@ const PATTERN = "/products/:product/streams/:stream/variants/:variant/components
 function issuesAt(query: { offset?: number }) {
   const every = ["CVE-1", "CVE-2", "CVE-3", "CVE-4", "CVE-5"].map((name, i) => ({
     vulnerability: name,
-    places: i + 1,
+    occurrences: i + 1,
     severity: "high",
   }));
   const pages: Record<number, typeof every> = { 0: every.slice(0, 3), 500: every.slice(3) };
@@ -65,18 +65,18 @@ function issuesAt(query: { offset?: number }) {
       total: 1003,
       findings: 15,
       issue_limit: 4,
-      place_limit: 6,
+      occurrence_limit: 6,
     },
   };
 }
 
-async function together() {
+async function bulkDecision() {
   const reads = serve((path, init) =>
     path === ISSUES
       ? issuesAt((init as { params: { query: { offset?: number } } }).params.query)
       : { data: { items: [] } },
   );
-  mount.render(screen(<Together />, AT, PATTERN));
+  mount.render(screen(<BulkDecision />, AT, PATTERN));
   await settle();
   return reads;
 }
@@ -89,7 +89,7 @@ const said = () => mount.host().textContent ?? "";
 
 describe("what a bulk decision would write", () => {
   it("counts the findings each picked issue writes, and warns past the limit", async () => {
-    await together();
+    await bulkDecision();
     await tick("CVE-2");
     expect(said()).toContain("1 issue · 2 findings would be written");
     await tick("CVE-3");
@@ -99,7 +99,7 @@ describe("what a bulk decision would write", () => {
   });
 
   it("keeps counting what was picked on an earlier page", async () => {
-    await together();
+    await bulkDecision();
     await tick("CVE-3");
     await act(async () =>
       Array.from(mount.host().querySelectorAll("button"))
@@ -108,13 +108,13 @@ describe("what a bulk decision would write", () => {
     );
     await settle();
     await tick("CVE-5");
-    // Past the limit only when the first page's places are remembered.
+    // Past the limit only when the first page's occurrences are remembered.
     expect(said()).toContain("2 issues · 8 findings would be written");
     expect(said()).toContain("limit 6 findings");
   });
 
   it("selects everything matching across pages, and counts it from the server", async () => {
-    await together();
+    await bulkDecision();
     await act(async () =>
       Array.from(mount.host().querySelectorAll("button"))
         .find((each) => each.textContent === "Select all 1,003 matching")
@@ -127,7 +127,7 @@ describe("what a bulk decision would write", () => {
   });
 
   it("lets go of the selection when the list is narrowed", async () => {
-    await together();
+    await bulkDecision();
     await tick("CVE-1");
     const box = mount.host().querySelector<HTMLInputElement>(".searchbox input");
     act(() => {

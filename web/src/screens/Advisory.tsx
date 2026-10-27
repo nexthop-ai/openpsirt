@@ -35,7 +35,7 @@ import {
   statusLabel,
 } from "./advisory";
 import { FlawPicker } from "./FlawPicker";
-import { decisionAt, issueAt } from "../app/routes";
+import { decisionOccurrenceAt, issueAt } from "../app/routes";
 import { Because, Outcome } from "../ui/Outcome";
 import { linkTo } from "../api/links";
 
@@ -326,7 +326,7 @@ function Releases({
                     <td>
                       {row.covered ? (
                         <>
-                          <Link to={decisionAt(row.covered.decision)}>
+                          <Link to={decisionOccurrenceAt(row.covered.decision_occurrence)}>
                             <Outcome outcome={row.covered.outcome} />
                           </Link>
                           {row.covered.reason && (
@@ -336,7 +336,7 @@ function Releases({
                           )}
                         </>
                       ) : (
-                        <span className="hint">None covers every place</span>
+                        <span className="hint">None covers every occurrence</span>
                       )}
                     </td>
                     <td>

@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useAfterClaim } from "../api/claims";
+import { useAfterDecision } from "../api/decisions";
 import { useStreams } from "../api/catalog";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +21,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
   const [from, setFrom] = useState("");
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const queries = useQueryClient();
-  const after = useAfterClaim();
+  const after = useAfterDecision();
 
   // The other lines of this product, to carry from.
   const streams = useStreams(at.product);
@@ -41,13 +41,13 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
   });
 
   const carry = useMutation({
-    mutationFn: async (decisions: number[]) =>
+    mutationFn: async (rows: number[]) =>
       unwrap(
         await api.POST(
           "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
           {
             params: { path: at, query: { from, from_variant: at.variant } },
-            body: { decisions },
+            body: { decision_occurrences: rows },
           },
         ),
       ),
@@ -97,7 +97,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
       {preview.isError && (
         <Failed
           error={preview.error}
-          what="The claims this line would inherit could not be read."
+          what="The decisions this line would inherit could not be read."
         />
       )}
 
@@ -134,13 +134,13 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
                 </thead>
                 <tbody>
                   {[...moved, ...postponed].map((row) => (
-                    <tr key={row.decision}>
+                    <tr key={row.decision_occurrence}>
                       <td>
                         <input
                           type="checkbox"
                           aria-label={`Carry ${row.vulnerability}`}
-                          checked={picked.has(row.decision ?? 0)}
-                          onChange={() => toggle(row.decision ?? 0)}
+                          checked={picked.has(row.decision_occurrence ?? 0)}
+                          onChange={() => toggle(row.decision_occurrence ?? 0)}
                         />
                       </td>
                       <td>
@@ -176,7 +176,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
               Carry {picked.size > 0 ? picked.size : ""} for review
             </button>
             <span className="hint">
-              Each needs a second person. The version moved, so the old judgment stopped applying.
+              Each needs a second person. The version moved, so the old decision stopped applying.
             </span>
           </div>
         </>

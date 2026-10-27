@@ -20,21 +20,21 @@ const ADDRESS =
 const PATTERN =
   "/products/:product/streams/:stream/variants/:variant/findings/:vulnerability/components/:component";
 
-// Two claims standing on one finding, each with a summary of its own.
+// Two decisions standing on one finding, each with a summary of its own.
 const finding = {
   vulnerability: "CVE-2026-1",
   component: "libnl",
   severity: "high",
-  places: [],
+  occurrences: [],
   standing: [
-    { decision_id: 11, claim_id: 101, places: 3, state: "proposed" },
-    { decision_id: 12, claim_id: 102, places: 7, state: "proposed" },
+    { decision_occurrence_id: 11, decision_id: 101, occurrences: 3, state: "proposed" },
+    { decision_occurrence_id: 12, decision_id: 102, occurrences: 7, state: "proposed" },
   ],
 };
 
-function claim(id: number, claimId: number) {
+function decision(id: number, decisionId: number) {
   return {
-    decision: { id, claim_id: claimId, outcome: "wont-fix", state: "proposed" },
+    decision_occurrence: { id, decision_id: decisionId, outcome: "wont-fix", state: "proposed" },
     proposed_by: "bob",
   };
 }
@@ -62,27 +62,27 @@ function serving(decisions: Record<number, unknown>) {
   });
 }
 
-function card(claimId: number): HTMLElement | undefined {
+function card(decisionId: number): HTMLElement | undefined {
   return Array.from(mount.host().querySelectorAll<HTMLElement>(".card.standing")).find(
-    (each) => each.querySelector("h3 .id")?.textContent === `#${claimId}`,
+    (each) => each.querySelector("h3 .id")?.textContent === `#${decisionId}`,
   );
 }
 
-describe("the claims standing on a finding", () => {
-  it("draws each claim with its own summary when an earlier read fails", async () => {
-    serving({ 12: claim(12, 102) });
+describe("the decisions standing on a finding", () => {
+  it("draws each decision with its own summary when an earlier read fails", async () => {
+    serving({ 12: decision(12, 102) });
     mount.render(screen(<Finding />, ADDRESS, PATTERN));
     await settle();
     expect(card(101)).toBeUndefined();
-    expect(card(102)?.textContent).toContain("7 places here");
+    expect(card(102)?.textContent).toContain("7 occurrences here");
     expect(mount.host().textContent).toContain("CVE-2026-1");
   });
 
-  it("draws both claims, each with its own summary, when both are read", async () => {
-    serving({ 11: claim(11, 101), 12: claim(12, 102) });
+  it("draws both decisions, each with its own summary, when both are read", async () => {
+    serving({ 11: decision(11, 101), 12: decision(12, 102) });
     mount.render(screen(<Finding />, ADDRESS, PATTERN));
     await settle();
-    expect(card(101)?.textContent).toContain("3 places here");
-    expect(card(102)?.textContent).toContain("7 places here");
+    expect(card(101)?.textContent).toContain("3 occurrences here");
+    expect(card(102)?.textContent).toContain("7 occurrences here");
   });
 });

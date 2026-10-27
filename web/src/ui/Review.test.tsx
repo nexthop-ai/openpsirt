@@ -14,7 +14,7 @@ afterEach(() => vi.restoreAllMocks());
 const other = (
   key: string,
   version: string,
-  places: number,
+  occurrences: number,
   build = "sonic · 202411 · arm",
 ): Other => ({
   key,
@@ -22,7 +22,7 @@ const other = (
   stream: "202411",
   variant: "arm",
   version,
-  places,
+  occurrences,
 });
 
 const PLAN: Plan = {
@@ -52,14 +52,14 @@ describe("the reach of a decision, reviewed before it is written", () => {
   it("submits only the other versions ticked, and counts the records each writes", async () => {
     const { onConfirm } = drawn();
     expect(text()).toContain("2 of 3 consumers");
-    expect(text()).toContain("2 places left open by you");
+    expect(text()).toContain("2 occurrences left open by you");
     expect(text()).toContain("What you wrote: Unreachable from any entry point.");
     const [first] = Array.from(
       mount.host().querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
     );
     await act(async () => first?.click());
     await press(mount.host(), "Review and submit → ↵");
-    // The places here and the places in the version ticked.
+    // The occurrences here and the occurrences in the version ticked.
     expect(text()).toContain("7 records written");
     expect(text()).toContain("Left undecided");
     expect(text()).toContain("unstated in this build");
@@ -67,7 +67,7 @@ describe("the reach of a decision, reviewed before it is written", () => {
     expect(onConfirm).toHaveBeenCalledWith([PLAN.offered[0]]);
   });
 
-  it("counts a version with no places stated as one record", async () => {
+  it("counts a version with no occurrences stated as one record", async () => {
     drawn();
     const boxes = Array.from(
       mount.host().querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),

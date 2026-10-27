@@ -12,7 +12,7 @@ import { at } from "./when";
 
 // A conversation about one thing, however that thing is addressed.
 //
-// The comments on a claim and the notes on an issue are the same thread: the
+// The comments on a decision and the notes on an issue are the same thread: the
 // avatar and the author line, the timestamp, the edited mark, the earlier
 // versions behind it, the editor in place, the draft, and the note about a
 // name that reached nobody. Written out twice, one tab apart, the two would

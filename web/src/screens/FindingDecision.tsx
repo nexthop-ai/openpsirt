@@ -1,15 +1,15 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// The claims made about this finding, and their fate.
+// The decisions made about this finding, and their fate.
 //
-// The state the head reads, the timeline, the revisions a claim went through,
-// the comments on it, and the judgments made at this place before — whose
+// The state the head reads, the timeline, the revisions a decision went through,
+// the comments on it, and the decisions made at this occurrence before — whose
 // reasoning is offered back rather than thrown away. Together they answer one
 // question, which is why they are one file: what does the record say, and how
 // did it come to say that.
 
-import { useAfterClaim, useClaimApprovals, useClaimRevisions } from "../api/claims";
+import { useAfterDecision, useDecisionApprovals, useDecisionRevisions } from "../api/decisions";
 import { happenedOf, stripeOf } from "../ui/stripe";
 import { FLOORS } from "../ui/severities";
 import { useState, type ReactNode } from "react";
@@ -27,12 +27,15 @@ import { Markdown } from "../ui/Markdown";
 import { EditPiece, Thread } from "../ui/Thread";
 import { Because, labeled } from "../ui/Outcome";
 import { UNPLACED, type Sitting } from "../ui/Covering";
-import { claimAt, decisionAt } from "../app/routes";
+import { decisionAt } from "../app/routes";
 
-type Detail = Body<"DecisionDetail">;
+type Detail = Body<"DecisionOccurrenceDetail">;
 
 export type Previous = {
+  // The row reaffirming names, and the decision it belongs to, which is the
+  // number a reader is shown.
   id: number;
+  decisionId: number;
   outcome: string;
   justification: string;
   deferredUntil: string;
@@ -43,32 +46,34 @@ export type Previous = {
   about: string;
   approvedBy: string;
   reasoning: string;
-  place: string;
+  occurrence: string;
 };
 
-// The head's pill reads each claim's state as a whole where the finding
+// The head's pill reads each decision's state as a whole where the finding
 // reports it, not the representative row's: one row approved and forty
 // returned is pending, not approved.
 //
-// A proposed claim that needs nobody is in force, the same as an approved one:
+// A proposed decision that needs nobody is in force, the same as an approved one:
 // an "affected" answer or a short deferral waits for no second person.
 export function stateOf(
-  claims: Detail[],
+  decisions: Detail[],
   decided: number,
   total: number,
   overall: string[],
 ): { label: string; cls: string } {
-  if (claims.length === 0)
+  if (decisions.length === 0)
     return decided > 0 && total > 0
       ? { label: "Decided", cls: "agreed" }
       : { label: "Undecided", cls: "open" };
   const states =
-    overall.length === claims.length ? overall : claims.map((c) => c.decision?.state ?? "");
-  const waits = (i: number) => !!claims[i]?.decision?.needs_approval;
+    overall.length === decisions.length
+      ? overall
+      : decisions.map((c) => c.decision_occurrence?.state ?? "");
+  const waits = (i: number) => !!decisions[i]?.decision_occurrence?.needs_approval;
   if (states.some((s, i) => s === "proposed" && waits(i)))
     return { label: "Pending approval", cls: "waiting" };
   if (states.every((s) => s === "approved" || s === "proposed")) {
-    const outcome = claims[0]?.decision?.outcome ?? "";
+    const outcome = decisions[0]?.decision_occurrence?.outcome ?? "";
     const word = states.every((s) => s === "approved") ? "approved" : "in force";
     return { label: `${labeled(outcome)} · ${word}`, cls: "agreed" };
   }
@@ -76,12 +81,12 @@ export function stateOf(
   return { label: "Decided", cls: "agreed" };
 }
 
-// The claim that stands, in its state, with outcome, justification, scope,
+// The decision that stands, in its state, with outcome, justification, scope,
 // approval, the reasoning rendered, and what may be done to it.
 export function Standing({
-  claim,
+  decision,
   summary,
-  places,
+  occurrences,
   mine,
   mayApprove,
   onRevised,
@@ -89,48 +94,51 @@ export function Standing({
   undisclosed,
   children,
 }: {
-  claim: Detail;
-  summary?: Body<"StandingClaimBody">;
-  places: Sitting[];
+  decision: Detail;
+  summary?: Body<"StandingDecisionBody">;
+  occurrences: Sitting[];
   mine: boolean;
   mayApprove: boolean;
   onRevised: () => void;
   about: { product: string; vulnerability: string };
   undisclosed?: boolean;
   // Drawn at the foot of the card: what belongs to this decision and is not
-  // its judgment, such as the conversation about it.
+  // its argument, such as the conversation about it.
   children?: ReactNode;
 }) {
-  // The claim, not the row. What a judgment says — its reasoning, the
+  // The decision, not the row. What a decision says — its reasoning, the
   // agreement given for it, the conversation about it — belongs to the action
-  // that made it, so revising, withdrawing and commenting all name the claim.
+  // that made it, so revising, withdrawing and commenting all name the decision.
   //
-  // Taken from the claim rather than from the summary beside it, so that every
-  // write on this card names the claim the card is drawing. The two hold the
-  // same number; one call here used the claim's and the rest used the
+  // Taken from the decision rather than from the summary beside it, so that every
+  // write on this card names the decision the card is drawing. The two hold the
+  // same number; one call here used the decision's and the rest used the
   // summary's, which is a disagreement waiting for the day the pair is wrong.
-  const id = claim.decision?.claim_id ?? summary?.claim_id ?? 0;
-  // The places this claim covers, named rather than counted. A count says
-  // how big the judgment was and not which code it was about, and on a finding
+  const id = decision.decision_occurrence?.decision_id ?? summary?.decision_id ?? 0;
+  // The occurrences this decision covers, named rather than counted. A count says
+  // how big the decision was and not which code it was about, and on a finding
   // that is only partly decided that is the question somebody has.
-  const covers = places
-    .filter((place) => id !== 0 && place.claim === id)
-    .map((place) => place.consumer || UNPLACED);
-  // The claim's state as a whole, not its representative row's: a claim with
+  const covers = occurrences
+    .filter((occurrence) => id !== 0 && occurrence.decision === id)
+    .map((occurrence) => occurrence.consumer || UNPLACED);
+  // The decision's state as a whole, not its representative row's: a decision with
   // one row approved and forty sent back is not approved.
-  const state = summary?.state ?? claim.decision?.state ?? "";
+  const state = summary?.state ?? decision.decision_occurrence?.state ?? "";
   // Proposed and needing nobody is in force: nothing waits on a second person.
-  const waiting = state === "proposed" && !!claim.decision?.needs_approval;
+  const waiting = state === "proposed" && !!decision.decision_occurrence?.needs_approval;
   const rows = summary?.rows;
   const mixed =
     !!rows &&
     [rows.proposed ?? 0, rows.sent_back ?? 0, rows.approved ?? 0].filter((n) => n > 0).length > 1;
-  const sentBackAt = summary?.sent_back_at ?? claim.decision?.sent_back_at;
+  const sentBackAt = summary?.sent_back_at ?? decision.decision_occurrence?.sent_back_at;
   const queries = useQueryClient();
-  const approvals = useClaimApprovals(id);
+  const approvals = useDecisionApprovals(id);
   const live = (approvals.data?.items ?? []).filter((a) => !a.withdrawn_at);
   const last = live[live.length - 1];
-  const stripe = stripeOf(happenedOf(state, !!sentBackAt), !!claim.decision?.needs_approval);
+  const stripe = stripeOf(
+    happenedOf(state, !!sentBackAt),
+    !!decision.decision_occurrence?.needs_approval,
+  );
 
   return (
     <div className={`card standing ${stripe}`}>
@@ -139,14 +147,14 @@ export function Standing({
           Decision <span className="id">#{id}</span>
         </h3>
         <span className="hint">
-          proposed by <b>{claim.proposed_by_name || claim.proposed_by}</b>
-          {claim.proposed_at && <> · {at(claim.proposed_at)}</>}
-          {typeof claim.age_days === "number" && claim.age_days > 365 && (
+          proposed by <b>{decision.proposed_by_name || decision.proposed_by}</b>
+          {decision.proposed_at && <> · {at(decision.proposed_at)}</>}
+          {typeof decision.age_days === "number" && decision.age_days > 365 && (
             <>
               {" "}
               ·{" "}
               <span style={{ color: "var(--sev-medium)" }}>
-                a judgment this old is worth re-reading
+                a decision this old is worth re-reading
               </span>
             </>
           )}
@@ -173,37 +181,42 @@ export function Standing({
         <div>
           <span className="l">Outcome</span>
           <span className="v">
-            {labeled(claim.decision?.outcome ?? "")}
-            {claim.decision?.deferred_until && <> until {claim.decision.deferred_until}</>}
+            {labeled(decision.decision_occurrence?.outcome ?? "")}
+            {decision.decision_occurrence?.deferred_until && (
+              <> until {decision.decision_occurrence.deferred_until}</>
+            )}
           </span>
         </div>
-        {claim.decision?.justification && (
+        {decision.decision_occurrence?.justification && (
           <div>
             <span className="l">Justification</span>
             <span className="v">
-              <Because code={claim.decision.justification} />
+              <Because code={decision.decision_occurrence.justification} />
             </span>
-            {claim.decision.mitigation && (
-              <span className="hint">stopped by: {claim.decision.mitigation}</span>
+            {decision.decision_occurrence.mitigation && (
+              <span className="hint">stopped by: {decision.decision_occurrence.mitigation}</span>
             )}
           </div>
         )}
-        {/* The evidence for a claim that the fix is already here, on the
-            screen the claim is read from. It is the one outcome whose claim
-            is a fact somebody can check, and it is checked from here. */}
-        {claim.decision?.fixed_version && (
+        {/* The evidence for a decision that the fix is already here, on the
+            screen the decision is read from. It is the one outcome that states
+            a fact somebody can check, and it is checked from here. */}
+        {decision.decision_occurrence?.fixed_version && (
           <div>
             <span className="l">Fixed in</span>
-            <span className="v mono">{claim.decision.fixed_version}</span>
+            <span className="v mono">{decision.decision_occurrence.fixed_version}</span>
             <span className="hint">as the packager states it; not compared against what ships</span>
           </div>
         )}
         <div>
           <span className="l">Scope</span>
           <span className="v">
-            {summary?.places ?? claim.decision?.places ?? 1}{" "}
-            {(summary?.places ?? claim.decision?.places ?? 1) === 1 ? "place" : "places"} here
-            {/* Named, not just counted — a place is what pulls the
+            {summary?.occurrences ?? decision.decision_occurrence?.occurrences ?? 1}{" "}
+            {(summary?.occurrences ?? decision.decision_occurrence?.occurrences ?? 1) === 1
+              ? "occurrence"
+              : "occurrences"}{" "}
+            here
+            {/* Named, not just counted — an occurrence is what pulls the
                 component in, which is what the decision is keyed on. Three at
                 most: a kernel sits at sixty and the list would be the card. */}
             {covers.length > 0 && (
@@ -215,8 +228,10 @@ export function Standing({
               </>
             )}
             {(summary?.builds ?? []).length > 0 && <> · also {summary?.builds?.join(", ")}</>}
-            {summary?.kind === "extension" && <> · extends an approved claim</>}
-            {claim.decision?.selected_by && <> · narrowed by: {claim.decision.selected_by}</>}
+            {summary?.kind === "extension" && <> · extends an approved decision</>}
+            {decision.decision_occurrence?.selected_by && (
+              <> · narrowed by: {decision.decision_occurrence.selected_by}</>
+            )}
           </span>
         </div>
         <div>
@@ -244,7 +259,7 @@ export function Standing({
                 <span className="state agreed">Approved</span> by{" "}
                 <b>{last.approved_by_name || last.approved_by}</b>
                 {last.approved_at && <>, {at(last.approved_at)}</>}
-                {/* Carried onto this claim from the one it re-affirms: they
+                {/* Carried onto this decision from the one it re-affirms: they
                     agreed to those words rather than to the reasoning shown
                     here. */}
                 {last.carried_from && <span className="hint"> · carried forward</span>}
@@ -260,7 +275,7 @@ export function Standing({
             ) : state === "approved" ? (
               <>
                 <span className="state agreed">Approved</span>
-                {claim.decision?.needs_approval === false &&
+                {decision.decision_occurrence?.needs_approval === false &&
                   " — needed nobody: under the deferral threshold"}
               </>
             ) : (
@@ -271,8 +286,8 @@ export function Standing({
       </div>
 
       <ReasonEditor
-        claimId={id}
-        reasoning={claim.reasoning ?? ""}
+        decisionId={id}
+        reasoning={decision.reasoning ?? ""}
         state={state}
         approved={state === "approved"}
         about={about}
@@ -292,32 +307,34 @@ export function Standing({
 
 type Event = { when: string; who: string; what: string; earlier?: boolean };
 
-// One timeline: what happened to the claim that stands, and what happened at
-// this place before it.
+// One timeline: what happened to the decision that stands, and what happened at
+// this occurrence before it.
 export function Activity({
-  claimId,
-  claim,
-  places,
+  decisionId,
+  decision,
+  occurrences,
   previous,
 }: {
-  claimId: number;
-  claim: Detail;
-  places?: number;
+  decisionId: number;
+  decision: Detail;
+  occurrences?: number;
   previous: Previous[];
 }) {
-  const approvals = useClaimApprovals(claimId);
-  const revisions = useClaimRevisions(claimId);
+  const approvals = useDecisionApprovals(decisionId);
+  const revisions = useDecisionRevisions(decisionId);
   const comments = useQuery({
-    queryKey: ["comments", claimId],
+    queryKey: ["comments", decisionId],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: claimId } } })),
+      unwrap(
+        await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: decisionId } } }),
+      ),
   });
 
   const now: Event[] = [];
   now.push({
-    when: claim.proposed_at ?? "",
-    who: claim.proposed_by_name || claim.proposed_by || "",
-    what: `proposed #${claimId} — ${labeled(claim.decision?.outcome ?? "")} · ${places ?? claim.decision?.places ?? 1} ${(places ?? claim.decision?.places ?? 1) === 1 ? "place" : "places"}`,
+    when: decision.proposed_at ?? "",
+    who: decision.proposed_by_name || decision.proposed_by || "",
+    what: `proposed #${decisionId} — ${labeled(decision.decision_occurrence?.outcome ?? "")} · ${occurrences ?? decision.decision_occurrence?.occurrences ?? 1} ${(occurrences ?? decision.decision_occurrence?.occurrences ?? 1) === 1 ? "occurrence" : "occurrences"}`,
   });
   for (const r of revisions.data?.items ?? []) {
     if ((r.ordinal ?? 1) > 1)
@@ -349,9 +366,9 @@ export function Activity({
       what: "commented",
     });
   }
-  if (claim.decision?.sent_back_at)
+  if (decision.decision_occurrence?.sent_back_at)
     now.push({
-      when: claim.decision.sent_back_at,
+      when: decision.decision_occurrence.sent_back_at,
       who: "",
       what: "rejected — returned for revision",
     });
@@ -360,7 +377,7 @@ export function Activity({
   const earlier: Event[] = previous.map((p) => ({
     when: p.proposedAt,
     who: p.proposedBy,
-    what: `proposed #${p.id} — ${labeled(p.outcome)}${p.state ? ` · ${p.state}` : ""}`,
+    what: `proposed #${p.decisionId} — ${labeled(p.outcome)}${p.state ? ` · ${p.state}` : ""}`,
     earlier: true,
   }));
   earlier.sort((a, b) => b.when.localeCompare(a.when));
@@ -387,13 +404,13 @@ export function Activity({
     <div className="card">
       <h3>Activity</h3>
       {unread && (
-        <Failed error={unread.error} what="Part of this claim's history could not be read." />
+        <Failed error={unread.error} what="Part of this decision's history could not be read." />
       )}
       <ul className="timeline">{now.map(line)}</ul>
       {earlier.length > 0 && (
         <>
           <p className="eyebrow" style={{ margin: "12px 0 6px" }}>
-            Earlier at this place
+            Earlier at this occurrence
           </p>
           <ul className="timeline past">{earlier.map(line)}</ul>
         </>
@@ -404,9 +421,9 @@ export function Activity({
 
 // Every revision is kept. An approval names the revision it was given for,
 // and revising withdraws it.
-export function Revisions({ claimId }: { claimId: number }) {
-  const revisions = useClaimRevisions(claimId);
-  const approvals = useClaimApprovals(claimId);
+export function Revisions({ decisionId }: { decisionId: number }) {
+  const revisions = useDecisionRevisions(decisionId);
+  const approvals = useDecisionApprovals(decisionId);
   const items = revisions.data?.items ?? [];
   if (revisions.isError && !notYours(revisions.error)) {
     return (
@@ -478,7 +495,7 @@ export function Revisions({ claimId }: { claimId: number }) {
 
 // Comments are separate from the reasoning and never affect an approval.
 export function Comments({
-  claimId,
+  decisionId,
   mine,
   about,
   undisclosed,
@@ -486,7 +503,7 @@ export function Comments({
   within,
   writes = true,
 }: {
-  claimId: number;
+  decisionId: number;
   // Drawn inside the decision's own card rather than as a card of its own.
   within?: boolean;
   mine: (who: string) => boolean;
@@ -500,14 +517,16 @@ export function Comments({
   undisclosed?: boolean;
   // Whether it is internal material: a lead's, until its flaw is disclosed.
   internal?: boolean;
-  // Whether the reader may comment, which reading the claim does not imply.
+  // Whether the reader may comment, which reading the decision does not imply.
   writes?: boolean;
 }) {
   const comment = useComment();
   const comments = useQuery({
-    queryKey: ["comments", claimId],
+    queryKey: ["comments", decisionId],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: claimId } } })),
+      unwrap(
+        await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: decisionId } } }),
+      ),
   });
 
   return (
@@ -522,18 +541,21 @@ export function Comments({
         word="Comment"
         consequence="Does not affect the approval"
         placeholder="A question, a note, something worth knowing later."
-        draftKey={`comment:${claimId}`}
+        draftKey={`comment:${decisionId}`}
         // silent-read: a write's answer, whose failure the thread draws from `adding`.
         notNotified={comment.data?.not_notified ?? []}
         // Said, as the note thread says it: an empty thread with a live
-        // composer above it reads as a claim nobody has objected to.
+        // composer above it reads as a decision nobody has objected to.
         unread={
           comments.isError && !notYours(comments.error) ? (
-            <Failed error={comments.error} what="The comments on this claim could not be read." />
+            <Failed
+              error={comments.error}
+              what="The comments on this decision could not be read."
+            />
           ) : null
         }
         adding={comment}
-        onAdd={(body, done) => comment.mutate({ id: claimId, body }, { onSuccess: done })}
+        onAdd={(body, done) => comment.mutate({ id: decisionId, body }, { onSuccess: done })}
         edit={(piece, done) => (
           <EditPiece
             id={piece.id ?? 0}
@@ -580,7 +602,7 @@ export function PreviousCard({
 }) {
   return (
     <div className="card">
-      <h3>Previous decisions at this place</h3>
+      <h3>Previous decisions at this occurrence</h3>
       <p className="hint" style={{ margin: "0 0 10px" }}>
         Lapsed and withdrawn decisions cover nothing. Kept so you can reuse the reasoning.
       </p>
@@ -604,11 +626,11 @@ function Prior({
   undecided: boolean;
   onReuse: (reasoning: string, outcome: string, justification: string) => void;
 }) {
-  const after = useAfterClaim();
+  const after = useAfterDecision();
   const [note, setNote] = useState("");
   const [asking, setAsking] = useState(false);
   // What reaffirming answered, said on the card it was done from.
-  const [done, setDone] = useState<{ claimId: number; waiting: boolean } | null>(null);
+  const [done, setDone] = useState<{ decisionId: number; waiting: boolean } | null>(null);
   const reaffirm = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -621,7 +643,7 @@ function Prior({
                 stream: at.stream,
                 variant: at.variant,
                 issue: at.vulnerability,
-                occurrence: item.place,
+                occurrence: item.occurrence,
               },
             },
             body: { previous: item.id, reasoning: `${item.reasoning}\n\n${note}`.trim() },
@@ -630,7 +652,7 @@ function Prior({
       ),
     onSuccess: (made) => {
       setAsking(false);
-      setDone({ claimId: made.claim_id ?? 0, waiting: !!made.needs_approval });
+      setDone({ decisionId: made.decision_id ?? 0, waiting: !!made.needs_approval });
       after();
     },
   });
@@ -639,7 +661,7 @@ function Prior({
   return (
     <article className="prior">
       <header>
-        <span className="id">#{item.id}</span> <b>{labeled(item.outcome)}</b>
+        <span className="id">#{item.decisionId}</span> <b>{labeled(item.outcome)}</b>
         {item.justification && (
           <>
             {" "}
@@ -682,8 +704,8 @@ function Prior({
             {done.waiting
               ? "It takes effect once a second person agrees. "
               : "In force now, with the earlier agreement carried onto it."}
-            {done.waiting && done.claimId > 0 && (
-              <Link to={claimAt(done.claimId)} className="linkish">
+            {done.waiting && done.decisionId > 0 && (
+              <Link to={decisionAt(done.decisionId)} className="linkish">
                 Open the decision →
               </Link>
             )}
@@ -702,7 +724,7 @@ function Prior({
         </div>
       )}
       <div className="actions">
-        {lapsed && undecided && item.place && !asking && (
+        {lapsed && undecided && item.occurrence && !asking && (
           <button type="button" className="btn" onClick={() => setAsking(true)}>
             Reaffirm
           </button>
@@ -734,8 +756,8 @@ function Prior({
             Reuse this reasoning
           </button>
         )}
-        <Link to={decisionAt(item.id)} className="linkish">
-          Open #{item.id} →
+        <Link to={decisionAt(item.decisionId)} className="linkish">
+          Open #{item.decisionId} →
         </Link>
       </div>
     </article>

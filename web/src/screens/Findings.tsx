@@ -89,7 +89,7 @@ const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
 
 // The filters the by-bump view can apply, by the key their chip carries.
 //
-// The rest ask about a place, a deadline or an assignee, and a bump has none
+// The rest ask about an occurrence, a deadline or an assignee, and a bump has none
 // of those — so they are named on that screen rather than dropped, which would
 // widen the list back out while the chips go on saying they are on.
 const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "state"]);
@@ -98,13 +98,13 @@ const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "
 // in one request; past it, "select all" asks by the filter and names none.
 const NAMED_AT_ONCE = 2000;
 
-// One row per issue in a component, not per place. Every filter is in the URL,
+// One row per issue in a component, not per occurrence. Every filter is in the URL,
 // so a link carries what somebody is looking at; every filter is the server's,
 // so the total beside the list counts the same thing the list shows.
 //
-// A judgment is not made from here. A row previews in place — the description
+// A decision is not made from here. A row previews in place — the description
 // and where the component sits — and opens the finding, which is where a
-// judgment is made with the evidence beside it.
+// decision is made with the evidence beside it.
 export function Findings() {
   const { product = "", stream: named = "", variant: builtAs = "" } = useParams();
   // No product in the path means every product the reader may see. The server
@@ -208,7 +208,7 @@ export function Findings() {
   const everyMatching = everyFor !== null && everyFor === questionIn(asked);
   const me = useWho();
   const [handing, setHanding] = useState("");
-  // The list somebody has turned down a prepared claim for, as its address.
+  // The list somebody has turned down a prepared decision for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
   // list on screen — narrowing further asks a different question, and the rule
   // is offered again.
@@ -291,14 +291,14 @@ export function Findings() {
     return now.toString();
   }, [asked, stream, variant]);
 
-  // The claim a saved filter prepares, where this list is exactly one somebody
+  // The decision a saved filter prepares, where this list is exactly one somebody
   // kept and that one prepares anything. Read off the address rather than
   // remembered from the pick: a rule that outlived the narrowing it was picked
   // for would prefill rows it never drew, with somebody's name about to go on
-  // the claim — and one remembered on the screen is lost coming back from a
+  // the decision — and one remembered on the screen is lost coming back from a
   // finding, leaving the dropdown saying it is open while no row carries it.
   //
-  // Offered and never applied: a named person submits the claim as their own.
+  // Offered and never applied: a named person submits the decision as their own.
   // The filter's name travels with every row, which is how a finding opened
   // from here knows to fill its form in.
   const kept = useKept();
@@ -457,7 +457,7 @@ export function Findings() {
 
   // The other rows on this page that are the same issue at another binary of
   // the same source package. Counted over the page rather than the list,
-  // because a page is what somebody is reading and the server counts places —
+  // because a page is what somebody is reading and the server counts occurrences —
   // saying otherwise would be a number that disagrees with the total beside
   // it.
   const siblings = useMemo(() => {
@@ -724,14 +724,14 @@ export function Findings() {
           their name to. */}
       {prepared && (
         <div className="alert info" style={{ margin: "10px 0" }}>
-          <strong>This filter prepares a claim</strong>
+          <strong>This filter prepares a decision</strong>
           <span>
             Every finding opened from this list fills its decision form in, saying{" "}
             <b>{said(prepared.prepares.outcome ?? "")}</b> in the words “{prepared.name}” carries
             {prepared.prepares.defer_days ? (
               <>, put off {prepared.prepares.defer_days} days from whenever you submit it</>
             ) : null}
-            . Nothing is proposed until you submit it, and it goes out as <b>your</b> claim for a
+            . Nothing is proposed until you submit it, and it goes out as <b>your</b> decision for a
             second person to agree to.
           </span>
           <button
@@ -814,7 +814,7 @@ export function Findings() {
           query={query}
           offset={offset}
           size={page}
-          // A bump has no place, no deadline and no assignee, so the filters
+          // A bump has no occurrence, no deadline and no assignee, so the filters
           // that ask about one have no row here to narrow. Named on screen
           // rather than dropped quietly — and the three this view does take
           // take one value each, so a second value asked for is named here

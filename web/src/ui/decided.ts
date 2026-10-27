@@ -9,8 +9,8 @@ import { drawn } from "./states";
 // takes one color on every screen.
 //
 // The five words the state filter takes, plus the two states a filter has no
-// name for: a claim sent back to its author, which is what the proposer is
-// looking for in a list, and the empty state — some places answered and the
+// name for: a decision sent back to its author, which is what the proposer is
+// looking for in a list, and the empty state — some occurrences answered and the
 // rest not, which is neither decided nor undecided and has to say so.
 type Decided = { word: string; cls: string };
 
@@ -27,7 +27,7 @@ export function decidedAs(state?: string, sentBack?: boolean): Decided {
     case "undecided":
       return { word: "Undecided", cls };
     default:
-      // Some places answered and the rest never decided. The server leaves
+      // Some occurrences answered and the rest never decided. The server leaves
       // the word empty where none of the four holds, and drawing that as
       // "Undecided" claims nobody has looked at any of it.
       return { word: "Partly", cls };

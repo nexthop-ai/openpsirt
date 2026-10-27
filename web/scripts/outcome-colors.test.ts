@@ -5,13 +5,13 @@ import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
 import { armsIn, outcomesIn, sweep, uncolored } from "./outcome-colors.mjs";
 
-describe("a claim's color", () => {
+describe("a decision's color", () => {
   it("reports an outcome no arm colors", () => {
     const outcomes = outcomesIn(`      outcome: "not-applicable" | "affected" | "mismatched";\n`);
     expect(
       uncolored(
         outcomes,
-        armsIn(".claimed.affected,\n.claimed.not-applicable {\n  --c: var(--ok);\n}"),
+        armsIn(".decided.affected,\n.decided.not-applicable {\n  --c: var(--ok);\n}"),
       ),
     ).toEqual(["mismatched"]);
   });
@@ -20,7 +20,7 @@ describe("a claim's color", () => {
     const outcomes = outcomesIn(
       `      outcome?: ("not-applicable" | "affected" | "mismatched")[] | null;\n`,
     );
-    const css = ".claimed.affected {\n}\n.claimed.mismatched,\n.claimed.not-applicable {\n}";
+    const css = ".decided.affected {\n}\n.decided.mismatched,\n.decided.not-applicable {\n}";
     expect(uncolored(outcomes, armsIn(css))).toEqual([]);
   });
 

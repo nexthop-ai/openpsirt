@@ -12,7 +12,7 @@ describe("a decision state drawn on any screen", () => {
     for (const state of STATES) expect(decidedAs(state).cls).toBe(drawn(state));
   });
 
-  it("takes the same class for a group some places answered and the rest did not", () => {
+  it("takes the same class for a group some occurrences answered and the rest did not", () => {
     expect(drawn(undefined)).toBe(decidedAs(undefined).cls);
     expect(drawn("")).toBe(decidedAs("").cls);
   });

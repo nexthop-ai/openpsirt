@@ -37,11 +37,11 @@ function daysOut(days: number): string {
 
 describe("proposing a deferral past the threshold", () => {
   // The deployment's threshold is thirty days. The date picked is twenty-five
-  // days out, inside it on its own, and the one place was already put off for
+  // days out, inside it on its own, and the one occurrence was already put off for
   // ten — so only a form that adds what was put off before says a second
   // person is needed.
   //
-  // Verified by replacing the place's earlier deferral with zero where the
+  // Verified by replacing the occurrence's earlier deferral with zero where the
   // form works out what it covers: the sentence reads "inside the 30-day
   // threshold" and the test fails on it. And by sending the landing date in
   // place of the deferral date: the body check fails.
@@ -63,14 +63,14 @@ describe("proposing a deferral past the threshold", () => {
       return { data: { items: [], total: 0 } };
     });
     const sent = accept(() => ({
-      data: { claim_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: true },
+      data: { decision_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: true },
     }));
     const done = vi.fn();
     mount.render(
       screen(
         <Decide
           at={at}
-          places={[{ place: "p1", component: "openssl", deferred_days: 10 }]}
+          occurrences={[{ occurrence: "p1", component: "openssl", deferred_days: 10 }]}
           onDone={done}
         />,
       ),
@@ -118,7 +118,7 @@ describe("proposing a deferral past the threshold", () => {
       reasoning: "Waiting on the vendor's next image.",
     });
     expect(done).toHaveBeenCalledWith(
-      expect.objectContaining({ claimId: 9, needsApproval: true, outcome: "deferred" }),
+      expect.objectContaining({ decisionId: 9, needsApproval: true, outcome: "deferred" }),
     );
   });
 });
@@ -142,14 +142,14 @@ describe("the decision form's Ctrl+Enter", () => {
       return { data: { items: [], total: 0 } };
     });
     const sent = accept(() => ({
-      data: { claim_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: false },
+      data: { decision_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: false },
     }));
     mount.render(
       screen(
         <>
           <Decide
             at={at}
-            places={[{ place: "p1", component: "openssl" }]}
+            occurrences={[{ occurrence: "p1", component: "openssl" }]}
             onDone={() => undefined}
           />
           <textarea aria-label="A comment elsewhere" />
@@ -198,7 +198,7 @@ describe("the decision form's Ctrl+Enter", () => {
     expect(sent()).toHaveLength(0);
   });
 
-  it("refreshes everything a new claim changes, the proposer's own list among it", async () => {
+  it("refreshes everything a new decision changes, the proposer's own list among it", async () => {
     const queries = client();
     const invalidated = watchInvalidations(queries);
     const { sent, reasoning } = await ready(queries);
@@ -206,7 +206,14 @@ describe("the decision form's Ctrl+Enter", () => {
     await settle();
     expect(sent()).toHaveLength(1);
     expect(invalidated()).toEqual(
-      expect.arrayContaining(["my-claims", "decided", "decision", "claim", "finding", "findings"]),
+      expect.arrayContaining([
+        "my-decisions",
+        "decided",
+        "decision-occurrence",
+        "decision",
+        "finding",
+        "findings",
+      ]),
     );
   });
 });

@@ -3,7 +3,7 @@
 
 import type { paths } from "../api/schema";
 
-// Why a claim waits in the review queue, in the server's own words.
+// Why a decision waits in the review queue, in the server's own words.
 export type Reason = NonNullable<
   NonNullable<paths["/v1/review-queue"]["get"]["parameters"]["query"]>["reason"]
 >;
@@ -15,7 +15,7 @@ type Words = { reason: Reason; tab: string; empty: string; stated: string };
 const APPROVAL: Words = {
   reason: "approval",
   tab: "To approve",
-  empty: "A claim needing a second person would appear here.",
+  empty: "A decision needing a second person would appear here.",
   stated: "Pending approval",
 };
 
@@ -47,24 +47,24 @@ export function queueReason(params: URLSearchParams): Reason {
   return REASONS.find((each) => each.reason === asked)?.reason ?? "approval";
 }
 
-// What a dated claim promised, as a card names it: "Upgrade to 3.0.15 by
+// What a dated decision promised, as a card names it: "Upgrade to 3.0.15 by
 // 2026-09-01", "Patch by 2026-09-01", "Deferred until 2026-09-01". Empty for an
 // outcome that carries no date.
-export function promised(claim: {
+export function promised(decision: {
   outcome: string;
   upgradeTo: string;
   committedTo: string;
   deferredUntil: string;
 }): string {
-  switch (claim.outcome) {
+  switch (decision.outcome) {
     case "upgrade-needed":
-      return claim.upgradeTo
-        ? `Upgrade to ${claim.upgradeTo} by ${claim.committedTo}`
-        : `Upgrade by ${claim.committedTo}`;
+      return decision.upgradeTo
+        ? `Upgrade to ${decision.upgradeTo} by ${decision.committedTo}`
+        : `Upgrade by ${decision.committedTo}`;
     case "patch-needed":
-      return `Patch by ${claim.committedTo}`;
+      return `Patch by ${decision.committedTo}`;
     case "deferred":
-      return `Deferred until ${claim.deferredUntil}`;
+      return `Deferred until ${decision.deferredUntil}`;
     default:
       return "";
   }
