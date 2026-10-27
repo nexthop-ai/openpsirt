@@ -50,7 +50,7 @@ carries) and the act hangs off it.
 | Nothing to upgrade to is a state, not an empty form | Where no version fixes anything, the work is a decision |
 | The decision over many issues at one component is linked here, beside the count no version fixes, and as the action where nothing fixes anything | |
 | What the product's upstream says about the component is a card: every standing statement about a component of this name at any version, with issue, version, status, mark, link and decline control; drawn only where it says something | |
-| A container image lists the versions each build stated for it, newest first, with the dates each was stated across; the first five shown and the rest counted | An image carries no version of its own (`design-docs/data-model.md` § Container images) |
+| A container image lists the versions each build stated for it, newest first, with the dates each was stated across; the first five shown and the rest counted | An image carries no version of its own (`design-docs/data-model-components.md` § Container images) |
 
 An upgrade is promised here on the terms `design-docs/triage.md` sets: the
 releases, the version, the date, the reason, and who carries it.
@@ -91,7 +91,7 @@ as on it, worked out when read, never stored, because findings move.
 | The walk records reach and not distance | Distance keeps a component once per path: 1,612,405 rows for 43,904 pairs |
 | Every row is ordered on its number: beneath it for a branch, its own for a leaf; what opens comes first | |
 | Ordered cumulatively, forty kernel-module packages each depending on the kernel all report its total | The document does not tell contains from depends on; the fault sits deep and is the lesser one |
-| The header says how many components the scanner cannot match and opens them, only when there are some (`design-docs/analytics.md` § Unmatched components) | A build of nothing else scans clean; a real 37-package image did |
+| The header says how many components the scanner cannot match and opens them, only when there are some (`design-docs/analytics-catalog.md` § Unmatched components) | A build of nothing else scans clean; a real 37-package image did |
 | What nothing pulls in hangs from the root, whose count is everything beneath it as one set | A real switch image of 60,935 components has no edges from its root |
 | A level is drawn whole; the cap is for inventories that are not honest | 5,270 components seen under one root |
 | Arriving from a finding opens on the component with every parent expanded; the chain travels in the link, and a step past a level's cap is kept | |

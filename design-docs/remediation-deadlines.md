@@ -129,4 +129,4 @@ when it is first given a severity (REQ-33).
 | Rule | Reason |
 |---|---|
 | Counting from the latest moment lowers overdue counts | A two-year-old issue learned today responds from today; learning sooner is scanning coverage |
-| A finding with no deadline is in no deadline figure: nothing overdue, due soon or in the compliance rate | Three reasons are seen elsewhere: below the minimum severity in the line a list states over what it hides, a tag's findings at the release, and nothing to take in the findings list's upstream column and filter. End-of-life has a report of its own (`design-docs/analytics.md`). Not-rated has no view of its own |
+| A finding with no deadline is in no deadline figure: nothing overdue, due soon or in the compliance rate | Three reasons are seen elsewhere: below the minimum severity in the line a list states over what it hides, a tag's findings at the release, and nothing to take in the findings list's upstream column and filter. End-of-life has a report of its own (`design-docs/analytics-catalog.md`). Not-rated has no view of its own |

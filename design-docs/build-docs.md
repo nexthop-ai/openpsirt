@@ -62,7 +62,7 @@ fills.
 | Site workflows check out full history | A shallow checkout has no tags |
 | A test fails on a hand-written release version in `README.md`, `SECURITY.md` or `docs/` | |
 | `README.md` names no version | The site does not build it |
-| The compatibility notes say a database any release built is upgraded in place, and one a candidate built is recreated | A candidate's migration can change before release (`design-docs/database.md` § Migrations) |
+| The compatibility notes say a database any release built is upgraded in place, and one a candidate built is recreated | A candidate's migration can change before release (`design-docs/database-migrations.md` § Migrations) |
 
 | Not reported | Reason |
 |---|---|

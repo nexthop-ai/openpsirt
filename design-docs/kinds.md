@@ -26,7 +26,7 @@ Satisfies REQ-06, REQ-14, REQ-17, REQ-18, REQ-19, REQ-21, REQ-25, REQ-43, REQ-50
 |---|---|---|---|
 | What arrives | An inventory, matched by the scanner | A person (REQ-19) | SARIF (`design-docs/analysis.md`) |
 | Issue | A published vulnerability, or a flaw minted here later given a CVE | A flaw minted here | The analyzer's rule |
-| Occurrence identity | Component and consumer (`design-docs/data-model.md` § Occurrence identity, REQ-17) | Component and consumer | Minted at first sighting, carried by matching |
+| Occurrence identity | Component and consumer (`design-docs/data-model-graph.md` § Occurrence identity, REQ-17) | Component and consumer | Minted at first sighting, carried by matching |
 | Carry across builds | Version and chain match (REQ-25) | Stated by a person | Matching (`design-docs/analysis-matching.md` § Matching) |
 | Absence | The run closes it with a reason (REQ-21) | Nothing; a person closes it | No longer detected; it stays open |
 | Visibilities | Public, private | Private, public | Internal, public once its flaw is disclosed |
@@ -69,7 +69,7 @@ A consumer reads findings and names its kinds; others never reach it.
 | Version carry | A decision lapsing on a version move, or carried to matching versions (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency, deadlines and their rewrites | Vulnerability, entered |
 | Triage | Findings lists and counts, a finding's page, issue notes, disclosure | Vulnerability, entered |
-| Assignment | Giving work, handovers, a lost role's hand-back, team assignment rules and preview, and the lists of held work: unassigned, one person's, a team's queue, totals per holder (`design-docs/access.md` § Teams, `design-docs/analysis-triage.md` § Code finding assignment) | Vulnerability, entered, analysis |
+| Assignment | Giving work, handovers, a lost role's hand-back, team assignment rules and preview, and the lists of held work: unassigned, one person's, a team's queue, totals per holder (`design-docs/access-assignment.md` § Teams, `design-docs/analysis-triage.md` § Code finding assignment) | Vulnerability, entered, analysis |
 | Decisions | Decisions and occurrences, reasoning and revisions, approvals, comments, the review queue, every read of one decision, the audit log and file, and decision notices: waiting, sent back, lapsed, agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and its occurrences | Vulnerability, entered |
 | Statistics | Trends, build comparisons, coverage, reports, the home page's figures | Vulnerability, entered |
@@ -79,16 +79,16 @@ A consumer reads findings and names its kinds; others never reach it.
 | Advisories | Documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What people are told about findings | Vulnerability, entered |
 | Evidence | One code finding's place, path, links and kept source (`design-docs/analysis-source.md` § Source) | Analysis |
-| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications.md` § Analyzer alerts, § Code finding notices) | Analysis |
+| Code findings | The queue by state with what each list leaves out, rule coverage, the queue file, a findings file's code findings, counts by series, and code finding and series notices (`design-docs/analysis-queue.md` § Code finding queue, `design-docs/analysis-triage.md` § Suppression rules, `design-docs/notifications-alerts.md` § Analyzer alerts, § Code finding notices) | Analysis |
 
 The audit log's file follows Decisions and includes code finding decisions under
-the log's visibility (REQ-50). `design-docs/interface.md` § Security testing
+the log's visibility (REQ-50). `design-docs/interface-security-testing.md` § Security testing
 holds the screens.
 
 | Rule | Reason |
 |---|---|
 | Exports names the findings lists' files alone; the disposition register is Register | Analysis on a shared consumer puts code findings into a statement of what a build ships |
-| A findings file reads its code findings through Code findings' read, its other rows through the list's (`design-docs/analytics.md` § Exports) | A list and its file are one read |
+| A findings file reads its code findings through Code findings' read, its other rows through the list's (`design-docs/analytics-exports.md` § Exports) | A list and its file are one read |
 | Counts by series belong to Code findings, never Statistics | Statistics feeds vulnerability figures |
 | Each is the queue's own read and visibility | Figure, list and file count one population |
 | Assignment is its own consumer, apart from Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a code finding nobody has judged into both. Holding work is one act, so handovers move code findings too |

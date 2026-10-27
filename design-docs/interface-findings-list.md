@@ -105,9 +105,9 @@ bump both start from a filtered set.
 | Changing the question clears the selection, through the one hook holding the rule, removing a chip included | A selection belongs to a population |
 | Select-all and deselect-all are inverses, both this page | |
 | A figure about a selection counts what it holds: the bulk form sums rows written across every page seen, and the line under the list names the limit the selection is past, issues or findings written | The ceiling is read against it (REQ-27) |
-| The bulk form asks, by an unticked box "Skip occurrences already decided", before skipping. Ticked, the result lists each occurrence left out linking its decision (`design-docs/triage.md` § Decided occurrences); unticked, a decided occurrence refuses the bulk decision naming it | |
+| The bulk form asks, by an unticked box "Skip occurrences already decided", before skipping. Ticked, the result lists each occurrence left out linking its decision (`design-docs/triage-bulk.md` § Decided occurrences); unticked, a decided occurrence refuses the bulk decision naming it | |
 | Approving a selection runs one at a time: what was agreed goes, a refusal stays ticked unless unticked meanwhile, and what was ticked meanwhile stays | |
-| Assigning a selection in one product is one request, resolved on the server against the list's filter. A refusal is the whole act's and the selection stays; rows a colleague holds that the caller may not take stay selected with a count (`design-docs/access.md` § Assignment by narrowing) | |
+| Assigning a selection in one product is one request, resolved on the server against the list's filter. A refusal is the whole act's and the selection stays; rows a colleague holds that the caller may not take stay selected with a count (`design-docs/access-assignment.md` § Assignment by narrowing) | |
 | Select all, offered on the batch bar in one product once something is ticked, takes every row the filter matches, counted by the list's total and naming no rows; a changed filter ends it | The server assigns what matches when the act lands |
 | Across products each row is its own request, and a loop over a selection survives a refusal: the rest are tried, failures stay selected with a count, and the undo control still appears | |
 

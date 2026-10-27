@@ -68,7 +68,7 @@ The deployment runs the scan itself, so the image carries the scanner.
 ## CVE record snapshot
 
 The snapshot lives in its own directory inside the scanner's data directory
-(`design-docs/ingest.md` § CVE records). The chart derives it from the scanner's
+(`design-docs/ingest-scanner.md` § CVE records). The chart derives it from the scanner's
 directory, after `extraEnv`, so the two share a volume. The first fetch makes the
 directory.
 
@@ -139,7 +139,7 @@ limit, and the kernel kills the larger on excess.
 | Every refusal reading no database precedes the port | Sign-in providers and return address, stores, the interface, queue sizes against the scanner timeout, the signing key |
 | A refusal after the port opened closes it and exits 1 | The administrators, group mappings, and a sign-in provider other than the one identities were bound under follow the migration |
 | An address already held is refused as the port opens, before migrating | |
-| A stop signal during the start ends it, exiting 0 | The migration or the wait for another's sees it through its context. PostgreSQL and SQLite roll back; MySQL and MariaDB leave the schema part changed (`design-docs/database.md` § Migrations that stop half way), and the next start reapplies it |
+| A stop signal during the start ends it, exiting 0 | The migration or the wait for another's sees it through its context. PostgreSQL and SQLite roll back; MySQL and MariaDB leave the schema part changed (`design-docs/database-migrations.md` § Migrations that stop half way), and the next start reapplies it |
 | An unknown subcommand is refused | A typo would start a server |
 | Background loops run from one list; the mail sender is absent with no channel and the attachment sweeper with no store | |
 | Every exit waits for the background work, a failure to serve included | Each pass fires at once, so an early return leaves them mid-query as the database closes |

@@ -92,7 +92,7 @@ plugin's two encodings of one build to one build.
 
 | Rule | Reason |
 |---|---|
-| A container image is read from the format only where no package identifier decides it; an image is identified by name (REQ-08, `design-docs/data-model.md` § Container images) | |
+| A container image is read from the format only where no package identifier decides it; an image is identified by name (REQ-08, `design-docs/data-model-components.md` § Container images) | |
 | Only the first ancestor supplies upstream identity | A scanner matches the fork point |
 | The first of each identifier stands | One producer emits eight spellings of one database key |
 | `NOASSERTION` and `NONE` are no value | Otherwise a scanner matches the word as a version |

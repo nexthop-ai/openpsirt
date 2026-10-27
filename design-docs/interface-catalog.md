@@ -40,7 +40,7 @@ action, both opening a drawer; the table is the screen.
 ## The Uploads screen
 
 One build's uploads, a tab per kind, each reading its own list
-(`design-docs/ingest.md` § Upload listing).
+(`design-docs/ingest-receipts.md` § Upload listing).
 
 | Tab | Holds |
 |---|---|
@@ -106,7 +106,7 @@ and picking its own pair the same way.
 ## The repositories screen
 
 One product's repository settings, reached from its row in the products table
-(`design-docs/analysis.md` § Repository settings).
+(`design-docs/analysis-source.md` § Repository settings).
 
 | Rule | Reason |
 |---|---|

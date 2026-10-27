@@ -62,10 +62,10 @@ start runs the migration from the top.
 
 Migration 43. It adds the image version table and merges what v0.8.0 stored
 per container image stamp into one image identified by name
-(`design-docs/data-model.md` § Container images), folds each destination's
+(`design-docs/data-model-components.md` § Container images), folds each destination's
 name into its key, stores a claim's reasoning once, keys a build's claim on it,
 and keys a reference on its address as given. A delivery gains when its latest
-attempt began (`design-docs/notifications.md` § Delivery); one v0.8.0 recorded
+attempt began (`design-docs/notifications-delivery.md` § Delivery); one v0.8.0 recorded
 holds none, which reads as no attempt in flight.
 
 On MySQL and MariaDB each step runs in a transaction of its own and steps over
@@ -90,10 +90,10 @@ runs.
 | Findings and labels are pointed at the kept component | Both a finding's component and what pulls it in. A label carried twice for one issue in one product keeps the first added |
 | Findings are read and moved once for every image | Read for the occurrences decisions key on before anything moves; moved after every image is merged, a batch of components at a time. Nothing indexes the finding table by component alone |
 | The other components are removed | Nothing points at them |
-| Each destination's name is folded | The lower-case name becomes the key and the typed spelling is kept (`design-docs/notifications.md` § Outbound HTTP). Two names of one kind folding to one key stay two: the one in use before a retired one, then the one spelled as the key, then the earliest keeps the key; the other takes the key followed by its own number, which is also the name it is listed and retired under. On MySQL and MariaDB between the image version table and the merge, asking first whether the column exists |
+| Each destination's name is folded | The lower-case name becomes the key and the typed spelling is kept (`design-docs/notifications-delivery.md` § Outbound HTTP). Two names of one kind folding to one key stay two: the one in use before a retired one, then the one spelled as the key, then the earliest keeps the key; the other takes the key followed by its own number, which is also the name it is listed and retired under. On MySQL and MariaDB between the image version table and the merge, asking first whether the column exists |
 | A delivery gains when its latest attempt began | A nullable column added where the table stands, after the fold. On MySQL and MariaDB between the fold and the merge, stepped over where present |
 | A patch repository records when its last visit ended | No v0.8.0 visit has an end, so each counts as holding the pass for no time until visited again (`design-docs/findings-patch-branches.md` § Host share) |
-| A graph node records the source package its build stated | Each node takes its component's source package and version. On v0.8.0 that can be another product's statement, and an upgraded node keeps it until a moving line's next scan (`design-docs/data-model.md` § Duplicate descriptions) |
+| A graph node records the source package its build stated | Each node takes its component's source package and version. On v0.8.0 that can be another product's statement, and an upgraded node keeps it until a moving line's next scan (`design-docs/data-model-components.md` § Duplicate descriptions) |
 | A finding no longer records when it last moved | Nothing read it. SQLite rebuilds the table; the others drop the column, stepped over where gone |
 | A recorded flaw's rating moves to the product that recorded it | The recorded rating table is made. Where an issue holds a flaw a person entered, its word and the score, vector and scheme naming no publisher become each recording product's recorded rating, and the word is put in force there where nothing rates the issue. Where a feed's score holds the row, the record's score is the newest rating beside it naming no publisher. The issue's word, unsourced score and unsourced ratings are emptied. A scanned issue that absorbed a record keeps its own rating except where it equals the absorbed record's, which moves as a record's does. Another product's finding of an emptied issue reads no word and keeps v0.8.0's deadline until a report fills a word and re-clocks it (`design-docs/findings-issues.md` § Report merging). On MySQL and MariaDB last, the table and the move in transactions of their own |
 

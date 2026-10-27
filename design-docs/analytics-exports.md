@@ -56,7 +56,7 @@ streams at the screen's page size; no complete list exists to filter afterwards.
 | The queue's file is the list the screen shows, with the deferral's end, the promised fix date and the target version | |
 | The audit log's file carries who agrees now, standing agreements only, and the whole agreement record with dates, carried and withdrawn marks, in a column of its own | What was agreed and then withdrawn is what an audit looks for; one column mixing the two is the answer it must not be given |
 | The audit log's file includes decisions about code findings, under the same visibility (REQ-50) | |
-| The code finding queue's file is the queue, under its visibility, with no source text | `design-docs/analysis.md` § Queue file |
+| The code finding queue's file is the queue, under its visibility, with no source text | `design-docs/analysis-queue.md` § Queue file |
 | The disposition register holds no code finding | It is the Register consumer's (`design-docs/kinds.md` § Consumers) |
 
 ### Code findings in a findings file

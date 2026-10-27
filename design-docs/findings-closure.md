@@ -25,7 +25,7 @@ data moves, so reading one leaves a scan to do.
 | Rule | Reason |
 |---|---|
 | The scanner is given what was stored, never the file sent | The file is not kept for a moving line |
-| What a later inventory states reaches its own product's scanner | A qualifier, CPE or source package on the build's node fills what another build of the product omitted (`design-docs/data-model.md` § Duplicate descriptions); another product's never does |
+| What a later inventory states reaches its own product's scanner | A qualifier, CPE or source package on the build's node fills what another build of the product omitted (`design-docs/data-model-components.md` § Duplicate descriptions); another product's never does |
 | A distribution stated as a name and version is told to the scanner as the `distro` qualifier; the stored identifier is untouched | Docker Scout and BuildKit write `os_name` and `os_version`: 3 matches as written, 66 with the qualifier, on one 142-package image |
 | The product itself is left out of what the scanner sees | Its name may collide with a real package |
 | A build holding only itself is not handed to the scanner; the run names the scanner it would have asked, with no version or database | The scanner errors on an empty inventory |
@@ -77,7 +77,7 @@ statements, against 324,508 a finding at a time, and no row re-ranked twice.
 | Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: never shipped, wrong product, or a duplicate |
 | Unaffected | The issue's CVE record excludes the upstream release held (§ CVE record ranges) |
-| Disclaimed | A supplier says its product, at the shipped version, is unaffected and every route up runs through it (`design-docs/triage.md` § Evidence from publishers); or a trusted upstream says the component at the shipped version is unaffected or fixed (`design-docs/upstream.md` § Statements applied) |
+| Disclaimed | A supplier says its product, at the shipped version, is unaffected and every route up runs through it (`design-docs/triage-evidence.md` § Evidence from publishers); or a trusted upstream says the component at the shipped version is unaffected or fixed (`design-docs/upstream.md` § Statements applied) |
 
 | Rule | Reason |
 |---|---|
@@ -120,7 +120,7 @@ out.
 ## Build-declared claims
 
 A build sends what it has decided does not apply to it, with its inventory or
-as a separate document naming the build's root (`design-docs/triage.md` §
+as a separate document naming the build's root (`design-docs/triage-evidence.md` §
 Statements about the build). Claims are stored as data when read (REQ-11); the
 file is discarded and the scan reruns on a schedule.
 
@@ -131,7 +131,7 @@ file is discarded and the scan reruns on a schedule.
 | Reasoning is cut to a typed markdown field's bound on a character; NUL dropped, invalid UTF-8 replaced, before keying | One long explanation is no reason to refuse a scan |
 | Issue identifier and justification are cut to an indexed name's width | |
 
-A supplier's statement is stored the same way (`design-docs/triage.md` §
+A supplier's statement is stored the same way (`design-docs/triage-evidence.md` §
 Evidence from publishers). A covered finding is kept, never dropped: one that
 never arrived looks like a scanner fault.
 
@@ -157,7 +157,7 @@ never arrived looks like a scanner fault.
 | A patch on the component and a `fixed` statement both close | |
 | A claim attached to the component beats one naming something to match; otherwise a stable order | The second may name a whole source tree |
 
-`design-docs/ingest.md` § Build-declared suppressions holds the matching.
+`design-docs/ingest-claims.md` § Build-declared suppressions holds the matching.
 
 ## CVE record ranges
 
@@ -215,7 +215,7 @@ numbers only; `6.18.55-onie` is not read.
 | A version alone | That version |
 | A version and a strict upper bound | Up to the bound |
 | A version and an inclusive bound | Up to and including; `.*` covers the prefix; `*` covers all |
-| No type, or `semver` | Release numbers (`design-docs/remediation.md` § Version ordering) |
+| No type, or `semver` | Release numbers (`design-docs/remediation-versions.md` § Version ordering) |
 | A commit range | Nothing |
 | Typed as a fix's origin commit, with a release number | Release numbers: the kernel writes the mainline release a fix first reached this way, 15,026 of 17,117 such lines |
 | Typed as a fix's origin commit, with a commit | A commit range |
@@ -254,7 +254,7 @@ kept lines are stated on the register row and logged.
 A scan that waits is asked before its run begins. Its job returns to the queue for five minutes without spending an
 attempt (`design-docs/queue.md` § Failure handling). The register lists these
 closures under their reason with the lines, judged against no deadline.
-`design-docs/ingest.md` § CVE records holds where the snapshot comes from.
+`design-docs/ingest-scanner.md` § CVE records holds where the snapshot comes from.
 
 ## Limits
 

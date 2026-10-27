@@ -161,13 +161,13 @@ longest:
 | It narrows to one product or one team's people | |
 | A team narrows waits by proposer and throughput by who did each piece | |
 | A team with nobody on it measures nothing | A narrowing never widens |
-| Only an administrator gets a team's per-person rows; anybody else its totals | `design-docs/access.md` § Teams |
+| Only an administrator gets a team's per-person rows; anybody else its totals | `design-docs/access-assignment.md` § Teams |
 
 ## Repeated deferrals
 
 Occurrences deferred more than once: how often, counted in decisions, and for
 how long, counted as the deferral threshold counts
-(`design-docs/triage.md` § The deferral threshold). A withdrawn or lapsed
+(`design-docs/triage-approval.md` § The deferral threshold). A withdrawn or lapsed
 deferral counts for the part that ran, and overlapping stretches count once.
 
 ## Limits

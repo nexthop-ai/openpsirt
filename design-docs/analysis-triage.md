@@ -43,7 +43,7 @@ it covers the code finding on every branch, tag and variant (REQ-25).
 | A dismissal states one of the four reasons | |
 | Approval needs `approver` and `internal-read` on the product, never the author | |
 | A fixed code finding takes no decision | It reopens when seen |
-| A probable pairing lapses a dismissal or not-security decision, re-affirmed as any lapsed decision (`design-docs/triage.md` § Re-affirmation); a confirmation stands | The pairing guesses it is the same result |
+| A probable pairing lapses a dismissal or not-security decision, re-affirmed as any lapsed decision (`design-docs/triage-lapse.md` § Re-affirmation); a confirmation stands | The pairing guesses it is the same result |
 | The lapse is written with the pairing | |
 | Decisions are read through the Decisions consumer (`design-docs/kinds.md` § Consumers) | The review queue and approval include them; the findings lists do not |
 
@@ -116,7 +116,7 @@ where it was.
 ## Code finding assignment
 
 `PUT …/code-findings/{occurrence}/assignment` gives one to a person or team, or
-to nobody, as a finding is assigned (`design-docs/access.md` § Assignment,
+to nobody, as a finding is assigned (`design-docs/access-assignment.md` § Assignment,
 § Teams; REQ-34).
 
 | Rule | Reason |
@@ -129,12 +129,12 @@ to nobody, as a finding is assigned (`design-docs/access.md` § Assignment,
 | Past its end of life, or recorded as a flaw, it is refused with 409, and the latter's page offers no holder | Its flaw is assigned instead |
 | Seen on a build where it was not open when assigned, it starts unassigned | |
 | Lost reading, deactivation and handover move code findings with everything else (`design-docs/kinds.md` § Consumers) | |
-| A team's assignment rules place unheld code findings, never one recorded as a flaw; whoever triages internal work reads and previews them (`design-docs/access.md` § Assignment rules) | |
+| A team's assignment rules place unheld code findings, never one recorded as a flaw; whoever triages internal work reads and previews them (`design-docs/access-assignment.md` § Assignment rules) | |
 | The lists of held work show each once to readers of internal work, naming the analyzer's rule | |
 | The unassigned list and the queue narrowed to unheld work leave out sightings past their end of life | |
 | One recorded as a flaw leaves the lists of held work; a handover leaves it with its holder and asks nothing, and releasing their work releases it | It is listed to nobody |
 | The page, every queue row and the file name the holder | |
-| The person given it is told, at internal visibility (`design-docs/notifications.md` § Code finding notices) | |
+| The person given it is told, at internal visibility (`design-docs/notifications-work.md` § Code finding notices) | |
 
 ## End of life
 

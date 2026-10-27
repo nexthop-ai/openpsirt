@@ -63,7 +63,7 @@ applies the scan, and is a record of its own (REQ-22).
 | Two rating claims in one product: the one in force beats the waiting one, otherwise the newer | |
 | The losing claim is withdrawn, naming no person, with "Superseded when the absorbed issue merged into the kept one"; the rating in force is recomputed, re-ranking and re-clocking the product's findings | |
 | Two incidents in one product: the newer stays; the other is cleared, naming no person, with the same reason | |
-| Each claim withdrawn and incident cleared this way is an administration trail row with a merge as its actor | `design-docs/access.md` § The administration trail |
+| Each claim withdrawn and incident cleared this way is an administration trail row with a merge as its actor | `design-docs/access-trail.md` § The administration trail |
 | Two answers that disagree are told to everybody who triages the product; two that agree tell nobody | Different outcomes, ratings, or dates of attack. A different date is a different obligation |
 | Published advisories and VEX documents are left as issued | |
 | A name recorded by hand that another issue holds is still refused | A person asserting identity is not a report |
@@ -92,7 +92,7 @@ in both orders and requires the same result.
 | Field | Rule | Reason |
 |---|---|---|
 | Known-exploited | Moves forward only | Silence in a later report is a gap |
-| Day the known-exploited catalog listed it | Earliest stated | Moving it re-clocks exploited findings (`design-docs/remediation.md` § Deadlines) |
+| Day the known-exploited catalog listed it | Earliest stated | Moving it re-clocks exploited findings (`design-docs/remediation-deadlines.md` § Deadlines) |
 | Score | Worst claimed | The one order-independent answer |
 | Likelihood | Newest by the day the estimate is about; dated beats undated; two undated are last-seen | It is a daily forecast that legitimately falls |
 | Likelihood, where a report carries none | Left alone | Omission is not zero |

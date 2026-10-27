@@ -93,7 +93,7 @@ one claim shape.
 
 A root-product statement is the build's own claim (REQ-11); a supplier's
 statement about its own product closes the finding inside it (REQ-31);
-anything else is evidence and a prefill (`design-docs/triage.md` § Evidence
+anything else is evidence and a prefill (`design-docs/triage-evidence.md` § Evidence
 from publishers).
 
 ## Supplier advisories

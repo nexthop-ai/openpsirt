@@ -28,8 +28,8 @@ the year, and six digits, `SONIC-2026-481907`, the shape of a vendor advisory.
 | It starts undisclosed, and recording asks the private triage right (REQ-37) | The dangerous mistake must not be the quiet one. Already-public is a flag on the request, asking the ordinary right |
 | Every flaw has a report | Recorded from a report, it accepts that report; recorded without one, the same request names where it came from and an accepted report is written. `design-docs/findings-reports.md` |
 | A flaw found here is marked so on its report | It carries no disclosure date and nobody is owed an answer |
-| Its deadline uses the windows for our own products, counted from its first severity (REQ-33) | `design-docs/remediation.md` § Recorded flaws. Unrated, it is listed and assignable with no deadline, reason `not-rated` |
-| A flaw is recorded from a confirmed code finding through this same path: found here, undisclosed, at no version, flaw and link in one transaction | `design-docs/analysis.md` § Flaw records |
+| Its deadline uses the windows for our own products, counted from its first severity (REQ-33) | `design-docs/remediation-deadlines.md` § Recorded flaws. Unrated, it is listed and assignable with no deadline, reason `not-rated` |
+| A flaw is recorded from a confirmed code finding through this same path: found here, undisclosed, at no version, flaw and link in one transaction | `design-docs/analysis-flaws.md` § Flaw records |
 | A flaw from a code finding records the code finding, the component ranked first and the builds proposed, kept after the flaw record is undone | What a person was offered beside what they chose |
 
 ## Names on a recorded flaw

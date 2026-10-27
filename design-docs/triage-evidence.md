@@ -72,7 +72,7 @@ run records it as a claim taken from that statement. Both apply alike
 | A statement claim closes when the statement is set aside or revised away, or the root moves, kept in step by the run before the build's claims are read | A scan restates only its own claims |
 | The claim names its statement | |
 | A statement about a component inside the build, uploaded alone, is its supplier's (§ Supplier statements applied) | |
-| The same statement sent with the inventory is the build's claim beneath that component (`design-docs/ingest.md` § Build-declared suppressions) | As a supplier's, each build's upload would set aside the last |
+| The same statement sent with the inventory is the build's claim beneath that component (`design-docs/ingest-claims.md` § Build-declared suppressions) | As a supplier's, each build's upload would set aside the last |
 
 ### Evidence placement
 
@@ -96,7 +96,7 @@ rejecting the absence of a fix as a signal.
 | Statements are resolved once into distinct pairs by `UNION`, and the list joins that | As a correlated `EXISTS` per finding the filter ran past five minutes on 281,884 findings and 1,854 statements |
 | The issue identifier is folded on write | A function on the indexed side defeats the index |
 | Only standing statements narrow; a superseded row stays readable | |
-| A later upload sets aside its own kind: a set replaces the set, an advisory the advisory of its name (`design-docs/ingest.md` § Supplier advisories) | |
+| A later upload sets aside its own kind: a set replaces the set, an advisory the advisory of its name (`design-docs/ingest-claims.md` § Supplier advisories) | |
 | The same bytes again change nothing | Supersession notifies holders of approvals citing it |
 | Shown against the package named, type and namespace compared, never the version | A short name such as `parser` is many packages |
 | The version a statement was made about is stored and shown beside it | A supplier names the fixing version; some state it only as a branch |

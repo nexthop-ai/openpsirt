@@ -30,8 +30,8 @@ product page.
 | Rows name the holder, a team marked team | |
 | The branch and variant are in the address, so a build's link narrows it; a product picked in the scope bar keeps the screen and drops them | A branch is one product's |
 | A series in the address narrows it and is named in the heading; each figure of Code findings by analyzer opens its series and state | |
-| Unassigned only narrows to code findings nobody holds, in the address and heading, across tabs, counts and the file (`design-docs/analysis.md` § Code finding queue) | The findings list holds no code finding |
-| The list is offered as CSV and JSON with the narrowing on screen, every row (`design-docs/analysis.md` § Queue file) | |
+| Unassigned only narrows to code findings nobody holds, in the address and heading, across tabs, counts and the file (`design-docs/analysis-queue.md` § Code finding queue) | The findings list holds no code finding |
+| The list is offered as CSV and JSON with the narrowing on screen, every row (`design-docs/analysis-queue.md` § Queue file) | |
 | Code findings by analyzer asks no count from a non-reader of internal material, and says code findings are internal | A table of zeros reads as an analyzer finding nothing |
 
 ## A code finding
@@ -48,8 +48,8 @@ product page.
 | On a decision about internal material the decision page offers the comment box to whoever triages or approves internal work, and the work link, Revise reasoning and Withdraw to whoever triages it | A flaw's readers read included decisions and take no part |
 | A code finding no longer detected offers closing it as fixed to a triager of internal material: what fixed it, naming the build of the first run not seeing it; a fixed one names that build | |
 | A non-triager of internal material sees no writing control | |
-| Past end of life it says so beside its state and offers no decision, Record as a flaw or fixed control (`design-docs/analysis.md` § End of life); Include in disclosure on an already-recorded one stays | The server refuses each |
-| In code its run declared third-party it reads Third-party beside its state, on its page and row; Record as a flaw stays, saying to report upstream, what declared it on hover (`design-docs/analysis.md` § Third-party code) | The flaw is the upstream's |
+| Past end of life it says so beside its state and offers no decision, Record as a flaw or fixed control (`design-docs/analysis-triage.md` § End of life); Include in disclosure on an already-recorded one stays | The server refuses each |
+| In code its run declared third-party it reads Third-party beside its state, on its page and row; Record as a flaw stays, saying to report upstream, what declared it on hover (`design-docs/analysis-source.md` § Third-party code) | The flaw is the upstream's |
 
 ## Flaw records from code findings
 
@@ -57,7 +57,7 @@ product page.
 |---|---|
 | A confirmed code finding offers Record as a flaw to a triager of internal material and undisclosed work | |
 | The offered components are cards, most likely first, each saying where it came from; a build not holding the picked one is unticked and cannot be ticked | |
-| The first component is picked unless it only resembles the code finding's directory (`design-docs/analysis.md` § Flaw record offer) | A resemblance is a guess |
+| The first component is picked unless it only resembles the code finding's directory (`design-docs/analysis-flaws.md` § Flaw record offer) | A resemblance is a guess |
 | A build holding the picked component that nothing analyzes is listed unticked beside the builds seen, and may be ticked (REQ-19) | It ships the code, unread by the analyzer |
 | Include in disclosure is one toggle, off; on, it lists what goes public before sending. Its hover: "Publishes the path, the analyzer's messages, and the decisions and comments on this finding with the flaw; until then, people on the flaw's case can read it." Under Disclosed with the flaw: each author's notes in full, messages and paths, whether snippets publish (REQ-40) | |
 | The preview and hover say who public is: "Once the flaw is disclosed, readable by everyone signed in with public access to this product. Not included in published VEX or CSAF." | |

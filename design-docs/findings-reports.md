@@ -70,12 +70,12 @@ A report is worked as a case (REQ-85).
 | Correspondence on a flaw found here | Refused; nobody outside to write to |
 | Notes | Markdown by somebody working the report, editable by its author, every wording kept. A mention reaches only readers of the product's reports; an unknown name is returned unnotified, worded alike whether or not the person exists |
 | After a decision | Notes and messages still accepted, readable from the issue under the report rule |
-| Assignment | One person or one team's queue (`design-docs/access.md` § Assignment), only to a reader of the product's reports or a team with one. Taking or handing back needs the right to work it; giving away needs the assigner right too. A holder who stops reading gives back, and a team does where no member still reads (`design-docs/access.md` § Lost reading) |
+| Assignment | One person or one team's queue (`design-docs/access-assignment.md` § Assignment), only to a reader of the product's reports or a team with one. Taking or handing back needs the right to work it; giving away needs the assigner right too. A holder who stops reading gives back, and a team does where no member still reads (`design-docs/access-assignment.md` § Lost reading) |
 | Assignment once judged | Refused. A report under a waiting ruling may still be handed over |
 | Held lists | Open reports by holder (a person with their teams' queues, a team, or nobody), narrowed to products where the reader reads reports, or to one when asked. A team's queue is not in nobody's list |
 | Assignment rules | A rule may place a product's reports, naming no package or occurrence; it places a new unheld report and sweeps open unheld ones when added. First match wins |
 | Hand-over | Releasing a person's work, and an administrator's hand-over, move their open reports with their findings |
-| Notices | The person given a report is told unless they gave it. Unanswered, messages and notes reach the report audience (`design-docs/notifications.md` § Report audience); a mentioned name gets the mention instead. Nothing leaving the deployment names the report |
+| Notices | The person given a report is told unless they gave it. Unanswered, messages and notes reach the report audience (`design-docs/notifications-work.md` § Report audience); a mentioned name gets the mention instead. Nothing leaving the deployment names the report |
 | History | Every act, oldest first, assembled from the rows that hold each |
 
 ## Judgment
@@ -95,7 +95,7 @@ keeps the earlier one.
 | It reaches the flaw's undisclosed open occurrences in the ruling's product, where they have no date or a later one | A scanned issue's reporter counts down elsewhere |
 | It is an embargo movement, act `duplicate`, naming the ruling and the claim | |
 | A first date needs nobody | |
-| Bringing a date earlier is a shortening, held to the movement threshold (`design-docs/access.md` § Disclosure-date movements) | The arrival is typed by the recorder, so a ruling is no route around the control |
+| Bringing a date earlier is a shortening, held to the movement threshold (`design-docs/access-disclosure.md` § Disclosure-date movements) | The arrival is typed by the recorder, so a ruling is no route around the control |
 | Withdrawing replays the embargo record without every withdrawn ruling, in the order each movement took effect (agreed, where it waited) | Where the answer is where the embargo stands, nothing moves; otherwise the occurrences take it, possibly no date, recorded as `duplicate-undone` |
 | The ruling form states the date it would set and whether it waits for a second person, asked of the server under the right to propose; nothing is shown where no date would start | |
 | Duplicates ruled before rulings set dates were dated by the v0.5.0 upgrade | |

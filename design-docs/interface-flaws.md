@@ -94,7 +94,7 @@ is and § Dispositions what a ruling does.
 | A finding says whether it is disclosed, wherever shown (REQ-40) | A private reader must know what not to repeat |
 | A group is undisclosed when any occurrence is, and its date is the earliest, both read as aggregates by count | A maximum of the visibility word answers "public" for a mixed group |
 | The standing notice sits above everything on the finding page (REQ-40), naming where disclosure happens: a ticket, a commit message, a chat; the row's chip is secondary | |
-| A screen lists what is approaching disclosure (REQ-38): soonest first, past due at the top, a date moved from it; a product the reader may not read undisclosed work in contributes nothing, not even a count (`design-docs/access.md`) | The list is a disclosure |
+| A screen lists what is approaching disclosure (REQ-38): soonest first, past due at the top, a date moved from it; a product the reader may not read undisclosed work in contributes nothing, not even a count (`design-docs/access-disclosure.md`) | The list is a disclosure |
 | A row is one issue in one product: Where names the product, components and every build in scope carrying it, the variant once where shared; Occurrences totals across those builds; the issue links its page. The row, its form and an act's answer are keyed on product and issue | The unit an embargo moves in |
 | The screen answers for the scope picked, sent with the request and named in the subtitle, or every product | |
 | It offers "Record a reported flaw" to whoever may record undisclosed in the scope's product, or any where none is picked, never labeled as starting a disclosure | An outside report starts a date; Disclose makes an issue public |
@@ -109,7 +109,7 @@ is and § Dispositions what a ruling does.
 ### The advisory
 
 Published advisories lists every advisory this deployment minted, and each has
-its own screen. `design-docs/remediation.md` § The advisory holds what an advisory
+its own screen. `design-docs/remediation-advisories.md` § The advisory holds what an advisory
 is and § Editorial state who may agree.
 
 | Rule | Reason |
@@ -124,7 +124,7 @@ is and § Editorial state who may agree.
 | Starting one asks a product and a flaw, mints the name and names the flaw. A name minted before a refused naming is kept for the next attempt, across closing the card and switching product on a flaw's panel | A mistyped identifier spends no number |
 | One flaw picker serves starting and adding: every flaw recorded in the product, open or fixed (marked), less those named; typing is allowed; a failed read says so and leaves the typing | An empty picker reads "none" |
 | The picker says when it holds less than is there, at the endpoint's maximum | |
-| Retitling and taking a flaw off are on the compose panel, each saying it takes back every agreement (`design-docs/remediation.md` § Editions and agreement) | They open an edition |
+| Retitling and taking a flaw off are on the compose panel, each saying it takes back every agreement (`design-docs/remediation-advisories.md` § Editions and agreement) | They open an edition |
 | Each release is listed under compose with its stated status, the decision and reason it stands under, and that decision's builds or "not recorded". A release of a variant none of those builds is reads "Another variant"; another branch or tag of the same variant says nothing | It reached by matching in another configuration |
 | A release a decision moves off affected can be marked affected and a mark cleared, the cost on hover, offered only where decisions move it | Either opens an edition |
 | A release whose status moved since agreement reads "Changed since approval"; the agreement stands | The moving decision had its own second person |
@@ -137,7 +137,7 @@ is and § Editorial state who may agree.
 #### Published VEX
 
 One build's published VEX has its own screen, reached from the release's customer
-documents. `design-docs/remediation.md` § The VEX document holds what it says
+documents. `design-docs/remediation-vex.md` § The VEX document holds what it says
 and § Issuance records what recording keeps.
 
 | Rule | Reason |

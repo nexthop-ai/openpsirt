@@ -28,7 +28,7 @@ Satisfies REQ-29, REQ-32, REQ-33.
 | A severity may be left unstated (REQ-18) | A forced choice stores a guess. A flaw recorded here then carries no deadline and says `not-rated` (REQ-33) |
 | A person's severity is checked against the words; a report's is folded | A scanner's silence is not a claim; a person typing "urgent" is wrong |
 | The scheme travels with the score | From the vector on a flaw assessed here, from the report otherwise |
-| The number shown is the newest generation's rating, whole, with the others named beside it | A list and the finding screen agree. `design-docs/ingest.md` holds which rating in a generation is kept |
+| The number shown is the newest generation's rating, whole, with the others named beside it | A list and the finding screen agree. `design-docs/ingest-scanner.md` holds which rating in a generation is kept |
 
 ### Version 4 classes
 
@@ -129,7 +129,7 @@ list.
 | The scanned build's own scanner findings are left out of the rewrite | The scan has just ranked them in the same transaction. Hand-recorded findings there are rewritten, and an earlier listing day still re-clocks them |
 | One statement per product and batch of issues; the issues, products and ratings are each read once for all | 16 statements against 1,955 the day a feed moved every likelihood, over 324,508 findings and another build's 43,220 |
 | The rank follows the issue; the stored signals move only toward worse | It does not flap nightly |
-| An incident moves no deadline | It admits the finding to the minimum severity whatever its rating (and clearing it may drop it again), and puts an upstream refusal back on the clock (`design-docs/remediation.md`). `design-docs/incidents.md` § Response windows holds the other clock |
+| An incident moves no deadline | It admits the finding to the minimum severity whatever its rating (and clearing it may drop it again), and puts an upstream refusal back on the clock (`design-docs/remediation-deadlines.md`). `design-docs/incidents.md` § Response windows holds the other clock |
 
 ## Limits
 

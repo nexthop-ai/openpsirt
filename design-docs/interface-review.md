@@ -53,7 +53,7 @@ The queue narrows to one product, the one a home figure counted for: the address
 carries it and the line under the heading names it.
 
 Filters above the queue narrow by proposer, an age of seven, thirty or ninety
-days, severity, outcome and release (`design-docs/triage.md` § Queue filters).
+days, severity, outcome and release (`design-docs/triage-approval.md` § Queue filters).
 They ride in the address, clear the selection when changed, and sit on the three
 lists, not the two tabs about the reader's own decisions.
 

@@ -39,7 +39,7 @@ are separate.
 |---|---|
 | One per person per sweep, counting their rows, gathered over every bounded batch | One a decision is a channel nobody reads |
 | A sweep failing part way still tells | Earlier batches are committed |
-| Says why: the code moved, or the issue was rated worse | They ask different things (`design-docs/triage.md` § Lapse marking) |
+| Says why: the code moved, or the issue was rated worse | They ask different things (`design-docs/triage-lapse.md` § Lapse marking) |
 | Links to the review queue's To reaffirm tab | The work is every lapsed decision |
 | Sent by the scan's sweep and by a rating put in or out of force here | |
 
@@ -80,7 +80,7 @@ back with its batch, a mention in its notes. Each line is withheld as internal
 | A decision's rows are counted at three visibilities, and its audience reads or approves at each | |
 | A code finding sent back links to the code finding | A rule names no finding page |
 | Agreeing to a dismissal tells nobody; withdrawing tells only where it was agreed | An unagreed dismissal never removed work |
-| A flaw record or inclusion names no flaw, its link answering the flaw to whoever may read it | `design-docs/analysis.md` § Disclosure inclusion |
+| A flaw record or inclusion names no flaw, its link answering the flaw to whoever may read it | `design-docs/analysis-flaws.md` § Disclosure inclusion |
 | An assignment names the rule, path, line and the build assigned from, withheld as internal while open at internal visibility | |
 | Queued code findings count one per occurrence per team and product, apart from other queued work, naming the team | `design-docs/kinds.md` § Consumers; apart, a disclosed-only member hears nothing internal |
 | One a decision stands on, or recorded as a flaw, is not waiting | |

@@ -60,16 +60,16 @@ first with how far it got.
 |---|---|
 | What each run changed | Worked out when asked, as issues at components, attributed to the newest read upload the run covered and omitted elsewhere |
 | Components described and components placed | Stored at read; a document placing none is a list, unable to answer "why is this here" |
-| Names gained, lost and changed since the upload before | Worked out when read (`design-docs/data-model.md` § Inventory delta), against what the build held whoever sent it |
+| Names gained, lost and changed since the upload before | Worked out when read (`design-docs/data-model-graph.md` § Inventory delta), against what the build held whoever sent it |
 
 | Rule | Reason |
 |---|---|
 | A key that reads no findings reads these counts | They are arithmetic over its own documents |
 | Which names moved is a listing of its own, on the receipt's terms | |
-| An upload moving much of a build is told to the product's readers after commit (`design-docs/notifications.md` § An inventory that moved sharply); a message that cannot be composed is logged | |
+| An upload moving much of a build is told to the product's readers after commit (`design-docs/notifications-alerts.md` § An inventory that moved sharply); a message that cannot be composed is logged | |
 | The counts read only the page's runs' findings, through an index on each run column carrying every counted column | Unindexed, the count grows with the calendar |
 | A page holding a first scan reads most of the build, until fifty scans follow | |
-| An index-only read misses findings written since the last vacuum; the finding table is vacuumed after a fiftieth changes (`design-docs/database.md` § Indexes) | |
+| An index-only read misses findings written since the last vacuum; the finding table is vacuumed after a fiftieth changes (`design-docs/database-schema.md` § Indexes) | |
 
 `design-docs/ingest-measurements.md` § Receipt page timings has the page on all
 four engines over a year.

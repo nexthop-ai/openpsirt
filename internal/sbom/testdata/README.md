@@ -110,7 +110,7 @@ against
 somebody's own output as well as against a written specification. Nothing this
 deployment ingests emits 3.0 — the scanner it ships emits 2.3 and tag-value —
 so these are the specification's own documents, which are hand-written and
-small by construction. `design-docs/ingest.md` records what that leaves open.
+small by construction. `design-docs/ingest-formats.md` records what that leaves open.
 
 They are worth having anyway, because two of them pair with a 2.3 fixture
 describing the same application, which is a comparison no single document

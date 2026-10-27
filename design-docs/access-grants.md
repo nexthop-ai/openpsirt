@@ -181,7 +181,7 @@ date on the person.
 | Their roles stay where they are | A return needs no reconstruction; the date stops them |
 | Read once, where every way in passes | A session, a personal token and a group-bound sign-in all resolve by identity |
 | **Every question of the form "may this person do this" excludes them** | A query reading grants alone would clear them to be handed undisclosed work, as a person or a team member, and to keep their work |
-| Nobody who has left is told anything, including what was opened before they left | `design-docs/notifications.md` § Delivery |
+| Nobody who has left is told anything, including what was opened before they left | `design-docs/notifications-delivery.md` § Delivery |
 | A departed administrator does not satisfy the startup check | |
 | Naming somebody in configuration readmits them, and nothing else clears the date | Re-recording a departed colleague must not readmit them |
 | Sessions are ended at once | Leaving is immediate, where a role withdrawal waits for a sign-in |

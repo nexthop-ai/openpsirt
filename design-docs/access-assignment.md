@@ -96,8 +96,8 @@ every binary built from it.
 | The preview is narrowed like every count (REQ-42, REQ-43); somebody who may see nothing is told nothing, never zero | Unnarrowed, its gap from the findings list is the undisclosed work |
 | The preview names no team and counts what the asker reads | |
 | A rule may place vulnerability reports instead of findings; it then names no package or place, and either key is refused | It places a report nobody holds as recorded, and sweeps the product's open unheld reports when added. Its preview counts them where the asker reads the product's reports, and zero elsewhere |
-| A rule places code findings, matched by component; one past its end of life is neither placed nor counted | `design-docs/analysis.md` § End of life |
-| A rule places no code finding recorded as a flaw, and the preview counts none | `design-docs/analysis.md` § Code finding assignment |
+| A rule places code findings, matched by component; one past its end of life is neither placed nor counted | `design-docs/analysis-triage.md` § End of life |
+| A rule places no code finding recorded as a flaw, and the preview counts none | `design-docs/analysis-triage.md` § Code finding assignment |
 | A rule places work only at a visibility one member of its team reads, per occurrence; a team of nobody is placed nothing | Unread occurrences stay unassigned beside those placed |
 | A rule places only work nobody holds, re-checked at the write | A human assignment always wins |
 | Rules are ordered, first match wins, and the finding records which rule placed it | |

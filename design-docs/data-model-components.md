@@ -143,7 +143,7 @@ product.
 | A VEX statement names the component by the node's identifier | |
 | Nothing stated is overwritten; qualifiers compare key by key ignoring capitals | |
 | The supplier and the license fill in on the row where it has none | `design-docs/findings-components.md` § Component suppliers |
-| The repository a build states is held on its node without credential or query, never filled from another build | `design-docs/analysis.md` § Placement |
+| The repository a build states is held on its node without credential or query, never filled from another build | `design-docs/analysis-source.md` § Placement |
 | Restating an identifier writes the node in place and opens and closes nothing | |
 | The fold key never moves after first storage | An upgrade commitment keyed on it keeps its coverage |
 | Captured at ingest | A scan file is not kept |
@@ -160,6 +160,6 @@ product.
 |---|---|
 | A component's row and fold are what its first report stated | A later source package or distribution reaches that product's scanner, claims and closure explanations from the node, never the fold, a decision's expiry, an assignment rule or a search by name. A package first described without its source folds on its own name everywhere |
 | Two artifacts distinguished only by a qualifier are one component | |
-| An image with no package identifier in a database v0.8.0 built is not recognized by the upgrade | Its next upload stores it by name once, as a version moving would (`design-docs/database.md` § The v0.9.0 upgrade) |
+| An image with no package identifier in a database v0.8.0 built is not recognized by the upgrade | Its next upload stores it by name once, as a version moving would (`design-docs/database-upgrades.md` § The v0.9.0 upgrade) |
 | An image's version is shown on the component screen alone | |
 | Where an issue sits, and the disclosure queue, link to a finding by name and version alone | Two components of that name and version land on the choice |

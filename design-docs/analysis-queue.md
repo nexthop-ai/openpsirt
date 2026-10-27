@@ -53,7 +53,7 @@ its code findings out.
 ## Queue file
 
 `GET /v1/products/{product}/code-findings.{format}` writes the list as CSV or
-JSON (`design-docs/analytics.md` § Exports).
+JSON (`design-docs/analytics-exports.md` § Exports).
 
 | Rule | Reason |
 |---|---|
@@ -68,7 +68,7 @@ JSON (`design-docs/analytics.md` § Exports).
 
 `GET /v1/products/{product}/code-finding-series` counts code findings per
 analyzer series by state, drawn as Code findings by analyzer
-(`design-docs/analytics.md` § Pages of the catalog's own).
+(`design-docs/analytics-catalog.md` § Pages of the catalog's own).
 
 | Rule | Reason |
 |---|---|

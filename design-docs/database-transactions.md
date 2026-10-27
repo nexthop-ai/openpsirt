@@ -62,7 +62,7 @@ back.
 | Inside the act | Reason |
 |---|---|
 | A job queued for what was written | Queued after, a failure reports a landed write as failed, or leaves rows nothing picks up |
-| Work handed back when somebody stops reading it | Done after, a failure leaves work with somebody who cannot open it. Bounded by what they held (`design-docs/access.md` § Lost reading) |
+| Work handed back when somebody stops reading it | Done after, a failure leaves work with somebody who cannot open it. Bounded by what they held (`design-docs/access-assignment.md` § Lost reading) |
 
 | Job | A full queue |
 |---|---|
@@ -73,7 +73,7 @@ back.
 | Outside the act | Reason |
 |---|---|
 | The deadline rewrite a policy change forces | Bounded by what is open: nineteen seconds against 441,108 findings, longer than a request |
-| A read naming things in the answer | `design-docs/api.md` § Refusal shape holds the rule |
+| A read naming things in the answer | `design-docs/api-refusals.md` § Refusal shape holds the rule |
 
 A store method handed a transaction takes one of three spellings.
 

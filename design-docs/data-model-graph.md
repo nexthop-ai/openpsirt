@@ -56,7 +56,7 @@ and names held at a different set of versions.
 | Counted by name | An upgrade is one dependency moving |
 | A name at two versions at once is one entry | A vendored tree ships one routinely |
 | The root is excluded from both sides | Its version is not stored and its name differs per variant |
-| An image held by name is at no version on either side | What each build stated is on the component screen (`design-docs/interface.md` § The component screen) |
+| An image held by name is at no version on either side | What each build stated is on the component screen (`design-docs/interface-component.md` § The component screen) |
 | The earliest scan applied to a build has none | |
 | Worked out when asked, never stored (REQ-20) | |
 
@@ -114,7 +114,7 @@ versions, hashed. Under the root the component's name stands alone.
 |---|---|
 | A component and its consumer, never the chain from the top | On a real switch image chains give 134,509 occurrences and 49,170 for the worst component; component and consumer give 27,366, the edge count, and 63 |
 | Nothing is lost | The worst component's 48 direct consumers include its containers, one step from the route |
-| A finding of the analysis kind has an occurrence minted from its series and the result's match key, carried by matching | `design-docs/analysis.md` § Matching |
+| A finding of the analysis kind has an occurrence minted from its series and the result's match key, carried by matching | `design-docs/analysis-matching.md` § Matching |
 | It carries no build and no product | A decision travels between builds (REQ-25), so every list correlating decisions requires a product |
 
 A decision occurrence relates to a finding by one spelling of the product, the

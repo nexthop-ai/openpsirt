@@ -46,7 +46,7 @@ A decision a severity bears on also lapses when its issue is rated worse
 | Swept when a rating here is put in force, agreed or withdrawn | Withdrawing a milder rating can restore a worse one |
 | Proposed decisions lapse as well as approved | |
 | Compared per decision, issue and product | |
-| The proposer is told why (`design-docs/notifications.md` § Decision outcomes) | |
+| The proposer is told why (`design-docs/notifications-work.md` § Decision outcomes) | |
 | Why it lapsed is worked out when read; both reasons can hold | |
 | Failing to mark is reported, not fatal | |
 | A decision covering nothing open in its product is not marked | |
@@ -57,7 +57,7 @@ A decision a severity bears on also lapses when its issue is rated worse
 When a report merges two issues, the live decision with less standing of two at
 one occurrence lapses, in the transaction applying the report, the merge naming
 its replacement (`design-docs/findings-issues.md` § Merged issues;
-`design-docs/notifications.md` § Decision outcomes).
+`design-docs/notifications-work.md` § Decision outcomes).
 
 ### Stopped standing
 
@@ -125,7 +125,7 @@ was made at.
 Lapsed decisions are reached by the findings list's `lapsed` state and the
 queue's To reaffirm tab, the reader's own. Neither lists nor offers a decision
 with a withdrawn row, nor a row at a code finding past its end of life, nor a
-decision with no other row (`design-docs/analysis.md` § End of life).
+decision with no other row (`design-docs/analysis-triage.md` § End of life).
 
 ## Re-affirmation across decisions
 

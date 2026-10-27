@@ -53,7 +53,7 @@ the next scan; anything else is evidence and a prefill, never a decision
 | One supplier unread does not stop the next | |
 | A pass cut by shutdown writes how far it reached, leaves the supplier due, and records no failure | |
 | Last attempt and last success are both recorded | Their gap is how long it has been unreachable |
-| A supplier unread past a set time, never under two scan intervals, from last success or configuration, is raised with administrators (`design-docs/notifications.md`) | Silence looks like publishing nothing |
+| A supplier unread past a set time, never under two scan intervals, from last success or configuration, is raised with administrators (`design-docs/notifications-alerts.md`) | Silence looks like publishing nothing |
 | What stopped an attempt is kept bounded | Unbounded, two engines refuse the write and the supplier is fetched every wake |
 
 ## The mark

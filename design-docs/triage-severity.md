@@ -66,7 +66,7 @@ working list.
 ## Deadline windows
 
 A finding's deadline comes from its urgency (REQ-33), on windows that are
-settings; `design-docs/remediation.md` § Deadlines holds when the clock starts
+settings; `design-docs/remediation-deadlines.md` § Deadlines holds when the clock starts
 and which findings carry none. Being known exploited has the shortest window,
 whatever the severity.
 

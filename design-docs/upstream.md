@@ -7,7 +7,7 @@ one depending on the upstream's own build is offered for review.
 Satisfies REQ-31, REQ-42, REQ-68, REQ-69, REQ-71, REQ-84.
 
 Neighbors: `design-docs/publishing.md` (what this deployment publishes),
-`design-docs/triage.md` § Evidence from publishers,
+`design-docs/triage-evidence.md` § Evidence from publishers,
 `design-docs/findings-closure.md` § Closure reasons, and
 `design-docs/access-signin.md` § Outbound provider fetches.
 
@@ -93,7 +93,7 @@ inventory and with no scan waiting is queued to be scanned again.
 ## Statements recorded
 
 An upstream's document lands with every third party's statements
-(`design-docs/triage.md` § Evidence from publishers), replaced by its own name.
+(`design-docs/triage-evidence.md` § Evidence from publishers), replaced by its own name.
 
 | The document names | Recorded as |
 |---|---|

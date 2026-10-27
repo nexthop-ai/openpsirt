@@ -117,7 +117,7 @@ the list pages through.
 | Rule | Reason |
 |---|---|
 | It rides on the page: a window count after the grouping, before the limit | The number and the rows cannot describe different sets |
-| The window sits outside the grouping | The findings lists narrow their groups with a `HAVING`; `design-docs/database.md` § Silently wrong query shapes names the distinct-count case |
+| The window sits outside the grouping | The findings lists narrow their groups with a `HAVING`; `design-docs/database-queries.md` § Silently wrong query shapes names the distinct-count case |
 | An empty page counts with a second statement grouped exactly as the page groups | Grouped one step finer, two binaries of one source count as two |
 | Any separate count repeats the page's key | Counting per component name where the page draws per component lists nine and says ten |
 | `limit=0` answers the total and no rows | The by-component view, planned upgrades and the review queue: a button's count and a polled badge |

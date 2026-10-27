@@ -150,7 +150,7 @@ The decisions easiest to violate by accident and costliest to unpick.
 | Every transaction is retryable as a whole, through the one helper. A cluster certifies at `COMMIT`, so a write whose statements all succeeded can still roll back | REQ-71 |
 | Nothing a transaction depends on is read outside it. A retry re-runs the closure against a moved database, so anything the closure uses but does not fetch is a defect | REQ-71 |
 | SQL values are parameterized; SQL identifiers come from an allowlist. A placeholder cannot bind a column, so a sort column from a query parameter is the real risk | REQ-66 |
-| Every identifier is quoted: declared, named and invented. Engines reserve different words, and a word is reserved only bare. `make reserved` reports bare names; it cannot see a string constant holding one qualified name or a column built from an alias at run time, which are quoted where written. See `design-docs/database.md` § Identifier quoting | REQ-71 |
+| Every identifier is quoted: declared, named and invented. Engines reserve different words, and a word is reserved only bare. `make reserved` reports bare names; it cannot see a string constant holding one qualified name or a column built from an alias at run time, which are quoted where written. See `design-docs/database-queries.md` § Identifier quoting | REQ-71 |
 | A name a query invents also avoids reserved words. A derived table `groups` fails on MySQL 8; quoting makes it legal, not readable | REQ-71 |
 | An affected-row count means rows matched, not changed, so a write whose values were already correct still reports its row. The connection settings make that true on all four engines | REQ-71 |
 | Exported code with no caller is a defect. `make unreachable` counts a test as a caller, so a symbol only its tests reach is a person's to catch | — |
@@ -172,7 +172,7 @@ The decisions easiest to violate by accident and costliest to unpick.
 
 - A cap follows reversibility: what nothing re-checks is capped.
 - Every bulk decision has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, so one answering many findings stays a size a reviewer can follow, and an unbounded write is a denial of service somebody triggers by accident.
-- A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. Its transaction size was measured and needs no chunking (`design-docs/triage.md`).
+- A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. Its transaction size was measured and needs no chunking (`design-docs/triage-promises.md`).
 - A cap bounds what is written, never what was asked for, because one named issue expands into many occurrences (REQ-27).
 
 ## Source file size
@@ -205,7 +205,7 @@ Below 1.0 there is no schema or API compatibility (REQ-76); the API path version
 is the shape 1.0 will have, and promises nothing.
 
 - A schema change edits the declaration in the untagged release's own migration, never a new migration beside it, and a development database is recreated.
-- What a tagged release shipped never changes; each release's declarations sit beside its upgrade migration (`design-docs/database.md` § Migrations).
+- What a tagged release shipped never changes; each release's declarations sit beside its upgrade migration (`design-docs/database-migrations.md` § Migrations).
 - Migration 41 is the baseline, v0.7.0's schema at once. An older database is refused.
 - Migrations 42, 43 and 44 upgrade databases v0.7.0, v0.8.0 and v0.9.0 built.
 - The next schema change is migration 45, edited until a tag ships it.
@@ -331,7 +331,7 @@ the OpenAPI drift check, the frontend, the race detector and three engines.
 - `check-engines` never runs for a documents-only change: it can only pass, and running it teaches people the gate is expensive.
 - The generated `docs/reference/openapi.yaml` and TypeScript client take the API tier.
 - A design document committed with code takes the code's tier.
-- Test binaries run in parallel, each with its own database per server through a leased slot (`design-docs/build.md` § Test databases).
+- Test binaries run in parallel, each with its own database per server through a leased slot (`design-docs/build-tests.md` § Test databases).
 
 ### The second command
 
@@ -352,7 +352,7 @@ tests on the other three.
 - Make reads the URLs when it starts, so run `make engines-up` first, then `make check && make check-engines`.
 - It writes `OPENPSIRT_TEST_POSTGRES_URL`, `OPENPSIRT_TEST_MYSQL_URL`, `OPENPSIRT_TEST_MARIADB_URL` and `OPENPSIRT_TEST_TOO_OLD_URL`. Each is set with `?=`, so the same variable in the environment points one run elsewhere.
 - `OPENPSIRT_TEST_TOO_OLD_URL` is a server below the supported floor (postgres:13 in CI), so the refusal to run against it is exercised rather than skipped.
-- `OPENPSIRT_TEST_RELAX_DURABILITY` lets the harness turn off commit durability on the MySQL and MariaDB servers, which is server-wide, so it is for throwaway servers only (`design-docs/build.md` § Commit durability). Left out, a server keeps its own.
+- `OPENPSIRT_TEST_RELAX_DURABILITY` lets the harness turn off commit durability on the MySQL and MariaDB servers, which is server-wide, so it is for throwaway servers only (`design-docs/build-tests.md` § Commit durability). Left out, a server keeps its own.
 
 ### A new table
 

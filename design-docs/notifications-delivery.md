@@ -72,7 +72,7 @@ reached anywhere; these controls govern it:
 | https only | The body is authenticated, not encrypted |
 | A redirect is refused | A moved receiver is reconfigured visibly |
 | A private address is allowed | The operator typed it, unlike a discovered sign-in endpoint |
-| The process's one outbound client, with its controls and User-Agent | `design-docs/access.md` § Outbound provider fetches |
+| The process's one outbound client, with its controls and User-Agent | `design-docs/access-signin.md` § Outbound provider fetches |
 
 | Rule | Reason |
 |---|---|
@@ -89,7 +89,7 @@ reached anywhere; these controls govern it:
 | A sweep reads what this destination has not settled | Read as "not cleared", events never clear, and past two hundred the same window is re-read forever |
 | A destination's kind is a kind some notification is, or every kind; a mistyped one is refused naming the kinds | It would list as working and receive nothing |
 | A destination's reason is why the last settled delivery failed, and nothing once one has gone since | |
-| A destination's name is matched folded to lower case, its typed spelling kept for the listing | Migration 43 folded v0.8.0's names; two folding to one key under one kind stay two, the second under a numbered key (`design-docs/database.md` § Migrations) |
+| A destination's name is matched folded to lower case, its typed spelling kept for the listing | Migration 43 folded v0.8.0's names; two folding to one key under one kind stay two, the second under a numbered key (`design-docs/database-migrations.md` § Migrations) |
 | A destination's kind is normalized where written | Compared loosely, a retired one keeps receiving |
 | Destinations are read and changed through the data layer, field by field | REQ-42 and REQ-43; an embedded row leaks the secret |
 

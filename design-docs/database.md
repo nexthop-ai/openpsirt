@@ -78,7 +78,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Listing the tables of the harness's SQLite schema | SQLite keeps its schema in its own catalog |
 | Commit durability on the harness servers | A global setting on MySQL and MariaDB. PostgreSQL takes it per session in the connection string |
 | Refreshing planner statistics before a measurement | A measurement queries seconds after a bulk load, before a server's own refresh. It asks as a start does |
-| Emptying a database for a measurement | PostgreSQL truncates every table in one statement; MySQL and MariaDB one table a statement, with foreign key checks suspended. SQLite copies a migrated file. `design-docs/build.md` § Measurement databases has the measurement |
+| Emptying a database for a measurement | PostgreSQL truncates every table in one statement; MySQL and MariaDB one table a statement, with foreign key checks suspended. SQLite copies a migrated file. `design-docs/build-tests.md` § Measurement databases has the measurement |
 | Reading a table's layout beside a measurement | PostgreSQL keeps pages and column correlation in its catalogs; MySQL and MariaDB report size through the information schema, in bytes of a page size each server sets |
 | Refreshing planner statistics in a deployment | `ANALYZE` with `SKIP_LOCKED` on PostgreSQL, `ANALYZE TABLE` under a bound on lock waits on MySQL and MariaDB, each table named from the catalog. SQLite is asked at start and after every scan (`design-docs/database-schema.md` § Planner statistics) |
 | Reading the planner's estimate of a table in a test | PostgreSQL's catalog, InnoDB's statistics tables, SQLite's own table |
@@ -183,7 +183,7 @@ reason otherwise. CI provides all four and checks that all four ran.
 The schema is built once per test binary. On SQLite a file is migrated on first
 use and copied per test; on a server the binary leases a slot of the schema and
 its database for as long as it runs, and the database is kept for the next
-binary (`design-docs/build.md` § Test databases).
+binary (`design-docs/build-tests.md` § Test databases).
 
 | Rule | Reason |
 |---|---|
@@ -246,5 +246,5 @@ on partitions.
 | Queries are not bounded | No statement timeout and no driver read timeout. A bound kills legitimate slow work, a large report or an ingest over tens of thousands of components, and would cut a migration part way |
 | Connections are not validated on checkout | There is no hook. A validation helper with a short deadline serves callers that would block on a dead connection, readiness among them; it costs a round trip and says only that a connection was alive a moment ago |
 | A SQLite write waiting on the write lock ignores its request's context | A write given 300 ms waited out 55 s, holding its goroutine and connection. The driver offers no busy handler, and queuing writes in the process would miss every write outside a transaction |
-| PostgreSQL compiles a plan priced past its default `jit_above_cost` of 100,000 | Server settings are left at their defaults, so a 30 ms statement can spend 150 ms compiling. A group condition in `HAVING` is the known case, asked over the grouped statement instead (`design-docs/triage.md` § Act placement) |
+| PostgreSQL compiles a plan priced past its default `jit_above_cost` of 100,000 | Server settings are left at their defaults, so a 30 ms statement can spend 150 ms compiling. A group condition in `HAVING` is the known case, asked over the grouped statement instead (`design-docs/triage-decisions.md` § Act placement) |
 | Timestamp semantics differ between engines | Moments are stored in UTC with explicit types |

@@ -29,4 +29,4 @@ For `design-docs/notifications-delivery.md` § Delivery. The read of who a sweep
 | Steady, changing nothing | 5.0 to 5.2 s | 4.3 to 4.4 s |
 | Opening 85,869 conditions | 401 to 404 s | 401 to 404 s |
 
-`design-docs/database.md` § Indexes has the read on each engine.
+`design-docs/database-schema.md` § Indexes has the read on each engine.

@@ -24,7 +24,7 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | Path | Holds |
 |---|---|
 | `cmd/openpsirt/` | The binary: flags, configuration, server lifecycle |
-| `cmd/openpsirt-upload/` | The upload client. See `design-docs/analysis.md` § Upload client |
+| `cmd/openpsirt-upload/` | The upload client. See `design-docs/analysis-client.md` § Upload client |
 | `internal/version/` | Build identity, injected at link time |
 | `internal/config/` | Settings from the environment, with defaults |
 | `internal/httpapi/` | Router, middleware, sign-in, the served interface, and the operation registry the API document is generated from. See `design-docs/api.md` § File organization |
@@ -39,44 +39,44 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | `internal/catalog/` | Products, branches and tags, variants. See `design-docs/data-model.md` |
 | `internal/ingest/` | Arriving scans. See `design-docs/ingest.md` |
 | `internal/queue/` | Durable background work. See `design-docs/queue.md` |
-| `internal/sbom/`, `internal/scanner/` | Reading and scanning an inventory. See `design-docs/ingest.md` |
-| `internal/docread/` | A third party's document as a bounded stream. See `design-docs/ingest.md` |
-| `internal/sarif/` | Reading SARIF and placing results in the checkout. See `design-docs/analysis.md` |
+| `internal/sbom/`, `internal/scanner/` | Reading and scanning an inventory. See `design-docs/ingest-parsing.md`, `design-docs/ingest-scanner.md` |
+| `internal/docread/` | A third party's document as a bounded stream. See `design-docs/ingest-parsing.md` |
+| `internal/sarif/` | Reading SARIF and placing results in the checkout. See `design-docs/analysis-source.md` |
 | `internal/series/` | Runs of one analysis across builds. See `design-docs/kinds.md` |
 | `internal/analysis/` | An analyzer's run applied as findings. See `design-docs/analysis.md` |
-| `internal/sourcelink/` | A product's repositories and the source addresses built from them. See `design-docs/analysis.md` |
-| `internal/uploadclient/` | The SARIF the upload client builds. See `design-docs/analysis.md` § Upload client |
-| `internal/graph/`, `internal/finding/` | The dependency graph and findings. See `design-docs/data-model.md`, `design-docs/findings.md` |
+| `internal/sourcelink/` | A product's repositories and the source addresses built from them. See `design-docs/analysis-source.md` |
+| `internal/uploadclient/` | The SARIF the upload client builds. See `design-docs/analysis-client.md` § Upload client |
+| `internal/graph/`, `internal/finding/` | The dependency graph and findings. See `design-docs/data-model-graph.md`, `design-docs/findings.md` |
 | `internal/filed/` | A record filed under one issue read as another. See `design-docs/findings-issues.md` § Merged issues |
 | `internal/rating/` | A product's own rating of an issue, in a query. See `design-docs/findings-severity.md` |
 | `internal/cvss/` | CVSS 3.0, 3.1 and 4.0 base scores and bands, with no database. See `design-docs/findings-severity.md` |
 | `internal/triage/`, `internal/advisory/` | Decisions, approvals, the CSAF document. See `design-docs/triage.md` |
-| `internal/access/`, `internal/signin/` | Subjects and sign-in. See `design-docs/access.md` |
+| `internal/access/`, `internal/signin/` | Subjects and sign-in. See `design-docs/access.md`, `design-docs/access-signin.md` |
 | `internal/notify/` | Notifications. See `design-docs/notifications.md` |
 | `internal/weblink/` | Interface addresses the server hands out. See `design-docs/notifications.md` § Links |
 | `internal/incident/` | Incident response windows, notices, the shelf. See `design-docs/incidents.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, upstream version lookups |
 | `internal/attach/` | Files on an issue. See `design-docs/attachments.md` |
-| `internal/trail/` | Changes to how this deployment works. See `design-docs/access.md` |
-| `internal/saved/` | Saved list narrowings. See `design-docs/remediation.md` |
-| `internal/vex/`, `internal/publisher/` | VEX statements and who makes them. See `design-docs/remediation.md` |
-| `internal/directory/` | Issued advisories written for another web server. See `design-docs/remediation.md` |
-| `internal/csaf/` | CSAF provider description, ROLIE feed and provider lists. See `design-docs/remediation.md` |
+| `internal/trail/` | Changes to how this deployment works. See `design-docs/access-trail.md` |
+| `internal/saved/` | Saved list narrowings. See `design-docs/interface-filters.md` |
+| `internal/vex/`, `internal/publisher/` | VEX statements and who makes them. See `design-docs/remediation-vex.md` |
+| `internal/directory/` | Issued advisories written for another web server. See `design-docs/remediation-directory.md` |
+| `internal/csaf/` | CSAF provider description, ROLIE feed and provider lists. See `design-docs/remediation-csaf.md` |
 | `internal/publish/` | Public security documents, revisions, and the publishing pass. See `design-docs/publishing.md` |
 | `internal/httpapi/published/` | The surface serving them. See `design-docs/publishing.md` |
 | `internal/signing/` | Signing with the operator's key. See `design-docs/publishing.md` |
-| `internal/supplier/` | Supplier advisories read on a schedule. See `design-docs/ingest.md` |
+| `internal/supplier/` | Supplier advisories read on a schedule. See `design-docs/ingest-suppliers.md` |
 | `internal/upstream/` | Trusted upstreams and their VEX pass. See `design-docs/upstream.md` |
-| `internal/cverecord/` | The CVE record snapshot. See `design-docs/findings-closure.md` § CVE record ranges and `design-docs/ingest.md` § CVE records |
+| `internal/cverecord/` | The CVE record snapshot. See `design-docs/findings-closure.md` § CVE record ranges and `design-docs/ingest-scanner.md` § CVE records |
 | `internal/patchbranch/` | Branches holding a patch commit, repository copies, git's proxy. See `design-docs/findings-patch-branches.md` |
-| `internal/vercmp/` | Version ordering per ecosystem. See `design-docs/remediation.md` |
-| `internal/outward/` | The one outbound HTTP client. See `design-docs/access.md` |
+| `internal/vercmp/` | Version ordering per ecosystem. See `design-docs/remediation-versions.md` |
+| `internal/outward/` | The one outbound HTTP client. See `design-docs/access-signin.md` |
 | `internal/typedname/` | The stored form of a typed name. See `design-docs/data-model.md` |
 | `internal/background/`, `internal/bound/` | Timed passes, and cutting a string without splitting a character |
-| `internal/redact/` | A credential-bearing address made safe to log. See `design-docs/access.md` § Secrets and logs |
-| `internal/refusal/` | A caller-readable sentence, apart from a withheld fault. See `design-docs/api.md` |
+| `internal/redact/` | A credential-bearing address made safe to log. See `design-docs/access-trail.md` § Secrets and logs |
+| `internal/refusal/` | A caller-readable sentence, apart from a withheld fault. See `design-docs/api-refusals.md` |
 | `internal/webui/` | The embedded interface. See `design-docs/interface.md` |
-| `internal/weakness/` | Weakness catalog names. See `design-docs/remediation.md` |
+| `internal/weakness/` | Weakness catalog names. See `design-docs/findings-severity.md` |
 | `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gate, release, rehearsal and image-inventory programs |
 | `web/` | The interface source. See `design-docs/interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `design-docs/packaging-chart.md` |
@@ -146,7 +146,7 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make reserved-current` | The committed reserved-word list against the engines, inside `check-engines` |
 | `make check-packaging` | The image and chart. Needs `$(DOCKER)`, docker unless set, and helm; without either it prints that docker or helm is not installed and passes unchecked |
 | `make dist` | Every release asset into `bin/dist`, checked against the tag. Refuses without docker, helm and npm. See `design-docs/packaging-release.md` § Release assets |
-| `make release-freeze VERSION=vX.Y.Z` | The release migration record and its check, on a branch from `main` with four engines up. See `design-docs/database.md` § Release records |
+| `make release-freeze VERSION=vX.Y.Z` | The release migration record and its check, on a branch from `main` with four engines up. See `design-docs/database-migrations.md` § Release records |
 | `make release-check VERSION=vX.Y.Z` | The tagged release was frozen and the tree still matches. The release workflow runs it first |
 | `make docs-site` | The documentation site, strict. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |

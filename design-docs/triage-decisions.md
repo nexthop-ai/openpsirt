@@ -103,11 +103,11 @@ Undoing a bulk approval:
 | Narrows to what the person undoing may reach | A batch may span products |
 | Takes back only their own agreements | Two reviewers may hold batches of one name |
 | Leaves whole a decision it reaches only part of | The agreement is one row on the decision |
-| Leaves whole a decision about a code finding recorded as a flaw | Its flaw is judged instead (`design-docs/analysis.md` § Flaw records) |
+| Leaves whole a decision about a code finding recorded as a flaw | Its flaw is judged instead (`design-docs/analysis-flaws.md` § Flaw records) |
 | Reports what returned to waiting | Ended decisions and those another agreement holds stay |
 
 A code finding recorded as a flaw is in no list of held work; its flaw is
-(`design-docs/analysis.md` § Code finding assignment).
+(`design-docs/analysis-triage.md` § Code finding assignment).
 
 ## The whole decision
 
@@ -135,7 +135,7 @@ One read answers everything about one decision.
 | Refused whole or answered whole | |
 | Lists showing rows a reader may read omit the reasoning of a decision they may read only part of: the audit log, decision occurrences, one occurrence, and the earlier, similar and elsewhere decisions on a finding | The reasoning covers every occurrence |
 | A case grant reaches it | An offer then refused reads as a fault |
-| While a flaw is undisclosed, its readers reach a decision at an included code finding's occurrence (`design-docs/analysis.md` § Disclosure inclusion) | |
+| While a flaw is undisclosed, its readers reach a decision at an included code finding's occurrence (`design-docs/analysis-flaws.md` § Disclosure inclusion) | |
 | Every count and reach is narrowed to findings the reader may see | A count leaks where no row is shown |
 
 ## Decision lists on a finding
@@ -215,7 +215,7 @@ A **note** tells whoever decides something without recording a decision
 A decision is keyed on occurrences and a note on an issue, and the decision's
 record stays what people wrote about it, which lets an approval point at one
 revision (REQ-28). What is true of one copy and not another is a comment.
-`design-docs/interface.md` § The finding screen draws both.
+`design-docs/interface-finding.md` § The finding screen draws both.
 
 ## Labels
 

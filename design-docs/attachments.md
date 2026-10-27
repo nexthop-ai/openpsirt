@@ -176,7 +176,7 @@ The request is admitted before its form is read:
 | Rule | Reason |
 |---|---|
 | Both bounds are checked before carrying and again inside the writing transaction | The first was read before the bytes |
-| The second check is serialized: each writing transaction first writes one fixed row of the lease table, which nothing takes as a lease | Otherwise two concurrent uploads both fit; cluster nodes conflict on that row (`design-docs/database.md` § Replica coordination) |
+| The second check is serialized: each writing transaction first writes one fixed row of the lease table, which nothing takes as a lease | Otherwise two concurrent uploads both fit; cluster nodes conflict on that row (`design-docs/database-transactions.md` § Replica coordination) |
 | Uploads are serialized per deployment while a quota or share is set, each holding the lock for two reads and an insert | |
 
 ## Write and delete ordering

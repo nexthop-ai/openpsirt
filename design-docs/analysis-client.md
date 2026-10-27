@@ -122,7 +122,7 @@ Each result carries `openpsirt/context/v1`, a content fingerprint of its line
 
 | Rule | Reason |
 |---|---|
-| One pure Go binary, cgo off, for Linux, macOS and Windows on amd64 and arm64 (`design-docs/packaging.md` § Release assets) | |
+| One pure Go binary, cgo off, for Linux, macOS and Windows on amd64 and arm64 (`design-docs/packaging-release.md` § Release assets) | |
 | Covered by the release's checksum file and signature | |
 | No Authenticode signature or notarization | A pipeline's command fetch passes neither check; a browser download waits for a person |
 | CI runs its tests on macOS and Windows when its sources move (`design-docs/build.md` § CI jobs) | Fingerprints under each line ending are pinned to hand-computed hashes |

@@ -71,7 +71,7 @@ its `v` (REQ-01 and REQ-02).
 | Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. `linux/amd64` alone (§ Not built) |
 | Helm chart | `openpsirt-<version>.tgz`, at `oci://ghcr.io/nexthop-ai/charts` | The image's registry, so no index to host |
 | Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary, serving the image's pages, with `LICENSE`, `NOTICE` and `README.md`. amd64 and arm64, cross-compiled, cgo off |
-| Upload client archive | `openpsirt-upload_<version>_<system>_<arch>.tar.gz`, `.zip` for Windows | With `LICENSE` and `NOTICE`, for Linux, macOS and Windows on amd64 and arm64. The release check opens each to find the program. See `design-docs/analysis.md` § Upload client |
+| Upload client archive | `openpsirt-upload_<version>_<system>_<arch>.tar.gz`, `.zip` for Windows | With `LICENSE` and `NOTICE`, for Linux, macOS and Windows on amd64 and arm64. The release check opens each to find the program. See `design-docs/analysis-client.md` § Upload client |
 | Binary inventory | `openpsirt_<version>.cdx.json` | |
 | Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | One per architecture |
 | Upload client inventory | `openpsirt-upload_<version>_<system>_<arch>.cdx.json` | One per archive, refused if it names another system or architecture or lacks the standard library |
@@ -147,7 +147,7 @@ A release is a tag on a commit that froze its migrations; the `Release`
 workflow does the rest.
 
 1. Rehearse the upgrade from every earlier release the baseline upgrades, on
-   each engine. `design-docs/database.md` § Upgrade rehearsal says what it checks.
+   each engine. `design-docs/database-migrations.md` § Upgrade rehearsal says what it checks.
 
    ```
    make engines-up
@@ -157,7 +157,7 @@ workflow does the rest.
    ```
 
 2. Freeze the migrations on a branch from the head of `main`, and land the
-   record through a pull request. `design-docs/database.md` § Release records
+   record through a pull request. `design-docs/database-migrations.md` § Release records
    says what it holds.
 
    ```
@@ -221,7 +221,7 @@ follow `AGENTS.md` § Pull request descriptions.
 | Not built | Detail |
 |---|---|
 | Multi-architecture images | The image is `linux/amd64` and the chart runs on `amd64` nodes. The inventory stage runs the cataloger at the target architecture, so `arm64` builds `node`, `go` and `syft` under emulation, for tens of minutes. The fix: build the binary stage at the build platform and cross-compile (`FROM --platform=$BUILDPLATFORM`, `GOARCH` from `TARGETARCH`), emulating only the cataloger |
-| Compatibility, which begins at 1.0 (REQ-76) | Below it the API and schema are alpha: releases exercise the publication path and promise no compatibility, and the schema is collapsed into one baseline only then, keeping an upgrade from the last 0.x release (`design-docs/database.md` § Migrations) |
+| Compatibility, which begins at 1.0 (REQ-76) | Below it the API and schema are alpha: releases exercise the publication path and promise no compatibility, and the schema is collapsed into one baseline only then, keeping an upgrade from the last 0.x release (`design-docs/database-migrations.md` § Migrations) |
 
 The major version marks alpha, never a tag suffix, so `0.1.0` is a release and
 moves the aliases: `latest` names the newest alpha.

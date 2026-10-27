@@ -45,7 +45,7 @@ Satisfies REQ-32 and REQ-77.
 | Only the third is a reportable event, and nothing computes it | |
 | A feed's flag is evidence an issue deserves attention | It says nothing about this product |
 | The first and third are kept apart in name and meaning | Both are "exploited", and reading the first as the third is the failure this area prevents |
-| On screen the third is the filled badge "Incident", the first the outline "Known exploited" (`design-docs/interface.md` § The ordering signals) | The rarer, attested fact is louder |
+| On screen the third is the filled badge "Incident", the first the outline "Known exploited" (`design-docs/interface-look.md` § The ordering signals) | The rarer, attested fact is louder |
 | Each is a column on a finding (`design-docs/findings-severity.md` § Urgency) | |
 
 ## Stored facts
@@ -133,7 +133,7 @@ or from the release of the fix.
 | A release date to come shows when the window starts, and nothing is near, passed or raised before | |
 | A window waiting on a notice, or on a fix with no dated named tag, has no start or end | |
 | An end is worked out when asked, and the shelf stores no end or state | Changing a window moves every incident's end |
-| The remediation computation is not reused (`design-docs/remediation.md` § Deadlines) | It stops where nothing upstream closes the finding, where our own flaws sit |
+| The remediation computation is not reused (`design-docs/remediation-deadlines.md` § Deadlines) | It stops where nothing upstream closes the finding, where our own flaws sit |
 | A window applies to products, never one incident; one judged not to apply goes on raising its condition until a notice, a clearing or retirement | Applicability to an incident is not judged here |
 
 ## Notices outside
@@ -206,7 +206,7 @@ never a filter of the overdue list.
 
 Each window raises a condition from its start until a notice names it, a second
 at its warning, and a third past its end, each stating the time, what it counts
-from, and that no notice is recorded (`design-docs/notifications.md` § Response
+from, and that no notice is recorded (`design-docs/notifications-work.md` § Response
 window notices).
 
 ## Limits

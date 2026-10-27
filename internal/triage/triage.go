@@ -250,7 +250,7 @@ func (o Outcome) Dated() bool { return o.Commits() || o == Deferred }
 //
 // Every outcome about a code finding does too. A code finding's occurrence is the code finding, carried by
 // matching rather than by versions, and what weakens a decision about one is a
-// pairing that is only probable (`design-docs/analysis.md` § Code finding triage).
+// pairing that is only probable (`design-docs/analysis-triage.md` § Code finding triage).
 func (o Outcome) StandsAtAnyVersion() bool {
 	return slices.Contains(finding.AnyVersionOutcomes(), string(o))
 }

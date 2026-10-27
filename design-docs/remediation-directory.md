@@ -58,7 +58,7 @@ is a copy.
 | A document's stated address and its path come from one rule: the tracking identifier names it, the initial release date folders it | |
 | A hash file sits beside each document and nothing else | The feed names it in the document's entry |
 | The feed names itself by a token, never its address | The feed shape allows letters, digits, a plus, a hyphen, an underscore and a dot |
-| The list of changes and the feed are how outsiders follow publication: no subscriber list, no per-CVE notice | Configured destinations are this deployment's notifications (`design-docs/notifications.md`) |
+| The list of changes and the feed are how outsiders follow publication: no subscriber list, no per-CVE notice | Configured destinations are this deployment's notifications (`design-docs/notifications-delivery.md`) |
 
 ## Operator responsibilities
 

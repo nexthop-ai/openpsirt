@@ -215,7 +215,7 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 // is read. Clearing writes the same row, so a clearing and a naming wait for
 // each other, and the one that goes second reads what the first committed: a
 // naming never lands on a record cleared after it was read
-// (`design-docs/database.md` § Reads a write depends on). The write changes
+// (`design-docs/database-transactions.md` § Reads a write depends on). The write changes
 // nothing, so it says nothing to a subject the reads below then refuse.
 func standingFor(ctx context.Context, tx bun.IDB, subject access.Subject,
 	recordID int64) (*triage.Incident, error) {

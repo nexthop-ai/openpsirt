@@ -47,7 +47,7 @@ changes nothing (REQ-49).
 | Somebody holding none of a kind and found none is not reconciled for it | Reconciling is a transaction per person per kind |
 | A reconcile writes a batch of rows a statement, choosing each restated row's values by its identifier | A row a statement is about a hundred times slower (`design-docs/notifications-measurements.md` § Reconcile batches) |
 | Who may do what is read once per sweep | |
-| A role across every product counts in every audience as a role on each product | `design-docs/access.md` § A role across every product |
+| A role across every product counts in every audience as a role on each product | `design-docs/access-grants.md` § A role across every product |
 
 ## Triggers and kinds
 
@@ -74,9 +74,9 @@ changes nothing (REQ-49).
 | A report given to you | event | To its assignee unless they assigned it, only where they read the product's reports. Never a team. Undisclosed |
 | A reporter writing back; a message sent to a reporter | event | To the report's audience but whoever recorded it. Undisclosed |
 | A note on a report | event | To the audience but its author and anybody named, who get the mention. An edit tells only names its new text holds. Undisclosed |
-| An issue somebody holds disclosed | event | To every holder of an occurrence but whoever made it public, with the issue's detail. `design-docs/access.md` § Issue disclosure |
-| Somebody brought onto one case | event | The grant is all they reach, so the notice is how they learn of it. `design-docs/access.md` § Case collaborators |
-| Somebody granted one code finding recorded as a flaw | event | `design-docs/analysis.md` § Code finding collaborators |
+| An issue somebody holds disclosed | event | To every holder of an occurrence but whoever made it public, with the issue's detail. `design-docs/access-disclosure.md` § Issue disclosure |
+| Somebody brought onto one case | event | The grant is all they reach, so the notice is how they learn of it. `design-docs/access-disclosure.md` § Case collaborators |
+| Somebody granted one code finding recorded as a flaw | event | `design-docs/analysis-flaws.md` § Code finding collaborators |
 | An upload that changed much of a build | event | `design-docs/notifications-alerts.md` § An inventory that moved sharply |
 | Analyzer drops; an incomparable newest run; a series gone quiet | event; condition; condition | `design-docs/notifications-alerts.md` § Analyzer alerts |
 | Code finding assigned, recorded as a flaw, in or out of disclosure, or returned by a withdrawn dismissal; a suppression rule outgrowing its approval | events; condition | `design-docs/notifications-work.md` § Code finding notices |
@@ -86,7 +86,7 @@ changes nothing (REQ-49).
 |---|---|
 | A new build | Arriving is the ordinary state of a nightly scan |
 | An approval | It is what the proposer asked for |
-| Work handed back because its holder stopped reading it, as any hand-back (`design-docs/access.md` § Lost reading) | It leaves their counts, the absence alert and their digest next sweep, and waits unassigned |
+| Work handed back because its holder stopped reading it, as any hand-back (`design-docs/access-assignment.md` § Lost reading) | It leaves their counts, the absence alert and their digest next sweep, and waits unassigned |
 | Being unassigned | Removal is no act directed at the holder |
 
 ## The in-application area

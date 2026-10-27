@@ -152,7 +152,7 @@ no file and carries the previous release's last migration as its own.
 `make release-freeze` freezes a release on a branch from the head of `main`
 that lands before the tag. The release workflow runs `make release-check` and
 refuses a tag whose release is not frozen, before building anything.
-`design-docs/packaging.md` § The release procedure says where the two sit.
+`design-docs/packaging-release.md` § The release procedure says where the two sit.
 
 1. The untagged release carries one migration, numbered after the previous release's last. Its declarations are named for it by its code, the version's parts run together: `v030` for v0.3.0, `v0100` for v0.10.0. Every schema change before the tag edits these.
 2. Rehearse from every earlier release the baseline upgrades, on each engine (§ Upgrade rehearsal).

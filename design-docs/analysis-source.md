@@ -41,7 +41,7 @@ address and never requests it; the reader's browser does.
 ## Repository settings
 
 Stated per product through the API or the Repositories screen
-(`design-docs/interface.md` § The repositories screen), each change in the
+(`design-docs/interface-catalog.md` § The repositories screen), each change in the
 administrative trail.
 
 | Setting | Holds |

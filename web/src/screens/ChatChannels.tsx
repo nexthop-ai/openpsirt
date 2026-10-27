@@ -19,7 +19,7 @@ import { Wide } from "../ui/Wide";
 // A channel belongs to the deployment, a product or a team, and is sent what is
 // about that and no narrower channel takes. The bot's credential is
 // configuration, so this screen names channels and never a token.
-// design-docs/notifications.md § Channel scope holds the rules.
+// design-docs/notifications-chat.md § Channel scope holds the rules.
 
 type Destination = Body<"OutboundBody">;
 

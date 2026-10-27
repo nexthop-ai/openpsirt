@@ -26,7 +26,7 @@ variant inherits exactly where its chain matches.
 
 | Rule | Reason |
 |---|---|
-| The builds a decision was made on are recorded beside it, outside the key: the build on screen, and every build chosen on the reach sheet. A build reached by lookup is never recorded | An advisory flags a release of a variant its covering decision was not made on, for whoever prepares it to mark affected where the code differs (`design-docs/remediation.md` § The CSAF document) |
+| The builds a decision was made on are recorded beside it, outside the key: the build on screen, and every build chosen on the reach sheet. A build reached by lookup is never recorded | An advisory flags a release of a variant its covering decision was not made on, for whoever prepares it to mark affected where the code differs (`design-docs/remediation-csaf.md` § The CSAF document) |
 | The two version columns are bounded in characters, and a version that does not fit is refused, never shortened | The match is an index lookup on every screen. The reference producer's longest version is 49 characters over 6,845 components |
 | A version nobody stated and an empty version differ; two absences match each other only | |
 
@@ -45,7 +45,7 @@ build invalidates a decision about a leaf.
 |---|---|
 | Only the upstream version counts: `10.5.4` to `10.6` lapses a decision, a packaging revision does not | A rebuild is not reasoning becoming wrong |
 | A version change mid-chain has no rule of its own | It moves the direct consumer of something, lapsing that decision, or it does not |
-| A rebuilt container image lapses nothing beneath it; a package inside it that moves lapses its own decision | An image stores no version (`design-docs/data-model.md` § Container images) |
+| A rebuilt container image lapses nothing beneath it; a package inside it that moves lapses its own decision | An image stores no version (`design-docs/data-model-components.md` § Container images) |
 | A carried patch lapses nothing, so under heavy patching a decision may never be re-examined | A patch moves no version this can see |
 | A decision's age travels with it everywhere it appears | The compensating control for the line above |
 | A deferral runs out on a date, never a version, and its finding returns marked deferred | A bump does not change priority, nor a calendar applicability |
@@ -56,7 +56,7 @@ build invalidates a decision about a leaf.
 ## Outcomes
 
 The outcomes about a vulnerability; a code finding takes its own
-(`design-docs/analysis.md` § Code finding triage).
+(`design-docs/analysis-triage.md` § Code finding triage).
 
 | Outcome | Means |
 |---|---|
@@ -72,7 +72,7 @@ The outcomes about a vulnerability; a code finding takes its own
 | Rule | Reason |
 |---|---|
 | Deferred is an outcome of its own | Otherwise "yes, but not now" is recorded as one of the others |
-| A deferral is never published as not-affected; where it publishes, it is affected. The VEX document takes none, and silence there reads as affected (`design-docs/remediation.md` § The VEX document) | Deferring is internal scheduling, not an assessment |
+| A deferral is never published as not-affected; where it publishes, it is affected. The VEX document takes none, and silence there reads as affected (`design-docs/remediation-vex.md` § The VEX document) | Deferring is internal scheduling, not an assessment |
 | Not applicable and a wrong match require a reason, from the exchange format's vocabulary | The reason is the decision; a private vocabulary needs a mapping nobody maintains |
 
 ### Already fixed

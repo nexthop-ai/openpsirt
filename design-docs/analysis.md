@@ -170,10 +170,10 @@ An applied run, in order:
 
 | Rule | Reason |
 |---|---|
-| Two runs of one series apply in turn, each first writing a new value to the series' row | Both would open one result twice; a cluster certifies only written rows (`design-docs/database.md` § Retryable transactions) |
+| Two runs of one series apply in turn, each first writing a new value to the series' row | Both would open one result twice; a cluster certifies only written rows (`design-docs/database-transactions.md` § Retryable transactions) |
 | No longer detected is absence, and the code finding stays open (`design-docs/kinds.md` § Kinds) | |
 | A code finding is in the queue from the run opening it, a first run included | |
-| A comparable run marking more no longer detected than the analyzer drop share and floor both allow is a sharp drop: applied, said on its receipt, and told once to internal readers after commit (REQ-21, `design-docs/notifications.md` § Analyzer alerts) | Partial analysis reads as a fix sweep; set aside, it would supersede every later run |
+| A comparable run marking more no longer detected than the analyzer drop share and floor both allow is a sharp drop: applied, said on its receipt, and told once to internal readers after commit (REQ-21, `design-docs/notifications-alerts.md` § Analyzer alerts) | Partial analysis reads as a fix sweep; set aside, it would supersede every later run |
 | The share is of what the last comparable run saw; the floor is a count | A small series does not alert on two fixes |
 
 ## Receipts
@@ -200,7 +200,7 @@ An applied run, in order:
 
 | Part | State |
 |---|---|
-| Code findings over time | Not built: Statistics include none (`design-docs/kinds.md` § Consumers), so nothing reports time to judge or fix or a series' trend. Current standing is by series (`design-docs/analysis-queue.md` § Code findings by series); approval quality and the exception report read code finding decisions (`design-docs/analytics.md` § Approval quality) |
+| Code findings over time | Not built: Statistics include none (`design-docs/kinds.md` § Consumers), so nothing reports time to judge or fix or a series' trend. Current standing is by series (`design-docs/analysis-queue.md` § Code findings by series); approval quality and the exception report read code finding decisions (`design-docs/analytics-controls.md` § Approval quality) |
 | A repository an SPDX inventory states | Not read; a download location places nothing |
 | Pulling from a hosted analyzer | Not built |
 | Fuzzing findings | Intended scope, not built (REQ-14) |

@@ -182,7 +182,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 | Today | Releases publish binaries for amd64 and arm64, and a container image for amd64 only. The chart says so |
 | Problem | An operator on arm64 nodes, such as AWS Graviton or Ampere, cannot run the image |
 | Work | Publish one multi-architecture image per tag covering amd64 and arm64, signed, with an image inventory per architecture |
-| Waits on | Nothing. `design-docs/packaging.md` § Not built names the Dockerfile change. The release pipeline is the larger part: it builds into the local Docker daemon and reads inventories out of the image, and a multi-architecture image needs buildx and a push instead |
+| Waits on | Nothing. `design-docs/packaging-release.md` § Not built names the Dockerfile change. The release pipeline is the larger part: it builds into the local Docker daemon and reads inventories out of the image, and a multi-architecture image needs buildx and a push instead |
 
 ### TODO-19 Distribution package descriptions
 

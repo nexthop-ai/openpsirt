@@ -62,7 +62,7 @@ on SQLite, against 1,760 rows taking 15.6 s one at a time on the demo, where 500
 
 | Rule | Reason |
 |---|---|
-| A triager may approve another's decision about disclosed or undisclosed work; a code finding's decision takes the approver capability (`design-docs/analysis.md` § Code finding triage) | The control is two different people |
+| A triager may approve another's decision about disclosed or undisclosed work; a code finding's decision takes the approver capability (`design-docs/analysis-triage.md` § Code finding triage) | The control is two different people |
 | Reading is the finding's visibility alone (REQ-43) | Narrower, one reader holding private reading was told none of a finding's 91 decision rows existed |
 | Writing is a rule apart from reading | |
 | Every check reads product and visibility from the row | |
@@ -76,7 +76,7 @@ column on any of them would read as a tightening and silently defeat this.
 
 | Rule | Reason |
 |---|---|
-| A decision occurrence copies its finding's visibility, which issue disclosure rewrites in the act that discloses (`design-docs/access.md` § Issue disclosure) | Reports and exports answer reach from the row |
+| A decision occurrence copies its finding's visibility, which issue disclosure rewrites in the act that discloses (`design-docs/access-disclosure.md` § Issue disclosure) | Reports and exports answer reach from the row |
 | An occurrence is written public where its issue has no undisclosed finding left in the product when the row is written | A disclosure may land between reading and writing |
 
 ## Set-aside rows
@@ -207,7 +207,7 @@ Three lists, one per reason a decision waits; a decision may be in two.
 | The queue count and a product's waiting count read the approval list alone | |
 
 A rating of an issue and a moved disclosure date wait for a second person too,
-listed apart (`design-docs/interface.md` § The review queue).
+listed apart (`design-docs/interface-review.md` § The review queue).
 
 ### Queue filters
 

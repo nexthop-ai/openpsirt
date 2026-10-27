@@ -28,7 +28,7 @@ read resolves every occurrence the promise covers; the act writes a row at each.
 The act's time is the writing, and it reads back no identifier of a row it
 writes. A row's cost is the act less the read, over 204,000 rows. On PostgreSQL
 the difference is the decision occurrence table's four foreign keys, each checked
-with a query per row (`design-docs/database.md` § Bulk inserts).
+with a query per row (`design-docs/database-queries.md` § Bulk inserts).
 
 The refresh-held-off row runs against PostgreSQL alone, with
 `ALTER SYSTEM SET autovacuum = off` and `SELECT pg_reload_conf()` before the run

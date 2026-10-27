@@ -28,7 +28,7 @@ flaws). `GET …/code-findings/{occurrence}/flaw` is the offer; `POST` records i
 | It needs `internal-triage` and `private-triage` | It reads internal and writes private |
 | The flaw is undisclosed, found here, at no version | |
 | Flaw and link are written in one transaction re-reading that the code finding is confirmed and unrecorded (REQ-71) | |
-| It changes the standing decision's stamp, matched on the stamp read (`design-docs/database.md` § Reads a write depends on) | A concurrent withdrawn confirmation would leave a flaw nobody confirmed |
+| It changes the standing decision's stamp, matched on the stamp read (`design-docs/database-transactions.md` § Reads a write depends on) | A concurrent withdrawn confirmation would leave a flaw nobody confirmed |
 | A recorded code finding takes no decision, and its decisions are neither revised, withdrawn, split, approved nor sent back (409); an undone batch of approvals skips them | The flaw's decisions replace them |
 | Recording, inclusion, removal and withdrawal are refused without both triage roles before any build named is resolved | A differing refusal lists builds (REQ-42) |
 | The flaw records its code finding, the offer's first component, and the builds proposed: every build seen in, plus those holding the component never analyzed | The record outlasts the link |
@@ -107,7 +107,7 @@ off by default, chosen at recording and changeable while undisclosed.
 The flaw is offered as fixed on each build where its code finding is no longer
 detected, with the first run not seeing it and any run a person named. A person
 closes it (`design-docs/findings-closure.md` § Closure by a person), and the
-advisory names the fixed build from that (`design-docs/remediation.md` § The
+advisory names the fixed build from that (`design-docs/remediation-advisories.md` § The
 advisory).
 
 | Rule | Reason |
@@ -120,7 +120,7 @@ advisory).
 
 `…/code-findings/{occurrence}/collaborators` brings people into one recorded
 code finding, as case collaborators into a flaw (REQ-43,
-`design-docs/access.md` § Case collaborators).
+`design-docs/access-disclosure.md` § Case collaborators).
 
 | Rule | Reason |
 |---|---|

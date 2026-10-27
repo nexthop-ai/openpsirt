@@ -99,7 +99,7 @@ are the slowest read.
 | Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
 | What became of decisions is counted from a page read, and the tile says where the page was cut | It is derived, with no count to ask for |
 | Every figure opens the list it counts, narrowed as counted, the aging buckets included (`design-docs/interface-administration.md` § Analytics) | |
-| A figure counting anything closed opens nothing | The findings list holds what is open (`design-docs/analytics.md`) |
+| A figure counting anything closed opens nothing | The findings list holds what is open (`design-docs/analytics-catalog.md`) |
 
 | Panel | Rule |
 |---|---|

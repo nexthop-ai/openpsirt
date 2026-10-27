@@ -109,7 +109,7 @@ func upgradeBaseline(t *columnTypes) []string {
 			"target_id"    ` + t.ref + ` NOT NULL,
 			-- What moves: the source package, at the version it was built at,
 			-- in the ecosystem and distribution it came from. See the fold in
-			-- design-docs/data-model.md.
+			-- design-docs/data-model-components.md.
 			"fold_key"     ` + t.hash + ` NOT NULL,
 			-- The version in hand when the commitment was made, and the version
 			-- it moves to. Both stored because neither can be worked out again:
