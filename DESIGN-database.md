@@ -588,6 +588,7 @@ its own after the renames.
 | Only a link at the v0.10.0 address of a decision's row is rewritten | v0.11.0 gives that address to the decision, so the link would open another record. A link to `/claims/{id}` is forwarded by the interface |
 | The setting's row moves only where none is under the new name | A row under the new name outranks the former one |
 | The setting is read under its former name while the new one is unset, and each start logs a warning naming both | A v0.10.0 binary still running after the upgrade writes the former name |
+| Changing the setting replaces the former row and removes it in the same transaction, and the trail records the former value as what was replaced | The former name is refused at the API, so this is the one way to clear it and end the warning |
 | A waiting condition's identity keeps the words v0.10.0 hashed | An open condition is matched by that hash, and a new one would notify everybody again |
 | The trail of administrative changes keeps the former setting name | It records a change under the name the setting had |
 | A decision's record of how its set was chosen is kept as written | It records what somebody asked for |

@@ -690,6 +690,26 @@ var formerNames = map[string]string{
 	BulkDecisionCap: "triage.together-cap",
 }
 
+// clearFormer removes the row under a setting's former name, inside the
+// transaction writing the setting, and answers what it held.
+func clearFormer(ctx context.Context, tx bun.IDB, name string) (string, bool, error) {
+	former, ok := formerNames[name]
+	if !ok {
+		return "", false, nil
+	}
+	row := new(Setting)
+	switch err := tx.NewSelect().Model(row).Where(`"name" = ?`, former).Scan(ctx); {
+	case database.IsNoRows(err):
+		return "", false, nil
+	case err != nil:
+		return "", false, fmt.Errorf("read the %q setting: %w", former, err)
+	}
+	if _, err := tx.NewDelete().Model((*Setting)(nil)).Where(`"name" = ?`, former).Exec(ctx); err != nil {
+		return "", false, fmt.Errorf("clear the %q setting: %w", former, err)
+	}
+	return row.Value, true, nil
+}
+
 // FormerName is a row held under a setting's former name.
 type FormerName struct {
 	// Former is the name the row is under, and Name the one the setting has.
@@ -784,6 +804,14 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 			before, had = held.Value, true
 		}
 
+		// A row under the setting's former name is what was read while the
+		// name was unset, so it is what this replaces, and it goes: the
+		// setting is held under one name from here.
+		formerValue, formerHeld, err := clearFormer(ctx, tx, name)
+		if err != nil {
+			return err
+		}
+
 		if s.beforeWrite != nil {
 			s.beforeWrite()
 		}
@@ -801,6 +829,9 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 					return fmt.Errorf("record the %q setting: %w", name, database.ErrGoAgain)
 				}
 				return fmt.Errorf("record the %q setting: %w", name, err)
+			}
+			if formerHeld {
+				before, had = formerValue, true
 			}
 			return nil
 		}
