@@ -137,7 +137,7 @@ inputs.
 | # | Requirement | Why |
 |---|---|---|
 | REQ-34 | Work is assigned to a person or to a team. A team queue is picked out of rather than held, and work nobody holds is given to a team by an assignment rule — a human assignment always wins | Ownership by a person cannot express a queue, and one rule naming a source package covers every binary built from it |
-| REQ-35 | A fix is declared as the set of releases it targets, and resolution is computed from later scans rather than declared | "Done" that nobody verified is the thing every tracker gets wrong |
+| REQ-35 | A fix is declared as the set of branches and tags it targets, and resolution is computed from later scans rather than declared | "Done" that nobody verified is the thing every tracker gets wrong |
 | REQ-36 | Hand-off to an external tracker is optional, off by default, and configured separately for public and private | This does not replace anybody's issue tracker |
 
 ### 3.9 Disclosure and publication
