@@ -1965,7 +1965,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        get: operations["list-patch-branch-progress"];
+        get: operations["list-patch-branch-lookups"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12224,11 +12224,11 @@ export interface components {
              */
             share: number;
         };
-        PatchBranchesOutputBody: {
+        PatchBranchLookupsOutputBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/PatchBranchesOutputBody.json
+             * @example https://example.com/schemas/PatchBranchLookupsOutputBody.json
              */
             readonly $schema?: string;
             /**
@@ -18169,7 +18169,7 @@ export interface operations {
             };
         };
     };
-    "list-patch-branch-progress": {
+    "list-patch-branch-lookups": {
         parameters: {
             query?: {
                 /** @description The number returned */
@@ -18189,7 +18189,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PatchBranchesOutputBody"];
+                    "application/json": components["schemas"]["PatchBranchLookupsOutputBody"];
                 };
             };
             /** @description Error */

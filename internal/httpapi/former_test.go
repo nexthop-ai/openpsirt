@@ -58,7 +58,7 @@ var formerAddresses = []struct{ method, path, operation string }{
 	{http.MethodDelete, "/v1/obligation-windows/{id}", "retire-response-window"},
 	{http.MethodPut, "/v1/obligation-windows/{id}", "change-response-window"},
 	{http.MethodGet, "/v1/obligations", "list-incidents"},
-	{http.MethodGet, "/v1/patch-branches", "list-patch-branch-progress"},
+	{http.MethodGet, "/v1/patch-branches", "list-patch-branch-lookups"},
 	{http.MethodGet, "/v1/products/{product}/advisory-sources", "list-advisory-sources"},
 	{http.MethodPost, "/v1/products/{product}/advisory-sources", "add-advisory-source"},
 	{http.MethodDelete, "/v1/products/{product}/advisory-sources/{name}", "withdraw-advisory-source"},

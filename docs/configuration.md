@@ -1067,8 +1067,9 @@ one applies to the branch you ship.
 
 Off unless the deployment turns it on. It fetches a copy of each repository a
 patch link names, from the host the link names, and asks the copy which
-branches hold each commit. Progress, failures and the size of each copy are on
-the System screen and at `/v1/patch-branch-lookups`.
+branches hold each commit. Progress, failures and the size of each copy are in
+the Patch branch lookups panel of the System screen and at
+`/v1/patch-branch-lookups`.
 
 Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.

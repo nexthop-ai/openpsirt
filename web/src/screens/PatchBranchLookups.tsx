@@ -28,10 +28,10 @@ const LIVE = 10_000;
 // On the System screen because it fails silently: a host that stopped
 // answering leaves labels missing from findings, and nothing on a finding
 // says so.
-export function PatchBranches() {
+export function PatchBranchLookups() {
   const [pages, setPages] = useState(1);
   const progress = useQuery({
-    queryKey: ["patch-branches", pages],
+    queryKey: ["patch-branch-lookups", pages],
     queryFn: async () => {
       const first = unwrap(
         await api.GET("/v1/patch-branch-lookups", { params: { query: { limit: PAGE } } }),
@@ -73,7 +73,7 @@ export function PatchBranches() {
 
   return (
     <section className="panel patches">
-      <h3>Patch branches</h3>
+      <h3>Patch branch lookups</h3>
       <p className="hint" style={{ marginTop: 0 }}>
         {it.on ? "On" : "Off, in the deployment's configuration"} · {it.looked.toLocaleString()} of{" "}
         {it.commits.toLocaleString()} commits looked up · from {it.links.toLocaleString()} patch

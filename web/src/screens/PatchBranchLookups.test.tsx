@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PatchBranches } from "./PatchBranches";
+import { PatchBranchLookups } from "./PatchBranchLookups";
 import { mounted, screen, serve, settle } from "../test/mount";
 import { press, type Init } from "../test/controls";
 
@@ -36,7 +36,7 @@ async function drawn(repositories: unknown[], total = repositories.length) {
       },
     };
   });
-  mount.render(screen(<PatchBranches />));
+  mount.render(screen(<PatchBranchLookups />));
   await settle();
   return () =>
     (spy.mock.calls as unknown as [string, Init][]).map(([, init]) => init.params?.query ?? {});

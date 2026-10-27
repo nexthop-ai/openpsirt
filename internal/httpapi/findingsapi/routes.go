@@ -39,7 +39,7 @@ func Register(api huma.API, in core.Deps) {
 	registerMatchCoverageExport(api, in)
 	// Components with no upstream answer, and the reason for each.
 	registerUpstream(api, in)
-	registerPatchBranches(api, in)
+	registerPatchBranchLookups(api, in)
 	registerMentions(api, in)
 	registerCarried(api, in)
 	registerIssueNotes(api, in)

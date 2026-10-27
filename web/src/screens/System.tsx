@@ -9,7 +9,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Wide } from "../ui/Wide";
 import { at, since } from "../ui/when";
-import { PatchBranches } from "./PatchBranches";
+import { PatchBranchLookups } from "./PatchBranchLookups";
 import { WebhookDelivery } from "./Webhooks";
 
 // The deployment's own state, rather than what it has found.
@@ -41,7 +41,7 @@ export function System() {
       <VulnerabilityData />
       <BackgroundJobs />
       <UpstreamUnanswered />
-      <PatchBranches />
+      <PatchBranchLookups />
       <WebhookDelivery />
     </>
   );

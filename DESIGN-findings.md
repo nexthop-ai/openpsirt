@@ -561,8 +561,8 @@ held the commit. A link not yet looked up carries nothing, and a screen shows
 nothing for it. Branches are listed in version order: `linux-6.6.y` before
 `linux-6.12.y`.
 
-The System screen reports the whole of the work: patch links, the commits they
-name, how many are looked up and held. Administrators only, like the rest of
+The System screen's Patch branch lookups panel reports the whole of the work:
+patch links, the commits they name, how many are looked up and held. Administrators only, like the rest of
 that screen. Repositories are listed in working order.
 
 | Part | What it holds |

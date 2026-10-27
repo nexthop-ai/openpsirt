@@ -33,8 +33,8 @@ type PatchRepositoryBody struct {
 	HeldBytes   int64                `json:"held_bytes,omitempty" doc:"The size of the repository's copy when the last visit finished, in bytes"`
 }
 
-// PatchBranchesOutput is the whole of the lookup work.
-type PatchBranchesOutput struct {
+// PatchBranchLookupsOutput is the whole of the lookup work.
+type PatchBranchLookupsOutput struct {
 	Body struct {
 		On           bool                  `json:"on" doc:"Whether the deployment turned the lookups on. Set in its configuration, not under Settings"`
 		Links        int                   `json:"links" doc:"How many patch links reports carry"`
@@ -47,13 +47,13 @@ type PatchBranchesOutput struct {
 	}
 }
 
-// registerPatchBranches answers how far the lookups have got.
+// registerPatchBranchLookups answers how far the lookups have got.
 //
 // An operator's question, like the rest of the deployment's own state: whether
 // the work is moving, where it is stuck, and how much disk the copies take.
-func registerPatchBranches(api huma.API, in core.Deps) {
+func registerPatchBranchLookups(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-patch-branch-progress", Method: http.MethodGet,
+		OperationID: "list-patch-branch-lookups", Method: http.MethodGet,
 		Path:    "/v1/patch-branch-lookups",
 		Summary: "Show how far patch branch lookups have got",
 		Description: "The repositories patch links point into, and how many of the commits " +
@@ -65,11 +65,11 @@ func registerPatchBranches(api huma.API, in core.Deps) {
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		core.Paging
-	}) (*PatchBranchesOutput, error) {
+	}) (*PatchBranchLookupsOutput, error) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
-		out := &PatchBranchesOutput{}
+		out := &PatchBranchLookupsOutput{}
 		out.Body.Repositories = []PatchRepositoryBody{}
 		out.Body.On = in.PatchBranches
 		repositories, totals, err := patchbranch.Progress(ctx, in.DB.DB, in.Excluded)

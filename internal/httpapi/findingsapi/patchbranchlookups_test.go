@@ -13,7 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-func TestPatchBranchProgressComesInTheOrderTheRepositoriesAreVisited(t *testing.T) {
+func TestPatchBranchLookupsComeInTheOrderTheRepositoriesAreVisited(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		for _, each := range []struct{ identifier, severity, repository string }{

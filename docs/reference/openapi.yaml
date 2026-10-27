@@ -9208,13 +9208,13 @@ components:
         - rows
         - share
       type: object
-    PatchBranchesOutputBody:
+    PatchBranchLookupsOutputBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/PatchBranchesOutputBody.json
+            - https://example.com/schemas/PatchBranchLookupsOutputBody.json
           format: uri
           readOnly: true
           type: string
@@ -19453,7 +19453,7 @@ paths:
         Repositories come in working order, with `position` on each one due. The one a visit is under way on comes first, with its `step` and `visit_looked`.
 
         Requires: administrator
-      operationId: list-patch-branch-progress
+      operationId: list-patch-branch-lookups
       parameters:
         - description: The number returned
           explode: false
@@ -19480,7 +19480,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PatchBranchesOutputBody"
+                $ref: "#/components/schemas/PatchBranchLookupsOutputBody"
           description: OK
         default:
           content:
