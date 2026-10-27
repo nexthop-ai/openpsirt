@@ -207,7 +207,7 @@
   },
   "formerDecision": { "path": "/claims/:id" },
   "formerBulkDecision": {
-    "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/components/:component/decide"
   },
   "formerStreams": { "path": "/products/:product/streams/*" },
   "formerMatchCoverage": {

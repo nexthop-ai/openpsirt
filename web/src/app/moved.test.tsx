@@ -99,12 +99,12 @@ describe("a former address", () => {
   it("forwards deciding about a component to the bulk decision, with what it narrowed by", () => {
     expect(
       landing(
-        "/products/sonic/streams/main/variants/broadcom/components/libfoo/decide?version=1.2",
+        "/products/sonic/branches-and-tags/main/variants/broadcom/components/libfoo/decide?version=1.2",
         ROUTES.formerBulkDecision,
         (at) => bulkDecisionAt(built(at), at.component ?? ""),
       ),
     ).toBe(
-      "/products/sonic/streams/main/variants/broadcom/components/libfoo/bulk-decision?version=1.2",
+      "/products/sonic/branches-and-tags/main/variants/broadcom/components/libfoo/bulk-decision?version=1.2",
     );
   });
 });
