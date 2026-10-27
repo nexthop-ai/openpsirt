@@ -90,9 +90,9 @@ The owner has chosen to wait on each of these.
 
 | | |
 |---|---|
-| Today | Remediation deadline windows are deployment-wide settings on the Settings screen: one set for scanned findings (3, 7, 30, 90 and 180 days by default, for exploited down to low) and one for flaws in our own product. A product can already override its triage floor, and not these windows |
+| Today | Remediation deadline windows are deployment-wide settings on the Settings screen: one set for scanned findings (3, 7, 30, 90 and 180 days by default, for exploited down to low) and one for flaws in our own product. A product can already override its minimum severity, and not these windows |
 | Problem | A customer-facing appliance and an internal lab tool must both fix a critical issue within the same seven days |
-| Work | Let a product set its own windows, falling back to the deployment's when cleared, the way the triage floor override works. Rewrite the deadlines of the product's open findings when its windows change (REQ-33) |
+| Work | Let a product set its own windows, falling back to the deployment's when cleared, the way the minimum severity override works. Rewrite the deadlines of the product's open findings when its windows change (REQ-33) |
 | Waits on | The owner's go-ahead only |
 
 ### TODO-09 Microsoft Teams and Google Chat

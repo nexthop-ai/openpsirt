@@ -29,7 +29,7 @@ import (
 // holding the issue rather than once for the deployment. The order is stored
 // per finding, so every build nothing rescanned holds a number computed from
 // the signals as they were. A known-exploited issue in a shipped tag would sit
-// below the triage line, answer no exploited filter, carry no exploited
+// below the minimum severity, answer no exploited filter, carry no exploited
 // deadline and sort at the bottom until somebody rescanned that tag, which for
 // a tag is never.
 //

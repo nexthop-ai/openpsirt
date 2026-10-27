@@ -67,6 +67,7 @@ var columnsRenamedV0110 = []columnRename{
 	{"incident_fix", "exploited_here_id", "incident_id"},
 	{"told_outside", "exploited_here_id", "incident_id"},
 	{"finding", "urgency_exploited_here", "urgency_incident"},
+	{"product", "triage_floor", "minimum_severity"},
 }
 
 // nameKind is what a renamed name belongs to, which decides how each engine
@@ -232,6 +233,7 @@ var keptV0110 = map[string]func(*columnTypes) []string{
 	"upgrade":      upgradeBaseline,
 	"job":          jobBaseline,
 	"told_outside": obligationBaseline,
+	"product":      productV0100,
 }
 
 // declaredV0110 is v0.11.0's declaration of a table it renames or renames

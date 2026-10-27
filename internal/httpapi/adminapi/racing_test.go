@@ -26,7 +26,7 @@ import (
 // destroys it — and the mechanism is then dead with every document describing
 // it still saying it works.
 func TestALostRaceReachesTheRetryHelper(t *testing.T) {
-	lost := fmt.Errorf("record the %q setting: %w", "triage.floor", database.ErrGoAgain)
+	lost := fmt.Errorf("record the %q setting: %w", "triage.minimum-severity", database.ErrGoAgain)
 
 	kept := recording(nil, "that setting could not be recorded", lost)
 	if !errors.Is(kept, database.ErrGoAgain) {

@@ -168,18 +168,18 @@ moment it is weighed at has not arrived: a scan weighs it at the run's start
 and the rewrite at the time of the edit.
 
 The rewrite writes a deadline only where one belongs: a release that moves and
-is in support, a band the line admits or an issue this product was attacked
+is in support, a band the minimum severity admits or an issue this product was attacked
 through, and a fix to take. A rewrite stopped part way, by an error or a
 shutdown, leaves every row it reached right and every other row as it was. The
 sweeps that follow take the clock off what was written before a release went out
-of support, a line moved or upstream answered.
+of support, a minimum severity moved or upstream answered.
 
 A finding with no deadline states which reason applies:
 
 | Reason | Reported as | Precedence |
 |---|---|---|
 | A flaw recorded here that nobody has rated | `not-rated` | The narrowest: it is about what this finding lacks rather than anything around it |
-| Below the line its product triages at | `below-the-line` | The narrowest statement about how this finding is rated |
+| Below its product's minimum severity | `below-minimum-severity` | The narrowest statement about how this finding is rated |
 | **Upstream has released no fix, or has declined to on an issue nobody is exploiting** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
 | **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
 | Its release is past end-of-life (REQ-15) | `out-of-support` | |
@@ -219,7 +219,7 @@ only be met by waiting.
 | A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
 | A scan moving the listing day earlier, for every build of the issue | The one deadline rule, over findings that already carry a deadline |
 | A record of this product being attacked, set or cleared | The recount, with either signal |
-| An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the line passes over either signal |
+| An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the minimum severity passes over either signal |
 
 A scanner that did not answer is not upstream saying no. Reading silence as
 "no fix exists" is a claim about the world made out of a gap in a report, and it
@@ -248,7 +248,7 @@ one tag carry a deadline, every one of them unmeetable by construction. Real
 deployments accumulate tags while branches do not, so that side grows — and it
 inflates every overdue count, the compliance rate among them.
 
-The reason is derived rather than stored, and derived where the triage line is
+The reason is derived rather than stored, and derived where the minimum severity is
 applied, so the two cannot disagree. The deadline itself is stored, because
 deriving it costs a pass over every open finding per urgency band — and it is
 rewritten whenever the answer moves rather than only when the ranking does, so

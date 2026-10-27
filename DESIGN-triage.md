@@ -32,7 +32,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [The deferral threshold](#the-deferral-threshold)
 - [One live decision per key](#one-live-decision-per-key)
 - [Decisions against an incident](#decisions-against-an-incident)
-- [The triage line](#the-triage-line)
+- [Minimum severity](#minimum-severity)
 - [Issue assessments](#issue-assessments)
 - [Coverage count](#coverage-count)
 - [Reach across builds](#reach-across-builds)
@@ -731,31 +731,31 @@ A product may record an incident: that it was exploited through an issue.
 | At the finding, only the decision that the issue does not apply | A decision that the scanner matched the wrong thing is about identity, and the outcomes that promise work or put it off are not contradicted by an attack. Made one finding at a time, each is a decision somebody made about that finding |
 | Clearing the record puts nothing back | Whether the decision was right is for whoever answers the finding, not for the clearing to decide on their behalf |
 
-## The triage line
+## Minimum severity
 
-A deployment says what it considers worth triaging. Below that line a finding
-is still recorded, still counted and still reportable — out of the working
-list, not out of the system. Five thousand findings is a list nobody reads, and
+A deployment states its **minimum severity**: the least severity it considers
+worth triaging. Below it a finding is still recorded, still counted and still
+reportable — out of the working list, not out of the system. Five thousand findings is a list nobody reads, and
 the ones that drown it are the ones nobody was ever going to act on.
 
 | Rule | |
 |---|---|
 | Nothing is hidden until somebody decides to hide it | A tool that kept findings out of the list on the day it was installed would be deciding something nobody asked it to |
-| The line is compared against our rating where one stands | Being able to say a published rating is wrong is pointless if everything that ranks and filters then ignores us |
+| The minimum severity is compared against our rating where one stands | Being able to say a published rating is wrong is pointless if everything that ranks and filters then ignores us |
 | An unrated issue is judged as a medium | The same folding the deadline uses, spelled once. Briefly two rules read one fact and disagreed: on a real image 91,040 findings rated "unknown" dropped out of the working list *and* off any clock |
-| Exploitation is never below the line | A line states how bad something has to be before it is worth an afternoon, and exploitation is a fact. Either signal admits it: a feed's word about the world, and this product's own incident |
-| Below the line nothing is on a clock | A line says "this is not work" and a deadline says "this is work, and it is late". Within a year the overdue figure would be thousands of things nobody intended to look at |
-| Nothing on a release out of support is on a clock either (REQ-15) | Applied separately rather than folded in: it reaches further, because a line never sets aside something known to be exploited while end-of-life says nothing here will be fixed at all |
+| Exploitation is never below the minimum severity | A minimum severity states how bad something has to be before it is worth an afternoon, and exploitation is a fact. Either signal admits it: a feed's word about the world, and this product's own incident |
+| Below the minimum severity nothing is on a clock | A minimum severity says "this is not work" and a deadline says "this is work, and it is late". Within a year the overdue figure would be thousands of things nobody intended to look at |
+| Nothing on a release out of support is on a clock either (REQ-15) | Applied separately rather than folded in: it reaches further, because a minimum severity never sets aside something known to be exploited while end-of-life says nothing here will be fixed at all |
 
-A product may state its own line. Products differ in what they can afford to
+A product may state its own minimum severity. Products differ in what they can afford to
 ignore, and a single number for an estate is either too strict somewhere or too
 loose somewhere else.
 
 | | |
 |---|---|
-| A product with no opinion **inherits rather than copies** | A product that stated the deployment's current line would stop following the next time the deployment changed its mind, and nobody would see that happen. Clearing a product's line is its own act |
+| A product with no opinion **inherits rather than copies** | A product that stated the deployment's current minimum severity would stop following the next time the deployment changed its mind, and nobody would see that happen. Clearing a product's minimum severity is its own act |
 | Stating one is administration | The same authority that sets the deployment's. It hides findings, which is the act every other part of this gates |
-| Moving either line rewrites what is stored | Away from the request and one replica at a time — see `DESIGN-queue.md` |
+| Moving either minimum severity rewrites what is stored | Away from the request and one replica at a time — see `DESIGN-queue.md` |
 
 ## Issue assessments
 
@@ -773,15 +773,15 @@ statement for the whole deployment.
 | A rating belongs to one product and reaches every build of it (REQ-29) | A rating is an assessment of how a component is used, and two products do not use one the same way: one may ship the vulnerable configuration and another may not |
 | Two products may hold different live ratings of one issue | Neither reaches the other. A single rating refused the second team any rating at all |
 | Nothing inherits | A product nobody has rated the issue in reads the published rating until somebody on that team looks. A rating arriving from a product a team cannot see is what this shape removes, so it is not reintroduced as a default |
-| Making one, agreeing to one and taking one back ask for the role **on that product** (REQ-29, REQ-42) | A rating sets the deadline and can push a finding below the line the product triages at. Asked anywhere, somebody holding one product moved both in a product they cannot see |
+| Making one, agreeing to one and taking one back ask for the role **on that product** (REQ-29, REQ-42) | A rating sets the deadline and can push a finding below the product's minimum severity. Asked anywhere, somebody holding one product moved both in a product they cannot see |
 | Every act on an assessment asks whether the person may read a finding of this issue **in that product**, at its visibility (REQ-43) | The assessment carries the severity recorded against the issue and the argument somebody wrote about it, so a row about an embargoed flaw is that flaw's disclosure. A refusal answers exactly as a name nobody has ever used, and an assessment that fails it is absent from the list rather than refused |
 | The list asks it from the issue's own row | The findings are reached through the issue the assessment is filed under and the findings held under the issue it is read as. Asked from the product's findings, each assessment reads all of them first: 5.4 s against under 5 ms for 306 assessments on PostgreSQL |
 | An issue that sits at no build anywhere may still be rated | It is nobody's secret: there is no finding for a rating to disclose. It is what lets a product get ahead of an issue it knows is coming |
 | The counts beside a waiting assessment stop at what the reader may see, inside the rating's own product | Narrowing on visibility alone admits every disclosed finding in the deployment, so an approver holding one product was told how many findings the issue has elsewhere — a count of what somebody else ships |
 | Rating something worse takes effect at once | Nobody needs protecting from being told something is worse than the world says |
-| Rating it milder waits for a second person, on that product | Severity sets the deadline, and where the product has said what is worth triaging, a downgrade below that line takes the finding off the working list and off any clock |
+| Rating it milder waits for a second person, on that product | Severity sets the deadline, and where the product has said what is worth triaging, a downgrade below that minimum severity takes the finding off the working list and off any clock |
 | Milder is judged against the **published** rating | What needs a second person is hiding something the world called bad. Judged against whatever the product holds now, the next step down would go through unwatched |
-| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; the product's is what ranks, what its triage line compares and what sets its deadline |
+| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; the product's is what ranks, what its minimum severity compares and what sets its deadline |
 | An assessment in force is written as the rating in force for that product | Everything that ranks, filters or clocks reads that one row with the published rating as its fallback, rather than each reader joining the assessment and folding it its own way. The product's open findings are reordered and re-clocked when it lands, and no other product's are |
 | A finding opened later picks the product's rating up | The applying path reads the rating for the build's product at the moment it opens findings. A copy written onto each finding would carry it only where something remembered to fetch it |
 
@@ -804,10 +804,10 @@ would take off a working list.
 | | |
 |---|---|
 | Counted in the rating's own product | That is everywhere the rating reaches. A count spanning products would describe work this assessment does not touch |
-| What is already below the line is not counted | Agreeing takes it off nothing |
+| What is already below the minimum severity is not counted | Agreeing takes it off nothing |
 | Narrowed to what the reader may see | That understates the effect for them, which is the right way for it to be wrong: the alternative discloses a count of undisclosed work |
 | Worked out only for the assessments that are waiting | A count for a historical assessment answers a question nobody is being asked |
-| Worked out for a page at once | The ratings, which of their issues the reader may be told of, and each named product's line, then one grouped read of the findings for every rating on the page. Each rating is still counted over its own issue in its own product. A rating at a time, a page of fifty is 263 statements and 0.32 s, of which 20 ms is the database |
+| Worked out for a page at once | The ratings, which of their issues the reader may be told of, and each named product's minimum severity, then one grouped read of the findings for every rating on the page. Each rating is still counted over its own issue in its own product. A rating at a time, a page of fifty is 263 statements and 0.32 s, of which 20 ms is the database |
 
 ## Coverage count
 
@@ -844,7 +844,7 @@ code, where a tick is a decision about a version nobody has looked at.
 | Covering many occurrences does not by itself require a second person | The alternative teaches people to make narrow decisions, which produces more records saying less |
 | Grouping is presentation only (REQ-17) | One grouped action writes an individual record per occurrence, and the group is derived when it is read. A stored group would describe a build that no longer exists within a scan or two |
 | A list that is hiding something says so, with the count (REQ-30) | |
-| Exceptions are grouped by the layer they come from (REQ-25) | A suppression a build supplied, a decision made here, and a finding below the line are three kinds of "not shown", and one flat list invites reading a build's own claim as a decision this deployment made. Every kind of variant follows the same model — the machinery does not learn what kind of thing a variant is |
+| Exceptions are grouped by the layer they come from (REQ-25) | A suppression a build supplied, a decision made here, and a finding below the minimum severity are three kinds of "not shown", and one flat list invites reading a build's own claim as a decision this deployment made. Every kind of variant follows the same model — the machinery does not learn what kind of thing a variant is |
 
 ## Reach across builds
 
@@ -1067,7 +1067,7 @@ deferrals is **where the gate sits**.
 | **At or before the earliest deadline among what the act covers** | No approval. Nothing is hidden for longer than the policy already allowed, and gating every planned upgrade would put the most routine act of all through the review queue |
 | **Past it** | A second person agrees. The promise now defers the worst thing the act covers |
 | **Measured over the whole set, not per finding** | One act covering a critical and a medium is gated by the critical. Gating each row separately would let the same act stand for the mediums and wait for the critical |
-| **Nothing the act covers has a deadline** | There is no date to be past, so the exemption has nothing to measure against and a second person agrees. A product below its own triage line is the ordinary case, and it was the one place a promise could hide a finding for years on one signature |
+| **Nothing the act covers has a deadline** | There is no date to be past, so the exemption has nothing to measure against and a second person agrees. A product below its own minimum severity is the ordinary case, and it was the one place a promise could hide a finding for years on one signature |
 | **A commitment with no date at all** | Not a commitment |
 
 The deadline is resolved with the occurrences, never supplied. It is a fact about
@@ -1206,7 +1206,7 @@ way a deadline reads one.
 
 The band is read from the rating in force as the baseline was: this product's
 word where it has one, and otherwise the published score, falling back to the
-published word where no score was given. Deadlines, filters and the triage line
+published word where no score was given. Deadlines, filters and the minimum severity
 band on the word instead.
 
 | | |

@@ -79,7 +79,7 @@ function openFor(opened: string | undefined): string | null {
 // screen whose purpose is noticing what is running out, so the reason is said.
 const noDeadlineSays: Record<NonNullable<Row["no_deadline"]>, string> = {
   "not-rated": "not rated",
-  "below-the-line": "below the line",
+  "below-minimum-severity": "below minimum severity",
   "nothing-to-take": "no fix to take",
   "out-of-support": "out of support",
 };

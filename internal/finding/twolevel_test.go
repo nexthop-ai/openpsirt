@@ -131,7 +131,7 @@ func TestAFoldIsOneRowInEveryCountOfTheList(t *testing.T) {
 			}
 		}
 
-		hidden, err := f.store.Hidden(ctx, who, f.scope, finding.Filter{Floor: finding.Floor{Word: "critical"}})
+		hidden, err := f.store.Hidden(ctx, who, f.scope, finding.Filter{MinimumSeverity: finding.MinimumSeverity{Word: "critical"}})
 		if err != nil {
 			t.Fatal(err)
 		}

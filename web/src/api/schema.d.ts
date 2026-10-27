@@ -15,7 +15,7 @@ export interface paths {
          * List administrative changes
          * @description Who changed a setting, a role grant, a routing rule, a support date, a credential, an account, a team or an issue's names — with what it held before and what it holds now.
          *
-         *     This is the layer above the triage record rather than part of it. Three of the things listed here silently rewrite what the tool reports: the deadline windows recompute every open finding's deadline, the triage floor takes the deadline off everything below it, and an end-of-life date takes it off everything past it.
+         *     This is the layer above the triage record rather than part of it. Three of the things listed here silently rewrite what the tool reports: the deadline windows recompute every open finding's deadline, the minimum severity takes the deadline off everything below it, and an end-of-life date takes it off everything past it.
          *
          *     Newest first, and paged: it only grows.
          *
@@ -495,7 +495,7 @@ export interface paths {
          * Approve a rating assessment
          * @description Only a milder rating waits for this. Somebody other than whoever proposed it, for the same reason every other second person here is somebody else: a control one person can complete alone is not a control.
          *
-         *     The second person holds their role on the product the rating belongs to. Agreeing is what puts a milder rating into force, so it moves that product's deadlines and its triage line; a rating in a product you hold nothing on answers as one that is not there.
+         *     The second person holds their role on the product the rating belongs to. Agreeing is what puts a milder rating into force, so it moves that product's deadlines and its minimum severity; a rating in a product you hold nothing on answers as one that is not there.
          *
          *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
          */
@@ -721,7 +721,7 @@ export interface paths {
          *
          *     Counted in the same unit as every other screen: one issue at one component, not one row per occurrence. A group is closed when no occurrence is still open, met when none of the closed ones was late, deferred when every open occurrence is covered by a standing deferral, and overdue when anything open is past its date and uncovered.
          *
-         *     A closed finding keeps the deadline it carried; only open ones lose theirs at end of life or below the triage line.
+         *     A closed finding keeps the deadline it carried; only open ones lose theirs at end of life or below the minimum severity.
          *
          *     A product is required — an occurrence identity carries no product, so this cannot be asked across the deployment.
          *
@@ -1323,7 +1323,7 @@ export interface paths {
          *
          *     One row per product, issue and component. The same library carrying the same issue in two products is two pieces of work, decided separately by different people; in three builds of one product it is one row, and `builds` says how many. Each row names one of those builds so there is somewhere to link to.
          *
-         *     Every product's own triage line still applies. `severity` raises the line for the whole page and never lowers it below what a product decided; `below_floor` turns every line off, which is how the rows a line keeps out are asked for.
+         *     Every product's own minimum severity still applies. `severity` raises it for the whole page and never lowers it below what a product decided; `below_minimum_severity` turns every minimum severity off, which is how the rows below one are asked for.
          *
          *     An issue that exists only in products you hold nothing on answers as an issue that does not exist, and `total` says the same.
          *
@@ -1353,7 +1353,7 @@ export interface paths {
          *
          *     Read with your own visibility, as it streams. It is the same query the screen reads, paged and written out as it goes.
          *
-         *     Each product applies its own triage line, so the file states that rather than naming one line, and `product` is a column.
+         *     Each product applies its own minimum severity, so the file states that rather than naming one, and `product` is a column.
          *
          *     Below the findings come the open static analysis leads of every product, by product name, as the product export writes them. The columns and the rule about filters are the product export's.
          *
@@ -1381,7 +1381,7 @@ export interface paths {
          * List package kinds with open findings across every product
          * @description Returns each kind of package that open findings sit at, across every product you may see, with how many. The same issue at the same package in two products counts in each, as it is two rows on the findings list across products.
          *
-         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
+         *     Counted over every open finding in the selection you may read. The findings list's other filters and the minimum severity do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3467,7 +3467,7 @@ export interface paths {
          *
          *     Both sides come from scans already collected, so this asks nothing new of a build pipeline. Where there is nothing to compare against, `shipped` is absent and `why` says what is missing rather than reporting zeroes, because a release that shipped clean and a release nobody scanned are not the same answer. A build nothing has scanned, declared and never built or with every upload refused, answers with zeroes, no `last_scanned_at`, and `why` saying nothing has been scanned there yet.
          *
-         *     Counted as issues at components at or above the deployment's line, which `floor` names.
+         *     Counted as issues at components at or above the deployment's minimum severity, which `minimum_severity` names.
          *
          *     `blocking` is the worst few of what the count is made of: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
          *
@@ -4207,7 +4207,7 @@ export interface paths {
          *
          *     The line this deployment triages at is stated in the file.
          *
-         *     Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a decision waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
+         *     Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a decision waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_minimum_severity`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
          *
          *     Takes every filter the findings list takes.
          *
@@ -4319,7 +4319,7 @@ export interface paths {
          * List package kinds with open findings
          * @description Returns each kind of package that open findings in the product sit at, with how many.
          *
-         *     Counted over every open finding in the selection you may read. The findings list's other filters and the triage line do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
+         *     Counted over every open finding in the selection you may read. The findings list's other filters and the minimum severity do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
          *
          *     `stream` and `variant` are optional and independent, as they are on the findings list.
          *
@@ -4771,7 +4771,7 @@ export interface paths {
          * List notes on an issue in a product
          * @description Returns the notes written about this issue in this product, oldest first, with who wrote each and when. A note that has been edited also carries when it was last changed.
          *
-         *     A note records no decision and changes nothing: not what ranks, not a deadline, not a triage line. It is context for whoever decides.
+         *     A note records no decision and changes nothing: not what ranks, not a deadline, not a minimum severity. It is context for whoever decides.
          *
          *     It is about the issue in this product, not about one component. A row in the findings list is one issue at one source package, and one issue is often several rows — so a note kept against a row would be written on one of them and hidden from the rest. What is about a decision at an occurrence is a comment on that decision instead.
          *
@@ -4890,15 +4890,15 @@ export interface paths {
         get?: never;
         /**
          * Set a product's minimum severity
-         * @description Sets the least severity worth triaging for one product, overriding what the deployment says. Below the line a finding is still recorded, still counted and still reportable, and it carries no deadline — it is out of the working list, not out of the system.
+         * @description Sets the least severity worth triaging for one product, overriding what the deployment says. Below it a finding is still recorded, still counted and still reportable, and it carries no deadline — it is out of the working list, not out of the system.
          *
-         *     An empty value clears the override, so the product follows the deployment again. Clearing is not the same as stating the deployment's current line: a product that stated it would stop following when the deployment changed.
+         *     An empty value clears the override, so the product follows the deployment again. Clearing is not the same as stating the deployment's current minimum severity: a product that stated it would stop following when the deployment changed.
          *
-         *     Deadlines are rewritten afterwards, away from the request, because moving the line moves what is on a clock at all. The response returns before that has finished.
+         *     Deadlines are rewritten afterwards, away from the request, because moving the minimum severity moves what is on a clock at all. The response returns before that has finished.
          *
          *     Requires: administrator
          */
-        put: operations["set-product-triage-floor"];
+        put: operations["set-product-minimum-severity"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5075,7 +5075,7 @@ export interface paths {
          * Report what is open in each build of a product
          * @description One number per build, which is what a release-over-release chart is drawn from. The comparison endpoint says what changed between two builds; this says whether the estate is getting better or worse across all of them.
          *
-         *     Counted before any triage line is applied, so it agrees with the findings list rather than with whatever a product has decided is worth working on — a line is about what to spend an afternoon on, not about what exists.
+         *     Counted before any minimum severity is applied, so it agrees with the findings list rather than with whatever a product has decided is worth working on — a line is about what to spend an afternoon on, not about what exists.
          *
          *     Severities are folded the same four ways everything else here ranks by, through the one expression the working list and the deadline also read, so a chart cannot disagree with a list about what counts as high.
          *
@@ -7574,7 +7574,7 @@ export interface components {
             needs_approval?: boolean;
             /**
              * Format: int64
-             * @description The number this rating would put below the product's triage line, where they stop being work and carry no deadline
+             * @description The number this rating would put below the product's minimum severity, where they stop being work and carry no deadline
              */
             off_the_list?: number;
             /**
@@ -9398,10 +9398,10 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
-            no_deadline?: "not-rated" | "below-the-line" | "nothing-to-take" | "out-of-support";
+            no_deadline?: "not-rated" | "below-minimum-severity" | "nothing-to-take" | "out-of-support";
             /** @description Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned */
             nothing_since?: boolean;
             occurrences: components["schemas"]["SittingBody"][] | null;
@@ -9604,10 +9604,10 @@ export interface components {
             /** @description The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version */
             namespace?: string;
             /**
-             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
-            no_deadline?: "not-rated" | "below-the-line" | "nothing-to-take" | "out-of-support";
+            no_deadline?: "not-rated" | "below-minimum-severity" | "nothing-to-take" | "out-of-support";
             /**
              * Format: int64
              * @description The number of findings under this row. The bulk cap counts these, and the disposition register expands to them, so it is not a number to reconcile with the two above
@@ -9767,14 +9767,14 @@ export interface components {
              * @example https://example.com/schemas/FindingsOutputBody.json
              */
             readonly $schema?: string;
-            /** @description The line they are below */
-            floor?: string;
             /**
              * Format: int64
              * @description Findings this product does not consider worth triaging, kept out of the list. Still recorded and still counted
              */
             hidden?: number;
             items: components["schemas"]["FindingBody"][] | null;
+            /** @description The minimum severity they are below */
+            minimum_severity?: string;
             /** Format: int64 */
             total: number;
         };
@@ -11618,6 +11618,19 @@ export interface components {
             title: string;
             tracking: components["schemas"]["Tracking"];
         };
+        MinimumSeverityBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MinimumSeverityBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description The least severity worth triaging here, "everything" to hide nothing, or empty to follow the deployment
+             * @enum {string}
+             */
+            minimum_severity: "everything" | "low" | "medium" | "high" | "critical" | "";
+        };
         ModeBody: {
             /**
              * Format: uri
@@ -12142,6 +12155,8 @@ export interface components {
             display_name?: string;
             /** @description The date the product goes out of support, where one is set */
             end_of_life?: string;
+            /** @description The least severity this product triages, where the product states one of its own */
+            minimum_severity?: string;
             name: string;
             /** Format: int64 */
             open: number;
@@ -12149,8 +12164,6 @@ export interface components {
             overdue: number;
             /** @description Whether the product has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
             retired?: boolean;
-            /** @description The least severity this product triages, where the product states one of its own */
-            triage_floor?: string;
             /** Format: int64 */
             undecided: number;
             /**
@@ -12645,6 +12658,11 @@ export interface components {
             end_of_life?: string;
             /** @description The moment a scan last arrived for any of its builds */
             last_scan_at?: string;
+            /**
+             * @description The product's own minimum severity, where it says something other than the deployment. Absent means it follows the deployment
+             * @enum {string}
+             */
+            minimum_severity?: "everything" | "low" | "medium" | "high" | "critical";
             /** @description The name scans use for this product */
             name: string;
             /**
@@ -12669,11 +12687,6 @@ export interface components {
              * @description The number of tags declared
              */
             tags?: number;
-            /**
-             * @description The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment
-             * @enum {string}
-             */
-            triage_floor?: "everything" | "low" | "medium" | "high" | "critical";
             /**
              * Format: int64
              * @description The number of variants declared
@@ -12825,7 +12838,7 @@ export interface components {
             /** @description The work nobody has agreed to ship with, worst first. Bounded; total says how many there are */
             blocking: components["schemas"]["BlockingBody"][] | null;
             /** @description The least severity counted, or empty where everything is */
-            floor?: string;
+            minimum_severity?: string;
             now: components["schemas"]["BuildCountsBody"];
             shipped?: components["schemas"]["BuildCountsBody"];
             /** @description The missing half, where there is nothing to compare against, or that nothing has been scanned here yet */
@@ -14588,19 +14601,6 @@ export interface components {
             revision_history: components["schemas"]["Revision"][] | null;
             status: string;
             version: string;
-        };
-        TriageFloorBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/TriageFloorBody.json
-             */
-            readonly $schema?: string;
-            /**
-             * @description The least severity worth triaging here, "everything" to hide nothing, or empty to follow the deployment
-             * @enum {string}
-             */
-            floor: "everything" | "low" | "medium" | "high" | "critical" | "";
         };
         "Trust-upstreamRequest": {
             /**
@@ -23094,7 +23094,7 @@ export interface operations {
             };
         };
     };
-    "set-product-triage-floor": {
+    "set-product-minimum-severity": {
         parameters: {
             query?: never;
             header?: never;
@@ -23105,7 +23105,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TriageFloorBody"];
+                "application/json": components["schemas"]["MinimumSeverityBody"];
             };
         };
         responses: {

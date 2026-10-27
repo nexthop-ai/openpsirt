@@ -697,11 +697,11 @@ func TestNarrowingToWhatSomebodyRecordedHere(t *testing.T) {
 		}
 
 		// A recorded flaw is undisclosed until somebody says otherwise, so
-		// the reader has to be one who may see it — and the triage line is
+		// the reader has to be one who may see it — and the minimum severity is
 		// off, because the question is what exists rather than what is worth
 		// an afternoon.
 		all, total, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{BelowFloor: true})
+			finding.Filter{BelowMinimumSeverity: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -710,7 +710,7 @@ func TestNarrowingToWhatSomebodyRecordedHere(t *testing.T) {
 				"one recorded", total)
 		}
 		kept, keptTotal, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{Origin: finding.RecordedByHand, BelowFloor: true})
+			finding.Filter{Origin: finding.RecordedByHand, BelowMinimumSeverity: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -726,7 +726,7 @@ func TestNarrowingToWhatSomebodyRecordedHere(t *testing.T) {
 		// "Scanner" and could only send the absence of "entered by hand", so
 		// choosing it narrowed nothing while the panel showed it as chosen.
 		scanned, scannedTotal, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{Origin: finding.ReportedByAScanner, BelowFloor: true})
+			finding.Filter{Origin: finding.ReportedByAScanner, BelowMinimumSeverity: true})
 		if err != nil {
 			t.Fatal(err)
 		}

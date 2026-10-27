@@ -84,6 +84,10 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		if err != nil {
 			return nil, core.WentWrong(d.Logger, "cannot read which products publish", err)
 		}
+		minimums, err := store.MinimumSeverities(ctx)
+		if err != nil {
+			return nil, core.WentWrong(d.Logger, "cannot read what each product triages", err)
+		}
 
 		out := &core.ListOutput[core.ProductBody]{}
 		out.Body.Items = make([]core.ProductBody, 0, len(rows))
@@ -92,13 +96,13 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 			out.Body.Items = append(out.Body.Items, core.ProductBody{
 				Name: row.Name, DisplayName: row.DisplayName,
 				Branches: shape.Branches, Tags: shape.Tags, Variants: shape.Variants,
-				Open:          counted(in.Counts, open, row.ID),
-				LastScanAt:    seen[row.Name],
-				TriageFloor:   core.Line(core.OrBlank(row.TriageFloor)),
-				PairShare:     core.CountedOr(row.PairShare),
-				PairApprovers: core.CountedOr(row.PairApprovers),
-				Publishes:     publishes[row.ID],
-				EndOfLife:     core.OnDate(row.EOLOn),
+				Open:            counted(in.Counts, open, row.ID),
+				LastScanAt:      seen[row.Name],
+				MinimumSeverity: core.MinimumSeverityWord(minimums[row.ID]),
+				PairShare:       core.CountedOr(row.PairShare),
+				PairApprovers:   core.CountedOr(row.PairApprovers),
+				Publishes:       publishes[row.ID],
+				EndOfLife:       core.OnDate(row.EOLOn),
 			})
 		}
 		return out, nil

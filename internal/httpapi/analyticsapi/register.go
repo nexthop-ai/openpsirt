@@ -256,7 +256,7 @@ func registerRegister(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		// No triage line is stated, because none is applied. The register is
+		// No minimum severity is stated, because none is applied. The register is
 		// every occurrence in the build with what stands there, which is what makes
 		// it answerable to an auditor — narrowing it by what this deployment
 		// considers worth triaging would be the omission the document exists
@@ -278,7 +278,7 @@ func registerRegister(api huma.API, in core.Deps) {
 		}
 		out := core.Exporting{
 			What: "disposition register",
-			// The build it is about, and nothing about a triage line: the
+			// The build it is about, and nothing about a minimum severity: the
 			// register applies none, and the comment above says why saying so
 			// would be worse than silence.
 			About: append([]core.Stated{
@@ -437,7 +437,7 @@ func registerCompliance(api huma.API, in core.Deps) {
 			"standing deferral, and overdue when anything open is past its date and " +
 			"uncovered.\n\n" +
 			"A closed finding keeps the deadline it carried; only open ones lose theirs at " +
-			"end of life or below the triage line.\n\n" +
+			"end of life or below the minimum severity.\n\n" +
 			"A product is required — an occurrence identity carries no product, so this cannot " +
 			"be asked across the deployment.\n\n" +
 			"A period, or the whole of it. `from` and `to` bound what closed in them, " +

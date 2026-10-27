@@ -291,19 +291,21 @@ type Recordable string
 // Schema offers every severity word somebody may record, worst first.
 func (Recordable) Schema(huma.Registry) *huma.Schema { return words(finding.Recordable()) }
 
-// Line is a triage line, or the word for none.
-type Line string
+// MinimumSeverityWord is a minimum severity, or the word for none.
+type MinimumSeverityWord string
 
-// Schema offers the words a line may be set to.
-func (Line) Schema(huma.Registry) *huma.Schema { return words(finding.TriageFloors()) }
+// Schema offers the words a minimum severity may be set to.
+func (MinimumSeverityWord) Schema(huma.Registry) *huma.Schema {
+	return words(finding.MinimumSeverities())
+}
 
-// lineOrClear is a triage line, the word for none, or empty to follow the
-// deployment.
-type lineOrClear string
+// minimumSeverityOrClear is a minimum severity, the word for none, or empty to
+// follow the deployment.
+type minimumSeverityOrClear string
 
-// Schema offers the words a line may be set to, and the empty word.
-func (lineOrClear) Schema(huma.Registry) *huma.Schema {
-	return words(append(finding.TriageFloors(), ""))
+// Schema offers the words a minimum severity may be set to, and the empty word.
+func (minimumSeverityOrClear) Schema(huma.Registry) *huma.Schema {
+	return words(append(finding.MinimumSeverities(), ""))
 }
 
 // ScoreBand is the band a score falls in.

@@ -27,7 +27,7 @@ type PackageKindsOutput struct {
 }
 
 const kindsSaid = "Counted over every open finding in the selection you may read. The " +
-	"findings list's other filters and the triage line do not narrow it. A kind present only " +
+	"findings list's other filters and the minimum severity do not narrow it. A kind present only " +
 	"on findings you may not read is absent. A package identifier the ecosystem filter cannot " +
 	"find by a kind is not counted, and neither is a component with none. Ordered by the " +
 	"count, largest first."

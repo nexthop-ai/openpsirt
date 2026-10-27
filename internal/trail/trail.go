@@ -30,7 +30,7 @@ type Kind string
 
 const (
 	// Setting is a value in the settings, including the three that rewrite
-	// what the tool reports: the deadline windows, the triage floor, and how
+	// what the tool reports: the deadline windows, the minimum severity, and how
 	// roles are assigned.
 	Setting Kind = "setting"
 	// Role is a grant or a withdrawal against one product.

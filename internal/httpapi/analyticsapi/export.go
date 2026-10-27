@@ -87,7 +87,7 @@ func registerExport(api huma.API, in core.Deps) {
 			"rows, and `path`, `line`, `function` and `message` say where each is and what the " +
 			"analyzer said. No row carries source text. A lead carries no rating, component or " +
 			"decision, so a file narrowed by any filter but the order holds no lead, and says " +
-			"so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, " +
+			"so. Three filters narrow no lead and keep them: `below_minimum_severity`, `planned=unplanned`, " +
 			"and `on=branch` with `support=in-support`, which is what the list reads when " +
 			"neither is asked.\n\n" +
 			"Takes every filter the findings list takes.",
@@ -102,11 +102,11 @@ func registerExport(api huma.API, in core.Deps) {
 	}) (*huma.StreamResponse, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		}, input.AtOneBuild, input.Narrowing, "the triage line could not be read")
+		}, input.AtOneBuild, input.Narrowing, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err
 		}
-		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.MinimumSeverity, at.Filter, at.Store
 
 		line := "everything"
 		if floor.Hides() {
@@ -150,7 +150,7 @@ func registerExport(api huma.API, in core.Deps) {
 // cannot leave the application — which is the screen somebody reporting to a
 // manager is on.
 //
-// The triage line is per product here, so the file cannot name one. It
+// The minimum severity is per product here, so the file cannot name one. It
 // says so rather than naming a number that would be wrong for every product
 // but one.
 func registerAnywhereExport(api huma.API, in core.Deps) {
@@ -162,8 +162,8 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			"would show, not one page of them.\n\n" +
 			"Read with your own visibility, as it streams. It is the same query the " +
 			"screen reads, paged and written out as it goes.\n\n" +
-			"Each product applies its own triage line, so the file states that rather than " +
-			"naming one line, and `product` is a column.\n\n" +
+			"Each product applies its own minimum severity, so the file states that rather than " +
+			"naming one, and `product` is a column.\n\n" +
 			"Below the findings come the open static analysis leads of every product, by " +
 			"product name, as the product export writes them. The columns and the rule about " +
 			"filters are the product export's.\n\n" +
@@ -181,7 +181,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 		// The same handling the cross-product list gives severity: the line is
 		// applied per row inside the store, and asking for it as a filter as
 		// well would narrow twice and answer neither question.
-		narrowed, err := input.Filter(finding.Floor{Word: string(input.Severity)})
+		narrowed, err := input.Filter(finding.MinimumSeverity{Word: string(input.Severity)})
 		if err != nil {
 			return nil, err
 		}

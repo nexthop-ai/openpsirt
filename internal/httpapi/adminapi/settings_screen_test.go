@@ -192,7 +192,7 @@ func TestASignInsLengthReportsWhatTheDeploymentSet(t *testing.T) {
 func TestAWordSettingOffersTheListItIsCheckedAgainst(t *testing.T) {
 	// The offered list and the accepted list were two tables keyed on the
 	// setting's name, so the second word setting anybody adds is offered
-	// nothing and then checked against the triage floor's words.
+	// nothing and then checked against the minimum severity's words.
 	said := 0
 	for _, each := range settable {
 		switch each.kind {

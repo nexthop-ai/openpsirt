@@ -290,7 +290,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// word a line states and the rating it compares against are both this
 	// product's decisions, and a caller free to state either would be choosing
 	// whose rating its findings are judged by.
-	filter.Floor.ProductID = productID
+	filter.MinimumSeverity.ProductID = productID
 	// The person "mine" means, from the subject rather than from the request,
 	// and their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
@@ -452,7 +452,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 
 	groups := make([]Group, 0, len(rows))
 	for _, row := range rows {
-		group := groupFrom(row, named, rated, shipped, filter.Floor)
+		group := groupFrom(row, named, rated, shipped, filter.MinimumSeverity)
 		group.Tags = marks[markKey{row.VulnerabilityID, row.Fold}]
 		if oneBuild {
 			// The number of distinct ways down: the consumers this
@@ -509,7 +509,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 // are one product's: the word the line states and the word it is compared
 // against are both decisions that team made.
 func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]string,
-	shipped map[int64]graph.Component, floor Floor) Group {
+	shipped map[int64]graph.Component, floor MinimumSeverity) Group {
 
 	group := Group{
 		Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
@@ -563,7 +563,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		case row.Recorded > 0 && group.Severity == "":
 			group.NoDeadline = NotRated
 		case !floor.Admits(group.Exploited || group.Incident, group.Severity):
-			group.NoDeadline = BelowTheLine
+			group.NoDeadline = BelowMinimumSeverity
 		// Asked of both ends rather than of the word they agree on. A group
 		// whose occurrences disagree reports "mixed", which is not a state
 		// upstream is ever in — and reading it as one tells a reader that a
@@ -661,9 +661,9 @@ type groupHead struct {
 type NoDeadline string
 
 const (
-	// BelowTheLine is a finding its product does not consider worth
+	// BelowMinimumSeverity is a finding its product does not consider worth
 	// triaging . Still recorded, still counted, and off the clock.
-	BelowTheLine NoDeadline = "below-the-line"
+	BelowMinimumSeverity NoDeadline = "below-minimum-severity"
 	// NothingToTake is a finding upstream has released no fix for, or has
 	// declined to fix on an issue nobody is using. There is no version that
 	// would close it, so a deadline on it is unmeetable by construction — the
@@ -682,7 +682,7 @@ const (
 
 // NoDeadlines is every reason a finding carries no deadline, narrowest first.
 func NoDeadlines() []NoDeadline {
-	return []NoDeadline{NotRated, BelowTheLine, NothingToTake, OutOfSupport}
+	return []NoDeadline{NotRated, BelowMinimumSeverity, NothingToTake, OutOfSupport}
 }
 
 // groupKey names one group of the list.

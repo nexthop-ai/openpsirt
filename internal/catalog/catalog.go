@@ -71,11 +71,6 @@ type Product struct {
 	Name        string     `bun:"name,notnull"`
 	DisplayName string     `bun:"display_name,notnull"`
 	EOLOn       *time.Time `bun:"eol_on"`
-	// TriageFloor is what this product considers worth triaging, where it
-	// has an opinion of its own. Empty means the deployment's line applies
-	// — stating the default instead would stop this product following it
-	// when the default changed.
-	TriageFloor *string `bun:"triage_floor"`
 	// PairShare and PairApprovers are this product's own thresholds for
 	// raising one pair agreeing to each other's work, where it states them.
 	// Nil follows the deployment.
@@ -252,7 +247,7 @@ func (s *Store) SetProductEndOfLife(ctx context.Context, productID int64, on *ti
 // it so the release follows its product again.
 //
 // Cleared rather than set to the product's date, for the reason a product's
-// triage line is cleared rather than copied: a release holding the product's
+// minimum severity is cleared rather than copied: a release holding the product's
 // current date would stop following it the next time the product moved, and
 // nobody would see that happen.
 func (s *Store) SetStreamEndOfLife(ctx context.Context, streamID int64, on *time.Time) error {
@@ -645,7 +640,7 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 
 // SetPairThresholds records this product's own thresholds for raising one pair
 // agreeing to each other's work. Nil clears one, so the product follows the
-// deployment again, for the reason clearing the triage line does.
+// deployment again, for the reason clearing the minimum severity does.
 func (s *Store) SetPairThresholds(ctx context.Context, productID int64,
 	share, approvers *int) error {
 
@@ -719,19 +714,60 @@ func (s *Store) publishing(ctx context.Context, inUse bool) ([]int64, error) {
 	return ids, nil
 }
 
-// SetTriageFloor records what a product considers worth triaging, or clears it
-// so the product follows the deployment again.
+// MinimumSeverities is the minimum severity each product states of its own, by
+// identifier. A product following the deployment is absent.
+//
+// Read by its column rather than through the product's model, as whether a
+// product publishes is: the catalog listing, a product's overview and the act
+// setting it ask, and nowhere a product is otherwise read or declared.
+func (s *Store) MinimumSeverities(ctx context.Context) (map[int64]string, error) {
+	var rows []struct {
+		ID   int64  `bun:"id"`
+		Word string `bun:"minimum_severity"`
+	}
+	if err := s.db.NewSelect().TableExpr(`"product" AS "p"`).
+		ColumnExpr(`"p"."id"`).ColumnExpr(`"p"."minimum_severity"`).
+		Where(`"p"."minimum_severity" IS NOT NULL`).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what each product triages: %w", err)
+	}
+	out := make(map[int64]string, len(rows))
+	for _, row := range rows {
+		out[row.ID] = row.Word
+	}
+	return out, nil
+}
+
+// MinimumSeverityOf is the minimum severity one product states of its own, or
+// nil where it follows the deployment.
+func (s *Store) MinimumSeverityOf(ctx context.Context, productID int64) (*string, error) {
+	var stated struct {
+		Word *string `bun:"minimum_severity"`
+	}
+	err := s.db.NewSelect().TableExpr(`"product" AS "p"`).
+		ColumnExpr(`"p"."minimum_severity"`).
+		Where(`"p"."id" = ?`, productID).
+		Scan(ctx, &stated)
+	if err != nil {
+		return nil, missingOr(err, fmt.Sprintf("product %d", productID),
+			fmt.Sprintf("read what product %d triages", productID))
+	}
+	return stated.Word, nil
+}
+
+// SetMinimumSeverity records what a product considers worth triaging, or clears
+// it so the product follows the deployment again.
 //
 // Cleared rather than set to the deployment's current value. A product that
-// copied the line the day somebody looked at it would stop following the
+// copied it the day somebody looked at it would stop following the
 // deployment the next time the deployment changed its mind, and nobody would
 // see that happen.
-func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string) error {
+func (s *Store) SetMinimumSeverity(ctx context.Context, productID int64, word string) error {
 	q := s.db.NewUpdate().Model((*Product)(nil)).Where(`"id" = ?`, productID)
 	if word == "" {
-		q = q.Set(`"triage_floor" = NULL`)
+		q = q.Set(`"minimum_severity" = NULL`)
 	} else {
-		q = q.Set(`"triage_floor" = ?`, word)
+		q = q.Set(`"minimum_severity" = ?`, word)
 	}
 	res, err := q.Exec(ctx)
 	if err != nil {

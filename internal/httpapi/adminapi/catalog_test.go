@@ -289,8 +289,8 @@ func (d *declaring) grants(t *testing.T, identity, product string, role access.R
 	}
 }
 
-// floorOf reads back what the catalog says a product triages from.
-func (d *declaring) floorOf(t *testing.T, name string) (string, bool) {
+// minimumSeverityOf reads back what the catalog says a product triages from.
+func (d *declaring) minimumSeverityOf(t *testing.T, name string) (string, bool) {
 	t.Helper()
 	_, body := d.get(t, "/v1/products")
 	items, _ := body["items"].([]any)
@@ -299,7 +299,7 @@ func (d *declaring) floorOf(t *testing.T, name string) (string, bool) {
 		if row["name"] != name {
 			continue
 		}
-		word, stated := row["triage_floor"].(string)
+		word, stated := row["minimum_severity"].(string)
 		return word, stated
 	}
 	t.Fatalf("product %q is not in the catalog: %v", name, body)
@@ -321,27 +321,27 @@ func TestAProductStatesWhatItTriagesAndCanStopSayingSo(t *testing.T) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
 		d.post(t, "/v1/products", `{"name": "onie"}`)
 
-		if word, stated := d.floorOf(t, "sonic"); stated {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); stated {
 			t.Errorf("a product nobody has set a line on reports %q", word)
 		}
 
-		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": "high"}`)
+		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"minimum_severity": "high"}`)
 		if code != http.StatusNoContent {
 			t.Fatalf("stating a line returned %d, want 204: %v", code, body)
 		}
-		if word, stated := d.floorOf(t, "sonic"); !stated || word != "high" {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); !stated || word != "high" {
 			t.Errorf("the product reports %q (stated=%v), want high", word, stated)
 		}
 		// And only that product.
-		if word, stated := d.floorOf(t, "onie"); stated {
+		if word, stated := d.minimumSeverityOf(t, "onie"); stated {
 			t.Errorf("another product picked up the line as %q", word)
 		}
 
-		code, body = d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": ""}`)
+		code, body = d.put(t, "/v1/products/sonic/minimum-severity", `{"minimum_severity": ""}`)
 		if code != http.StatusNoContent {
 			t.Fatalf("clearing a line returned %d, want 204: %v", code, body)
 		}
-		if word, stated := d.floorOf(t, "sonic"); stated {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); stated {
 			t.Errorf("after clearing, the product still states %q", word)
 		}
 	})
@@ -393,29 +393,29 @@ func TestAProductStatesItsOwnPairThresholdsAndClearsThem(t *testing.T) {
 	})
 }
 
-func TestALineAProductCannotHoldIsRefused(t *testing.T) {
+func TestAMinimumSeverityAProductCannotHoldIsRefused(t *testing.T) {
 	// The same words the deployment's line takes, checked the same way. A
 	// product that could be set to something the deployment could not would be
 	// a second vocabulary for one idea, and a value nothing reads is a policy
 	// that silently reverted.
 	twoCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": "catastrophic"}`)
+		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"minimum_severity": "catastrophic"}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("a line nobody recognizes returned %d, want 422: %v", code, body)
 		}
 		if detail, _ := body["detail"].(string); detail == "" {
 			t.Errorf("the refusal says nothing: %v", body)
 		}
-		if word, stated := d.floorOf(t, "sonic"); stated {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); stated {
 			t.Errorf("a refused line was stored as %q", word)
 		}
 	})
 }
 
-func TestStatingALineOnAProductNobodyDeclaredSaysSo(t *testing.T) {
+func TestStatingAMinimumSeverityOnAProductNobodyDeclaredSaysSo(t *testing.T) {
 	twoCatalog(t, func(t *testing.T, d *declaring) {
-		code, body := d.put(t, "/v1/products/nowhere/minimum-severity", `{"floor": "high"}`)
+		code, body := d.put(t, "/v1/products/nowhere/minimum-severity", `{"minimum_severity": "high"}`)
 		if code != http.StatusNotFound {
 			t.Fatalf("a line on an undeclared product returned %d, want 404: %v", code, body)
 		}

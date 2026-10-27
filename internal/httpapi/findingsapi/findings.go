@@ -110,7 +110,7 @@ type FindingBody struct {
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"Nothing here has been announced. Anything said about it outside this deployment discloses it"`
 	DiscloseAt  string `json:"disclose_at,omitempty" doc:"The date the embargo ends. Reaching it discloses nothing by itself"`
 
-	NoDeadline core.NoDeadline `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	// Exploited is the reason a row sits at the top. A position nobody
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
@@ -144,12 +144,12 @@ type FindingsOutput struct {
 		// findings: one issue in one component can occupy sixty
 		// occurrences and is one decision.
 		Total int `json:"total"`
-		// Hidden counts the rows the triage line keeps out, and Floor
-		// is the line itself. Stated rather than silently subtracted: a list
+		// Hidden counts the rows the minimum severity keeps out, and
+		// MinimumSeverity is the severity itself. Stated rather than silently subtracted: a list
 		// showing a smaller number with nothing explaining it is how
 		// two people quote different figures for one question.
-		Hidden int    `json:"hidden,omitempty" doc:"Findings this product does not consider worth triaging, kept out of the list. Still recorded and still counted"`
-		Floor  string `json:"floor,omitempty" doc:"The line they are below"`
+		Hidden          int    `json:"hidden,omitempty" doc:"Findings this product does not consider worth triaging, kept out of the list. Still recorded and still counted"`
+		MinimumSeverity string `json:"minimum_severity,omitempty" doc:"The minimum severity they are below"`
 	}
 }
 
@@ -225,7 +225,7 @@ func registerFindings(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.MinimumSeverity, at.Filter, at.Store
 		groups, total, err := store.Groups(ctx, subject, scope,
 			input.Limit, input.Offset, narrowed)
 		if err != nil {
@@ -240,7 +240,7 @@ func registerFindings(api huma.API, in core.Deps) {
 		out.Body.Total = total
 		out.Body.Hidden = hidden
 		if hidden > 0 {
-			out.Body.Floor = floor.Word
+			out.Body.MinimumSeverity = floor.Word
 		}
 		out.Body.Items = make([]FindingBody, 0, len(groups))
 		now := time.Now().UTC()
@@ -571,7 +571,7 @@ type EvidenceBody struct {
 	// The same words the list body declares, and the words the store emits.
 	// A consumer validating against the published document rejects a body
 	// carrying a word the enum omits, and a TypeScript one cannot narrow on it.
-	NoDeadline core.NoDeadline    `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline    `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	FoundBy    *core.MeasuredBody `json:"found_by,omitempty" doc:"The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
 	// Recorded says a person entered this rather than a scanner reporting it,

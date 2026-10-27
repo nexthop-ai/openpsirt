@@ -467,11 +467,11 @@ func registerComponentExport(api huma.API, in core.Deps) {
 	}) (*huma.StreamResponse, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		}, input.AtOneBuild, input.Narrowing, "the triage line could not be read")
+		}, input.AtOneBuild, input.Narrowing, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err
 		}
-		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.MinimumSeverity, at.Filter, at.Store
 		line := "everything"
 		if floor.Hides() {
 			line = floor.Word

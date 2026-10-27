@@ -96,7 +96,7 @@ asymmetry produces.
 
 A record puts this product's open findings of the issue above everything a feed
 can say about it (REQ-32). `DESIGN-findings.md` § Urgency holds the packing,
-the other four signals, and what the record does to the triage line and the
+the other four signals, and what the record does to the minimum severity and the
 deadline.
 
 | Rule | Reason |
@@ -230,7 +230,7 @@ against an incident holds the rules.
 | | |
 |---|---|
 | No bulk dismissal and no bulk deferral | `DESIGN-triage.md` § Decisions against an incident |
-| No vanishing under a triage floor | The record puts its findings in a band above everything a feed can say, and the line admits either exploitation signal. `DESIGN-findings.md` § Urgency |
+| No vanishing under a minimum severity | The record puts its findings in a band above everything a feed can say, and the minimum severity admits either exploitation signal. `DESIGN-findings.md` § Urgency |
 | No bulk clearing | A record is cleared one at a time, with a reason and a name |
 | The list a bulk decision is picked from marks an attacked issue | A selection reaching one is refused whole, so the list says which issue that is before anything is sent |
 

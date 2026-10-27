@@ -72,13 +72,13 @@ type PlannedUpgradeQuery struct {
 }
 
 // narrow is the store's own filter, built from the request.
-func (q PlannedUpgradeQuery) narrow(floor finding.Floor) finding.Filter {
+func (q PlannedUpgradeQuery) narrow(floor finding.MinimumSeverity) finding.Filter {
 	return finding.Filter{
 		MinSeverity: string(q.Severity), Exploited: q.Exploited,
 		Components: []string{q.Component}, Search: q.Search,
 		Ecosystems: []string{q.Ecosystem}, States: []finding.DecisionStanding{finding.DecisionStanding(q.State)},
 		PlannedUpgradeSort: finding.PlannedUpgradeSortKey(q.Sort), Ascending: q.Ascending,
-		Floor: floor,
+		MinimumSeverity: floor,
 	}
 }
 
@@ -111,9 +111,9 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		PlannedUpgradeQuery
 		core.CountedPaging
 	}) (*core.CountedListOutput[PlannedUpgradeItemBody], error) {
-		subject, scope, floor, err := core.ScopedFloor(ctx, in, core.ScopeQuery{
+		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		}, "the triage line could not be read")
+		}, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err
 		}
@@ -155,9 +155,9 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		Format  string `path:"format" enum:"csv,json"`
 		PlannedUpgradeQuery
 	}) (*huma.StreamResponse, error) {
-		subject, scope, floor, err := core.ScopedFloor(ctx, in, core.ScopeQuery{
+		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
-		}, "the triage line could not be read")
+		}, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err
 		}

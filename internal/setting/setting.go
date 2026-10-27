@@ -80,10 +80,10 @@ const (
 	// it has to be the same across replicas and survive a restart, and this
 	// is where deployment state already is. Minted on first use.
 	SignInKey = "signin.key"
-	// TriageFloor is what this deployment considers worth triaging: a
+	// MinimumSeverity is what this deployment considers worth triaging: a
 	// severity word, below which a finding is recorded and counted but
 	// kept out of the working list. A product may state its own instead.
-	TriageFloor = "triage.floor"
+	MinimumSeverity = "triage.minimum-severity"
 
 	// DisclosureLead is how long before an embargo's date somebody is told
 	// it is coming. The date arriving is the last moment to act rather
@@ -688,6 +688,7 @@ func (s *Store) read(ctx context.Context, name string) (string, bool, error) {
 // binary of the earlier release wrote afterwards.
 var formerNames = map[string]string{
 	BulkDecisionCap: "triage.together-cap",
+	MinimumSeverity: "triage.floor",
 }
 
 // clearFormer removes the row under a setting's former name, inside the

@@ -295,7 +295,7 @@ func TestTwoAssessmentsProposedAtOnceLeaveOneStanding(t *testing.T) {
 func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 	// a downgrade needing a second person gates a downgrade on a second
 	// person because it pushes a deadline out. Since the line a deployment
-	// triages at exists, a downgrade that crosses a product's triage line
+	// triages at exists, a downgrade that crosses a product's minimum severity
 	// does something different in kind: the finding stops being work
 	// rather than becoming later work, and no deadline below the line
 	// takes its deadline away entirely. Those are two things to agree to
@@ -303,7 +303,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		settings := setting.NewStore(f.db.DB)
-		if _, _, err := settings.Change(ctx, setting.TriageFloor, "medium"); err != nil {
+		if _, _, err := settings.Change(ctx, setting.MinimumSeverity, "medium"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -376,7 +376,7 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 	// undisclosed work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TriageFloor, "medium"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.MinimumSeverity, "medium"); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
@@ -426,7 +426,7 @@ func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		products := catalog.NewStore(f.db.DB)
-		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TriageFloor, "medium"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.MinimumSeverity, "medium"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -442,7 +442,7 @@ func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 		// And another shipping the same thing, which this rating does not
 		// reach.
 		elsewhere := f.inAnotherProduct(t, "strict-product")
-		if err := products.SetTriageFloor(ctx, f.productOf(t, elsewhere), "medium"); err != nil {
+		if err := products.SetMinimumSeverity(ctx, f.productOf(t, elsewhere), "medium"); err != nil {
 			t.Fatal(err)
 		}
 		f.shippedTo(t, elsewhere, twoConsumers())
@@ -711,7 +711,7 @@ func TestRatingAProductAsksForTriageOnThatProduct(t *testing.T) {
 
 func TestAgreeingToARatingAsksForTheRoleOnItsOwnProduct(t *testing.T) {
 	// The other half of the same hole. Agreeing is what puts a milder rating
-	// into force, so it moves that product's deadlines and its triage line —
+	// into force, so it moves that product's deadlines and its minimum severity —
 	// and a role held somewhere else buys nothing here. Refused in the words a
 	// rating that is not there gets, because "you may not agree to this" about
 	// a product somebody holds nothing on says the rating is there.
@@ -1007,7 +1007,7 @@ func TestARatingIsListedByWhatItsOwnIssueReachesAndNotByAnotherIssue(t *testing.
 func (f *fixture) pageOfRatings(t *testing.T) (access.Subject, []int64) {
 	t.Helper()
 	ctx := t.Context()
-	if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TriageFloor, "medium"); err != nil {
+	if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.MinimumSeverity, "medium"); err != nil {
 		t.Fatal(err)
 	}
 	f.shipped(t, twoConsumers())

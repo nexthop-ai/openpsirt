@@ -751,7 +751,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	// narrower, because a reader told the release is retired learns nothing
 	// they could act on if the rating is what actually put it off the clock.
 	if evidence.DueAt == nil {
-		line, err := FloorFor(ctx, s.db, productID)
+		line, err := MinimumSeverityFor(ctx, s.db, productID)
 		if err != nil {
 			return nil, err
 		}
@@ -759,7 +759,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		case evidence.unrated:
 			evidence.NoDeadline = NotRated
 		case !line.Admits(evidence.Exploited || evidence.Incident, issue.InForce()):
-			evidence.NoDeadline = BelowTheLine
+			evidence.NoDeadline = BelowMinimumSeverity
 		case evidence.nothingToTake:
 			evidence.NoDeadline = NothingToTake
 		default:

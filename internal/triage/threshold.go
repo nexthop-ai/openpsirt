@@ -191,7 +191,7 @@ func (s *Store) deferredWith(ctx context.Context, occurrences []DecisionOccurren
 // where nothing it covers has a deadline there is no date the promise can be
 // inside — the exemption is "this hides nothing the policy did not already
 // allow", and a place with no deadline allowed nothing. Reading that the
-// other way made a product below its own triage line the one place a promise
+// other way made a product below its own minimum severity the one place a promise
 // could hide a finding for years on one signature.
 func commitmentGated(committedTo, binding *time.Time) bool {
 	if committedTo == nil || binding == nil {

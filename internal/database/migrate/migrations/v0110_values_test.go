@@ -26,9 +26,9 @@ const (
 // word v0.11.0 renames: a bulk claim, a notification and a destination of
 // each renamed kind, a notification linking a decision's row and one linking
 // a claim, a job that ran out of attempts beside one that finished, a kept
-// filter naming the renamed words, the bulk action limit under its v0.10.0
-// name, and a change on the trail of the renamed kind beside one of a kind
-// kept.
+// filter naming the renamed words, the bulk action limit and the minimum
+// severity under their v0.10.0 names, and a change on the trail of the
+// renamed kind beside one of a kind kept.
 func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	declared, err := world.Declare(ctx, db)
@@ -76,6 +76,8 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 		exec(`INSERT INTO "admin_change" ("at", "by", "actor", "kind", "about", "was", "became")
 			VALUES (?, ?, ?, ?, ?, ?, ?)`, at, person, "person", kind, "Obligation window Early warning", nil, "24")
 	}
+	exec(`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
+		"triage.floor", "medium", at)
 }
 
 // wordsRenamed asserts every stored word the seed wrote reads in v0.11.0's
@@ -133,6 +135,10 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 			WHERE "name" = 'triage.bulk-decision-cap' AND "value" = '250'`, 1},
 		{"the limit under its v0.10.0 name",
 			`SELECT COUNT(*) FROM "application_setting" WHERE "name" = 'triage.together-cap'`, 0},
+		{"the minimum severity under its new name", `SELECT COUNT(*) FROM "application_setting"
+			WHERE "name" = 'triage.minimum-severity' AND "value" = 'medium'`, 1},
+		{"the minimum severity under its v0.10.0 name",
+			`SELECT COUNT(*) FROM "application_setting" WHERE "name" = 'triage.floor'`, 0},
 	} {
 		var n int
 		if err := db.DB.NewRaw(c.query).Scan(ctx, &n); err != nil {

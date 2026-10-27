@@ -140,7 +140,7 @@ func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 
 		// Something to replace, written by a store with no seam on it so that
 		// seeding does not consume one.
-		if _, _, err := NewStore(db.DB).Change(ctx, TriageFloor, "critical"); err != nil {
+		if _, _, err := NewStore(db.DB).Change(ctx, MinimumSeverity, "critical"); err != nil {
 			t.Fatalf("the setting to be moved could not be recorded: %v", err)
 		}
 
@@ -177,7 +177,7 @@ func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 		for i, to := range wrote {
 			go func() {
 				defer wait.Done()
-				held[i], _, failures[i] = stores[i].Change(ctx, TriageFloor, to)
+				held[i], _, failures[i] = stores[i].Change(ctx, MinimumSeverity, to)
 			}()
 		}
 		// Both have read "critical". Let them both write.
@@ -230,7 +230,7 @@ func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 
 		// The stored value is the loser's: it wrote last, and it wrote
 		// knowing what it was replacing.
-		stored, found, err := stores[0].Get(ctx, TriageFloor)
+		stored, found, err := stores[0].Get(ctx, MinimumSeverity)
 		if err != nil || !found {
 			t.Fatalf("the setting is not stored: %v found=%v", err, found)
 		}
@@ -261,7 +261,7 @@ func TestAWriterInsideACallersTransactionHandsTheLostRaceBack(t *testing.T) {
 		} {
 			dbtest.Reset(t, db)
 			if c.seeded {
-				if _, _, err := NewStore(db.DB).Change(ctx, TriageFloor, "critical"); err != nil {
+				if _, _, err := NewStore(db.DB).Change(ctx, MinimumSeverity, "critical"); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -272,7 +272,7 @@ func TestAWriterInsideACallersTransactionHandsTheLostRaceBack(t *testing.T) {
 				store := &Store{db: tx, now: time.Now}
 				if attempts == 1 {
 					store.beforeWrite = func() {
-						args := []any{TriageFloor}
+						args := []any{MinimumSeverity}
 						if !c.seeded {
 							args = append(args, time.Now().UTC())
 						}
@@ -281,7 +281,7 @@ func TestAWriterInsideACallersTransactionHandsTheLostRaceBack(t *testing.T) {
 						}
 					}
 				}
-				_, _, err := store.Change(ctx, TriageFloor, "low")
+				_, _, err := store.Change(ctx, MinimumSeverity, "low")
 				if attempts == 1 {
 					first = err
 				}

@@ -28,7 +28,7 @@ import {
 // what is open per build, how much is overdue, how much has been decided, when
 // each build was last scanned — every piece of which exists and none of which
 // sits together. The products table is an
-// administration surface: a triage line in a select and an end-of-support date
+// administration surface: a minimum severity in a select and an end-of-support date
 // in an input, which is a different job from reading how something is going.
 //
 // Every number here opens the list that produced it. A figure somebody
@@ -64,10 +64,10 @@ export function Product() {
         <h2>{it.display_name || it.name}</h2>
         <p>
           <span className="id">{it.name}</span>
-          {it.triage_floor ? (
-            <> · triaged at {it.triage_floor} and above</>
+          {it.minimum_severity ? (
+            <> · minimum severity {it.minimum_severity}</>
           ) : (
-            <> · triaged at whatever the deployment says</>
+            <> · minimum severity from the deployment</>
           )}
           {it.end_of_life && <> · out of support {it.end_of_life}</>}
           {mayReadLeads && (

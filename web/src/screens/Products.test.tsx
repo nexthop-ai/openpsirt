@@ -27,7 +27,7 @@ const SONIC = {
   tags: 1,
   variants: 3,
   open: 12,
-  triage_floor: "",
+  minimum_severity: "",
   pair_share: 0,
   pair_approvers: 0,
 };
@@ -86,7 +86,7 @@ describe("the products an administrator manages", () => {
     expect(only(writes.post)[1].body).toEqual({ name: "edgeos", display_name: undefined });
   });
 
-  it("sets the triage line picked", async () => {
+  it("sets the minimum severity picked", async () => {
     const writes = await drawn();
     change(
       host().querySelector<HTMLSelectElement>(
@@ -97,7 +97,7 @@ describe("the products an administrator manages", () => {
     await settle();
     const [path, init] = only(writes.put);
     expect(path).toBe("/v1/products/{product}/minimum-severity");
-    expect(init.body).toEqual({ floor: "high" });
+    expect(init.body).toEqual({ minimum_severity: "high" });
   });
 
   it("sends pair thresholds as numbers, and a blank one as the deployment's", async () => {

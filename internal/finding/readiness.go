@@ -61,9 +61,9 @@ type Readiness struct {
 	// Why is the missing part where Shipped is nil, in words a
 	// screen can print. Empty where there is something to compare against.
 	Why string
-	// Floor is the line these counts are at or above, so a screen can say
+	// MinimumSeverity is the line these counts are at or above, so a screen can say
 	// whose number it is showing.
-	Floor Floor
+	MinimumSeverity MinimumSeverity
 }
 
 // NothingScannedYet is what readiness says of a build declared and never
@@ -86,7 +86,7 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	if _, err := access.Readable(subject, productID); err != nil {
 		return nil, err
 	}
-	floor, err := FloorFor(ctx, s.db, productID)
+	floor, err := MinimumSeverityFor(ctx, s.db, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	out := &Readiness{Now: *here, Floor: floor}
+	out := &Readiness{Now: *here, MinimumSeverity: floor}
 	if here.TargetID == 0 || here.LastScanned == nil {
 		// Declared and not scanned: never built, or built and every upload
 		// refused. An answer rather than a refusal, and not zeroes alone,
@@ -147,7 +147,7 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 
 // standing counts what one build holds now, by band.
 func (s *Store) standing(ctx context.Context, subject access.Subject,
-	productID, streamID, variantID int64, floor Floor) (*Standing, error) {
+	productID, streamID, variantID int64, floor MinimumSeverity) (*Standing, error) {
 
 	_, all := subject.Products()
 

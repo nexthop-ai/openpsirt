@@ -290,7 +290,7 @@ type registerRow struct {
 // list. What a register is asked is "show me what nobody decided", "show me
 // the dismissals", "show me this component" — each of them a way of reading
 // the same complete answer rather than a different question. What is left out
-// is deliberate: a triage line, because the register applies none.
+// is deliberate: a minimum severity, because the register applies none.
 type Registering struct {
 	// States keeps rows standing in any of these, by the four words the row
 	// itself carries.

@@ -287,7 +287,7 @@ export function Release({ product, stream }: { product: string; stream: string }
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>The record</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Every vulnerability known in this release and what became of it, with no triage line
+          Every vulnerability known in this release and what became of it, with no minimum severity
           applied.
         </p>
         <ul className="files catalog">

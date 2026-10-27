@@ -307,7 +307,7 @@ per issue at a source package and version.
 | Rule | |
 |---|---|
 | Counted over what the reader may see (REQ-43) | Narrowed in the data-access layer like every other aggregate. A kind present only on an undisclosed finding is absent for somebody who reads disclosed ones |
-| Over the whole scope | The list's other filters, its release and support defaults and the triage line do not narrow it. It answers what the filter can offer, and a kind that vanished whenever another filter was on would be a choice nobody can see |
+| Over the whole scope | The list's other filters, its release and support defaults and the minimum severity do not narrow it. It answers what the filter can offer, and a kind that vanished whenever another filter was on would be a choice nobody can see |
 | A row is counted once per product | However many builds and binaries of the selection hold it, as the list holds it as one row. Across products it counts in each, as it is a row in each |
 | Every binary of one source package is one kind | So a row's lowest package identifier speaks for it |
 | A kind is read as the filter reads it | The identifier as stored, without regard to capitals, beginning `pkg:`, the kind and a slash. An identifier the filter finds under no kind, and a component with no identifier, is not counted, because ticking it would empty the list |
@@ -365,12 +365,13 @@ The findings list spans products too, at `/v1/findings` with no product in the
 path: one row per product, issue and component, with the same filters, sort
 allowlist and paging.
 
-Every product's own triage line applies per row from that product's own column
-rather than from one number chosen for the page. `severity` raises the line for
-the whole page and never lowers it below what a product decided: a row passes
-its product's line and the raised one, so the higher of the two applies,
-whether the product states its own line or inherits the deployment's. An
-exploited row passes both. `below_floor` turns every line off.
+Every product's own minimum severity applies per row from that product's own column
+rather than from one number chosen for the page. `severity` raises it for the
+whole page and never lowers it below what a product decided: a row passes its
+product's minimum severity and the raised one, so the higher of the two
+applies, whether the product states its own or inherits the deployment's. An
+exploited row passes both. `below_minimum_severity` turns every minimum
+severity off.
 
 The filters belonging to one product's builds are not offered across products
 rather than answered from whichever build sorted first: `beneath` walks one

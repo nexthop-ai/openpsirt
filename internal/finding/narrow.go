@@ -50,13 +50,13 @@ type Filter struct {
 	// packages reads them together, and one at a time is the same list
 	// read three times.
 	Components []string
-	// Floor is what this product considers worth triaging, and BelowFloor
+	// MinimumSeverity is what this product considers worth triaging, and BelowMinimumSeverity
 	// asks to see what it keeps out. The line is policy rather than
 	// preference — somebody set it once for everybody — which is why what
 	// it hides is counted and said rather than silently subtracted (the
 	// line a deployment triages at, a list saying what it hid).
-	Floor      Floor
-	BelowFloor bool
+	MinimumSeverity      MinimumSeverity
+	BelowMinimumSeverity bool
 	// Workable keeps the releases work can land in: which sort of release,
 	// and whether it is still in support. Two questions kept apart, because
 	// a tag can be in support and a branch can be past end-of-life.
@@ -771,8 +771,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where(`"f"."component_id" IN (?)`, graph.Within(q.DB(), f.TargetID, *f.Beneath))
 	}
 	q = f.byState(q)
-	if !f.BelowFloor {
-		q = f.Floor.narrow(q)
+	if !f.BelowMinimumSeverity {
+		q = f.MinimumSeverity.narrow(q)
 	}
 	return q
 }

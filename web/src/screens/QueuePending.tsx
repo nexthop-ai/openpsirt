@@ -171,7 +171,7 @@ export function Embargoes({
 // Each row names its product, because a rating belongs to one and two
 // products may rate the same issue differently. A row saying only "CVE-… low"
 // is a word an approver cannot act on: what they are agreeing to is a deadline
-// and a triage line in one named place.
+// and a minimum severity in one named place.
 export function Ratings({
   waiting,
   total,
@@ -236,7 +236,7 @@ export function Ratings({
               </p>
             ) : (
               <p className="hint" style={{ margin: "6px 0 0" }}>
-                Still above {row.product_name || row.product}'s triage line: later work, not no
+                Still above {row.product_name || row.product}'s minimum severity: later work, not no
                 work.
               </p>
             )}

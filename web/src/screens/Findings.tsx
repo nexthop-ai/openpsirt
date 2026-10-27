@@ -355,15 +355,15 @@ export function Findings() {
   // the top of it, eighteen rows above where they were reading.
   useKeepPlace(findings.isSuccess);
 
-  // The rows below what this product triages, and the line itself.
-  // A product's own answer: across products each has its own line, so there is
+  // The rows below what this product triages, and the minimum severity itself.
+  // A product's own answer: across products each has its own, so there is
   // no single count to give and no single value to name, and the notice is not
   // drawn. The cross-product response does not carry the two fields at all,
   // which is what makes reading them through a narrowing here rather than off
   // the response the honest form.
   const line = spanning
-    ? { hidden: 0, floor: "" }
-    : ((findings.data ?? {}) as { hidden?: number; floor?: string });
+    ? { hidden: 0, minimum_severity: "" }
+    : ((findings.data ?? {}) as { hidden?: number; minimum_severity?: string });
 
   // The build a row's actions and links are about. Where the selection is
   // one build that is the selection; across several the row names one of them
@@ -1114,7 +1114,8 @@ export function Findings() {
           {(line.hidden ?? 0) > 0 && !below && (
             <>
               {" "}
-              · {(line.hidden ?? 0).toLocaleString()} below the {line.floor} line
+              · {(line.hidden ?? 0).toLocaleString()} below the {line.minimum_severity} minimum
+              severity
             </>
           )}
         </span>

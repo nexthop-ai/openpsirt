@@ -132,7 +132,7 @@ var formerAddresses = []struct{ method, path, operation string }{
 	{http.MethodPost, formerBuild + "/vex/issuance", "record-vex-issued"},
 	{http.MethodGet, formerBuild + "/vex/issuance/{version}", "get-vex-issued"},
 	{http.MethodGet, "/v1/products/{product}/tags", "list-tags"},
-	{http.MethodPut, "/v1/products/{product}/triage-floor", "set-product-triage-floor"},
+	{http.MethodPut, "/v1/products/{product}/triage-floor", "set-product-minimum-severity"},
 	{http.MethodGet, "/v1/products/{product}/vex-statements", "list-vex-documents"},
 	{http.MethodPost, "/v1/products/{product}/vex-statements", "upload-vex-statements"},
 	{http.MethodGet, "/v1/scanning", "list-last-uploads"},

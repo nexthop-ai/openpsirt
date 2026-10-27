@@ -37,7 +37,7 @@ const PAGE = 200;
 // a person reading a list wants the decision rather than the repetition; a
 // register is read against what shipped, and what shipped is occurrences.
 //
-// It states no triage line because it applies none. Everything in the build
+// It states no minimum severity because it applies none. Everything in the build
 // is here whatever the deployment considers worth triaging, which is the basis
 // on which somebody can rely on it.
 export function Register() {
@@ -135,7 +135,7 @@ export function Register() {
         <section className="panel">
           {/* An auditor's questions, asked of the whole answer rather than
               of a narrower one: "what has nobody decided", "what is still
-              open". The register applies no triage line whatever is picked
+              open". The register applies no minimum severity whatever is picked
               here, which is what it is for. */}
           <div className="controls">
             <div className="seg" role="group" aria-label="The decision standing">
@@ -197,7 +197,7 @@ export function Register() {
             )}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            One row per issue and occurrence, open or closed, <b>no triage line</b>.{" "}
+            One row per issue and occurrence, open or closed, <b>no minimum severity</b>.{" "}
             <a href={fileAt(where, "csv", asked)}>CSV</a> ·{" "}
             <a href={fileAt(where, "json", asked)}>JSON</a>
           </p>

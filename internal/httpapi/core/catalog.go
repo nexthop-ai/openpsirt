@@ -77,11 +77,11 @@ type ProductBody struct {
 	// LastScanAt is absent where nothing has ever been filed against any of
 	// this product's builds.
 	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived for any of its builds"`
-	// TriageFloor is the least severity this product triages, where it has
+	// MinimumSeverity is the least severity this product triages, where it has
 	// said something of its own. Absent means it follows the deployment, which
 	// is a different statement from stating the same word — a product that
 	// stated it would stop following when the deployment changed its mind.
-	TriageFloor Line `json:"triage_floor,omitempty" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
+	MinimumSeverity MinimumSeverityWord `json:"minimum_severity,omitempty" doc:"The product's own minimum severity, where it says something other than the deployment. Absent means it follows the deployment"`
 	// PairShare and PairApprovers are this product's own thresholds for one
 	// pair agreeing to each other's work, where it states them. Absent follows
 	// the deployment.
@@ -125,11 +125,11 @@ type PublicationBody struct {
 	Publishes bool `json:"publishes" doc:"Whether this product's security documents are served to anybody who asks, without signing in"`
 }
 
-// TriageFloorBody is what a product considers worth triaging.
-type TriageFloorBody struct {
-	// Floor is the least severity worth triaging here, "everything" for a
+// MinimumSeverityBody is what a product considers worth triaging.
+type MinimumSeverityBody struct {
+	// MinimumSeverity is the least severity worth triaging here, "everything" for a
 	// product that hides nothing, or empty to follow the deployment.
-	Floor lineOrClear `json:"floor" doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
+	MinimumSeverity minimumSeverityOrClear `json:"minimum_severity" doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
 }
 
 // StreamBody is a branch or a tag.

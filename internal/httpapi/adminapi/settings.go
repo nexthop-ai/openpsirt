@@ -101,7 +101,7 @@ var settable = []struct {
 	//
 	// On the row rather than in a second table keyed on the name: keyed that
 	// way, the next word setting anybody adds is offered nothing and then
-	// checked against the triage floor's list.
+	// checked against the minimum severity's list.
 	words []string
 	// shipped is the value in force where nobody has set one, read from the
 	// package that reads it rather than respelled here: a shipped number
@@ -192,10 +192,10 @@ var settable = []struct {
 		"How many findings one answer about many issues, or one flaw recorded here, may write",
 		"",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultWriteCeiling) }, false},
-	{setting.TriageFloor, "Minimum severity", setting.Triage,
+	{setting.MinimumSeverity, "Minimum severity", setting.Triage,
 		"The severity below which findings stay out of the working list",
 		"Below it, findings are still recorded and counted. A product may state its own.",
-		setting.Word, theFloor, func(core.Deps) string { return theFloor[0] }, true},
+		setting.Word, minimumSeverities, func(core.Deps) string { return minimumSeverities[0] }, true},
 	{setting.QuietAfter, "Quiet build threshold", setting.Scanning,
 		"How long a build may go without a scan before it is reported as quiet",
 		"Measured from the last arrival, or from when the build was declared if nothing has arrived.",
@@ -330,12 +330,12 @@ var atMost = map[string]int{
 // theSwitch is the two values an on-or-off setting may take.
 var theSwitch = []string{setting.On, setting.Off}
 
-// theFloor is the words the triage line may be set to, from the package that
-// owns the ordering they are drawn from.
+// minimumSeverities is the words the minimum severity may be set to, from the
+// package that owns the ordering they are drawn from.
 //
-// "everything" is not a severity: it is the line that keeps nothing out, and a
+// "everything" is not a severity: it is the minimum that keeps nothing out, and a
 // word an operator sets rather than a rating anything is compared against.
-var theFloor = finding.TriageFloors()
+var minimumSeverities = finding.MinimumSeverities()
 
 func registerSettings(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -407,7 +407,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			// offers. Two tables keyed on the name is how an offered word and
 			// an accepted word come to differ. A word is typed, so it is
 			// matched and stored without regard to capitals or the spaces
-			// around it, as the product's own floor is.
+			// around it, as the product's own minimum severity is.
 			value = strings.ToLower(strings.TrimSpace(value))
 			if !slices.Contains(settable[row].words, value) {
 				return nil, huma.Error422UnprocessableEntity(
@@ -466,7 +466,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			}
 		}
 		// The prior value, answered by the write that replaced it: it is not
-		// derivable afterwards, and the person who raised the floor to
+		// derivable afterwards, and the person who raised the minimum severity to
 		// critical is half of what somebody asks. Read in a statement of its
 		// own it is the value at some earlier moment — two administrators
 		// moving the same setting at once both read the original, and the

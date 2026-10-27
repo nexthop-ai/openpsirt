@@ -22,7 +22,8 @@ import (
 
 // triageV0100 is one claim in a v0.10.0 database with a row at a place, a
 // revision, an approval, a comment and its earlier wording, a build it was
-// made on and a commitment citing it.
+// made on and a commitment citing it, and a product stating the least severity
+// it triages.
 type triageV0100 struct{ claim, decision, revision int64 }
 
 func seedTriageV0100(t *testing.T, ctx context.Context, db *database.DB) triageV0100 {
@@ -74,6 +75,7 @@ func seedTriageV0100(t *testing.T, ctx context.Context, db *database.DB) triageV
 	exec(`INSERT INTO "upgrade" ("target_id", "fold_key", "from_version", "to_version", "claim_id",
 		"declared_by", "declared_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		declared.Target.ID, "fold-libfoo", "1.0", "1.1", out.claim, person, at)
+	exec(`UPDATE "product" SET "triage_floor" = ? WHERE "id" = ?`, "high", product)
 	return out
 }
 
@@ -108,6 +110,14 @@ func (w triageV0100) renamedAs(t *testing.T, ctx context.Context, db *database.D
 	}
 	if occurrence != w.decision {
 		t.Errorf("the occurrence is row %d after the upgrade, want the row %d it was", occurrence, w.decision)
+	}
+	var stated int
+	if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "product" WHERE "minimum_severity" = 'high'`).
+		Scan(ctx, &stated); err != nil {
+		t.Fatal(err)
+	}
+	if stated != 1 {
+		t.Errorf("%d products state a minimum severity of high after the upgrade, want 1", stated)
 	}
 }
 
@@ -294,6 +304,7 @@ func TestAnUpgradeStoppedPartWayThroughItsRenamesResumes(t *testing.T) {
 		{after: "told_outside_record_idx"},
 		{after: "obligation_window_product_window_fk", servers: true},
 		{after: "job_set_aside_idx"},
+		{after: "triage_floor"},
 	} {
 		t.Run(stop.after, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

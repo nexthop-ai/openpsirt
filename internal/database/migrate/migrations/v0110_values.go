@@ -37,8 +37,11 @@ var valuesRewrittenV0110 = []valueRewrite{
 	{"job", "state", "dead", "failed"},
 }
 
-// settingRenamedV0110 is the setting v0.11.0 renames, from its v0.10.0 name.
-var settingRenamedV0110 = struct{ from, to string }{"triage.together-cap", "triage.bulk-decision-cap"}
+// settingsRenamedV0110 is each setting v0.11.0 renames, from its v0.10.0 name.
+var settingsRenamedV0110 = []struct{ from, to string }{
+	{"triage.together-cap", "triage.bulk-decision-cap"},
+	{"triage.floor", "triage.minimum-severity"},
+}
 
 // savedWordsV0110 is each word of the findings list's address v0.11.0
 // renames, and savedSortsV0110 each order it renames.
@@ -53,7 +56,7 @@ var errValuesStopped = errors.New("the stored words were stopped part way")
 // valuesV0110 gives every stored word the renames reach its v0.11.0
 // spelling: a decision's kind, the kinds of notification and destination,
 // the link a notification holds to a decision's row, a job's state, the
-// address a kept filter opens and a setting's name. It runs after the
+// address a kept filter opens and the settings' names. It runs after the
 // renames, against the tables as v0.11.0 names them.
 //
 // Every step changes only rows still holding a v0.10.0 word, so a start that
@@ -176,20 +179,22 @@ func savedQueryV0110(query string) string {
 	return strings.Join(pairs, "&")
 }
 
-// settingV0110 moves the renamed setting's row to its new name. A row already
+// settingV0110 moves each renamed setting's row to its new name. A row already
 // under the new name is left beside the old one, which the new one outranks.
 func settingV0110(ctx context.Context, tx bun.Tx) error {
-	var held int
-	if err := tx.NewRaw(`SELECT COUNT(*) FROM "application_setting" WHERE "name" = ?`,
-		settingRenamedV0110.to).Scan(ctx, &held); err != nil {
-		return fmt.Errorf("read the %q setting: %w", settingRenamedV0110.to, err)
-	}
-	if held > 0 {
-		return nil
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE "application_setting" SET "name" = ? WHERE "name" = ?`,
-		settingRenamedV0110.to, settingRenamedV0110.from); err != nil {
-		return fmt.Errorf("rename the %q setting: %w", settingRenamedV0110.from, err)
+	for _, renamed := range settingsRenamedV0110 {
+		var held int
+		if err := tx.NewRaw(`SELECT COUNT(*) FROM "application_setting" WHERE "name" = ?`,
+			renamed.to).Scan(ctx, &held); err != nil {
+			return fmt.Errorf("read the %q setting: %w", renamed.to, err)
+		}
+		if held > 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE "application_setting" SET "name" = ? WHERE "name" = ?`,
+			renamed.to, renamed.from); err != nil {
+			return fmt.Errorf("rename the %q setting: %w", renamed.from, err)
+		}
 	}
 	return nil
 }

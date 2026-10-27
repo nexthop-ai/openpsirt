@@ -127,35 +127,35 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "set-product-triage-floor", Method: http.MethodPut,
+		OperationID: "set-product-minimum-severity", Method: http.MethodPut,
 		Path:    "/v1/products/{product}/minimum-severity",
 		Summary: "Set a product's minimum severity",
 		Description: "Sets the least severity worth triaging for one product, overriding what " +
-			"the deployment says. Below the line a finding is still recorded, still counted and " +
+			"the deployment says. Below it a finding is still recorded, still counted and " +
 			"still reportable, and it carries no deadline — it is out of the working list, not " +
 			"out of the system.\n\n" +
 			"An empty value clears the override, so the product follows the deployment again. " +
-			"Clearing is not the same as stating the deployment's current line: a product that " +
+			"Clearing is not the same as stating the deployment's current minimum severity: a product that " +
 			"stated it would stop following when the deployment changed.\n\n" +
-			"Deadlines are rewritten afterwards, away from the request, because moving the line " +
-			"moves what is on a clock at all. The response returns before that has finished.",
+			"Deadlines are rewritten afterwards, away from the request, because moving the minimum " +
+			"severity moves what is on a clock at all. The response returns before that has finished.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
-		Body    core.TriageFloorBody
+		Body    core.MinimumSeverityBody
 	}) (*struct{}, error) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
-		// The same words the deployment's line takes, checked the same way. A
+		// The same words the deployment's minimum severity takes, checked the same way. A
 		// product that could be set to something the deployment could not
 		// would be a second vocabulary for one idea.
-		word := strings.TrimSpace(strings.ToLower(string(in.Body.Floor)))
-		if word != "" && !slices.Contains(theFloor, word) {
+		word := strings.TrimSpace(strings.ToLower(string(in.Body.MinimumSeverity)))
+		if word != "" && !slices.Contains(minimumSeverities, word) {
 			return nil, huma.Error422UnprocessableEntity(
-				fmt.Sprintf("%q is not a line to triage from — write one of %s, "+
+				fmt.Sprintf("%q is not a minimum severity — write one of %s, "+
 					"or nothing at all to follow the deployment",
-					in.Body.Floor, strings.Join(theFloor, ", ")))
+					in.Body.MinimumSeverity, strings.Join(minimumSeverities, ", ")))
 		}
 		var product *catalog.Product
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
@@ -165,17 +165,20 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 				return err
 			}
 			// Absent means the product follows the deployment, which is a
-			// different act from stating the deployment's current line: a
+			// different act from stating the deployment's current minimum severity: a
 			// blank and an unset value have to stay distinguishable in the
 			// record.
-			before := product.TriageFloor
-			if err := store.SetTriageFloor(ctx, product.ID, word); err != nil {
-				return core.WentWrong(d.Logger, "that line could not be recorded", err)
+			before, err := store.MinimumSeverityOf(ctx, product.ID)
+			if err != nil {
+				return core.WentWrong(d.Logger, "that minimum severity could not be recorded", err)
 			}
-			// The line one product triages at, recorded like the deployment's
+			if err := store.SetMinimumSeverity(ctx, product.ID, word); err != nil {
+				return core.WentWrong(d.Logger, "that minimum severity could not be recorded", err)
+			}
+			// One product's minimum severity, recorded like the deployment's
 			// own: it is one of the three levers that rewrite what this tool
 			// reports without anything being scanned.
-			if err := core.Noted(ctx, tx, trail.Setting, "triage floor of "+product.Name,
+			if err := core.Noted(ctx, tx, trail.Setting, "minimum severity of "+product.Name,
 				trail.Said(core.OrBlank(before), before != nil),
 				trail.Said(word, word != "")); err != nil {
 				return core.NotRecorded(d.Logger, err)
@@ -185,7 +188,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			return nil, err
 		}
 		if d.RewriteDeadlines != nil {
-			d.RewriteDeadlines(ctx, "triage floor of product "+product.Name, word)
+			d.RewriteDeadlines(ctx, "minimum severity of product "+product.Name, word)
 		}
 		return &struct{}{}, nil
 	})

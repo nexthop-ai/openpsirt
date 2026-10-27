@@ -132,7 +132,7 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		Description: "One number per build, which is what a release-over-release chart is " +
 			"drawn from. The comparison endpoint says what changed between two builds; " +
 			"this says whether the estate is getting better or worse across all of them.\n\n" +
-			"Counted before any triage line is applied, so it agrees with the findings list " +
+			"Counted before any minimum severity is applied, so it agrees with the findings list " +
 			"rather than with whatever a product has decided is worth working on — a line is " +
 			"about what to spend an afternoon on, not about what exists.\n\n" +
 			"Severities are folded the same four ways everything else here ranks by, through " +

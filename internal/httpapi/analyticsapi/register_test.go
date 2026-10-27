@@ -81,13 +81,13 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 		if got.Code != http.StatusOK {
 			t.Fatalf("exporting the register answered %d: %s", got.Code, got.Body.String())
 		}
-		// It states no triage line, because it applies none. The register is
+		// It states no minimum severity, because it applies none. The register is
 		// every occurrence in the build with what stands there, which is what makes
 		// it answerable to an auditor — and a header saying things were left
 		// out above a file that left nothing out is worse than saying nothing,
 		// because it reads as complete about what remains.
 		if strings.Contains(got.Body.String(), "# triaged at or above") {
-			t.Error("the register export claims a triage line it does not apply")
+			t.Error("the register export claims a minimum severity it does not apply")
 		}
 		if !strings.Contains(got.Body.String(), "CVE-2026-9999") {
 			t.Error("the register export holds no rows")

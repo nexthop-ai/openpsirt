@@ -393,7 +393,7 @@ func TestAnExportAnswersTheSameQuestionAsTheListItCameFrom(t *testing.T) {
 
 		// One filter of each kind the hand-written list left out: a plain
 		// narrowing, one that reads a date, one that walks the tree, one
-		// behind the triage line, and one that changes the population
+		// behind the minimum severity, and one that changes the population
 		// entirely — asking for what has closed, which this list is not about
 		// and which the export could never have produced a row of.
 		for _, each := range []struct{ list, file, query string }{

@@ -109,7 +109,7 @@ export function Compare() {
             <h3>Open findings by release</h3>
           </header>
           <Across releases={releases.data?.items ?? []} />
-          <p className="hint">Every open finding at each build, before any triage line.</p>
+          <p className="hint">Every open finding at each build, before any minimum severity.</p>
         </div>
       )}
 

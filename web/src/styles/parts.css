@@ -141,10 +141,10 @@ td.rowacts > :last-child {
   margin-right: 0;
 }
 
-/* The triage line, which is the widest word in the catalog table and the one
-   the table squeezes first. Narrower than its longest option it reads as a
-   different word — "deploy" where the value is the deployment's own line. */
-select.triageline {
+/* The minimum severity, which is the widest word in the catalog table and the
+   one the table squeezes first. Narrower than its longest option it reads as a
+   different word — "deploy" where the value is the deployment's own. */
+select.minimumseverity {
   min-width: 13ch;
 }
 

@@ -424,7 +424,7 @@ rather than naming the product itself.
 | The age is the finding's own (REQ-60) | Not the year in the issue identifier. A 2019 CVE that first appeared last week read as six years old, and how long this has been open *here* — the age a deadline relates to — was shown nowhere. The row says "open 12d" |
 | A deadline is on the row, with its reason where there is none (REQ-33) | The date while it is far off, days left as it approaches, days over once it has passed. There are exactly two reasons for having none, so a blank would mean two intended things at once |
 | A finding says whether anybody who packages it confirmed it (REQ-13) | A row reached by comparing a published identifier against an upstream version range is marked "not confirmed", and the filters can narrow to those |
-| A triage line is announced where it applies, never silently | The list says so and says how many it is not showing |
+| A minimum severity is announced where it applies, never silently | The list says so and says how many it is not showing |
 | Narrow screens get cards, not a table that scrolls sideways (REQ-55) | |
 
 One CVE at three binaries is one piece of work, and the row says so. A third of
@@ -1345,7 +1345,7 @@ table. What the settings are and how they are checked is `DESIGN-analysis.md`
 The product page names every declared build with what is open, overdue,
 exploited, undecided and agreed in each, and when each was last scanned.
 Without it "how is SONiC doing" is five requests and a spreadsheet, because the
-products table is an administration surface — a triage line in a select, an
+products table is an administration surface — a minimum severity in a select, an
 end-of-support date in an input — which is a different job from reading how
 something is going.
 
@@ -1538,7 +1538,7 @@ running out with every movement of an embargo on it, disclosure included.
 | **The window it opens on is this deployment's own embargo length** | It opened on thirty days against the ninety-day policy that ships, so a deployment with five embargoes running drew an empty screen — which reads as "nothing is coming". The server answers over its own window where the caller names none, and the picker's first option says that is what it is doing |
 | The screen says what a date arriving means | The answer is counter-intuitive: nothing has been published, and the row is waiting for somebody to say what happens. It also says what moving the date will do before it is asked for |
 | Agreeing to a movement sits on the review queue | Beside the ratings that wait there for the same reason: both are a second person's turn, and a queue holding one kind and not the other is one somebody has to remember to look past. The card names the act, because an embargo ending later, one ending sooner and an issue made public for good are different things to agree to, and a disclosure says it cannot be undone |
-| A waiting rating names its product, on the card and in every sentence about what agreeing does | A rating belongs to one product and two products may rate one issue differently (REQ-29), so a card reading only "CVE-… low" is a word an approver cannot act on. What they are agreeing to is a deadline and a triage line in one named place |
+| A waiting rating names its product, on the card and in every sentence about what agreeing does | A rating belongs to one product and two products may rate one issue differently (REQ-29), so a card reading only "CVE-… low" is a word an approver cannot act on. What they are agreeing to is a deadline and a minimum severity in one named place |
 | A notice arrives at a lead time somebody sets (REQ-38), inside the application rather than by mail | A screen alone surfaces nothing to the person who needs it — an approver who touches disclosure a few times a year has no reason to open it — and a movement nobody can agree to in time is an approval in name only |
 
 ### The advisory
@@ -1928,7 +1928,7 @@ no visibility, since a person only ever sees products they hold a role on.
 | A date written to the server is written on Save | A date box fires a change for each segment typed, so a write per change records partial years, each with a trail row. A tag's release date and an end of support both hold the date until Save |
 | An inherited end of support opens empty, and stating the same date is a change | Following a date and stating it differ: a release that stated it keeps it when the product's moves |
 | A setting whose value is one of a few words is a select, not a text box | A free field invites a value the server then refuses, and for a switch it invites "true", "yes" and "1", none of which are what it takes |
-| The server takes a word without regard to capitals or surrounding spaces, and stores it as its list spells it | A word is typed by whoever calls the API. The deployment's triage floor and a product's own take `High` alike |
+| The server takes a word without regard to capitals or surrounding spaces, and stores it as its list spells it | A word is typed by whoever calls the API. The deployment's minimum severity and a product's own take `High` alike |
 | A setting nobody has set is composed like one that is set | Nothing to read is not a value the composer refuses. The embargo periods arrive with no value at all, and they fell to the plain box kept for a duration this cannot say — which is the one control that cannot ask whether a typed 90 means hours, days or weeks. An empty composer opens on days, because a period nobody has set here is an embargo and an embargo is said in days |
 | What a new line inherits is on the SBOM tab of Uploads | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already, how many are past their date and how many cover nothing here, and offers the rest as a list to tick. A promised upgrade that moved is counted on a line of its own that says to plan it again from the component. Only two of the six groups are questions, and the screen says which |
 | What was recorded here is a filter | A flaw somebody entered is the only kind a person may close by hand (REQ-19), and the screen that records one is where "is this already filed" gets asked. Offered on the list and linked from the recording screen, with the line off, because the question is what exists rather than what is worth an afternoon |

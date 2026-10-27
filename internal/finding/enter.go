@@ -381,7 +381,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// transaction for the refusal — a request is authorized before a name
 		// in it is resolved, so that read has to stay — and then used inside
 		// to mint the identifier, to name the product in it, and to read the
-		// triage floor. A retry runs against a database where a stream may
+		// minimum severity. A retry runs against a database where a stream may
 		// have been re-pointed, and the identifier would have been minted
 		// from a product that is gone, under an authorization taken against
 		// it. Refused rather than guessed at, the way widening a flaw's build
@@ -431,7 +431,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
-		floor, err := FloorFor(ctx, tx, productID)
+		floor, err := MinimumSeverityFor(ctx, tx, productID)
 		if err != nil {
 			return err
 		}

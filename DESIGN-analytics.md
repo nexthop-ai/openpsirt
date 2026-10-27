@@ -104,7 +104,7 @@ is an issue, or an issue at a component, and one issue sits at many occurrences,
 so the
 findings are grouped on their own columns first and the issue, its rating and
 the catalog's names are joined to the groups. Every narrowing — what the reader
-may see, the selection, the line — is a condition on an occurrence and applies before
+may see, the selection, the minimum severity — is a condition on an occurrence and applies before
 the grouping.
 
 | Report | Grouped to | Measured on 367,577 open occurrences, PostgreSQL on one CPU |
@@ -136,7 +136,7 @@ one report to another carries the same two parameters.
 | A period that ends before it starts is refused, and so is one that holds no days | A report answering zero for either is indistinguishable from a quarter in which nothing happened. Two refusals, because the end is not itself in the period: naming one day twice asks for no days rather than for a day |
 | Every report says back the period it covered, with the end resolved | A figure read apart from its window is a number nobody can check, and a start with no end answered with nothing over figures that ran to now. An unstated *start* is the beginning and says so by being absent |
 | A default window belongs to the report, and each says which in its own words | They differ — thirty days, ninety, or the whole of it — and one shared parameter cannot carry three answers |
-| **What is open is always now** | Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable — the same reason the register states current state with no `as_of`. A period bounds what closed in it |
+| **What is open is always now** | Deadlines are recomputed as the policy moves and dropped below the minimum severity and past end of life, so what stood open on a date gone by is not recoverable — the same reason the register states current state with no `as_of`. A period bounds what closed in it |
 | The rate asked for no period is the lifetime figure | It is what that report has always answered, and a default window would quietly change what the number means for everybody reading it |
 | The change log takes no default window | A record read with one answers about the last stretch while looking like it answers about everything, which is the reading an audit must not be given |
 | **A trend is stepped, so its window is a count of steps rather than a period** | It is the one report whose answer is a series: a step is a week, and what is asked for is how many of them. Two dates cannot say "in steps of a week" and a number of days cannot say where a step ends, so the shape above does not fit and is not pretended to |
@@ -252,7 +252,7 @@ but nobody edits the ranking and people do edit deadlines.
 
 Per severity: closed within the deadline against closed in total, and open past
 the deadline against open in total. The inputs are stored, because a closed row
-keeps its deadline; only open rows lose one at end-of-life or below the floor.
+keeps its deadline; only open rows lose one at end-of-life or below the minimum severity.
 
 | Rule | Reason |
 |---|---|
@@ -285,8 +285,8 @@ of a build pipeline.
 | It is read through the findings list's own reader, with the same line | So the list it opens is the list it counts |
 | The link under the count opens the list without its own defaults | The list keeps planned work, tags and releases past end of life out unless asked, and the count takes none of those out. Opened with them it shows fewer rows than the number it sits under, and none at all on a branch past end of life |
 
-Counted as issues at components, at or above the deployment's line, with the line
-named beside the number (REQ-30).
+Counted as issues at components, at or above the deployment's minimum severity,
+with it named beside the number (REQ-30).
 
 ## Holder workload
 
@@ -470,7 +470,7 @@ deadline, and whether the deadline was met.
 | Rule | Reason |
 |---|---|
 | One row per issue and occurrence, whatever else is true of it | The agreement is read as a scalar rather than joined, because nothing makes an approval unique per decision — a second approver adds a row, and a join multiplied the finding. The page then held fewer rows than its total said, and because paging is by offset every page after that skipped one |
-| It states no triage line, because it applies none | Everything in the build is here, decided or not, which is the basis on which an auditor can rely on it. A file stating it has been taken above a line where it has not is worse than silence |
+| It states no minimum severity, because it applies none | Everything in the build is here, decided or not, which is the basis on which an auditor can rely on it. A file stating it has been taken above a minimum severity where it has not is worse than silence |
 | Everything is joined outward from the finding and joined left | An occurrence nobody has decided about is the row this exists to show. Closed rows are included, and whether a deadline was met is answerable only for something that closed |
 | A decision that lapsed is part of the record, and a superseded one is not | Who proposed and who approved a lapsed decision is what a compliance reader comes for, and the findings list calls the same occurrence lapsed |
 | A row reports the one decision on the record at its occurrence: the live one covering the finding's versions, or where none does, the latest lapsed one | Decision occurrence rows are never deleted, so an occurrence carries every withdrawn and lapsed decision ever made at it, and one row per occurrence is the rule above. A live decision covers an occurrence at the versions it was keyed on and no other, which is the findings list's own test; a build shipping the occurrence at other versions reads undecided on both surfaces. Where two live decisions cover one finding, one keyed on its versions and a correction covering the occurrence at any version, the row names the one the finding's screen names: the correction in force, otherwise the older |
@@ -481,7 +481,7 @@ deadline, and whether the deadline was met.
 | It names what it was measured with: the upload, the inventory in it, the run, the scanner, the vulnerability data and the CVE record snapshot | The chain an auditor follows is shipped artifact, inventory, run, scanner and database, disposition. The register is the last link, and naming none of the first four leaves what it says standing on nothing a reader can check — while all of them are recorded |
 | The inventory is a link, not a hash | A hash nobody can fetch the bytes for is a claim rather than evidence. A tagged release keeps its documents and a branch build does not, so an inventory that was let go says so instead of reading as an omission |
 | It narrows by what stands, by outcome, by component, by issue, and to one side of the history | An auditor asks "what has nobody decided" and "show me the dismissals", which are ways of reading the same complete answer rather than different questions. The count is of the narrowed list, because counted over the build a narrowed page says how many rows the build holds and every later offset is a page of a different list |
-| It still applies no triage line, whatever else is asked of it | That is what it is for, and a filter that could hide part of the build would make it the findings list at a second address |
+| It still applies no minimum severity, whatever else is asked of it | That is what it is for, and a filter that could hide part of the build would make it the findings list at a second address |
 | A state word it does not recognize keeps nothing | A filter that silently widens is how a register reads as complete about rows it left out. The route's own vocabulary refuses one at the door; this is the guard behind it |
 | Provenance missing never fails the report, and provenance unreadable does | A build nothing has finished scanning is the one somebody is most likely asking about, so no upload means no block and no finished run means a block without one. A read that failed is a fault: an absent block would say nothing was uploaded |
 
@@ -489,7 +489,7 @@ Current state, with no `as_of`. Reconstructing the view as of a past date is
 refused on two grounds. Each row carries the timestamps that evidence the thing
 being checked — that a decision predates the ship date. And the reconstruction
 would be least trustworthy on the column it would be checked hardest on:
-deadlines are recomputed when the policy moves and removed below the floor and
+deadlines are recomputed when the policy moves and removed below the minimum severity and
 past end-of-life, so a deadline "as of" a date is not recoverable.
 
 Findings and decisions filter on when things happened instead: opened after,
@@ -890,7 +890,7 @@ stops is one somebody reads as whole.
 | The open leads a decision waits on are held, and the leads open only in releases past their end of life are not | The file's findings rows hold a finding a decision waits on, and the list leaves releases past their end of life out unless asked, which narrows the leads out |
 | The cross-product file holds each product's queue in turn, by product name | Each product's queue is its own read, under its own visibility |
 | A findings file narrowed by any filter but the order holds no lead, and states that it holds none | A lead carries no rating, component, upstream, decision or deadline, so every filter asks what a lead does not carry. A filter added to the list narrows the leads out without anything naming it |
-| Three filters keep the leads: the floor widened, work no promised upgrade covers, and branches in support | Every lead answers each the same way. The last is what the list reads when no release question is asked, and the screen writes all three into the address it exports |
+| Three filters keep the leads: the minimum severity widened, work no promised upgrade covers, and branches in support | Every lead answers each the same way. The last is what the list reads when no release question is asked, and the screen writes all three into the address it exports |
 | A file states which leads it holds | Without it, an empty lead list in a file reads as a product with no leads |
 | A lead row is a row of the findings file's columns. The rule is the issue, and the opened date, branch or tag and variant are the newest build's, as the queue lists it. The columns after the variant are a lead's: whether the row is a lead, the path, line, function and message. Every other column is empty on a lead, and the lead columns are empty on every other row | One header keeps a file one table, and a reader filters the leads by one column. A lead has no rating, component or decision to fill the rest with |
 | The disposition register holds no lead | It is the Register consumer's, which states what a build ships beside its VEX document (`DESIGN-kinds.md` § Consumers) |
@@ -911,7 +911,7 @@ reach the filesystem and restart the process.
 | The reviewed issue limit | How many issues one answer about many issues may cover where a second person has to agree |
 | The re-confirmation issue limit | How many issues one re-confirmation may cover where nobody has to agree again |
 | The write ceiling | How many findings one answer about many issues, or one flaw recorded here, may write |
-| The triage floor | The severity below which findings are recorded and counted but kept off the working list. A product may state its own |
+| The minimum severity | The severity below which findings are recorded and counted but kept off the working list. A product may state its own |
 | Quiet after | How long a build may go without a scan before it is reported as quiet |
 | Scan every | How often everything tracked is scanned again |
 | Upstream currency | Whether to ask public package indexes for the newest version. Off unless turned on, and what goes out is a component's name. Names this deployment calls its own are held back, and the report of what has no upstream answer says which |
@@ -928,13 +928,13 @@ the shipped default where a setting is unset or unparseable, so a stored value
 nobody can read is a policy that quietly stopped applying. The value is checked
 before it is written, against the kind the name is: a duration for the windows,
 threshold and lifetimes; a whole number above zero for the four limits; a
-severity word for the triage floor; on or off for upstream currency.
+severity word for the minimum severity; on or off for upstream currency.
 
 | Rule | Reason |
 |---|---|
 | Zero and negative are refused | Every reader treats them as unset, so storing one produces a setting that looks set and does nothing |
 | Only known names may be set | Storing an unknown one creates a setting nothing reads |
-| A triage line that is not one of the severity words reads as no line | The word admits nothing and narrows nothing, so a line outside the vocabulary was displayed everywhere as in force while every query let everything through. A line that cannot be enforced says so |
+| A minimum severity that is not one of the severity words reads as none | The word admits nothing and narrows nothing, so a minimum severity outside the vocabulary would be displayed everywhere as in force while every query let everything through. One that cannot be enforced says so |
 | A failure to *read* a setting is not "unset" | Every caller has a default, so a database that could not answer would silently swap the deployment's configuration for the shipped one, including the threshold deciding which deferrals need a second person. That is reported |
 | Everything offered is read | The session lifetime was offered here while sign-in took its value from the environment and never looked. The order is the administrator's setting, then what the process was started with, then the built-in default |
 

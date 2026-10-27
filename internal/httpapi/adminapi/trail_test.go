@@ -84,8 +84,8 @@ type trailedAct struct {
 var administrativeActs = []trailedAct{
 	{
 		id: "set-setting", what: "a setting", method: http.MethodPut,
-		path: "/v1/settings/triage.floor", body: `{"value":"medium"}`,
-		kind: "setting", about: "triage.floor",
+		path: "/v1/settings/triage.minimum-severity", body: `{"value":"medium"}`,
+		kind: "setting", about: "triage.minimum-severity",
 	},
 	{
 		id: "record-person", what: "an account", method: http.MethodPost,
@@ -163,9 +163,9 @@ var administrativeActs = []trailedAct{
 		kind: "credential", about: "reader · theirs",
 	},
 	{
-		id: "set-product-triage-floor", what: "the line a product triages at",
+		id: "set-product-minimum-severity", what: "the line a product triages at",
 		method: http.MethodPut, path: "/v1/products/mine/minimum-severity",
-		body: `{"floor":"high"}`, kind: "setting", about: "triage floor of mine",
+		body: `{"minimum_severity":"high"}`, kind: "setting", about: "minimum severity of mine",
 	},
 	{
 		id: "set-product-publication", what: "whether a product's documents are published",
@@ -795,7 +795,7 @@ func TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot(t *testing.T) {
 // row back.
 //
 // Three of the things here silently rewrite what this tool reports — the
-// deadline windows, the triage floor, and a support date — and none of them
+// deadline windows, the minimum severity, and a support date — and none of them
 // recorded who moved it. For a tool whose whole output is evidence, that is
 // the evidence being movable with nothing saying that anybody moved it.
 //
@@ -859,7 +859,7 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 
 		// The prior value is kept, because "who raised the floor to
 		// critical" is half the question and the other half is what it was.
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"critical"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
 		}
@@ -942,13 +942,13 @@ func TestTheTrailIsAnAdministratorsToRead(t *testing.T) {
 // way to make the record fail without making the change fail first.
 func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"medium"}`); got.Code >= 300 {
 			t.Fatalf("setting the floor answered %d: %s", got.Code, got.Body.String())
 		}
 
 		restore := dbtest.Hide(t, r.DB, "admin_change")
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"critical"}`)
 		restore()
 
@@ -964,7 +964,7 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "admin", "/v1/settings", &offered)
 		for _, item := range offered.Items {
-			if item.Name != "triage.floor" {
+			if item.Name != "triage.minimum-severity" {
 				continue
 			}
 			if item.Value != "medium" {
@@ -973,7 +973,7 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 			}
 			return
 		}
-		t.Error("the triage floor is not among the settings offered")
+		t.Error("the minimum severity is not among the settings offered")
 	})
 }
 
@@ -983,7 +983,7 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 // and a label in its place matches nobody.
 func TestTheTrailNamesWhoChangedSomethingByTheIdentityTheySignInUnder(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"high"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
 		}
@@ -1067,7 +1067,7 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 		for _, act := range []struct {
 			method, path, body string
 		}{
-			{http.MethodPut, "/v1/settings/triage.floor", `{"value":"high"}`},
+			{http.MethodPut, "/v1/settings/triage.minimum-severity", `{"value":"high"}`},
 			{http.MethodPost, "/v1/people", `{"identity":"someone-else"}`},
 		} {
 			got := httpapitest.AsPerson(t, r, "auditor", act.method, act.path, act.body)
@@ -1234,7 +1234,7 @@ func TestACaseIsRecordedByTheNamesItResolvedTo(t *testing.T) {
 // running server without racing every goroutine that reads it.
 func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"high"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
 		}

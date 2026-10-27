@@ -134,7 +134,7 @@ func TestTheListAcrossProductsAnswersOnlyForWhatIsHeld(t *testing.T) {
 
 // Each product's own line applies, because a line is a claim about what is
 // worth an afternoon here.
-func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
+func TestTheListAcrossProductsKeepsEachProductsMinimumSeverity(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
@@ -161,7 +161,7 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 
 		// The second product decides low findings are not worth triaging. The
 		// first says nothing, so its row stays.
-		if err := catalog.NewStore(f.db.DB).SetTriageFloor(t.Context(), other, "high"); err != nil {
+		if err := catalog.NewStore(f.db.DB).SetMinimumSeverity(t.Context(), other, "high"); err != nil {
 			t.Fatal(err)
 		}
 		after, afterTotal, err := f.store.Anywhere(t.Context(), both, 50, 0, finding.Filter{})
@@ -180,7 +180,7 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 		// A request for what is below the line brings it back, so the row is
 		// hidden rather than gone.
 		below, belowTotal, err := f.store.Anywhere(t.Context(), both, 50, 0,
-			finding.Filter{BelowFloor: true})
+			finding.Filter{BelowMinimumSeverity: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -195,7 +195,7 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 // one that states a lower line of its own. The product's line is a floor the
 // caller cannot go beneath, and the caller's raise is a second floor above it.
 // Being exploited passes both, because no line sets that aside.
-func TestASeverityAskedAcrossProductsRaisesAProductsOwnLowerLine(t *testing.T) {
+func TestASeverityAskedAcrossProductsRaisesAProductsOwnLowerMinimumSeverity(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		used := finding.Reported{
@@ -209,12 +209,12 @@ func TestASeverityAskedAcrossProductsRaisesAProductsOwnLowerLine(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := catalog.NewStore(f.db.DB).SetTriageFloor(t.Context(), f.productID, "low"); err != nil {
+		if err := catalog.NewStore(f.db.DB).SetMinimumSeverity(t.Context(), f.productID, "low"); err != nil {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
 		rows, total, err := f.store.Anywhere(t.Context(), who, 50, 0,
-			finding.Filter{Floor: finding.Floor{Word: "high"}})
+			finding.Filter{MinimumSeverity: finding.MinimumSeverity{Word: "high"}})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -416,7 +416,7 @@ function Ruled() {
 // The changes somebody made to how this deployment works.
 //
 // Beside the decisions rather than on a screen of its own, because it is the same
-// question one layer up: the deadline windows, the triage floor and a support
+// question one layer up: the deadline windows, the minimum severity and a support
 // date each silently rewrite what the decisions above say, and reading the
 // decisions without being able to see who moved the ground under them is
 // reading half of it.

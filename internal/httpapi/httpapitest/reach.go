@@ -43,7 +43,7 @@ import (
 // about who may do what.
 func DeclaredBody(method, path, name string) io.Reader {
 	if method == http.MethodPut && strings.HasSuffix(path, "/minimum-severity") {
-		return strings.NewReader(`{"floor": "high"}`)
+		return strings.NewReader(`{"minimum_severity": "high"}`)
 	}
 	if method == http.MethodPut && strings.HasSuffix(path, "/pair-thresholds") {
 		return strings.NewReader(`{"share": 90, "approvers": 4}`)

@@ -43,9 +43,9 @@ type ReadinessBody struct {
 	// never dressed up as the first.
 	Shipped *BuildCountsBody `json:"shipped,omitempty"`
 	Why     string           `json:"why,omitempty" doc:"The missing half, where there is nothing to compare against, or that nothing has been scanned here yet"`
-	// Floor is the line both counts are at or above, named so a shared number
+	// MinimumSeverity is the line both counts are at or above, named so a shared number
 	// says whose it is.
-	Floor string `json:"floor,omitempty" doc:"The least severity counted, or empty where everything is"`
+	MinimumSeverity string `json:"minimum_severity,omitempty" doc:"The least severity counted, or empty where everything is"`
 	// Blocking is the work behind the count, worst first: what nobody has
 	// agreed to ship with. A number with no list behind it is a number
 	// somebody has to go and assemble by hand before they can do anything
@@ -106,8 +106,8 @@ func registerReadiness(api huma.API, in core.Deps) {
 			"nothing has scanned, declared and never built or with every upload refused, " +
 			"answers with zeroes, no `last_scanned_at`, and `why` " +
 			"saying nothing has been scanned there yet.\n\n" +
-			"Counted as issues at components at or above the deployment's line, which `floor` " +
-			"names.\n\n" +
+			"Counted as issues at components at or above the deployment's minimum severity, which " +
+			"`minimum_severity` names.\n\n" +
 			"`blocking` is the worst few of what the count is made of: the work nobody has agreed to ship " +
 			"with, worst first, read through the findings list's own reader with the same " +
 			"line — so the list it opens is the list it counts. Anything agreed is absent, " +
@@ -137,8 +137,8 @@ func registerReadiness(api huma.API, in core.Deps) {
 		out := &struct{ Body ReadinessBody }{}
 		out.Body.Now = buildCounts(ready.Now)
 		out.Body.Why = ready.Why
-		if ready.Floor.Hides() {
-			out.Body.Floor = ready.Floor.Word
+		if ready.MinimumSeverity.Hides() {
+			out.Body.MinimumSeverity = ready.MinimumSeverity.Word
 		}
 		if ready.Shipped != nil {
 			shipped := buildCounts(*ready.Shipped)
@@ -153,7 +153,7 @@ func registerReadiness(api huma.API, in core.Deps) {
 		}
 		groups, blockers, err := finding.NewStore(in.DB.DB).Groups(ctx, subject, scope,
 			blocking, 0, finding.Filter{
-				Floor: ready.Floor,
+				MinimumSeverity: ready.MinimumSeverity,
 				// Everything nobody has agreed to. An agreed row is a
 				// decision somebody made to ship with it, which is the
 				// opposite of a blocker.

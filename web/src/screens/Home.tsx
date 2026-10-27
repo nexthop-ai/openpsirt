@@ -250,7 +250,7 @@ function Readiness({ at }: { at: Scoped }) {
 
   const now = ready.data?.now;
   const shipped = ready.data?.shipped;
-  const floor = ready.data?.floor;
+  const minimum = ready.data?.minimum_severity;
   const blocking = ready.data?.blocking ?? [];
 
   return (
@@ -295,7 +295,7 @@ function Readiness({ at }: { at: Scoped }) {
               shipped.critical ?? 0,
               shipped.stream_name || shipped.stream || "",
             )}
-            {floor ? ` Counted at ${floor} and above.` : ""}
+            {minimum ? ` Counted at ${minimum} and above.` : ""}
           </p>
         </>
       ) : (

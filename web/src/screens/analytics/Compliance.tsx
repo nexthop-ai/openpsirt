@@ -171,7 +171,7 @@ export function Compliance() {
             </p>
             <ul className="files">
               <li>
-                <b>Below the line this product triages at.</b> Recorded and counted, but not worked
+                <b>Below this product's minimum severity.</b> Recorded and counted, but not worked
                 to a date.
               </li>
               <li>

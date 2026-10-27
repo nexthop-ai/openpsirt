@@ -18,7 +18,7 @@ func TestARowCarriesItsOwnAgeAndSaysWhyItHasNoDeadline(t *testing.T) {
 	// on the one screen whose purpose is noticing what is running out.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if err := f.setting(t, "triage.floor", "medium"); err != nil {
+		if err := f.setting(t, "triage.minimum-severity", "medium"); err != nil {
 			t.Fatal(err)
 		}
 		run := f.run(t)
@@ -34,7 +34,7 @@ func TestARowCarriesItsOwnAgeAndSaysWhyItHasNoDeadline(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		// Below the line as well, because what it says about itself is the
 		// point and it is out of the list by default.
-		line := finding.Filter{Floor: finding.Floor{Word: "medium"}, BelowFloor: true}
+		line := finding.Filter{MinimumSeverity: finding.MinimumSeverity{Word: "medium"}, BelowMinimumSeverity: true}
 
 		rows := func(t *testing.T) map[string]finding.Group {
 			t.Helper()
@@ -66,7 +66,7 @@ func TestARowCarriesItsOwnAgeAndSaysWhyItHasNoDeadline(t *testing.T) {
 		if below.DueAt != nil {
 			t.Error("something below the line is on a clock")
 		}
-		if below.NoDeadline != finding.BelowTheLine {
+		if below.NoDeadline != finding.BelowMinimumSeverity {
 			t.Errorf("a finding below the line says %q, want it to say the line",
 				below.NoDeadline)
 		}
@@ -93,10 +93,10 @@ func TestARowCarriesItsOwnAgeAndSaysWhyItHasNoDeadline(t *testing.T) {
 // published high as low, under a medium line, took it off the clock by its own
 // rating, and a reader told the release is out of support would be told
 // something false.
-func TestAFindingReRatedBelowTheLineSaysSoOnItsOwnScreen(t *testing.T) {
+func TestAFindingReRatedBelowTheMinimumSeveritySaysSoOnItsOwnScreen(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if err := f.setting(t, "triage.floor", "medium"); err != nil {
+		if err := f.setting(t, "triage.minimum-severity", "medium"); err != nil {
 			t.Fatal(err)
 		}
 		loud := found("CVE-2026-LOUD", teamd)
@@ -110,11 +110,11 @@ func TestAFindingReRatedBelowTheLineSaysSoOnItsOwnScreen(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicTriage)
 		listed, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{Floor: finding.Floor{Word: "medium"}, BelowFloor: true})
+			finding.Filter{MinimumSeverity: finding.MinimumSeverity{Word: "medium"}, BelowMinimumSeverity: true})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(listed) != 1 || listed[0].NoDeadline != finding.BelowTheLine {
+		if len(listed) != 1 || listed[0].NoDeadline != finding.BelowMinimumSeverity {
 			t.Fatalf("the list reads %+v, want one row below the line", listed)
 		}
 		open := f.open(t)

@@ -554,6 +554,7 @@ release's declarations are written against the new names.
 | `place_identity`, on `decision_occurrence` and `finding` | `occurrence_identity` |
 | `exploited_here_id`, on `incident_fix` and `told_outside` | `incident_id` |
 | `urgency_exploited_here`, on `finding` | `urgency_incident` |
+| `triage_floor`, on `product` | `minimum_severity` |
 
 Every index and constraint named after a renamed table or column is renamed
 with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`,
@@ -587,6 +588,7 @@ its own after the renames.
 | A failed job's `state` on `job` | `dead` | `failed` |
 | A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
 | The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
+| The minimum severity's `name` on `application_setting` | `triage.floor` | `triage.minimum-severity` |
 
 | Rule | Why |
 |---|---|
@@ -594,9 +596,9 @@ its own after the renames.
 | PostgreSQL and SQLite rewrite inside the upgrade's one transaction | A failure leaves every value as it was |
 | A kept filter is rewritten in Go, one part of its query string at a time | A word matched in SQL also matches inside a value. Every other part stays byte for byte, because the list recognizes a kept filter as open by comparing addresses |
 | Only a link at the v0.10.0 address of a decision's row is rewritten | v0.11.0 gives that address to the decision, so the link would open another record. A link to `/claims/{id}` is forwarded by the interface |
-| The setting's row moves only where none is under the new name | A row under the new name outranks the former one |
-| The setting is read under its former name while the new one is unset, and each start logs a warning naming both | A v0.10.0 binary still running after the upgrade writes the former name |
-| Changing the setting replaces the former row and removes it in the same transaction, and the trail records the former value as what was replaced | The former name is refused at the API, so this is the one way to clear it and end the warning |
+| A setting's row moves only where none is under the new name | A row under the new name outranks the former one |
+| A setting is read under its former name while the new one is unset, and each start logs a warning naming both | A v0.10.0 binary still running after the upgrade writes the former name |
+| Changing a setting replaces the former row and removes it in the same transaction, and the trail records the former value as what was replaced | The former name is refused at the API, so this is the one way to clear it and end the warning |
 | A waiting condition's and a response window condition's identity keep the words v0.10.0 hashed | An open condition is matched by that hash, and a new one would notify everybody again |
 | The trail of administrative changes keeps the former setting name, and what each change was about as written | It records a change under the name the setting had. Its kind is rewritten, because the API filters on and returns it from a fixed list |
 | A decision's record of how its set was chosen is kept as written | It records what somebody asked for |
@@ -1207,7 +1209,7 @@ read is as stale as the first.
 
 The damage is in the record rather than in the value: the row ends up holding
 what the last writer wrote, and the trail says that writer replaced something
-nothing ever held. That is the settings trail, where "who raised the floor to
+nothing ever held. That is the settings trail, where "who raised the minimum severity to
 critical, and from what" is the question being asked of it.
 
 | Write | What it matches on beside the key |

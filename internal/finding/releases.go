@@ -22,7 +22,7 @@ type Release struct {
 	Kind    string
 	Variant string
 	// Open is what the findings list would show for this build, before any
-	// triage line: one per issue at a component, however many occurrences it sits
+	// minimum severity: one per issue at a component, however many occurrences it sits
 	// at there.
 	//
 	// Not a row count. Rows are occurrences, and a component reached twenty

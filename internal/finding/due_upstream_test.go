@@ -113,7 +113,7 @@ func TestRewritingTheWindowsCountsFromWhenTheFixArrived(t *testing.T) {
 func TestRewritingTheWindowsKeepsAnIssueAttackedHereOnTheClock(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if err := catalog.NewStore(f.db.DB).SetTriageFloor(t.Context(), f.productID, "medium"); err != nil {
+		if err := catalog.NewStore(f.db.DB).SetMinimumSeverity(t.Context(), f.productID, "medium"); err != nil {
 			t.Fatal(err)
 		}
 		low := finding.Reported{

@@ -94,7 +94,7 @@ func TestAPromiseInsideTheDeadlineTheFindingHasStandsOnItsOwn(t *testing.T) {
 
 // With nothing the act covers carrying a deadline, there is no date the
 // promise can be inside, so the exemption has nothing to measure against and a
-// second person agrees. A product below its own triage line was the one place
+// second person agrees. A product below its own minimum severity was the one place
 // a promise could hide a finding for years on one signature.
 func TestAPromiseCoveringWorkWithNoDeadlineIsGated(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -105,7 +105,7 @@ func TestAPromiseCoveringWorkWithNoDeadlineIsGated(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := catalog.NewStore(r.DB.DB).SetTriageFloor(t.Context(),
+		if err := catalog.NewStore(r.DB.DB).SetMinimumSeverity(t.Context(),
 			located.ProductID, "critical"); err != nil {
 			t.Fatal(err)
 		}

@@ -94,11 +94,12 @@ const SAMPLE = 8;
 // The reason a finding carries no deadline, in words a reader can act on.
 //
 // Each says what to do with the row rather than naming the rule: somebody
-// reading this is deciding whether to look further, and "below the line" on
-// its own is a term they would have to go and learn.
+// reading this is deciding whether to look further, and a bare reason code is
+// a term they would have to go and learn.
 const NO_DEADLINE: Record<NonNullable<Body<"FindingBody">["no_deadline"]>, string> = {
   "not-rated": "nobody has rated it yet. The clock starts when somebody does.",
-  "below-the-line": "below what this product triages at. Recorded and counted; nothing is late.",
+  "below-minimum-severity":
+    "below what this product triages at. Recorded and counted; nothing is late.",
   "nothing-to-take":
     "upstream has released no fix, or has declined to, so there is no version that would close it.",
   "out-of-support": "the release is past its end of life, so nothing here will be fixed.",

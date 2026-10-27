@@ -628,8 +628,8 @@ what a product's people work on.
 | Taking one back | Triage on the product the rating belongs to |
 | Agreeing to a milder one | That, or the approver capability, on the product the rating belongs to |
 
-A rating sets the deadline and can push a finding below the line that product
-triages at. Asked anywhere, somebody holding one product moves both in a
+A rating sets the deadline and can push a finding below that product's minimum
+severity. Asked anywhere, somebody holding one product moves both in a
 product they cannot see; held deployment-wide, one live rating stands for every
 product and a second team is refused any rating of their own.
 
@@ -1236,13 +1236,13 @@ prevented in the browser; losing the *place* is prevented here.
 
 An administrative change is recorded — who, what, before, after, and when
 (REQ-22): settings, role grants and withdrawals, routing rules, end-of-life
-dates, the triage floor, credentials, accounts, teams, who is on a case, and
+dates, the minimum severity, credentials, accounts, teams, who is on a case, and
 the names an issue answers to. An administrator reads it beside the triage
 record, because it is the same question one layer up.
 
 | Rule | Reason |
 |---|---|
-| Both values are kept, and absent is not empty | "Who raised the floor to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
+| Both values are kept, and absent is not empty | "Who raised the minimum severity to critical" is half of what somebody asks; the other half is what it was. A value nobody had set is an *absent* before rather than an empty one |
 | Recorded where the actor is known, which is the request | A setting write knows a name and a value and nothing about who is asking. The cost is that a new administrative route can forget, which is what the walk below exists for |
 | Every row names its actor: a person, configuration, a merge, or an upgrade | Configuration is the deployment's startup configuration. It names and stops naming the administrators in `OPENPSIRT_BOOTSTRAP_ADMINS`, adds and removes the group mappings in `OPENPSIRT_GROUP_ROLES`, and sets where roles come from to match, and records nothing else. A merge is a scan merging two issues its report named together, and records only a rating claim it withdrew or an incident it cleared, because another stood in its place in the same product (`DESIGN-findings.md` § Merged issues). An upgrade is the one to v0.5.0, which recorded only a key it withdrew because another key holds its folded name, or a token it withdrew because another of its owner's does. No migration this tree carries writes one. None is a person. A row by a person names the person |
 | Configuration records a name when it starts or stops naming somebody | Administration moved with nobody in the application having moved it. A start naming the same people as the last records nothing, because nothing moved |
@@ -1264,7 +1264,7 @@ that is neither.
 
 | | |
 |---|---|
-| **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
+| **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the minimum severity, destinations, who is on a case, and another name for an issue |
 | **Leaves none, deliberately** | A triage decision and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as editing a report, recording a message to or from its reporter, assigning it, or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because
@@ -1280,7 +1280,7 @@ recording nothing with the suite green — a group bound to administration among
 them.
 
 Three levers silently rewrite what this tool reports: changing the deadline policy
-recomputes every open finding's deadline, raising the triage floor removes
+recomputes every open finding's deadline, raising the minimum severity removes
 deadlines below it, and an end-of-life date removes them past it. For a tool
 whose entire output is evidence, that is the evidence itself being movable.
 

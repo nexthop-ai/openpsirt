@@ -84,15 +84,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// The line is applied per product below rather than from the filter's one
 	// word, so the filter's own is turned off — including its inverse, which
 	// would otherwise ask for what is beneath a line that is not in the query.
-	line := filter.Floor
-	filter.Floor = Floor{}
-	wasBelow := filter.BelowFloor
-	filter.BelowFloor = true
+	line := filter.MinimumSeverity
+	filter.MinimumSeverity = MinimumSeverity{}
+	wasBelow := filter.BelowMinimumSeverity
+	filter.BelowMinimumSeverity = true
 
 	// The deployment's line, which a product that states none inherits.
-	deployment := NoFloor
+	deployment := NoMinimumSeverity
 	if !wasBelow {
-		word, set, err := setting.NewStore(s.db).Get(ctx, setting.TriageFloor)
+		word, set, err := setting.NewStore(s.db).Get(ctx, setting.MinimumSeverity)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -411,7 +411,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// compared against. One word chosen for a page that spans
 			// products would answer for none of them, and neither would one
 			// rating.
-			Floor{Word: deployment, ProductID: head.ProductID})
+			MinimumSeverity{Word: deployment, ProductID: head.ProductID})
 		group.Product, group.ProductName = row.Product, row.ProductName
 		// One build of possibly several, so a row has somewhere to link to and
 		// an action has a build to name. What says there are others is the
@@ -436,4 +436,4 @@ var ratedAt = rankCase(rating.BandExpr, 0)
 //
 // Zero for anything that is not a band, which is what makes the sentinel for
 // "no line" compare below every rating.
-var lineAt = rankCase(`COALESCE(NULLIF("p"."triage_floor", ''), ?)`, 0)
+var lineAt = rankCase(`COALESCE(NULLIF("p"."minimum_severity", ''), ?)`, 0)

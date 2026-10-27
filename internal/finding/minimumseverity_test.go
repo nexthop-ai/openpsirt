@@ -13,7 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-func TestTheLineKeepsThingsOutOfTheListAndSaysHowMany(t *testing.T) {
+func TestTheMinimumSeverityKeepsThingsOutOfTheListAndSaysHowMany(t *testing.T) {
 	// Below the line a finding is still recorded and still counted — it
 	// leaves the working list, not the system — and the list says what it
 	// is keeping out rather than showing a smaller number with nothing
@@ -42,7 +42,7 @@ func TestTheLineKeepsThingsOutOfTheListAndSaysHowMany(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicTriage)
-		line := finding.Filter{Floor: finding.Floor{Word: "medium"}}
+		line := finding.Filter{MinimumSeverity: finding.MinimumSeverity{Word: "medium"}}
 
 		rows, total, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, line)
 		if err != nil {
@@ -75,7 +75,7 @@ func TestTheLineKeepsThingsOutOfTheListAndSaysHowMany(t *testing.T) {
 		// And asking for them brings them back rather than needing the line
 		// changed.
 		open := line
-		open.BelowFloor = true
+		open.BelowMinimumSeverity = true
 		_, all, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, open)
 		if err != nil {
 			t.Fatal(err)
@@ -86,12 +86,12 @@ func TestTheLineKeepsThingsOutOfTheListAndSaysHowMany(t *testing.T) {
 	})
 }
 
-func TestNothingBelowTheLineIsOnAClock(t *testing.T) {
+func TestNothingBelowTheMinimumSeverityIsOnAClock(t *testing.T) {
 	// A line says this is not work and a deadline says this is work and it
 	// is late; holding both means one of them is lying.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if err := f.setting(t, "triage.floor", "medium"); err != nil {
+		if err := f.setting(t, "triage.minimum-severity", "medium"); err != nil {
 			t.Fatal(err)
 		}
 		run := f.run(t)
@@ -113,7 +113,7 @@ func TestNothingBelowTheLineIsOnAClock(t *testing.T) {
 	})
 }
 
-func TestAProductsOwnLineIsWhatAppliesToIt(t *testing.T) {
+func TestAProductsOwnMinimumSeverityIsWhatAppliesToIt(t *testing.T) {
 	// the line a deployment triages at's second half. A single number for
 	// an estate is either too strict somewhere or too loose somewhere
 	// else, so a product may say something different — and what it says
@@ -125,7 +125,7 @@ func TestAProductsOwnLineIsWhatAppliesToIt(t *testing.T) {
 
 		// Nothing said anywhere: the line hides nothing, which is what a
 		// deployment starts with.
-		line, err := finding.FloorFor(ctx, f.db.DB, f.productID)
+		line, err := finding.MinimumSeverityFor(ctx, f.db.DB, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,10 +134,10 @@ func TestAProductsOwnLineIsWhatAppliesToIt(t *testing.T) {
 		}
 
 		// The deployment states one, and the product inherits it.
-		if _, _, err := settings.Change(ctx, setting.TriageFloor, "medium"); err != nil {
+		if _, _, err := settings.Change(ctx, setting.MinimumSeverity, "medium"); err != nil {
 			t.Fatal(err)
 		}
-		line, err = finding.FloorFor(ctx, f.db.DB, f.productID)
+		line, err = finding.MinimumSeverityFor(ctx, f.db.DB, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,10 +146,10 @@ func TestAProductsOwnLineIsWhatAppliesToIt(t *testing.T) {
 		}
 
 		// The product says something stricter, and that is what applies.
-		if err := products.SetTriageFloor(ctx, f.productID, "high"); err != nil {
+		if err := products.SetMinimumSeverity(ctx, f.productID, "high"); err != nil {
 			t.Fatal(err)
 		}
-		line, err = finding.FloorFor(ctx, f.db.DB, f.productID)
+		line, err = finding.MinimumSeverityFor(ctx, f.db.DB, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,10 +159,10 @@ func TestAProductsOwnLineIsWhatAppliesToIt(t *testing.T) {
 
 		// The deployment changes its mind and the product does not follow,
 		// because it has an opinion of its own.
-		if _, _, err := settings.Change(ctx, setting.TriageFloor, "low"); err != nil {
+		if _, _, err := settings.Change(ctx, setting.MinimumSeverity, "low"); err != nil {
 			t.Fatal(err)
 		}
-		line, err = finding.FloorFor(ctx, f.db.DB, f.productID)
+		line, err = finding.MinimumSeverityFor(ctx, f.db.DB, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -173,10 +173,10 @@ func TestAProductsOwnLineIsWhatAppliesToIt(t *testing.T) {
 		// Cleared, and it follows again — including where the deployment has
 		// moved since. Storing the deployment's word instead of clearing would
 		// have frozen it at whatever it was the day somebody looked.
-		if err := products.SetTriageFloor(ctx, f.productID, ""); err != nil {
+		if err := products.SetMinimumSeverity(ctx, f.productID, ""); err != nil {
 			t.Fatal(err)
 		}
-		line, err = finding.FloorFor(ctx, f.db.DB, f.productID)
+		line, err = finding.MinimumSeverityFor(ctx, f.db.DB, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,7 +186,7 @@ func TestAProductsOwnLineIsWhatAppliesToIt(t *testing.T) {
 	})
 }
 
-func TestOneProductsLineLeavesAnotherAlone(t *testing.T) {
+func TestOneProductsMinimumSeverityLeavesAnotherAlone(t *testing.T) {
 	// The reason it is per product at all: products differ in what they can
 	// afford to ignore, and a line stated on one must not quietly narrow what
 	// somebody sees on another.
@@ -194,15 +194,15 @@ func TestOneProductsLineLeavesAnotherAlone(t *testing.T) {
 		ctx := t.Context()
 		other := f.inAnotherProduct(t, "another-product")
 		products := catalog.NewStore(f.db.DB)
-		if err := products.SetTriageFloor(ctx, f.productID, "critical"); err != nil {
+		if err := products.SetMinimumSeverity(ctx, f.productID, "critical"); err != nil {
 			t.Fatal(err)
 		}
 
-		mine, err := finding.FloorFor(ctx, f.db.DB, f.productID)
+		mine, err := finding.MinimumSeverityFor(ctx, f.db.DB, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		theirs, err := finding.FloorFor(ctx, f.db.DB, f.productOf(t, other))
+		theirs, err := finding.MinimumSeverityFor(ctx, f.db.DB, f.productOf(t, other))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 	})
 }
 
-func TestALineNothingCanEnforceReadsAsNoLine(t *testing.T) {
+func TestAMinimumSeverityNothingCanEnforceReadsAsNone(t *testing.T) {
 	// A word outside the ordering admits nothing and narrows nothing, so the
 	// two halves disagreed: every screen said the product triaged at that
 	// line, and every query let everything through. Refused at the write, and
@@ -352,11 +352,11 @@ func TestALineNothingCanEnforceReadsAsNoLine(t *testing.T) {
 		ctx := t.Context()
 		for _, word := range []string{"negligible", "Critical", "none", "  "} {
 			if _, err := f.db.DB.NewUpdate().TableExpr("\"product\"").
-				Set(`"triage_floor" = ?`, word).
+				Set(`"minimum_severity" = ?`, word).
 				Where(`"id" = ?`, f.productID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			line, err := finding.FloorFor(ctx, f.db.DB, f.productID)
+			line, err := finding.MinimumSeverityFor(ctx, f.db.DB, f.productID)
 			if err != nil {
 				t.Fatal(err)
 			}

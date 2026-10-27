@@ -32,7 +32,7 @@ type PackageKind struct {
 // Over the whole selection. None of the list's other filters narrows it,
 // because it answers what the filter can offer, and a kind offered only while
 // the rest of the filter happens to admit it vanishes from the list the moment
-// somebody changes something else. The triage line does not narrow it either:
+// somebody changes something else. The minimum severity does not narrow it either:
 // a kind below the line is still one the list can be asked for.
 //
 // Counted over what the reader may see, so a kind present only on an

@@ -10,6 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -42,12 +43,12 @@ type OverviewOutput struct {
 	Body struct {
 		Name        string `json:"name"`
 		DisplayName string `json:"display_name,omitempty"`
-		// TriageFloor is the least severity this product triages, or empty
+		// MinimumSeverity is the least severity this product triages, or empty
 		// where it inherits the deployment's line. Stated rather than left out:
 		// a number somebody chose and a number nobody noticed are different
 		// facts about the same screen.
-		TriageFloor string `json:"triage_floor,omitempty" doc:"The least severity this product triages, where the product states one of its own"`
-		EndOfLife   string `json:"end_of_life,omitempty" doc:"The date the product goes out of support, where one is set"`
+		MinimumSeverity string `json:"minimum_severity,omitempty" doc:"The least severity this product triages, where the product states one of its own"`
+		EndOfLife       string `json:"end_of_life,omitempty" doc:"The date the product goes out of support, where one is set"`
 		// Retired says the product is out of use. The lists stop offering it,
 		// so the page is reached by a link somebody kept — and without this it
 		// reads as a product in use whose scans have quietly stopped.
@@ -127,7 +128,11 @@ func registerOverview(api huma.API, in core.Deps) {
 		out := &OverviewOutput{}
 		out.Body.Name = named.Name
 		out.Body.DisplayName = named.DisplayName
-		out.Body.TriageFloor = core.OrBlank(named.TriageFloor)
+		minimum, err := catalog.NewStore(in.DB.DB).MinimumSeverityOf(ctx, named.ID)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "cannot read what this product triages", err)
+		}
+		out.Body.MinimumSeverity = core.OrBlank(minimum)
 		out.Body.EndOfLife = core.OnDate(named.EOLOn)
 		out.Body.Retired = named.Retired()
 		out.Body.Builds = make([]BuildStandingBody, 0, len(covered)+len(held))

@@ -128,7 +128,7 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // decision, which is the one act the deadline exists to ask for and cannot be
 // the answer to. It is the statement three other rules here already make from
 // other directions — a tag that cannot change, a build past its end of life,
-// and an issue below the triage line all carry no deadline for the same reason.
+// and an issue below the minimum severity all carry no deadline for the same reason.
 //
 // A scanner that did not answer is not upstream saying no. Reading silence
 // as "no fix exists" is a claim about the world made out of a gap in a report,
@@ -603,7 +603,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		// A band the product's line does not admit is written only where the
 		// product was attacked through the issue, which no line sets aside, so
 		// the pass never writes a deadline the line would take away.
-		floor, err := FloorFor(ctx, s.db, productID)
+		floor, err := MinimumSeverityFor(ctx, s.db, productID)
 		if err != nil {
 			return changed, err
 		}
@@ -714,7 +714,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	// The passes sweep what was written before a release went out of support,
 	// a line moved, or upstream answered, and each reports what it took off
 	// under its own rule.
-	cleared, err := s.clearBelowFloor(ctx)
+	cleared, err := s.clearBelowMinimumSeverity(ctx)
 	if err != nil {
 		return changed, err
 	}
@@ -886,9 +886,9 @@ func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (
 	return cleared, err
 }
 
-// clearBelowFloor removes the deadline from open findings their product does
+// clearBelowMinimumSeverity removes the deadline from open findings their product does
 // not consider worth triaging.
-func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
+func (s *Store) clearBelowMinimumSeverity(ctx context.Context) (int, error) {
 	products, err := s.everyProduct(ctx)
 	if err != nil {
 		return 0, err
@@ -897,7 +897,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 	cleared := 0
 	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	for _, productID := range products {
-		floor, err := FloorFor(ctx, s.db, productID)
+		floor, err := MinimumSeverityFor(ctx, s.db, productID)
 		if err != nil {
 			return cleared, err
 		}

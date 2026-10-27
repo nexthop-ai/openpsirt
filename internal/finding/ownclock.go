@@ -29,7 +29,7 @@ import (
 // so exploitation and a fix arriving move it the same way.
 func ownDeadline(own Windows, severity string, ratedAt *time.Time, state FixState,
 	exploited, incident bool, observedAt time.Time, learnedAt, fixedAt *time.Time,
-	floor Floor) *time.Time {
+	floor MinimumSeverity) *time.Time {
 
 	if severity == "" || ratedAt == nil {
 		return nil
@@ -66,7 +66,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	if err != nil {
 		return 0, err
 	}
-	floor, err := FloorFor(ctx, db, productID)
+	floor, err := MinimumSeverityFor(ctx, db, productID)
 	if err != nil {
 		return 0, err
 	}

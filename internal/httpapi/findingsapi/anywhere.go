@@ -35,10 +35,10 @@ func registerAnywhere(api huma.API, in core.Deps) {
 			"issue in two products is two pieces of work, decided separately by different " +
 			"people; in three builds of one product it is one row, and `builds` says how " +
 			"many. Each row names one of those builds so there is somewhere to link to.\n\n" +
-			"Every product's own triage line still applies. `severity` raises the line " +
+			"Every product's own minimum severity still applies. `severity` raises it " +
 			"for the whole page and never lowers it below what a product decided; " +
-			"`below_floor` turns every line off, which is how the rows a line keeps out are " +
-			"asked for.\n\n" +
+			"`below_minimum_severity` turns every minimum severity off, which is how the rows " +
+			"below one are asked for.\n\n" +
 			"An issue that exists only in products you hold nothing on answers as an " +
 			"issue that does not exist, and `total` says the same.\n\n" +
 			"`beneath` is not offered: a subtree is a walk over one build's edges. Neither is " +
@@ -56,7 +56,7 @@ func registerAnywhere(api huma.API, in core.Deps) {
 		// The line is per product and is applied per row inside the store, so
 		// what is handed over here is only what the caller asked to raise it
 		// to — never a number chosen for a page that spans products.
-		narrowed, err := input.Filter(finding.Floor{Word: string(input.Severity)})
+		narrowed, err := input.Filter(finding.MinimumSeverity{Word: string(input.Severity)})
 		if err != nil {
 			return nil, err
 		}

@@ -1525,7 +1525,7 @@ package — reach the join to the component and the second grouping.
 | The decided groups are stacked with the partial groups, never joined to them | The two are put one under the other and folded on the keys. Joined on the keys, MariaDB worked out the decided groups again for each of 12,260 partial groups it joined them to: 71 s for the undecided list across products, which takes 0.37 s joined to every occurrence and 0.23 s stacked |
 | Who holds an occurrence is read from the covering index | The index carries the assignee after its other columns, so the partial groups of a list asking who holds a group read no table. Home's unassigned badge over 368,849 open occurrences takes 0.67 s against 1.08 s reading the table. Counted instead over the held occurrences in an arm of their own, stacked like the decided groups, the arm grows with what is held: 2.5 s against 1.3 s across products on MySQL with 127,704 of 425,680 occurrences held, and 1.01 s against 0.26 s inside one product on SQLite |
 | Each occurrence is counted once only where a condition compares decided occurrences with occurrences | Agreed and an outcome hold where every occurrence does, so the decision occurrences are folded to the occurrence before the keys. Every other condition asks whether any occurrence carries a flag or none does, and the decision occurrences fold straight to the keys |
-| Across products, the line is applied after the first level | The first level also keys on the product and on whether the occurrence carries an exploitation signal, so each partial group is wholly above a product's line or wholly below it. The issue, the product's rating and its line are read once per partial group, and every aggregate after it counts exactly the occurrences the line admits |
+| Across products, the minimum severity is applied after the first level | The first level also keys on the product and on whether the occurrence carries an exploitation signal, so each partial group is wholly above a product's minimum severity or wholly below it. The issue, the product's rating and its minimum severity are read once per partial group, and every aggregate after it counts exactly the occurrences the minimum severity admits |
 | The groups another view keeps under a condition over a group that reads no decision are grouped in one level | They are joined back to the finding rows, and the planner's estimate of how many groups a condition keeps falls by a factor of ten over two levels: 186 where 7,742 are kept. On that estimate PostgreSQL read one component's rows once per kept group and did not finish in two minutes; over one level it hashes the join in 2 s |
 | The groups another view keeps under a condition on the decisions are the list's own two-level statement | The decided occurrences are stacked beside the first level. In one level the `decision_occurrence` table is grouped per occurrence and joined to every open occurrence, and MariaDB works that table out again for each occurrence it is joined to: no answer in 985 s for the component view of what is undecided among 425,680 open rows with 3,060 decision occurrences, against 2.6 s in two levels, and none in three minutes for what is waiting |
 | Under a filter needing a decision, the view's own first level is restricted after it groups | The view's first level groups the occurrences on its keys, the component and the issue among them, and keeps a group where its issue and its component's fold are among the list's kept groups, asked as a membership test. Joined to the finding rows instead, PostgreSQL estimates the kept groups at 279 where 1,753 pass and walks a component's rows once per group: 185 s for the lapsed planned upgrades, and 215 s for the components lapsed and fixable in one level. A group has no index to probe, so the misestimate does not multiply the work, and MariaDB materializes the membership test once |
@@ -1578,7 +1578,7 @@ And it is rewritten wherever the issue is open, not only in the build being
 scanned — once per product holding it, each against that product's rating. A
 nightly branch scan raising one of the issue's signals left every other build
 carrying a number worked out from a world that had moved — a known-exploited issue in a shipped tag below
-the triage line, answering no exploited filter, on no exploited clock, at the
+the minimum severity, answering no exploited filter, on no exploited clock, at the
 bottom of the list, until somebody rescanned that tag, which for a tag is never.
 
 | Rule | |
@@ -1621,7 +1621,7 @@ trusts or argues with, and packing gives a rule statable in a sentence.
 
 The two exploitation signals are one band each and are never read apart from
 the number. A comparison against the lower of the two answers "is some
-exploitation on this", which is what the triage line asks and what lets it stay
+exploitation on this", which is what the minimum severity asks and what lets it stay
 on an index holding only the urgency. Which of the two holds is a column, on
 the finding, and every list and count that names one of them reads that column:
 a feed's word about the world and a person's word about this product are
@@ -1642,8 +1642,8 @@ impossible otherwise carries into the band above and ranks as exploited.
 
 An incident moves no deadline. How long a fix may take
 is a question about the work and about upstream, and being attacked says
-nothing about either; what it does is admit the finding to the triage line
-whatever the rating says, so a finding that was below the line gains the clock
+nothing about either; what it does is admit the finding to the minimum severity
+whatever the rating says, so a finding that was below it gains the clock
 its severity earns and one whose incident is cleared may lose it again. It also
 puts an upstream refusal back on that clock, which `DESIGN-remediation.md`
 describes beside the other reasons a finding carries none.
@@ -1870,7 +1870,7 @@ chance for a word added to one to be missing from the others.
 |---|---|
 | The four rated bands | The order a report reads in |
 | `negligible` and `none` | Answers a scanner gives and no band holds. The fold reads them as lows, so scoring them anywhere else put them above unrated and below every low — and a stored score turned back into a word came out "low" regardless, which is a word nobody published about the issue |
-| `everything` | Not a severity: the absence of a floor, which is why it sits with the floor rather than the ladder |
+| `everything` | Not a severity: the absence of a minimum severity, which is why it sits with the minimum severity rather than the ladder |
 
 The ordering in SQL is built from the list rather than written out beside it,
 and the mapping back to a word is an index into the same list. The `ELSE` is
@@ -1894,7 +1894,7 @@ us.
 
 Nine queries said it a second way. They selected the published column with no
 rating joined at all, so a product that re-rated an issue saw its own decision
-in the findings list, the severity filter, the triage floor and the deadline,
+in the findings list, the severity filter, the minimum severity and the deadline,
 and saw the world's in the component tree, the upgrade band strip, the build
 comparison export, the remediation plan and the triage measures. Nothing
 errored; the screens simply disagreed with the list they summarize, and the

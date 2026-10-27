@@ -52,11 +52,11 @@ func TestWhoMayReachWhat(t *testing.T) {
 			absent     = "/v1/products/nosuch/branches-and-tags"
 			version    = "/v1/version"
 
-			mineFound = "/v1/products/mine/findings?stream=master&variant=broadcom"
-			mineFloor = "/v1/products/mine/minimum-severity"
-			mineEOL   = "/v1/products/mine/end-of-life"
-			streamEOL = "/v1/products/mine/branches-and-tags/master/end-of-life"
-			mineScans = "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"
+			mineFound           = "/v1/products/mine/findings?stream=master&variant=broadcom"
+			mineMinimumSeverity = "/v1/products/mine/minimum-severity"
+			mineEOL             = "/v1/products/mine/end-of-life"
+			streamEOL           = "/v1/products/mine/branches-and-tags/master/end-of-life"
+			mineScans           = "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"
 			// What one upload changed about the build's inventory. Reached
 			// on the same terms the receipt carrying its counts is: they are
 			// one answer read twice.
@@ -154,16 +154,16 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"private-triage", http.MethodPost, theirsAttacked, http.StatusNotFound},
 			{"", http.MethodPost, mineAttacked, http.StatusUnauthorized},
 
-			// A product's triage line hides findings, which
+			// A product's minimum severity hides findings, which
 			// is the act every other part of this gates. No role granted per
 			// product carries it, so it is the same authority that sets the
 			// deployment's line.
-			{"reader", http.MethodPut, mineFloor, http.StatusForbidden},
-			{"triager", http.MethodPut, mineFloor, http.StatusForbidden},
-			{"approver", http.MethodPut, mineFloor, http.StatusForbidden},
-			{"", http.MethodPut, mineFloor, http.StatusUnauthorized},
-			{"nothing", http.MethodPut, mineFloor, http.StatusUnauthorized},
-			{"admin", http.MethodPut, mineFloor, http.StatusNoContent},
+			{"reader", http.MethodPut, mineMinimumSeverity, http.StatusForbidden},
+			{"triager", http.MethodPut, mineMinimumSeverity, http.StatusForbidden},
+			{"approver", http.MethodPut, mineMinimumSeverity, http.StatusForbidden},
+			{"", http.MethodPut, mineMinimumSeverity, http.StatusUnauthorized},
+			{"nothing", http.MethodPut, mineMinimumSeverity, http.StatusUnauthorized},
+			{"admin", http.MethodPut, mineMinimumSeverity, http.StatusNoContent},
 
 			// Going out of support decides what carries a
 			// deadline and what a build going quiet means, so it is

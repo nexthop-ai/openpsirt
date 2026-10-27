@@ -226,7 +226,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 //
 // The second person holds their role on the product the rating belongs to.
 // Agreeing is what puts a milder rating into force, so it moves that product's
-// deadlines and its triage line, and a role held elsewhere buys nothing here.
+// deadlines and its minimum severity, and a role held elsewhere buys nothing here.
 func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*Assessment, error) {
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return nil, refusal.New("agreeing is something a person does")
@@ -700,7 +700,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	if err != nil {
 		return err
 	}
-	floor, err := FloorFor(ctx, tx, productID)
+	floor, err := MinimumSeverityFor(ctx, tx, productID)
 	if err != nil {
 		return err
 	}
@@ -1005,14 +1005,14 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		return held, nil
 	}
 
-	floors := map[int64]Floor{}
+	floors := map[int64]MinimumSeverity{}
 	var ratedIn, filed []int64
 	for _, claim := range asked {
 		filed = append(filed, claim.VulnerabilityID)
 		if _, read := floors[claim.ProductID]; read {
 			continue
 		}
-		floor, err := FloorFor(ctx, s.db, claim.ProductID)
+		floor, err := MinimumSeverityFor(ctx, s.db, claim.ProductID)
 		if err != nil {
 			return nil, err
 		}

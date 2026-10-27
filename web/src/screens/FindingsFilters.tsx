@@ -275,7 +275,7 @@ export function activeFilters(
   const pick = (key: string, label: string, pairs: Pairs) => {
     if (at(key)) add(key, label, said(pairs, at(key)));
   };
-  if (at("below") === "yes") add("below", "Below the triage line", "included");
+  if (at("below") === "yes") add("below", "Below minimum severity", "included");
   if (at("exploited") === "1") add("exploited", "Known exploited", "only");
   if (at("fixable") === "1") add("fixable", "Fix version known", "only");
   add(
@@ -585,7 +585,7 @@ export function Filters({
           onChange={(on) => flag("exploited", on)}
         />
         <Flag
-          label="Include below the triage line"
+          label="Include below minimum severity"
           hint="Always recorded and counted"
           on={at("below") === "yes"}
           onChange={(on) => set("below", on ? "yes" : "")}

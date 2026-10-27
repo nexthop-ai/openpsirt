@@ -107,7 +107,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// so a report raising one here leaves every open finding of it in
 		// every build nothing rescanned carrying a number worked out from a
 		// world that has moved — a known-exploited issue in a shipped tag
-		// below the triage line, answering no exploited filter, on no
+		// below the minimum severity, answering no exploited filter, on no
 		// exploited clock, at the bottom of the list, until somebody
 		// rescans a tag, which for a tag is never.
 		//
@@ -138,7 +138,7 @@ type applyRun struct {
 	fixing          map[int64]bool
 	windows         Windows
 	startedAt       time.Time
-	floor           Floor
+	floor           MinimumSeverity
 	onTheClock      bool
 	// claimsReaching and claimsReachingNothing say how many of the build's
 	// claims land on something it ships.
@@ -256,19 +256,19 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 		return nil, fmt.Errorf("read when this run started: %w", err)
 	}
 
-	// The product's triage line. Below that line nothing carries a deadline:
+	// The product's minimum severity. Below that line nothing carries a deadline:
 	// a line says "this is not work" and a deadline says "this is work, and
 	// it is late", and holding both means one of them is lying — within a
 	// year the overdue figure would be thousands of things nobody ever
 	// intended to look at.
-	if run.floor, err = FloorFor(ctx, tx, productID); err != nil {
+	if run.floor, err = MinimumSeverityFor(ctx, tx, productID); err != nil {
 		return nil, err
 	}
 
 	// And whether this build is still supported. Past its end-of-life date
 	// nothing on it carries a deadline: the overdue figure and the escalation
 	// view would otherwise fill permanently with releases nobody will ever
-	// fix, and both stop being read. It is the same statement the triage line
+	// fix, and both stop being read. It is the same statement the minimum severity
 	// makes from another direction — "this is not work" — and it is applied
 	// the same way.
 	//
