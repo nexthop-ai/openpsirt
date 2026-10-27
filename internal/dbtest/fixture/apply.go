@@ -30,13 +30,13 @@ func ApplyGraph(ctx context.Context, db bun.IDB, targetID, scanID int64,
 
 // RecordClaims stores what a build argued in a transaction of its own, as
 // ingest does inside the one it opens for the whole scan.
-func RecordDecisions(ctx context.Context, db bun.IDB, targetID, scanID int64,
-	decisions []sbom.Suppression, stated map[sbom.Origin]bool) (finding.ClaimsApplied, error) {
+func RecordClaims(ctx context.Context, db bun.IDB, targetID, scanID int64,
+	claims []sbom.Suppression, stated map[sbom.Origin]bool) (finding.ClaimsApplied, error) {
 
 	var applied finding.ClaimsApplied
 	err := database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
 		var err error
-		applied, err = finding.RecordClaimsWithin(ctx, tx, targetID, scanID, decisions, stated)
+		applied, err = finding.RecordClaimsWithin(ctx, tx, targetID, scanID, claims, stated)
 		return err
 	})
 	return applied, err

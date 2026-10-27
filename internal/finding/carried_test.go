@@ -25,7 +25,7 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 	// stands would not have at all.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{
 				aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
 				aClaim("CVE-2026-2", sbom.Affected, libnl, sbom.FromStatement),
@@ -86,7 +86,7 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 		// That is the whole point: what a build no longer claims is what
 		// somebody has to notice.
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{
 				aClaim("CVE-2026-2", sbom.Affected, libnl, sbom.FromStatement),
 			}, everyOrigin); err != nil {
@@ -120,7 +120,7 @@ func TestWhatABuildCarriesIsNarrowedByANameInAnyCapitals(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		eclair := at("Éclair-Lib", "1.0")
-		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{
 				aClaim("CVE-2026-1", sbom.AlreadyFixed, eclair, sbom.FromPedigree),
 				aClaim("CVE-2026-2", sbom.AlreadyFixed, libnl, sbom.FromPedigree),

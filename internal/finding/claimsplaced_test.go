@@ -38,7 +38,7 @@ func insideOf(status sbom.Status, product graph.Described, statement string) sbo
 // argues records claims the build sent with its inventory on the last scan.
 func (f *fixture) argues(t *testing.T, claims ...sbom.Suppression) {
 	t.Helper()
-	if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
+	if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -240,7 +240,7 @@ func TestAScanDoesNotWithdrawAClaimTakenFromAPublishedStatement(t *testing.T) {
 		f.vendorSays(t, rootPurl, sbom.NotAffected, "sha256:vendor-1")
 		f.reported(t, found(inside, zlib))
 		// The build's own document, stating nothing.
-		applied, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -102,9 +102,9 @@ func (r *Reach) Shipped(t testing.TB, b Build, hash string, snapshot graph.Snaps
 
 // Argued records what an upload argues about what it ships, with statements
 // and pedigree both stated by the build.
-func (r *Reach) Argued(t testing.TB, target, scan int64, decisions []sbom.Suppression) {
+func (r *Reach) Argued(t testing.TB, target, scan int64, claims []sbom.Suppression) {
 	t.Helper()
-	if _, err := fixture.RecordDecisions(t.Context(), r.DB.DB, target, scan, decisions,
+	if _, err := fixture.RecordClaims(t.Context(), r.DB.DB, target, scan, claims,
 		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
 		t.Fatal(err)
 	}

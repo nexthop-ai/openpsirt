@@ -23,7 +23,7 @@ import (
 func (f *fixture) claimed(t *testing.T, claims ...sbom.Suppression) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
-	if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
+	if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -307,7 +307,7 @@ func TestAFindingWhosePatchWasDroppedInABumpSaysWhereItCameFrom(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -334,7 +334,7 @@ func TestABumpOntoAPatchedVersionClosesAsPatched(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnlNew, sbom.FromPedigree),
 		}, everyOrigin); err != nil {
 			t.Fatal(err)

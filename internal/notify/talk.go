@@ -153,11 +153,11 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 		OrderExpr(`"id" ASC`).Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read which channels there are: %w", err)
 	}
-	type occurrence struct{ channel, topic string }
-	var order []occurrence
-	named := map[occurrence][]Outbound{}
+	type place struct{ channel, topic string }
+	var order []place
+	named := map[place][]Outbound{}
 	for _, to := range destinations {
-		at := occurrence{deref(to.Channel), deref(to.Topic)}
+		at := place{deref(to.Channel), deref(to.Topic)}
 		if _, seen := named[at]; !seen {
 			order = append(order, at)
 		}
@@ -170,7 +170,7 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 		// the same cycle would read as trying it again. The note says each
 		// thing once, however many of the channel's destinations take it.
 		var carried []noting
-		decisions := map[int64][]int64{}
+		claims := map[int64][]int64{}
 		shown := map[string]bool{}
 		for _, to := range named[at] {
 			var rows []noting
@@ -191,14 +191,14 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 					continue
 				}
 				said[key] = true
-				id, err := t.signal.decision(ctx, to, row.Notification)
+				id, err := t.signal.claim(ctx, to, row.Notification)
 				if err != nil {
 					return sent, failed, err
 				}
 				if id == 0 {
 					continue
 				}
-				decisions[to.ID] = append(decisions[to.ID], id)
+				claims[to.ID] = append(claims[to.ID], id)
 				if !shown[key] {
 					shown[key] = true
 					carried = append(carried, row)
@@ -210,10 +210,10 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 		}
 		postErr := chat.Post(ctx, at.channel, at.topic, noteOf(carried, t.baseURL))
 		for _, to := range named[at] {
-			if len(decisions[to.ID]) == 0 {
+			if len(claims[to.ID]) == 0 {
 				continue
 			}
-			if err := t.signal.settle(ctx, to, decisions[to.ID], postErr); err != nil {
+			if err := t.signal.settle(ctx, to, claims[to.ID], postErr); err != nil {
 				return sent, failed, err
 			}
 		}
@@ -301,7 +301,7 @@ func (t *Talk) directs(ctx context.Context, chat Chat, offered []string) (sent, 
 		}
 		var claimed []noting
 		for _, row := range rows {
-			mine, err := t.decisionDirect(ctx, chat.Platform(), row.ID)
+			mine, err := t.claimDirect(ctx, chat.Platform(), row.ID)
 			if err != nil {
 				return sent, failed, err
 			}
@@ -382,12 +382,12 @@ func direct(q *bun.SelectQuery, platform string, offered []string,
 
 // claimDirect stakes one notification's direct delivery on a platform, and
 // says whether this cycle holds it.
-func (t *Talk) decisionDirect(ctx context.Context, platform string, id int64) (bool, error) {
-	decision := &ChatDelivery{
+func (t *Talk) claimDirect(ctx context.Context, platform string, id int64) (bool, error) {
+	claim := &ChatDelivery{
 		NotificationID: id, Platform: platform, Attempts: 1,
 		FirstSeen: t.now().UTC().Truncate(time.Microsecond),
 	}
-	if _, err := t.db.NewInsert().Model(decision).Exec(ctx); err == nil {
+	if _, err := t.db.NewInsert().Model(claim).Exec(ctx); err == nil {
 		return true, nil
 	} else if !database.IsDuplicate(err) {
 		return false, fmt.Errorf("claim a direct delivery: %w", err)

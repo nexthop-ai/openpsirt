@@ -31,7 +31,7 @@ func (r *Reach) ScannedTwoIssues(t *testing.T) {
 
 // ScannedTwoIssuesArguing is the same build on a scan of its own, carrying
 // what the build argues about what it ships.
-func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, decisions []sbom.Suppression) {
+func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom.Suppression) {
 	t.Helper()
 	kernel := graph.Described{
 		Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10",
@@ -41,7 +41,7 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, decisions []s
 		Components:   []graph.Described{kernel},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: kernel}},
 	})
-	r.Argued(t, target, scan, decisions)
+	r.Argued(t, target, scan, claims)
 	r.Ran(t, target, []finding.Reported{
 		{
 			Issue: finding.Named{

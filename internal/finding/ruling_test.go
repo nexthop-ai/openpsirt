@@ -544,7 +544,7 @@ func TestADuplicateOfAnIssueDismissedOrSuppressedEverywhereIsRefused(t *testing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordDecisions(ctx, f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(ctx, f.db, f.target, f.lastScan,
 			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)},
 			everyOrigin); err != nil {
 			t.Fatal(err)

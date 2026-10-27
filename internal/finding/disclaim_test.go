@@ -391,7 +391,7 @@ func TestAStatementTheBuildsOwnPatchAlreadyAnswersClosesNothing(t *testing.T) {
 	// The build's word about its own code is asked first.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, beside(acmeY))
-		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
 			Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 			Targets: []sbom.Target{{Purl: zlib.Purl}},
 		}}, everyOrigin); err != nil {
@@ -979,7 +979,7 @@ func TestEveryOtherClosureTakesTheSuppliersAnswerOffTheOccurrence(t *testing.T) 
 			f.reported(t, r)
 		}},
 		{"the build patches it", func(t *testing.T, f *fixture) {
-			if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
+			if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
 				Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 				Targets: []sbom.Target{{Purl: zlib.Purl}},
 			}}, everyOrigin); err != nil {
