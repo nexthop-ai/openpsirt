@@ -142,8 +142,8 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 					t.Fatalf("a promise over %d occurrences: %v (after %s)", size, err, took)
 				}
 				t.Logf("%8d rows over %d issues in one transaction: %s (%.0f rows/s)",
-					done.Decisions, done.Issues, took.Round(time.Millisecond),
-					float64(done.Decisions)/took.Seconds())
+					done.Occurrences, done.Issues, took.Round(time.Millisecond),
+					float64(done.Occurrences)/took.Seconds())
 			})
 		}
 	})

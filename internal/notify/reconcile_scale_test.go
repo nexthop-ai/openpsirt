@@ -23,8 +23,8 @@ import (
 // bench holds 430 decisions waiting on a second person in one product, and 200
 // approvers there each hear about all of them, which is 86,000 conditions.
 const (
-	sweepPeople = 200
-	sweepClaims = 430
+	sweepPeople    = 200
+	sweepDecisions = 430
 )
 
 // counted is a query hook that counts statements.
@@ -33,7 +33,7 @@ type counted struct{ n int }
 func (c *counted) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context { return ctx }
 func (c *counted) AfterQuery(context.Context, *bun.QueryEvent)                        { c.n++ }
 
-func TestMeasureASweepOpeningEveryWaitingClaim(t *testing.T) {
+func TestMeasureASweepOpeningEveryWaitingDecision(t *testing.T) {
 	// Every approver reconciled once per phase, as a sweep does: opening
 	// every condition, a sweep where nothing moved, every sentence moving,
 	// and every condition clearing. Measured as statements and wall time,
@@ -50,7 +50,7 @@ func TestMeasureASweepOpeningEveryWaitingClaim(t *testing.T) {
 			people[i] = who.ID
 		}
 		held := func(waiting string) []notify.Holds {
-			out := make([]notify.Holds, sweepClaims)
+			out := make([]notify.Holds, sweepDecisions)
 			for i := range out {
 				out[i] = notify.Holds{
 					About: fmt.Sprintf("claim-waiting %d", i),
@@ -70,7 +70,7 @@ func TestMeasureASweepOpeningEveryWaitingClaim(t *testing.T) {
 			opened, cleared := 0, 0
 			start := time.Now()
 			for _, person := range people {
-				o, c, err := store.Reconcile(ctx, person, notify.ClaimWaiting, holds)
+				o, c, err := store.Reconcile(ctx, person, notify.DecisionWaiting, holds)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -86,7 +86,7 @@ func TestMeasureASweepOpeningEveryWaitingClaim(t *testing.T) {
 		restating := phase("restate", held("4 weeks"))
 		clearing := phase("clear", nil)
 		t.Logf("%d conditions: opening %.1fx, restating %.1fx, clearing %.1fx the steady sweep",
-			sweepPeople*sweepClaims, opening.Seconds()/steady.Seconds(),
+			sweepPeople*sweepDecisions, opening.Seconds()/steady.Seconds(),
 			restating.Seconds()/steady.Seconds(), clearing.Seconds()/steady.Seconds())
 	})
 }
