@@ -37,9 +37,8 @@ declared before anything may name them.
 | Group | One issue at one component across every occurrence it sits at. The row the findings list returns, and the thing somebody decides about |
 | Report | A problem somebody reported to us, and the record that it arrived. It exists before anybody has judged it, and points at an issue only once somebody has (`design-docs/findings-reports.md` § Reports) |
 
-Each word names one thing. Every count is of findings or of groups: the
-twenty-five thousand rows a scan produces against the four hundred things
-somebody looks at.
+Every count is of findings or of groups: twenty-five thousand rows a scan
+produces against four hundred things somebody looks at.
 
 | Term | Usage |
 |---|---|
@@ -63,9 +62,9 @@ a branch against it, and a new line seeds its decisions from it.
 
 | Rule | Reason |
 |---|---|
-| The parent can be filled in afterwards, by declaring the tag again with the branch named (REQ-15) | A pipeline that does not know declares the tag without it, and release readiness then reports that the branch never released |
+| The parent can be filled in afterwards, by declaring the tag again with the branch named (REQ-15) | Without it, release readiness reports the branch never released |
 | Naming a different branch is refused | A tag is one frozen point |
-| Only a tag has a parent, and it is a branch of the same product | A tag under a tag, a release under itself and a branch in another product are lines that do not exist. Declaring and filling in ask the same check |
+| Only a tag has a parent, and it is a branch of the same product; declaring and filling in ask the same check | |
 | A listed tag names its parent even when the parent is retired | The parent is a fact about the tag |
 
 ## Release dates
@@ -76,7 +75,7 @@ after, or while backfilling a year.
 
 | Rule | Reason |
 |---|---|
-| The release-over-release chart orders and labels its points by it | Ordered by declaration, a release recorded late sorts after earlier ones, and a year entered in an afternoon plots as one day |
+| The release-over-release chart orders and labels its points by it | A year entered in an afternoon otherwise plots as one day |
 | It falls back to the declaration date where nobody has stated one | |
 | It can be corrected; the parent fills in once and never moves | The date is a fact about the world somebody may have got wrong |
 
@@ -90,9 +89,9 @@ policies are published.
 |---|---|
 | Set on a release, or on a product for every release with no date of its own | |
 | A release with no date inherits rather than copying | A copy stops following the product the next time it moves. A screen shows a release's date and whose it is |
-| Reversible | Extended support happens |
-| Absent is not past | A release nobody has dated is supported |
-| Nothing is deleted or hidden past the date | An auditor asks about a release long after support ends |
+| Reversible | |
+| Absent is not past | |
+| Nothing is deleted or hidden past the date | |
 | The comparison is spelled once, in the catalog | The same fact decides both effects below and what a screen says |
 
 | Effect | Detail |
@@ -126,11 +125,11 @@ administrative act, recorded with who did it and what it held before.
 
 | Rule | Reason |
 |---|---|
-| The matching name and the spelling shown move together | Both derive from one string; apart, a variant is matched as one thing and shown as another |
-| A name another variant of the product holds is refused, retired ones included | The name stays spoken for, so declaring it again brings that variant back |
-| A name is refused once a document naming it has been published | An OpenVEX document is identified by its build, and an advisory names each affected release in its product tree, both through these names. Renamed, the next document reads as a second document, or the customer as no longer affected. Issued documents are kept as the bytes sent and never rewritten |
-| A product's name is refused where a group mapping names it, before or after | A mapping names its product by name (REQ-41): renaming to it hands that group the product, renaming away strands it. Configuration changes first |
-| A release is asked about the advisories that named it, never about its product | A release reaches an advisory's product tree by holding an issue the advisory covers. Asked of the product, one release named once blocks every sibling, and retiring and redeclaring loses the history |
+| The matching name and the spelling shown move together | Both derive from one string |
+| A name another variant of the product holds is refused, retired ones included | Declaring it again brings that variant back |
+| A name is refused once a document naming it has been published | OpenVEX documents and advisory product trees identify builds and releases by these names, so a rename reads as a second document or a customer no longer affected. Issued documents are kept as the bytes sent |
+| A product's name is refused where a group mapping names it, before or after | A mapping names its product (REQ-41); configuration changes first |
+| A release is asked about the advisories that named it, by holding an issue they cover, never about its product | Asked of the product, one named release blocks every sibling |
 | An issue taken off an advisory after an issuance still counts; one taken off before does not | The first was on the document readers hold |
 | An issue taken off an advisory and put back keeps one row, with the interval it was last on | The pair is unique. When it was first on is lost, so an issuance from before it was taken off reads as not naming it, and a rename that document should refuse is allowed |
 | A product's displayed name moves freely | Nothing is identified by it. A release and a variant have no displayed name apart from their name |
@@ -142,7 +141,7 @@ administrative act, recorded with who did it and what it held before.
 A product, a release and a variant are retired, never deleted. The row and
 everything filed against it stay. Retiring differs from an end-of-support date:
 the date ends support and hides nothing; retiring says the thing is not tracked
-here. It is an administrative act, recorded.
+here. It is an administrative act, recorded with who did it and what it held before.
 
 | Rule | Reason |
 |---|---|
@@ -153,7 +152,7 @@ here. It is an administrative act, recorded.
 | Declaring it again brings it back, matching what it reaches as any redeclaration does | A pipeline declares on every build, and tidying a list must not break it |
 | Retiring a product writes nothing onto its releases and variants | They leave every list through the product, and bringing it back is then one write |
 | A retired product or release is named by nothing | A kept link opens a page saying it is retired |
-| Retiring one already retired is refused | Two administrators at once would both record having done it |
+| Retiring one already retired is refused | Two administrators at once would both record it |
 | One conditional write, matching only a row in use, retires every kind of row kept after retirement | A catalog part, a team, a destination, a supplier, an assignment rule and a response window share the refusal above |
 
 ## Declaration before use
@@ -165,8 +164,8 @@ unscanned.
 
 | Rule | Reason |
 |---|---|
-| Declaring what is there succeeds and changes nothing | A CI pipeline cannot know whether it is first, and two arriving together is ordinary |
-| A declaration losing to another writer reads what won and confirms it, once and no further | The read and write are two statements, so both callers insert and the unique index refuses one. A row that keeps disappearing is not a race |
+| Declaring what is there succeeds and changes nothing | Two CI pipelines arriving together is ordinary |
+| A declaration losing to another writer reads what won and confirms it, once and no further | The unique index refuses one of two inserts; a row that keeps disappearing is no race |
 | Declaring something else under a known name is refused | A tag redeclared as a branch, or a product with another display name, is a name changing meaning |
 | A display name is compared trimmed, as stored | Surrounding space is not part of it |
 
@@ -177,7 +176,7 @@ unscanned.
 | Bounded: no surrounding space, nothing empty, a length counted in characters that keeps a unique index inside every engine's key limit | The column holds characters |
 | Unique within the parent: a product globally, a branch or tag and a variant within their product | |
 | Capitals do not distinguish two names | Typed into build scripts, `sonic` against `SONiC` is a typo |
-| The normalized form is stored for matching, the spelling written beside it and shown | A lower-case value compares alike under any collation, so the unique constraint means one thing on all four engines; a collation per engine makes the rule a property of the deployment |
+| The normalized form is stored for matching, the spelling written beside it and shown | A lower-case value compares alike under any collation on all four engines |
 | An identity a sign-in provider hands over is compared exactly | Deciding two accounts are one person merges access nobody granted |
 | A component name is stored, reported and linked in the producer's spelling, and matched on its stored fold where a person types it | The fold the assignment rules and search match on |
 | Two components differing only in capitals are both what a typed name means | A lookup answers with the choices; a filter keeps both |

@@ -1,11 +1,12 @@
 # Data model measurements
 
-Benchmark runs behind the inventory delta rules in
+Benchmark runs behind the inventory delta and comparison rules in
 `design-docs/data-model-graph.md`.
 
 ## Contents
 
 - [Inventory delta timings](#inventory-delta-timings)
+- [Comparison timings](#comparison-timings)
 
 ## Inventory delta timings
 
@@ -27,4 +28,10 @@ names:
 | Only the rows of the names moved | 10–15 ms | 4.5 ms |
 
 Reading the build's rows costs the difference, and keeps an upload moving tens
-of thousands of names under a second rather than one lookup per name.
+of thousands of names under a second.
+
+## Comparison timings
+
+Comparing the master branch of a switch image built for two platforms, 6,866
+components against 6,748: 211 names differ, in 18 to 29 ms on each of the four
+engines, measured on 2026-09-27, one engine at a time.
