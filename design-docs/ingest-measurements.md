@@ -5,14 +5,14 @@ Measurements behind the ingest rules. Each section names the rule it justifies.
 
 ## Contents
 
-- [Receipt cost](#receipt-cost)
+- [Receipt page timings](#receipt-page-timings)
 - [Supplier directory volume](#supplier-directory-volume)
 - [Claim writes](#claim-writes)
 - [Rating mixture](#rating-mixture)
 
-## Receipt cost
+## Receipt page timings
 
-Justifies the run indexes (`design-docs/ingest-receipts.md` § Receipt counts).
+Justifies the run indexes (`design-docs/ingest-receipts.md` § Receipt cost).
 A page of receipts reads the receipts, what each run on it opened and closed,
 each upload's documents, what each upload changed in the inventory, and the last
 run. The counts are the cost; every other read is a few milliseconds.
@@ -64,8 +64,8 @@ year: 3.75 s and 3.83 s on PostgreSQL restamped, 3.39 s and 3.42 s quiet.
 
 ## Supplier directory volume
 
-Justifies the per-wake bound and the window (`design-docs/ingest-suppliers.md`
-§ The pass). Five publishers on 2026-09-23, from their listings and sampled
+Justifies the per-wake bound (`design-docs/ingest-suppliers.md` § The pass) and the
+window (`design-docs/ingest-suppliers.md` § Configuration). Five publishers on 2026-09-23, from their listings and sampled
 documents, at twenty documents a wake every five minutes, up to 5,760 a day.
 
 | Publisher | Shape | Listed in a year | Listed in 30 days | Drains in | Digest served |
@@ -88,7 +88,7 @@ documents, at twenty documents a wake every five minutes, up to 5,760 a day.
 
 Justifies writing one document's claims in batches
 (`design-docs/ingest-claims.md` § CSAF bounds). A real distribution advisory
-about a kernel: 95,139 claims, in seconds.
+about a kernel holds 95,139 claims. In seconds:
 
 | Engine | A row at a time | In batches | Revising, every claim set aside and written again |
 |---|---:|---:|---:|

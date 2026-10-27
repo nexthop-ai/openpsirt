@@ -14,159 +14,148 @@ Satisfies REQ-05, REQ-08, REQ-76.
 
 ## The formats read
 
-CycloneDX encoded as JSON or XML, and SPDX 2.x and 3.x as JSON (REQ-05): three
-vocabularies sharing one reader. A vocabulary knows which keys its format uses
-and what they mean; deduplication, edge resolution and where a bound is
-charged are the reader's.
+CycloneDX as JSON or XML, and SPDX 2.x and 3.x as JSON (REQ-05): three
+vocabularies over one reader. A vocabulary knows its keys; deduplication, edge
+resolution and bound charging are the reader's.
 
 | Rule | Reason |
 |---|---|
-| The document chooses the reader, never the request | A format parameter is one a build sets wrong, and the refusal is then about the parameter instead of the file |
-| A top-level key is read by the format that owns it, before the document has necessarily declared its format | The declaration has no guaranteed position: a producer sorting its keys puts SPDX's packages ahead of `spdxVersion` |
-| The formats claim no key in common, and a test asserts it | A key claimed twice makes routing a coin toss |
-| Which vocabulary read each key is recorded, and a document that used two is refused | A handler writes before anything checked the format, and both formats state an identity, so a file carrying both is stored under whichever came last, an identity decided by key order |
-| A document declaring no format is refused | A fragment or a hand-edited file whose keys look familiar. The declaration exists so nothing guesses |
-| Half a declaration is no declaration | CycloneDX states format and version in two keys, and an unstated version is one this was not written against |
-| A major version is read only where it was written against, refused by name where it is read | A file never going to be read is dropped before the rest is walked |
-| SPDX 2.2 and 2.3 are one vocabulary | The later revision adds nothing this reads |
+| The document chooses the reader, never the request | A format parameter is one a build sets wrong |
+| A top-level key is read by the format owning it, before the format is declared | A producer sorting keys puts SPDX's packages ahead of `spdxVersion` |
+| The formats share no key, and a test asserts it | |
+| Which vocabulary read each key is recorded, and a document using two is refused | Both state an identity, so the stored one would depend on key order |
+| A document declaring no format is refused | |
+| Half a declaration is none | CycloneDX states format and version in two keys |
+| A major version is read only where written against, refused by name where read | The rest is never walked |
+| SPDX 2.2 and 2.3 are one vocabulary | 2.3 adds nothing read |
 
 ### SPDX 3.x
 
-A third vocabulary sharing no key path with 2.x: a context and one flat graph
-of typed elements, packages, files, relationships, people, tools, licenses and
-the document's own record, in no stated order.
+A context and one flat graph of typed elements in no stated order, sharing no
+key path with 2.x.
 
 | Difference | Rule |
 |---|---|
-| An element states its type in a field that may follow the fields it governs | An element is read into one neutral shape and interpreted when it closes, holding one element at a time |
-| The header is inside the contents | The document's creation record is one entry of the same array, so the header pass walks the whole graph and builds nothing from it |
-| A document carries several creation records | The one the document points at is the document's. Where it points at none, none stands in and the upload is dated on arrival, because an imported document's time does not move between builds and every later scan would be refused as not newer |
-| A file carries several document elements | The file's own is the one no other names in its imports, and its identifier, creation record and roots are the document's. Several the imports leave unsettled are refused, because the last read is an accident of order |
-| An inventory element belongs to an imported document | Where an import names it, the imported document names it as a root, or every root it names is the imported document's and none the file's own. It names none of the build's roots |
-| A creation record may be written in place as an object | On the document, its time is the document's. On another element it dates nothing unless it carries an identifier, and then it is the record every reference to that identifier names. Its version is checked as a referred-to record's is |
-| One relationship states a list of ends | The edge bound is charged per end, as each is read |
-| An element's type is known only once it is read | Every entry is charged against the component bound on the way in. A path hands that charge back and takes the file bound; a relationship hands it back for the edge bound its ends took, and one stating no end keeps its component charge |
-| Identifiers are absolute | Nothing depends on their shape. Every one but the document's own resolves the document to itself and is discarded |
-| A path and a package may not share an identifier | Checked where a package is bound and where a path is recorded, since either may come first |
-| The version is stated in the context and in every creation record, and either serves | A producer need not emit the first |
+| An element's type may follow the fields it governs | Each element is read into a neutral shape and interpreted when it closes |
+| The header is inside the contents | The header pass walks the graph and builds nothing |
+| Several creation records | The one the document points at is its own; with none, the upload is dated on arrival, since an imported document's time never moves |
+| Several document elements | The file's own is the one no import names, and its identifier, creation record and roots are the document's; several left unsettled are refused |
+| An inventory element of an imported document | One an import names, the imported document names as root, or whose roots are all the imported document's; it names none of the build's roots |
+| A creation record written in place | On the document it dates the document; elsewhere it dates nothing unless it carries an identifier, and then every reference to it names it; its version is checked as a referred record's |
+| One relationship, many ends | The edge bound is charged per end |
+| Type known only after reading | Every entry charges the component bound on the way in; a path hands it back for the file bound, a relationship for the edge bound its ends took, and one with no end keeps it |
+| Identifiers are absolute | All but the document's own resolve and are discarded |
+| A path and a package sharing an identifier | Refused, checked where either is recorded |
+| The version in the context or in any creation record | Either serves |
 
 ### CycloneDX encoded as XML
 
-A second walk over the same reader, never a fourth vocabulary: its Maven
-plugin, the likeliest source, writes both encodings by default. Everything a
-fact means once read (which of two suppliers wins, how licenses combine, what a
-patch claims, where a bound is charged) is the JSON reader's, and a test holds
-the plugin's two encodings of one build to one build.
+A second walk over the same reader: the Maven plugin writes both encodings by
+default, and what a fact means once read is the JSON reader's. A test holds the
+plugin's two encodings of one build to one build.
 
-| Where XML differs | Spelling |
+| XML spelling | Of |
 |---|---|
-| A component's identifier within the file, and its kind | The attributes `bom-ref` and `type` |
-| The document's identity | The `serialNumber` attribute of the top-level element |
-| What a component depends on | A `dependency` element nested inside its own, each naming one by its `ref` attribute |
+| The attributes `bom-ref` and `type` | A component's in-file identifier and kind |
+| `serialNumber` on the top-level element | The document's identity |
+| A `dependency` element nested in its component, naming one by `ref` | What a component depends on |
 
 | Rule | Reason |
 |---|---|
-| The encoding is told from the first character after layout and, in XML, a byte-order mark: a brace or an angle bracket | The content type a pipeline sends is its HTTP client's default |
-| The declaration is the top-level element's namespace, `http://cyclonedx.org/schema/bom/1.6` | It states format and revision at once and cannot arrive late. Any other namespace is refused by name, SPDX's RDF encoding among them, found once in 41 public inventories |
-| An element in another namespace is walked past | It is an extension. Version 1.1 stated dependencies through one, so a 1.1 document reads with its components and no edges |
-| A document type declaration is refused where it is met | It is where XML defines entities, through which a document makes its reader fetch a file or URL or expand to gigabytes. No producer writes one, and a reader never accepting one is not exposed by a later change to the decoder |
-| UTF-8 only; another declared encoding is refused | Every producer seen writes UTF-8 |
-| The same bounds, charged at the same points, depth per element including unread ones | |
-| A dependency nested in a nested dependency is an edge from the one it is nested in | The schema nests the element without saying where it stops. How deep is the depth bound's business |
-| A NUL is refused, where the JSON reader drops one | XML forbids the character, written or by reference, and JSON allows it |
-| An element's text is trimmed | Layout is not the value |
-| The decoder's complaints are bounded like anything else quoted | They quote the document; passed on whole, a 1 MiB element name returned a refusal of about that size |
+| The encoding is told from the first character after layout and any byte-order mark | A pipeline's content type is its client's default |
+| The declaration is the top-level namespace, `http://cyclonedx.org/schema/bom/1.6`; any other is refused by name | SPDX's RDF encoding turned up once in 41 public inventories |
+| An element in another namespace is walked past | It is an extension, so a 1.1 document reads without its edges |
+| A document type declaration is refused where met | It is how XML fetches files or expands to gigabytes, and no producer writes one |
+| UTF-8 only | Every producer seen writes it |
+| Size, depth, components, edges, licenses and claims are charged at the JSON walk's points, through the same functions; depth per element, unread ones included | |
+| A dependency nested in a nested dependency is an edge from its parent | Depth is the depth bound's business |
+| A NUL is refused | XML forbids it |
+| Element text is trimmed | |
+| The decoder's complaints are bounded | A 1 MiB element name came back as a refusal that size |
 
 ## Format spellings
 
-The internal shape is the graph's own, the same from every format.
-
 | Fact | CycloneDX | SPDX 2.x | SPDX 3.x |
 |---|---|---|---|
-| The document's identity | `serialNumber` | `documentNamespace` | the document element's identifier |
-| When the producer made it | `metadata.timestamp` | `creationInfo.created` | the creation record the document points at |
-| What it is about | the component under `metadata`, inline | an identifier pointing at a package | identifiers on the document or inventory element, and `describes` |
+| Document identity | `serialNumber` | `documentNamespace` | the document element's identifier |
+| When made | `metadata.timestamp` | `creationInfo.created` | the creation record the document points at |
+| What it is about | the component under `metadata` | an identifier pointing at a package | identifiers on the document or inventory element, and `describes` |
 | What ships | `components` | `packages` | entries typed as a package |
-| A component's identity in the file | `bom-ref` | `SPDXID` | `spdxId` |
-| The version | `version` | `versionInfo` | `software_packageVersion` |
-| Package identifier and database key | fields of the component | external references, by type | a field of the package, or external identifiers by type |
+| In-file identity | `bom-ref` | `SPDXID` | `spdxId` |
+| Version | `version` | `versionInfo` | `software_packageVersion` |
+| Package identifier and database key | component fields | external references by type | a package field, or external identifiers by type |
 | Structure | `dependencies`, and nesting | relationships, either way round | relationships, one way round |
-| A dependency's scope | a component's `scope` | the relationship type: build, development, runtime, optional, test | a `scope` on the relationship |
-| What it was built from | a pedigree describing the ancestor | a relationship to another package | the same, as `ancestorOf` or `descendantOf` |
-| What a carried patch resolves | a patch in the pedigree, naming the vulnerability | cannot be stated | cannot be stated |
-| A container image | `type` of `container` | `primaryPackagePurpose` of `CONTAINER` | `software_primaryPurpose` of `container` |
+| Dependency scope | `scope` | the relationship type | `scope` on the relationship |
+| Built from | a pedigree | a relationship to another package | `ancestorOf` or `descendantOf` |
+| What a carried patch resolves | a pedigree patch naming the vulnerability | cannot be stated | cannot be stated |
+| Container image | `type` `container` | `primaryPackagePurpose` `CONTAINER` | `software_primaryPurpose` `container` |
 
 | Rule | Reason |
 |---|---|
-| A container image is read from the format only where the component carries no package identifier | The identifier's type decides where there is one. An image is identified by its name (REQ-08, `design-docs/data-model.md` § Container images) |
-| Only the first ancestor supplies upstream identity | Anything further back is history, and a scanner matches against the fork point |
-| The first of each identifier stands | One real producer emits eight spellings of one database key, differing in a hyphen, and nothing says which an advisory used |
-| SPDX's `NOASSERTION` and `NONE` are read as no value | Taken literally a package's version is `NOASSERTION`, which a person reads as a version and a scanner tries to match |
-| `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF` are edges carrying the producer's word; `TEST_DEPENDENCY_OF` places nothing | The word's meaning is `design-docs/findings-components.md` § Declared dependency scope |
-| A component reached only by those four has a consumer, so its occurrence identity is a consumer's and a decision keyed on the component alone does not cover it | A database that took SPDX 2 inventories under an earlier build is recreated, never migrated (REQ-76) |
+| A container image is read from the format only where no package identifier decides it; an image is identified by name (REQ-08, `design-docs/data-model.md` § Container images) | |
+| Only the first ancestor supplies upstream identity | A scanner matches the fork point |
+| The first of each identifier stands | One producer emits eight spellings of one database key |
+| `NOASSERTION` and `NONE` are no value | Otherwise a scanner matches the word as a version |
+| SPDX 2's `BUILD_`, `DEV_`, `RUNTIME_` and `OPTIONAL_DEPENDENCY_OF` are edges keeping the producer's word; `TEST_DEPENDENCY_OF` places nothing | What the word means is `design-docs/findings-components.md` § Declared dependency scope |
+| A component reached only by those four has a consumer, so a decision keyed on the component alone does not cover it; an older database is recreated (REQ-76) | |
 
 ### Structural relationships
 
-A relationship is an edge where it says one component is part of another in the
-sense the graph is walked, the question a CycloneDX `dependsOn` answers.
+An edge is a relationship saying one component is part of another, as
+CycloneDX `dependsOn` does.
 
 | SPDX 2.x | Types |
 |---|---|
-| An edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF`, `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF` |
-| What the document is about | `DESCRIBES` and `DESCRIBED_BY`, between the document and a package |
-| What a component was derived from | `ANCESTOR_OF` and `DESCENDANT_OF` |
+| Edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF`, `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF` |
+| What the document is about | `DESCRIBES`, `DESCRIBED_BY` |
+| Derived from | `ANCESTOR_OF`, `DESCENDANT_OF` |
 | Nothing | Everything else |
 
 | SPDX 3.x | Types |
 |---|---|
-| An edge | `contains`, `dependsOn`, `hasDynamicLink`, `hasStaticLink`, `hasPrerequisite`, `hasOptionalComponent`, `hasOptionalDependency`, `hasProvidedDependency` |
+| Edge | `contains`, `dependsOn`, `hasDynamicLink`, `hasStaticLink`, `hasPrerequisite`, `hasOptionalComponent`, `hasOptionalDependency`, `hasProvidedDependency` |
 | What the document is about | `describes` |
-| What a component was derived from | `ancestorOf`, `descendantOf` |
+| Derived from | `ancestorOf`, `descendantOf` |
 | Nothing | Everything else |
 
 | Rule | Reason |
 |---|---|
-| A type stated either way round is the same edge | The graph has one shape |
-| A build tool, a development tool and a test dependency place nothing | They describe the build, not the product. The component is still held and counted as under nothing, as CycloneDX build tooling under `formulation` is |
-| A derivation fills an upstream nothing else stated and never replaces one | It is a pointer to something the document also describes, weaker than a pedigree |
-| A derivation is charged against the claim bound | An unbounded array of them is the edge hazard under another name |
+| Either direction is one edge | |
+| A build tool, development tool or test dependency places nothing; the component is held under nothing | As CycloneDX `formulation` tooling |
+| A derivation fills an upstream nothing else stated, never replacing one | It only points at something the document describes |
+| A derivation charges the claim bound | |
 
 ### Lifecycle scopes
 
-The third version annotates a relationship with a phase: build, design,
-development, runtime, test or other. The specification never says one means the
-target does not ship.
-
-| Scope | Read as |
+| SPDX 3 scope | Read as |
 |---|---|
-| `test` | Places nothing. The target is held and counted as under nothing, as `TEST_DEPENDENCY_OF` is |
-| Everything else | Places its target under the element the relationship is stated from |
+| `test` | Places nothing; the target is held under nothing |
+| build, design, development, runtime, other | Places its target under the relationship's source |
 
-`build` is not "does not ship": a crate or module linked into a binary is a
-build-phase dependency inside what ships. § Limits says what the reading costs.
+`build` ships: a crate linked into a binary is a build-phase dependency.
 
 ### Files are not components
 
 | Rule | Reason |
 |---|---|
-| A file is never held as a component | Nothing matches a vulnerability against a path, and a real image catalogs five files per package |
-| File identifiers are kept, and an edge naming one is dropped and counted apart from other dropped edges | 91 of the fixture's 125 relationships run from a package to its files. Uncounted, the graph reads as holed, and a count meant to say the derivation changed moves with how much file detail the producer emits |
-| Files have a bound of their own, set by measurement | A real scan catalogs 4,964 files against 89 packages and 21,643 against 480, 45 to 56 per package, so a switch operating system's 6,866 packages bring over 300,000 files. Charged against the component ceiling of 100,000, a real inventory is refused; raised to fit, the component bound bounds nothing. A path costs 133 bytes to hold, a component 766 |
+| A file is never held as a component | Nothing matches a path, and an image catalogs five files per package |
+| An edge naming a file is dropped and counted apart | 91 of the fixture's 125 relationships run to files, so mixed in, the count tracks file detail |
+| Files have their own bound | 4,964 files against 89 packages and 21,643 against 480 put a 6,866-package switch image over 300,000 files, past the 100,000 component ceiling; a path costs 133 bytes held, a component 766 |
 
 ## The root
 
 | Rule | Reason |
 |---|---|
-| The root is resolved once the document closes | One format states it inline; the other points at a package that may not have been read |
-| A document pointing at several things has no single root, and the tracked unit stands in, as for a document naming none | Picking one states a hierarchy the producer did not |
-| Roots are counted by what the pointers resolve to | A producer filling both the list and the relationship names one component twice, and counting statements would leave the document with none |
-| The root is stored by name alone | A package identifier carries the version, which moves every build, and the root's identity moving takes every edge with it |
-| The declared root's package identifier is kept on the scan as a fact about the document, beside its serial and what it was made of, never as an identity | It is what a published advisory offers a reader to match a release against |
-| It is read off the document, never off the resolved graph, and a root carrying no package identifier keeps nothing | An identifier helps only if it appears on both sides, and the tracked unit standing in is ours |
+| Resolved once the document closes | SPDX may point at a package not yet read |
+| A document pointing at several things has no single root, and the tracked unit stands in, as for none | Picking one invents a hierarchy |
+| Roots are counted by what the pointers resolve to | A producer filling list and relationship names one root twice |
+| Stored by name alone | Its version moves every build and would move every edge |
+| The declared root's package identifier is kept on the scan as a fact, beside serial and composition, never as identity | An advisory reader matches a release by it |
+| Read off the document; a root with no package identifier keeps nothing | An identifier we invent matches nothing |
 
 ## Limits
 
 | Limit | Detail |
 |---|---|
-| A lifecycle scope is read the way that keeps a component | Keeping too much adds triage somebody sees; dropping too much removes a finding nobody learns of. The format's example 11 states its three dependencies unscoped in the second version and as `build` in the third, so read as not shipping, that document loses every component |
-| The third SPDX version is read against the specification's documents and no producer's output | Nothing ingested here emits it, and the bundled scanner emits 2.3 and tag-value. The fixtures are hand-written and small, so which shapes real producers use is unknown |
+| A lifecycle scope is read the way that keeps a component | Too much adds visible triage; too little hides findings. The format's example 11 states as `build` in version 3 what version 2 states unscoped, so reading `build` as not shipping loses every component |
+| SPDX 3 is read against the specification alone | Nothing ingested emits it, the bundled scanner emits 2.3 and tag-value, and the fixtures are small and hand-written |
