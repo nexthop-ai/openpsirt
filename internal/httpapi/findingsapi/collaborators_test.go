@@ -436,8 +436,8 @@ func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing
 		for _, path := range []string{
 			build + "/sboms",
 			build + "/components",
-			build + "/match-coverage",
-			build + "/match-coverage.csv",
+			build + "/unmatched-components",
+			build + "/unmatched-components.csv",
 			build + "/register",
 			build + "/register.csv",
 		} {
@@ -445,6 +445,11 @@ func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing
 			stranger := httpapitest.AsPerson(t, r, "reader", http.MethodGet,
 				"/v1/products/theirs/branches-and-tags/master/variants/broadcom"+
 					path[len(build):], "")
+			// A path no route answers refuses both alike without reaching
+			// the read, so the pair would compare nothing.
+			if strings.HasPrefix(stranger.Body.String(), "404 page not found") {
+				t.Errorf("%s answers as no route, so this compares nothing", path)
+			}
 			if collaborator.Code != stranger.Code {
 				t.Errorf("%s answers a collaborator %d and a stranger %d, so the pair "+
 					"says which builds exist: %s",

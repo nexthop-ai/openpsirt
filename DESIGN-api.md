@@ -398,7 +398,7 @@ upload changed also answer under
 `/v1/products/{product}/streams/{stream}/variants/{variant}/scans`, the address
 build pipelines called before the paths were renamed (REQ-86). Every other
 renamed path answers at its own address alone, and a former one answers as no
-route.
+route, apart from `GET /v1/decisions/{id}`, which now answers one decision.
 
 | Rule | Why |
 |---|---|

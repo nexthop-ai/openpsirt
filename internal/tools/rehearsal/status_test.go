@@ -29,6 +29,18 @@ func TestABuildWhoseCountDoesNotReadIsNotSettled(t *testing.T) {
 	}
 }
 
+// A release whose API path says branches-and-tags names its builds that way in
+// its status report, and one before it says streams.
+func TestABuildIsReadUnderEitherSpellingOfItsBranch(t *testing.T) {
+	out := "  a/branches-and-tags/s/variants/v   scan scanned · open 3 findings\n" +
+		"  b/streams/s/variants/v   scan scanned · open 4 findings\n"
+	totals, busy, failed, unread := parseStatus(out)
+	if busy || len(failed) != 0 || len(unread) != 0 ||
+		!reflect.DeepEqual(totals, Totals{"a/s/v": 3, "b/s/v": 4}) {
+		t.Errorf("totals %v busy %v failed %v unread %q", totals, busy, failed, unread)
+	}
+}
+
 func TestEveryBuildScannedAndCountedIsSettled(t *testing.T) {
 	out := "  a/streams/s/variants/v   scan scanned · open 3 findings\n" +
 		"  b/streams/s/variants/v   scan failed · open 0 findings\n" +
