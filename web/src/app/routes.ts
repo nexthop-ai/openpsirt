@@ -78,11 +78,12 @@ export const comparisonAt = (product: string, query?: Query) =>
   at("comparison", { product }, query);
 export const inventoryComparisonAt = (product: string, query?: Query) =>
   at("inventoryComparison", { product }, query);
-// A product's inbox, or only the rulings in it waiting for a second person.
-export const inboxAt = (product: string, waiting = false) =>
-  at("inbox", { product }, { waiting: waiting ? "1" : undefined });
-export const inboxReportAt = (product: string, reference: string) =>
-  at("inboxReport", { product, reference });
+// A product's vulnerability reports, or only the rulings waiting for a second
+// person.
+export const vulnerabilityReportsAt = (product: string, waiting = false) =>
+  at("vulnerabilityReports", { product }, { waiting: waiting ? "1" : undefined });
+export const vulnerabilityReportAt = (product: string, reference: string) =>
+  at("vulnerabilityReport", { product, reference });
 // A product's static analysis leads: the queue, or one state's leads, on
 // every build or one.
 export const leadsAt = (

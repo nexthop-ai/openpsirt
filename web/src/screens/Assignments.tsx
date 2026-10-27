@@ -16,7 +16,7 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
-import { findingOf, inboxReportAt, leadAt, leadsAt } from "../app/routes";
+import { findingOf, vulnerabilityReportAt, leadAt, leadsAt } from "../app/routes";
 import { useHandBack, useHeldReports } from "../api/intake";
 import { on } from "../ui/when";
 
@@ -263,7 +263,7 @@ function Reports({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const to = inboxReportAt(row.product, row.reference);
+              const to = vulnerabilityReportAt(row.product, row.reference);
               return (
                 <tr
                   key={`${row.product} ${row.reference}`}

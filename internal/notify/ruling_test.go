@@ -103,7 +103,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		if !strings.Contains(told[0].Body, "calling 2 vulnerability reports rejected") {
 			t.Errorf("the alert reads %q", told[0].Body)
 		}
-		if told[0].Link != "/products/sonic/inbox?waiting=1" {
+		if told[0].Link != "/products/sonic/vulnerability-reports?waiting=1" {
 			t.Errorf("the alert points at %q", told[0].Link)
 		}
 		for _, who := range []*access.Account{proposer, approver, announced, reads} {

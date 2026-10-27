@@ -207,7 +207,7 @@ export function useScope(): Scoped {
 
 // The scope an address names, or null where it names none and the tab's
 // remembered one stands. An address under a product that names nothing below
-// it, such as a component or an inbox, keeps the branch and variant
+// it, such as a component or its vulnerability reports, keeps the branch and variant
 // remembered for that product, so walking into one does not widen the scope.
 export function scopeAt(pathname: string, search: string, kept: Scoped = {}): Scoped | null {
   // The wider findings list is the one address whose scope is not all in the
@@ -246,8 +246,10 @@ const UNDER_PRODUCT: { shape: string; carries: "nothing" | "stream" | "tail" }[]
   { shape: ROUTES.variants, carries: "tail" },
   { shape: ROUTES.comparison, carries: "tail" },
   { shape: ROUTES.inventoryComparison, carries: "tail" },
-  { shape: ROUTES.inbox, carries: "tail" },
-  { shape: ROUTES.inboxReport, carries: "nothing" },
+  { shape: ROUTES.vulnerabilityReports, carries: "tail" },
+  { shape: ROUTES.vulnerabilityReport, carries: "nothing" },
+  { shape: ROUTES.formerVulnerabilityReports, carries: "tail" },
+  { shape: ROUTES.formerVulnerabilityReport, carries: "nothing" },
   { shape: ROUTES.leads, carries: "tail" },
   { shape: ROUTES.leadRules, carries: "tail" },
   { shape: ROUTES.repositories, carries: "tail" },

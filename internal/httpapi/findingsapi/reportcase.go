@@ -514,7 +514,7 @@ func tellReportNamed(ctx context.Context, in core.Deps, subject access.Subject,
 	}
 	dropped, err := core.Mentioned(ctx, in, subject, core.MentionTarget{
 		ProductID: row.ProductID, Visibility: access.Private, About: row.Reference,
-	}, body, weblink.InboxReport(product, row.Reference))
+	}, body, weblink.VulnerabilityReport(product, row.Reference))
 	if err != nil {
 		in.Log().WarnContext(ctx, "could not tell who was named", "error", err)
 	}

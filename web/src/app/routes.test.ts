@@ -23,8 +23,11 @@ const SAMPLES: Record<string, () => string[]> = {
   variantsAt: () => [routes.variantsAt(odd)],
   comparisonAt: () => [routes.comparisonAt(odd), routes.comparisonAt(odd, { from: odd, to: odd })],
   inventoryComparisonAt: () => [routes.inventoryComparisonAt(odd, { from: odd, to: odd })],
-  inboxAt: () => [routes.inboxAt(odd), routes.inboxAt(odd, true)],
-  inboxReportAt: () => [routes.inboxReportAt(odd, odd)],
+  vulnerabilityReportsAt: () => [
+    routes.vulnerabilityReportsAt(odd),
+    routes.vulnerabilityReportsAt(odd, true),
+  ],
+  vulnerabilityReportAt: () => [routes.vulnerabilityReportAt(odd, odd)],
   leadsAt: () => [
     routes.leadsAt(odd),
     routes.leadsAt(odd, { state: "not-reproduced", stream: odd, variant: odd }),
@@ -73,7 +76,7 @@ const SAMPLES: Record<string, () => string[]> = {
     routes.sameScreenAt(build, "dependencies"),
     routes.sameScreenAt(build, "findings/CVE-1/components/a%2Fb"),
   ],
-  sameProductScreenAt: () => [routes.sameProductScreenAt(odd, "/inbox")],
+  sameProductScreenAt: () => [routes.sameProductScreenAt(odd, "/vulnerability-reports")],
   decisionAt: () => [routes.decisionAt(7)],
   decisionOccurrenceAt: () => [routes.decisionOccurrenceAt(7)],
   issueAt: () => [routes.issueAt(odd)],

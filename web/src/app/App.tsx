@@ -20,6 +20,8 @@ import {
   inventoryChangesAt,
   personAt,
   incidentsAt,
+  vulnerabilityReportAt,
+  vulnerabilityReportsAt,
 } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
@@ -42,8 +44,12 @@ const Home = retrying(() => import("../screens/Home").then((m) => m.Home));
 const Finding = retrying(() => import("../screens/Finding").then((m) => m.Finding));
 const Dependencies = retrying(() => import("../screens/Dependencies").then((m) => m.Dependencies));
 const Compare = retrying(() => import("../screens/Compare").then((m) => m.Compare));
-const Inbox = retrying(() => import("../screens/Inbox").then((m) => m.Inbox));
-const InboxReport = retrying(() => import("../screens/InboxReport").then((m) => m.InboxReport));
+const VulnerabilityReports = retrying(() =>
+  import("../screens/VulnerabilityReports").then((m) => m.VulnerabilityReports),
+);
+const VulnerabilityReport = retrying(() =>
+  import("../screens/VulnerabilityReport").then((m) => m.VulnerabilityReport),
+);
 const Leads = retrying(() => import("../screens/Leads").then((m) => m.Leads));
 const Lead = retrying(() => import("../screens/Lead").then((m) => m.Lead));
 const LeadRules = retrying(() => import("../screens/LeadRules").then((m) => m.LeadRules));
@@ -197,8 +203,8 @@ export function App() {
               <Route path={ROUTES.vex} element={<VEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
               <Route path={ROUTES.inventoryComparison} element={<InventoryCompare />} />
-              <Route path={ROUTES.inbox} element={<Inbox />} />
-              <Route path={ROUTES.inboxReport} element={<InboxReport />} />
+              <Route path={ROUTES.vulnerabilityReports} element={<VulnerabilityReports />} />
+              <Route path={ROUTES.vulnerabilityReport} element={<VulnerabilityReport />} />
               <Route path={ROUTES.leads} element={<Leads />} />
               <Route path={ROUTES.lead} element={<Lead />} />
               <Route path={ROUTES.leadRules} element={<LeadRules />} />
@@ -251,6 +257,16 @@ export function App() {
               <Route
                 path={ROUTES.formerRecordFlaw}
                 element={<Moved to={() => "/record-a-flaw"} />}
+              />
+              <Route
+                path={ROUTES.formerVulnerabilityReports}
+                element={<Moved to={(at) => vulnerabilityReportsAt(at.product ?? "")} />}
+              />
+              <Route
+                path={ROUTES.formerVulnerabilityReport}
+                element={
+                  <Moved to={(at) => vulnerabilityReportAt(at.product ?? "", at.reference ?? "")} />
+                }
               />
               <Route
                 path={ROUTES.formerDependencies}

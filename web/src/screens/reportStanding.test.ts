@@ -3,7 +3,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { Report } from "../api/intake";
-import { dispositionSaid, needsReason, needsSecond, ready, rulable, standing } from "./inbox";
+import {
+  dispositionSaid,
+  needsReason,
+  needsSecond,
+  ready,
+  rulable,
+  standing,
+} from "./reportStanding";
 
 const report = (extra: Partial<Report>): Report =>
   ({ reference: "SONIC-R-2026-1", recorded_by: "them", recorded_at: "", ...extra }) as Report;

@@ -114,7 +114,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 				core.Tell(ctx, in, "could not say that a report was assigned", notify.Telling{
 					PersonID: them.ID, Kind: notify.Assigned,
 					Body:    "Report " + row.Reference + ", in " + product.Name,
-					Link:    weblink.InboxReport(product.Name, row.Reference),
+					Link:    weblink.VulnerabilityReport(product.Name, row.Reference),
 					Private: true, ProductID: &productID,
 				}, "person", them.ID)
 			}

@@ -182,7 +182,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 				"second person. It takes effect only once somebody agrees to it.",
 				row.Product, reports, strings.ReplaceAll(row.Disposition, "-", " "),
 				plainly(days)),
-			Link: weblink.InboxWaiting(row.Product),
+			Link: weblink.VulnerabilityReportsWaiting(row.Product),
 			// A claim nobody has agreed to set aside is one nobody has
 			// decided is safe to repeat.
 			Private:   true,
@@ -745,7 +745,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Reference, row.Product, when)
-			holds.Link = weblink.InboxReport(row.Product, row.Reference)
+			holds.Link = weblink.VulnerabilityReport(row.Product, row.Reference)
 			holds.VulnerabilityID = nil
 		}
 		told, err := audience.of(ctx, row.ProductID, row.AssignedTo)

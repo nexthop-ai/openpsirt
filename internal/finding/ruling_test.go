@@ -168,7 +168,7 @@ func TestAWaitingRulingHoldsItsReports(t *testing.T) {
 	})
 }
 
-func TestWithdrawingARulingReturnsItsReportsToTheInbox(t *testing.T) {
+func TestWithdrawingARulingOpensItsReportsAgain(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		proposer := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		second := f.somebody(t, "second@example.com", access.PrivateTriage)
@@ -218,7 +218,7 @@ func TestWithdrawingARulingReturnsItsReportsToTheInbox(t *testing.T) {
 				ruling.ID); !errors.Is(err, finding.ErrWithdrawn) {
 				t.Errorf("withdrawing twice was answered %v", err)
 			}
-			// Back in the inbox means it can be answered again.
+			// Open again means it can be answered again.
 			if _, err := f.store.Rule(t.Context(), proposer, f.productID, finding.Ruled{
 				References: named, Disposition: finding.NotReproducible, Reasoning: "Tried.",
 			}); err != nil {

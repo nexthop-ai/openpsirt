@@ -242,8 +242,8 @@ func registerRulings(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "withdraw-report-ruling", Method: http.MethodPost, Path: one + "/withdrawal",
 		Summary: "Withdraw a ruling on vulnerability reports",
-		Description: "Takes a ruling back, waiting or in force, and returns every report it " +
-			"covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in " +
+		Description: "Takes a ruling back, waiting or in force, and opens every report it " +
+			"covered again, judged as nothing. Sending a waiting ruling back and undoing one in " +
 			"force are this one act.\n\n" +
 			"Needs nobody else, and the proposer may withdraw their own. The ruling stays on " +
 			"record as withdrawn.",

@@ -481,10 +481,10 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 	return s.RulingBy(ctx, subject, productID, rulingID)
 }
 
-// WithdrawRuling takes a ruling back, waiting or in force, and returns its
-// reports to the inbox.
+// WithdrawRuling takes a ruling back, waiting or in force, and opens its
+// reports again, unjudged.
 //
-// Needs nobody else. Returning a claim to the inbox re-exposes it rather than
+// Needs nobody else. Opening a report again re-exposes it rather than
 // hiding it, and the proposer sending their own back and an approver sending
 // it back are the same act.
 func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
@@ -530,7 +530,7 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 			Set(`"evaluated_by" = NULL`).
 			Where(`"ruling_id" = ?`, rulingID).
 			Exec(ctx); err != nil {
-			return fmt.Errorf("return those reports to the inbox: %w", err)
+			return fmt.Errorf("open those reports again: %w", err)
 		}
 		// A disclosure date the ruling started goes back to where the rest
 		// of the embargo's record leaves it.

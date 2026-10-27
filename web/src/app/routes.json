@@ -135,7 +135,10 @@
     "path": "/products/:product/comparison/inventory",
     "query": ["change", "from", "from_variant", "to", "to_variant"]
   },
-  "inbox": { "path": "/products/:product/inbox", "query": ["waiting"] },
+  "vulnerabilityReports": {
+    "path": "/products/:product/vulnerability-reports",
+    "query": ["waiting"]
+  },
   "leads": {
     "path": "/products/:product/leads",
     "query": ["state", "stream", "variant", "series"]
@@ -143,7 +146,7 @@
   "lead": { "path": "/products/:product/streams/:stream/variants/:variant/leads/:place" },
   "leadRules": { "path": "/products/:product/lead-rules" },
   "repositories": { "path": "/products/:product/repositories" },
-  "inboxReport": { "path": "/products/:product/inbox/:reference" },
+  "vulnerabilityReport": { "path": "/products/:product/vulnerability-reports/:reference" },
   "me": { "path": "/me" },
   "access": { "path": "/access" },
   "person": { "path": "/access/:identity" },
@@ -173,6 +176,8 @@
   "formerRecord": { "path": "/record" },
   "formerDisclosureDeadlines": { "path": "/disclosing" },
   "formerRecordFlaw": { "path": "/report-a-flaw" },
+  "formerVulnerabilityReports": { "path": "/products/:product/inbox" },
+  "formerVulnerabilityReport": { "path": "/products/:product/inbox/:reference" },
   "formerDependencies": {
     "path": "/products/:product/streams/:stream/variants/:variant/components"
   },

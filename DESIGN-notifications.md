@@ -288,7 +288,7 @@ Both reach the report's audience (§ Report audience).
 A ruling waiting for approval takes the period a waiting decision does, because it
 is the same thing: one act setting something aside, which takes effect only
 once somebody else agrees. One alert per ruling, however many reports it
-covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
+covers, pointing at the product's vulnerability reports narrowed to what is waiting. It is undisclosed,
 and reaches whoever may approve it under the report rule: the approver
 capability or triage of undisclosed work, over reading it, and never its
 proposer. A ruling answers what a claim is and not

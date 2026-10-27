@@ -23,14 +23,14 @@ import { Scoring } from "../ui/Scoring";
 import { Weaknesses } from "../ui/Weaknesses";
 import { Required } from "../ui/Required";
 import { humane } from "./duration";
-import { inboxReportAt, issueAt, productFindingsAt } from "../app/routes";
+import { vulnerabilityReportAt, issueAt, productFindingsAt } from "../app/routes";
 
 // Recording a flaw in what we ship: one somebody outside sent, or one somebody
 // here found. The one way in for both. What separates them is a single answer
 // about where it came from, which decides the disclosure date and whether
 // anybody is owed a reply.
 //
-// Filed as a report, it waits in the product's Inbox to be judged. Recorded as
+// Filed as a report, it waits in the product's vulnerability reports to be judged. Recorded as
 // a flaw at once, it asks for what a flaw carries — the builds, the component,
 // how bad — and is written with its report in the same act. The second is
 // offered to whoever may judge reports, and it is the only path for somebody
@@ -61,7 +61,7 @@ export function RecordFlaw() {
   // and takes who reported it from the report rather than asking again.
   const [params] = useSearchParams();
   const fromReport = params.get("from") ?? "";
-  // The product the link names, where it names one: the Inbox opens this with
+  // The product the link names, where it names one: Vulnerability reports opens this with
   // its own product picked.
   const [product, setProduct] = useState(params.get("product") ?? scope.product ?? "");
   const report = useReport(fromReport ? product : "", fromReport);
@@ -267,7 +267,7 @@ export function RecordFlaw() {
       return { made, failed };
     },
     onSuccess: ({ made, failed }) => {
-      const onward = inboxReportAt(product, made.reference);
+      const onward = vulnerabilityReportAt(product, made.reference);
       setRefused(failed);
       if (failed.length > 0) {
         setOnward(onward);
@@ -392,7 +392,7 @@ export function RecordFlaw() {
         {fromReport ? (
           <p className="hint">
             From{" "}
-            <Link className="id" to={inboxReportAt(product, fromReport)}>
+            <Link className="id" to={vulnerabilityReportAt(product, fromReport)}>
               {fromReport}
             </Link>
             {report.data?.found_here
@@ -483,7 +483,7 @@ export function RecordFlaw() {
             value={recordNow ? "record" : "file"}
             onChange={(next) => setNow(next === "record")}
             options={[
-              { value: "file", label: "File for judging", note: "Waits in the Inbox" },
+              { value: "file", label: "File for judging", note: "Waits in Vulnerability reports" },
               {
                 value: "record",
                 label: "Record as a flaw now",
@@ -729,7 +729,7 @@ export function RecordFlaw() {
               : !said
                 ? "Say where it came from."
                 : !recordNow
-                  ? "Goes to the Inbox for judging."
+                  ? "Goes to Vulnerability reports for judging."
                   : whole
                     ? `Against ${streams.length * variants.length} ${
                         streams.length * variants.length === 1 ? "build" : "builds"

@@ -93,7 +93,7 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 				told[0].Body, report.Reference)
 		}
 		// And it points at the report, which is where it is answered.
-		if want := "/products/sonic/inbox/" + report.Reference; told[0].Link != want {
+		if want := "/products/sonic/vulnerability-reports/" + report.Reference; told[0].Link != want {
 			t.Errorf("the alert points at %q, want %q", told[0].Link, want)
 		}
 		if n := len(waiting(announced)); n != 0 {

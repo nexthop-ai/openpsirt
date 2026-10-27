@@ -92,21 +92,21 @@ func ProductFindings(product, search string) string {
 	return "/products/" + url.PathEscape(product) + "/findings?q=" + url.QueryEscape(search)
 }
 
-// InboxWaiting is a product's inbox opened on the rulings waiting for a second
-// person.
-func InboxWaiting(product string) string {
+// VulnerabilityReportsWaiting is a product's vulnerability reports opened on
+// the rulings waiting for a second person.
+func VulnerabilityReportsWaiting(product string) string {
 	if climbs(product) {
 		return Home()
 	}
-	return "/products/" + url.PathEscape(product) + "/inbox?waiting=1"
+	return "/products/" + url.PathEscape(product) + "/vulnerability-reports?waiting=1"
 }
 
-// InboxReport is one report in a product's inbox.
-func InboxReport(product, reference string) string {
+// VulnerabilityReport is one of a product's vulnerability reports.
+func VulnerabilityReport(product, reference string) string {
 	if climbs(product, reference) {
 		return Home()
 	}
-	return "/products/" + url.PathEscape(product) + "/inbox/" + url.PathEscape(reference)
+	return "/products/" + url.PathEscape(product) + "/vulnerability-reports/" + url.PathEscape(reference)
 }
 
 // Finding is one finding: an issue at one component of one build. A version,

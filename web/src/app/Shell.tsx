@@ -11,7 +11,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { TO_THE_TOP, useTopOnArrival } from "./arrival";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import {
-  inboxAt,
+  vulnerabilityReportsAt,
   uploadsAt,
   leadsAt,
   issueAt,
@@ -267,12 +267,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             />
             {/* What people outside have sent a product. Only for somebody who may
               read vulnerability reports somewhere, and it needs a product
-              picked because an inbox belongs to one. */}
+              picked because a product's reports belong to it. */}
             {reportsAnywhere && (
               <Rail
-                to={product ? inboxAt(product) : ""}
+                to={product ? vulnerabilityReportsAt(product) : ""}
                 icon="letter"
-                label="Inbox"
+                label="Vulnerability reports"
                 needs={!!product && reportsHere}
                 why={
                   product
@@ -282,7 +282,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               />
             )}
             {/* A product's static analysis leads, under the same rule as the
-              inbox: shown to somebody who reads internal material anywhere, and
+              vulnerability reports: shown to somebody who reads internal material anywhere, and
               opening on the branch and variant picked where both are. */}
             {leadsAnywhere && (
               <Rail

@@ -542,7 +542,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			return then()
 		}
 		// Every flaw has a report, whether it was sent in or found here, so
-		// the Inbox is the one list of where flaws came from and the same
+		// the vulnerability reports are the one list of where flaws came from and the same
 		// fields answer it for both.
 		told := in.Told
 		reference, err := mintReference(ctx, tx, s.drawer(), product, now.Year())

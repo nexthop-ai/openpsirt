@@ -22,8 +22,8 @@ import { notACredential } from "../ui/noautofill";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { on } from "../ui/when";
-import { dispositionSaid, needsReason, needsSecond, RULABLE, ready } from "./inbox";
-import { inboxAt, inboxReportAt, issueAt } from "../app/routes";
+import { dispositionSaid, needsReason, needsSecond, RULABLE, ready } from "./reportStanding";
+import { vulnerabilityReportsAt, vulnerabilityReportAt, issueAt } from "../app/routes";
 
 // Saying what one or more reports are, where the answer is not an issue here.
 //
@@ -157,7 +157,7 @@ export function RuleForm({
 
 // One ruling: what it says, about which reports, and where it stands.
 //
-// Named by its product wherever it is read outside that product's inbox, and
+// Named by its product wherever it is read outside that product's vulnerability reports, and
 // without its controls in the audit log, which is read and printed rather than
 // worked.
 export function RulingCard({
@@ -188,7 +188,7 @@ export function RulingCard({
       <p style={{ margin: 0 }}>
         {named && (
           <>
-            <Link to={inboxAt(product)}>{product}</Link> ·{" "}
+            <Link to={vulnerabilityReportsAt(product)}>{product}</Link> ·{" "}
           </>
         )}
         <b>{dispositionSaid(ruling.disposition)}</b>{" "}
@@ -222,7 +222,7 @@ export function RulingCard({
       {ruling.reasoning && <Markdown source={ruling.reasoning} className="reading" />}
       <p style={{ margin: "6px 0 0", display: "flex", flexWrap: "wrap", gap: 6 }}>
         {(ruling.reports ?? []).map((reference) => (
-          <Link key={reference} className="id" to={inboxReportAt(product, reference)}>
+          <Link key={reference} className="id" to={vulnerabilityReportAt(product, reference)}>
             {reference}
           </Link>
         ))}
@@ -245,7 +245,7 @@ export function RulingCard({
             className="btn quiet"
             hidden={!may?.may_hide}
             disabled={withdraw.isPending}
-            title="Returns every vulnerability report it covers to the inbox"
+            title="Opens every vulnerability report it covers again, unjudged"
             onClick={() => withdraw.mutate(ruling.id)}
           >
             {ruling.state === "waiting" ? (ruling.yours ? "Withdraw" : "Send back") : "Undo"}

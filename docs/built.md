@@ -20,7 +20,7 @@ database built by a release candidate or any other earlier build is recreated.
 | Access | Roles per product or across every product, public, private and internal as separate grants, enforced in the data layer |
 | Triage | Decisions, approval, revision history, comments, bulk decisions, standing corrections, and a review queue listed by the reason each decision waits. Static analysis leads in a queue of their own, ordered by what is likely real, with their evidence and source links, standing rules that dismiss by rule or path, grouping across analyzers, and hand-off of a confirmed lead as a flaw recorded here |
 | Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public. A report from outside ruled a duplicate of a flaw found here starts the flaw's disclosure date |
-| Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
+| Vulnerability reports | One form for every report, a list of them per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
 | Advisories | CSAF advisories with editorial states and a second person's agreement, stating a release known not affected where approved decisions cover it and saying no fix is planned where they say it will not be fixed, a CSAF provider directory, and per-build OpenVEX documents with a revision chain, in two kinds: this deployment's own, and that with suppliers' statements beside it |
 | Incidents | Records that a product was attacked, the response windows counted from each, and the notices given |

@@ -15,7 +15,7 @@ import { mayOf, useWho } from "../app/session";
 import { useRulings } from "../api/intake";
 import {
   buildFindingsAt,
-  inboxAt,
+  vulnerabilityReportsAt,
   leadsAt,
   uploadsAt,
   productFindingsAt,
@@ -37,7 +37,7 @@ import {
 export function Product() {
   const { product = "" } = useParams();
   const who = useWho();
-  // The inbox asks what reading a report asks: reading undisclosed work.
+  // The vulnerability reports ask what reading a report asks: reading undisclosed work.
   const mayReadReports = !!mayOf(who.data, product)?.reads_private;
   const mayReadLeads = !!mayOf(who.data, product)?.reads_internal;
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
@@ -79,12 +79,12 @@ export function Product() {
           {mayReadReports && (
             <>
               {" "}
-              · <Link to={inboxAt(product)}>Inbox</Link>
+              · <Link to={vulnerabilityReportsAt(product)}>Vulnerability reports</Link>
               {(waitingRulings.data?.total ?? 0) > 0 && (
                 <>
                   {" "}
                   (
-                  <Link to={inboxAt(product, true)}>
+                  <Link to={vulnerabilityReportsAt(product, true)}>
                     {(waitingRulings.data?.total ?? 0).toLocaleString()} waiting for approval
                   </Link>
                   )

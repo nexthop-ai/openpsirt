@@ -104,7 +104,7 @@ func TestSlopIsRejectedInOneActThatASecondPersonApproves(t *testing.T) {
 			t.Errorf("an approved rejection reads %+v on its report", report)
 		}
 
-		// Undone, the reports are back in the inbox.
+		// Undone, the reports are open again.
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at+"/withdrawal", ""); got.Code !=
 			http.StatusOK {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())

@@ -38,7 +38,7 @@ end rather than left to be found by clicking.
 - [Catalog and uploads](#catalog-and-uploads)
 - [Product and scan pages](#product-and-scan-pages)
 - [Flaw entry](#flaw-entry)
-- [The inbox](#the-inbox)
+- [Vulnerability reports](#vulnerability-reports)
 - [Static analysis leads](#static-analysis-leads)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The Incidents screen](#the-incidents-screen)
@@ -311,7 +311,7 @@ screen answering the question just asked of it.
 | Changing scope keeps you where you are | A build-scoped screen swaps its build and stays the same screen |
 | A screen that names a build in its address is the authority for it | Everything else remembers the last one. That memory belongs to the tab rather than the browser: it is where somebody is working right now, not a preference, and a second tab looking at another product must not drag the first one with it |
 | **A screen whose address names the product has that address rewritten** | The same rule, one level up: the path is the authority, so remembering a different product and staying put lets the path put the old one back. The bar snapped to the product in the address and nothing said why. Choosing every product from one of these is the catalog |
-| **Every address under a product names that product** | The bar and the rail read the product from any address below `/products/:product`, including one no rule lists by shape, so an inbox opened from a link in a fresh tab is that product's inbox in the bar too. An address that names only the product, such as a component or an inbox, keeps the branch and variant already picked for that product, so opening a component from a branch's list leaves the rail's links on that branch. A test walks every route the router declares under a product and holds both this and the rewrite above to it |
+| **Every address under a product names that product** | The bar and the rail read the product from any address below `/products/:product`, including one no rule lists by shape, so a product's vulnerability reports opened from a link in a fresh tab name that product in the bar too. An address that names only the product, such as a component or the vulnerability reports, keeps the branch and variant already picked for that product, so opening a component from a branch's list leaves the rail's links on that branch. A test walks every route the router declares under a product and holds both this and the rewrite above to it |
 | **What sat below the product in the address is dropped where it belonged to it** | A branch is one product's and so is a component, so neither carries across. The address falls back to the new product's branch list, or to the product |
 | What comes back out of the tab's memory is checked, not cast | The value becomes a path segment and a query parameter. An entry an older build wrote, or one edited by hand, otherwise reaches the server as `[object Object]` |
 | What the tab remembers goes with the session | Signing out takes it away, which the drafts section states in full: the next person in that tab was shown the previous person's product |
@@ -1384,7 +1384,7 @@ where nothing happened.
 
 One screen for every flaw reported in what we ship, whether somebody outside
 sent it or somebody here found it. It is reached from the rail as "Record a
-flaw", from a product's Inbox with that product picked, and from a report being
+flaw", from a product's vulnerability reports with that product picked, and from a report being
 recorded as a flaw. Not from the findings list: what is being recorded is
 precisely what is **not** in that list.
 
@@ -1392,10 +1392,10 @@ precisely what is **not** in that list.
 |---|---|
 | Where it came from is asked, with no default | It decides the disclosure date and whether anybody is owed an answer (REQ-37). A preselected answer is a choice nobody made. Found here asks for the finder and the credit; sent in from outside asks for the reporter, how to reach them, the credit and the day it arrived |
 | A shortcut labelled with the source opens the form with it answered | The Disclosure deadlines screen's "Record a reported flaw" is the one such shortcut. Following a link that names the answer is choosing it, and the answer stays changeable on the form |
-| Filing and recording are one choice on the same form | Filed, it waits in the Inbox to be recorded as a flaw, matched to one, or ruled out. Recorded now, it asks for the builds, the component and the severity, and its report is written in the same act. Offered to whoever may work reports; somebody who may not is offered recording alone, because filing is working reports |
+| Filing and recording are one choice on the same form | Filed, it waits in Vulnerability reports to be recorded as a flaw, matched to one, or ruled out. Recorded now, it asks for the builds, the component and the severity, and its report is written in the same act. Offered to whoever may work reports; somebody who may not is offered recording alone, because filing is working reports |
 | Opened from a report, it records that report | Where it came from is read from the report rather than asked again, and recording accepts it |
 | A recorded flaw opens on its issue page | Every build it landed in, and the advisory panel, which is where a flaw in our own product is headed |
-| A filed report opens on its own page in the Inbox | Where it is judged |
+| A filed report opens on its own page under Vulnerability reports | Where it is judged |
 
 Recording asks for the product and then for **sets** of lines and variants, because the
 same code goes out on several lines and as several variants at once and a flaw in
@@ -1437,7 +1437,7 @@ deciding from, plus the ability to name one of this deployment's own
 attachments and have it drawn beside their argument. A judgment somebody else
 publishes may be evidence and may never be presentation.
 
-## The inbox
+## Vulnerability reports
 
 One product's reports, reached from the product page and from the two notices
 that name a report. `DESIGN-findings.md` § Reports holds what a report is and
@@ -1468,8 +1468,8 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | The correspondence card says whether the reporter was answered, and lists every message | "Not answered." with the line that the first message sent is the acknowledgement, until one is recorded; "Acknowledged" with its day and who recorded it after. Each message reads Sent or Received with its day and who logged it |
 | Recording a message says it sends nothing | Direction, day and the text, with a file attached into the text held on the report. The day is today where it is left empty |
 | The history card lists every act, oldest first | One line an act, with its moment and who did it. A report a routing rule placed says so |
-| The inbox rows carry the title beside the reference, and who holds each | A team carries the word team beside its name |
-| The Inbox's control for a new report opens the flaw entry form | With the product picked. One form for every report, so a flaw found here and one sent in are filed the same way |
+| The rows carry the title beside the reference, and who holds each | A team carries the word team beside its name |
+| The list's control for a new report opens the flaw entry form | With the product picked. One form for every report, so a flaw found here and one sent in are filed the same way |
 | Files are attached from the report's page and held at once | A file attached into the text of a message, a note or the claim is held on the report the same way, and listed with the rest |
 | The reporter card on an issue carries its report's correspondence and notes, and links the report | Read under the report rule, so absent for somebody who may not read reports. Writing to either is offered where the reader works reports |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
@@ -1486,7 +1486,7 @@ the screens draw them.
 | Rule | |
 |---|---|
 | The link appears only for somebody who reads internal material in the product | A lead is internal, and every read of one asks that |
-| The rail carries it under the scope, beside the inbox, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
+| The rail carries it under the scope, beside Vulnerability reports, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
 | The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
 | What the queue leaves out is counted above it | How many wait for approval, how many a standing rule dismisses, the second opening the dismissed tab, and how many are past end of life |
 | A row opens the lead on the build it is on | Evidence is per build, so the row names one build and how many others hold the lead in the state listed. The build and the date it opened do not wrap |
@@ -1498,7 +1498,7 @@ the screens draw them.
 | On a decision about internal material the decision page offers the comment box to somebody who triages or approves internal work, and the control linking where it is worked on, Revise reasoning and Withdraw to somebody who triages it | The flaw's readers read a moved lead's decisions and take no part in them. The server refuses both to anybody else |
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
 | A lead not reproduced offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it, and names the build of the first run that did not see it. A fixed lead names the build it was fixed in |
-| A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
+| A reader who does not triage internal material sees no control that writes | The same rule as Vulnerability reports |
 | A lead's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work, which is where a lead is held until its flaw is disclosed, and is not offered past end of life. Choosing applies to every build the lead is open on |
 | The queue's rows name who holds each lead | A team carries the word team beside its name |
 | A lead past its end of life says so beside its state and offers no decision, hand-off or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). A move of a lead already handed off stays |
