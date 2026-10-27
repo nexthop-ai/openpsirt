@@ -11,6 +11,7 @@ Satisfies REQ-27, REQ-35.
 - [Promised work](#promised-work)
 - [Approval gate](#approval-gate)
 - [Covered work](#covered-work)
+- [Limits](#limits)
 
 ## Planned upgrades
 
@@ -44,7 +45,7 @@ reported.
 | Neither is recordable at the other's grain: an upgrade from one finding is refused saying where to record it, and a backport naming a version is refused | |
 | Both need the date | Nothing to gate or lapse otherwise |
 | Both may stand, and the issue-grain decision wins where they disagree | |
-| Coverage follows the source package: any binary or the source reaches all of them in the releases ticked, at each release's version, covering everything open on them | Whether 3.5.2 covers what 3.5.0 fixed needs an ordering; the scan says what the move answered |
+| Coverage follows the source package: any binary or the source reaches all of them in the releases ticked, at each release's version, covering everything open on them | |
 | One source version per promise; naming none where a release ships two is refused, offering the versions | |
 | A blank name reaches nothing | Every component naming no source holds it |
 | A handover discloses by the same resolution, every visibility read across the source packages | An embargoed sibling binary makes the handover a disclosure |
@@ -92,3 +93,9 @@ join, never a stored mark.
 | The by-issue list shows uncovered work by default; the by-component view is untouched | The component view is where an upgrade is managed |
 | The default is in the address, a removable chip, and the parameter has a word for either | |
 | Only the standing decision counts | |
+
+## Limits
+
+| Limit | Detail |
+|---|---|
+| Whether the promised version fixes what a promise covers is not judged | No version ordering per ecosystem decides whether 3.5.2 covers what 3.5.0 fixed; a person claims it, and the next scan says which was true |

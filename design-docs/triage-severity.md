@@ -11,6 +11,7 @@ Satisfies REQ-15, REQ-29, REQ-30, REQ-33, REQ-42, REQ-43.
 - [Minimum severity](#minimum-severity)
 - [Issue assessments](#issue-assessments)
 - [Deadline windows](#deadline-windows)
+- [Limits](#limits)
 
 ## Minimum severity
 
@@ -51,13 +52,6 @@ issue and belongs to one product (REQ-29).
 | An assessment in force is written as the product's rating in force, the published rating its fallback, and the product's open findings are reordered and re-clocked when it lands | One stored value every reader reads |
 | A finding opened later takes the product's rating as it opens | |
 
-### The cost of a per-product rating
-
-| Cost | Detail |
-|---|---|
-| An issue arriving in a product arrives unrated there | No rating reaches a product before the issue does |
-| A published score wrong everywhere is corrected per product | Three teams say it three times |
-
 ### Effects of agreement
 
 A waiting assessment carries how many open findings agreeing would take off a
@@ -86,3 +80,10 @@ whatever the severity.
 
 Becoming known exploited also re-clocks an issue
 (`design-docs/findings-severity.md` § Urgency).
+
+## Limits
+
+| Limit | Detail |
+|---|---|
+| No rating reaches a product the issue has not met | An issue arriving in a product arrives unrated there |
+| A published score wrong everywhere is corrected product by product | Nothing states once that a score is wrong for the whole deployment |

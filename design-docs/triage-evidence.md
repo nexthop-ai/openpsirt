@@ -10,6 +10,7 @@ Satisfies REQ-11, REQ-31, REQ-84.
 - [Evidence from publishers](#evidence-from-publishers)
 - [Statement display and filters](#statement-display-and-filters)
 - [Decided elsewhere](#decided-elsewhere)
+- [Limits](#limits)
 
 ## Evidence from publishers
 
@@ -80,7 +81,6 @@ run records it as a claim taken from that statement. Both apply alike
 | A statement naming the product its component ships inside, where this product ships that product, is evidence where the product sits above the component, at any version; at another release it still closes nothing | Shown on every component of the name, it speaks where the supplier did not |
 | Naming a product this product does not ship, asked by name across its builds, it is evidence by package | |
 | Naming a product alone, it is evidence on the product and beneath | |
-| The publisher and status filter finds a placed statement only through findings the run answered with it | Placing every list row is a walk per row |
 
 ## Statement display and filters
 
@@ -114,3 +114,9 @@ its identity, so two products shipping a library under one consumer share it.
 | Offered as a reasoning prefill, never its outcome | |
 | Narrowed by what the subject may read | Otherwise it leaks an embargoed decision in an unseen product |
 | Approved decisions only, at most a handful | |
+
+## Limits
+
+| Limit | Detail |
+|---|---|
+| The publisher and status filter misses a placed statement the run does not apply | It finds one only through findings the run answered with it, so a placed statement of another status or naming no version is evidence on its finding and absent from the filter; placing every list row would be a walk per row |

@@ -14,6 +14,7 @@ Satisfies REQ-24, REQ-28, REQ-40, REQ-42, REQ-43.
 - [Sending back](#sending-back)
 - [The deferral threshold](#the-deferral-threshold)
 - [The review queue](#the-review-queue)
+- [Limits](#limits)
 
 ## Approval
 
@@ -121,7 +122,6 @@ author to revise it. The outliers are shown to the author too.
 | Naming all of what is still argued is refused | That is a revision or a withdrawal |
 | A row agreed, withdrawn or lapsed cannot be held back | |
 | Splitting is the author's act and setting aside the approver's, each refused to the other | An author holding rows back while agreeing to the rest approves their own decision |
-| Narrowing within a fold is not offered | One decision covers the fold; splitting serves decisions spanning folds |
 
 ## Sending back
 
@@ -225,3 +225,8 @@ satisfies every filter, and is shown whole.
 | Outcome | Of these outcomes |
 | Release | Covering an open finding in a branch or tag of this name, by the builds-covered match, narrowed to readable findings |
 
+## Limits
+
+| Limit | Detail |
+|---|---|
+| Neither partial approval nor setting aside narrows within a fold | One decision covers the whole fold; splitting serves only decisions spanning folds |

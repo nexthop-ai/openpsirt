@@ -12,6 +12,7 @@ Satisfies REQ-17, REQ-25, REQ-26, REQ-27, REQ-30.
 - [Bulk decisions](#bulk-decisions)
 - [Rule-prepared decisions](#rule-prepared-decisions)
 - [Decisions on a new branch](#decisions-on-a-new-branch)
+- [Limits](#limits)
 
 ## Reach across builds
 
@@ -32,7 +33,6 @@ Satisfies REQ-17, REQ-25, REQ-26, REQ-27, REQ-30.
 | Only occurrences nothing stands at are written; a build wholly reached by lookup records nothing, without error | |
 | One request, one transaction, one decision | |
 | Bounded on the occurrences resolved, never the builds named (REQ-27) | |
-| Nothing is withheld for sitting past the named fix; a version that moved with the issue still open is recorded instead | That needs an ordering per ecosystem, which exists only for some |
 | An approval names the reach: the three parts are shown first, and what was covered is counted then and kept as one number | Coverage moves on its own, and consent is a different question |
 | Grouping is presentation (REQ-17): a grouped action writes a record per occurrence | A stored group describes a build gone in a scan or two |
 | A list hiding something says so, with the count (REQ-30) | |
@@ -145,3 +145,9 @@ the version moved; the reasoning travels so nobody starts from a blank page.
 | What is carried is checked as anything written, at the new line's visibility, a tag refusing dates | |
 | An occurrence the carrier may not argue about on the new line is neither offered nor counted | The count would disclose |
 | Bounded, and one transaction | |
+
+## Limits
+
+| Limit | Detail |
+|---|---|
+| Nothing carried across builds is withheld for sitting past the named fix | That needs a version ordering per ecosystem, which exists only for some; what is recorded instead is a version that moved with the issue still open |

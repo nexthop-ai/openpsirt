@@ -18,6 +18,7 @@ Satisfies REQ-29, REQ-40, REQ-43, REQ-53, REQ-57, REQ-65, REQ-66.
 - [Comments and reasoning](#comments-and-reasoning)
 - [Notes on an issue](#notes-on-an-issue)
 - [Labels](#labels)
+- [Limits](#limits)
 
 ## Decisions
 
@@ -167,8 +168,7 @@ occurrences, as a decision of its own. Checked inside the writing transaction:
 3. The outcome and justification are the source's; one stating no statement
    scope takes the source's, and one stating another is refused.
 
-A second person agrees, and the queue names the source. Whether rejecting a
-source reaches its extensions is not decided.
+A second person agrees, and the queue names the source.
 
 ## Decision outcomes
 
@@ -233,3 +233,9 @@ customer-escalated or waiting on a vendor stay out of the reasoning.
 | Labeling is triage; a reader sees labels without the control | |
 | Each list group carries its labels, read for the page in one statement, each a filter | |
 | Called a label in every register | |
+
+## Limits
+
+| Limit | Detail |
+|---|---|
+| Rejecting a source does not reach its extensions | Whether it should is not decided; each extension stands or falls as its own decision |
