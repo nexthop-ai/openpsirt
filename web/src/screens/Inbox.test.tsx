@@ -65,7 +65,7 @@ describe("the inbox for somebody who works it", () => {
 
   it("offers the way to report a flaw", async () => {
     await drawn(true);
-    expect(text()).toContain("Report a flaw");
+    expect(text()).toContain("Record a flaw");
   });
 
   it("says a report found here was never sent, and one sent in is not answered yet", async () => {
@@ -79,7 +79,7 @@ describe("the inbox for somebody who only reads it", () => {
   it("offers no selection and no report form", async () => {
     await drawn(false);
     expect(box("Select sonic-R-1")?.closest("td")?.hidden).toBe(true);
-    expect(text()).not.toContain("Report a flaw");
+    expect(text()).not.toContain("Record a flaw");
   });
 });
 

@@ -3,7 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { belongTo } from "../app/drafts";
-import { ReportFlaw, unpicked } from "./ReportFlaw";
+import { RecordFlaw, unpicked } from "./RecordFlaw";
 import { change, pick, press, tick } from "../test/controls";
 import { accept, mounted, screen, serve, settle, type Sent } from "../test/mount";
 
@@ -47,7 +47,7 @@ function serving(rights: { may_hide: boolean; triages_public: boolean }) {
 }
 
 async function fillIn() {
-  mount.render(screen(<ReportFlaw />, "/report?product=sonic"));
+  mount.render(screen(<RecordFlaw />, "/record-a-flaw?product=sonic"));
   await settle();
   pick(mount.host(), "Found here");
   pick(mount.host(), "Record as a flaw now");
@@ -90,7 +90,7 @@ describe("recording a flaw", () => {
 
   it("records it public for somebody who may record nothing else", async () => {
     const sent = serving({ may_hide: false, triages_public: true });
-    mount.render(screen(<ReportFlaw />, "/report?product=sonic"));
+    mount.render(screen(<RecordFlaw />, "/record-a-flaw?product=sonic"));
     await settle();
     pick(mount.host(), "Found here");
     await settle();

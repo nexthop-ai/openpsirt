@@ -25,7 +25,7 @@ import { Required } from "../ui/Required";
 import { humane } from "./duration";
 import { inboxReportAt, issueAt, productFindingsAt } from "../app/routes";
 
-// Reporting a flaw in what we ship: one somebody outside sent, or one somebody
+// Recording a flaw in what we ship: one somebody outside sent, or one somebody
 // here found. The one way in for both. What separates them is a single answer
 // about where it came from, which decides the disclosure date and whether
 // anybody is owed a reply.
@@ -47,7 +47,7 @@ import { inboxReportAt, issueAt, productFindingsAt } from "../app/routes";
 // rather than in a scheme of its own.
 const SEVERITIES = RECORDABLE;
 
-export function ReportFlaw() {
+export function RecordFlaw() {
   const scope = useScope();
   const who = useWho();
   // The deployment's embargo as somebody would say it, or nothing where it
@@ -310,7 +310,7 @@ export function ReportFlaw() {
   return (
     <>
       <div className="screen-head">
-        <h2>Report a flaw</h2>
+        <h2>Record a flaw</h2>
         <p>
           {fromReport
             ? "Record this report as a flaw in what we ship."

@@ -82,7 +82,7 @@ const System = retrying(() => import("../screens/System").then((m) => m.System))
 const TheRecord = retrying(() => import("../screens/TheRecord").then((m) => m.TheRecord));
 const Reports = retrying(() => import("../screens/reports/Catalog").then((m) => m.Catalog));
 const Report = retrying(() => import("../screens/reports/Report").then((m) => m.Report));
-const ReportFlaw = retrying(() => import("../screens/ReportFlaw").then((m) => m.ReportFlaw));
+const RecordFlaw = retrying(() => import("../screens/RecordFlaw").then((m) => m.RecordFlaw));
 const Person = retrying(() => import("../screens/Person").then((m) => m.Person));
 const Branch = retrying(() => import("../screens/Branch").then((m) => m.Branch));
 const Advisories = retrying(() => import("../screens/Advisories").then((m) => m.Advisories));
@@ -215,7 +215,7 @@ export function App() {
               <Route path={ROUTES.record} element={<TheRecord />} />
               <Route path={ROUTES.reports} element={<Reports />} />
               <Route path={ROUTES.report} element={<Report />} />
-              <Route path={ROUTES.reportFlaw} element={<ReportFlaw />} />
+              <Route path={ROUTES.recordFlaw} element={<RecordFlaw />} />
               <Route path={ROUTES.disclosureDeadlines} element={<DisclosureDeadlines />} />
               <Route path={ROUTES.incidents} element={<Incidents />} />
               <Route path={ROUTES.advisories} element={<Advisories />} />
@@ -247,6 +247,10 @@ export function App() {
               <Route
                 path={ROUTES.formerDisclosureDeadlines}
                 element={<Moved to={() => "/disclosure-deadlines"} />}
+              />
+              <Route
+                path={ROUTES.formerRecordFlaw}
+                element={<Moved to={() => "/record-a-flaw"} />}
               />
               <Route
                 path={ROUTES.formerDependencies}

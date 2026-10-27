@@ -254,8 +254,8 @@ export const reviewQueueAt = (
 
 // The form that records a flaw in a product, started from a report where one
 // prompted it, or with where it came from already answered.
-export const reportFlawAt = (product: string, from?: string, source?: "outside") =>
-  at("reportFlaw", {}, { product, from: from || undefined, source });
+export const recordFlawAt = (product: string, from?: string, source?: "outside") =>
+  at("recordFlaw", {}, { product, from: from || undefined, source });
 
 // The Incidents screen, narrowed to one product where one is named.
 export const incidentsAt = (product?: string) =>

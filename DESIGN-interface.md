@@ -236,7 +236,7 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Reporting a flaw, the disclosure deadlines, the advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
+| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.
@@ -1380,9 +1380,9 @@ where nothing happened.
 ## Flaw entry
 
 One screen for every flaw reported in what we ship, whether somebody outside
-sent it or somebody here found it. It is reached from the rail as "Report a
+sent it or somebody here found it. It is reached from the rail as "Record a
 flaw", from a product's Inbox with that product picked, and from a report being
-recorded as a flaw. Not from the findings list: what is being reported is
+recorded as a flaw. Not from the findings list: what is being recorded is
 precisely what is **not** in that list.
 
 | Rule | |
@@ -1529,7 +1529,7 @@ running out with every movement of an embargo on it, disclosure included.
 | A screen lists what is approaching disclosure (REQ-38) | Soonest first with what is past due at the top, and a date moved from it. That list is itself a disclosure and is narrowed the way `DESIGN-access.md` describes — a product somebody may not read undisclosed work in contributes nothing to it, not even a count |
 | A row on that screen is one issue in one product | The unit an embargo is moved and disclosed in. Its Where names the product, the components and every build in scope that carries it, the variant said once where the builds share it, and Occurrences totals the findings across those builds. The issue links to the issue's own page, which lists every build. The row, its open form and the answer to an act are keyed on the product and the issue together |
 | The screen answers for the scope picked | The picker's product, branch and variant are sent with the request, and the subtitle names them, or says every product where none is picked |
-| The screen offers "Record a reported flaw" | Reporting a flaw sent in from outside starts a date, as a claim from outside ruled a duplicate of a flaw found here does, so the screen links to that form with the source answered. Offered to whoever may record an undisclosed flaw in the scope's product, or in any product where none is picked. It is not labelled as starting a disclosure, because Disclose on this screen makes an issue public |
+| The screen offers "Record a reported flaw" | Recording a flaw sent in from outside starts a date, as a claim from outside ruled a duplicate of a flaw found here does, so the screen links to that form with the source answered. Offered to whoever may record an undisclosed flaw in the scope's product, or in any product where none is picked. It is not labelled as starting a disclosure, because Disclose on this screen makes an issue public |
 | The empty screen says what puts a flaw on it | A flaw gets a date when it is sent in from outside or when a report from outside is ruled its duplicate, in the same words the form uses |
 | Disclosing is offered in the standing notice and on the Disclosure deadlines screen | The notice is where somebody is thinking about who may know, and the screen is where every other movement of the embargo is made. Offered to whoever may triage undisclosed work in the product. It says it cannot be undone, and after it is asked for it says whether it took effect or waits for a second person |
 | The act is chosen before the date, not derived from it | Extending and bringing forward are different events, so the form asks which and labels the reason for that one. Derived from whichever way the typed date pointed, a date typed the wrong way round would be recorded as a decision somebody made |

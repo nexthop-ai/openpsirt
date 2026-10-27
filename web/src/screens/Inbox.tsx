@@ -15,7 +15,7 @@ import { on } from "../ui/when";
 import { rulable, standing } from "./inbox";
 import { RuleForm, RulingCard, useBackOff } from "./InboxRuling";
 import { Count } from "../ui/Count";
-import { inboxReportAt, issueAt, productAt, reportFlawAt } from "../app/routes";
+import { inboxReportAt, issueAt, productAt, recordFlawAt } from "../app/routes";
 
 // One product's reports: what arrived, what it was judged to be, and the
 // rulings waiting on a second person.
@@ -43,8 +43,8 @@ export function Inbox() {
         {/* The one form every flaw is reported through, found here or sent
             in, with this product already picked. */}
         {works && (
-          <Link className="btn" to={reportFlawAt(product)}>
-            Report a flaw
+          <Link className="btn" to={recordFlawAt(product)}>
+            Record a flaw
           </Link>
         )}
       </div>
