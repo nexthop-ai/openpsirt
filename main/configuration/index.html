@@ -1083,6 +1083,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="From v0.10.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#renamed-api-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed API paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -1835,6 +1852,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="From v0.10.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#renamed-api-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed API paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -3792,7 +3826,7 @@ one applies to the branch you ship.</p>
 <p>Off unless the deployment turns it on. It fetches a copy of each repository a
 patch link names, from the host the link names, and asks the copy which
 branches hold each commit. Progress, failures and the size of each copy are on
-the System screen and at <code>/v1/patch-branches</code>.</p>
+the System screen and at <code>/v1/patch-branch-lookups</code>.</p>
 <p>Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.</p>
 <table>
@@ -4548,6 +4582,313 @@ changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> s
 <tr>
 <td>A role held across every product counts in every notice's audience as a role on each product. v0.10.2 read per-product roles alone, so somebody reading a product only through such a role was told nothing about it</td>
 <td>Nothing</td>
+</tr>
+<tr>
+<td>The API paths use the words the interface uses. A request to a former path answers 404, apart from the SBOM upload paths</td>
+<td>Move every client but a build pipeline to the paths in <a href="#renamed-api-paths">Renamed API paths</a></td>
+</tr>
+<tr>
+<td>The SBOM upload, the list of uploads and the read of what an upload changed keep answering at their former addresses under <code>/v1/products/{product}/streams/{stream}/variants/{variant}/scans</code>, with no removal planned</td>
+<td>Nothing. A build pipeline needs no edit</td>
+</tr>
+<tr>
+<td><code>/v1/decisions/{id}</code> is one decision, which v0.10.2 answered at <code>/v1/claims/{id}</code>. The row of a decision at one occurrence, which v0.10.2 answered at <code>/v1/decisions/{id}</code>, is at <code>/v1/decision-occurrences/{id}</code></td>
+<td>A client reading such a row by its identifier asks <code>/v1/decision-occurrences/{id}</code>, because the former address answers a different record</td>
+</tr>
+<tr>
+<td>The findings lists take <code>label</code>, <code>below_minimum_severity</code>, <code>decision</code> and <code>decision_state</code> in place of <code>tag</code>, <code>below_floor</code>, <code>claim</code> and <code>claim_state</code>. <code>GET /v1/advisories</code> takes <code>issue</code> in place of <code>vulnerability</code></td>
+<td>Rename them in the request. A former name is refused with 400, naming it</td>
+</tr>
+</tbody>
+</table>
+<h4 id="renamed-api-paths">Renamed API paths<a class="headerlink" href="#renamed-api-paths" title="Permanent link">&para;</a></h4>
+<p>Every path below <code>/v1/products/{product}/streams</code> moves below
+<code>/v1/products/{product}/branches-and-tags</code>, and <code>…</code> below is a build's address,
+<code>/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}</code>. A path
+under it absent from the table keeps the rest of its address.</p>
+<table>
+<thead>
+<tr>
+<th>Former path</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>…/components/{component}/decisions</code></td>
+<td><code>…/components/{component}/bulk-decision</code></td>
+</tr>
+<tr>
+<td><code>…/findings/{vulnerability}/components/{component}/tags/{tag}</code></td>
+<td><code>…/findings/{issue}/components/{component}/labels/{label}</code></td>
+</tr>
+<tr>
+<td><code>…/findings/{vulnerability}/places/{place}/decision</code></td>
+<td><code>…/findings/{issue}/occurrences/{occurrence}/decision</code></td>
+</tr>
+<tr>
+<td><code>…/findings/{vulnerability}/places/{place}/decision/reaffirmation</code></td>
+<td><code>…/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation</code></td>
+</tr>
+<tr>
+<td><code>…/findings/{vulnerability}/places/{place}/reach</code></td>
+<td><code>…/findings/{issue}/occurrences/{occurrence}/reach</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}</code></td>
+<td><code>…/code-findings/{occurrence}</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/assignment</code></td>
+<td><code>…/code-findings/{occurrence}/assignment</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/collaborators</code></td>
+<td><code>…/code-findings/{occurrence}/collaborators</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/collaborators/{identity}</code></td>
+<td><code>…/code-findings/{occurrence}/collaborators/{identity}</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/decision</code></td>
+<td><code>…/code-findings/{occurrence}/decision</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/fixed</code></td>
+<td><code>…/code-findings/{occurrence}/fixed</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/hand-off</code></td>
+<td><code>…/code-findings/{occurrence}/flaw</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/hand-off/withdrawal</code></td>
+<td><code>…/code-findings/{occurrence}/flaw/withdrawal</code></td>
+</tr>
+<tr>
+<td><code>…/leads/{place}/move</code></td>
+<td><code>…/code-findings/{occurrence}/flaw/disclosure</code></td>
+</tr>
+<tr>
+<td><code>…/match-coverage</code></td>
+<td><code>…/unmatched-components</code></td>
+</tr>
+<tr>
+<td><code>…/match-coverage.{format}</code></td>
+<td><code>…/unmatched-components.{format}</code></td>
+</tr>
+<tr>
+<td><code>…/pending-upgrades</code></td>
+<td><code>…/planned-upgrades</code></td>
+</tr>
+<tr>
+<td><code>…/pending-upgrades.{format}</code></td>
+<td><code>…/planned-upgrades.{format}</code></td>
+</tr>
+<tr>
+<td><code>…/scans</code></td>
+<td><code>…/sboms</code></td>
+</tr>
+<tr>
+<td><code>…/scans/{scan}/changes</code></td>
+<td><code>…/sboms/{sbom}/changes</code></td>
+</tr>
+<tr>
+<td><code>…/scans/{scan}/documents/{document}</code></td>
+<td><code>…/sboms/{sbom}/documents/{document}</code></td>
+</tr>
+<tr>
+<td><code>/v1/audit/claims</code></td>
+<td><code>/v1/audit/decisions</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}</code></td>
+<td><code>/v1/decisions/{id}</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/approval</code></td>
+<td><code>/v1/decisions/{id}/approval</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/approvals</code></td>
+<td><code>/v1/decisions/{id}/approvals</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/comments</code></td>
+<td><code>/v1/decisions/{id}/comments</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/elsewhere</code></td>
+<td><code>/v1/decisions/{id}/elsewhere</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/promise</code></td>
+<td><code>/v1/decisions/{id}/promise</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/reaffirmation</code></td>
+<td><code>/v1/decisions/{id}/reaffirmation</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/reasoning</code></td>
+<td><code>/v1/decisions/{id}/reasoning</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/revisions</code></td>
+<td><code>/v1/decisions/{id}/revisions</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/send-back</code></td>
+<td><code>/v1/decisions/{id}/send-back</code></td>
+</tr>
+<tr>
+<td><code>/v1/claims/{id}/split</code></td>
+<td><code>/v1/decisions/{id}/split</code></td>
+</tr>
+<tr>
+<td><code>/v1/decisions</code></td>
+<td><code>/v1/decision-occurrences</code></td>
+</tr>
+<tr>
+<td><code>/v1/decisions/{id}</code></td>
+<td><code>/v1/decision-occurrences/{id}</code></td>
+</tr>
+<tr>
+<td><code>/v1/disclosing</code></td>
+<td><code>/v1/disclosure-deadlines</code></td>
+</tr>
+<tr>
+<td><code>/v1/exploited-here/{id}</code></td>
+<td><code>/v1/incidents/{id}</code></td>
+</tr>
+<tr>
+<td><code>/v1/exploited-here/{id}/fixes</code></td>
+<td><code>/v1/incidents/{id}/fixes</code></td>
+</tr>
+<tr>
+<td><code>/v1/exploited-here/{id}/fixes/{fix}</code></td>
+<td><code>/v1/incidents/{id}/fixes/{fix}</code></td>
+</tr>
+<tr>
+<td><code>/v1/exploited-here/{id}/told</code></td>
+<td><code>/v1/incidents/{id}/told</code></td>
+</tr>
+<tr>
+<td><code>/v1/my-claims</code></td>
+<td><code>/v1/my-decisions</code></td>
+</tr>
+<tr>
+<td><code>/v1/my-claims.{format}</code></td>
+<td><code>/v1/my-decisions.{format}</code></td>
+</tr>
+<tr>
+<td><code>/v1/obligation-windows</code></td>
+<td><code>/v1/response-windows</code></td>
+</tr>
+<tr>
+<td><code>/v1/obligation-windows/{id}</code></td>
+<td><code>/v1/response-windows/{id}</code></td>
+</tr>
+<tr>
+<td><code>/v1/obligations</code></td>
+<td><code>/v1/incidents</code></td>
+</tr>
+<tr>
+<td><code>/v1/patch-branches</code></td>
+<td><code>/v1/patch-branch-lookups</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/advisory-sources</code></td>
+<td><code>/v1/products/{product}/supplier-advisory-feeds</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/advisory-sources/{name}</code></td>
+<td><code>/v1/products/{product}/supplier-advisory-feeds/{name}</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/fix-bundles</code></td>
+<td><code>/v1/products/{product}/planned-upgrades</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/fix-bundles.{format}</code></td>
+<td><code>/v1/products/{product}/planned-upgrades.{format}</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/issues/{vulnerability}/exploited-here</code></td>
+<td><code>/v1/products/{product}/issues/{issue}/incidents</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/issues/{vulnerability}/lead</code></td>
+<td><code>/v1/products/{product}/issues/{issue}/code-finding</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/lead-rules</code></td>
+<td><code>/v1/products/{product}/suppression-rules</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/lead-rules/{id}</code></td>
+<td><code>/v1/products/{product}/suppression-rules/{id}</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/lead-rules/{id}/approval</code></td>
+<td><code>/v1/products/{product}/suppression-rules/{id}/approval</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/lead-series</code></td>
+<td><code>/v1/products/{product}/code-finding-series</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/leads</code></td>
+<td><code>/v1/products/{product}/code-findings</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/leads.{format}</code></td>
+<td><code>/v1/products/{product}/code-findings.{format}</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/routing-rules</code></td>
+<td><code>/v1/products/{product}/assignment-rules</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/routing-rules/preview</code></td>
+<td><code>/v1/products/{product}/assignment-rules/preview</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/routing-rules/{id}</code></td>
+<td><code>/v1/products/{product}/assignment-rules/{id}</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/streams</code></td>
+<td><code>/v1/products/{product}/branches-and-tags</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/tags</code></td>
+<td><code>/v1/products/{product}/labels</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/triage-floor</code></td>
+<td><code>/v1/products/{product}/minimum-severity</code></td>
+</tr>
+<tr>
+<td><code>/v1/products/{product}/vex-statements</code></td>
+<td><code>/v1/products/{product}/vex-documents</code></td>
+</tr>
+<tr>
+<td><code>/v1/scanning</code></td>
+<td><code>/v1/last-uploads</code></td>
+</tr>
+<tr>
+<td><code>/v1/scanning.{format}</code></td>
+<td><code>/v1/last-uploads.{format}</code></td>
+</tr>
+<tr>
+<td><code>/v1/work/set-aside</code></td>
+<td><code>/v1/failed-jobs</code></td>
+</tr>
+<tr>
+<td><code>/v1/work/set-aside/{id}/retry</code></td>
+<td><code>/v1/failed-jobs/{id}/retry</code></td>
 </tr>
 </tbody>
 </table>

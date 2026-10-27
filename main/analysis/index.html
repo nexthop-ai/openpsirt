@@ -1693,7 +1693,7 @@ steps:
 <h2 id="uploads-without-the-client">Uploads without the client<a class="headerlink" href="#uploads-without-the-client" title="Permanent link">&para;</a></h2>
 <p>A producer writing complete SARIF posts it directly:</p>
 <pre><code class="language-bash">curl --fail-with-body --retry 5 -X POST \
-  &quot;$OPENPSIRT_URL/v1/products/sonic/streams/main/variants/broadcom/analyses&quot; \
+  &quot;$OPENPSIRT_URL/v1/products/sonic/branches-and-tags/main/variants/broadcom/analyses&quot; \
   -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
   -F &quot;sarif=@ruff.sarif&quot; \
   -F &quot;series=ruff&quot; \

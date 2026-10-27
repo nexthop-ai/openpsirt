@@ -853,7 +853,7 @@ needs nothing extra.</p>
   -H 'Content-Type: application/json' \
   -d '{&quot;name&quot;: &quot;sonic&quot;, &quot;display_name&quot;: &quot;SONiC&quot;}'
 
-curl -X POST &quot;$OPENPSIRT/v1/products/sonic/streams&quot; \
+curl -X POST &quot;$OPENPSIRT/v1/products/sonic/branches-and-tags&quot; \
   -H 'Content-Type: application/json' \
   -d '{&quot;name&quot;: &quot;main&quot;, &quot;kind&quot;: &quot;branch&quot;}'
 
@@ -862,7 +862,7 @@ curl -X POST &quot;$OPENPSIRT/v1/products/sonic/variants&quot; \
   -d '{&quot;name&quot;: &quot;broadcom&quot;, &quot;customer_facing&quot;: true}'
 </code></pre>
 <p>A tag names the branch it was cut from, which is what release comparison reads:</p>
-<pre><code class="language-bash">curl -X POST &quot;$OPENPSIRT/v1/products/sonic/streams&quot; \
+<pre><code class="language-bash">curl -X POST &quot;$OPENPSIRT/v1/products/sonic/branches-and-tags&quot; \
   -H 'Content-Type: application/json' \
   -d '{&quot;name&quot;: &quot;v2.4.1&quot;, &quot;kind&quot;: &quot;tag&quot;, &quot;parent&quot;: &quot;main&quot;}'
 </code></pre>
@@ -890,7 +890,7 @@ grant of its own.</p>
 <h2 id="the-upload">The upload<a class="headerlink" href="#the-upload" title="Permanent link">&para;</a></h2>
 <p>Your build already produces an SBOM. Send it.</p>
 <pre><code class="language-bash">curl --retry 5 -X POST \
-  &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans&quot; \
+  &quot;$OPENPSIRT/v1/products/sonic/branches-and-tags/main/variants/broadcom/sboms&quot; \
   -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
   -F &quot;inventory=@sbom.cdx.json&quot;
 </code></pre>
@@ -927,7 +927,7 @@ together each gets its turn rather than failing its step.</p>
     OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
   run: |
     curl --fail-with-body --retry 5 -X POST \
-      &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans&quot; \
+      &quot;$OPENPSIRT/v1/products/sonic/branches-and-tags/main/variants/${{ matrix.variant }}/sboms&quot; \
       -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
       -F &quot;inventory=@sbom.cdx.json&quot;
 </code></pre>
@@ -940,7 +940,7 @@ only failing the step.</p>
   script:
     - |
       curl --fail-with-body --retry 5 -X POST \
-        &quot;$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans&quot; \
+        &quot;$OPENPSIRT/v1/products/sonic/branches-and-tags/$CI_COMMIT_BRANCH/variants/broadcom/sboms&quot; \
         -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
         -F &quot;inventory=@sbom.cdx.json&quot;
 </code></pre>
@@ -951,9 +951,9 @@ says which part is missing rather than making you guess:</p>
 <pre><code>404  product &quot;sonic&quot;: stream &quot;nobody-declared-this&quot;: not declared
 </code></pre>
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
-<p>Poll the scans for that build.</p>
+<p>Poll the SBOM uploads for that build.</p>
 <pre><code class="language-bash">curl -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
-  &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans&quot;
+  &quot;$OPENPSIRT/v1/products/sonic/branches-and-tags/main/variants/broadcom/sboms&quot;
 </code></pre>
 <p>Each entry carries <code>state</code>, and where something went wrong, <code>failure</code> — in the
 words the screen shows, so the person reading the failed step and the person
@@ -978,7 +978,7 @@ arrive. Removals are the ones to watch: a build that stopped describing a
 dependency looks exactly like one that stopped shipping it.</p>
 <p>Which names those were is one request further, against the upload the receipt
 names:</p>
-<pre><code>GET /v1/products/sonic/streams/master/variants/broadcom/scans/2/changes
+<pre><code>GET /v1/products/sonic/branches-and-tags/master/variants/broadcom/sboms/2/changes
 </code></pre>
 <pre><code class="language-json">{&quot;items&quot;: [
    {&quot;name&quot;: &quot;libssl1.1&quot;, &quot;change&quot;: &quot;removed&quot;, &quot;before&quot;: [&quot;1.1.1w&quot;]},
