@@ -541,7 +541,7 @@ func TestTheCrossProductExportCarriesTheProductAndTheVisibility(t *testing.T) {
 		}
 		// Each product applies its own line, so the file says that rather than
 		// naming a number that would be wrong for every product but one.
-		if states(open)["triaged at or above"] != "each product's own line" {
+		if states(open)["triaged at or above"] != "each product's own minimum severity" {
 			t.Errorf("the file does not say how the line was applied: %v", states(open))
 		}
 		body := httpapitest.RowsUnder(open)

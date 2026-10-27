@@ -54,7 +54,7 @@ type Rate struct {
 // The open half is a statement about the present whatever period was asked
 // for, because reconstructing what stood open on a date gone by is the
 // reconstruction the register refuses — deadlines are recomputed when the
-// policy moves and dropped below the line and past end of life, so a deadline
+// policy moves and dropped below the minimum severity and past end of life, so a deadline
 // "as of" a past date is not recoverable.
 func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	scope Scope, since, until time.Time) ([]Rate, error) {

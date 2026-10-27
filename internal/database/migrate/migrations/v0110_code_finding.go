@@ -128,7 +128,7 @@ func codeFindingV0110(t *columnTypes) []string {
 			"id"                  ` + t.id + `,
 			"product_id"          ` + t.ref + ` NOT NULL,
 			"vulnerability_id"    ` + t.ref + ` NOT NULL,
-			-- The place of the code finding the flaw record was made at.
+			-- The occurrence of the code finding the flaw record was made at.
 			"occurrence_identity" ` + t.hash + ` NOT NULL,
 			-- The component the offer ranked first, which the person may
 			-- have turned down. Null where it was the build itself.

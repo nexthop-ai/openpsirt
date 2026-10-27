@@ -53,7 +53,7 @@ type FlawCodeFindingBody struct {
 	State       CodeFindingState       `json:"state" doc:"Where the code finding stands on that build"`
 	Suggested   FlawSuggestedBody      `json:"suggested" doc:"The component the flaw record's offer ranked first, which the person may have turned down"`
 	Proposed    []FlawCodeFindingBuild `json:"proposed" doc:"The builds the flaw record proposed the flaw against"`
-	RecordedBy  string                 `json:"recorded_by" doc:"The person who handed it off, by sign-in identity"`
+	RecordedBy  string                 `json:"recorded_by" doc:"The person who recorded it as a flaw, by sign-in identity"`
 	RecordedAt  string                 `json:"recorded_at" format:"date-time"`
 	UndoneBy    string                 `json:"undone_by,omitempty" doc:"The person who undid the flaw record, by sign-in identity"`
 	UndoneAt    string                 `json:"undone_at,omitempty" format:"date-time" doc:"When the flaw record was undone. Absent while it stands"`

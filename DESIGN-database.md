@@ -451,7 +451,7 @@ as v0.9.0 stores the same image.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decision occurrences beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one label on it, one commitment on its fold, the occurrence proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the occurrence about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
+| A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a label, a commitment on each stamp's fold, and decision occurrences beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one label on it, one commitment on its fold, the occurrence proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the occurrence about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
 | The same on PostgreSQL, a trigger on every table refusing a removal while a column pointing at the table leads no index, and an index made by hand on one such column | Migrations 42, 43 and 44 remove nothing the trigger refuses, components and nodes are removed under it, the index made by hand is still there, and none of the merge's own remains |
 | The same on MySQL and MariaDB, the merge stopped at its last step | No version is recorded, no image version written and every stamp is still its own component. The next start steps over the table and leaves what an upgrade that did not stop leaves |
 | The nodes of that build, one component carrying a source package | Upgraded, that component's node holds its source package and version, and every other node holds none |
@@ -569,6 +569,7 @@ written against the new names.
 | `stream_id`, on `advisory_agreed_status`, `advisory_override`, `api_key`, `build` and `incident_fix` | `branch_or_tag_id` |
 | `live_stream_id`, on `incident_fix` | `live_branch_or_tag_id` |
 | `target_id`, on `decision_build`, `finding`, `graph_edge`, `graph_node`, `published_vex`, `scan`, `scan_refusal`, `scan_run`, `suppression` and `upgrade` | `build_id` |
+| `summary`, on `flaw_report` | `reported_problem` |
 
 Every index and constraint named after a renamed table or column is renamed
 with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`,

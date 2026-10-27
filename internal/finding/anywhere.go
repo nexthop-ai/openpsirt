@@ -102,8 +102,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	}
 	// A caller may raise the line for the whole page — that is what the
 	// severity control on the list does — but never lower it below what a
-	// product decided, because the line is the product's decision. So the
-	// raise is a second condition beside each product's own line, and a row
+	// product decided, because the minimum severity is the product's decision. So the
+	// raise is a second condition beside each product's own minimum severity, and a row
 	// passes both: the higher of the two.
 	raised := 0
 	if !wasBelow && line.Hides() {

@@ -46,7 +46,7 @@ func TestAFlawRecordsTheCodeFindingItWasRecordedFromWithItsOffer(t *testing.T) {
 			t.Errorf("the flaw names its code finding as %+v; want the code finding recorded as a flaw at %s", got, occurrence)
 		}
 		if got.Suggested.From == "" || got.RecordedBy != "code-finding-handler" || got.RecordedAt == "" || got.UndoneAt != "" {
-			t.Errorf("the flaw records its offer as %+v; want the first suggestion and who handed it off", got)
+			t.Errorf("the flaw records its offer as %+v; want the first suggestion and who recorded it", got)
 		}
 		if len(got.Proposed) != 1 || got.Proposed[0].BranchOrTag != "master" || !got.Proposed[0].Seen {
 			t.Errorf("the flaw was proposed against %+v; want the one build the code finding was seen in", got.Proposed)

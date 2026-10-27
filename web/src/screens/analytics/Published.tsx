@@ -27,7 +27,7 @@ const WINDOWS = [90, 365, 3650] as const;
 //
 // Advisories are about flaws in our own product, recorded here by hand.
 // Known issues in third-party components are tracked and fixed rather than
-// published about; the document for those is a VEX statement per build, which
+// published about; the document for those is a published VEX per build, which
 // the catalog offers as a file.
 export function Published() {
   const at = useScope();

@@ -382,7 +382,7 @@ named host, the revision is not a commit, or the path leaves the repository.
 | A context region's source is preferred to its region's, with the line it starts at | It is the wider of the two |
 | At most `analysis.max_snippet` bytes of source are kept per place, 4 KiB where nobody has said | A client sends a few lines either side |
 | A snippet is answered as text, and shown as text | It is uploaded data (REQ-66) |
-| Source is disclosed with a flaw under a path where the longest prefix stating it says so, and stripped everywhere else | Off by default: a private product's source is not published because one flaw in it was (§ Flaw record) |
+| Source is disclosed with a flaw under a path where the longest prefix stating it says so, and stripped everywhere else | Off by default: a private product's source is not published because one flaw in it was (§ Flaw records) |
 
 ### Rule documentation
 
@@ -511,7 +511,7 @@ and the decision standing at its occurrence. The evidence of a code finding carr
 | State | When |
 |---|---|
 | Fixed | The finding is closed |
-| Recorded as a flaw | It was recorded as a flaw (§ Flaw record) |
+| Recorded as a flaw | It was recorded as a flaw (§ Flaw records) |
 | Dismissed, Not a security issue, Confirmed | A decision with that outcome stands at the occurrence: approved, or waiting on nobody and not sent back |
 | Dismissed | No decision stands, and a suppression rule in force or outgrown covers it (§ Suppression rules) |
 | No longer detected | A comparable run did not see it |

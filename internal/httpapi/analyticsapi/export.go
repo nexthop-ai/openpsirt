@@ -213,7 +213,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 		}
 		out := core.Exporting{
 			What:   "findings, every product",
-			About:  []core.Stated{{Label: "triaged at or above", Value: "each product's own line"}, codeFindings},
+			About:  []core.Stated{{Label: "triaged at or above", Value: "each product's own minimum severity"}, codeFindings},
 			Header: append([]string{"product"}, findingColumns()...),
 			Rows:   core.InTurn(parts...),
 		}

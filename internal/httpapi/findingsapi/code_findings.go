@@ -84,7 +84,7 @@ type CodeFindingFlawBody struct {
 	Flaw                 string `json:"flaw" doc:"The identifier the flaw was filed under"`
 	IncludedInDisclosure bool   `json:"included_in_disclosure" doc:"Whether the code finding is included in its flaw's disclosure. Otherwise it is internal only, and linked"`
 	Disclosed            bool   `json:"disclosed" doc:"Whether the flaw is disclosed, which ends moving the code finding in or out"`
-	RecordedBy           string `json:"recorded_by" doc:"The person who handed it off, by sign-in identity"`
+	RecordedBy           string `json:"recorded_by" doc:"The person who recorded it as a flaw, by sign-in identity"`
 	RecordedByName       string `json:"recorded_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	RecordedAt           string `json:"recorded_at" format:"date-time"`
 }

@@ -260,7 +260,7 @@ func registerRegister(api huma.API, in core.Deps) {
 		// every occurrence in the build with what stands there, which is what makes
 		// it answerable to an auditor — narrowing it by what this deployment
 		// considers worth triaging would be the omission the document exists
-		// to rule out. A header stating a line has been applied where none
+		// to rule out. A header stating a minimum severity has been applied where none
 		// has is the more dangerous of the two: a file that claims to have
 		// left things out reads as complete about what remains.
 		store := finding.NewStore(in.DB.DB)
@@ -445,7 +445,7 @@ func registerCompliance(api huma.API, in core.Deps) {
 			"is the rolling window, and only one of the two may be sent. Asked for neither, " +
 			"this is the lifetime figure.\n\n" +
 			"What is open is always now. Deadlines are recomputed as the policy moves and " +
-			"dropped below the line and past end of life, so what stood open on a date gone " +
+			"dropped below the minimum severity and past end of life, so what stood open on a date gone " +
 			"by is not recoverable and is not reconstructed.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {

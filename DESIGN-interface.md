@@ -236,7 +236,7 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the audit log. The audit log is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The dependency findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed under Analytics with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the published advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
+| **The named build** | The dependency findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed under Analytics with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the published advisories and the incidents sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 The findings entry is labeled Dependency findings, with SCA on hover, because
@@ -1475,7 +1475,7 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | Files are attached from the report's page and held at once | A file attached into the text of a message, a note or the reported problem is held on the report the same way, and listed with the rest |
 | The reporter card on an issue carries its report's correspondence and notes, and links the report | Read under the report rule, so absent for somebody who may not read reports. Writing to either is offered where the reader works reports |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a report duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
-| The audit log draws one card per decision | The issue, the outcome, the state in one word, what it is about or how many components, and how many occurrences it covers, with the states counted where they differ. The issue opens the decision page, and "Findings there now" opens the findings list narrowed to the decision and the states asked for. `DESIGN-analytics.md` § Dismissals and scan coverage holds what is counted |
+| The audit log draws one card per decision | The issue, the outcome, the state in one word, what it is about or how many components, and how many occurrences it covers, with the states counted where they differ. The issue opens the decision page, and "Findings there now" opens the findings list narrowed to the decision and the states asked for. `DESIGN-analytics.md` § Dismissals and last uploads holds what is counted |
 | Rulings sit beside the decisions in the audit log, over its products and period | A ruling is a decision somebody could be asked to account for, and an auditor asks about a period. Beside the triage decisions rather than among them: a ruling is about a report rather than a finding and takes none of their filters. Printed with them, without the controls |
 | The change history sits below the decisions in the audit log, over its period, and narrows to one kind of change | The decision filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
 
@@ -1883,7 +1883,7 @@ goes out with the release, which sat in four places reached four ways.
 | The variants | The variants it was actually built as, each with what is open in it |
 | Open now | Open across every variant, by severity |
 | Changes | The release before this one, and the comparison against it |
-| Customer documents | The release note, the advisories, and a VEX document per variant |
+| Customer documents | The release note, the advisories, and a published VEX per variant |
 | The record | The disposition register per variant |
 
 | Rule | |

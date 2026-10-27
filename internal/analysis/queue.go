@@ -39,7 +39,7 @@ var precisionRank = func() string {
 	return out + ` ELSE 0 END`
 }()
 
-// Scope narrows a product's leads to one branch or tag, one variant or one build,
+// Scope narrows a product's code findings to one branch or tag, one variant or one build,
 // and to one analyzer series. Unset is every one under the product.
 type Scope struct {
 	ProductID     int64

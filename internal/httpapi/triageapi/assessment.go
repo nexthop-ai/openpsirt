@@ -166,7 +166,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		Summary: "Withdraw an assessment, and take the published rating back",
 		Description: "The rating in force in that product returns to the published one, and " +
 			"everything that reads it — where a finding sits in the list, how long it has, " +
-			"whether it is above the line the product triages — follows it back. No other " +
+			"whether it is at or above the product's minimum severity — follows it back. No other " +
 			"product is touched.\n\n" +
 			"Asked of triage on the product the rating belongs to: taking a rating back " +
 			"is making one.",

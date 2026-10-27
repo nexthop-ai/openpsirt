@@ -52,7 +52,7 @@ func registerPublished(api huma.API, in core.Deps) {
 			"the document hashed to at the time.\n\n" +
 			"Advisories are about flaws in our own product, recorded here by hand. Known " +
 			"issues in third-party components are tracked and fixed rather than published " +
-			"about, and the document for those is a VEX statement per build.\n\n" +
+			"about, and the document for those is a published VEX per build.\n\n" +
 			"`ordinal` above one is a revision of an advisory already out, which is the entry " +
 			"a period is usually read for.\n\n" +
 			"Narrowed by what you may see: a flaw nobody has disclosed is absent for anybody " +

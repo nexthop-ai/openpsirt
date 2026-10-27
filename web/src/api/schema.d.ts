@@ -109,7 +109,7 @@ export interface paths {
          * List advisories that have gone out
          * @description Every advisory published from this deployment in a period, newest first, with how much it covered, which revision it was, who published it and what the document hashed to at the time.
          *
-         *     Advisories are about flaws in our own product, recorded here by hand. Known issues in third-party components are tracked and fixed rather than published about, and the document for those is a VEX statement per build.
+         *     Advisories are about flaws in our own product, recorded here by hand. Known issues in third-party components are tracked and fixed rather than published about, and the document for those is a published VEX per build.
          *
          *     `ordinal` above one is a revision of an advisory already out, which is the entry a period is usually read for.
          *
@@ -470,7 +470,7 @@ export interface paths {
         post?: never;
         /**
          * Withdraw an assessment, and take the published rating back
-         * @description The rating in force in that product returns to the published one, and everything that reads it — where a finding sits in the list, how long it has, whether it is above the line the product triages — follows it back. No other product is touched.
+         * @description The rating in force in that product returns to the published one, and everything that reads it — where a finding sits in the list, how long it has, whether it is at or above the product's minimum severity — follows it back. No other product is touched.
          *
          *     Asked of triage on the product the rating belongs to: taking a rating back is making one.
          *
@@ -727,7 +727,7 @@ export interface paths {
          *
          *     A period, or the whole of it. `from` and `to` bound what closed in them, which is the number a report on a quarter or a financial year is about; `days` is the rolling window, and only one of the two may be sent. Asked for neither, this is the lifetime figure.
          *
-         *     What is open is always now. Deadlines are recomputed as the policy moves and dropped below the line and past end of life, so what stood open on a date gone by is not recoverable and is not reconstructed.
+         *     What is open is always now. Deadlines are recomputed as the policy moves and dropped below the minimum severity and past end of life, so what stood open on a date gone by is not recoverable and is not reconstructed.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3849,7 +3849,7 @@ export interface paths {
          *
          *     With no `state` it is the queue: open code findings with no decision waiting for a second person. `state` lists the code findings in one state instead. `fixed` lists the code findings closed on a build and not opened anew there.
          *
-         *     `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `branch_or_tag`, `variant`, `series` and `method` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
+         *     `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and recording it as a flaw are refused with 409. `branch_or_tag`, `variant`, `series` and `method` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -8437,7 +8437,7 @@ export interface components {
             included_in_disclosure: boolean;
             /** Format: date-time */
             recorded_at: string;
-            /** @description The person who handed it off, by sign-in identity */
+            /** @description The person who recorded it as a flaw, by sign-in identity */
             recorded_by: string;
             /** @description Their display name, where it differs from their identity */
             recorded_by_name?: string;
@@ -10082,7 +10082,7 @@ export interface components {
             proposed: components["schemas"]["FlawCodeFindingBuild"][] | null;
             /** Format: date-time */
             recorded_at: string;
-            /** @description The person who handed it off, by sign-in identity */
+            /** @description The person who recorded it as a flaw, by sign-in identity */
             recorded_by: string;
             /** @description The analyzer's rule, as <tool>/<rule> */
             rule: string;

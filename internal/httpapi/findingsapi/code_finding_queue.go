@@ -159,8 +159,8 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			"left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, " +
 			"so what the list leaves out is counted. The queue also leaves out a code finding open only in " +
 			"releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in " +
-			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +
-			"it off are refused with 409. " +
+			"such releases is kept as it stands: a decision, a fixed closure, an assignment and recording " +
+			"it as a flaw are refused with 409. " +
 			"`branch_or_tag`, `variant`, `series` and `method` are optional and independent. `assigned=nobody` keeps " +
 			"the code findings nobody holds on the build each row names, and combines with every other filter. " +
 			"Supports limit and offset.",
