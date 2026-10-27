@@ -10,7 +10,7 @@ Benchmark runs behind the reconcile and sweep rules in
 
 ## Reconcile batches
 
-Opening 152,859 `decision-waiting` conditions for 204 people, on PostgreSQL 16
+For `design-docs/notifications.md` § Events and conditions. Opening 152,859 `decision-waiting` conditions for 204 people, on PostgreSQL 16
 at one processor over a 1 ms link:
 
 | Writes | Time |
@@ -21,7 +21,7 @@ at one processor over a 1 ms link:
 
 ## Sweep index
 
-The read of who a sweep has told, per kind, with 152,859 open conditions over
+For `design-docs/notifications-delivery.md` § Delivery. The read of who a sweep has told, per kind, with 152,859 open conditions over
 204 people on PostgreSQL:
 
 | Sweep | Without the index | With it |
