@@ -25,7 +25,7 @@ afterEach(() => vi.restoreAllMocks());
 
 // Everything a change to a report or a ruling moves.
 const EVERY_REPORT_KEY = [
-  "disclosing",
+  "disclosure-deadlines",
   "duplicate-disclosure",
   "duplicates",
   "finding",
@@ -42,14 +42,24 @@ const EVERY_REPORT_KEY = [
 
 describe("an act on a report, once it lands", () => {
   it.each([
-    ["filing one", "POST", () => useRecordReport("sonic"), { summary: "A socket answers." }],
+    [
+      "filing one",
+      "POST",
+      () => useRecordReport("sonic"),
+      { reported_problem: "A socket answers." },
+    ],
     [
       "recording a message",
       "POST",
       () => useLogMessage("sonic", "R-1"),
       { direction: "sent", body: "Thanks." },
     ],
-    ["editing one", "PUT", () => useEditReport("sonic", "R-1"), { summary: "A socket answers." }],
+    [
+      "editing one",
+      "PUT",
+      () => useEditReport("sonic", "R-1"),
+      { reported_problem: "A socket answers." },
+    ],
     ["noting on one", "POST", () => useNoteOnReport("sonic", "R-1"), "Seen before."],
     [
       "editing a note on one",

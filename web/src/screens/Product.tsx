@@ -15,8 +15,8 @@ import { mayOf, useWho } from "../app/session";
 import { useRulings } from "../api/intake";
 import {
   buildFindingsAt,
-  inboxAt,
-  leadsAt,
+  vulnerabilityReportsAt,
+  codeFindingsAt,
   uploadsAt,
   productFindingsAt,
   reviewQueueAt,
@@ -28,7 +28,7 @@ import {
 // what is open per build, how much is overdue, how much has been decided, when
 // each build was last scanned — every piece of which exists and none of which
 // sits together. The products table is an
-// administration surface: a triage line in a select and an end-of-support date
+// administration surface: a minimum severity in a select and an end-of-support date
 // in an input, which is a different job from reading how something is going.
 //
 // Every number here opens the list that produced it. A figure somebody
@@ -37,9 +37,9 @@ import {
 export function Product() {
   const { product = "" } = useParams();
   const who = useWho();
-  // The inbox asks what reading a report asks: reading undisclosed work.
+  // The vulnerability reports ask what reading a report asks: reading undisclosed work.
   const mayReadReports = !!mayOf(who.data, product)?.reads_private;
-  const mayReadLeads = !!mayOf(who.data, product)?.reads_internal;
+  const mayReadCodeFindings = !!mayOf(who.data, product)?.reads_internal;
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
   const overview = useQuery({
     queryKey: ["overview", product],
@@ -64,27 +64,27 @@ export function Product() {
         <h2>{it.display_name || it.name}</h2>
         <p>
           <span className="id">{it.name}</span>
-          {it.triage_floor ? (
-            <> · triaged at {it.triage_floor} and above</>
+          {it.minimum_severity ? (
+            <> · minimum severity {it.minimum_severity}</>
           ) : (
-            <> · triaged at whatever the deployment says</>
+            <> · minimum severity from the deployment</>
           )}
           {it.end_of_life && <> · out of support {it.end_of_life}</>}
-          {mayReadLeads && (
+          {mayReadCodeFindings && (
             <>
               {" "}
-              · <Link to={leadsAt(product)}>Leads</Link>
+              · <Link to={codeFindingsAt(product)}>Code findings</Link>
             </>
           )}
           {mayReadReports && (
             <>
               {" "}
-              · <Link to={inboxAt(product)}>Inbox</Link>
+              · <Link to={vulnerabilityReportsAt(product)}>Vulnerability reports</Link>
               {(waitingRulings.data?.total ?? 0) > 0 && (
                 <>
                   {" "}
                   (
-                  <Link to={inboxAt(product, true)}>
+                  <Link to={vulnerabilityReportsAt(product, true)}>
                     {(waitingRulings.data?.total ?? 0).toLocaleString()} waiting for approval
                   </Link>
                   )
@@ -166,12 +166,16 @@ export function Product() {
               </thead>
               <tbody>
                 {builds.map((row) => {
-                  const build = { product, stream: row.stream ?? "", variant: row.variant ?? "" };
+                  const build = {
+                    product,
+                    branch_or_tag: row.branch_or_tag ?? "",
+                    variant: row.variant ?? "",
+                  };
                   return (
-                    <tr key={`${row.stream} ${row.variant}`} className="row">
+                    <tr key={`${row.branch_or_tag} ${row.variant}`} className="row">
                       <td>
                         <Link to={buildFindingsAt(build, counted())} className="id">
-                          {row.stream}
+                          {row.branch_or_tag}
                         </Link>{" "}
                         <span className="hint">·</span> <span className="id">{row.variant}</span>
                         {row.out_of_support && (

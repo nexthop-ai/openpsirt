@@ -115,13 +115,13 @@ var Held = []Entry{
 
 	// Written here, or produced here by running a tool over something this
 	// project builds or a public image. The fixture READMEs say which.
-	{"internal/analysisclient/testdata/clang18-a.plist", Ours, ""},
-	{"internal/analysisclient/testdata/clang18-b.plist", Ours, ""},
-	{"internal/analysisclient/testdata/cppcheck222.xml", Ours, ""},
-	{"internal/analysisclient/testdata/endings/.gitattributes", Ours, ""},
-	{"internal/analysisclient/testdata/endings/auto.c", Ours, ""},
-	{"internal/analysisclient/testdata/endings/crlf.c", Ours, ""},
-	{"internal/analysisclient/testdata/endings/lf.c", Ours, ""},
+	{"internal/uploadclient/testdata/clang18-a.plist", Ours, ""},
+	{"internal/uploadclient/testdata/clang18-b.plist", Ours, ""},
+	{"internal/uploadclient/testdata/cppcheck222.xml", Ours, ""},
+	{"internal/uploadclient/testdata/endings/.gitattributes", Ours, ""},
+	{"internal/uploadclient/testdata/endings/auto.c", Ours, ""},
+	{"internal/uploadclient/testdata/endings/crlf.c", Ours, ""},
+	{"internal/uploadclient/testdata/endings/lf.c", Ours, ""},
 	{"internal/sarif/testdata/clang18-a.sarif", Ours, ""},
 	{"internal/sarif/testdata/clang18-b.sarif", Ours, ""},
 	{"internal/sarif/testdata/cppcheck222.sarif", Ours, ""},

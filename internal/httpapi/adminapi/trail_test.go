@@ -25,14 +25,14 @@ import (
 // seeded is what an act needs that the fixture does not already hold: an issue
 // to name, and the identifier of a rule an earlier act made.
 type seeded struct {
-	issue    string
-	rule     string
-	leadRule string
-	lead     string
-	flaw     string
-	record   string
-	window   string
-	fix      string
+	issue           string
+	rule            string
+	suppressionRule string
+	codeFinding     string
+	flaw            string
+	record          string
+	window          string
+	fix             string
 }
 
 // fill puts what has been seeded into a path, a body or an expected name.
@@ -41,8 +41,8 @@ func (s *seeded) fill(text string) string {
 	text = strings.ReplaceAll(text, "{record}", s.record)
 	text = strings.ReplaceAll(text, "{window}", s.window)
 	text = strings.ReplaceAll(text, "{fix}", s.fix)
-	text = strings.ReplaceAll(text, "{lead-rule}", s.leadRule)
-	text = strings.ReplaceAll(text, "{lead}", s.lead)
+	text = strings.ReplaceAll(text, "{suppression-rule}", s.suppressionRule)
+	text = strings.ReplaceAll(text, "{code finding}", s.codeFinding)
 	text = strings.ReplaceAll(text, "{flaw}", s.flaw)
 	return strings.ReplaceAll(text, "{rule}", s.rule)
 }
@@ -84,8 +84,8 @@ type trailedAct struct {
 var administrativeActs = []trailedAct{
 	{
 		id: "set-setting", what: "a setting", method: http.MethodPut,
-		path: "/v1/settings/triage.floor", body: `{"value":"medium"}`,
-		kind: "setting", about: "triage.floor",
+		path: "/v1/settings/triage.minimum-severity", body: `{"value":"medium"}`,
+		kind: "setting", about: "triage.minimum-severity",
 	},
 	{
 		id: "record-person", what: "an account", method: http.MethodPost,
@@ -132,7 +132,7 @@ var administrativeActs = []trailedAct{
 		// The one act that hands out a new way into the deployment, and the
 		// one the trail recorded the withdrawal of without the grant.
 		id: "create-key", what: "a pipeline credential minted", method: http.MethodPost,
-		path: "/v1/keys", body: `{"name":"builder","product":"mine","stream":"master"}`,
+		path: "/v1/keys", body: `{"name":"builder","product":"mine","branch_or_tag":"master"}`,
 		kind: "credential", about: "builder",
 	},
 	{
@@ -163,9 +163,9 @@ var administrativeActs = []trailedAct{
 		kind: "credential", about: "reader · theirs",
 	},
 	{
-		id: "set-product-triage-floor", what: "the line a product triages at",
+		id: "set-product-minimum-severity", what: "the line a product triages at",
 		method: http.MethodPut, path: "/v1/products/mine/minimum-severity",
-		body: `{"floor":"high"}`, kind: "setting", about: "triage floor of mine",
+		body: `{"minimum_severity":"high"}`, kind: "setting", about: "minimum severity of mine",
 	},
 	{
 		id: "set-product-publication", what: "whether a product's documents are published",
@@ -184,10 +184,10 @@ var administrativeActs = []trailedAct{
 		kind: "setting", about: "repositories of mine",
 	},
 	{
-		id: "propose-lead-rule", what: "a standing rule for leads", who: "internal-triager",
+		id: "propose-suppression-rule", what: "a suppression rule", who: "internal-triager",
 		method: http.MethodPost, path: "/v1/products/mine/suppression-rules",
 		body: `{"prefix":"tests","reason":"used_in_tests","reasoning":"the tests do not ship"}`,
-		kind: "lead-rule", about: "mine · {lead-rule}",
+		kind: "suppression-rule", about: "mine · {suppression-rule}",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			var rule struct {
 				ID int64 `json:"id"`
@@ -195,18 +195,18 @@ var administrativeActs = []trailedAct{
 			if err := json.Unmarshal(answered, &rule); err != nil {
 				t.Fatal(err)
 			}
-			seen.leadRule = strconv.FormatInt(rule.ID, 10)
+			seen.suppressionRule = strconv.FormatInt(rule.ID, 10)
 		},
 	},
 	{
-		id: "approve-lead-rule", what: "a standing rule for leads approved", who: "internal-reviewer",
-		method: http.MethodPost, path: "/v1/products/mine/suppression-rules/{lead-rule}/approval", body: `{}`,
-		kind: "lead-rule", about: "mine · {lead-rule}",
+		id: "approve-suppression-rule", what: "a suppression rule approved", who: "internal-reviewer",
+		method: http.MethodPost, path: "/v1/products/mine/suppression-rules/{suppression-rule}/approval", body: `{}`,
+		kind: "suppression-rule", about: "mine · {suppression-rule}",
 	},
 	{
-		id: "retire-lead-rule", what: "a standing rule for leads retired", who: "internal-triager",
-		method: http.MethodDelete, path: "/v1/products/mine/suppression-rules/{lead-rule}",
-		kind: "lead-rule", about: "mine · {lead-rule}",
+		id: "retire-suppression-rule", what: "a suppression rule retired", who: "internal-triager",
+		method: http.MethodDelete, path: "/v1/products/mine/suppression-rules/{suppression-rule}",
+		kind: "suppression-rule", about: "mine · {suppression-rule}",
 	},
 	{
 		id: "set-product-end-of-life", what: "a support date", method: http.MethodPut,
@@ -214,7 +214,7 @@ var administrativeActs = []trailedAct{
 		kind: "support", about: "mine",
 	},
 	{
-		id: "set-stream-end-of-life", what: "a release's support date",
+		id: "set-branch-or-tag-end-of-life", what: "a release's support date",
 		method: http.MethodPut, path: "/v1/products/mine/branches-and-tags/master/end-of-life",
 		body: `{"on":"2027-01-01"}`, kind: "support", about: "mine master",
 	},
@@ -257,7 +257,7 @@ var administrativeActs = []trailedAct{
 	{
 		// On a release and a product nothing else here reads, for the reason
 		// the variant acts above use one nothing is built as.
-		id: "amend-stream", what: "a release renamed", method: http.MethodPatch,
+		id: "amend-branch-or-tag", what: "a release renamed", method: http.MethodPatch,
 		path: "/v1/products/spare/branches-and-tags/old-line", body: `{"name":"retired-line"}`,
 		kind: "catalog", about: "spare old-line",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
@@ -269,7 +269,7 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
-		id: "retire-stream", what: "a release retired", method: http.MethodDelete,
+		id: "retire-branch-or-tag", what: "a release retired", method: http.MethodDelete,
 		path: "/v1/products/spare/branches-and-tags/retired-line",
 		kind: "catalog", about: "spare retired-line",
 	},
@@ -314,13 +314,13 @@ var administrativeActs = []trailedAct{
 		path: "/v1/teams/kernel/members/newcomer", kind: "team", about: "kernel · newcomer",
 	},
 	{
-		// Routing is neither a grant nor a withdrawal and is not held against
+		// An assignment rule is neither a grant nor a withdrawal and is not held against
 		// a person, so it carries a kind of its own rather than being read as
 		// a role change by anybody filtering the trail.
-		id: "add-routing-rule", what: "a routing rule", who: "assigner",
+		id: "add-assignment-rule", what: "an assignment rule", who: "assigner",
 		method: http.MethodPost, path: "/v1/products/mine/assignment-rules",
 		body: `{"name":"kernel things","team":"kernel","beneath":"libnl-3-200"}`,
-		kind: "routing", about: "mine · kernel things",
+		kind: "assignment-rule", about: "mine · kernel things",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			var rule struct {
 				ID int64 `json:"id"`
@@ -332,9 +332,9 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
-		id: "retire-routing-rule", what: "a routing rule retired", who: "assigner",
+		id: "retire-assignment-rule", what: "an assignment rule retired", who: "assigner",
 		method: http.MethodDelete, path: "/v1/products/mine/assignment-rules/{rule}",
-		kind: "routing", about: "mine · {rule}",
+		kind: "assignment-rule", about: "mine · {rule}",
 	},
 	{
 		id: "retire-team", what: "a team retired", method: http.MethodDelete,
@@ -366,18 +366,18 @@ var administrativeActs = []trailedAct{
 		about: "outbound · pager · assigned",
 	},
 	{
-		id: "add-advisory-source", what: "a supplier to read advisories from",
+		id: "add-supplier-advisory-feed", what: "a supplier to read advisories from",
 		method: http.MethodPost, path: "/v1/products/mine/supplier-advisory-feeds",
 		body: `{"name":"ExampleLinux",` +
 			`"url":"https://supplier.example.test/.well-known/csaf/provider-metadata.json"}`,
-		kind: "setting", about: "advisory source · mine · ExampleLinux",
+		kind: "setting", about: "supplier advisory feed · mine · ExampleLinux",
 	},
 	{
-		id: "withdraw-advisory-source", what: "a supplier no longer read",
+		id: "withdraw-supplier-advisory-feed", what: "a supplier no longer read",
 		// Withdrawn in other capitals, which the match ignores; the row names
 		// the supplier as it was added.
 		method: http.MethodDelete, path: "/v1/products/mine/supplier-advisory-feeds/exampleLINUX",
-		kind: "setting", about: "advisory source · mine · ExampleLinux",
+		kind: "setting", about: "supplier advisory feed · mine · ExampleLinux",
 	},
 	{
 		id: "trust-upstream", what: "an upstream trusted", kind: "upstream", about: "upstream · mine",
@@ -426,40 +426,40 @@ var administrativeActs = []trailedAct{
 		kind:   "case", about: "mine · {issue} · reader",
 	},
 	{
-		// A kept lead made part of its flaw's case: who reads it changes.
-		id: "move-lead", what: "a handed-off lead moved into its case", who: "lead-handler",
+		// An internal-only code finding made part of its flaw's case: who reads it changes.
+		id: "include-code-finding-in-disclosure", what: "a code finding recorded as a flaw included in its flaw's disclosure", who: "code-finding-handler",
 		kind: "case", about: "mine · {flaw} · clang-tidy/leak",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
-			seen.lead, seen.flaw = httpapitest.HandedOffLead(t, r, false)
-			return httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-				seen.fill("/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/disclosure"), "")
+			seen.codeFinding, seen.flaw = httpapitest.RecordedCodeFinding(t, r, false)
+			return httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut,
+				seen.fill("/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/flaw/disclosure"), "")
 		},
 	},
 	{
-		id: "unmove-lead", what: "a lead taken back out of its case", who: "lead-handler",
+		id: "exclude-code-finding-from-disclosure", what: "a code finding taken out of its flaw's disclosure", who: "code-finding-handler",
 		method: http.MethodDelete,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/disclosure",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/flaw/disclosure",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
 	},
 	{
-		id: "add-lead-collaborator", what: "somebody granted a handed-off lead", who: "lead-handler",
+		id: "add-code-finding-collaborator", what: "somebody granted a code finding recorded as a flaw", who: "code-finding-handler",
 		method: http.MethodPut,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/collaborators/reader",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/collaborators/reader",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
-		id: "remove-lead-collaborator", what: "a lead grant withdrawn", who: "lead-handler",
+		id: "remove-code-finding-collaborator", what: "a code finding grant withdrawn", who: "code-finding-handler",
 		method: http.MethodDelete,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/collaborators/reader",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/collaborators/reader",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
-		// The lead is internal again, so who reads it changes. With no grant
-		// left standing, the one row is the hand-off's own.
-		id: "undo-lead-handoff", what: "a lead's hand-off undone", who: "lead-handler",
+		// The code finding is internal again, so who reads it changes. With no grant
+		// left standing, the one row is the flaw record's own.
+		id: "undo-code-finding-flaw", what: "a code finding's flaw record undone", who: "code-finding-handler",
 		method: http.MethodPost,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/withdrawal",
-		body:   `{"because":"handed off against the wrong component"}`,
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/flaw/withdrawal",
+		body:   `{"because":"recorded as a flaw against the wrong component"}`,
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
 	},
 	{
@@ -525,12 +525,12 @@ var administrativeActs = []trailedAct{
 		// decision that the issue does not apply is refused while one stands —
 		// which is what puts them in the trail rather than in the decision
 		// record beside the decisions.
-		id: "record-exploited-here", what: "this product exploited through an issue",
+		id: "record-incident", what: "this product exploited through an issue",
 		who: "private-triage", method: http.MethodPost,
 		path: "/v1/products/mine/issues/CVE-2026-9999/incidents",
 		body: `{"known_at":"2026-09-20T14:00:00Z",` +
 			`"grounds":"A customer sent packet captures of the management socket."}`,
-		kind: "exploited-here", about: "CVE-2026-9999 on mine",
+		kind: "incident", about: "CVE-2026-9999 on mine",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			t.Helper()
 			var kept struct {
@@ -547,7 +547,7 @@ var administrativeActs = []trailedAct{
 		// from the fix starts, which is the layer the record sits in.
 		id: "name-fix-release", what: "a tag carrying the fix",
 		who: "private-triage", method: http.MethodPost,
-		kind: "exploited-here", about: "CVE-2026-9999 on mine, fix release",
+		kind: "incident", about: "CVE-2026-9999 on mine, fix release",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
 			t.Helper()
 			names := catalog.NewStore(r.DB.DB)
@@ -555,7 +555,7 @@ var administrativeActs = []trailedAct{
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := names.DeclareStream(t.Context(), product.ID, "v9.0.1", catalog.Tag, nil); err != nil {
+			if _, err := names.DeclareBranchOrTag(t.Context(), product.ID, "v9.0.1", catalog.Tag, nil); err != nil {
 				t.Fatal(err)
 			}
 			return httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
@@ -576,22 +576,22 @@ var administrativeActs = []trailedAct{
 		id: "withdraw-fix-release", what: "a tag carrying the fix withdrawn",
 		who: "private-triage", method: http.MethodDelete,
 		path: "/v1/incidents/{record}/fixes/{fix}",
-		kind: "exploited-here", about: "CVE-2026-9999 on mine, fix release",
+		kind: "incident", about: "CVE-2026-9999 on mine, fix release",
 	},
 	{
-		id: "clear-exploited-here", what: "a record of being exploited cleared",
+		id: "clear-incident", what: "an incident cleared",
 		who: "private-triage", method: http.MethodDelete,
 		path: "/v1/incidents/{record}",
 		body: `{"because":"The captures were of a different deployment."}`,
-		kind: "exploited-here", about: "CVE-2026-9999 on mine",
+		kind: "incident", about: "CVE-2026-9999 on mine",
 	},
 	{
 		// A window decides what every standing attack is watched against,
 		// which is the layer a setting sits in.
-		id: "declare-obligation-window", what: "a window after an attack",
+		id: "declare-response-window", what: "a response window",
 		method: http.MethodPost, path: "/v1/response-windows",
 		body: `{"name":"Early warning","hours":24}`,
-		kind: "setting", about: "Obligation window Early warning",
+		kind: "setting", about: "Response window Early warning",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			t.Helper()
 			var declared struct {
@@ -604,15 +604,15 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
-		id: "change-obligation-window", what: "a window after an attack changed",
+		id: "change-response-window", what: "a response window changed",
 		method: http.MethodPut, path: "/v1/response-windows/{window}",
 		body: `{"name":"Early warning","hours":36}`,
-		kind: "setting", about: "Obligation window Early warning",
+		kind: "setting", about: "Response window Early warning",
 	},
 	{
-		id: "retire-obligation-window", what: "a window after an attack retired",
+		id: "retire-response-window", what: "a response window retired",
 		method: http.MethodDelete, path: "/v1/response-windows/{window}",
-		kind: "setting", about: "Obligation window Early warning",
+		kind: "setting", about: "Response window Early warning",
 	},
 	{
 		id: "deactivate-person", what: "somebody deactivated", method: http.MethodPut,
@@ -646,16 +646,16 @@ var outsideTheTrail = map[string]string{
 	"approve-decision":             "the decision record",
 	"assess-issue":                 "the decision record",
 	"assign-finding":               "the decision record",
-	"assign-lead":                  "the decision record",
+	"assign-code-finding":          "the decision record",
 	"assign-matching-findings":     "the decision record",
 	"carry-decisions":              "the decision record",
 	"comment-on-decision":          "the decision record",
 	"decide":                       "the decision record",
 	"decide-finding":               "the decision record",
 	"decide-in-bulk":               "the decision record",
-	"decide-lead":                  "the decision record",
-	"hand-off-lead":                "the flaw's own record, linked to the lead; a move it carries is trailed as move-lead's is",
-	"fix-lead":                     "the decision record",
+	"decide-code-finding":          "the decision record",
+	"record-code-finding-as-flaw":  "the flaw's own record, linked to the code finding; an inclusion it carries is trailed as include-code-finding-in-disclosure's is",
+	"fix-code-finding":             "the decision record",
 	"disclose-issue":               "the decision record",
 	"edit-comment":                 "the decision record",
 	"edit-issue-note":              "the decision record",
@@ -681,9 +681,9 @@ var outsideTheTrail = map[string]string{
 	"start-advisory":               "the decision record",
 	"set-affected-builds":          "the decision record",
 	"split-decision":               "the decision record",
-	"tag-finding":                  "the decision record",
+	"label-finding":                "the decision record",
 	"undo-batch":                   "the decision record",
-	"untag-finding":                "the decision record",
+	"unlabel-finding":              "the decision record",
 	"withdraw-assessment":          "the decision record",
 	"withdraw-decision":            "the decision record",
 
@@ -705,7 +705,7 @@ var outsideTheTrail = map[string]string{
 	"upload-attachment":          "recorded on the attachment, which names who uploaded it",
 	"upload-scan":                "recorded as the scan's provenance",
 	"upload-analysis":            "recorded as the run's provenance",
-	"record-vex-issued":          "recorded as the issuance, which names who published it and when",
+	"record-published-vex":       "recorded as the issuance, which names who published it and when",
 	"record-told-outside":        "recorded as the notice, which names who recorded it and when",
 
 	// One person's own, and nothing anybody else reads changes.
@@ -722,16 +722,16 @@ var outsideTheTrail = map[string]string{
 	// something retired, or filling in what a tag was cut from, does leave a
 	// row, which TestBringingBackWhatWasRetiredIsRecordedLikeRetiringIt and
 	// TestFillingInWhatATagWasCutFromIsRecorded drive.
-	"declare-product": "the catalog",
-	"declare-stream":  "the catalog",
-	"declare-variant": "the catalog",
+	"declare-product":       "the catalog",
+	"declare-branch-or-tag": "the catalog",
+	"declare-variant":       "the catalog",
 
 	// Work moving, which is recorded where work is.
 	"hand-back-assignments": "recorded in the assignment history",
 
 	// Running the tool rather than changing it: a job that was set aside is
 	// asked to run again, and nothing about what anybody may do moves.
-	"retry-set-aside-work": "operating the queue",
+	"retry-failed-job": "operating the queue",
 }
 
 // TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot walks the document
@@ -795,7 +795,7 @@ func TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot(t *testing.T) {
 // row back.
 //
 // Three of the things here silently rewrite what this tool reports — the
-// deadline windows, the triage floor, and a support date — and none of them
+// deadline windows, the minimum severity, and a support date — and none of them
 // recorded who moved it. For a tool whose whole output is evidence, that is
 // the evidence being movable with nothing saying that anybody moved it.
 //
@@ -859,7 +859,7 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 
 		// The prior value is kept, because "who raised the floor to
 		// critical" is half the question and the other half is what it was.
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"critical"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
 		}
@@ -942,13 +942,13 @@ func TestTheTrailIsAnAdministratorsToRead(t *testing.T) {
 // way to make the record fail without making the change fail first.
 func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"medium"}`); got.Code >= 300 {
 			t.Fatalf("setting the floor answered %d: %s", got.Code, got.Body.String())
 		}
 
 		restore := dbtest.Hide(t, r.DB, "admin_change")
-		got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"critical"}`)
 		restore()
 
@@ -964,7 +964,7 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "admin", "/v1/settings", &offered)
 		for _, item := range offered.Items {
-			if item.Name != "triage.floor" {
+			if item.Name != "triage.minimum-severity" {
 				continue
 			}
 			if item.Value != "medium" {
@@ -973,7 +973,7 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 			}
 			return
 		}
-		t.Error("the triage floor is not among the settings offered")
+		t.Error("the minimum severity is not among the settings offered")
 	})
 }
 
@@ -983,7 +983,7 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 // and a label in its place matches nobody.
 func TestTheTrailNamesWhoChangedSomethingByTheIdentityTheySignInUnder(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"high"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
 		}
@@ -1067,7 +1067,7 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 		for _, act := range []struct {
 			method, path, body string
 		}{
-			{http.MethodPut, "/v1/settings/triage.floor", `{"value":"high"}`},
+			{http.MethodPut, "/v1/settings/triage.minimum-severity", `{"value":"high"}`},
 			{http.MethodPost, "/v1/people", `{"identity":"someone-else"}`},
 		} {
 			got := httpapitest.AsPerson(t, r, "auditor", act.method, act.path, act.body)
@@ -1234,7 +1234,7 @@ func TestACaseIsRecordedByTheNamesItResolvedTo(t *testing.T) {
 // running server without racing every goroutine that reads it.
 func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":"high"}`); got.Code >= 300 {
 			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
 		}
@@ -1295,20 +1295,20 @@ func TestATrailRowNamesWhatATypedNameResolvedTo(t *testing.T) {
 		}
 
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/keys",
-			`{"name":"spelled","product":"MINE","stream":"Master"}`)
+			`{"name":"spelled","product":"MINE","branch_or_tag":"Master"}`)
 		if got.Code >= 300 {
 			t.Fatalf("creating a key answered %d: %s", got.Code, got.Body.String())
 		}
 		var created struct {
 			Item struct {
-				Product string `json:"product"`
-				Stream  string `json:"stream"`
+				Product     string `json:"product"`
+				BranchOrTag string `json:"branch_or_tag"`
 			} `json:"item"`
 		}
 		if err := json.Unmarshal(got.Body.Bytes(), &created); err != nil {
 			t.Fatal(err)
 		}
-		if key := created.Item; key.Product != "mine" || key.Stream != "master" {
+		if key := created.Item; key.Product != "mine" || key.BranchOrTag != "master" {
 			t.Errorf("the key answers %+v, want the names declared: mine · master", created.Item)
 		}
 		if _, became := newest(t, "credential"); became != "mine · master" {

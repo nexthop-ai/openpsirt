@@ -104,7 +104,7 @@ export function useMarkRelease() {
       advisory: string;
       product: string;
       vulnerability: string;
-      stream: string;
+      branch_or_tag: string;
       variant: string;
       affected: boolean;
     }) => {

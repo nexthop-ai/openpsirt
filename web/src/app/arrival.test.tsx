@@ -49,16 +49,16 @@ describe("scrolling to the top on arrival", () => {
   it("scrolls on a rail entry for the screen already open, and not on Back to it", () => {
     const scrolled = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
     mount.render(
-      <MemoryRouter initialEntries={["/record"]}>
+      <MemoryRouter initialEntries={["/audit-log"]}>
         <Frame />
       </MemoryRouter>,
     );
     scrolled.mockClear();
 
-    act(() => go("/record", { state: TO_THE_TOP }));
+    act(() => go("/audit-log", { state: TO_THE_TOP }));
     expect(scrolled, "the same address, from the rail").toHaveBeenCalledTimes(1);
 
-    act(() => go("/record?change=role"));
+    act(() => go("/audit-log?change=role"));
     scrolled.mockClear();
     act(() => go(-1));
     expect(scrolled, "Back to an entry the rail opened").not.toHaveBeenCalled();

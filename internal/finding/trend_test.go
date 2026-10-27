@@ -24,7 +24,7 @@ func TestABumpThatFixedNothingIsNotCountedAsResolved(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		first := f.run(t)
 		f.seenAt(t, first, time.Now().UTC().Add(-20*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, first,
+		if _, err := f.store.Apply(t.Context(), f.build, first,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -34,7 +34,7 @@ func TestABumpThatFixedNothingIsNotCountedAsResolved(t *testing.T) {
 		f.shipped(t, movedTo(libnlNew))
 		second := f.run(t)
 		f.seenAt(t, second, time.Now().UTC().Add(-10*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, second,
+		if _, err := f.store.Apply(t.Context(), f.build, second,
 			[]finding.Reported{found("CVE-2026-1", libnlNew)}); err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +68,7 @@ func TestAnUpgradeThatFixedSomethingIsCountedAsResolved(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		first := f.run(t)
 		f.seenAt(t, first, time.Now().UTC().Add(-20*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, first,
+		if _, err := f.store.Apply(t.Context(), f.build, first,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestAnUpgradeThatFixedSomethingIsCountedAsResolved(t *testing.T) {
 		f.shipped(t, movedTo(libnlNew))
 		second := f.run(t)
 		f.seenAt(t, second, time.Now().UTC().Add(-10*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, second, nil); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, second, nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -107,14 +107,14 @@ func TestATrendCountsNothingFromOutsideTheRangeItDraws(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		old := f.run(t)
 		f.seenAt(t, old, time.Now().UTC().Add(-400*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, old,
+		if _, err := f.store.Apply(t.Context(), f.build, old,
 			[]finding.Reported{found("CVE-2026-ANCIENT", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, movedTo(libnlNew))
 		closing := f.run(t)
 		f.seenAt(t, closing, time.Now().UTC().Add(-380*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, closing, nil); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, closing, nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -140,7 +140,7 @@ func TestATrendWithNoStepStillDrawsARange(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		f.seenAt(t, run, time.Now().UTC().Add(-20*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestATrendCanBeAskedForOnePartOfTheTree(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		f.seenAt(t, run, time.Now().UTC().Add(-20*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			found("CVE-2026-1", libnl),
 			found("CVE-2026-2", teamd),
 		}); err != nil {
@@ -200,7 +200,7 @@ func TestATrendCanBeAskedForOnePartOfTheTree(t *testing.T) {
 
 		beneath := func(t *testing.T, name string) *int64 {
 			t.Helper()
-			id, err := f.graph.ComponentAs(t.Context(), f.target, name, graph.Choice{})
+			id, err := f.graph.ComponentAs(t.Context(), f.build, name, graph.Choice{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -235,14 +235,14 @@ func TestASubtreeTrendIsRefusedWhereTheSelectionIsNotOneBuild(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		// A second build under the same product, so the selection holds two.
 		f.anotherBuild(t, "v2")
 
-		under, err := f.graph.ComponentAs(t.Context(), f.target, "libswsscommon", graph.Choice{})
+		under, err := f.graph.ComponentAs(t.Context(), f.build, "libswsscommon", graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -273,7 +273,7 @@ func TestAScannerGoingQuietIsNotCountedAsWorkDone(t *testing.T) {
 		now := time.Now().UTC()
 		run := f.run(t)
 		f.seenAt(t, run, now.Add(-20*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}

@@ -29,7 +29,7 @@ const (
 	// outside knows about it. No scan reports it and no scan closes it.
 	Entered Kind = "entered"
 	// Analysis is one result a static analyzer reported in our own code, at one
-	// occurrence, tracked across builds: a lead. It is unconfirmed, and most
+	// occurrence, tracked across builds: a code finding. It is unconfirmed, and most
 	// are false positives.
 	Analysis Kind = "analysis"
 )
@@ -103,14 +103,14 @@ const (
 	Triage Consumer = "triage"
 	// Assignment is who deals with a finding: the write that gives work to a
 	// person or a team or hands it back, handing over everything one person
-	// holds, the routing rules' sweep and preview, and the lists of who holds
-	// what. It names leads, which Triage does not, so a lead is held, routed
+	// holds, the assignment rules' sweep and preview, and the lists of who holds
+	// what. It names code findings, which Triage does not, so a code finding is held, assigned by rule
 	// and listed as held work by the one implementation a finding is without
 	// reaching the findings lists or disclosure.
 	Assignment Consumer = "assignment"
 	// Decisions is the decisions people make about findings: their occurrences,
 	// the reasoning and its revisions, approvals, comments on a decision, the
-	// review queue, every read of one decision, and the record of decisions and
+	// review queue, every read of one decision, and the audit log and
 	// its file.
 	Decisions Consumer = "decisions"
 	// Inventory is the screens about what a build contains: its tree, a
@@ -120,12 +120,12 @@ const (
 	// builds, coverage, the reports and the home page's numbers.
 	Statistics Consumer = "statistics"
 	// Exports is the findings lists written out as files: the rows the
-	// list reads, then the leads of the same selection as the lead queue
+	// list reads, then the code findings of the same selection as the code finding queue
 	// reads them.
 	Exports Consumer = "exports"
 	// Register is the disposition register: what was decided at every
 	// occurrence of one build, its screen and its file. It states what a build
-	// ships, beside its VEX document, and a lead nobody has judged is not that.
+	// ships, beside its VEX document, and a code finding nobody has judged is not that.
 	Register Consumer = "register"
 	// VEX is the documents stating what affects a build.
 	VEX Consumer = "vex"
@@ -133,22 +133,22 @@ const (
 	Advisories Consumer = "advisories"
 	// Notifications is what is said to people about findings.
 	Notifications Consumer = "notifications"
-	// Evidence is one lead's evidence: where it is, the path the analyzer
+	// Evidence is one code finding's evidence: where it is, the path the analyzer
 	// took to it, links into the source and the source kept beside it.
 	Evidence Consumer = "evidence"
-	// Leads is the lead queue: the leads a product holds, by where they stand,
-	// with how many each list leaves out, the queue's file, the leads a
+	// CodeFindings is the code finding queue: the code findings a product holds, by where they stand,
+	// with how many each list leaves out, the queue's file, the code findings a
 	// findings list's file carries, and the counts by analyzer series. The
 	// counts are here rather than under Statistics, which feeds the
 	// vulnerability figures.
-	Leads Consumer = "leads"
+	CodeFindings Consumer = "code-findings"
 )
 
 // consumers is every consumer of findings.
 func consumers() []Consumer {
 	return []Consumer{
 		Closure, VersionCarry, Ranking, Triage, Assignment, Decisions, Inventory, Statistics,
-		Exports, Register, VEX, Advisories, Notifications, Evidence, Leads,
+		Exports, Register, VEX, Advisories, Notifications, Evidence, CodeFindings,
 	}
 }
 
@@ -160,7 +160,7 @@ func consumers() []Consumer {
 // Analysis results are read by the consumers built for them, by the decisions
 // about them, and by the findings lists' files, which write out everything the
 // reader may read. The vulnerability figures, documents and lists are about
-// what a build ships, and a lead nobody has judged is not that.
+// what a build ships, and a code finding nobody has judged is not that.
 func (c Consumer) Kinds() []Kind {
 	switch c {
 	case Closure:
@@ -170,7 +170,7 @@ func (c Consumer) Kinds() []Kind {
 		return []Kind{Vulnerability, Entered}
 	case Assignment, Decisions, Exports:
 		return []Kind{Vulnerability, Entered, Analysis}
-	case Evidence, Leads:
+	case Evidence, CodeFindings:
 		return []Kind{Analysis}
 	}
 	return nil

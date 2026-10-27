@@ -107,14 +107,14 @@ type SupplierSaid struct {
 // Closed rows are in it. What was known and dealt with is exactly what an
 // auditor is asking about, and a register of only what is still open answers a
 // different question.
-func (s *Store) Register(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) Register(ctx context.Context, subject access.Subject, buildID int64,
 	only Registering, limit, offset int) ([]Disposed, int, error) {
 
-	rows, err := s.RegisterPage(ctx, subject, targetID, only, limit, offset)
+	rows, err := s.RegisterPage(ctx, subject, buildID, only, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.registerSize(ctx, subject, targetID, only)
+	total, err := s.registerSize(ctx, subject, buildID, only)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -126,9 +126,9 @@ func (s *Store) Register(ctx context.Context, subject access.Subject, targetID i
 // Its own statement because it is its own cost: a scan of every finding in
 // the build, which is a quarter of a million rows on a real image.
 func (s *Store) registerSize(ctx context.Context, subject access.Subject,
-	targetID int64, only Registering) (int, error) {
+	buildID int64, only Registering) (int, error) {
 
-	productID, narrow, err := s.registerNarrowing(ctx, subject, targetID)
+	productID, narrow, err := s.registerNarrowing(ctx, subject, buildID)
 	if err != nil {
 		return 0, err
 	}
@@ -145,16 +145,16 @@ func (s *Store) registerSize(ctx context.Context, subject access.Subject,
 // registerNarrowing is the one place that says which of a build's findings a
 // subject may read, so the page and the count cannot come to differ about it.
 func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
-	targetID int64) (int64, func(*bun.SelectQuery) *bun.SelectQuery, error) {
+	buildID int64) (int64, func(*bun.SelectQuery) *bun.SelectQuery, error) {
 
-	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, buildID)
 	if err != nil {
 		return 0, nil, err
 	}
 	return productID, func(q *bun.SelectQuery) *bun.SelectQuery {
 		kinds, args := kind.Register.Where(`"f"."kind"`)
 		return q.TableExpr(`"finding" AS "f"`).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(kinds, args...)
 	}, nil
@@ -167,8 +167,8 @@ func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
 // gone, so a refusal that arrives mid-stream can only be said in the file. A
 // caller asks this first and refuses with a status, the way every other route
 // refuses.
-func (s *Store) MayReadRegister(ctx context.Context, subject access.Subject, targetID int64) error {
-	_, _, err := s.registerNarrowing(ctx, subject, targetID)
+func (s *Store) MayReadRegister(ctx context.Context, subject access.Subject, buildID int64) error {
+	_, _, err := s.registerNarrowing(ctx, subject, buildID)
 	return err
 }
 
@@ -179,10 +179,10 @@ func (s *Store) MayReadRegister(ctx context.Context, subject access.Subject, tar
 // page a thousand times — so the whole register was answering "how many are
 // there altogether" a thousand times to fill in a number the file has no
 // column for. The screen still asks, once, through Register.
-func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, buildID int64,
 	only Registering, limit, offset int) ([]Disposed, error) {
 
-	productID, narrow, err := s.registerNarrowing(ctx, subject, targetID)
+	productID, narrow, err := s.registerNarrowing(ctx, subject, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -217,10 +217,10 @@ func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, target
 // exists in memory — is what a cursor already gives: this holds one row.
 //
 // The screen still pages, because a screen is a page.
-func (s *Store) RegisterEach(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) RegisterEach(ctx context.Context, subject access.Subject, buildID int64,
 	only Registering, each func(Disposed) error) error {
 
-	productID, narrow, err := s.registerNarrowing(ctx, subject, targetID)
+	productID, narrow, err := s.registerNarrowing(ctx, subject, buildID)
 	if err != nil {
 		return err
 	}
@@ -290,7 +290,7 @@ type registerRow struct {
 // list. What a register is asked is "show me what nobody decided", "show me
 // the dismissals", "show me this component" — each of them a way of reading
 // the same complete answer rather than a different question. What is left out
-// is deliberate: a triage line, because the register applies none.
+// is deliberate: a minimum severity, because the register applies none.
 type Registering struct {
 	// States keeps rows standing in any of these, by the four words the row
 	// itself carries.
@@ -465,7 +465,7 @@ func (s *Store) registerQuery(productID int64,
 		// says "lapsed" about the same occurrence.
 		Join(`LEFT JOIN "person" AS "pp" ON "pp"."id" = "de"."proposed_by"`).
 		// The supplier's statement answering the occurrence, where one does.
-		Join(`LEFT JOIN "vex_statement" AS "sr" ON "sr"."id" = "f"."stated_by"`).
+		Join(`LEFT JOIN "received_vex_statement" AS "sr" ON "sr"."id" = "f"."stated_by"`).
 		Join(WordsJoin("sr")).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).

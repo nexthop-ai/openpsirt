@@ -187,7 +187,7 @@ func TellReport(ctx context.Context, db *bun.DB, act ReportAct) error {
 		if err := NewStore(db).Tell(ctx, Telling{
 			PersonID: personID, Kind: act.Kind,
 			Body:    fmt.Sprintf(said, act.Reference, act.Product),
-			Link:    weblink.InboxReport(act.Product, act.Reference),
+			Link:    weblink.VulnerabilityReport(act.Product, act.Reference),
 			Private: true, ProductID: &productID,
 		}); err != nil {
 			// Carried on: an event has no retry, so stopping tells a random

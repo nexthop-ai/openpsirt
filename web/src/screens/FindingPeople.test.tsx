@@ -25,7 +25,7 @@ const issue = { product: "sonic", vulnerability: "OPENPSIRT-2026-1" };
 const issuePath = { product: "sonic", issue: "OPENPSIRT-2026-1" };
 const at = {
   product: "sonic",
-  stream: "master",
+  branch_or_tag: "master",
   variant: "broadcom",
   vulnerability: "OPENPSIRT-2026-1",
   component: "libnl",
@@ -91,7 +91,7 @@ describe("closing a recorded flaw by hand", () => {
     mount.render(
       screen(
         <Resolve
-          at={{ product: "sonic", stream: "master", variant: "broadcom" }}
+          at={{ product: "sonic", branch_or_tag: "master", variant: "broadcom" }}
           vulnerability="OPENPSIRT-2026-1"
         />,
       ),
@@ -141,22 +141,22 @@ describe("the files attached to an issue", () => {
   });
 });
 
-describe("the tags on a finding", () => {
-  it("adds the tag typed and removes the one pressed, on this component", async () => {
+describe("the labels on a finding", () => {
+  it("adds the label typed and removes the one pressed, on this component", async () => {
     serve(() => ({ data: { items: ["waiting on vendor"] } }));
     const put = answer("PUT", () => ({ data: {} }));
     const removed = answer("DELETE", () => ({ data: {} }));
     const changed = vi.fn();
-    mount.render(screen(<Marks at={at} tags={["triaged"]} mayMark onChanged={changed} />));
-    await press(mount.host(), "+ Tag");
+    mount.render(screen(<Marks at={at} labels={["triaged"]} mayMark onChanged={changed} />));
+    await press(mount.host(), "+ Label");
     await settle();
-    change(mount.host().querySelector<HTMLInputElement>("#tag-with"), "upstream asked");
+    change(mount.host().querySelector<HTMLInputElement>("#label-with"), "upstream asked");
     await press(mount.host(), "Add");
     await settle();
     expect(put().map(pathOf)).toEqual([
       {
         product: "sonic",
-        stream: "master",
+        branch_or_tag: "master",
         variant: "broadcom",
         issue: "OPENPSIRT-2026-1",
         component: "libnl",
@@ -165,17 +165,17 @@ describe("the tags on a finding", () => {
     ]);
     const remove = mount
       .host()
-      .querySelector<HTMLButtonElement>('[aria-label="Remove tag triaged"]');
+      .querySelector<HTMLButtonElement>('[aria-label="Remove label triaged"]');
     act(() => remove?.click());
     await settle();
     expect(removed().map((each) => pathOf(each).label)).toEqual(["triaged"]);
     expect(changed).toHaveBeenCalledTimes(2);
   });
 
-  it("shows the tags and no control to somebody who may only read", () => {
+  it("shows the labels and no control to somebody who may only read", () => {
     serve(() => undefined);
     mount.render(
-      screen(<Marks at={at} tags={["triaged"]} mayMark={false} onChanged={() => undefined} />),
+      screen(<Marks at={at} labels={["triaged"]} mayMark={false} onChanged={() => undefined} />),
     );
     expect(mount.host().textContent).toBe("triaged");
     expect(mount.host().querySelectorAll("button")).toHaveLength(0);

@@ -20,7 +20,7 @@ func TestWhatNothingPullsInHangsFromTheRoot(t *testing.T) {
 		loose := at("libfoo", "1.0")
 		// The root pulls in curl. zlib is pulled in by nothing and pulls in
 		// openssl, and libfoo is pulled in by nothing and pulls in nothing.
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, zlib, openssl, loose},
 			Dependencies: []graph.Dependency{
@@ -36,7 +36,7 @@ func TestWhatNothingPullsInHangsFromTheRoot(t *testing.T) {
 		f.opens(t, shared, f.componentNamed(t, loose.Name), "loose")
 		f.opens(t, deep, f.componentNamed(t, openssl.Name), "under-zlib")
 
-		top, kids, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		top, kids, err := f.store.Roots(ctx, everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -72,7 +72,7 @@ func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 		ctx := t.Context()
 		bare := graph.Described{Purl: "pkg:generic/nginx@1.25", Name: "nginx", Version: "1.25"}
 		named := graph.Described{Purl: "pkg:generic/library/nginx@1.25", Name: "nginx", Version: "1.25"}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{bare, named},
 			Dependencies: []graph.Dependency{
@@ -81,14 +81,14 @@ func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		_, err := f.store.ComponentAs(ctx, f.targetID, "nginx", graph.Choice{Version: "1.25"})
+		_, err := f.store.ComponentAs(ctx, f.buildID, "nginx", graph.Choice{Version: "1.25"})
 		var several *graph.Ambiguous
 		if !errors.As(err, &several) || len(several.Choices) != 2 {
 			t.Fatalf("a name held twice answered %v, want the two choices", err)
 		}
 		// Each choice offered resolves exactly one component.
 		for _, choice := range several.Choices {
-			if _, err := f.store.ComponentAs(ctx, f.targetID, "nginx", choice); err != nil {
+			if _, err := f.store.ComponentAs(ctx, f.buildID, "nginx", choice); err != nil {
 				t.Errorf("the choice %+v did not resolve: %v", choice, err)
 			}
 		}
@@ -102,7 +102,7 @@ func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
 	// count the same, so there this pins nothing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, zlib},
 			Dependencies: []graph.Dependency{
@@ -115,7 +115,7 @@ func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
 		}
 		f.opens(t, f.anIssue(t, "CVE-2026-LOOP"), f.componentNamed(t, zlib.Name), "under-curl")
 
-		top, kids, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		top, kids, err := f.store.Roots(ctx, everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +131,7 @@ func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
 func TestASubtreeHoldingACycleIsEachComponentOnce(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, zlib},
 			Dependencies: []graph.Dependency{
@@ -143,7 +143,7 @@ func TestASubtreeHoldingACycleIsEachComponentOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 		var ids []int64
-		if err := graph.Within(f.db.DB, f.targetID, f.componentNamed(t, curl.Name)).
+		if err := graph.Within(f.db.DB, f.buildID, f.componentNamed(t, curl.Name)).
 			Scan(ctx, &ids); err != nil {
 			t.Fatal(err)
 		}
@@ -166,7 +166,7 @@ func TestWhatNothingCanMatchIsCounted(t *testing.T) {
 		byName := graph.Described{Name: "bash", Version: "4.4.18-4.ph3"}
 		byPlatform := graph.Described{Name: "busybox", Version: "1.36",
 			CPE: "cpe:2.3:a:busybox:busybox:1.36:*:*:*:*:*:*:*"}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{matched, byName, byPlatform},
 			Dependencies: []graph.Dependency{
@@ -176,7 +176,7 @@ func TestWhatNothingCanMatchIsCounted(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		tally, err := f.store.Counts(ctx, everyone(f), f.targetID)
+		tally, err := f.store.Counts(ctx, everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestTheChoiceForAComponentWithNoIdentifierResolvesIt(t *testing.T) {
 		ctx := t.Context()
 		bare := graph.Described{Name: "gdbm", Version: "1.26-r6"}
 		named := graph.Described{Purl: "pkg:apk/wolfi/gdbm@1.26-r6", Name: "gdbm", Version: "1.26-r6"}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{bare, named},
 			Dependencies: []graph.Dependency{
@@ -202,14 +202,14 @@ func TestTheChoiceForAComponentWithNoIdentifierResolvesIt(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		_, err := f.store.ComponentAs(ctx, f.targetID, "gdbm", graph.Choice{})
+		_, err := f.store.ComponentAs(ctx, f.buildID, "gdbm", graph.Choice{})
 		var several *graph.Ambiguous
 		if !errors.As(err, &several) || len(several.Choices) != 2 {
 			t.Fatalf("a name held twice answered %v, want the two choices", err)
 		}
 		seen := map[int64]bool{}
 		for _, choice := range several.Choices {
-			id, err := f.store.ComponentAs(ctx, f.targetID, "gdbm", choice)
+			id, err := f.store.ComponentAs(ctx, f.buildID, "gdbm", choice)
 			if err != nil {
 				t.Errorf("the choice %+v did not resolve: %v", choice, err)
 			}
@@ -237,7 +237,7 @@ func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 			deps = append(deps, graph.Dependency{Parent: parent, Child: chain[i]})
 			parent = chain[i]
 		}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root: root, Components: chain, Dependencies: deps,
 		}); err != nil {
 			t.Fatal(err)
@@ -245,7 +245,7 @@ func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 		last := f.componentNamed(t, chain[length-1].Name)
 		f.opens(t, f.anIssue(t, "CVE-2026-FAR"), last, "at-the-end")
 
-		top, _, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		top, _, err := f.store.Roots(ctx, everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +253,7 @@ func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 			t.Errorf("the root counts %+v beneath it, want the issue at the end of the chain", top)
 		}
 		var ids []int64
-		if err := graph.Within(f.db.DB, f.targetID, f.componentNamed(t, chain[0].Name)).
+		if err := graph.Within(f.db.DB, f.buildID, f.componentNamed(t, chain[0].Name)).
 			Scan(ctx, &ids); err != nil {
 			t.Fatal(err)
 		}
@@ -263,7 +263,7 @@ func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 		// The climb reads every node above the end of the chain, however far.
 		// Drawing a chain from it stops at the bound on how deep a chain is
 		// shown, which is a separate limit from the engine's.
-		if _, err := f.store.Chains(ctx, everyone(f), f.targetID, []int64{last}); err != nil {
+		if _, err := f.store.Chains(ctx, everyone(f), f.buildID, []int64{last}); err != nil {
 			t.Errorf("climbing from the end of the chain: %v", err)
 		}
 	})

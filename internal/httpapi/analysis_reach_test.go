@@ -14,11 +14,11 @@ import (
 // An analysis result reaches none of the consumers of vulnerability findings,
 // at any visibility: the lists and their counts, the disposition register, the
 // findings file's vulnerability rows and the VEX document. Each read below
-// would carry it on its visibility alone, since a lead whose flaw is
+// would carry it on its visibility alone, since a code finding whose flaw is
 // disclosed is public and only its kind keeps it out. The rows are set at
 // each visibility a finding holds, so none lets one through. A findings file
-// writes a lead only through the lead queue's read, which needs the
-// analyzer's result these rows have none of. The lists of held work list leads, and are pinned
+// writes a code finding only through the code finding queue's read, which needs the
+// analyzer's result these rows have none of. The lists of held work list code findings, and are pinned
 // with the assignment routes.
 func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -26,13 +26,13 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 		hidden := r.Embargoed(t)
 		r.ScannedTwoIssues(t)
 		const internal, shown = "CVE-2026-1000", "CVE-2026-9999"
-		lead := func(identifier, visibility string) {
+		codeFinding := func(identifier, visibility string) {
 			t.Helper()
 			r.PatchedRows(t, `UPDATE "finding" SET "kind" = 'analysis', "visibility" = '`+visibility+`'
 				WHERE "vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = '`+identifier+`')`)
 		}
-		lead(internal, "internal")
-		lead(hidden, "private")
+		codeFinding(internal, "internal")
+		codeFinding(hidden, "private")
 
 		type listed struct {
 			Items []struct {
@@ -83,7 +83,7 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 
 		// An agreed decision is stated in the build's VEX document, and the
 		// same row as an analysis result is not, though it is public, which
-		// no lead is.
+		// no code finding is.
 		decision, _ := r.Claimed(t, "triager", shown, "linux-image", httpapitest.Dismissal)
 		r.Agreed(t, decision)
 		stated := func() bool {
@@ -97,7 +97,7 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 		if !stated() {
 			t.Fatal("the decided vulnerability is not stated, so the document checks nothing")
 		}
-		lead(shown, "public")
+		codeFinding(shown, "public")
 		if stated() {
 			t.Error("the build's VEX document states an analysis result")
 		}

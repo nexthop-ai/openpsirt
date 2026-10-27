@@ -36,19 +36,19 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | Path | Holds |
 |---|---|
 | `cmd/openpsirt/` | The binary. Flag parsing, configuration, server lifecycle |
-| `cmd/openpsirt-analysis/` | The upload client a pipeline runs. See `DESIGN-analysis.md` § Upload client |
+| `cmd/openpsirt-upload/` | The upload client a pipeline runs. See `DESIGN-analysis.md` § Upload client |
 | `internal/version/` | What this build is. Values injected at link time |
 | `internal/config/` | Settings, read from the environment with working defaults |
 | `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `DESIGN-api.md` § File organization |
 | `internal/httpapi/core/` | What every area of the API shares: the dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies more than one area answers with |
-| `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/reportsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, decisions, reports, advisories, administration |
+| `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/analyticsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, decisions, reports, advisories, administration |
 | `internal/httpapi/httpapitest/`, `internal/httpapi/refusaltest/` | The test harness the areas share — a server over a seeded cast — and the checks each area runs over its own refusal mappers |
 | `internal/database/` | Opening, identifying and validating a database. See `DESIGN-database.md` |
 | `internal/database/migrate/` | The migration runner and the locks around it |
 | `internal/database/migrate/migrations/` | The migrations |
 | `internal/schema/` | Applies this application's schema. Exists so that using the runner registers the migrations |
 | `internal/dbtest/` | Runs a test against every database available to it |
-| `internal/catalog/` | Products, streams and variants. See `DESIGN-data-model.md` |
+| `internal/catalog/` | Products, branches and tags, and variants. See `DESIGN-data-model.md` |
 | `internal/ingest/` | Arriving scans. See `DESIGN-ingest.md` |
 | `internal/queue/` | Durable background work. See `DESIGN-queue.md` |
 | `internal/sbom/`, `internal/scanner/` | Reading an inventory and scanning it. See `DESIGN-ingest.md` |
@@ -57,7 +57,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/series/` | Runs of one analysis across builds: their order, whether each is comparable, and what each saw. See `DESIGN-kinds.md` |
 | `internal/analysis/` | Applying an analyzer's run to its build as findings of the analysis kind. See `DESIGN-analysis.md` |
 | `internal/sourcelink/` | What a product says about its repositories, and the source addresses built from it. See `DESIGN-analysis.md` |
-| `internal/analysisclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `DESIGN-analysis.md` § Upload client |
+| `internal/uploadclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `DESIGN-analysis.md` § Upload client |
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `DESIGN-data-model.md`, `DESIGN-findings.md` |
 | `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `DESIGN-findings.md` § Merged issues |
 | `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |
@@ -66,7 +66,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
 | `internal/weblink/` | The addresses into the interface that the server hands out, held to the interface's route table. See `DESIGN-notifications.md` § Links |
-| `internal/obligation/` | The windows a deployment counts after an attack, the notices given, and the shelf over both. See `DESIGN-obligations.md` |
+| `internal/incident/` | The response windows a deployment counts after an incident, the notices given, and the shelf over both. See `DESIGN-incidents.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
 | `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
 | `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |
@@ -501,7 +501,7 @@ test needs to reach the rows, such as an identifier or a secret shown once.
 | SQLite | Once per binary, against the template, before the first copy |
 | The three servers | Per test, after the binary's database is emptied |
 
-A test that needs a product, its streams, its variants and a build of them
+A test that needs a product, its branches and tags, its variants and a build of them
 takes them from one shared default world rather than declaring its own. The
 world is seeded either per test or as the rows a package's template starts
 from, and it keeps apart the attributes a hand-written seed collapses.
@@ -509,7 +509,7 @@ from, and it keeps apart the attributes a hand-written seed collapses.
 | The default world holds | So that |
 |---|---|
 | A product whose display name is not its name in other capitals | A read answering the display name where the name is resolved fails |
-| A branch and a tag cut from it | A read keyed on the stream answers more than one bucket |
+| A branch and a tag cut from it | A read keyed on the branch or tag answers more than one bucket |
 | One variant reaching customers and one not | A rule keyed on that flag is shown on both sides |
 | A person whose display name is neither empty nor their identity | A read of one never coincides with the other |
 
@@ -708,9 +708,9 @@ database and twice with truncation, one engine at a time:
 | Measurement, engine | Deleted, then reloaded | Truncated, then reloaded | A newly built database |
 |---|---|---|---|
 | The list across products, PostgreSQL | 20,900 pages, correlation of `id` −0.38 and of `vulnerability_id` −0.32; then 12,697 pages, 1.00 and 0.68 | 12,697 pages, 1.00 and 0.68, then 0.67 | Correlation 1.00 and 0.67 |
-| A fix bundle page, PostgreSQL | 20,900 and 18,867 pages | 6,169 and 6,170 pages | — |
-| A fix bundle page, MySQL | 3,078 and 3,014 pages, 30.6 s and 31.4 s | 2,854 pages, 14.5 s, both runs | 2,854 pages, 15.1 s |
-| A fix bundle page, MariaDB | 2,886 and 2,823 pages, 25.0 s and 24.7 s | 2,854 pages, 11.3 s and 10.6 s | 2,854 pages, 11.3 s |
+| A planned upgrades page, PostgreSQL | 20,900 and 18,867 pages | 6,169 and 6,170 pages | — |
+| A planned upgrades page, MySQL | 3,078 and 3,014 pages, 30.6 s and 31.4 s | 2,854 pages, 14.5 s, both runs | 2,854 pages, 15.1 s |
+| A planned upgrades page, MariaDB | 2,886 and 2,823 pages, 25.0 s and 24.7 s | 2,854 pages, 11.3 s and 10.6 s | 2,854 pages, 11.3 s |
 | The list across products, MySQL and MariaDB | 5,802 pages, and once 5,834 on MariaDB | 5,802 pages | — |
 
 The deleted runs on PostgreSQL disagree with each other because autovacuum

@@ -23,7 +23,7 @@ describe("the scope panel on a screen that needs a build", () => {
       if (path === "/v1/products/{product}/variants") return { data: { items: [{ name: "arm" }] } };
       return { data: { items: [] } };
     });
-    mount.render(screen(<Scope />, "/products/sonic/streams/master/variants/x/uploads"));
+    mount.render(screen(<Scope />, "/products/sonic/branches-and-tags/master/variants/x/uploads"));
     await settle();
     await act(async () => mount.host().querySelector<HTMLButtonElement>("button.scope")?.click());
     await settle();
@@ -46,7 +46,7 @@ function catalog(path: string): Answer | undefined {
   if (path === "/v1/products/{product}/branches-and-tags")
     return { data: { items: [{ name: "master", kind: "branch" }] } };
   if (path === "/v1/products/{product}/variants") return { data: { items: [{ name: "arm" }] } };
-  if (path === "/v1/products/{product}/branches-and-tags/{stream}/variants")
+  if (path === "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants")
     return { data: { items: [{ name: "arm" }, { name: "old", retired: true }] } };
   return { data: { items: [] } };
 }
@@ -88,7 +88,7 @@ describe("applying a pick", () => {
     await opened("/findings");
     await pick("sonic");
     await pick("master");
-    expect(location()).toBe("/products/sonic/findings?stream=master");
+    expect(location()).toBe("/products/sonic/findings?branch_or_tag=master");
   });
 
   it("closes on the variant, the last level", async () => {
@@ -96,8 +96,8 @@ describe("applying a pick", () => {
     await pick("sonic");
     await pick("master");
     await pick("arm");
-    expect(location()).toBe("/products/sonic/streams/master/variants/arm/findings");
-    expect(kept()).toEqual({ product: "sonic", stream: "master", variant: "arm" });
+    expect(location()).toBe("/products/sonic/branches-and-tags/master/variants/arm/findings");
+    expect(kept()).toEqual({ product: "sonic", branch_or_tag: "master", variant: "arm" });
     expect(expanded()).toBe("false");
   });
 
@@ -116,12 +116,12 @@ describe("applying a pick", () => {
   });
 
   it("swaps the build on a screen about one build and keeps the screen", async () => {
-    await opened("/products/edgeos/streams/main/variants/x86/uploads");
+    await opened("/products/edgeos/branches-and-tags/main/variants/x86/uploads");
     await pick("sonic");
-    expect(location()).toBe("/products/edgeos/streams/main/variants/x86/uploads");
+    expect(location()).toBe("/products/edgeos/branches-and-tags/main/variants/x86/uploads");
     await pick("master");
     await pick("arm");
-    expect(location()).toBe("/products/sonic/streams/master/variants/arm/uploads");
+    expect(location()).toBe("/products/sonic/branches-and-tags/master/variants/arm/uploads");
   });
 
   it("says the products could not be read rather than listing none", async () => {

@@ -18,9 +18,9 @@ const (
 	Parse = "scan.read"
 	// Scan names the work of scanning what a build contains.
 	Scan = "vulnerability.scan"
-	// Route names the work of applying the standing rules to what is already
-	// open.
-	Route = "routing.sweep"
+	// AssignmentSweep names the work of applying the assignment rules to what
+	// is already open.
+	AssignmentSweep = "assignment.sweep"
 	// Analyze names the work of applying an analyzer's run to its build.
 	Analyze = "analysis.apply"
 )
@@ -31,4 +31,4 @@ const (
 // operator looking at what is waiting. The cap is per kind, so a single number
 // across the queue would hide the kind that is actually backed up behind the
 // two that are not.
-func Kinds() []string { return []string{Parse, Scan, Route, Analyze} }
+func Kinds() []string { return []string{Parse, Scan, AssignmentSweep, Analyze} }

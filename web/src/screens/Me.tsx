@@ -21,7 +21,7 @@ import { Wide } from "../ui/Wide";
 // credentials they hold. The one place in the interface a person mints a token
 // for a script or turns the daily digest on, which is off until asked for.
 //
-// The digest matters more after routing by rule: it is what tells somebody
+// The digest matters more after assignment by rule: it is what tells somebody
 // that work arrived for their team without anybody sending a message.
 export function Me() {
   const who = useWho();

@@ -22,7 +22,7 @@ func (f *fixture) decidedSaying(t *testing.T, by, issueID int64, occurrence, sta
 	})
 }
 
-// The by-component view and the fix bundles keep the groups the findings list
+// The by-component view and the planned upgrades keep the groups the findings list
 // keeps under a filter needing a decision: one issue at one fold, asked of the
 // whole fold. A fold of two packages with the issue agreed at one of them is
 // not agreed, so neither package carries it; an issue lapsed at one package of
@@ -118,26 +118,26 @@ func TestTheViewsKeepTheListsGroupsUnderAFilterNeedingADecision(t *testing.T) {
 				t.Errorf("%s: by component the total alone is %d (%v), and the page says %d", name, alone, err, total)
 			}
 
-			bundles, bumps, err := f.store.Bundles(ctx, who, f.scope, 50, 0, filter)
+			upgrades, bumps, err := f.store.PlannedUpgrades(ctx, who, f.scope, 50, 0, filter)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if want.issues == 0 {
-				if bumps != 0 || len(bundles) != 0 {
-					t.Errorf("%s: by upgrade %+v (total %d), want none", name, bundles, bumps)
+				if bumps != 0 || len(upgrades) != 0 {
+					t.Errorf("%s: by upgrade %+v (total %d), want none", name, upgrades, bumps)
 				}
 			} else {
-				if bumps != 1 || len(bundles) != 1 {
-					t.Fatalf("%s: by upgrade %+v (total %d), want the one bump", name, bundles, bumps)
+				if bumps != 1 || len(upgrades) != 1 {
+					t.Fatalf("%s: by upgrade %+v (total %d), want the one bump", name, upgrades, bumps)
 				}
 				names := slices.Sorted(maps.Keys(want.components))
-				if bundles[0].Issues != want.issues || bundles[0].Occurrences != want.occurrences ||
-					!slices.Equal(bundles[0].Components, names) {
+				if upgrades[0].Issues != want.issues || upgrades[0].Occurrences != want.occurrences ||
+					!slices.Equal(upgrades[0].Components, names) {
 					t.Errorf("%s: the bump closes %d issues at %d occurrences in %v, want %d at %d in %v", name,
-						bundles[0].Issues, bundles[0].Occurrences, bundles[0].Components, want.issues, want.occurrences, names)
+						upgrades[0].Issues, upgrades[0].Occurrences, upgrades[0].Components, want.issues, want.occurrences, names)
 				}
 			}
-			counted, err := f.store.CountBundles(ctx, who, f.scope, filter)
+			counted, err := f.store.CountPlannedUpgrades(ctx, who, f.scope, filter)
 			if err != nil || counted != bumps {
 				t.Errorf("%s: by upgrade the total alone is %d (%v), and the page says %d", name, counted, err, bumps)
 			}

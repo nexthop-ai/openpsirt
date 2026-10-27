@@ -134,12 +134,12 @@ export function asAsked(params: URLSearchParams, view: string): URLSearchParams 
 // The selection rides on the path rather than in the parameters, so widening is
 // a move rather than a parameter change — and the filters have to be carried
 // across by hand or removing the product chip would silently drop the narrowing
-// somebody actually chose. `stream` and `variant` are dropped from what is
+// somebody actually chose. `branch_or_tag` and `variant` are dropped from what is
 // carried because the address being built owns those: it puts back whichever of
 // them the new scope still has.
 export function widened(path: string, params: URLSearchParams): string {
   const rest = new URLSearchParams(params);
-  rest.delete("stream");
+  rest.delete("branch_or_tag");
   rest.delete("variant");
   // What is specific to a variant goes with the variant it was about. Left
   // standing, the chip says "only this variant" over a list narrowed by no
@@ -211,9 +211,12 @@ export function hidden(params: URLSearchParams, component: string): URLSearchPar
 // The build the list is looking at. Either may be absent: the list is not
 // one of the screens that needs a whole build.
 export function where(params: URLSearchParams) {
-  const stream = params.get("stream") ?? "";
+  const branchOrTag = params.get("branch_or_tag") ?? "";
   const variant = params.get("variant") ?? "";
-  return { ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) };
+  return {
+    ...(branchOrTag ? { branch_or_tag: branchOrTag } : {}),
+    ...(variant ? { variant } : {}),
+  };
 }
 
 // The rows a page holds, as the address says, refusing a size that is not
@@ -379,7 +382,7 @@ export function listQuery(params: URLSearchParams) {
   // two publishers, the memory-safety weaknesses. Any of them rather than all
   // of them — one row has one component name, so "both" would be nothing.
   const components = params.getAll("component").filter(Boolean);
-  const tags = params.getAll("tag").filter(Boolean);
+  const labels = params.getAll("label").filter(Boolean);
   const publishers = params.getAll("vex_publisher").filter(Boolean);
   const weaknesses = params.getAll("weakness").filter(Boolean);
   const likelihood = Number(params.get("epss_at_least") ?? "");
@@ -456,7 +459,7 @@ export function listQuery(params: URLSearchParams) {
     ...(buildSays.length > 0 ? { build_says: buildSays } : {}),
     ...(hiding.length > 0 ? { exclude: hiding } : {}),
     ...(components.length > 0 ? { component: components } : {}),
-    ...(tags.length > 0 ? { label: tags } : {}),
+    ...(labels.length > 0 ? { label: labels } : {}),
     ...(origin ? { origin } : {}),
     ...(planned && planned !== "either" ? { planned } : {}),
     ...(params.get("below") === "yes" ? { below_minimum_severity: true } : {}),
@@ -538,11 +541,11 @@ export function identityOf(row: Row): string {
 // the page through this one key.
 export function findingsPageKey(
   product: string,
-  stream: string,
+  branchOrTag: string,
   variant: string,
   query: ReturnType<typeof withinVariant>,
 ) {
-  return ["findings", product, stream, variant, query] as const;
+  return ["findings", product, branchOrTag, variant, query] as const;
 }
 
 // The window a finding asks for to know its neighbors: the page the list was

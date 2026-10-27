@@ -1,0 +1,405 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package assignapi
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+)
+
+// plannedUpgradeSort is the query parameter for which order the planned-upgrade list pages
+// in, built from the store's own list the way the findings list's is.
+type plannedUpgradeSort string
+
+// Schema answers with the orders the store knows, in its order.
+func (plannedUpgradeSort) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(finding.PlannedUpgradeSortKeys()))
+	for _, key := range finding.PlannedUpgradeSortKeys() {
+		offered = append(offered, string(key))
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
+}
+
+// PlannedUpgradeItemBody is one upstream bump and everything it would close.
+type PlannedUpgradeItemBody struct {
+	Upstream string `json:"upstream" doc:"The upgrade's subject: the source package where one is recorded, and the component's own name otherwise"`
+	From     string `json:"from" doc:"The version in hand"`
+	To       string `json:"to" doc:"The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped"`
+	// Components are the names this upgrade moves, which is what makes a
+	// upgrade keyed on a source package readable.
+	Components  []string `json:"components" doc:"The packages this one upgrade moves. More than one where a source package builds several"`
+	Issues      int      `json:"issues" doc:"Distinct vulnerabilities the upgrade closes"`
+	Occurrences int      `json:"occurrences" doc:"The number of findings those sit at"`
+	Builds      int      `json:"builds,omitempty" doc:"The number of builds of the selection holding any of it. Absent where the selection is one build"`
+	Severity    string   `json:"severity,omitempty" doc:"The worst of what it closes"`
+	Exploited   bool     `json:"exploited,omitempty" doc:"Some of what it closes is being exploited"`
+	// Incident is the other exploitation signal, and the one that
+	// outranks it: an upgrade carrying it closes something this product was
+	// attacked through.
+	Incident bool `json:"incident,omitempty" doc:"Whether an incident stands in this product through some of what it closes"`
+	// In names the builds that hold it, which is what a declaration is
+	// offered against: a bump is declared for releases, and the ones worth
+	// offering are the ones that have it.
+	In []BuildName `json:"in" doc:"The builds that hold this upgrade"`
+}
+
+// PlannedUpgradeQuery is the narrowing the planned-upgrade list takes.
+//
+// One struct for the screen and the file, because they are one question. An
+// export declaring its own parameters drifts from the list it came from, and
+// nothing rejects an undeclared parameter — so the filters a caller sent
+// arrive and are dropped before the handler runs, with no error and no clue.
+type PlannedUpgradeQuery struct {
+	BranchOrTag string             `query:"branch_or_tag" doc:"Limit to one branch or tag"`
+	Variant     string             `query:"variant" doc:"Limit to one variant"`
+	Severity    core.Rating        `query:"severity" doc:"Keep only issues rated this badly or worse"`
+	Exploited   bool               `query:"exploited" doc:"Keep only upgrades closing something known to be exploited"`
+	Component   string             `query:"component" doc:"Keep only upgrades moving a component of this name"`
+	Search      string             `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
+	Ecosystem   string             `query:"ecosystem" doc:"Keep only components of one package kind"`
+	State       core.Standing      `query:"state" doc:"Keep only groups this far decided"`
+	Sort        plannedUpgradeSort `query:"sort" doc:"The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for"`
+	Ascending   bool               `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
+}
+
+// narrow is the store's own filter, built from the request.
+func (q PlannedUpgradeQuery) narrow(floor finding.MinimumSeverity) finding.Filter {
+	return finding.Filter{
+		MinSeverity: string(q.Severity), Exploited: q.Exploited,
+		Components: []string{q.Component}, Search: q.Search,
+		Ecosystems: []string{q.Ecosystem}, States: []finding.DecisionStanding{finding.DecisionStanding(q.State)},
+		PlannedUpgradeSort: finding.PlannedUpgradeSortKey(q.Sort), Ascending: q.Ascending,
+		MinimumSeverity: floor,
+	}
+}
+
+func registerPlannedUpgrades(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-planned-upgrades", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/planned-upgrades",
+		Summary: "List planned upgrades",
+		Description: "One row per upstream upgrade, with the issues it closes.\n\n" +
+
+			"Keyed on the source package where one is recorded and on the component's " +
+			"own name otherwise, so packages built from one source are one row — curl, " +
+			"libcurl4t64 and libcurl3t64 are upgraded once.\n\n" +
+			"Only what has a fix: an upgrade is a version to move to, so a finding upstream has " +
+			"released nothing for is not in one.\n\n" +
+			"Grouping is presentation: one act still records its decision separately at " +
+			"every occurrence of every component.\n\n" +
+			"Takes the same selection as the findings list, and six of its filters: " +
+			"severity, exploited, component, search, ecosystem and state. Not the rest: a " +
+			"filter that answers about an occurrence or a deadline has no row here to narrow.\n\n" +
+			"Ordered worst first, and `sort` takes any of: what the upgrade would close " +
+			"(`issues`, `occurrences`), how far it reaches (`builds`), how bad the worst of it is " +
+			"(`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). " +
+			"`asc` orders the other way. The default answers what should worry you; " +
+			"`sort=issues` answers what to do this afternoon.\n\n" +
+			"`limit=0` returns `total` alone, with no rows.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		PlannedUpgradeQuery
+		core.CountedPaging
+	}) (*core.CountedListOutput[PlannedUpgradeItemBody], error) {
+		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
+		}, "the minimum severity could not be read")
+		if err != nil {
+			return nil, err
+		}
+		out := &core.CountedListOutput[PlannedUpgradeItemBody]{}
+		store := finding.NewStore(in.DB.DB)
+		if input.Limit == 0 {
+			total, err := store.CountPlannedUpgrades(ctx, subject, scope, input.narrow(floor))
+			if err != nil {
+				return nil, core.RefusedFinding(in, err)
+			}
+			out.Body.Total = total
+			out.Body.Items = []PlannedUpgradeItemBody{}
+			return out, nil
+		}
+		upgrades, total, err := store.PlannedUpgrades(ctx, subject, scope,
+			input.Limit, input.Offset, input.narrow(floor))
+		if err != nil {
+			return nil, core.RefusedFinding(in, err)
+		}
+
+		out.Body.Total = total
+		oneBuild := scope.BranchOrTagID != nil && scope.VariantID != nil
+		out.Body.Items = plannedUpgradeBodies(upgrades, oneBuild)
+		return out, nil
+	})
+
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-planned-upgrades", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/planned-upgrades.{format}",
+		Summary: "Export planned upgrades",
+		Description: "The same list as a file: one row per upstream upgrade, with what it closes " +
+			"and the builds that hold it.\n\n" +
+			"Takes the same selection and the same filters as the screen, from the same " +
+			"struct. The builds an upgrade is held in are one cell, separated by spaces, because " +
+			"a spreadsheet has no second dimension.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		Format  string `path:"format" enum:"csv,json"`
+		PlannedUpgradeQuery
+	}) (*huma.StreamResponse, error) {
+		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
+		}, "the minimum severity could not be read")
+		if err != nil {
+			return nil, err
+		}
+		store := finding.NewStore(in.DB.DB)
+		narrowed := input.narrow(floor)
+		oneBuild := scope.BranchOrTagID != nil && scope.VariantID != nil
+		line := "everything"
+		if floor.Hides() {
+			line = floor.Word
+		}
+		out := core.Exporting{
+			What:  "findings by upgrade",
+			About: []core.Stated{{Label: "triaged at or above", Value: line}},
+			Header: []string{
+				"upstream", "from", "to", "components", "issues", "occurrences",
+				"builds", "severity", "exploited", "incident", "in",
+			},
+			// Paged through the store the screen reads, so the file is the
+			// list rather than a second query that will come to disagree
+			// with it.
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				upgrades, _, err := store.PlannedUpgrades(ctx, subject, scope, limit, offset, narrowed)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(upgrades))
+				for _, body := range plannedUpgradeBodies(upgrades, oneBuild) {
+					builds := make([]string, 0, len(body.In))
+					for _, at := range body.In {
+						builds = append(builds, at.BranchOrTag+"/"+at.Variant)
+					}
+					// Empty where the selection is one build, as the list
+					// leaves it out: it is the same number on every row.
+					count := ""
+					if !oneBuild {
+						count = strconv.Itoa(body.Builds)
+					}
+					rows = append(rows, []string{
+						body.Upstream, body.From, body.To,
+						strings.Join(body.Components, " "),
+						strconv.Itoa(body.Issues), strconv.Itoa(body.Occurrences),
+						count, body.Severity,
+						strconv.FormatBool(body.Exploited),
+						strconv.FormatBool(body.Incident),
+						strings.Join(builds, " "),
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, "planned-upgrades-"+core.DownloadName(input.Product), out)
+		}}, nil
+	})
+}
+
+// plannedUpgradeBodies is the list as it is written, for the screen and for the file.
+func plannedUpgradeBodies(upgrades []finding.PlannedUpgrade, oneBuild bool) []PlannedUpgradeItemBody {
+	out := make([]PlannedUpgradeItemBody, 0, len(upgrades))
+	for _, upgrade := range upgrades {
+		body := PlannedUpgradeItemBody{
+			Upstream: upgrade.Upstream, From: upgrade.From, To: upgrade.To,
+			Components: upgrade.Components,
+			Issues:     upgrade.Issues, Occurrences: upgrade.Occurrences,
+			Severity: upgrade.Severity, Exploited: upgrade.Exploited,
+			Incident: upgrade.Incident,
+			In:       make([]BuildName, 0, len(upgrade.In)),
+		}
+		for _, at := range upgrade.In {
+			body.In = append(body.In, BuildName{BranchOrTag: at.BranchOrTag, Variant: at.Variant})
+		}
+		// Absent where the selection is one build, because then it is the
+		// same number on every row.
+		if !oneBuild {
+			body.Builds = upgrade.Builds
+		}
+		out = append(out, body)
+	}
+	return out
+}
+
+// BuildName is a release and variant, as the catalog names them.
+type BuildName struct {
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
+}
+
+// PlannedBody is one bump a release is waiting on.
+type PlannedBody struct {
+	Fold        string   `json:"fold" doc:"The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"`
+	Upstream    string   `json:"upstream" doc:"The name: the source package"`
+	From        string   `json:"from"`
+	To          string   `json:"to" doc:"The version it moves to, as the commitment recorded it"`
+	Components  []string `json:"components"`
+	Issues      int      `json:"issues" doc:"Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"`
+	Occurrences int      `json:"occurrences" doc:"The number of findings those issues sit at"`
+	DeclaredAt  string   `json:"declared_at" doc:"The moment the commitment was made, which is what this release has been waiting since"`
+	// By, HeldBy and State are the promise, who is carrying it, and where
+	// it stands. The state is derived on every read from the scans and the
+	// date, and set by nobody.
+	By         string            `json:"by,omitempty" doc:"The date the promise named, as a date. Absent where the commitment is intent rather than a promise"`
+	HeldBy     string            `json:"held_by,omitempty" doc:"The identity or team name of the party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
+	HeldByName string            `json:"held_by_name,omitempty" doc:"The carrying party's display name, where it differs from held_by"`
+	State      core.UpgradeState `json:"state" doc:"The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
+	// DecisionID is the decision that argued for it, which is the way through to
+	// the reasoning, the approval and the conversation about the upgrade.
+	DecisionID int64 `json:"decision_id,omitempty" doc:"The decision that argued for it, where one did: its reasoning, its approval and its comments"`
+}
+
+func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-build-planned-upgrades", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades",
+		Summary: "List one build's planned upgrades",
+		Description: "Everything committed for this build, one row per upgrade — a source package " +
+			"at the version it was built at, moving to another version — with what it would " +
+			"still close here.\n\n" +
+			"What it covers is a match, not a list. A finding is covered when its " +
+			"component folds to the same key in this build, so changing the version a release " +
+			"is moving to is one row, and an issue published tonight against the same package " +
+			"is covered by this morning's commitment with nobody acting.\n\n" +
+			"The planned-upgrade query read from the other end. A triager reads an upgrade and the " +
+			"issues it closes; a coordinator reads a build and the upgrades it is waiting on. One " +
+			"query rather than two reports that will eventually disagree.\n\n" +
+			"Nothing here is declared done. A piece of work has landed when the build " +
+			"stops holding it, which the scans already say — a declared fix that is still " +
+			"open after a scan has run is a missed target, and the scan is independent " +
+			"evidence against the claim.\n\n" +
+			"Each row says where it stands — planned, landed, or lapsed — derived on every " +
+			"read from the scans and the date the promise named, and set by nobody. A lapsed " +
+			"upgrade returns as one item to whoever holds it: the findings it covers stay " +
+			"covered, because deciding them again one at a time is the thing the promise was " +
+			"made instead of. They return on their own only when the component moved and they " +
+			"did not close, which needs nothing extra — a decision is keyed on the version it " +
+			"was made against and stops applying the moment that version changes.\n\n" +
+			"There is no separate 'replanned': re-promising writes a new date and the standing " +
+			"promise is the one read, so a replanned upgrade is a planned one with a later " +
+			"date.",
+		Tags: []string{"Remediation"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+	}) (*core.ListOutput[PlannedBody], error) {
+		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
+		if err != nil {
+			return nil, err
+		}
+		planned, err := finding.NewStore(in.DB.DB).PlannedUpgradesFor(ctx, subject, buildID)
+		if err != nil {
+			return nil, core.RefusedFinding(in, err)
+		}
+		out := &core.ListOutput[PlannedBody]{}
+		out.Body.Items = plannedBodies(planned)
+		return out, nil
+	})
+
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-build-planned-upgrades", Method: http.MethodGet,
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
+			"/planned-upgrades.{format}",
+		Summary: "Export one build's planned upgrades",
+		Description: "The same list as a file: one row per upgrade this build is waiting on, " +
+			"where it stands, and what it would still close here.\n\n" +
+			"The packages one upgrade moves are a single cell, separated by spaces, because a " +
+			"spreadsheet has no second dimension.",
+		Tags: []string{"Remediation"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Format      string `path:"format" enum:"csv,json"`
+	}) (*huma.StreamResponse, error) {
+		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
+		if err != nil {
+			return nil, err
+		}
+		// Read whole before a byte is written, like the screen reads it: this
+		// is one build's plan rather than a paged list, and a refusal has to
+		// land before the status is gone.
+		planned, err := finding.NewStore(in.DB.DB).PlannedUpgradesFor(ctx, subject, buildID)
+		if err != nil {
+			return nil, core.RefusedFinding(in, err)
+		}
+		rows := plannedBodies(planned)
+		out := core.Exporting{
+			What: "upgrades this build is waiting on",
+			About: []core.Stated{
+				{Label: "build", Value: input.Product + " " + input.BranchOrTag + " (" + input.Variant + ")"},
+			},
+			Header: []string{
+				"upstream", "from", "to", "components", "issues", "occurrences",
+				"declared_at", "by", "held_by", "held_by_name", "state", "decision",
+			},
+			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
+				page := core.Window(rows, limit, offset)
+				if len(page) == 0 {
+					return nil, nil
+				}
+				written := make([][]string, 0, len(page))
+				for _, row := range page {
+					decision := ""
+					if row.DecisionID != 0 {
+						decision = strconv.FormatInt(row.DecisionID, 10)
+					}
+					written = append(written, []string{
+						row.Upstream, row.From, row.To,
+						strings.Join(row.Components, " "),
+						strconv.Itoa(row.Issues), strconv.Itoa(row.Occurrences),
+						row.DeclaredAt, row.By, row.HeldBy, row.HeldByName, string(row.State), decision,
+					})
+				}
+				return written, nil
+			},
+		}
+		name := "planned-upgrades-" + core.DownloadName(input.Product+"-"+input.BranchOrTag+"-"+input.Variant)
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, name, out)
+		}}, nil
+	})
+}
+
+// plannedBodies is the plan as it is written, for the screen and for the file.
+func plannedBodies(planned []finding.Planned) []PlannedBody {
+	out := make([]PlannedBody, 0, len(planned))
+	for _, one := range planned {
+		row := PlannedBody{
+			Fold: one.Fold, Upstream: one.Upstream, From: one.From, To: one.To,
+			Components: one.Components,
+			Issues:     one.Issues, Occurrences: one.Occurrences,
+			DeclaredAt: one.DeclaredAt.UTC().Format(time.DateOnly),
+			HeldBy:     one.HeldBy, HeldByName: core.LabelBeside(one.HeldByName, one.HeldBy),
+			State:      core.UpgradeState(one.State),
+			DecisionID: one.DecisionID,
+		}
+		if row.Components == nil {
+			row.Components = []string{}
+		}
+		if one.By != nil {
+			row.By = one.By.UTC().Format(time.DateOnly)
+		}
+		out = append(out, row)
+	}
+	return out
+}

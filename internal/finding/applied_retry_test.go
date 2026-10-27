@@ -25,10 +25,10 @@ func TestAScanAppliedAgainAfterALostCommitCountsOnce(t *testing.T) {
 	db, race := dbtest.Racing(t, nil)
 	ctx := t.Context()
 	w := world.New(t, db)
-	product, target := w.Product, w.Target
+	product, build := w.Product, w.Build
 	f := &fixture{
 		db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-		target: target.ID, productID: product.ID, scans: ingest.NewStore(db.DB),
+		build: build.ID, productID: product.ID, scans: ingest.NewStore(db.DB),
 		built: time.Now().UTC().Add(-72 * time.Hour),
 	}
 	f.shipped(t, twoConsumers())
@@ -37,7 +37,7 @@ func TestAScanAppliedAgainAfterALostCommitCountsOnce(t *testing.T) {
 	// Reported by nothing, so every occurrence closes with no reason given.
 	quiet := f.run(t)
 	race.Arm(1)
-	applied, err := f.store.Apply(ctx, f.target, quiet, nil)
+	applied, err := f.store.Apply(ctx, f.build, quiet, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

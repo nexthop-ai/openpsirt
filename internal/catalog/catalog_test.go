@@ -32,16 +32,16 @@ func each(t *testing.T, fn func(t *testing.T, db *database.DB, s *catalog.Store)
 // Beside each() because three tests wrote these nine lines out, and a fourth
 // wrote out each()'s body as well — so a change to how a test database is
 // prepared landed in one place and silently missed the only test covering
-// EnsureStream.
+// EnsureBranchOrTag.
 func declared(t *testing.T, ctx context.Context, s *catalog.Store) (
-	*catalog.Product, *catalog.Stream, *catalog.Variant) {
+	*catalog.Product, *catalog.BranchOrTag, *catalog.Variant) {
 
 	t.Helper()
 	product, err := s.DeclareProduct(ctx, "SONiC", "SONiC")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := s.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+	branchOrTag, err := s.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func declared(t *testing.T, ctx context.Context, s *catalog.Store) (
 	if err != nil {
 		t.Fatal(err)
 	}
-	return product, stream, variant
+	return product, branchOrTag, variant
 }
 
 func TestDeclareAndResolve(t *testing.T) {
@@ -59,13 +59,13 @@ func TestDeclareAndResolve(t *testing.T) {
 		if err != nil {
 			t.Fatalf("declare product: %v", err)
 		}
-		br, err := s.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil)
+		br, err := s.DeclareBranchOrTag(ctx, p.ID, "release-2.4", catalog.Branch, nil)
 		if err != nil {
 			t.Fatalf("declare branch: %v", err)
 		}
 		// A tag records the branch it was cut from, which is what lets a
 		// branch be compared against its last release.
-		tag, err := s.DeclareStream(ctx, p.ID, "v2.4.1", catalog.Tag, &br.ID)
+		tag, err := s.DeclareBranchOrTag(ctx, p.ID, "v2.4.1", catalog.Tag, &br.ID)
 		if err != nil {
 			t.Fatalf("declare tag: %v", err)
 		}
@@ -85,16 +85,16 @@ func TestDeclareAndResolve(t *testing.T) {
 		if err != nil {
 			t.Fatalf("resolve: %v", err)
 		}
-		if got.StreamID != br.ID || got.VariantID != v.ID {
+		if got.BranchOrTagID != br.ID || got.VariantID != v.ID {
 			t.Errorf("resolved to %+v", got)
 		}
-		// Resolving again is the same target, not a second one.
+		// Resolving again is the same build, not a second one.
 		again, err := s.Resolve(ctx, "sonic", "release-2.4", "broadcom")
 		if err != nil || again.ID != got.ID {
 			t.Errorf("resolving twice gave %v and %v (%v)", got.ID, again.ID, err)
 		}
 
-		// The same variant in another release is a different target over the
+		// The same variant in another release is a different build over the
 		// same variant, which is what stops the name being typed twice.
 		other, err := s.Resolve(ctx, "sonic", "v2.4.1", "broadcom")
 		if err != nil {
@@ -104,7 +104,7 @@ func TestDeclareAndResolve(t *testing.T) {
 			t.Error("a release built as the same variant got a second variant")
 		}
 		if other.ID == got.ID {
-			t.Error("two releases share one target")
+			t.Error("two releases share one build")
 		}
 	})
 }
@@ -115,17 +115,17 @@ func TestResolveNamesTheMissingPart(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
 		p, _ := s.DeclareProduct(ctx, "sonic", "SONiC")
-		_, _ = s.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil)
+		_, _ = s.DeclareBranchOrTag(ctx, p.ID, "release-2.4", catalog.Branch, nil)
 		if _, err := s.DeclareVariant(ctx, p.ID, "broadcom", true); err != nil {
 			t.Fatal(err)
 		}
 
-		for _, tc := range []struct{ product, stream, variant, want string }{
+		for _, tc := range []struct{ product, branchOrTag, variant, want string }{
 			{"nope", "release-2.4", "broadcom", `product "nope"`},
-			{"sonic", "relase-2.4", "broadcom", `stream "relase-2.4"`},
+			{"sonic", "relase-2.4", "broadcom", `branch or tag "relase-2.4"`},
 			{"sonic", "release-2.4", "brodcom", `variant "brodcom"`},
 		} {
-			_, err := s.Resolve(ctx, tc.product, tc.stream, tc.variant)
+			_, err := s.Resolve(ctx, tc.product, tc.branchOrTag, tc.variant)
 			if err == nil {
 				t.Errorf("%v resolved, but should not have", tc)
 				continue
@@ -150,12 +150,12 @@ func TestNamesAreUniqueWithinTheirParent(t *testing.T) {
 		if _, err := s.DeclareProduct(ctx, "sonic", "again"); !errors.Is(err, catalog.ErrExists) {
 			t.Errorf("duplicate product accepted: %v", err)
 		}
-		a, err := s.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil)
+		a, err := s.DeclareBranchOrTag(ctx, p.ID, "release-2.4", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.DeclareStream(ctx, p.ID, "release-2.4", catalog.Branch, nil); !errors.Is(err, catalog.ErrExists) {
-			t.Errorf("duplicate stream accepted: %v", err)
+		if _, err := s.DeclareBranchOrTag(ctx, p.ID, "release-2.4", catalog.Branch, nil); !errors.Is(err, catalog.ErrExists) {
+			t.Errorf("duplicate branch or tag accepted: %v", err)
 		}
 		if _, err := s.DeclareVariant(ctx, p.ID, "broadcom", true); err != nil {
 			t.Fatal(err)
@@ -169,7 +169,7 @@ func TestNamesAreUniqueWithinTheirParent(t *testing.T) {
 		}
 
 		// Every release is built as it without anyone restating the name.
-		b, err := s.DeclareStream(ctx, p.ID, "release-2.5", catalog.Branch, nil)
+		b, err := s.DeclareBranchOrTag(ctx, p.ID, "release-2.5", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,8 +186,8 @@ func TestNamesAreUniqueWithinTheirParent(t *testing.T) {
 		// And a release only appears to be built as something once a scan has
 		// been filed for it, which is what keeps a variant introduced later
 		// out of earlier releases.
-		for _, stream := range []int64{a.ID, b.ID} {
-			was, err := s.BuiltAs(ctx, admin, stream)
+		for _, branchOrTag := range []int64{a.ID, b.ID} {
+			was, err := s.BuiltAs(ctx, admin, branchOrTag)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -244,12 +244,12 @@ func TestBadNamesAreRejected(t *testing.T) {
 	})
 }
 
-func TestStreamKindIsChecked(t *testing.T) {
+func TestBranchOrTagKindIsChecked(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
 		p, _ := s.DeclareProduct(ctx, "sonic", "SONiC")
-		if _, err := s.DeclareStream(ctx, p.ID, "x", catalog.Kind("release"), nil); err == nil {
-			t.Error("an unrecognized stream kind was accepted")
+		if _, err := s.DeclareBranchOrTag(ctx, p.ID, "x", catalog.Kind("release"), nil); err == nil {
+			t.Error("an unrecognized branch or tag kind was accepted")
 		}
 	})
 }
@@ -265,7 +265,7 @@ func TestADeclaredNameIsFoundHoweverItIsCapitalized(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.DeclareStream(ctx, product.ID, "Master", catalog.Branch, nil); err != nil {
+		if _, err := s.DeclareBranchOrTag(ctx, product.ID, "Master", catalog.Branch, nil); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := s.DeclareVariant(ctx, product.ID, "Broadcom", true); err != nil {
@@ -285,8 +285,8 @@ func TestADeclaredNameIsFoundHoweverItIsCapitalized(t *testing.T) {
 				t.Errorf("the product reads back as %q", found.DisplayName)
 			}
 		}
-		if _, err := s.StreamByName(ctx, product.ID, "master"); err != nil {
-			t.Errorf("looking up stream \"master\" after declaring \"Master\": %v", err)
+		if _, err := s.BranchOrTagByName(ctx, product.ID, "master"); err != nil {
+			t.Errorf("looking up branch or tag \"master\" after declaring \"Master\": %v", err)
 		}
 		if _, err := s.VariantByName(ctx, product.ID, "BROADCOM"); err != nil {
 			t.Errorf("looking up variant \"BROADCOM\" after declaring \"Broadcom\": %v", err)
@@ -311,17 +311,17 @@ func TestWhatAScanIsFiledAgainstIgnoresCapitals(t *testing.T) {
 		ctx := t.Context()
 		declared(t, ctx, s)
 
-		target, err := s.Resolve(ctx, "sonic", "MASTER", "Broadcom")
+		build, err := s.Resolve(ctx, "sonic", "MASTER", "Broadcom")
 		if err != nil {
 			t.Fatalf("a scan spelled differently was refused: %v", err)
 		}
-		where, err := s.Describe(ctx, target.ID)
+		where, err := s.Describe(ctx, build.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// And it describes itself the way people wrote it.
-		if where.Product != "SONiC" || where.Stream != "master" || where.Variant != "broadcom" {
-			t.Errorf("reads back as %s / %s / %s", where.Product, where.Stream, where.Variant)
+		if where.Product != "SONiC" || where.BranchOrTag != "master" || where.Variant != "broadcom" {
+			t.Errorf("reads back as %s / %s / %s", where.Product, where.BranchOrTag, where.Variant)
 		}
 	})
 }
@@ -340,18 +340,18 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		branch, err := store.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		branch, err := store.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		other, err := store.DeclareStream(ctx, product.ID, "next", catalog.Branch, nil)
+		other, err := store.DeclareBranchOrTag(ctx, product.ID, "next", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Declared without saying where it came from, which is what a pipeline
 		// that does not know will do.
-		tag, created, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, nil)
+		tag, created, err := store.EnsureBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, nil)
 		if err != nil || !created.Created {
 			t.Fatalf("declaring the tag: created=%v %v", created, err)
 		}
@@ -360,7 +360,7 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		}
 
 		// Told afterwards, which fills the parent in rather than refusing.
-		filled, created, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
+		filled, created, err := store.EnsureBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
 		if err != nil {
 			t.Fatalf("filling in what it was cut from: %v", err)
 		}
@@ -372,7 +372,7 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		}
 
 		// And it is recorded, not merely returned.
-		read, err := store.StreamByName(ctx, product.ID, "v1.0")
+		read, err := store.BranchOrTagByName(ctx, product.ID, "v1.0")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -381,7 +381,7 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 		}
 
 		// Moving it to a different branch is still a contradiction.
-		if _, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &other.ID); err == nil {
+		if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, &other.ID); err == nil {
 			t.Error("a tag was moved to a branch it was not cut from")
 		}
 	})
@@ -401,15 +401,15 @@ func TestAReleaseIsCutOnlyFromABranchOfItsOwnProduct(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		branch, err := store.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		branch, err := store.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		foreign, err := store.DeclareStream(ctx, elsewhere.ID, "master", catalog.Branch, nil)
+		foreign, err := store.DeclareBranchOrTag(ctx, elsewhere.ID, "master", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tag, err := store.DeclareStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
+		tag, err := store.DeclareBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
 		if err != nil {
 			t.Fatalf("a tag cut from a branch of its own product was refused: %v", err)
 		}
@@ -424,23 +424,23 @@ func TestAReleaseIsCutOnlyFromABranchOfItsOwnProduct(t *testing.T) {
 			{"a branch cut from a branch", "next", catalog.Branch, branch.ID},
 			{"a tag cut from another product's branch", "v1.2", catalog.Tag, foreign.ID},
 		} {
-			if _, err := store.DeclareStream(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
+			if _, err := store.DeclareBranchOrTag(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
 				t.Errorf("%s was recorded", c.what)
 			}
-			if _, _, err := store.EnsureStream(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
+			if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
 				t.Errorf("%s was recorded through ensuring", c.what)
 			}
-			if _, err := store.StreamByName(ctx, product.ID, c.name); err == nil {
+			if _, err := store.BranchOrTagByName(ctx, product.ID, c.name); err == nil {
 				t.Errorf("%s left a row behind", c.what)
 			}
 		}
 
 		// Filling in afterwards answers the same.
-		bare, err := store.DeclareStream(ctx, product.ID, "v2.0", catalog.Tag, nil)
+		bare, err := store.DeclareBranchOrTag(ctx, product.ID, "v2.0", catalog.Tag, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := store.EnsureStream(ctx, product.ID, "v2.0", catalog.Tag, &tag.ID); err == nil {
+		if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, "v2.0", catalog.Tag, &tag.ID); err == nil {
 			t.Error("a tag was filled in as cut from a tag")
 		}
 		if _, err := store.FillInParent(ctx, bare.ID, foreign.ID); err == nil {
@@ -486,18 +486,18 @@ func TestRedeclaringSomethingDifferentlyIsRefusedAndChangesNothing(t *testing.T)
 
 		// A tag that became a branch would turn everything filed against it as
 		// a frozen point into something rebuilt nightly.
-		if _, _, err := s.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, nil); err != nil {
+		if _, _, err := s.EnsureBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, nil); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := s.EnsureStream(ctx, product.ID, "v1.0", catalog.Branch, nil); !errors.Is(err, catalog.ErrDiffers) {
+		if _, _, err := s.EnsureBranchOrTag(ctx, product.ID, "v1.0", catalog.Branch, nil); !errors.Is(err, catalog.ErrDiffers) {
 			t.Errorf("redeclaring a tag as a branch: %v", err)
 		}
-		stream, err := s.StreamByName(ctx, product.ID, "v1.0")
+		branchOrTag, err := s.BranchOrTagByName(ctx, product.ID, "v1.0")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if stream.Kind != catalog.Tag {
-			t.Errorf("the refused call made it a %s", stream.Kind)
+		if branchOrTag.Kind != catalog.Tag {
+			t.Errorf("the refused call made it a %s", branchOrTag.Kind)
 		}
 
 		// A thing's reach to customers feeds how its findings rank, so
@@ -538,27 +538,27 @@ func TestFillingInAParentAfterLosingARaceIsNotReportedAsRecorded(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		branch, err := store.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		branch, err := store.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		other, err := store.DeclareStream(ctx, product.ID, "next", catalog.Branch, nil)
+		other, err := store.DeclareBranchOrTag(ctx, product.ID, "next", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tag, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, nil)
+		tag, _, err := store.EnsureBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		hook := &beforeFillingIn{run: func() {
-			if _, err := db.DB.NewUpdate().Table("stream").Set(`"parent_id" = ?`, other.ID).
+			if _, err := db.DB.NewUpdate().Table("branch_or_tag").Set(`"parent_id" = ?`, other.ID).
 				Where(`"id" = ?`, tag.ID).Exec(context.Background()); err != nil {
 				t.Errorf("filling it in first: %v", err)
 			}
 		}}
 		store = catalog.NewStore(dbtest.Hooked(db, hook).DB)
-		if _, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID); !errors.Is(err, catalog.ErrDiffers) {
+		if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID); !errors.Is(err, catalog.ErrDiffers) {
 			t.Errorf("filling in a branch after another was recorded answered %v", err)
 		}
 		if !hook.fired {
@@ -568,7 +568,7 @@ func TestFillingInAParentAfterLosingARaceIsNotReportedAsRecorded(t *testing.T) {
 }
 
 // beforeFillingIn runs something once, just before the first write that
-// fills in what a stream was cut from.
+// fills in what a branch or tag was cut from.
 type beforeFillingIn struct {
 	run   func()
 	fired bool

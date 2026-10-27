@@ -16,11 +16,18 @@
 // builds.
 const APART = "\u0000";
 
-export function buildKey(row: { stream?: string; variant?: string }, version?: string): string {
-  return [row.stream ?? "", row.variant ?? "", version ?? ""].join(APART);
+export function buildKey(
+  row: { branch_or_tag?: string; variant?: string },
+  version?: string,
+): string {
+  return [row.branch_or_tag ?? "", row.variant ?? "", version ?? ""].join(APART);
 }
 
-export function fromBuildKey(key: string): { stream: string; variant: string; version: string } {
-  const [stream = "", variant = "", version = ""] = key.split(APART);
-  return { stream, variant, version };
+export function fromBuildKey(key: string): {
+  branch_or_tag: string;
+  variant: string;
+  version: string;
+} {
+  const [branchOrTag = "", variant = "", version = ""] = key.split(APART);
+  return { branch_or_tag: branchOrTag, variant, version };
 }

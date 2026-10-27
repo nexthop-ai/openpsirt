@@ -20,7 +20,7 @@ import { notACredential } from "../ui/noautofill";
 import { Pace, TREND_WEEKS, trendSaid } from "../ui/Charts";
 import { ranked, rankedLabel, rankedWhy, upgradeCount } from "../ui/ranked";
 import { ROLLED } from "../ui/severities";
-import { ExploitedHere, Severity } from "../ui/Severity";
+import { Incident, Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
 import { Wide } from "../ui/Wide";
 import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
@@ -39,7 +39,7 @@ import { UpstreamSaid } from "../ui/UpstreamSaid";
 // Arranged on where it sits. What can be done about a package is mostly a
 // function of its position: a leaf carries its own risk and is upgraded, and
 // something vendored in pre-built carries everything beneath it and moves only
-// when it does. So the graph leads — what pulls it in, the package, what it
+// when it does. So the graph code findings — what pulls it in, the package, what it
 // carries — and the act hangs off that.
 //
 // A build is listed because it ships it, not because something is open
@@ -78,7 +78,7 @@ function pickPackage(row: Build, asked: string): Package | undefined {
 // a build can hold one name as more than one component.
 const bulkDecisionHere = (product: string, row: Build, component: string, pkg?: Package) =>
   bulkDecisionAt(
-    { product, stream: row.stream ?? "", variant: row.variant ?? "" },
+    { product, branch_or_tag: row.branch_or_tag ?? "", variant: row.variant ?? "" },
     component,
     whichOf({ version: pkg?.version, ecosystem: row.ecosystem, namespace: pkg?.namespace }),
   );
@@ -100,20 +100,20 @@ export function Component() {
 
   // The one the page is about. The address names it, so a link from the
   // tree or from a findings list arrives on what somebody was reading.
-  const stream = params.get("stream") ?? "";
+  const branchOrTag = params.get("branch_or_tag") ?? "";
   const variant = params.get("variant") ?? "";
   const version = params.get("version") ?? "";
   const here = useMemo(() => {
     const match = rows.find(
       (row) =>
-        (!stream || row.stream === stream) &&
+        (!branchOrTag || row.branch_or_tag === branchOrTag) &&
         (!variant || row.variant === variant) &&
         (!version || row.version === version),
     );
     // The worst of them where nothing was named, so the page opens on the build
     // with something to answer rather than on whichever sorted first.
     return match ?? [...rows].sort((a, b) => (b.issues ?? 0) - (a.issues ?? 0))[0];
-  }, [rows, stream, variant, version]);
+  }, [rows, branchOrTag, variant, version]);
 
   // The versions this product ships the name at. More than one is two pieces of
   // code, and the reader picks which.
@@ -184,7 +184,7 @@ export function Component() {
           <span className="vchip id">{here.version}</span>
           {here.ecosystem && <span className="vchip">{here.ecosystem}</span>}
           {!action && <span className="vchip ok">nothing open on it</span>}
-          <ExploitedHere when={here.exploited_here} />
+          <Incident when={here.incident} />
           {here.exploited && <span className="vchip bad">known exploited</span>}
           {worst && <Severity word={worst} />}
           {here.due_at && <span className="vchip differs">due {on(here.due_at)}</span>}
@@ -206,12 +206,12 @@ export function Component() {
                 aria-pressed={each.at === here.version}
                 onClick={() => {
                   // The build that ships it, because the two versions need not
-                  // be in the same one: keeping the old stream and variant
+                  // be in the same one: keeping the old branch or tag and variant
                   // matches no row and falls back to whatever is worst.
                   const row = rows.find((r) => (r.version ?? "") === each.at);
                   go({
                     version: each.at,
-                    stream: row?.stream ?? "",
+                    branch_or_tag: row?.branch_or_tag ?? "",
                     variant: row?.variant ?? "",
                   });
                 }}
@@ -237,7 +237,7 @@ export function Component() {
             builds={rows}
             onBuild={(row) =>
               go({
-                stream: row.stream ?? "",
+                branch_or_tag: row.branch_or_tag ?? "",
                 variant: row.variant ?? "",
                 version: row.version ?? "",
                 package: pickPackage(row, pkg.name)?.name ?? "",
@@ -507,7 +507,7 @@ function Sits({
   builds: Build[];
   onBuild: (row: Build) => void;
 }) {
-  const scope = { product, stream: here.stream ?? "", variant: here.variant ?? "" };
+  const scope = { product, branch_or_tag: here.branch_or_tag ?? "", variant: here.variant ?? "" };
   const component = pkg.name;
   const around = useQuery({
     queryKey: aroundKey(scope, component, pkg.version, here.ecosystem, pkg.namespace),
@@ -540,7 +540,7 @@ function Sits({
             >
               {builds.map((row) => (
                 <option key={buildKey(row, row.version)} value={buildKey(row, row.version)}>
-                  {row.stream} · {row.variant} · {row.version}
+                  {row.branch_or_tag} · {row.variant} · {row.version}
                 </option>
               ))}
             </select>
@@ -784,11 +784,11 @@ function Upgrade({
   const [holder, setHolder] = useState<Held | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   // Where the promise just made is followed: its own page while it waits for
-  // a second person, and the pending upgrades of the builds it names.
+  // a second person, and the planned upgrades of the builds it names.
   const [made, setMade] = useState<{
     decisionId: number;
     waiting: boolean;
-    builds: { stream: string; variant: string }[];
+    builds: { branch_or_tag: string; variant: string }[];
   } | null>(null);
   // Every release shipping this version, because one bump moves all of them.
   const [chosen, setChosen] = useState<Set<string>>(
@@ -812,8 +812,8 @@ function Upgrade({
             // The build alone: one bump moves every release shipping the
             // version, and what the server takes is the pair naming each.
             builds: [...chosen].map((each) => {
-              const { stream, variant } = fromBuildKey(each);
-              return { stream, variant };
+              const { branch_or_tag: branchOrTag, variant } = fromBuildKey(each);
+              return { branch_or_tag: branchOrTag, variant };
             }),
           },
         }),
@@ -831,8 +831,8 @@ function Upgrade({
         decisionId: done.decision_id,
         waiting: done.waiting,
         builds: [...chosen].map((each) => {
-          const { stream, variant } = fromBuildKey(each);
-          return { stream, variant };
+          const { branch_or_tag: branchOrTag, variant } = fromBuildKey(each);
+          return { branch_or_tag: branchOrTag, variant };
         }),
       });
       setBy("");
@@ -1034,7 +1034,8 @@ function Upgrade({
                 }
               >
                 {picked ? "✓ " : ""}
-                <span className="id">{row.stream}</span> <span className="hint">{row.variant}</span>
+                <span className="id">{row.branch_or_tag}</span>{" "}
+                <span className="hint">{row.variant}</span>
               </button>
             );
           })}
@@ -1093,7 +1094,7 @@ function Ships({ product, rows, here }: { product: string; rows: Build[]; here: 
                 }
               >
                 <td>
-                  <span className="id">{row.stream}</span>{" "}
+                  <span className="id">{row.branch_or_tag}</span>{" "}
                   <span className="hint">{row.variant}</span>
                 </td>
                 <td className="id">{row.version}</td>
@@ -1134,7 +1135,7 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
       "component-trend",
       product,
       component,
-      here.stream,
+      here.branch_or_tag,
       here.variant,
       pkg.version,
       here.ecosystem,
@@ -1146,7 +1147,7 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
           params: {
             query: {
               product,
-              stream: here.stream ?? "",
+              branch_or_tag: here.branch_or_tag ?? "",
               variant: here.variant ?? "",
               beneath: component,
               // The subtree of one component, so it says which where the name
@@ -1169,7 +1170,7 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
       <div className="screen-head" style={{ marginBottom: 8 }}>
         <h3>{trendSaid}</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {here.stream} · {here.variant}
+          {here.branch_or_tag} · {here.variant}
         </span>
       </div>
       {trend.isError ? (

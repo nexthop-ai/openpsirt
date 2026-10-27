@@ -20,16 +20,16 @@ import (
 )
 
 func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
-	// The case the decoupling exists for. Somebody sends a claim, it is
+	// The case the decoupling exists for. Somebody sends a report, it is
 	// written down, it is answered — and none of that requires anybody to
-	// have decided it is a flaw. Recorded only by minting an issue, a claim
+	// have decided it is a flaw. Recorded only by minting an issue, a report
 	// nobody believes either fills the findings with one or goes unrecorded,
-	// and an unrecorded claim destroys the evidence that it was answered.
+	// and an unrecorded report destroys the evidence that it was answered.
 	each(t, func(t *testing.T, f *fixture) {
 		f.store.Clock(minting)
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		row, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
-			Summary: "The management socket accepts a request nobody authenticated.",
+		row, err := f.store.Record(t.Context(), who, f.productID, finding.NewReport{
+			ReportedProblem: "The management socket accepts a request nobody authenticated.",
 			Told: finding.Told{
 				ReportedBy: "A Researcher", Contact: "them@example.org",
 				Credit: "anonymous", Received: "2026-06-01",
@@ -39,7 +39,7 @@ func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
 			t.Fatal(err)
 		}
 		if row.VulnerabilityID != nil {
-			t.Errorf("a claim nobody judged points at issue %d", *row.VulnerabilityID)
+			t.Errorf("a report nobody judged points at issue %d", *row.VulnerabilityID)
 		}
 		if !referenceFor(row.Reference, "SONIC", minting().Year()) {
 			t.Errorf("filed under %q, want the product's name, an R, the year and a number",
@@ -49,26 +49,26 @@ func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
 			t.Errorf("the day it arrived came back as %v", row.ReceivedOn)
 		}
 		if row.EvaluatedAt != nil {
-			t.Error("a claim nobody judged says when it was judged")
+			t.Error("a report nobody judged says when it was judged")
 		}
 
-		// Nothing was minted. A claim is not a flaw until somebody says so,
-		// and a findings list that fills with claims is one nobody reads.
+		// Nothing was minted. A report is not a flaw until somebody says so,
+		// and a findings list that fills with reports is one nobody reads.
 		var issues int
 		if err := f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).
 			ColumnExpr("COUNT(*)").Scan(t.Context(), &issues); err != nil {
 			t.Fatal(err)
 		}
 		if issues != 0 {
-			t.Errorf("recording a claim minted %d issues", issues)
+			t.Errorf("recording a report minted %d issues", issues)
 		}
 
 		back, err := f.store.ReportBy(t.Context(), who, f.productID, row.Reference)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if back.Summary != row.Summary || back.Contact != "them@example.org" {
-			t.Errorf("read back as %q from %q", back.Summary, back.Contact)
+		if back.ReportedProblem != row.ReportedProblem || back.Contact != "them@example.org" {
+			t.Errorf("read back as %q from %q", back.ReportedProblem, back.Contact)
 		}
 		// A reference is a name somebody types, so it matches without regard
 		// to capitals. The stored form is the minted one and the typed one is
@@ -84,26 +84,26 @@ func TestAClaimWithNothingInItIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, err := f.store.Record(t.Context(), who, f.productID,
-			finding.Claimed{Summary: "   "})
-		if !errors.Is(err, finding.ErrNothingClaimed) {
-			t.Errorf("a claim saying nothing was answered %v", err)
+			finding.NewReport{ReportedProblem: "   "})
+		if !errors.Is(err, finding.ErrNoReportedProblem) {
+			t.Errorf("a report saying nothing was answered %v", err)
 		}
 
 		// The submission policy typed text goes through, because the summary
 		// quotes somebody outside this deployment and is rendered as markdown
 		// where it is read back.
-		_, err = f.store.Record(t.Context(), who, f.productID, finding.Claimed{
-			Summary: "It crashes\n<script>alert(1)</script>\n",
+		_, err = f.store.Record(t.Context(), who, f.productID, finding.NewReport{
+			ReportedProblem: "It crashes\n<script>alert(1)</script>\n",
 		})
 		var faults markdown.Faults
 		if !errors.As(err, &faults) {
-			t.Errorf("raw HTML in a claim was answered %v", err)
+			t.Errorf("raw HTML in a report was answered %v", err)
 		}
 	})
 }
 
 func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
-	// A claim nobody has judged is undisclosed by definition: there is no
+	// A report nobody has judged is undisclosed by definition: there is no
 	// issue to be public about, and nobody has decided it is safe to repeat.
 	// So reading one and listing them ask for the right to read work nobody
 	// has announced, and recording one, answering one or judging one ask for
@@ -111,7 +111,7 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		owner := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), owner, f.productID,
-			finding.Claimed{Summary: "A claim nobody has judged."})
+			finding.NewReport{ReportedProblem: "A report nobody has judged."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,22 +120,22 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 			stranger := f.somebody(t, "stranger@example.com", held)
 			if _, err := f.store.ReportBy(t.Context(), stranger, f.productID,
 				row.Reference); !errors.Is(err, finding.ErrNoSuchReport) {
-				t.Errorf("%s read a claim nobody has judged: %v", held, err)
+				t.Errorf("%s read a report nobody has judged: %v", held, err)
 			}
 			if _, _, err := f.store.ReportsIn(t.Context(), stranger, f.productID,
 				50, 0); !errors.Is(err, access.ErrDenied) {
-				t.Errorf("%s listed the claims: %v", held, err)
+				t.Errorf("%s listed the reports: %v", held, err)
 			}
 		}
 
 		reader := f.somebody(t, "reader@example.com", access.PrivateRead)
 		if _, err := f.store.ReportBy(t.Context(), reader, f.productID,
 			row.Reference); err != nil {
-			t.Errorf("somebody who reads undisclosed work could not read the claim: %v", err)
+			t.Errorf("somebody who reads undisclosed work could not read the report: %v", err)
 		}
 		if _, _, err := f.store.ReportsIn(t.Context(), reader, f.productID,
 			50, 0); err != nil {
-			t.Errorf("somebody who reads undisclosed work could not list the claims: %v", err)
+			t.Errorf("somebody who reads undisclosed work could not list the reports: %v", err)
 		}
 
 		for _, held := range []access.Role{
@@ -143,10 +143,10 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 		} {
 			stranger := f.somebody(t, "writer@example.com", held)
 			if _, err := f.store.Record(t.Context(), stranger, f.productID,
-				finding.Claimed{Summary: "Theirs."}); !errors.Is(err, access.ErrDenied) {
-				t.Errorf("%s recorded a claim: %v", held, err)
+				finding.NewReport{ReportedProblem: "Theirs."}); !errors.Is(err, access.ErrDenied) {
+				t.Errorf("%s recorded a report: %v", held, err)
 			}
-			// Somebody who may not read the claim is told it is not here;
+			// Somebody who may not read the report is told it is not here;
 			// somebody who reads it is refused in words.
 			want := finding.ErrNoSuchReport
 			if held == access.PrivateRead {
@@ -154,30 +154,30 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 			}
 			if _, _, err := f.store.LogMessage(t.Context(), stranger, f.productID,
 				row.Reference, finding.Logged{Direction: finding.Sent, Body: "Thanks."}); !errors.Is(err, want) {
-				t.Errorf("%s answering a claim was answered %v, want %v", held, err, want)
+				t.Errorf("%s answering a report was answered %v, want %v", held, err, want)
 			}
 			if _, err := f.store.Revise(t.Context(), stranger, f.productID,
-				row.Reference, finding.Rewritten{Summary: "Changed."}); !errors.Is(err, want) {
-				t.Errorf("%s editing a claim was answered %v, want %v", held, err, want)
+				row.Reference, finding.Rewritten{ReportedProblem: "Changed."}); !errors.Is(err, want) {
+				t.Errorf("%s editing a report was answered %v, want %v", held, err, want)
 			}
 			if _, _, err := f.store.NoteOnReport(t.Context(), stranger, f.productID,
 				row.Reference, "A note."); !errors.Is(err, want) {
-				t.Errorf("%s noting on a claim was answered %v, want %v", held, err, want)
+				t.Errorf("%s noting on a report was answered %v, want %v", held, err, want)
 			}
 			mine := stranger.Party()
 			if _, err := f.store.AssignReport(t.Context(), stranger, f.productID,
 				row.Reference, &mine, nil); !errors.Is(err, want) {
-				t.Errorf("%s taking a claim was answered %v, want %v", held, err, want)
+				t.Errorf("%s taking a report was answered %v, want %v", held, err, want)
 			}
 			if _, err := f.store.JudgeAsIssue(t.Context(), stranger, f.productID,
 				row.Reference, 1); !errors.Is(err, want) {
-				t.Errorf("%s judging a claim was answered %v, want %v", held, err, want)
+				t.Errorf("%s judging a report was answered %v, want %v", held, err, want)
 			}
 		}
 
 		// A reference is reached in the product it was recorded against and
 		// nowhere else. Told apart, the pair of answers says which products
-		// hold claims.
+		// hold reports.
 		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(t.Context(),
 			"edge-router", "Edge")
 		if err != nil {
@@ -189,7 +189,7 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 			}, 0)
 		if _, err := f.store.ReportBy(t.Context(), everywhere, elsewhere.ID,
 			row.Reference); !errors.Is(err, finding.ErrNoSuchReport) {
-			t.Errorf("a claim recorded against one product was read from another: %v", err)
+			t.Errorf("a report recorded against one product was read from another: %v", err)
 		}
 	})
 }
@@ -202,7 +202,7 @@ func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 			"The management socket accepts a request nobody authenticated.")
 
 		row, err := f.store.Record(t.Context(), who, f.productID,
-			finding.Claimed{Summary: "The management socket lets anybody in."})
+			finding.NewReport{ReportedProblem: "The management socket lets anybody in."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -235,7 +235,7 @@ func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 		// repeat does not reach: judged by somebody else between this
 		// judgment reading the row and writing to it.
 		third, err := f.store.Record(t.Context(), who, f.productID,
-			finding.Claimed{Summary: "Judged by somebody else mid-flight."})
+			finding.NewReport{ReportedProblem: "Judged by somebody else mid-flight."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,13 +249,13 @@ func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 		})
 		if _, err := racing.JudgeAsIssue(t.Context(), who, f.productID,
 			third.Reference, issue); !errors.Is(err, finding.ErrAlreadyJudged) {
-			t.Errorf("judging a claim somebody judged mid-flight was answered %v", err)
+			t.Errorf("judging a report somebody judged mid-flight was answered %v", err)
 		}
 
 		// One report is one issue's record. A second pointed at the same
 		// issue is a duplicate, which is a judgment of its own.
 		second, err := f.store.Record(t.Context(), who, f.productID,
-			finding.Claimed{Summary: "Somebody else says the same thing."})
+			finding.NewReport{ReportedProblem: "Somebody else says the same thing."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -274,7 +274,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		owner := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), owner, f.productID,
-			finding.Claimed{Summary: "A claim about something undisclosed."})
+			finding.NewReport{ReportedProblem: "A report about something undisclosed."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -299,7 +299,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 		holder := access.NewPerson(owner.ID, "somebody@example.com", false,
 			map[int64][]access.Role{elsewhere.ID: {access.PrivateTriage}}, 0)
 		_, name, err := f.store.Enter(t.Context(), holder, finding.Entering{
-			TargetIDs: []int64{theirs}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{theirs}, Component: swss.Name, Severity: "high",
 			Summary: "A flaw in a product this judge holds nothing on.",
 		})
 		if err != nil {
@@ -311,7 +311,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 		}
 		if _, err := f.store.JudgeAsIssue(t.Context(), judge, f.productID,
 			row.Reference, far); !errors.Is(err, finding.ErrNoSuchIssueHere) {
-			t.Errorf("a claim was pointed at an issue the judge cannot be told of: %v", err)
+			t.Errorf("a report was pointed at an issue the judge cannot be told of: %v", err)
 		}
 		// And the issue is genuinely there, so the refusal is about who is
 		// asking rather than about a row that does not exist.
@@ -326,7 +326,7 @@ func TestTheFirstMessageSentIsTheAcknowledgement(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), who, f.productID,
-			finding.Claimed{Summary: "Somebody wrote in."})
+			finding.NewReport{ReportedProblem: "Somebody wrote in."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -362,7 +362,7 @@ func TestAProductsClaimsArePagedNewestFirst(t *testing.T) {
 		var references []string
 		for i := range 5 {
 			row, err := f.store.Record(t.Context(), who, f.productID,
-				finding.Claimed{Summary: fmt.Sprintf("Claim number %d.", i)})
+				finding.NewReport{ReportedProblem: fmt.Sprintf("Report number %d.", i)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -373,7 +373,7 @@ func TestAProductsClaimsArePagedNewestFirst(t *testing.T) {
 			t.Fatal(err)
 		}
 		if total != 5 {
-			t.Errorf("%d claims counted, want 5", total)
+			t.Errorf("%d reports counted, want 5", total)
 		}
 		if len(rows) != 2 {
 			t.Fatalf("a page of two came back with %d", len(rows))
@@ -396,7 +396,7 @@ func TestAProductsClaimsArePagedNewestFirst(t *testing.T) {
 }
 
 func TestAReferenceIsDrawnRatherThanCounted(t *testing.T) {
-	// Counted from one, the reference is a running total of how many claims
+	// Counted from one, the reference is a running total of how many reports
 	// this product has received and when the last one arrived. That is a
 	// disclosure made by the name alone, before any route is asked anything.
 	each(t, func(t *testing.T, f *fixture) {
@@ -405,7 +405,7 @@ func TestAReferenceIsDrawnRatherThanCounted(t *testing.T) {
 		numbers := make([]int, 0, 6)
 		for range 6 {
 			row, err := f.store.Record(t.Context(), who, f.productID,
-				finding.Claimed{Summary: "One of several."})
+				finding.NewReport{ReportedProblem: "One of several."})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -435,7 +435,7 @@ func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *tes
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told: finding.Told{
 				ReportedBy: "A Researcher", Contact: "them@example.org",
@@ -488,7 +488,7 @@ func TestAReferenceFitsAProductNamedAtTheFullWidth(t *testing.T) {
 		who := access.NewPerson(f.planner(t).ID, "somebody@example.com", false,
 			map[int64][]access.Role{product.ID: {access.PrivateTriage}}, 0)
 		row, err := f.store.Record(t.Context(), who, product.ID,
-			finding.Claimed{Summary: "Reported against a product with a very long name."})
+			finding.NewReport{ReportedProblem: "Reported against a product with a very long name."})
 		if err != nil {
 			t.Fatalf("recording against the widest product name: %v", err)
 		}
@@ -518,7 +518,7 @@ func (f *fixture) anIssueHere(t *testing.T, who access.Subject, summary string) 
 	one := found(identifier, swss)
 	one.Issue.Description = summary
 	f.issues = append(f.issues, one)
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), f.issues); err != nil {
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t), f.issues); err != nil {
 		t.Fatal(err)
 	}
 	return f.issueID(t, identifier)
@@ -547,24 +547,24 @@ func referenceFor(reference, product string, year int) bool {
 }
 
 func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
-	// The claim was a flaw nobody had recorded yet. Recording it from the
+	// The report was a flaw nobody had recorded yet. Recording it from the
 	// report writes one report rather than two, accepts that report as the
 	// flaw in the same act, and counts the embargo from the day the report
 	// says it arrived.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		claim, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
-			Summary: "The management socket lets anybody in.",
-			Told:    finding.Told{ReportedBy: "A Researcher", Received: "2026-06-01"},
+		report, err := f.store.Record(t.Context(), who, f.productID, finding.NewReport{
+			ReportedProblem: "The management socket lets anybody in.",
+			Told:            finding.Told{ReportedBy: "A Researcher", Received: "2026-06-01"},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		entering := finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary:    "The management socket accepts a request nobody authenticated.",
-			FromReport: strings.ToLower(claim.Reference),
+			FromReport: strings.ToLower(report.Reference),
 		}
 		_, identifier, err := f.store.Enter(t.Context(), who, entering)
 		if err != nil {
@@ -574,7 +574,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		back, err := f.store.ReportBy(t.Context(), who, f.productID, claim.Reference)
+		back, err := f.store.ReportBy(t.Context(), who, f.productID, report.Reference)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -607,7 +607,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 		}
 
 		// Once accepted it is judged, and a second flaw from it is refused.
-		entering.Summary = "A second flaw from the same claim."
+		entering.Summary = "A second flaw from the same report."
 		if _, _, err := f.store.Enter(t.Context(), who, entering); !errors.Is(err,
 			finding.ErrAlreadyJudged) {
 			t.Errorf("recording a second flaw from a judged report answered %v", err)
@@ -615,8 +615,8 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 
 		// A report that says nothing about when it arrived was here no later
 		// than when it was recorded, so the embargo counts from then.
-		undated, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
-			Summary: "The console accepts a password it never checks.",
+		undated, err := f.store.Record(t.Context(), who, f.productID, finding.NewReport{
+			ReportedProblem: "The console accepts a password it never checks.",
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -628,7 +628,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, identifier, err = f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary:    "The console accepts any password.",
 			FromReport: undated.Reference,
 		})
@@ -655,14 +655,14 @@ func TestAFlawRecordedFromAReportIsRefusedWhatTheReportAlreadySays(t *testing.T)
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		claim, err := f.store.Record(t.Context(), who, f.productID,
-			finding.Claimed{Summary: "A claim."})
+		report, err := f.store.Record(t.Context(), who, f.productID,
+			finding.NewReport{ReportedProblem: "A report."})
 		if err != nil {
 			t.Fatal(err)
 		}
 		base := finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
-			Summary: "A flaw.", FromReport: claim.Reference,
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
+			Summary: "A flaw.", FromReport: report.Reference,
 		}
 		twice := base
 		twice.Told = finding.Told{ReportedBy: "Somebody else"}

@@ -1,0 +1,562 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package triage_test
+
+import (
+	"context"
+	"errors"
+	"regexp"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
+)
+
+// knownAt is when the fixture's attack became known. A fixed moment rather
+// than the clock, so that what is stored can be compared against what was
+// said: the whole point of the column is that it is not the moment of typing.
+var knownAt = time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
+
+// exploited records that the fixture's product was exploited through its
+// issue, which is the precondition of everything below.
+//
+// The issue is opened somewhere in the product first. What may be recorded
+// about an issue in a product is what may be read about it there, and an issue
+// that sits nowhere in the product is one nobody there may be told of.
+func (f *fixture) exploited(t *testing.T) (*triage.Incident, triage.Undone) {
+	t.Helper()
+	f.sits(t, access.Public)
+	record, undone, err := f.store.RecordIncident(t.Context(), f.triager,
+		f.product, f.issue, knownAt,
+		"A customer sent packet captures of the management socket.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return record, undone
+}
+
+func TestADecisionThatAnExploitedIssueDoesNotApplyIsRefused(t *testing.T) {
+	// The first contradiction rule. Somebody watched this product be attacked
+	// through the issue; a decision that the issue does not apply here says the
+	// opposite about the same product, and the one that arrived from a person
+	// who saw it happen is not the one to give way.
+	each(t, func(t *testing.T, f *fixture) {
+		f.exploited(t)
+
+		_, err := f.store.Propose(t.Context(), f.triager, triage.Proposal{
+			Occurrence: f.at(), Outcome: triage.NotApplicable,
+			Justification: triage.CodeNotInExecutePath,
+			Reasoning:     "The parser is never reached: we only call the encoder.",
+			By:            f.proposer, NeedsApproval: true,
+		})
+		if !errors.Is(err, triage.ErrContradictsIncident) {
+			t.Fatalf("stating an exploited issue does not apply answered %v", err)
+		}
+		if standing, _ := f.store.Applying(t.Context(), f.at()); standing != nil {
+			t.Error("the refused decision was recorded anyway")
+		}
+	})
+}
+
+func TestARefusedDecisionIsOnlyTheOneThatContradicts(t *testing.T) {
+	// The other arm of the same rule, which is what stops it being a rule
+	// nobody can work under. Being attacked through an issue says the issue
+	// applies; it says nothing about whether the scanner matched the right
+	// component, when the work will land, or whether anybody will do it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.exploited(t)
+
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Occurrence: f.at(), Outcome: triage.Affected,
+			Reasoning: "It applies, and we are dealing with it.",
+			By:        f.proposer, NeedsApproval: false,
+		}); err != nil {
+			t.Fatalf("stating an exploited issue affects us answered %v", err)
+		}
+
+		// A correction, at an occurrence of its own so the one above is not in the
+		// way. It is a decision about identity rather than about applicability.
+		elsewhere := f.at()
+		elsewhere.OccurrenceIdentity = "place-of-libqux-under-libbar"
+		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+			Occurrence: elsewhere, Outcome: triage.Mismatched,
+			Justification: triage.ComponentNotPresent,
+			Reasoning:     "This build does not ship libqux at all.",
+			By:            f.proposer, NeedsApproval: true,
+		}); err != nil {
+			t.Fatalf("correcting a wrong match on an exploited issue answered %v", err)
+		}
+	})
+}
+
+func TestAnIncidentTakesBackTheAgreementUnderADismissal(t *testing.T) {
+	// The second contradiction rule, which is the asymmetry the first one
+	// rests on: a decision gives way to a fact, and never the other way
+	// round. The decision itself stands — whether it was wrong is for whoever
+	// answers it again — and what goes is the second person's agreement to
+	// it, which puts the finding back in the queue.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.agreed(t, f.at())
+		if standing, _ := f.store.Applying(ctx, f.at()); standing == nil {
+			t.Fatal("the dismissal does not stand, so there is nothing to take back")
+		}
+
+		_, undone := f.exploited(t)
+		if undone.Rows != 1 {
+			t.Errorf("recording this returned %d rows to the queue, want 1", undone.Rows)
+		}
+		if len(undone.Told) != 1 || undone.Told[0].PersonID != f.proposer {
+			t.Errorf("whoever wrote the decision was not told: %+v", undone.Told)
+		}
+
+		approvals, err := f.store.Approvals(ctx, f.reviewer, agreed.DecisionID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(approvals) != 1 || approvals[0].WithdrawnAt == nil {
+			t.Fatalf("the agreement still stands: %+v", approvals)
+		}
+		// Back to waiting rather than gone. The argument still stands and is
+		// still somebody's; what it has lost is the second person, which is
+		// exactly what puts the finding in front of somebody again.
+		if state := f.stateOf(t, agreed.ID); state != triage.Proposed {
+			t.Errorf("the decision is %q, want it waiting for a second person again", state)
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
+			t.Error("a decision nobody agrees to any more still suppresses the finding")
+		}
+	})
+}
+
+func TestAnIncidentCountsOnlyWhatItsRecorderMayRead(t *testing.T) {
+	// Every agreement it contradicts is taken back, and the count it answers
+	// is of the rows the person recording may read: a count of the others
+	// says how much undisclosed work stood on the issue.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.agreed(t, f.at())
+		elsewhere := f.at()
+		elsewhere.OccurrenceIdentity = "another-place"
+		hidden := f.agreed(t, elsewhere)
+		if _, err := f.db.DB.NewUpdate().Model((*triage.DecisionOccurrence)(nil)).
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"id" = ?`, hidden.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		_, undone := f.exploited(t)
+		if undone.Rows != 1 {
+			t.Errorf("a triager of disclosed work was told %d rows returned, want the one they may read",
+				undone.Rows)
+		}
+		if state := f.stateOf(t, hidden.ID); state != triage.Proposed {
+			t.Errorf("the undisclosed decision it contradicts is %q, want it waiting again", state)
+		}
+	})
+}
+
+func TestAnIncidentLeavesAnUnagreedDecisionAlone(t *testing.T) {
+	// Nothing to take back. A decision still waiting for a second person is
+	// already in the queue, and reporting that something was undone would
+	// tell whoever wrote it that an agreement they never had was withdrawn.
+	each(t, func(t *testing.T, f *fixture) {
+		f.decisions(t, f.at())
+		_, undone := f.exploited(t)
+		if undone.Rows != 0 || len(undone.Told) != 0 {
+			t.Errorf("a waiting decision was reported as undone: %+v", undone)
+		}
+	})
+}
+
+func TestOnlyOneIncidentStandsAtATime(t *testing.T) {
+	// One answer rather than two. The rule is the database's — a unique pair
+	// over the live issue and the product — because a read-then-write check
+	// is what two requests arriving together both walk through.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		record, _ := f.exploited(t)
+
+		_, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
+			knownAt, "The same thing again.")
+		if !errors.Is(err, triage.ErrIncidentStands) {
+			t.Fatalf("a second record answered %v", err)
+		}
+
+		// Cleared, and then a second may be kept: what happened once may
+		// happen again, and the cleared record stays readable beside it.
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
+			"The captures were of a different deployment."); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
+			knownAt, "It happened again, and this time it is ours."); err != nil {
+			t.Fatalf("recording another after clearing answered %v", err)
+		}
+	})
+}
+
+func TestClearingAIncidentIsAnActWithANameOnIt(t *testing.T) {
+	// Nothing verifies the record, so nothing may clear it quietly. What the
+	// cleared row keeps is who cleared it and why — the record is not deleted,
+	// because a record that went away is one nobody can account for.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		record, _ := f.exploited(t)
+
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID, "  "); err == nil {
+			t.Error("a record was cleared with no reason given")
+		}
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
+			"The captures were of a different deployment."); err != nil {
+			t.Fatal(err)
+		}
+		if standing := f.standingHere(t); standing != nil {
+			t.Errorf("a cleared record still stands: %+v", standing)
+		}
+
+		records, err := f.store.IncidentAt(ctx, f.triager, f.product, f.issue)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(records) != 1 {
+			t.Fatalf("the cleared record is not readable: %d kept", len(records))
+		}
+		kept := records[0]
+		switch {
+		case kept.Standing():
+			t.Error("the cleared record reads as standing")
+		case kept.ClearedBy == nil || *kept.ClearedBy != f.proposer:
+			t.Error("the cleared record does not say who cleared it")
+		case kept.ClearedBecause == nil || *kept.ClearedBecause == "":
+			t.Error("the cleared record does not say why")
+		case !kept.KnownAt.Equal(knownAt):
+			t.Errorf("the moment it became known is %s, want %s", kept.KnownAt, knownAt)
+		}
+	})
+}
+
+func TestRecordingAnIncidentAsksForTriageOnThatProduct(t *testing.T) {
+	// A record moves this product's findings and refuses a dismissal somebody
+	// there would otherwise be free to make, so reading the product is not
+	// enough to keep one.
+	each(t, func(t *testing.T, f *fixture) {
+		f.sits(t, access.Public)
+		_, _, err := f.store.RecordIncident(t.Context(), f.onlooker,
+			f.product, f.issue, knownAt, "I read about it somewhere.")
+		if !errors.Is(err, access.ErrDenied) {
+			t.Fatalf("somebody who may only read the product recorded one: %v", err)
+		}
+	})
+}
+
+func TestAnIncidentSaysWhenAndWhy(t *testing.T) {
+	// The two things nothing else holds. Nothing re-checks the record, so
+	// grounds are the whole of what a later reader has; and every window a
+	// deployment might be under counts from the moment it became known, which
+	// is not the moment somebody reached a screen.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.sits(t, access.Public)
+		if _, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
+			knownAt, "   "); err == nil {
+			t.Error("a record was kept with nothing said about it")
+		}
+		if _, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
+			time.Time{}, "A customer sent packet captures."); err == nil {
+			t.Error("a record was kept with no moment to count from")
+		}
+	})
+}
+
+func TestAnAttackKnownOfInTheFutureIsRefused(t *testing.T) {
+	// Every window counts from the moment it became known, so a moment still
+	// to come would start each of them late.
+	each(t, func(t *testing.T, f *fixture) {
+		f.sits(t, access.Public)
+		ahead := time.Now().UTC().Add(24 * time.Hour)
+		if _, _, err := f.store.RecordIncident(t.Context(), f.triager, f.product, f.issue,
+			ahead, "A customer sent packet captures."); !refusal.In(err) {
+			t.Errorf("a record known of tomorrow answered %v, want a refusal", err)
+		}
+		if standing := f.standingHere(t); standing != nil {
+			t.Errorf("a refused record stands: %+v", standing)
+		}
+	})
+}
+
+func TestAnAttackKnownOfBeforeTwoThousandIsRefusedOnEveryEngine(t *testing.T) {
+	// Two engines store a moment that early and two refuse it, so the bound
+	// is what makes one request get one answer.
+	each(t, func(t *testing.T, f *fixture) {
+		f.sits(t, access.Public)
+		early := time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC)
+		if _, _, err := f.store.RecordIncident(t.Context(), f.triager, f.product, f.issue,
+			early, "A customer sent packet captures."); !refusal.In(err) {
+			t.Errorf("a record known of in 1999 answered %v, want a refusal", err)
+		}
+		if standing := f.standingHere(t); standing != nil {
+			t.Errorf("a refused record stands: %+v", standing)
+		}
+	})
+}
+
+func TestAnIncidentOutranksAnythingAFeedSays(t *testing.T) {
+	// The order, which is the whole reason the record reaches the findings at
+	// all. A feed saying somebody somewhere is exploiting an issue says
+	// nothing about whether it reaches this product; a person saying this
+	// product was attacked does, so it sits above every signal a feed can
+	// produce — including the worst one a feed could produce all at once.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		in := f.build(t, f.product, "202411")
+		id := f.finds(t, in, f.component(t, "libfoo", "1.2.3"), "place-of-libfoo",
+			access.Public)
+
+		worst := int64(finding.Ranked{
+			Exploited: true, Shipped: true,
+			ScoreCenti: 1000, LikelihoodPPM: 1_000_000,
+		}.Rank())
+
+		record, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
+			knownAt, "A customer sent packet captures of the management socket.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		row := f.findingRow(t, id)
+		switch {
+		case !row.RankIncident:
+			t.Error("the finding does not carry the record")
+		case row.RankExploited:
+			t.Error("the record was written into the flag that holds a feed's word")
+		case row.Urgency <= worst:
+			t.Errorf("urgency %d does not outrank the worst a feed can say, %d",
+				row.Urgency, worst)
+		}
+
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
+			"The captures were of a different deployment."); err != nil {
+			t.Fatal(err)
+		}
+		// Back below the band any exploitation sits in, which is the lowest
+		// rank a finding carrying one of the two signals can have.
+		lowest := int64(finding.Ranked{Exploited: true}.Rank())
+		cleared := f.findingRow(t, id)
+		if cleared.RankIncident || cleared.Urgency >= lowest {
+			t.Errorf("clearing left the finding ranked as exploited: urgency %d",
+				cleared.Urgency)
+		}
+	})
+}
+
+// findingRow reads one finding back, for the checks about what the order was
+// written as.
+func (f *fixture) findingRow(t *testing.T, id int64) finding.Finding {
+	t.Helper()
+	var row finding.Finding
+	if err := f.db.DB.NewSelect().Model(&row).Where(`"id" = ?`, id).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	return row
+}
+
+func TestIncidentsAreNarrowedToWhoMayBeToldOfTheIssue(t *testing.T) {
+	// The record names an issue and carries what somebody wrote about an
+	// attack through it. Reading one is reading the issue, so somebody who
+	// may not be told of the issue in that product is answered as somebody
+	// with nothing there rather than told there is something they may not see.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.sits(t, access.Private)
+		if _, _, err := f.store.RecordIncident(ctx, f.privately(t), f.product, f.issue,
+			knownAt, "A customer sent packet captures."); err != nil {
+			t.Fatal(err)
+		}
+
+		// Public triage on the product, and the issue sits nowhere they may
+		// read it.
+		if _, err := f.store.IncidentAt(ctx, f.triager, f.product,
+			f.issue); !errors.Is(err, triage.ErrNoSuchIncident) {
+			t.Errorf("somebody who may not be told of the issue read its records: %v", err)
+		}
+		if _, err := f.store.IncidentAt(ctx, f.onlooker, f.product,
+			f.issue); !errors.Is(err, triage.ErrNoSuchIncident) {
+			t.Errorf("somebody who may only read the product read the record: %v", err)
+		}
+	})
+}
+
+// standingHere is the record in force, picked out of everything kept about
+// the fixture's issue the way a reader of the finding picks it out.
+func (f *fixture) standingHere(t *testing.T) *triage.Incident {
+	t.Helper()
+	kept, err := f.store.IncidentAt(t.Context(), f.triager, f.product, f.issue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range kept {
+		if kept[i].Standing() {
+			return &kept[i]
+		}
+	}
+	return nil
+}
+
+func TestClearingAIncidentAsksForTriageOnThatProduct(t *testing.T) {
+	// Clearing one is recording one. Without this the next gate is whether
+	// the reader may be told of the issue, which somebody holding nothing but
+	// read on the product passes — so reading would be enough to clear an
+	// incident record.
+	each(t, func(t *testing.T, f *fixture) {
+		record, _ := f.exploited(t)
+		if err := f.store.ClearIncident(t.Context(), f.onlooker, record.ID,
+			"I read about it somewhere."); !errors.Is(err, triage.ErrNoSuchIncident) {
+			t.Fatalf("somebody who may only read the product cleared one: %v", err)
+		}
+		if standing := f.standingHere(t); standing == nil {
+			t.Error("the record was cleared anyway")
+		}
+	})
+}
+
+func TestAgreeingToADismissalIsRefusedWhileARecordStands(t *testing.T) {
+	// The sixth path. The other five write a decision occurrence and meet the
+	// refusal where the row is written; approving writes no row, so a decision
+	// proposed before the record arrived and agreed to afterwards would hide
+	// the finding with the record standing over it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		claimed := f.decisions(t, f.at())
+		f.exploited(t)
+
+		err := agreeTo(ctx, f.store, f.reviewer, claimed.DecisionID, "")
+		if !errors.Is(err, triage.ErrContradictsIncident) {
+			t.Fatalf("agreeing to a dismissal of an exploited issue answered %v", err)
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
+			t.Error("the finding is hidden by a decision the record contradicts")
+		}
+	})
+}
+
+func TestBulkDismissalNamesEachIssueOnce(t *testing.T) {
+	// The refusal looks up what a decision lands on, and a decision over shared
+	// code lands at many occurrences naming one issue. Bound to the occurrences, a bulk
+	// act sends one copy of the identifier per occurrence — which one engine
+	// refuses outright past a limit, turning a decision into a driver error.
+	each(t, func(t *testing.T, f *fixture) {
+		occurrences := f.occurrences("place-of-a", "place-of-b", "place-of-c", "place-of-d")
+		if made := f.decisionsMany(t, occurrences); len(made) != len(occurrences) {
+			t.Fatalf("%d of %d occurrences were decided", len(made), len(occurrences))
+		}
+		// And the rule still fires over the set, which is what says the
+		// narrowing did not narrow the question away.
+		f.exploited(t)
+		lists := &exploitedLists{}
+		hooked := triage.NewStore(bun.NewDB(f.db.DB.DB, f.db.Dialect()).WithQueryHook(lists))
+		if _, err := hooked.ProposeMany(t.Context(), f.triager, dismissing(f, f.occurrences(
+			"place-of-e", "place-of-f", "place-of-g"))); !errors.Is(
+			err, triage.ErrContradictsIncident) {
+			t.Fatalf("a bulk dismissal of an exploited issue answered %v", err)
+		}
+		sizes := lists.read()
+		if len(sizes) == 0 {
+			t.Fatal("no statement asked what the product has been attacked through, so this checked nothing")
+		}
+		for _, size := range sizes {
+			if size != 1 {
+				t.Errorf("a dismissal over three occurrences of one issue asked about %d issues, want 1", size)
+			}
+		}
+	})
+}
+
+// exploitedLists records the length of each list of issues a statement asks
+// the attack records about.
+type exploitedLists struct {
+	mu    sync.Mutex
+	sizes []int
+}
+
+var exploitedInList = regexp.MustCompile(`(?i)"live_vulnerability_id"\s+IN \(([^()]*)\)`)
+
+func (l *exploitedLists) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	// Compared with identifiers quoted the standard way, which is not how the
+	// two MySQL-protocol engines quote them.
+	query := strings.ReplaceAll(e.Query, "`", `"`)
+	if !strings.Contains(query, `"incident"`) {
+		return ctx
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, m := range exploitedInList.FindAllStringSubmatch(query, -1) {
+		l.sizes = append(l.sizes, len(strings.Split(m[1], ",")))
+	}
+	return ctx
+}
+
+func (l *exploitedLists) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+func (l *exploitedLists) read() []int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]int(nil), l.sizes...)
+}
+
+// dismissing is one decision that the issue does not apply, at several occurrences.
+func dismissing(f *fixture, occurrences []triage.Occurrence) []triage.Proposal {
+	proposals := make([]triage.Proposal, 0, len(occurrences))
+	for _, at := range occurrences {
+		proposals = append(proposals, triage.Proposal{
+			Occurrence: at, Outcome: triage.NotApplicable,
+			Justification: triage.CodeNotInExecutePath,
+			Reasoning:     "The parser is never reached: we only call the encoder.",
+			By:            f.proposer, NeedsApproval: true,
+		})
+	}
+	return proposals
+}
+
+func TestAnIncidentIsClearedOnlyByWhoTriagesWhatItIsAbout(t *testing.T) {
+	// Each refusal is reached by somebody who passes the one before it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		record, _ := f.exploited(t)
+
+		// Told of the issue and triaging nothing here.
+		if err := f.store.ClearIncident(ctx, f.onlooker, record.ID,
+			"It was a test."); !errors.Is(err, triage.ErrNoSuchIncident) {
+			t.Errorf("a reader of the product cleared the record: %v", err)
+		}
+		// Triaging disclosed work, with the issue undisclosed here now.
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
+			"It was a test."); !errors.Is(err, triage.ErrNoSuchIncident) {
+			t.Errorf("somebody who may not be told of the issue cleared the record: %v", err)
+		}
+	})
+}
+
+func TestAnAttackIsRecordedOnlyBySomebodyWhoMayBeToldOfTheIssue(t *testing.T) {
+	// A triager of disclosed work, on an issue undisclosed here, is answered
+	// as a record nobody could keep.
+	each(t, func(t *testing.T, f *fixture) {
+		f.sits(t, access.Private)
+		if _, _, err := f.store.RecordIncident(t.Context(), f.triager, f.product, f.issue,
+			knownAt, "A customer sent packet captures."); !errors.Is(err, triage.ErrNoSuchIncident) {
+			t.Errorf("somebody who may not be told of the issue recorded an attack: %v", err)
+		}
+	})
+}

@@ -12,17 +12,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
-// What is said to people about findings names no lead. A critical on a
+// What is said to people about findings names no code finding. A critical on a
 // release is told of a vulnerability, and of nothing where the same row is a
-// lead: its kind is the only thing keeping it out, since it keeps the
-// visibility, the rating and the release that would carry it. A lead's own
-// notices are told through the lead consumers.
+// code finding: its kind is the only thing keeping it out, since it keeps the
+// visibility, the rating and the release that would carry it. A code finding's own
+// notices are told through the code finding consumers.
 func TestACriticalOnAReleaseIsNeverALead(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		ctx := t.Context()
 		rights := access.NewStore(db.DB)
-		released := w.TargetFor(w.Tag, w.Customer)
+		released := w.BuildFor(w.Tag, w.Customer)
 		triager := recordPerson(t, rights, "triager@example.com", false, w.Product.ID, access.PublicTriage)
 
 		critical(t, db, released.ID, "CVE-2026-SHIPPED", "critical")
@@ -39,7 +39,7 @@ func TestACriticalOnAReleaseIsNeverALead(t *testing.T) {
 		}
 		for _, line := range told {
 			if strings.Contains(line, "CVE-2026-LEAD") {
-				t.Errorf("the triager was told of a lead: %q", line)
+				t.Errorf("the triager was told of a code finding: %q", line)
 			}
 		}
 	})

@@ -14,7 +14,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
 - [An inventory that moved sharply](#an-inventory-that-moved-sharply)
 - [Analyzer alerts](#analyzer-alerts)
-- [Lead notices](#lead-notices)
+- [Code finding notices](#code-finding-notices)
 - [Staleness conditions](#staleness-conditions)
 - [Report audience](#report-audience)
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
@@ -35,7 +35,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Chat delivery](#chat-delivery)
 - [Chat markup](#chat-markup)
 - [Embargo notices](#embargo-notices)
-- [Obligation notices](#obligation-notices)
+- [Response window notices](#response-window-notices)
 - [Ownership of a notification](#ownership-of-a-notification)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -73,7 +73,7 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody named you | event | A name after an `@`, resolved when the text is saved |
 | An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue returning a decision that sets it aside to the queue. The second reaches somebody who was not in the exchange at all, so without it the decision simply reappears in their queue with no explanation |
 | A decision the code moved under | event | It hands work back to somebody who did nothing to cause it |
-| A merge meeting two answers that disagree in one product | event | Two decisions at one occurrence, two rating claims, or two records of being attacked dated differently. To everybody who triages the product. The merge keeps one and ends the other, and nobody chooses which. Below |
+| A merge meeting two answers that disagree in one product | event | Two decisions at one occurrence, two rating claims, or two incidents dated differently. To everybody who triages the product. The merge keeps one and ends the other, and nobody chooses which. Below |
 | An approval an edit withdrew | event | To everybody whose standing agreement a revision of the reasoning or a moved promise took back, once each, and never to whoever made the edit. Without it an approver goes on relying on an agreement the record no longer holds (REQ-24, REQ-28) |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |
 | An embargo whose date arrived | condition | Reaching the date discloses nothing (REQ-37). Clears when the date moves or the finding is disclosed |
@@ -90,17 +90,17 @@ true is cleared, and running the same pass twice changes nothing.
 | A note on a report | event | To the report's audience, apart from its author and anybody it names, who is told of the mention instead. An edit tells the names its new text holds, and nobody else. Undisclosed |
 | An issue somebody holds disclosed | event | To every person holding an occurrence of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
-| Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
+| Somebody granted one code finding recorded as a flaw | event | The same reason, for a grant of one code finding (`DESIGN-analysis.md` § Code finding collaborators) |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
-| An analyzer run that marked much of a build not reproduced | event | Below, under analyzer alerts |
+| An analyzer run that marked much of a build no longer detected | event | Below, under analyzer alerts |
 | An analyzer series whose newest run on a build could not be compared | condition | Below, under analyzer alerts |
 | An analyzer series gone quiet on a build | condition | Below, under analyzer alerts |
-| A lead assigned, handed off, moved into or out of its flaw's case, or put back in the queue by a withdrawn dismissal | event | Below, under lead notices |
-| A standing rule on leads outgrowing its approval | condition | Below, under lead notices |
-| A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
-| The same window near its end, where it names a warning | condition | Described under obligation notices below |
-| The same window passed | condition | Described under obligation notices below |
+| A code finding assigned, recorded as a flaw, included in or taken out of its flaw's disclosure, or put back in the queue by a withdrawn dismissal | event | Below, under code finding notices |
+| A suppression rule outgrowing its approval | condition | Below, under code finding notices |
+| A response window running, with nobody outside recorded as told | condition | Described under response window notices below |
+| The same window near its end, where it names a warning | condition | Described under response window notices below |
+| The same window passed | condition | Described under response window notices below |
 
 A new build notifies nobody. A build arriving is the ordinary state of a tool
 scanned nightly. What a build changed is on the receipts and in the trend, and
@@ -206,9 +206,9 @@ found, and each is about internal work, so it is withheld on the terms of
 
 | Alert | Kind | Says | Clears |
 |---|---|---|---|
-| Sharp drop | event | A comparable run marked more of the build's open leads not reproduced than the deployment expects of one run, with both counts. Told once, after the run commits, and linked to the build's leads of the series not reproduced | Acknowledged |
-| Not comparable | condition | The series' newest applied run on the build could not be compared, and why. Nothing it stops reporting there is marked not reproduced | The next comparable run |
-| Gone quiet | condition | No run of the series has been applied to the build for three of its usual gaps, and never under a day. Names the last upload of the series to the build turned away since, with what its sender was told | The next applied run |
+| Many findings no longer detected (`security-testing-dropped`) | event | A comparable run marked more of the build's open code findings no longer detected than the deployment expects of one run, with both counts. Told once, after the run commits, and linked to the build's code findings of the series no longer detected | Acknowledged |
+| Latest run can't be compared (`security-testing-not-comparable`) | condition | The series' newest applied run on the build could not be compared, and why. Nothing it stops reporting there is marked no longer detected | The next comparable run |
+| Security testing stopped reporting (`security-testing-stopped`) | condition | No run of the series has been applied to the build for three of its usual gaps, and never under a day. Names the last upload of the series to the build turned away since, with what its sender was told | The next applied run |
 
 | Rule | Reason |
 |---|---|
@@ -218,9 +218,9 @@ found, and each is about internal work, so it is withheld on the terms of
 | Builds retired at any level, and releases past their end of life, are left out | Nobody analyzes them on purpose |
 | The thresholds of a sharp drop are the analyzer drop share and floor, both passed | `DESIGN-analysis.md` § Run application |
 
-## Lead notices
+## Code finding notices
 
-A decision on a lead is told on the terms of every other decision: waiting for a
+A decision on a code finding is told on the terms of every other decision: waiting for a
 second person, sent back and left, rows of it set aside, lapsed, an agreement an
 edit took back, an agreement taken back with its batch, and a mention in its
 notes. Its rows are internal work, so each
@@ -228,30 +228,30 @@ line is withheld as internal (§ The notification list).
 
 | Notice | Kind | To | Clears |
 |---|---|---|---|
-| A decision on a lead waiting for a second person | condition | Whoever may approve at internal visibility: the approver capability and `internal-read`, never its proposer | Approved, sent back or withdrawn |
-| A decision on a lead sent back and left | condition | Its author, while they read internal work | Revised or withdrawn |
-| A dismissal of a lead lapsed by a probable pairing | event | Its proposer, once per run, after the run commits | Acknowledged |
-| An agreement to a decision on a lead taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
-| A lead handed off as a flaw | event | The product's internal triagers, never whoever handed it off. The flaw recorded tells what recording any flaw tells | Acknowledged |
-| A handed-off lead moved into its flaw's case, or taken back out | event | The product's internal triagers, never whoever moved it | Acknowledged |
-| A lead's agreed dismissal or not-a-security-issue ruling withdrawn, putting it back in the queue | event | The product's internal triagers, never whoever withdrew it | Acknowledged |
-| A lead assigned | event | The person given it, while they read it at every visibility it is open at. Never a team, never whoever gave it out, and nobody for handing one back | Acknowledged |
-| A standing rule on leads outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or covering less |
-| A standing rule on leads waiting for its approval | condition | Whoever may approve at internal visibility, never its proposer, once it has waited the period a decision waits | Approved or retired |
-| Leads sitting in a team's queue | condition | The team's members who read the product's internal work, after the period queued work waits | Taken by a person, judged, handed off or closed |
+| A decision on a code finding waiting for a second person | condition | Whoever may approve at internal visibility: the approver capability and `internal-read`, never its proposer | Approved, sent back or withdrawn |
+| A decision on a code finding sent back and left | condition | Its author, while they read internal work | Revised or withdrawn |
+| A dismissal of a code finding lapsed by a probable pairing | event | Its proposer, once per run, after the run commits | Acknowledged |
+| An agreement to a decision on a code finding taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
+| A code finding recorded as a flaw | event | The product's internal triagers, never whoever recorded it. The flaw recorded tells what recording any flaw tells | Acknowledged |
+| A code finding recorded as a flaw included in its flaw's disclosure, or taken back out | event | The product's internal triagers, never whoever included it or took it out | Acknowledged |
+| A code finding's agreed dismissal or not-a-security-issue ruling withdrawn, putting it back in the queue | event | The product's internal triagers, never whoever withdrew it | Acknowledged |
+| A code finding assigned | event | The person given it, while they read it at every visibility it is open at. Never a team, never whoever gave it out, and nobody for handing one back | Acknowledged |
+| A suppression rule outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or covering less |
+| A suppression rule waiting for its approval | condition | Whoever may approve at internal visibility, never its proposer, once it has waited the period a decision waits | Approved or retired |
+| Code findings sitting in a team's queue | condition | The team's members who read the product's internal work, after the period queued work waits | Taken by a person, judged, recorded as a flaw or closed |
 
 | Rule | Reason |
 |---|---|
 | A decision's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
-| A lead sent back links to the lead | A rule names no finding page |
-| Agreeing to a dismissal of a lead tells nobody, and withdrawing one tells only where it was agreed to | An approval is what was asked for. A withdrawal puts work back in the queue, and a dismissal nobody agreed to never took it out |
-| A hand-off or a move names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of a kept lead's case (`DESIGN-analysis.md` § Keep or move) |
-| A lead assigned names the analyzer's rule, its path and line, and the build it was assigned from | The line is internal work, and names no more than the lead's page |
-| A lead assigned is withheld as internal while it is open at internal visibility | Its recipient reads it at every visibility it holds, and a reader of disclosed work reads no internal row |
-| A standing rule waiting for approval is one condition per rule | It dismisses nothing while it waits, so every lead it names stays in the queue, and one approval answers all of them |
-| Leads in a team's queue are counted one per occurrence, for each team and product, apart from the team's other queued work, and the condition names the team | A lead is one piece of work at its occurrence (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
-| A lead a decision stands on, or one handed off as a flaw, is not waiting | A decision is somebody judging it, and a handed-off lead is closed work for its holder |
-| Team routing reaches a lead notice through the team's queue alone | A hand-off, a move and an assignment are each one act about one lead, told to the people the table names. A series alert is about a series, which no team holds |
+| A code finding sent back links to the code finding | A rule names no finding page |
+| Agreeing to a dismissal of a code finding tells nobody, and withdrawing one tells only where it was agreed to | An approval is what was asked for. A withdrawal puts work back in the queue, and a dismissal nobody agreed to never took it out |
+| A flaw record or an inclusion names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of an internal-only code finding's case (`DESIGN-analysis.md` § Disclosure inclusion) |
+| A code finding assigned names the analyzer's rule, its path and line, and the build it was assigned from | The line is internal work, and names no more than the code finding's page |
+| A code finding assigned is withheld as internal while it is open at internal visibility | Its recipient reads it at every visibility it holds, and a reader of disclosed work reads no internal row |
+| A suppression rule waiting for approval is one condition per rule | It dismisses nothing while it waits, so every code finding it names stays in the queue, and one approval answers all of them |
+| Code findings in a team's queue are counted one per occurrence, for each team and product, apart from the team's other queued work, and the condition names the team | A code finding is one piece of work at its occurrence (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
+| A code finding a decision stands on, or one recorded as a flaw, is not waiting | A decision is somebody judging it, and a code finding recorded as a flaw is closed work for its holder |
+| Assignment to a team reaches a code finding notice through the team's queue alone | A flaw record, an inclusion and an assignment are each one act about one code finding, told to the people the table names. A series alert is about a series, which no team holds |
 
 ## Staleness conditions
 
@@ -264,7 +264,7 @@ occurred, which nothing driven by an event can do.
 | A ruling on reports waiting for approval | Whoever may triage undisclosed work in that product, never its proposer |
 | A deferral whose end is approaching | The proposer |
 | A decision sent back and untouched | The proposer |
-| Work sitting in a team queue | The people on that team. Leads in it, to the members who read internal work (§ Lead notices) |
+| Work sitting in a team queue | The people on that team. Code findings in it, to the members who read internal work (§ Code finding notices) |
 | A report nobody has answered | Whoever may triage undisclosed work in that product |
 
 Each of the waits carries its own period, which is a setting. A period each
@@ -288,7 +288,7 @@ Both reach the report's audience (§ Report audience).
 A ruling waiting for approval takes the period a waiting decision does, because it
 is the same thing: one act setting something aside, which takes effect only
 once somebody else agrees. One alert per ruling, however many reports it
-covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
+covers, pointing at the product's vulnerability reports narrowed to what is waiting. It is undisclosed,
 and reaches whoever may approve it under the report rule: the approver
 capability or triage of undisclosed work, over reading it, and never its
 proposer. A ruling answers what a claim is and not
@@ -302,7 +302,7 @@ be closed and goes on being raised until it is answered.
 Every one is bounded by what the person may read. An alert is not a way back in
 to something somebody has lost the reading of.
 
-The team queue is the one that needs stating. Work routed to a team is neither
+The team queue is the one that needs stating. Work assigned to a team is neither
 owned nor unowned, so it sits in a gap where it looks handled and is not.
 
 A deferral that is not in force has no end to announce. The notice states that a
@@ -317,7 +317,7 @@ findings list.
 
 The queue is counted per team and product; the others per decision. A decision is one
 person's action and one thing to read, however many rows it wrote. A queue is a
-population: one routing rule places thousands of findings in a sweep. Within it
+population: one assignment rule places thousands of findings in a sweep. Within it
 the unit is an issue in a component, whatever its occurrences' visibility, and the
 condition is undisclosed where any of those occurrences is.
 
@@ -376,7 +376,7 @@ than about anybody's work.
 | Rule | Reason |
 |---|---|
 | The three that claim no further work is needed are counted whatever else is recorded about them | It does not apply, it will not be fixed, the fix is already here. Each closes the question and nothing re-opens it, so each needs a second person — and counting them unconditionally means a write path that got around the gate by clearing its own flag is still caught |
-| A lead dismissed or called no security issue is counted whatever else is recorded about it, as the three above are | Each closes the question and always needs a second person. The condition is a count across every product, so nothing about the lead reaches an administrator who reads no internal work |
+| A code finding dismissed or called no security issue is counted whatever else is recorded about it, as the three above are | Each closes the question and always needs a second person. The condition is a count across every product, so nothing about the code finding reaches an administrator who reads no internal work |
 | A deferral or a promise to act counts where the gate asked for a second person | Both hide risk and both are approved conditionally, on where the date sits against the deadline already set. A short deferral standing alone is the rule working; one past the threshold needed agreement as surely as a dismissal did, and asking which outcome it was saw none of them |
 | The gate's verdict is read, never a caller's | A proposal's own answer is re-worked against the policy in force when the write lands, so nothing a caller asserts reaches the record |
 | Whether somebody agreed is asked of the record | No approval from anybody other than the proposer, and none taken back. A flag there would be the row's own account of itself, and the failure this exists to find is a row the write path should never have produced |
@@ -389,7 +389,7 @@ than about anybody's work.
 |---|---|
 | Raised where one pair's share of a product's agreements reaches a threshold, among at least a set number of people who may approve | Two thresholds, both met. A share alone is permanently true in a team of two, which is an alert nobody can clear (REQ-49). The count of people who may approve is what makes the pattern a choice. A share of a hundred is one pair giving every agreement, and is raised |
 | Only over at least ten agreed decisions in the period | A fixed floor. Below it a share is a handful of acts: one agreed decision is a hundred percent, and each decision ageing out moves the share across the threshold and back, raising and mailing a new condition each time |
-| Each threshold is a deployment setting a product may override | Teams differ in size by product. A product's own value follows the triage line's shape: cleared, it follows the deployment rather than copying its current value |
+| Each threshold is a deployment setting a product may override | Teams differ in size by product. A product's own value follows the minimum severity's shape: cleared, it follows the deployment rather than copying its current value |
 | A pair is two people, whichever proposed | The pattern is two people each agreeing to what the other proposes. Counted by direction, the pair it exists to find reads as two halves under the threshold |
 | Counted in decisions | A decision over sixty occurrences is one thing proposed and one agreed to |
 | Over the last ninety days of proposals | The approval quality report's own period, so the report the link opens holds what raised it. What it asks about is how agreement is given now; a pattern a team has moved away from is not a control failing today. Older agreements are left out of the whole as well as of the pair, so a spread-out past does not hide a concentrated present |
@@ -480,7 +480,7 @@ holds the rules.
 | Merge message | |
 |---|---|
 | Sent only where the two say different things: another outcome, another rating, another date of attack | Two that agree collapse to one, and nothing the product reads changes |
-| To everybody who triages the product: at private visibility where either decision is private, and for a rating claim or a record of being attacked, unless a finding of the issue in the product is disclosed | The tool chooses between two people's answers by standing, so the choice is the product's to look at. The message names both issues and links to the one that stands, so it is as private as the more private of the two. An answer about the whole issue has no visibility of its own |
+| To everybody who triages the product: at private visibility where either decision is private, and for a rating claim or an incident, unless a finding of the issue in the product is disclosed | The tool chooses between two people's answers by standing, so the choice is the product's to look at. The message names both issues and links to the one that stands, so it is as private as the more private of the two. An answer about the whole issue has no visibility of its own |
 | Names both issues and the product, and links to the decision that stands, or for the other two to the issue | That is where the one that ends can be compared with the one that stands |
 | Sent by the scan that merges the issues, once the scan has applied, to each person in turn | What a scan does and how anybody hears about it are wired together at the deployment, as the lapse message is. One person not told leaves the rest told |
 
@@ -505,7 +505,7 @@ what somebody may do, not what they want to read.
 |---|---|
 | Assembled as its reader | Every query narrows by the subject it is handed. The sweep holds no rights of its own |
 | Nothing is repeated | An event records what it was about, kept apart from the name a condition clears against, which is a uniqueness key and would deduplicate two unrelated events into one |
-| It pages past what it has already said | Filtering one page rather than paging until enough survive gives a holder with a page's worth of already-told items an empty digest. Routed work arrives deliberately without a message, so the digest is the only place it is named |
+| It pages past what it has already said | Filtering one page rather than paging until enough survive gives a holder with a page's worth of already-told items an empty digest. Work assigned by rule arrives deliberately without a message, so the digest is the only place it is named |
 | A digest with nothing in it is not sent, and the clock still moves | A daily "nothing" is how somebody stops opening the daily message. Leaving the mark unmoved would make a quiet week report itself as new the following Monday |
 | A digest that cannot be assembled moves the clock | On the rule a refusing mailbox follows: it is tried tomorrow rather than every minute, and a batch of them cannot crowd out a reader it can serve |
 | A first digest reports nothing under "nobody owns" | There is no "since" to measure against |
@@ -556,7 +556,7 @@ these hold for the notification area, mail and chat alike.
 | Rule | |
 |---|---|
 | A day is the UTC day a moment falls on | One moment is one day to every reader, whatever zone the server's clock is in, and it is the day the interface shows for it (`DESIGN-interface.md`) |
-| A time within a day is to the minute in UTC, and says UTC | An obligation window ends at an hour, and a time with no zone reads as the reader's own |
+| A time within a day is to the minute in UTC, and says UTC | A response window ends at an hour, and a time with no zone reads as the reader's own |
 
 ## The notification list
 
@@ -574,7 +574,7 @@ name are what a later read has to ask about.
 | It names a product where this person reads undisclosed work now | The role is the reason it arrived, so withdrawing the role is what takes it away |
 | It is about internal work, in a product where this person reads internal work now | A reader of undisclosed work reads no internal finding, so a line about one is withheld from them on the same terms |
 | It names an issue they were brought onto, one case at a time | A case grant is a pair. Widening it to the product would hand a collaborator the rest of that product's embargo list, which is the whole of what the grant is not |
-| It is about a handed-off lead they were granted, one lead at a time | A lead grant is a pair of a product and an occurrence, and the line granting it is about that lead, so it is the one line the grant reaches |
+| It is about a code finding recorded as a flaw they were granted, one code finding at a time | A code finding grant is a pair of a product and an occurrence, and the line granting it is about that code finding, so it is the one line the grant reaches |
 | They administer the deployment | Administering is not reading, and every other read here says so — but the embargo notice names administrators as an audience of its own, and a message sent under that rule and withheld under this one is written for somebody who cannot open it. An administrator grants roles, so it hands them nothing they could not hand themselves |
 
 Filtered, never deleted. Destroying the row destroys the record that somebody
@@ -711,7 +711,7 @@ which, and a test holds the table against the list of kinds.
 |---|---|---|
 | Somebody's own | Assigned, named in a note, a decision sent back or waiting on them, an approval withdrawn or undone, a decision that lapsed, brought into a case, an issue they hold disclosed, a deferral running out | To them directly. Never to a channel |
 | Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, an answer a merge of two issues superseded, the vulnerability data stale, a supplier silent, an upstream failing or read again | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
-| Shared, undisclosed | An embargo approaching or due, an obligation window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
+| Shared, undisclosed | An embargo approaching or due, a response window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
 
 | Person's setting | Default | Effect |
 |---|---|---|
@@ -841,11 +841,11 @@ statement carries which statement that was. Inferring it from the issue and the
 component would raise an alert about every decision at an occurrence a publisher
 happens to have spoken about.
 
-## Obligation notices
+## Response window notices
 
-A window a deployment declares runs from the moment a record says its product
-was attacked, from the first notice for the window it counts from, or from the
-release of a fix the record names (REQ-77). `DESIGN-obligations.md` holds the windows and the
+A response window a deployment declares runs from the moment an incident says
+its product was attacked, from the first notice for the window it counts from, or from the
+release of a fix the record names (REQ-77). `DESIGN-incidents.md` holds the windows and the
 notices; what is said about them is here.
 
 | Rule | Reason |
@@ -857,10 +857,10 @@ notices; what is said about them is here.
 | A window counting from the fix raises nothing until a stated release date of a tag named on the record has come | The same reason. A release date still to come is a start that has not arrived |
 | Near is raised at the warning the window names, and not at all where it names none | Beside the running one rather than instead of it. The first says an attack is being counted; the second says the count is nearly out |
 | Only for a product the window applies to | A window limited to other products raises nothing for this one |
-| One per record and window | Each window is answered separately, so each is said separately |
-| Cleared by a notice naming the window, by clearing the record, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
+| One per incident and window | Each window is answered separately, so each is said separately |
+| Cleared by a notice naming the window, by clearing the incident, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
 | To whoever may triage the product, at the issue's visibility | The people who may record the notice. An undisclosed issue reaches nobody who may not read undisclosed work there, and what leaves the deployment about it is a link |
-| No window declared, nothing said | None ships. A deployment under no obligation hears nothing |
+| No window declared, nothing said | None ships. A deployment under no response window hears nothing |
 | The sentence says the time, what the window counts from, and that nothing is recorded | All three are facts. Whether anybody owed anything is not the tool's answer to give |
 
 ## Ownership of a notification
@@ -883,7 +883,7 @@ finding it names may since have been decided, closed or reopened.
 | Not built | Detail |
 |---|---|
 | Teams and Google Chat | Slack and Zulip are built. § Chat says what each of the other two needs |
-| A message when a rule routes work to a team | Routed work arrives without a notification, so a team's channel hears of it through the condition that work is sitting in the queue |
+| A message when a rule assigns work to a team | Work assigned by rule arrives without a notification, so a team's channel hears of it through the condition that work is sitting in the queue |
 | The HTML part of a mail | Every mail body is text the server composes, so the part is that text escaped, with the link as an anchor. A renderer would be needed only for typed notes, which mail does not carry |
 
 ## Limits
@@ -895,5 +895,5 @@ finding it names may since have been decided, closed or reopened.
 | Slack shows a backslash before each character escaped as markdown in a webhook's text | Slack's markup has no backslash escape and Teams renders markdown, and one text goes to both. A stray backslash costs less than a link labelled anything |
 | A chat account registered to somebody's address is taken to be theirs | The platform's administrator controls which addresses its accounts hold, and a deployment that does not trust them should not configure the bot |
 | Chat carries nothing opened more than a day ago | A backlog from before a platform was configured, or from a day it refused, is in the application, and delivered at once it buries what is new |
-| A team's channel carries only the queue condition | It is the one notification that names a team. Assignment to a team and routing by rule make none |
-| A report's watchers are its audience, with no list of their own | Nobody joins or leaves a report except by who holds it. Findings and leads have no watch list to follow, and the audience already decides who may open the report |
+| A team's channel carries only the queue condition | It is the one notification that names a team. Assignment to a team, by hand or by rule, makes none |
+| A report's watchers are its audience, with no list of their own | Nobody joins or leaves a report except by who holds it. Findings and code findings have no watch list to follow, and the audience already decides who may open the report |

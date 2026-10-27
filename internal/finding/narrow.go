@@ -27,12 +27,12 @@ import (
 // arbitrary subset each time. It also makes the total meaningless, which is the
 // number people quote.
 type Filter struct {
-	// BundleSort is which order the fix-bundle list pages in, and is read by
-	// that list alone: a bundle is a bump rather than a finding, so what it is
+	// PlannedUpgradeSort is which order the planned-upgrade list pages in, and is read by
+	// that list alone: an upgrade is a bump rather than a finding, so what it is
 	// worth ordering by — how many issues it closes, how many builds hold it —
 	// has no meaning on a list of findings, and the six the findings list
 	// takes do not all have one on a bump. The direction below is shared.
-	BundleSort BundleSortKey
+	PlannedUpgradeSort PlannedUpgradeSortKey
 	// MinSeverity keeps issues rated at this word or worse. Empty — or "low",
 	// which excludes nothing — keeps everything, including issues carrying no
 	// rating at all.
@@ -50,13 +50,13 @@ type Filter struct {
 	// packages reads them together, and one at a time is the same list
 	// read three times.
 	Components []string
-	// Floor is what this product considers worth triaging, and BelowFloor
+	// MinimumSeverity is what this product considers worth triaging, and BelowMinimumSeverity
 	// asks to see what it keeps out. The line is policy rather than
 	// preference — somebody set it once for everybody — which is why what
 	// it hides is counted and said rather than silently subtracted (the
 	// line a deployment triages at, a list saying what it hid).
-	Floor      Floor
-	BelowFloor bool
+	MinimumSeverity      MinimumSeverity
+	BelowMinimumSeverity bool
 	// Workable keeps the releases work can land in: which sort of release,
 	// and whether it is still in support. Two questions kept apart, because
 	// a tag can be in support and a branch can be past end-of-life.
@@ -154,10 +154,10 @@ type Filter struct {
 	// dependency tree's cumulative count makes, so the number the tree draws
 	// and the list it opens agree. Nil is no narrowing.
 	Beneath *int64
-	// TargetID is which build the query is over, set by the store rather than
+	// BuildID is which build the query is over, set by the store rather than
 	// by a caller, for the same reason ProductID is: the walk beneath a
 	// component is a walk over one build's edges.
-	TargetID int64
+	BuildID int64
 	// State keeps groups by how far they have been decided. A group is an issue
 	// in a component across every occurrence it sits at, and its occurrences
 	// can be in different states, so what a group's state *is* had to be
@@ -272,8 +272,8 @@ type Filter struct {
 	//
 	// Derived, never stored. A finding is covered when a standing
 	// `upgrade-needed` decision reaches it, which the decision already
-	// records — so the mark is a join rather than a tag written across every
-	// row an upgrade touches. A tag would be per product and could not say
+	// records — so the mark is a join rather than a label written across every
+	// row an upgrade touches. A label would be per product and could not say
 	// "planned on master, not on 2.4", which is the case the whole per-build
 	// target exists for.
 	//
@@ -281,12 +281,12 @@ type Filter struct {
 	// is the working list once planning suppresses, and a bool cannot ask
 	// it.
 	Planned PlannedFilter
-	// Tags keeps only what somebody marked with one of these words.
+	// Labels keeps only what somebody marked with one of these words.
 	// Matched folded, the way every other name people type is, so
-	// "Waiting" and "waiting" are one tag rather than half an answer each.
+	// "Waiting" and "waiting" are one label rather than half an answer each.
 	// Any of them rather than all of them: the words are a person's own
 	// filing, and asking for two of somebody's labels means "either pile".
-	Tags []string
+	Labels []string
 	// SentBack keeps groups where a live decision is with its author, which is
 	// the row a proposer is looking for and cannot ask for today.
 	SentBack bool
@@ -312,11 +312,11 @@ type Filter struct {
 	// looked at.
 	AcrossVariants VariantSpread
 	// VariantID is the variant the selection names, where it names one.
-	// Targets is the builds it holds, which AcrossVariants reads as the
+	// Builds is the builds it holds, which AcrossVariants reads as the
 	// signal that a selection was resolved at all: applied to a filter
 	// nobody resolved, its comparison would find nothing anywhere and keep
 	// every row as though it were unique.
-	Targets   []int64
+	BuildIDs  []int64
 	VariantID *int64
 	// Visible is what the reader may see, set with the two above. A finding
 	// in another variant is compared only where the reader could see it
@@ -435,16 +435,16 @@ func (f Filter) ofRows() Filter {
 // rows on that guess it read the kernel's 271,000 rows once per kept group, and
 // did not finish in two minutes where the one-level form hashes the join in 2
 // s.
-func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
+func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
 	if !f.asksOfGroups() {
 		return f.narrow(q)
 	}
 	if f.keepsAfterGrouping() {
-		return f.amongKept(db, f.ofRows().narrow(q), targets, visible)
+		return f.amongKept(db, f.ofRows().narrow(q), buildIDs, visible)
 	}
-	kept := f.listed(db, targets, visible).
+	kept := f.listed(db, buildIDs, visible).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return f.ofRows().narrow(q.
@@ -469,15 +469,15 @@ func (f Filter) keepsAfterGrouping() bool {
 // the fold is read from the component by its key. On PostgreSQL the groups have
 // no index to probe, so an estimate of 279 kept groups where 1,753 pass cannot
 // become a walk of a component's rows once per group: that walk took 185 s for
-// the lapsed fix bundles. On MariaDB the membership test is materialized once.
+// the lapsed planned upgrades. On MariaDB the membership test is materialized once.
 // A grouped table joined on its grouping keys is instead worked out again for
 // every row it is joined to: the one-level kept groups, joined that way to the
 // open occurrences, had built the decision table again for 10,572 occurrences
 // after 55 s for the components waiting, and gave no answer in three minutes.
-func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
+func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
-	kept := f.listed(db, targets, visible).
+	kept := f.listed(db, buildIDs, visible).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return db.NewSelect().
@@ -498,11 +498,11 @@ func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
 // with 3,060 decision occurrences, against 2.6 s in two levels. A filter
 // needing a decision also narrows both sides to the issues the decision
 // occurrences name (see decidedIssuesFor).
-func (f Filter) listed(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
+func (f Filter) listed(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.SelectQuery {
 	if f.asksDecided() {
-		return f.folded(db, openRows(db, targets, visible), issueAndComponent).GroupExpr(GroupedOn)
+		return f.folded(db, openRows(db, buildIDs, visible), issueAndComponent).GroupExpr(GroupedOn)
 	}
-	return f.narrow(openGroups(db, targets, visible))
+	return f.narrow(openGroups(db, buildIDs, visible))
 }
 
 // narrow applies the filter to a grouped query over finding AS f.
@@ -626,7 +626,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 				TableExpr(`"graph_edge" AS "ge"`).
 				Join(`JOIN "graph_node" AS "gch" ON "gch"."id" = "ge"."child_id"`).
 				ColumnExpr(`"gch"."component_id"`).
-				Where(`"ge"."target_id" = "f"."target_id"`).
+				Where(`"ge"."build_id" = "f"."build_id"`).
 				Where(`"ge"."closed_scan_id" IS NULL`).
 				Where(`"ge"."kind" IN (?)`, bun.List(words)))
 	}
@@ -707,8 +707,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 			WHERE "vw"."vulnerability_id" = "f"."vulnerability_id"
 			  AND "vw"."cwe" IN (?))`, bun.List(upper))
 	}
-	if words := foldedTags(f.Tags); len(words) > 0 {
-		// A tag belongs to the fold, so a row carries a word put on any
+	if words := foldedLabels(f.Labels); len(words) > 0 {
+		// A label belongs to the fold, so a row carries a word put on any
 		// package of its fold, including one put on before the row's own
 		// package joined it. The word counts where its own package carries a
 		// finding of the issue in the product at the row's visibility: a word
@@ -716,16 +716,16 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// finding is about.
 		where, args := f.product()
 		kinds, kindArgs := kind.Triage.Where(`"fv"."kind"`)
-		q = q.Where(`EXISTS (SELECT 1 FROM "finding_tag" AS "ft"
+		q = q.Where(`EXISTS (SELECT 1 FROM "finding_label" AS "ft"
 			JOIN "component" AS "ct" ON "ct"."id" = "ft"."component_id"
 			WHERE "ft"."product_id" = `+where+`
 			  AND "ft"."vulnerability_id" = "f"."vulnerability_id"
 			  AND "ct"."fold_key" = (SELECT "c1"."fold_key" FROM "component" AS "c1"
 				WHERE "c1"."id" = "f"."component_id")
-			  AND "ft"."tag" IN (?)
+			  AND "ft"."label" IN (?)
 			  AND EXISTS (SELECT 1 FROM "finding" AS "fv"
-				JOIN "target" AS "tv" ON "tv"."id" = "fv"."target_id"
-				JOIN "stream" AS "sv" ON "sv"."id" = "tv"."stream_id"
+				JOIN "build" AS "tv" ON "tv"."id" = "fv"."build_id"
+				JOIN "branch_or_tag" AS "sv" ON "sv"."id" = "tv"."branch_or_tag_id"
 				WHERE "sv"."product_id" = "ft"."product_id"
 				  AND "fv"."vulnerability_id" = "ft"."vulnerability_id"
 				  AND "fv"."component_id" = "ft"."component_id"
@@ -768,11 +768,11 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.Beneath != nil {
 		// The subtree as the engine walks it, not as a list of identifiers
 		// bound back in: under a build's root that list is the whole build.
-		q = q.Where(`"f"."component_id" IN (?)`, graph.Within(q.DB(), f.TargetID, *f.Beneath))
+		q = q.Where(`"f"."component_id" IN (?)`, graph.Within(q.DB(), f.BuildID, *f.Beneath))
 	}
 	q = f.byState(q)
-	if !f.BelowFloor {
-		q = f.Floor.narrow(q)
+	if !f.BelowMinimumSeverity {
+		q = f.MinimumSeverity.narrow(q)
 	}
 	return q
 }
@@ -853,7 +853,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	// than over every build there is: "differs" is a statement about what is
 	// being looked at.
 	if f.DiffersBetweenBuilds && f.Builds > 1 {
-		q = q.Having(`COUNT(DISTINCT "f"."target_id") < ?`, f.Builds)
+		q = q.Having(`COUNT(DISTINCT "f"."build_id") < ?`, f.Builds)
 	}
 	return f.statesHaving(q, g)
 }
@@ -881,8 +881,8 @@ func VariantSpreads() []VariantSpread { return []VariantSpread{OnlyThisVariant, 
 // Spelled as a scalar subquery, which is how the other five lookups of this
 // shape here are written, rather than as a join correlated outward from
 // inside a subquery.
-const onThisRowsBranch = `(SELECT "tg0"."stream_id" FROM "target" AS "tg0"` +
-	` WHERE "tg0"."id" = "f"."target_id")`
+const onThisRowsBranch = `(SELECT "tg0"."branch_or_tag_id" FROM "build" AS "tg0"` +
+	` WHERE "tg0"."id" = "f"."build_id")`
 
 // acrossVariants keeps rows by how the variants of a branch share them.
 //
@@ -903,7 +903,7 @@ const onThisRowsBranch = `(SELECT "tg0"."stream_id" FROM "target" AS "tg0"` +
 // occurrences where its variant is alone with it and drops the occurrences
 // where it is not.
 func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
-	if f.AcrossVariants == AnyVariants || len(f.Targets) == 0 {
+	if f.AcrossVariants == AnyVariants || len(f.BuildIDs) == 0 {
 		return q
 	}
 	// The same issue at the same fold, open and seen by this reader; which
@@ -928,18 +928,18 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 		if f.VariantID == nil {
 			return q.Where("1 = 0")
 		}
-		others := q.NewSelect().TableExpr(`"target" AS "tg2"`).
+		others := q.NewSelect().TableExpr(`"build" AS "tg2"`).
 			ColumnExpr(`"tg2"."id"`).
-			Where(`"tg2"."stream_id" = `+onThisRowsBranch).
+			Where(`"tg2"."branch_or_tag_id" = `+onThisRowsBranch).
 			Where(`"tg2"."variant_id" <> ?`, *f.VariantID)
 		return q.Where("NOT EXISTS (?)", heldElsewhere().
-			Where(`"f2"."target_id" IN (?)`, others))
+			Where(`"f2"."build_id" IN (?)`, others))
 	case EveryVariant:
 		// No build on the row's own branch lacks it.
-		lacking := q.NewSelect().TableExpr(`"target" AS "tg2"`).
+		lacking := q.NewSelect().TableExpr(`"build" AS "tg2"`).
 			ColumnExpr(`"tg2"."id"`).
-			Where(`"tg2"."stream_id" = `+onThisRowsBranch).
-			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."target_id" = "tg2"."id"`))
+			Where(`"tg2"."branch_or_tag_id" = `+onThisRowsBranch).
+			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."build_id" = "tg2"."id"`))
 		return q.Where("NOT EXISTS (?)", lacking)
 	}
 	return q
@@ -1077,8 +1077,8 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		alone := narrowing + ` AND ("ss"."within" IS NULL OR NOT EXISTS (SELECT 1
 			FROM "component" AS "pc"
 			JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"
-			JOIN "target" AS "pt" ON "pt"."id" = "pn"."target_id"
-			JOIN "stream" AS "ps" ON "ps"."id" = "pt"."stream_id"
+			JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"
+			JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"
 			WHERE "ps"."product_id" = "ss"."product_id" AND "pn"."closed_scan_id" IS NULL
 			  AND "pc"."name_folded" = "ss"."within"))`
 
@@ -1097,13 +1097,13 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		// statement.
 		pairs := `(SELECT "ss"."product_id" AS "product_id", "vc"."id" AS "component_id",
 			"vv"."issue_id" AS "vulnerability_id"
-			FROM "vex_statement" AS "ss"
+			FROM "received_vex_statement" AS "ss"
 			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
 			JOIN "vulnerability" AS "vv" ON "vv"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `
 			UNION
 			SELECT "ss"."product_id", "vc"."id", "vl"."vulnerability_id"
-			FROM "vex_statement" AS "ss"
+			FROM "received_vex_statement" AS "ss"
 			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
 			JOIN "vulnerability_alias" AS "vl" ON "vl"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `)`
@@ -1124,7 +1124,7 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 			// is in the finding's own product, because the run reads that
 			// product's statements and no other's.
 			Where(`("vx"."component_id" IS NOT NULL OR "f"."stated_by" IN
-				(SELECT "ss"."id" FROM "vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
+				(SELECT "ss"."id" FROM "received_vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
 	}
 	return q
 }
@@ -1191,15 +1191,15 @@ func containsTerm(term string) string {
 	return database.LikeEscaped(strings.ToLower(term))
 }
 
-// foldedTags is a set of tags as they are stored, without the ones that fold
-// to nothing. Folded rather than trimmed, because a tag is matched on the
+// foldedLabels is a set of labels as they are stored, without the ones that fold
+// to nothing. Folded rather than trimmed, because a label is matched on the
 // folded form everywhere else and a filter that skipped the folding would
 // answer nothing for a word somebody typed with a capital.
-func foldedTags(words []string) []string {
+func foldedLabels(words []string) []string {
 	kept := make([]string, 0, len(words))
 	for _, word := range words {
-		if tag := TagAs(word); tag != "" {
-			kept = append(kept, tag)
+		if label := LabelAs(word); label != "" {
+			kept = append(kept, label)
 		}
 	}
 	return kept

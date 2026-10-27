@@ -191,7 +191,7 @@ func (s *Store) deferredWith(ctx context.Context, occurrences []DecisionOccurren
 // where nothing it covers has a deadline there is no date the promise can be
 // inside — the exemption is "this hides nothing the policy did not already
 // allow", and a place with no deadline allowed nothing. Reading that the
-// other way made a product below its own triage line the one place a promise
+// other way made a product below its own minimum severity the one place a promise
 // could hide a finding for years on one signature.
 func commitmentGated(committedTo, binding *time.Time) bool {
 	if committedTo == nil || binding == nil {
@@ -299,15 +299,15 @@ const DefaultDeferralThreshold = 30 * 24 * time.Hour
 // critical and a medium is gated by the critical, however many mediums are in
 // it.
 func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Proposal) error {
-	var targets []int64
+	var buildIDs []int64
 	occurrences := make([]finding.At, 0, len(proposals))
 	var productID int64
 	for _, p := range proposals {
 		if len(p.BindingAcross) == 0 {
 			continue
 		}
-		if len(targets) == 0 {
-			targets, productID = p.BindingAcross, p.Occurrence.ProductID
+		if len(buildIDs) == 0 {
+			buildIDs, productID = p.BindingAcross, p.Occurrence.ProductID
 		}
 		occurrences = append(occurrences, finding.At{
 			VulnerabilityID:    p.Occurrence.VulnerabilityID,
@@ -320,7 +320,7 @@ func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Pr
 	// The store here is only a receiver: what the read runs on is this
 	// transaction, which DeadlineAt takes as its own argument for exactly this
 	// reason.
-	binding, err := (&finding.Store{}).DeadlineAt(ctx, s.db, subject, productID, targets, occurrences)
+	binding, err := (&finding.Store{}).DeadlineAt(ctx, s.db, subject, productID, buildIDs, occurrences)
 	if err != nil {
 		return err
 	}

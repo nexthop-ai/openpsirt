@@ -134,26 +134,26 @@ func eachWorld(t *testing.T, fn func(t *testing.T, w *world)) {
 
 // inventory records a read inventory for a build: the product, and FRR
 // built from its repository.
-func (w *world) inventory(t *testing.T, targetID int64) {
+func (w *world) inventory(t *testing.T, buildID int64) {
 	t.Helper()
-	w.inventoryWith(t, targetID, graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frr", Version: "10.2"})
+	w.inventoryWith(t, buildID, graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frr", Version: "10.2"})
 }
 
 // inventoryWith records a read inventory for a build: the product, and FRR
 // as the inventory describes it.
-func (w *world) inventoryWith(t *testing.T, targetID int64, frr graph.Described) {
+func (w *world) inventoryWith(t *testing.T, buildID int64, frr graph.Described) {
 	t.Helper()
 	ctx := t.Context()
 	scans := ingest.NewStore(w.DB.DB)
 	scan, outcome, err := scans.Record(ctx, ingest.Arriving{
-		TargetID: targetID, ContentHash: fmt.Sprintf("inventory-%d", targetID),
+		BuildID: buildID, ContentHash: fmt.Sprintf("inventory-%d", buildID),
 		BuiltAt: time.Now().UTC().Add(-2 * time.Hour), ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record the inventory: %v %v", outcome, err)
 	}
 	root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
-	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, targetID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, buildID, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{frr},
 		Dependencies: []graph.Dependency{{Parent: root, Child: frr}},
 	}); err != nil {
@@ -168,7 +168,7 @@ func (w *world) inventoryWith(t *testing.T, targetID int64, frr graph.Described)
 	}
 	if err := w.DB.DB.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id", "n"."is_root"`).
-		Where(`"n"."target_id" = ?`, targetID).Scan(ctx, &nodes); err != nil {
+		Where(`"n"."build_id" = ?`, buildID).Scan(ctx, &nodes); err != nil {
 		t.Fatal(err)
 	}
 	for _, n := range nodes {
@@ -181,9 +181,9 @@ func (w *world) inventoryWith(t *testing.T, targetID int64, frr graph.Described)
 }
 
 // send receives a run as the upload operation does and applies it.
-func (w *world) send(t *testing.T, targetID int64, built time.Time, doc string) (*series.Run, series.Status) {
+func (w *world) send(t *testing.T, buildID int64, built time.Time, doc string) (*series.Run, series.Status) {
 	t.Helper()
-	run := w.receive(t, targetID, built, doc)
+	run := w.receive(t, buildID, built, doc)
 	status, err := w.applier.Apply(t.Context(), run.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -196,7 +196,7 @@ func (w *world) send(t *testing.T, targetID int64, built time.Time, doc string) 
 }
 
 // receive receives a run as the upload operation does.
-func (w *world) receive(t *testing.T, targetID int64, built time.Time, doc string) *series.Run {
+func (w *world) receive(t *testing.T, buildID int64, built time.Time, doc string) *series.Run {
 	t.Helper()
 	ctx := t.Context()
 	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
@@ -211,7 +211,7 @@ func (w *world) receive(t *testing.T, targetID int64, built time.Time, doc strin
 		store := series.NewStore(tx)
 		var err error
 		run, _, err = store.Receive(ctx, series.Arriving{
-			ProductID: w.Product.ID, TargetID: targetID, Kind: kind.Analysis, Series: given.Series,
+			ProductID: w.Product.ID, BuildID: buildID, Kind: kind.Analysis, Series: given.Series,
 			ContentHash: hash, BuiltAt: given.BuiltAt, Params: given.Params,
 		})
 		if err != nil {
@@ -262,13 +262,13 @@ func receiptOf(t *testing.T, run *series.Run) Receipt {
 	return r
 }
 
-// leads is the build's open analysis findings, by component.
-func (w *world) leads(t *testing.T, targetID int64) []finding.Finding {
+// codeFindings is the build's open analysis findings, by component.
+func (w *world) codeFindings(t *testing.T, buildID int64) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
 	if err := w.DB.DB.NewSelect().Model(&rows).
-		Where(`"f"."target_id" = ?`, targetID).Where(where, args...).
+		Where(`"f"."build_id" = ?`, buildID).Where(where, args...).
 		OrderExpr(`"f"."id" ASC`).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -278,14 +278,14 @@ func (w *world) leads(t *testing.T, targetID int64) []finding.Finding {
 func TestARunWaitsUntilItsBuildHasAnInventory(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		built := time.Now().UTC().Add(-time.Hour)
-		run, status := w.send(t, w.Target.ID, built, document([]sent{inFRR}, 10))
+		run, status := w.send(t, w.Build.ID, built, document([]sent{inFRR}, 10))
 		if status != series.Waiting {
 			t.Fatalf("status %s; want waiting with no inventory read", status)
 		}
-		if got := w.leads(t, w.Target.ID); len(got) != 0 {
+		if got := w.codeFindings(t, w.Build.ID); len(got) != 0 {
 			t.Errorf("%d findings opened before the build had components", len(got))
 		}
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		status, err := w.applier.Apply(t.Context(), run.ID)
 		if err != nil || status != series.Applied {
 			t.Fatalf("status %s, %v; want applied once the inventory is read", status, err)
@@ -295,8 +295,8 @@ func TestARunWaitsUntilItsBuildHasAnInventory(t *testing.T) {
 
 func TestAResultIsAnInternalFindingOnTheComponentItsRepositoryBuilt(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
-		run, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour),
+		w.inventory(t, w.Build.ID)
+		run, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
 			document([]sent{inFRR, inSWSS}, 10))
 		if status != series.Applied {
 			t.Fatalf("status %s (%s); want applied", status, run.Failure)
@@ -307,12 +307,12 @@ func TestAResultIsAnInternalFindingOnTheComponentItsRepositoryBuilt(t *testing.T
 		if run.Comparable == nil || !*run.Comparable {
 			t.Errorf("the series' first run with nothing before it is comparable: %v", run.Comparable)
 		}
-		leads := w.leads(t, w.Target.ID)
-		if len(leads) != 2 {
-			t.Fatalf("%d findings; want 2", len(leads))
+		codeFindings := w.codeFindings(t, w.Build.ID)
+		if len(codeFindings) != 2 {
+			t.Fatalf("%d findings; want 2", len(codeFindings))
 		}
 		on := map[int64]int{}
-		for _, f := range leads {
+		for _, f := range codeFindings {
 			if f.Visibility != access.Internal {
 				t.Errorf("a finding opened %s; want internal", f.Visibility)
 			}
@@ -323,7 +323,7 @@ func TestAResultIsAnInternalFindingOnTheComponentItsRepositoryBuilt(t *testing.T
 		}
 		var issue finding.Vulnerability
 		if err := w.DB.DB.NewSelect().Model(&issue).
-			Where(`"vu"."id" = ?`, leads[0].VulnerabilityID).Scan(t.Context()); err != nil {
+			Where(`"vu"."id" = ?`, codeFindings[0].VulnerabilityID).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if issue.Identifier != "clang-tidy/bugprone-use-after-move" || issue.Kind != kind.Rule {
@@ -332,37 +332,37 @@ func TestAResultIsAnInternalFindingOnTheComponentItsRepositoryBuilt(t *testing.T
 	})
 }
 
-func TestAComparableRunThatMissesAResultMarksItNotReproduced(t *testing.T) {
+func TestAComparableRunThatMissesAResultMarksItNoLongerDetected(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR, inSWSS}, 10))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR, inSWSS}, 10))
 
-		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inSWSS}, 10))
-		if r := receiptOf(t, run); r.Seen != 1 || r.NotReproduced != 1 || r.Opened != 0 {
-			t.Errorf("receipt %+v; want one seen and one not reproduced", r)
+		run, _ := w.send(t, w.Build.ID, start.Add(time.Hour), document([]sent{inSWSS}, 10))
+		if r := receiptOf(t, run); r.Seen != 1 || r.NoLongerDetected != 1 || r.Opened != 0 {
+			t.Errorf("receipt %+v; want one seen and one no longer detected", r)
 		}
-		if got := w.leads(t, w.Target.ID); len(got) != 2 {
-			t.Errorf("%d findings; not reproduced closes nothing", len(got))
+		if got := w.codeFindings(t, w.Build.ID); len(got) != 2 {
+			t.Errorf("%d findings; no longer detected closes nothing", len(got))
 		}
 
-		run, _ = w.send(t, w.Target.ID, start.Add(2*time.Hour), document([]sent{inFRR, inSWSS}, 10))
+		run, _ = w.send(t, w.Build.ID, start.Add(2*time.Hour), document([]sent{inFRR, inSWSS}, 10))
 		if r := receiptOf(t, run); r.Seen != 2 || r.Returned != 1 || r.Opened != 0 {
 			t.Errorf("receipt %+v; want both seen, one of them returned", r)
 		}
 	})
 }
 
-func TestARunShortOfItsUnitsMarksNothingNotReproduced(t *testing.T) {
+func TestARunShortOfItsUnitsMarksNothingNoLongerDetected(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR, inSWSS}, 10))
-		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inSWSS}, 4))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR, inSWSS}, 10))
+		run, _ := w.send(t, w.Build.ID, start.Add(time.Hour), document([]sent{inSWSS}, 4))
 		if run.Comparable == nil || *run.Comparable || run.Reason != series.UnitsShort {
 			t.Errorf("comparable %v for %q; want not comparable, units short", run.Comparable, run.Reason)
 		}
-		if r := receiptOf(t, run); r.NotReproduced != 0 || r.Seen != 1 {
+		if r := receiptOf(t, run); r.NoLongerDetected != 0 || r.Seen != 1 {
 			t.Errorf("receipt %+v; want one seen and none marked", r)
 		}
 	})
@@ -370,14 +370,14 @@ func TestARunShortOfItsUnitsMarksNothingNotReproduced(t *testing.T) {
 
 func TestARunBuiltBeforeTheLastAppliedIsSuperseded(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
-		_, status := w.send(t, w.Target.ID, start.Add(-time.Hour), document([]sent{inSWSS}, 10))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
+		_, status := w.send(t, w.Build.ID, start.Add(-time.Hour), document([]sent{inSWSS}, 10))
 		if status != series.Superseded {
 			t.Fatalf("status %s; want superseded", status)
 		}
-		if got := w.leads(t, w.Target.ID); len(got) != 1 {
+		if got := w.codeFindings(t, w.Build.ID); len(got) != 1 {
 			t.Errorf("%d findings; a superseded run opens nothing", len(got))
 		}
 	})
@@ -387,15 +387,15 @@ func TestARunThatMarksMostOfABuildIsAppliedAndToldOnce(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		var told []Drop
 		w.applier.TellingDrops(func(_ context.Context, d Drop) { told = append(told, d) })
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		w.drops(t, "50", "1")
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR, inSWSS}, 10))
-		run, status := w.send(t, w.Target.ID, start.Add(time.Hour), document(nil, 10))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR, inSWSS}, 10))
+		run, status := w.send(t, w.Build.ID, start.Add(time.Hour), document(nil, 10))
 		if status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
-		if r := receiptOf(t, run); !r.SharpDrop || r.NotReproduced != 2 {
+		if r := receiptOf(t, run); !r.SharpDrop || r.NoLongerDetected != 2 {
 			t.Errorf("receipt %+v; want a sharp drop that marked both", r)
 		}
 		if len(told) != 1 || told[0].RunID != run.ID || told[0].Missed != 2 || told[0].Live != 2 {
@@ -416,17 +416,17 @@ func TestARunPastOnlyOneOfTheTwoDropBoundsIsApplied(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			eachWorld(t, func(t *testing.T, w *world) {
-				w.inventory(t, w.Target.ID)
+				w.inventory(t, w.Build.ID)
 				w.drops(t, c.share, c.floor)
 				start := time.Now().UTC().Add(-3 * time.Hour)
 				all := spread(4)
-				w.send(t, w.Target.ID, start, document(all, 10))
-				run, status := w.send(t, w.Target.ID, start.Add(time.Hour), document(all[c.missed:], 10))
+				w.send(t, w.Build.ID, start, document(all, 10))
+				run, status := w.send(t, w.Build.ID, start.Add(time.Hour), document(all[c.missed:], 10))
 				if status != series.Applied {
 					t.Fatalf("status %s; want applied", status)
 				}
-				if r := receiptOf(t, run); r.NotReproduced != c.missed || r.SharpDrop {
-					t.Errorf("receipt %+v; want %d not reproduced and no sharp drop", r, c.missed)
+				if r := receiptOf(t, run); r.NoLongerDetected != c.missed || r.SharpDrop {
+					t.Errorf("receipt %+v; want %d no longer detected and no sharp drop", r, c.missed)
 				}
 			})
 		})
@@ -435,7 +435,7 @@ func TestARunPastOnlyOneOfTheTwoDropBoundsIsApplied(t *testing.T) {
 
 func TestARunWaitingADayForItsInventoryFails(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		run, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		run, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
 		if status != series.Waiting {
 			t.Fatalf("status %s; want waiting", status)
 		}
@@ -456,7 +456,7 @@ func TestARunWaitingADayForItsInventoryFails(t *testing.T) {
 
 func TestARunHeldInAShapeThisReleaseDoesNotReadFailsOnceItsBuildIsInventoried(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		run := w.receive(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		run := w.receive(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
 		store := series.NewStore(w.DB.DB)
 		if err := store.Discard(t.Context(), run.ID); err != nil {
 			t.Fatal(err)
@@ -468,7 +468,7 @@ func TestARunHeldInAShapeThisReleaseDoesNotReadFailsOnceItsBuildIsInventoried(t 
 		if status, err := w.applier.Apply(t.Context(), run.ID); err != nil || status != series.Waiting {
 			t.Fatalf("status %s, %v; want waiting, unread", status, err)
 		}
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		status, err := w.applier.Apply(t.Context(), run.ID)
 		if err != nil || status != series.Failed {
 			t.Fatalf("status %s, %v; want failed", status, err)
@@ -484,14 +484,14 @@ func TestAResultIsPlacedOnTheComponentWhoseReferenceNamesItsRepository(t *testin
 	eachWorld(t, func(t *testing.T, w *world) {
 		withCredential := graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr", Version: "10.2", //nolint:gosec // G101: a placeholder credential to be removed
 			Repository: "https://ci:SECRET@github.com/FRRouting/frr.git?ref=main"}
-		w.inventoryWith(t, w.Target.ID, withCredential)
-		if _, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour),
+		w.inventoryWith(t, w.Build.ID, withCredential)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
 			document([]sent{inFRR}, 10)); status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
-		leads := w.leads(t, w.Target.ID)
-		if len(leads) != 1 || leads[0].ComponentID != w.frr {
-			t.Fatalf("findings %+v; want one on FRR (%d)", leads, w.frr)
+		codeFindings := w.codeFindings(t, w.Build.ID)
+		if len(codeFindings) != 1 || codeFindings[0].ComponentID != w.frr {
+			t.Fatalf("findings %+v; want one on FRR (%d)", codeFindings, w.frr)
 		}
 		var held []string
 		if err := w.DB.DB.NewSelect().TableExpr(`"graph_node" AS "n"`).ColumnExpr(`"n"."repository"`).
@@ -572,9 +572,9 @@ func TestWhatARunSaysOnceIsHeldOnce(t *testing.T) {
 
 func TestAFailureSignalOutsideTheCheckoutMakesTheRunNotComparable(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		failed := sent{"clang-diagnostic-error", "", "file:///tmp/build/generated.h", "unknown type name", 3}
-		run, _ := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR, failed}, 10))
+		run, _ := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR, failed}, 10))
 		if run.Comparable == nil || *run.Comparable || run.Reason != series.FailureSignal {
 			t.Errorf("comparable %v for %q; want not comparable, a failure signal", run.Comparable, run.Reason)
 		}
@@ -586,7 +586,7 @@ func TestAFailureSignalOutsideTheCheckoutMakesTheRunNotComparable(t *testing.T) 
 
 func TestTakingASeriesWritesItsRowEveryTime(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		run := w.receive(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		run := w.receive(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
 		taken := func() string {
 			t.Helper()
 			if err := series.NewStore(w.DB.DB).Take(t.Context(), run.ID); err != nil {
@@ -607,9 +607,9 @@ func TestTakingASeriesWritesItsRowEveryTime(t *testing.T) {
 
 func TestTwoRunsOfOneSeriesAreAppliedOneAfterTheOther(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		ctx := t.Context()
-		run := w.receive(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		run := w.receive(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
 		tx, err := w.DB.BeginTx(ctx, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -639,16 +639,16 @@ func TestTwoRunsOfOneSeriesAreAppliedOneAfterTheOther(t *testing.T) {
 
 func TestAResultOnAnotherBuildCarriesTheOccurrenceItWasJudgedAt(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
-		tag, err := w.Catalog.TargetFor(t.Context(), w.Tag.ID, w.Customer.ID)
+		w.inventory(t, w.Build.ID)
+		tag, err := w.Catalog.BuildFor(t.Context(), w.Tag.ID, w.Customer.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		w.inventory(t, tag.ID)
 		built := time.Now().UTC().Add(-time.Hour)
-		w.send(t, w.Target.ID, built, document([]sent{inFRR}, 10))
+		w.send(t, w.Build.ID, built, document([]sent{inFRR}, 10))
 		w.send(t, tag.ID, built, document([]sent{inFRR}, 10))
-		a, b := w.leads(t, w.Target.ID), w.leads(t, tag.ID)
+		a, b := w.codeFindings(t, w.Build.ID), w.codeFindings(t, tag.ID)
 		if len(a) != 1 || len(b) != 1 {
 			t.Fatalf("%d and %d findings; want one on each build", len(a), len(b))
 		}
@@ -658,32 +658,32 @@ func TestAResultOnAnotherBuildCarriesTheOccurrenceItWasJudgedAt(t *testing.T) {
 	})
 }
 
-func TestASeriesFirstRunPutsEveryLeadInTheQueue(t *testing.T) {
+func TestASeriesFirstRunPutsEveryCodeFindingInTheQueue(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
-		if _, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour),
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
 			document([]sent{inFRR, inSWSS}, 10)); status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
 		reader := w.holding(t, "analyst", access.InternalRead)
-		queue, err := LeadsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
+		queue, err := CodeFindingsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if queue.Total != 2 || queue.ByState[Open] != 2 {
-			t.Errorf("queue of %d, %v by state; want both leads of the first run open in it",
+			t.Errorf("queue of %d, %v by state; want both code findings of the first run open in it",
 				queue.Total, queue.ByState)
 		}
 	})
 }
 
-// matchedOn is how each of the build's leads was last paired, by finding.
-func (w *world) matchedOn(t *testing.T, targetID int64) map[int64]string {
+// matchedOn is how each of the build's code findings was last paired, by finding.
+func (w *world) matchedOn(t *testing.T, buildID int64) map[int64]string {
 	t.Helper()
 	var rows []result
 	if err := w.DB.DB.NewSelect().Model(&rows).Column("finding_id", "matched_on").
 		Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
-		Where(`"f"."target_id" = ?`, targetID).Scan(t.Context()); err != nil {
+		Where(`"f"."build_id" = ?`, buildID).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	out := map[int64]string{}
@@ -695,22 +695,22 @@ func (w *world) matchedOn(t *testing.T, targetID int64) map[int64]string {
 
 func TestAResultMovedWithNoFingerprintIsSeenAgainOnItsNearestLine(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
-		first := w.leads(t, w.Target.ID)
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
+		first := w.codeFindings(t, w.Build.ID)
 
 		moved := inFRR
 		moved.line += 6
-		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{moved}, 10))
-		if r := receiptOf(t, run); r.Seen != 1 || r.Opened != 0 || r.NotReproduced != 0 || r.Probable != 1 {
-			t.Errorf("receipt %+v; want the lead seen again, probably", r)
+		run, _ := w.send(t, w.Build.ID, start.Add(time.Hour), document([]sent{moved}, 10))
+		if r := receiptOf(t, run); r.Seen != 1 || r.Opened != 0 || r.NoLongerDetected != 0 || r.Probable != 1 {
+			t.Errorf("receipt %+v; want the code finding seen again, probably", r)
 		}
-		leads := w.leads(t, w.Target.ID)
-		if len(leads) != 1 || leads[0].ID != first[0].ID {
-			t.Fatalf("leads %+v; want the one lead the first run opened", leads)
+		codeFindings := w.codeFindings(t, w.Build.ID)
+		if len(codeFindings) != 1 || codeFindings[0].ID != first[0].ID {
+			t.Fatalf("code findings %+v; want the one code finding the first run opened", codeFindings)
 		}
-		if on := w.matchedOn(t, w.Target.ID)[leads[0].ID]; on != onLine {
+		if on := w.matchedOn(t, w.Build.ID)[codeFindings[0].ID]; on != onLine {
 			t.Errorf("paired on %q; want the nearest line", on)
 		}
 	})
@@ -718,17 +718,17 @@ func TestAResultMovedWithNoFingerprintIsSeenAgainOnItsNearestLine(t *testing.T) 
 
 func TestAResultMovedWithinItsFunctionIsSeenAgainOnTheFunction(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		before := inside{inFRR, "bgp_attr_parse", "a1"}
-		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{before}, 10, ""))
+		w.send(t, w.Build.ID, start, documentOf([]interface{ json() string }{before}, 10, ""))
 		after := before
 		after.line, after.print = 400, "b2"
-		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), documentOf([]interface{ json() string }{after}, 10, ""))
+		run, _ := w.send(t, w.Build.ID, start.Add(time.Hour), documentOf([]interface{ json() string }{after}, 10, ""))
 		if r := receiptOf(t, run); r.Seen != 1 || r.Opened != 0 || r.Probable != 1 {
-			t.Errorf("receipt %+v; want the lead seen again, probably", r)
+			t.Errorf("receipt %+v; want the code finding seen again, probably", r)
 		}
-		for _, on := range w.matchedOn(t, w.Target.ID) {
+		for _, on := range w.matchedOn(t, w.Build.ID) {
 			if on != onFunction {
 				t.Errorf("paired on %q; want the function", on)
 			}
@@ -738,27 +738,27 @@ func TestAResultMovedWithinItsFunctionIsSeenAgainOnTheFunction(t *testing.T) {
 
 func TestTheFirstRunOnABranchTakesTheOccurrencesOfTheLineItWasCutFrom(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		tag := w.TargetFor(w.Tag, w.Customer)
-		w.inventory(t, w.Target.ID)
+		tag := w.BuildFor(w.Tag, w.Customer)
+		w.inventory(t, w.Build.ID)
 		w.inventory(t, tag.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
 
 		moved := inFRR
 		moved.line += 3
 		run, _ := w.send(t, tag.ID, start.Add(time.Hour), document([]sent{moved}, 10))
 		if r := receiptOf(t, run); r.Opened != 1 || r.Inherited != 1 || r.Probable != 1 {
-			t.Errorf("receipt %+v; want one lead opened, carried probably from the branch", r)
+			t.Errorf("receipt %+v; want one code finding opened, carried probably from the branch", r)
 		}
-		branch, cut := w.leads(t, w.Target.ID), w.leads(t, tag.ID)
+		branch, cut := w.codeFindings(t, w.Build.ID), w.codeFindings(t, tag.ID)
 		if len(branch) != 1 || len(cut) != 1 || branch[0].OccurrenceIdentity != cut[0].OccurrenceIdentity {
-			t.Errorf("branch %+v, tag %+v; want one lead each at one occurrence", branch, cut)
+			t.Errorf("branch %+v, tag %+v; want one code finding each at one occurrence", branch, cut)
 		}
 	})
 }
 
-// dismissed records an approved dismissal at a lead's occurrence.
-func (w *world) dismissed(t *testing.T, lead finding.Finding, at time.Time) *triage.DecisionOccurrence {
+// dismissed records an approved dismissal at a code finding's occurrence.
+func (w *world) dismissed(t *testing.T, codeFinding finding.Finding, at time.Time) *triage.DecisionOccurrence {
 	t.Helper()
 	ctx := t.Context()
 	by, err := access.NewStore(w.DB.DB).Ensure(ctx, "analyst@example.com", "analyst", nil, nil)
@@ -773,9 +773,9 @@ func (w *world) dismissed(t *testing.T, lead finding.Finding, at time.Time) *tri
 		t.Fatal(err)
 	}
 	// Any key holding is live; the occurrence identity fits the column.
-	live := lead.OccurrenceIdentity
-	decided := &triage.DecisionOccurrence{DecisionID: decision.ID, ProductID: w.Product.ID, VulnerabilityID: lead.VulnerabilityID,
-		OccurrenceIdentity: lead.OccurrenceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
+	live := codeFinding.OccurrenceIdentity
+	decided := &triage.DecisionOccurrence{DecisionID: decision.ID, ProductID: w.Product.ID, VulnerabilityID: codeFinding.VulnerabilityID,
+		OccurrenceIdentity: codeFinding.OccurrenceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
 		NeedsApproval: true, ProposedBy: by.ID, ProposedAt: at}
 	if _, err := w.DB.DB.NewInsert().Model(decided).Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -795,21 +795,21 @@ func (w *world) stateOf(t *testing.T, id int64) triage.State {
 
 func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		// One result alone under its key without the fingerprint, and two
 		// that share one: the same rule, file, message and function.
 		lone := inside{inFRR, "bgp_attr_parse", "a1"}
 		tied, twin := inside{inSWSS, "Orch::doTask", "b1"}, inside{inSWSS, "Orch::doTask", "b2"}
 		twin.line = 40
-		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{lone, tied, twin}, 10, "0123456789abcdef"))
-		leads := w.leads(t, w.Target.ID)
-		if len(leads) != 3 {
-			t.Fatalf("leads %+v; want three", leads)
+		w.send(t, w.Build.ID, start, documentOf([]interface{ json() string }{lone, tied, twin}, 10, "0123456789abcdef"))
+		codeFindings := w.codeFindings(t, w.Build.ID)
+		if len(codeFindings) != 3 {
+			t.Fatalf("code findings %+v; want three", codeFindings)
 		}
 		decided := map[int64]*triage.DecisionOccurrence{}
-		for _, lead := range leads {
-			decided[lead.ID] = w.dismissed(t, lead, start.Add(time.Minute))
+		for _, codeFinding := range codeFindings {
+			decided[codeFinding.ID] = w.dismissed(t, codeFinding, start.Add(time.Minute))
 		}
 
 		var heard []triage.ForPerson
@@ -817,57 +817,57 @@ func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 
 		// The salt rotates, so every fingerprint changes and nothing else.
 		lone.print, tied.print, twin.print = "c1", "c2", "c3"
-		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour),
+		run, _ := w.send(t, w.Build.ID, start.Add(time.Hour),
 			documentOf([]interface{ json() string }{lone, tied, twin}, 10, "fedcba9876543210"))
 		if r := receiptOf(t, run); !r.FingerprintsChanged || r.Opened != 0 || r.Seen != 3 || r.Probable != 2 {
 			t.Errorf("receipt %+v; want a fingerprint change seeing all three, the two ties probably", r)
 		}
-		on := w.matchedOn(t, w.Target.ID)
-		for _, lead := range leads {
+		on := w.matchedOn(t, w.Build.ID)
+		for _, codeFinding := range codeFindings {
 			want := triage.LapsedState
-			if lead.ID == leads[0].ID {
+			if codeFinding.ID == codeFindings[0].ID {
 				want = triage.Approved
 			}
-			if got := w.stateOf(t, decided[lead.ID].ID); got != want {
-				t.Errorf("lead %d paired on %q: dismissal %q; want %q", lead.ID, on[lead.ID], got, want)
+			if got := w.stateOf(t, decided[codeFinding.ID].ID); got != want {
+				t.Errorf("code finding %d paired on %q: dismissal %q; want %q", codeFinding.ID, on[codeFinding.ID], got, want)
 			}
 		}
 		// Its proposer is told once, of both, as internal work.
 		if len(heard) != 1 || heard[0].Rows != 2 || !heard[0].Probable || !heard[0].Internal {
-			t.Errorf("told %+v; want the proposer told once of two lapsed decisions on leads", heard)
+			t.Errorf("told %+v; want the proposer told once of two lapsed decisions on code findings", heard)
 		}
 	})
 }
 
-func TestADismissalLapsesOnABranchItsLeadIsCarriedToProbably(t *testing.T) {
+func TestADismissalLapsesOnABranchItsCodeFindingIsCarriedToProbably(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		tag := w.TargetFor(w.Tag, w.Customer)
-		w.inventory(t, w.Target.ID)
+		tag := w.BuildFor(w.Tag, w.Customer)
+		w.inventory(t, w.Build.ID)
 		w.inventory(t, tag.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
-		lead := w.leads(t, w.Target.ID)[0]
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
+		codeFinding := w.codeFindings(t, w.Build.ID)[0]
 
-		decided := w.dismissed(t, lead, start.Add(time.Minute))
+		decided := w.dismissed(t, codeFinding, start.Add(time.Minute))
 
-		// The tag's first run carries the lead from the branch on its
+		// The tag's first run carries the code finding from the branch on its
 		// nearest line, which is probable.
 		moved := inFRR
 		moved.line += 3
 		w.send(t, tag.ID, start.Add(time.Hour), document([]sent{moved}, 10))
 		if state := w.stateOf(t, decided.ID); state != triage.LapsedState {
-			t.Errorf("the dismissal of a lead carried probably is %q; want it lapsed", state)
+			t.Errorf("the dismissal of a code finding carried probably is %q; want it lapsed", state)
 		}
 	})
 }
 
 func TestALaterRunOnABranchTakesNothingFromTheLineItWasCutFrom(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		tag := w.TargetFor(w.Tag, w.Customer)
-		w.inventory(t, w.Target.ID)
+		tag := w.BuildFor(w.Tag, w.Customer)
+		w.inventory(t, w.Build.ID)
 		w.inventory(t, tag.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
 		w.send(t, tag.ID, start.Add(time.Hour), document([]sent{inSWSS}, 10))
 
 		moved := inFRR
@@ -879,56 +879,56 @@ func TestALaterRunOnABranchTakesNothingFromTheLineItWasCutFrom(t *testing.T) {
 	})
 }
 
-func TestAResultAnotherBuildHoldsTakesThatLeadsPlace(t *testing.T) {
+func TestAResultAnotherBuildHoldsTakesThatCodeFindingsPlace(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		other := w.TargetFor(w.Branch, w.Internal)
-		w.inventory(t, w.Target.ID)
+		other := w.BuildFor(w.Branch, w.Internal)
+		w.inventory(t, w.Build.ID)
 		w.inventory(t, other.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
 		moved := inFRR
 		moved.line += 3
-		w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{moved}, 10))
+		w.send(t, w.Build.ID, start.Add(time.Hour), document([]sent{moved}, 10))
 
 		// The other variant's first run reports the result where it has moved
-		// to. The lead's occurrence was minted from where it was first seen, so only
-		// the lead's newest key finds it.
+		// to. The code finding's occurrence was minted from where it was first seen, so only
+		// the code finding's newest key finds it.
 		run, _ := w.send(t, other.ID, start.Add(2*time.Hour), document([]sent{moved}, 10))
 		if r := receiptOf(t, run); r.Opened != 1 || r.Probable != 0 || r.Inherited != 0 {
-			t.Errorf("receipt %+v; want one lead opened, carried strongly", r)
+			t.Errorf("receipt %+v; want one code finding opened, carried strongly", r)
 		}
-		here, there := w.leads(t, w.Target.ID), w.leads(t, other.ID)
+		here, there := w.codeFindings(t, w.Build.ID), w.codeFindings(t, other.ID)
 		if len(here) != 1 || len(there) != 1 || here[0].OccurrenceIdentity != there[0].OccurrenceIdentity {
-			t.Errorf("leads %+v and %+v; want one occurrence", here, there)
+			t.Errorf("code findings %+v and %+v; want one occurrence", here, there)
 		}
 	})
 }
 
-func TestAClosedLeadFoundAgainOpensAtItsOccurrence(t *testing.T) {
+func TestAClosedCodeFindingFoundAgainOpensAtItsOccurrence(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
-		closed := w.leads(t, w.Target.ID)[0]
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
+		closed := w.codeFindings(t, w.Build.ID)[0]
 		if _, err := w.DB.DB.NewUpdate().TableExpr(`"finding"`).
 			Set(`"closed_at" = ?`, start.Add(time.Minute)).
 			Where(`"id" = ?`, closed.ID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
+		run, _ := w.send(t, w.Build.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
 		if r := receiptOf(t, run); r.Opened != 1 || r.Reopened != 1 {
-			t.Errorf("receipt %+v; want one lead opened at a closed lead's occurrence", r)
+			t.Errorf("receipt %+v; want one code finding opened at a closed code finding's occurrence", r)
 		}
-		leads := w.leads(t, w.Target.ID)
-		if len(leads) != 2 || leads[1].OccurrenceIdentity != closed.OccurrenceIdentity {
-			t.Errorf("leads %+v; want a second at the first's occurrence", leads)
+		codeFindings := w.codeFindings(t, w.Build.ID)
+		if len(codeFindings) != 2 || codeFindings[1].OccurrenceIdentity != closed.OccurrenceIdentity {
+			t.Errorf("code findings %+v; want a second at the first's occurrence", codeFindings)
 		}
 	})
 }
 
 func TestARunFingerprintedDifferentlyFromTheBuildsLastIsAFingerprintChange(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-5 * time.Hour)
 		plain := inside{inFRR, "", ""}
 		printed := inside{inFRR, "", "a1"}
@@ -943,7 +943,7 @@ func TestARunFingerprintedDifferentlyFromTheBuildsLastIsAFingerprintChange(t *te
 			{printed, "0123456789abcdef", true},
 			{printed, "fedcba9876543210", true},
 		} {
-			run, status := w.send(t, w.Target.ID, start.Add(time.Duration(i)*time.Hour),
+			run, status := w.send(t, w.Build.ID, start.Add(time.Duration(i)*time.Hour),
 				documentOf([]interface{ json() string }{c.result}, 10, c.salt))
 			if status != series.Applied || run.FingerprintsChanged != c.want || receiptOf(t, run).FingerprintsChanged != c.want {
 				t.Errorf("run %d: %s, fingerprints changed %v; want %v", i, status, run.FingerprintsChanged, c.want)
@@ -954,7 +954,7 @@ func TestARunFingerprintedDifferentlyFromTheBuildsLastIsAFingerprintChange(t *te
 
 func TestAResultWithNoFingerprintBesideOthersIsNoFingerprintChange(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		elsewhere := inFRR
 		elsewhere.line, elsewhere.message = 90, "z used after it was moved"
@@ -966,7 +966,7 @@ func TestAResultWithNoFingerprintBesideOthersIsNoFingerprintChange(t *testing.T)
 			{printed, other, plain},
 			{printed, other},
 		} {
-			run, _ := w.send(t, w.Target.ID, start.Add(time.Duration(i)*time.Hour), documentOf(results, 10, ""))
+			run, _ := w.send(t, w.Build.ID, start.Add(time.Duration(i)*time.Hour), documentOf(results, 10, ""))
 			if i > 0 && run.FingerprintsChanged {
 				t.Errorf("run %d: a fingerprint change where one result carried no fingerprint (%q)", i, run.Fingerprints)
 			}
@@ -976,55 +976,55 @@ func TestAResultWithNoFingerprintBesideOthersIsNoFingerprintChange(t *testing.T)
 
 func TestARunReportingNothingLeavesTheFingerprintsAsTheyWere(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-5 * time.Hour)
 		const salt = "0123456789abcdef"
 		printed := inside{inFRR, "", "a1"}
-		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{printed}, 10, salt))
-		// Short of its units, so it marks nothing not reproduced and is never
+		w.send(t, w.Build.ID, start, documentOf([]interface{ json() string }{printed}, 10, salt))
+		// Short of its units, so it marks nothing no longer detected and is never
 		// a sharp drop. Its salt mark alone says nothing of how results are
 		// fingerprinted.
-		empty, _ := w.send(t, w.Target.ID, start.Add(time.Hour), documentOf(nil, 4, salt))
+		empty, _ := w.send(t, w.Build.ID, start.Add(time.Hour), documentOf(nil, 4, salt))
 		if empty.Fingerprints != "" {
 			t.Errorf("a run reporting nothing carries %q", empty.Fingerprints)
 		}
-		run, _ := w.send(t, w.Target.ID, start.Add(2*time.Hour), documentOf([]interface{ json() string }{printed}, 10, salt))
+		run, _ := w.send(t, w.Build.ID, start.Add(2*time.Hour), documentOf([]interface{ json() string }{printed}, 10, salt))
 		if run.FingerprintsChanged {
 			t.Errorf("a fingerprint change after a run that reported nothing")
 		}
 	})
 }
 
-func TestAClosedLeadFoundAgainIsReopenedWhereAnOlderBuildHoldsItToo(t *testing.T) {
+func TestAClosedCodeFindingFoundAgainIsReopenedWhereAnOlderBuildHoldsItToo(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		other := w.TargetFor(w.Branch, w.Internal)
-		w.inventory(t, w.Target.ID)
+		other := w.BuildFor(w.Branch, w.Internal)
+		w.inventory(t, w.Build.ID)
 		w.inventory(t, other.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		w.send(t, other.ID, start, document([]sent{inFRR}, 10))
-		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
-		closed := w.leads(t, w.Target.ID)[0]
+		w.send(t, w.Build.ID, start, document([]sent{inFRR}, 10))
+		closed := w.codeFindings(t, w.Build.ID)[0]
 		if _, err := w.DB.DB.NewUpdate().TableExpr(`"finding"`).
 			Set(`"closed_at" = ?`, start.Add(time.Minute)).
 			Where(`"id" = ?`, closed.ID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
+		run, _ := w.send(t, w.Build.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
 		if r := receiptOf(t, run); r.Reopened != 1 {
-			t.Errorf("receipt %+v; want the build's own closed lead reopened", r)
+			t.Errorf("receipt %+v; want the build's own closed code finding reopened", r)
 		}
 	})
 }
 
 func TestSourceIsStoredOnlyUnderAPathTheProductKeepsItFor(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		yes := true
 		if err := sourcelink.NewStore(w.DB.DB).Replace(t.Context(), w.Product.ID,
 			sourcelink.Config{Paths: []sourcelink.Path{{Prefix: "src/sonic-frr", Snippets: &yes}}}); err != nil {
 			t.Fatal(err)
 		}
-		run, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), documentOf(
+		run, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), documentOf(
 			[]interface{ json() string }{quoted{inFRR, "free(x); use(x);"}, quoted{inSWSS, "private();"}}, 10, ""))
 		if status != series.Applied {
 			t.Fatalf("status %s (%s); want applied", status, run.Failure)
@@ -1051,16 +1051,16 @@ func TestSourceIsStoredOnlyUnderAPathTheProductKeepsItFor(t *testing.T) {
 
 func TestARulesDocumentationOnAnAnalyzersHostIsRecordedWithItsIssue(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		const help = "https://clang.llvm.org/extra/clang-tidy/checks/bugprone/use-after-move.html"
 		doc := strings.Replace(document([]sent{inFRR}, 10),
 			`{"id":"bugprone-use-after-move",`, `{"id":"bugprone-use-after-move","helpUri":"`+help+`",`, 1)
-		if _, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), doc); status != series.Applied {
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), doc); status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
 		var refs []finding.Reference
 		if err := w.DB.DB.NewSelect().Model(&refs).
-			Where(`"vr"."vulnerability_id" = ?`, w.leads(t, w.Target.ID)[0].VulnerabilityID).Scan(t.Context()); err != nil {
+			Where(`"vr"."vulnerability_id" = ?`, w.codeFindings(t, w.Build.ID)[0].VulnerabilityID).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if len(refs) != 1 || refs[0].URL != help || refs[0].Kind != finding.Documentation {
@@ -1088,17 +1088,17 @@ func (w *world) holding(t *testing.T, who string, role access.Role) access.Subje
 	return subject
 }
 
-func TestALeadsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T) {
+func TestACodeFindingsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
-		w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
-		lead := w.leads(t, w.Target.ID)[0]
-		if _, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "public", access.PublicRead), &lead, w.Product.ID); !errors.Is(err, finding.ErrNoOpenFinding) {
-			t.Errorf("a public reader was answered %v; want no lead", err)
+		w.inventory(t, w.Build.ID)
+		w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		codeFinding := w.codeFindings(t, w.Build.ID)[0]
+		if _, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "public", access.PublicRead), &codeFinding, w.Product.ID); !errors.Is(err, finding.ErrNoOpenFinding) {
+			t.Errorf("a public reader was answered %v; want no code finding", err)
 		}
-		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &lead, w.Product.ID)
+		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &codeFinding, w.Product.ID)
 		if err != nil || got.At.Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" {
-			t.Errorf("an internal reader was answered %+v, %v; want the lead's occurrence", got.At, err)
+			t.Errorf("an internal reader was answered %+v, %v; want the code finding's occurrence", got.At, err)
 		}
 	})
 }

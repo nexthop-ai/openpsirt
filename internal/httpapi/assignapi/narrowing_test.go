@@ -10,7 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-func TestTheRoutingPreviewCountsOnlyWhatTheAskerMayRead(t *testing.T) {
+func TestTheAssignmentRulePreviewCountsOnlyWhatTheAskerMayRead(t *testing.T) {
 	// counts, aggregates and searches are narrowed like rows. A preview is
 	// all three at once — three numbers and a list of component names —
 	// and the difference between what it says and what the same person's

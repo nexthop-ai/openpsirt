@@ -28,7 +28,7 @@ func TestNamingAPageOfFindingsDoesNotCostAQueryPerRow(t *testing.T) {
 	// page instead of staying flat.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
 			found("CVE-2026-3", swss), found("CVE-2026-4", teamd),
 		}); err != nil {
@@ -37,7 +37,7 @@ func TestNamingAPageOfFindingsDoesNotCostAQueryPerRow(t *testing.T) {
 
 		// Four more issues over the same components, so the same fixture
 		// answers a page of four and a page of eight.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
 			found("CVE-2026-3", swss), found("CVE-2026-4", teamd),
 			found("CVE-2026-5", libnl), found("CVE-2026-6", swss),
@@ -97,7 +97,7 @@ func TestWhatIsOpenIsReportedPerBuild(t *testing.T) {
 		second := f.anotherBuild(t, "202411")
 
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl),
 			found("CVE-2026-2", libnl),
 		}); err != nil {
@@ -120,7 +120,7 @@ func TestWhatIsOpenIsReportedPerBuild(t *testing.T) {
 		}
 		by := map[string]finding.Release{}
 		for _, r := range releases {
-			by[r.Stream] = r
+			by[r.BranchOrTag] = r
 		}
 		// Two issues at one component is two rows on the findings list, not the
 		// six occurrences they sit at. Counting occurrences is the mistake the
@@ -153,11 +153,11 @@ func TestTheLastRunSaysWhatItWasMeasuredWith(t *testing.T) {
 		// it would say the build was measured against a database version that
 		// nothing has been measured against yet.
 		running := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, running,
+		if _, err := f.store.Apply(t.Context(), f.build, running,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
-		unfinished, err := f.store.LatestRun(t.Context(), who, f.target)
+		unfinished, err := f.store.LatestRun(t.Context(), who, f.build)
 		if err != nil {
 			t.Fatalf("latest run: %v", err)
 		}
@@ -174,7 +174,7 @@ func TestTheLastRunSaysWhatItWasMeasuredWith(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		last, err := f.store.LatestRun(t.Context(), who, f.target)
+		last, err := f.store.LatestRun(t.Context(), who, f.build)
 		if err != nil {
 			t.Fatalf("latest run: %v", err)
 		}
@@ -195,7 +195,7 @@ func TestTheLastRunSaysWhatItWasMeasuredWith(t *testing.T) {
 		// And somebody who may not see this product is told nothing, on the
 		// query rather than by the caller remembering to ask.
 		stranger := access.NewPerson(2, "stranger", false, nil, 0)
-		if hidden, err := f.store.LatestRun(t.Context(), stranger, f.target); err != nil {
+		if hidden, err := f.store.LatestRun(t.Context(), stranger, f.build); err != nil {
 			t.Fatalf("latest run for a stranger: %v", err)
 		} else if hidden != nil {
 			t.Errorf("somebody with no rights was told what it was measured with: %+v", hidden)
@@ -237,7 +237,7 @@ func TestOnlyTheVersionsCarryingTheIssueAreOffered(t *testing.T) {
 				{Parent: root, Child: sibling}, {Parent: root, Child: elsewhere},
 			},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-9", carrying),
 			// A different issue at the clean version: the vulnerability filter
 			// has to drop this, not the absence of a row.
@@ -252,7 +252,7 @@ func TestOnlyTheVersionsCarryingTheIssueAreOffered(t *testing.T) {
 
 		who := f.holding(t, access.PublicRead)
 		issue := f.issueID(t, "CVE-2026-9")
-		got, err := f.store.VersionsWithIssue(t.Context(), who, f.target, issue,
+		got, err := f.store.VersionsWithIssue(t.Context(), who, f.build, issue,
 			"example.com/lib")
 		if err != nil {
 			t.Fatalf("versions: %v", err)
@@ -270,10 +270,10 @@ func TestOnlyTheVersionsCarryingTheIssueAreOffered(t *testing.T) {
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"closed_at" = ?`, time.Now().UTC()).
 			Set(`"closed_run_id" = ?`, f.run(t)).
-			Where(`"target_id" = ?`, f.target).Exec(t.Context()); err != nil {
+			Where(`"build_id" = ?`, f.build).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		closed, err := f.store.VersionsWithIssue(t.Context(), who, f.target, issue,
+		closed, err := f.store.VersionsWithIssue(t.Context(), who, f.build, issue,
 			"example.com/lib")
 		if err != nil {
 			t.Fatalf("versions after closing: %v", err)
@@ -374,7 +374,7 @@ func (f *fixture) liveAssessments(t *testing.T, vulnerabilityID int64) int {
 func vulnerability(i int) string { return fmt.Sprintf("CVE-2026-%04d", i) }
 
 // inAnotherProduct declares a build of a product of its own and returns its
-// target, for the checks about reaching across products.
+// build, for the checks about reaching across products.
 func (f *fixture) inAnotherProduct(t *testing.T, name string) int64 {
 	t.Helper()
 	ctx := t.Context()
@@ -383,7 +383,7 @@ func (f *fixture) inAnotherProduct(t *testing.T, name string) int64 {
 	if err != nil {
 		t.Fatalf("declare %s: %v", name, err)
 	}
-	stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+	branchOrTag, err := cat.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 	if err != nil {
 		t.Fatalf("declare a line of %s: %v", name, err)
 	}
@@ -391,44 +391,44 @@ func (f *fixture) inAnotherProduct(t *testing.T, name string) int64 {
 	if err != nil {
 		t.Fatalf("declare a variant of %s: %v", name, err)
 	}
-	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
+	build, err := cat.BuildFor(ctx, branchOrTag.ID, variant.ID)
 	if err != nil {
-		t.Fatalf("target for %s: %v", name, err)
+		t.Fatalf("build for %s: %v", name, err)
 	}
-	return target.ID
+	return build.ID
 }
 
 // productOf is which product a build belongs to.
-func (f *fixture) productOf(t *testing.T, target int64) int64 {
+func (f *fixture) productOf(t *testing.T, build int64) int64 {
 	t.Helper()
 	var productID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"target\" AS \"tg\"").
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr("\"build\" AS \"tg\"").
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id"`).
-		Where(`"tg"."id" = ?`, target).
+		Where(`"tg"."id" = ?`, build).
 		Scan(t.Context(), &productID); err != nil {
 		t.Fatal(err)
 	}
 	return productID
 }
 
-// streamOf is which release a build belongs to.
-func (f *fixture) streamOf(t *testing.T, target int64) int64 {
+// branchOrTagOf is which release a build belongs to.
+func (f *fixture) branchOrTagOf(t *testing.T, build int64) int64 {
 	t.Helper()
-	var streamID int64
+	var branchOrTagID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"target\" AS \"tg\"").
-		ColumnExpr(`"tg"."stream_id"`).
-		Where(`"tg"."id" = ?`, target).
-		Scan(t.Context(), &streamID); err != nil {
+		TableExpr("\"build\" AS \"tg\"").
+		ColumnExpr(`"tg"."branch_or_tag_id"`).
+		Where(`"tg"."id" = ?`, build).
+		Scan(t.Context(), &branchOrTagID); err != nil {
 		t.Fatal(err)
 	}
-	return streamID
+	return branchOrTagID
 }
 
 // anotherVariant declares a second way this product is built and returns the
-// target for it on the fixture's own stream.
+// build for it on the fixture's own branch or tag.
 func (f *fixture) anotherVariant(t *testing.T, name string) int64 {
 	t.Helper()
 	ctx := t.Context()
@@ -437,39 +437,39 @@ func (f *fixture) anotherVariant(t *testing.T, name string) int64 {
 	if err != nil {
 		t.Fatalf("declare variant %s: %v", name, err)
 	}
-	var streamID int64
+	var branchOrTagID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"target\" AS \"tg\"").ColumnExpr(`"tg"."stream_id"`).
-		Where(`"tg"."id" = ?`, f.target).Scan(ctx, &streamID); err != nil {
+		TableExpr("\"build\" AS \"tg\"").ColumnExpr(`"tg"."branch_or_tag_id"`).
+		Where(`"tg"."id" = ?`, f.build).Scan(ctx, &branchOrTagID); err != nil {
 		t.Fatal(err)
 	}
-	target, err := cat.TargetFor(ctx, streamID, variant.ID)
+	build, err := cat.BuildFor(ctx, branchOrTagID, variant.ID)
 	if err != nil {
-		t.Fatalf("target for %s: %v", name, err)
+		t.Fatalf("build for %s: %v", name, err)
 	}
-	return target.ID
+	return build.ID
 }
 
 // scopeOf is one build as a selection, for a build that is not the fixture's
 // own — a second variant, or a second branch.
-func (f *fixture) scopeOf(t *testing.T, targetID int64) finding.Scope {
+func (f *fixture) scopeOf(t *testing.T, buildID int64) finding.Scope {
 	t.Helper()
 	var row struct {
-		ProductID int64 `bun:"product_id"`
-		StreamID  int64 `bun:"stream_id"`
-		VariantID int64 `bun:"variant_id"`
+		ProductID     int64 `bun:"product_id"`
+		BranchOrTagID int64 `bun:"branch_or_tag_id"`
+		VariantID     int64 `bun:"variant_id"`
 	}
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"target\" AS \"tg\"").
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr("\"build\" AS \"tg\"").
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"tg"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"tg"."branch_or_tag_id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"tg"."variant_id" AS "variant_id"`).
-		Where(`"tg"."id" = ?`, targetID).Scan(t.Context(), &row); err != nil {
-		t.Fatalf("look up build %d: %v", targetID, err)
+		Where(`"tg"."id" = ?`, buildID).Scan(t.Context(), &row); err != nil {
+		t.Fatalf("look up build %d: %v", buildID, err)
 	}
 	return finding.Scope{
-		ProductID: &row.ProductID, StreamID: &row.StreamID, VariantID: &row.VariantID,
+		ProductID: &row.ProductID, BranchOrTagID: &row.BranchOrTagID, VariantID: &row.VariantID,
 	}
 }
 
@@ -482,7 +482,7 @@ func (f *fixture) wholeProduct() finding.Scope {
 // componentID is the component row one name resolves to in the fixture's build.
 func (f *fixture) componentID(t *testing.T, name string) int64 {
 	t.Helper()
-	id, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), f.target, name, graph.Choice{})
+	id, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), f.build, name, graph.Choice{})
 	if err != nil {
 		t.Fatalf("resolve %s: %v", name, err)
 	}

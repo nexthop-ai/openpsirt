@@ -25,17 +25,17 @@ import (
 // versions and nothing else — the build, the component and what the issue is
 // are the finding's to say.
 type Described struct {
-	TargetID int64
-	// Product, Stream and Variant are the names a path addresses the build
+	BuildID int64
+	// Product, Branch or tag and Variant are the names a path addresses the build
 	// by, and the three Name fields the ones it is shown under.
-	Product, ProductName string
-	Stream, StreamName   string
-	Variant, VariantName string
-	Component            string
-	Version              string
-	Purl                 string
-	FixState             string
-	FixedIn              string
+	Product, ProductName         string
+	BranchOrTag, BranchOrTagName string
+	Variant, VariantName         string
+	Component                    string
+	Version                      string
+	Purl                         string
+	FixState                     string
+	FixedIn                      string
 	// Issue is the vulnerability, with what the report says about it.
 	Issue finding.Vulnerability
 	// Owner and Parent are the two ends of the way down, as the findings list
@@ -51,12 +51,12 @@ type describedRow struct {
 	DecisionOccurrenceID int64  `bun:"decision_occurrence_id"`
 	DecisionID           int64  `bun:"decision_id"`
 	Exact                int    `bun:"exact"`
-	TargetID             int64  `bun:"target_id"`
+	BuildID              int64  `bun:"build_id"`
 	ProductID            int64  `bun:"product_id"`
 	Product              string `bun:"product"`
 	ProductName          string `bun:"product_name"`
-	Stream               string `bun:"stream"`
-	StreamName           string `bun:"stream_name"`
+	BranchOrTag          string `bun:"branch_or_tag"`
+	BranchOrTagName      string `bun:"branch_or_tag_name"`
 	Variant              string `bun:"variant"`
 	VariantName          string `bun:"variant_name"`
 	ComponentID          int64  `bun:"component_id"`
@@ -109,14 +109,14 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "product" AS "pr" ON "pr"."id" = "st"."product_id"`).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr("CASE WHEN "+finding.VersionsMatch+` THEN 1 ELSE 0 END AS "exact"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		Apply(catalog.BuildNames("pr", "st", "va")).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
@@ -195,37 +195,37 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 	// how many of those the row's decision covers. One grouped statement
 	// each over the builds and components in hand; the triples that were not
 	// asked about fall out in Go.
-	targets, components := distinctOf(chosen)
+	buildIDs, components := distinctOf(chosen)
 	var counts []struct {
-		TargetID    int64 `bun:"target_id"`
+		BuildID     int64 `bun:"build_id"`
 		Issue       int64 `bun:"vulnerability_id"`
 		ComponentID int64 `bun:"component_id"`
 		Occurrences int   `bun:"places"`
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(wanted)).
 		Where(`"f"."component_id" IN (?)`, bun.List(components)).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
+		GroupExpr(`"f"."build_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &counts); err != nil {
 		return nil, fmt.Errorf("count where these sit: %w", err)
 	}
 	type triple struct {
-		target, issue, component int64
+		build, issue, component int64
 	}
 	occurrencesAt := map[triple]int{}
 	for _, count := range counts {
-		occurrencesAt[triple{count.TargetID, count.Issue, count.ComponentID}] = count.Occurrences
+		occurrencesAt[triple{count.BuildID, count.Issue, count.ComponentID}] = count.Occurrences
 	}
 
 	// Covered is what the decision's live rows actually match — the occurrence and
@@ -236,7 +236,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 	// it does not cover.
 	var covered []struct {
 		DecisionID  int64 `bun:"decision_id"`
-		TargetID    int64 `bun:"target_id"`
+		BuildID     int64 `bun:"build_id"`
 		Issue       int64 `bun:"vulnerability_id"`
 		ComponentID int64 `bun:"component_id"`
 		Decided     int   `bun:"decided"`
@@ -250,10 +250,10 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."occurrence_identity") AS "decided"`).
@@ -261,30 +261,30 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."component_id" IN (?)`, bun.List(components)).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		GroupExpr(`"de"."decision_id", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
+		GroupExpr(`"de"."decision_id", "f"."build_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &covered); err != nil {
 		return nil, fmt.Errorf("count what these decisions cover: %w", err)
 	}
 	type claimed struct {
-		decision, target, issue, component int64
+		decision, build, issue, component int64
 	}
 	decided := map[claimed]int{}
 	for _, count := range covered {
-		decided[claimed{count.DecisionID, count.TargetID, count.Issue, count.ComponentID}] = count.Decided
+		decided[claimed{count.DecisionID, count.BuildID, count.Issue, count.ComponentID}] = count.Decided
 	}
 
 	// The two ends of the way down, one walk per build rather than per row.
-	byTarget := map[int64][]int64{}
+	byBuild := map[int64][]int64{}
 	for _, row := range chosen {
 		if row.ConsumerID != nil {
-			byTarget[row.TargetID] = append(byTarget[row.TargetID], *row.ConsumerID)
+			byBuild[row.BuildID] = append(byBuild[row.BuildID], *row.ConsumerID)
 		} else {
-			byTarget[row.TargetID] = append(byTarget[row.TargetID], row.ComponentID)
+			byBuild[row.BuildID] = append(byBuild[row.BuildID], row.ComponentID)
 		}
 	}
 	// The graph store reads through the pool. Describing is a read on the
@@ -294,32 +294,32 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		return nil, fmt.Errorf("describing decision occurrences reads the graph through the pool: %w", err)
 	}
 	chains := map[int64]map[int64][]graph.Step{}
-	for target, components := range byTarget {
-		down, err := graph.NewStore(pool).Chains(ctx, subject, target, components)
+	for build, components := range byBuild {
+		down, err := graph.NewStore(pool).Chains(ctx, subject, build, components)
 		if err != nil {
 			return nil, err
 		}
-		chains[target] = down
+		chains[build] = down
 	}
 
 	for id, row := range chosen {
 		one := Described{
-			TargetID: row.TargetID,
-			Product:  row.Product, ProductName: row.ProductName,
-			Stream: row.Stream, StreamName: row.StreamName,
+			BuildID: row.BuildID,
+			Product: row.Product, ProductName: row.ProductName,
+			BranchOrTag: row.BranchOrTag, BranchOrTagName: row.BranchOrTagName,
 			Variant: row.Variant, VariantName: row.VariantName,
 			Component: row.Component, Version: row.Version, Purl: row.Purl,
 			FixState: row.FixState, FixedIn: row.FixedIn,
 			Issue: byIssue[row.Issue].RatedIn(
 				rated[finding.RatedKey{ProductID: row.ProductID, VulnerabilityID: row.Issue}]),
-			Occurrences: occurrencesAt[triple{row.TargetID, row.Issue, row.ComponentID}],
-			Decided:     decided[claimed{row.DecisionID, row.TargetID, row.Issue, row.ComponentID}],
+			Occurrences: occurrencesAt[triple{row.BuildID, row.Issue, row.ComponentID}],
+			Decided:     decided[claimed{row.DecisionID, row.BuildID, row.Issue, row.ComponentID}],
 		}
 		at := row.ComponentID
 		if row.ConsumerID != nil {
 			at = *row.ConsumerID
 		}
-		one.Owner, one.Parent, _ = finding.Ends(chains[row.TargetID][at])
+		one.Owner, one.Parent, _ = finding.Ends(chains[row.BuildID][at])
 		// A route up that could not be walked is not the same as nothing
 		// pulling this in. The finding records its consumer either way, so
 		// the card names it rather than showing an approver a blank where the
@@ -334,20 +334,20 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 
 // distinctOf lists the builds and components a set of described rows names,
 // in a stable order.
-func distinctOf(rows map[int64]describedRow) (targets, components []int64) {
-	seenTarget := map[int64]bool{}
+func distinctOf(rows map[int64]describedRow) (buildIDs, components []int64) {
+	seenBuild := map[int64]bool{}
 	seenComponent := map[int64]bool{}
 	for _, row := range rows {
-		if !seenTarget[row.TargetID] {
-			seenTarget[row.TargetID] = true
-			targets = append(targets, row.TargetID)
+		if !seenBuild[row.BuildID] {
+			seenBuild[row.BuildID] = true
+			buildIDs = append(buildIDs, row.BuildID)
 		}
 		if !seenComponent[row.ComponentID] {
 			seenComponent[row.ComponentID] = true
 			components = append(components, row.ComponentID)
 		}
 	}
-	sort.Slice(targets, func(i, j int) bool { return targets[i] < targets[j] })
+	sort.Slice(buildIDs, func(i, j int) bool { return buildIDs[i] < buildIDs[j] })
 	sort.Slice(components, func(i, j int) bool { return components[i] < components[j] })
-	return targets, components
+	return buildIDs, components
 }

@@ -49,8 +49,8 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 			name        string
 			was, became *string
 		}{
-			{trail.Setting, "triage-floor", nil, trail.Said("high", true)},
-			{trail.Setting, "triage-floor", trail.Said("high", true), trail.Said("medium", true)},
+			{trail.Setting, "minimum-severity", nil, trail.Said("high", true)},
+			{trail.Setting, "minimum-severity", trail.Said("high", true), trail.Said("medium", true)},
 			{trail.Support, "sonic/master", trail.Said("2030-01-01", true), trail.Said("", false)},
 			{trail.Role, "them@example.com", nil, trail.Said("private-triage", true)},
 		} {
@@ -107,7 +107,7 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 
 		// A change nobody made is refused rather than recorded against
 		// nobody, which is the state this exists to end.
-		if err := s.Record(ctx, access.Subject{}, trail.Setting, "triage-floor",
+		if err := s.Record(ctx, access.Subject{}, trail.Setting, "minimum-severity",
 			nil, trail.Said("low", true)); err == nil {
 			t.Error("a change with nobody behind it was recorded")
 		}
@@ -342,7 +342,7 @@ func TestConfigurationsAdministratorsAreRecordedAgainstConfiguration(t *testing.
 		}
 
 		// And a person's change is still a person's.
-		if err := s.Record(ctx, reader, trail.Setting, "triage-floor", nil, trail.Said("high", true)); err != nil {
+		if err := s.Record(ctx, reader, trail.Setting, "minimum-severity", nil, trail.Said("high", true)); err != nil {
 			t.Fatal(err)
 		}
 		changes, _, err := s.Changes(ctx, reader, trail.Setting, trail.Over{}, 10, 0)

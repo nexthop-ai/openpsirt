@@ -41,7 +41,7 @@ func seriesV0110(t *columnTypes) []string {
 		`CREATE TABLE "series_run" (
 			"id"             ` + t.id + `,
 			"series_id"      ` + t.ref + ` NOT NULL,
-			"target_id"      ` + t.ref + ` NOT NULL,
+			"build_id"      ` + t.ref + ` NOT NULL,
 			-- Over every document as it arrived, sorted, so a repeat is
 			-- answered as the run it repeats.
 			"content_hash"   ` + t.hash + ` NOT NULL,
@@ -85,24 +85,24 @@ func seriesV0110(t *columnTypes) []string {
 			-- run reported nothing, and "none" where nothing carried one.
 			"fingerprints"   ` + t.text + ` NULL,
 			-- Whether the fingerprints changed from the last run on the build
-			-- that stated any, which leaves every lead matched probably.
+			-- that stated any, which leaves every code finding matched probably.
 			"fingerprints_changed" ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			-- What the sender is told: what was dropped or discarded and why,
 			-- and how many results it opened, saw again and did not see, as
 			-- JSON. It names no result.
 			"receipt"        ` + t.text + ` NULL,
 			"applied_at"     ` + t.timestamp + ` NULL,
-			CONSTRAINT "series_run_content_unique" UNIQUE ("series_id", "target_id", "content_hash"),
+			CONSTRAINT "series_run_content_unique" UNIQUE ("series_id", "build_id", "content_hash"),
 			CONSTRAINT "series_run_series_fk" FOREIGN KEY ("series_id") REFERENCES "series"("id"),
-			CONSTRAINT "series_run_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			CONSTRAINT "series_run_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "series_run_scan_fk" FOREIGN KEY ("scan_id") REFERENCES "scan"("id")
 		)` + t.suffix,
 
 		// The newest applied run of a series against a build, which every
 		// arriving run is ordered against and matched against.
-		`CREATE INDEX "series_run_newest_idx" ON "series_run" ("series_id", "target_id", "status", "built_at")`,
+		`CREATE INDEX "series_run_newest_idx" ON "series_run" ("series_id", "build_id", "status", "built_at")`,
 		// A build's runs, newest first, which the receipts read.
-		`CREATE INDEX "series_run_target_idx" ON "series_run" ("target_id", "received_at")`,
+		`CREATE INDEX "series_run_build_idx" ON "series_run" ("build_id", "received_at")`,
 
 		`CREATE TABLE "series_document" (
 			"id"           ` + t.id + `,
@@ -147,7 +147,7 @@ func seriesV0110(t *columnTypes) []string {
 
 		// What a series knows of each finding it reports: the run that first
 		// saw it, the last that did, and the first comparable run that did
-		// not, which is what not reproduced is.
+		// not, which is what no longer detected is.
 		`CREATE TABLE "sighting" (
 			"id"                  ` + t.id + `,
 			"finding_id"          ` + t.ref + ` NOT NULL,
@@ -178,7 +178,7 @@ func seriesV0110(t *columnTypes) []string {
 		// minute.
 		`CREATE TABLE "series_refusal" (
 			"id"           ` + t.id + `,
-			"target_id"    ` + t.ref + ` NOT NULL,
+			"build_id"    ` + t.ref + ` NOT NULL,
 			-- As the upload named it, and folded. Empty where the upload was
 			-- turned away before it named one.
 			"series"       ` + t.name + ` NOT NULL,
@@ -188,8 +188,8 @@ func seriesV0110(t *columnTypes) []string {
 			-- What the sender was told.
 			"reason"       ` + t.text + ` NOT NULL,
 			"credential"   ` + t.name + ` NULL,
-			CONSTRAINT "series_refusal_unique" UNIQUE ("target_id", "kind", "series_folded"),
-			CONSTRAINT "series_refusal_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+			CONSTRAINT "series_refusal_unique" UNIQUE ("build_id", "kind", "series_folded"),
+			CONSTRAINT "series_refusal_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id")
 		)` + t.suffix,
 	}
 }
@@ -221,14 +221,14 @@ func analysisV0110(t *columnTypes) []string {
 			"match_key"     ` + t.hash + ` NOT NULL,
 			-- The same without the fingerprint or the line, which a run
 			-- whose fingerprints changed compares where one result and one
-			-- lead hold it.
+			-- code finding hold it.
 			"unprinted_key" ` + t.hash + ` NOT NULL,
 			-- The two probable keys: the rule, the path and the message with
 			-- its digits taken out, with the function where the output names
 			-- one, and with neither.
 			"function_key"  ` + t.hash + ` NULL,
 			"line_key"      ` + t.hash + ` NOT NULL,
-			-- How the newest sighting was paired with the lead: on the whole
+			-- How the newest sighting was paired with the code finding: on the whole
 			-- key or on the whole key without its fingerprint, which are
 			-- strong, or on the function or the nearest line, which are
 			-- probable. Null where the sighting opened it.
@@ -252,8 +252,8 @@ func analysisV0110(t *columnTypes) []string {
 			CONSTRAINT "analysis_result_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id")
 		)` + t.suffix,
 		`CREATE INDEX "analysis_result_key_idx" ON "analysis_result" ("match_key")`,
-		// The leads whose last place is near another's, which is how two
-		// analyzers' leads are found to be one flaw.
+		// The code findings whose last place is near another's, which is how two
+		// analyzers' code findings are found to be one flaw.
 		`CREATE INDEX "analysis_result_last_idx" ON "analysis_result" ("last_path_identity", "last_line")`,
 
 		// The other places a result names: related locations, and the steps

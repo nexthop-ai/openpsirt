@@ -31,7 +31,7 @@ func TestOneReportedIssueBecomesOneFindingPerConsumer(t *testing.T) {
 	// in, so there are two decisions to make about it.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)})
 		if err != nil {
 			t.Fatal(err)
@@ -81,10 +81,10 @@ func TestRescanningWithNothingChangedWritesNothing(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		reported := []finding.Reported{found("CVE-2026-1", libnl)}
 
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), reported)
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), reported)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +99,7 @@ func TestAnUpgradeClosesWithTheReason(t *testing.T) {
 	// things to whoever reads the report later.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +114,7 @@ func TestAnUpgradeClosesWithTheReason(t *testing.T) {
 		}
 		f.shipped(t, upgraded)
 
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), nil)
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,7 +141,7 @@ func TestAnUpgradeClosesWithTheReason(t *testing.T) {
 func TestAComponentGoneAltogetherClosesAsRemoved(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -150,7 +150,7 @@ func TestAComponentGoneAltogetherClosesAsRemoved(t *testing.T) {
 			Root: root, Components: []graph.Described{swss, teamd},
 			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: teamd}},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), nil); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -176,12 +176,12 @@ func TestADisappearanceNothingExplainsIsFlagged(t *testing.T) {
 	// mattering, so it is never quietly folded into the others.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), nil)
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -197,7 +197,7 @@ func TestAComponentUnderTheProductSitsUnderNothing(t *testing.T) {
 	// be two occurrences and a decision would not carry.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-2", swss)}); err != nil {
 			t.Fatal(err)
 		}
@@ -235,7 +235,7 @@ func TestAFindingThatMovesIsUpdated(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{noFix}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{noFix}); err != nil {
 			t.Fatal(err)
 		}
 		opened := f.open(t)
@@ -247,7 +247,7 @@ func TestAFindingThatMovesIsUpdated(t *testing.T) {
 		fixed := noFix
 		fixed.FixState = finding.FixedUpstream
 		fixed.FixedIn = "3.9.0"
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{fixed})
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{fixed})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -268,7 +268,7 @@ func TestAFindingThatMovesIsUpdated(t *testing.T) {
 		}
 
 		// And a run that finds the same thing again still writes nothing.
-		applied, err = f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{fixed})
+		applied, err = f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{fixed})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -290,13 +290,13 @@ func TestUpstreamDecliningToFixIsAMovement(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{noFix}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{noFix}); err != nil {
 			t.Fatal(err)
 		}
 
 		declined := noFix
 		declined.FixState = finding.WontFix
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{declined})
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{declined})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -329,7 +329,7 @@ func TestAnAbsurdlyLongValueDoesNotFailTheScanThatCarriedIt(t *testing.T) {
 			}}},
 		})
 
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{{
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{{
 			Issue: finding.Named{Identifier: "CVE-2026-1" + long, Severity: "high"},
 			Component: graph.Described{
 				Purl: "pkg:deb/debian/sprawling@1.0", Name: "sprawling", Version: long,
@@ -372,7 +372,7 @@ func (f *fixture) someoneElse(t *testing.T, roles ...access.Role) access.Subject
 }
 
 // holding returns a subject holding one role on the product this fixture's
-// target belongs to.
+// build belongs to.
 func (f *fixture) holding(t *testing.T, roles ...access.Role) access.Subject {
 	t.Helper()
 	grants := map[int64][]access.Role{f.productID: roles}
@@ -383,10 +383,10 @@ func (f *fixture) holding(t *testing.T, roles ...access.Role) access.Subject {
 	return access.NewPerson(1, "someone", false, grants, 101)
 }
 
-func TestTwoRunsAgainstOneTargetDoNotBothOpenTheSameFinding(t *testing.T) {
+func TestTwoRunsAgainstOneBuildDoNotBothOpenTheSameFinding(t *testing.T) {
 	// The queue hands different jobs to different workers by design, so two
-	// runs against one target overlapping is ordinary rather than exotic.
-	// Without a hold on the target, both read the same open findings, both
+	// runs against one build overlapping is ordinary rather than exotic.
+	// Without a hold on the build, both read the same open findings, both
 	// compute the same difference, and both write it — leaving two open rows
 	// for one finding, which everything downstream reads as two problems and
 	// which two separate triage decisions can then be made about.
@@ -401,7 +401,7 @@ func TestTwoRunsAgainstOneTargetDoNotBothOpenTheSameFinding(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, errs[i] = f.store.Apply(context.WithoutCancel(t.Context()), f.target, runID, reported)
+				_, errs[i] = f.store.Apply(context.WithoutCancel(t.Context()), f.build, runID, reported)
 			}()
 		}
 		wg.Wait()
@@ -450,7 +450,7 @@ func TestWhatIsStoredAboutAnIssueDoesNotDependOnWhichScanRanLast(t *testing.T) {
 			{graded("CVE-2026-B", 9.1, 0.86), graded("CVE-2026-B", 4.2, 0.01)},
 		} {
 			for _, report := range order {
-				if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 					[]finding.Reported{report}); err != nil {
 					t.Fatal(err)
 				}
@@ -503,14 +503,14 @@ func TestABumpThatFixedNothingIsNotRecordedAsAFix(t *testing.T) {
 	// to customers.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 
 		// Bumped, and the scanner still reports it: 3.9.0 is not far enough.
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnlNew)}); err != nil {
 			t.Fatal(err)
 		}
@@ -540,14 +540,14 @@ func TestABumpThatDidFixItStillReadsAsAFix(t *testing.T) {
 	// make every real fix disappear from what was fixed.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 
 		// Bumped, and the scanner reports nothing against the new version.
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{}); err != nil {
 			t.Fatal(err)
 		}
@@ -579,12 +579,12 @@ func movedTo(library graph.Described) graph.Snapshot {
 	}
 }
 
-// byState splits this target's findings into closed and open.
+// byState splits this build's findings into closed and open.
 func (f *fixture) byState(t *testing.T) (closed, opened []finding.Finding) {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, f.target).Order("id").Scan(t.Context()); err != nil {
+		Where(`"build_id" = ?`, f.build).Order("id").Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	for _, row := range rows {

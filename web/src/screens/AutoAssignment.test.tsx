@@ -64,7 +64,7 @@ async function fill(upstream: string) {
   await settle();
 }
 
-describe("the rules that route work to a team", () => {
+describe("the rules that assign work to a team", () => {
   it("adds a rule naming only the key that was given", async () => {
     const { post } = await drawn(() => 2);
     await fill(" linux* ");

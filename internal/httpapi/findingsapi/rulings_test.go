@@ -39,8 +39,8 @@ type rulingOf struct {
 func TestSlopIsRejectedInOneActThatASecondPersonApproves(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		first := r.Claim(t, "Generated text about a function this does not have.")
-		second := r.Claim(t, "More generated text about the same missing function.")
+		first := r.Reported(t, "Generated text about a function this does not have.")
+		second := r.Reported(t, "More generated text about the same missing function.")
 
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/report-rulings",
 			fmt.Sprintf(`{"reports":[%q,%q,%q],"disposition":"rejected","reasoning":"Slop."}`,
@@ -104,7 +104,7 @@ func TestSlopIsRejectedInOneActThatASecondPersonApproves(t *testing.T) {
 			t.Errorf("an approved rejection reads %+v on its report", report)
 		}
 
-		// Undone, the reports are back in the inbox.
+		// Undone, the reports are open again.
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at+"/withdrawal", ""); got.Code !=
 			http.StatusOK {
 			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())
@@ -121,16 +121,16 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		minted := r.Embargoed(t)
-		claimed := r.Claim(t, "The management socket lets anybody in, with a screenshot.")
+		reported := r.Reported(t, "The management socket lets anybody in, with a screenshot.")
 
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/report-rulings",
 			fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":%q}`,
-				claimed, minted))
+				reported, minted))
 		if got.Code != http.StatusCreated {
 			t.Fatalf("a duplicate answered %d: %s", got.Code, got.Body.String())
 		}
 		var report rulingOf
-		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/reports/"+claimed, &report)
+		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/reports/"+reported, &report)
 		if report.Disposition != "duplicate" || report.DuplicateOf != minted {
 			t.Errorf("the duplicate reads %+v", report)
 		}
@@ -140,7 +140,7 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 			Items []httpapitest.ReportRead `json:"items"`
 		}
 		httpapitest.Read(t, r, "private-triage", duplicates, &listed)
-		if len(listed.Items) != 1 || listed.Items[0].Reference != claimed {
+		if len(listed.Items) != 1 || listed.Items[0].Reference != reported {
 			t.Errorf("the issue lists duplicates %+v", listed.Items)
 		}
 		// Somebody who reads undisclosed work reads them; somebody who
@@ -166,13 +166,13 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 			}
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/report-rulings",
 				fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":%q}`,
-					claimed, name))
+					reported, name))
 			if got.Code != http.StatusForbidden {
 				t.Errorf("a public triager naming %s answered %d: %s", name, got.Code,
 					got.Body.String())
 			}
 			got = httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-				"/v1/products/mine/reports/"+claimed+"/issue",
+				"/v1/products/mine/reports/"+reported+"/issue",
 				fmt.Sprintf(`{"vulnerability":%q}`, name))
 			if got.Code != http.StatusNotFound ||
 				!strings.Contains(got.Body.String(), "no report here goes by that name") {
@@ -185,7 +185,7 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/report-rulings",
 			fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":"CVE-1999-0001"}`,
-				r.Claim(t, "Another."))); got.Code != http.StatusNotFound {
+				r.Reported(t, "Another."))); got.Code != http.StatusNotFound {
 			t.Errorf("a duplicate of an issue not here answered %d: %s", got.Code, got.Body.String())
 		}
 	})
@@ -194,11 +194,11 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 func TestRulingsAcrossProductsAreThoseInProductsTheReaderWorksReportsIn(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		claimed := r.Claim(t, "Generated text about a function this does not have.")
+		reported := r.Reported(t, "Generated text about a function this does not have.")
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/report-rulings",
 			fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Slop."}`,
-				claimed)); got.Code != http.StatusCreated {
+				reported)); got.Code != http.StatusCreated {
 			t.Fatalf("proposing answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -292,12 +292,12 @@ func TestRulingsAcrossProductsAreThoseInProductsTheReaderWorksReportsIn(t *testi
 func TestARulingIsNarrowedToItsProductAndRefusedWhereItCannotStand(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		claimed := r.Claim(t, "Generated text about a function this does not have.")
+		reported := r.Reported(t, "Generated text about a function this does not have.")
 		const list = "/v1/products/mine/report-rulings"
 		rule := func(body string) *httptest.ResponseRecorder {
 			return httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, list, body)
 		}
-		got := rule(fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Slop."}`, claimed))
+		got := rule(fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Slop."}`, reported))
 		if got.Code != http.StatusCreated {
 			t.Fatalf("proposing answered %d: %s", got.Code, got.Body.String())
 		}
@@ -323,10 +323,10 @@ func TestARulingIsNarrowedToItsProductAndRefusedWhereItCannotStand(t *testing.T)
 			want       int
 		}{
 			{"ruling a report already waiting on one",
-				fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Again."}`, claimed),
+				fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Again."}`, reported),
 				http.StatusConflict},
 			{"a ruling with no reasoning",
-				fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"  "}`, claimed),
+				fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"  "}`, reported),
 				http.StatusUnprocessableEntity},
 			{"a report nobody filed",
 				`{"reports":["MINE-R-1999-0001"],"disposition":"rejected","reasoning":"Slop."}`,
@@ -352,7 +352,7 @@ func TestADuplicateOfAClosedIssueIsRefusedInTheStoresWords(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		minted := r.Embargoed(t)
-		claimed := r.Claim(t, "The management socket lets anybody in, with a screenshot.")
+		reported := r.Reported(t, "The management socket lets anybody in, with a screenshot.")
 		issue, err := finding.NewVulnerabilities(r.DB.DB).ByName(t.Context(), minted)
 		if err != nil {
 			t.Fatal(err)
@@ -365,7 +365,7 @@ func TestADuplicateOfAClosedIssueIsRefusedInTheStoresWords(t *testing.T) {
 		}
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/report-rulings",
 			fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":%q}`,
-				claimed, minted))
+				reported, minted))
 		httpapitest.RefusedWith(t, got, http.StatusUnprocessableEntity)
 		if !strings.Contains(got.Body.String(), finding.ErrDuplicateOfClosed.Error()) {
 			t.Errorf("a duplicate of a closed issue was refused as %s", got.Body.String())

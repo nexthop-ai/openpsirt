@@ -26,7 +26,7 @@ import { findingAt } from "../app/routes";
 // two builds is two things somebody ships, and sixty occurrences of it in one build
 // is one piece of work with a count.
 export function Issue() {
-  const { vulnerability = "" } = useParams();
+  const { issue: vulnerability = "" } = useParams();
   const who = useWho();
   const opener = useRowOpener();
   // The identity alone. A note records who wrote it by the name they sign in
@@ -150,20 +150,20 @@ export function Issue() {
                 const to = findingAt(
                   {
                     product: row.product ?? "",
-                    stream: row.stream ?? "",
+                    branch_or_tag: row.branch_or_tag ?? "",
                     variant: row.variant ?? "",
                   },
                   { ...row, vulnerability: it?.vulnerability },
                 );
                 return (
                   <tr
-                    key={`${row.product} ${row.stream} ${row.variant} ${row.component} ${row.version}`}
+                    key={`${row.product} ${row.branch_or_tag} ${row.variant} ${row.component} ${row.version}`}
                     className="row opens"
                     onClick={opener(to)}
                   >
                     <td>{row.product_name || row.product}</td>
                     <td className="hint">
-                      {row.stream} · {row.variant}
+                      {row.branch_or_tag} · {row.variant}
                     </td>
                     <td>
                       <Link to={to} className="id">

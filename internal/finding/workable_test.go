@@ -47,12 +47,12 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 			t.Errorf("out of support, with nothing out of support, kept %d rows", n)
 		}
 		cat := catalog.NewStore(f.db.DB)
-		gone, err := cat.StreamByName(ctx, f.productID, "release-1.x")
+		gone, err := cat.BranchOrTagByName(ctx, f.productID, "release-1.x")
 		if err != nil {
 			t.Fatal(err)
 		}
 		yesterday := time.Now().UTC().AddDate(0, 0, -1)
-		if err := cat.SetStreamEndOfLife(ctx, gone.ID, &yesterday); err != nil {
+		if err := cat.SetBranchOrTagEndOfLife(ctx, gone.ID, &yesterday); err != nil {
 			t.Fatal(err)
 		}
 

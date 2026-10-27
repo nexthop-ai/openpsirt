@@ -189,9 +189,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	// alone reaches other products' findings and findings this reader may not
 	// see; and moving either condition to WHERE would turn the outer join into
 	// an inner one and flatten the figures the LEFT JOIN is there to keep.
-	sameProduct := `AND EXISTS (SELECT 1 FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
-			WHERE "tg"."id" = "f"."target_id" AND "st"."product_id" = "de"."product_id")`
+	sameProduct := `AND EXISTS (SELECT 1 FROM "build" AS "tg"
+			JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
+			WHERE "tg"."id" = "f"."build_id" AND "st"."product_id" = "de"."product_id")`
 	kinds, onArgs := kindsOf(kind.Statistics, "f")
 	sameProduct += " AND " + kinds
 	mayRead, readArgs := readableFindingsOn(subject, "f", `"de"."product_id"`)

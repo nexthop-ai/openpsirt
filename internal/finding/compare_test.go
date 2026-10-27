@@ -48,7 +48,7 @@ func TestComparingTwoBuildsSaysWhatWentWhatCameAndWhatStayed(t *testing.T) {
 			found("CVE-2026-GONE", libnl),
 			found("CVE-2026-STAYS", swss),
 		)
-		earlier := f.target
+		earlier := f.build
 
 		// The release they would move to. It carried the same two, and then
 		// the library was dropped and a new issue appeared at the other
@@ -118,10 +118,10 @@ func TestWhyEveryFixedEntryWentIsReadWithoutAQueryEach(t *testing.T) {
 			carried = append(carried, found(vulnerability(i), libnl))
 		}
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), carried); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), carried); err != nil {
 			t.Fatal(err)
 		}
-		earlier := f.target
+		earlier := f.build
 
 		later := f.anotherBuild(t, "v2")
 		f.shippedTo(t, later, twoConsumers())
@@ -174,10 +174,10 @@ func TestAFixedEntrySaysWhichVersionItMovedTo(t *testing.T) {
 		carried := []finding.Reported{found("CVE-2026-1", libnl)}
 
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), carried); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), carried); err != nil {
 			t.Fatal(err)
 		}
-		earlier := f.target
+		earlier := f.build
 
 		// The later build ships the same thing, then bumps it, and the bump
 		// resolves the issue.
@@ -229,7 +229,7 @@ func bumpedLibnl() graph.Snapshot {
 }
 
 func TestComparingBuildsAuthorizesBoth(t *testing.T) {
-	// The earlier build as well as the later one. Authorizing only the target
+	// The earlier build as well as the later one. Authorizing only the build
 	// somebody asked to compare *to* and applying that answer to the other
 	// lets a reader who can reach one product read findings out of another
 	// through the comparison — which is why this is enforced here rather than
@@ -237,11 +237,11 @@ func TestComparingBuildsAuthorizesBoth(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
-		mine := f.target
+		mine := f.build
 
 		// A build of a product this reader holds nothing on.
 		theirs := f.inAnotherProduct(t, "somebody-elses")
@@ -283,7 +283,7 @@ func TestAComparisonLeavesOutWhatIsNotDisclosed(t *testing.T) {
 			found("CVE-2026-QUIET", teamd),
 			found("CVE-2026-VOID", teamd),
 		)
-		earlier := f.target
+		earlier := f.build
 
 		// The later build carried them and then a scan of it found none of
 		// them, which is what closing with a recorded reason looks like. A
@@ -400,10 +400,10 @@ func TestAScannerFaultIsNotCountedAsAFix(t *testing.T) {
 			found("CVE-2026-SILENT", teamd),
 		}
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), carried); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), carried); err != nil {
 			t.Fatal(err)
 		}
-		earlier := f.target
+		earlier := f.build
 
 		later := f.anotherBuild(t, "v2")
 		f.shippedTo(t, later, twoConsumers())

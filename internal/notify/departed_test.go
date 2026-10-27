@@ -40,9 +40,9 @@ func TestSomebodyWhoHasLeftIsToldNothing(t *testing.T) {
 		}
 		// A build declared a month ago and never scanned: a condition every
 		// administrator is told.
-		if _, err := db.DB.NewUpdate().Table("target").
+		if _, err := db.DB.NewUpdate().Table("build").
 			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
-			Where(`"id" = ?`, w.Target.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, w.Build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		watch := notify.NewWatch(db.DB, discard())

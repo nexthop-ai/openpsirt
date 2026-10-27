@@ -344,7 +344,7 @@ func TestAScanFromTheFutureIsRefusedAsABadRequest(t *testing.T) {
 	})
 }
 
-func TestAnUndeclaredTargetSaysWhichPartIsMissing(t *testing.T) {
+func TestAnUndeclaredBuildSaysWhichPartIsMissing(t *testing.T) {
 	twoIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
 		req := f.Sending(httpapitest.Upload(t, "/v1/products/sonic/branches-and-tags/master/variants/mellanox/sboms",
 			httpapitest.Inventory(time.Now().UTC().Add(-time.Hour), "libc6")))
@@ -528,7 +528,7 @@ func TestAnInventoryThatStatesNoBuildTimeIsDatedOnArrival(t *testing.T) {
 				code, again.BuiltAt, got.BuiltAt)
 		}
 
-		// And the target is not left wedged: the next undated build lands.
+		// And the build is not left wedged: the next undated build lands.
 		if code, again := f.Send(t, httpapitest.Upload(t, f.Path, undated("2.42"))); code != http.StatusAccepted {
 			t.Errorf("a second undated build answered %d: %+v", code, again)
 		}

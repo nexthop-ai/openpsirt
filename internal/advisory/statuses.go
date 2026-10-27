@@ -42,13 +42,13 @@ type agreedStatus struct {
 	ApprovalID      int64  `bun:"approval_id,notnull"`
 	ProductID       int64  `bun:"product_id,notnull"`
 	VulnerabilityID int64  `bun:"vulnerability_id,notnull"`
-	StreamID        int64  `bun:"stream_id,notnull"`
+	BranchOrTagID   int64  `bun:"branch_or_tag_id,notnull"`
 	VariantID       int64  `bun:"variant_id,notnull"`
 	Status          string `bun:"status,notnull"`
 }
 
 // releaseKey names one release of one issue in one product.
-type releaseKey struct{ product, issue, stream, variant int64 }
+type releaseKey struct{ product, issue, branchOrTag, variant int64 }
 
 // placed is every release of every issue the advisory covers, with its status,
 // read through the handle given.
@@ -98,12 +98,12 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// merged into another after the agreement is compared as the one it
 	// merged into.
 	var saw []struct {
-		ApprovalID int64  `bun:"approval_id"`
-		ProductID  int64  `bun:"product_id"`
-		IssueID    int64  `bun:"issue_id"`
-		StreamID   int64  `bun:"stream_id"`
-		VariantID  int64  `bun:"variant_id"`
-		Status     string `bun:"status"`
+		ApprovalID    int64  `bun:"approval_id"`
+		ProductID     int64  `bun:"product_id"`
+		IssueID       int64  `bun:"issue_id"`
+		BranchOrTagID int64  `bun:"branch_or_tag_id"`
+		VariantID     int64  `bun:"variant_id"`
+		Status        string `bun:"status"`
 	}
 	where, args := database.InAnyOf(`"ag"."approval_id"`, ids)
 	if err := s.db.NewSelect().
@@ -112,7 +112,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"ag"."approval_id" AS "approval_id"`).
 		ColumnExpr(`"ag"."product_id" AS "product_id"`).
 		ColumnExpr(`"sv"."issue_id" AS "issue_id"`).
-		ColumnExpr(`"ag"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"ag"."branch_or_tag_id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"ag"."variant_id" AS "variant_id"`).
 		ColumnExpr(`"ag"."status" AS "status"`).
 		Where(where, args...).Scan(ctx, &saw); err != nil {
@@ -124,7 +124,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 			seen[one.ApprovalID] = map[releaseKey]string{}
 		}
 		seen[one.ApprovalID][releaseKey{one.ProductID, one.IssueID,
-			one.StreamID, one.VariantID}] = one.Status
+			one.BranchOrTagID, one.VariantID}] = one.Status
 	}
 	// Against every agreement standing rather than the first: two people
 	// agreeing a day apart can have seen two different documents, and either
@@ -135,7 +135,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// of every advisory agreed to before the upgrade reads as changed.
 	for i := range out {
 		key := releaseKey{out[i].Covered.ProductID, out[i].Covered.IssueID,
-			out[i].StreamID, out[i].VariantID}
+			out[i].BranchOrTagID, out[i].VariantID}
 		for _, id := range ids {
 			if seen[id] != nil && seen[id][key] != out[i].Status {
 				out[i].Changed = true
@@ -158,7 +158,7 @@ func recordSeen(ctx context.Context, tx bun.Tx, subject access.Subject,
 	for _, one := range now {
 		rows = append(rows, agreedStatus{
 			ApprovalID: approvalID, ProductID: one.Covered.ProductID, VulnerabilityID: one.Covered.IssueID,
-			StreamID: one.StreamID, VariantID: one.VariantID, Status: one.Status,
+			BranchOrTagID: one.BranchOrTagID, VariantID: one.VariantID, Status: one.Status,
 		})
 	}
 	if len(rows) == 0 {
@@ -179,7 +179,7 @@ func recordSeen(ctx context.Context, tx bun.Tx, subject access.Subject,
 // every agreement standing, as retitling does. Asking for what already stands
 // changes nothing and opens nothing.
 func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
-	advisory, product, identifier, stream, variant string, affected bool) error {
+	advisory, product, identifier, branchOrTag, variant string, affected bool) error {
 
 	row, named, issue, err := s.editing(ctx, subject, advisory, product, identifier,
 		"mark a release affected")
@@ -197,7 +197,7 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 	if !covered {
 		return ErrNoSuchIssue
 	}
-	// The release resolved by the names the document gives it. A stream and a
+	// The release resolved by the names the document gives it. A branch or tag and a
 	// variant are declared once and never renamed, so resolving them outside
 	// the transaction reads nothing that moves.
 	among, err := releases(ctx, s.db, subject, row.ID, named.ID, issue.ID)
@@ -206,7 +206,7 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 	}
 	var at *Release
 	for i := range among {
-		if typedname.Matching(among[i].Stream) == typedname.Matching(stream) &&
+		if typedname.Matching(among[i].BranchOrTag) == typedname.Matching(branchOrTag) &&
 			typedname.Matching(among[i].Variant) == typedname.Matching(variant) {
 			at = &among[i]
 		}
@@ -222,8 +222,8 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		// into another is the other's.
 		const marks = `"advisory_id" = ? AND "product_id" = ?
 			AND "vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "issue_id" = ?)
-			AND "stream_id" = ? AND "variant_id" = ?`
-		on := []any{row.ID, named.ID, issue.ID, at.StreamID, at.VariantID}
+			AND "branch_or_tag_id" = ? AND "variant_id" = ?`
+		on := []any{row.ID, named.ID, issue.ID, at.BranchOrTagID, at.VariantID}
 		var held []Override
 		if err := tx.NewSelect().Model(&held).Where(marks, on...).
 			OrderExpr(`"ao"."id"`).Scan(ctx); err != nil {
@@ -259,7 +259,7 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		case affected:
 			if _, err := tx.NewInsert().Model(&Override{
 				AdvisoryID: row.ID, ProductID: named.ID, VulnerabilityID: issue.ID,
-				StreamID: at.StreamID, VariantID: at.VariantID,
+				BranchOrTagID: at.BranchOrTagID, VariantID: at.VariantID,
 				SetAt: now, SetBy: subject.ID,
 			}).Exec(ctx); err != nil {
 				// Two people marking one release at once both read nothing,

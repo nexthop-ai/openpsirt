@@ -26,15 +26,15 @@ const openVEXContext = "https://openvex.dev/ns/v0.2.0"
 // One per branch or tag, for a scanner: what it holds is one build, and what
 // it asks is what is true of that build now.
 func (g *Generator) openVEXDocuments(product *catalog.Product, builds []*built) []Generated {
-	streams := map[string][]*built{}
+	branchesAndTags := map[string][]*built{}
 	shown := map[string]string{}
 	for _, one := range builds {
-		streams[one.stream] = append(streams[one.stream], one)
-		shown[one.stream] = one.streamShown
+		branchesAndTags[one.branchOrTag] = append(branchesAndTags[one.branchOrTag], one)
+		shown[one.branchOrTag] = one.branchOrTagShown
 	}
 	var out []Generated
-	for _, stream := range sortedKeys(streams) {
-		if doc, ok := g.openVEXDocument(product, stream, shown[stream], streams[stream]); ok {
+	for _, branchOrTag := range sortedKeys(branchesAndTags) {
+		if doc, ok := g.openVEXDocument(product, branchOrTag, shown[branchOrTag], branchesAndTags[branchOrTag]); ok {
 			out = append(out, doc)
 		}
 	}
@@ -49,7 +49,7 @@ func (g *Generator) openVEXDocuments(product *catalog.Product, builds []*built) 
 // product with the component beneath it, and one about one place names the
 // component that pulls it in, the way the document of one build does. A reader
 // tells the two apart by whether the product has subcomponents.
-func (g *Generator) openVEXDocument(product *catalog.Product, stream, streamShown string,
+func (g *Generator) openVEXDocument(product *catalog.Product, branchOrTag, branchOrTagShown string,
 	builds []*built) (Generated, bool) {
 
 	var facts []placed
@@ -132,10 +132,10 @@ func (g *Generator) openVEXDocument(product *catalog.Product, stream, streamShow
 		Statements []vex.Statement `json:"statements"`
 	}{g.base, g.who.Name, statements})
 
-	path := OpenVEXPath + segment(product.Name) + "/" + segment(stream) + ".json"
-	title := product.DisplayName + " " + streamShown
+	path := OpenVEXPath + segment(product.Name) + "/" + segment(branchOrTag) + ".json"
+	title := product.DisplayName + " " + branchOrTagShown
 	return Generated{
-		Kind: OpenVEX, Subject: stream, TrackingID: g.base + path, Title: title,
+		Kind: OpenVEX, Subject: branchOrTag, TrackingID: g.base + path, Title: title,
 		Settled: settled(digestOver),
 		path:    func(revision) string { return path },
 		render: func(at revision) ([]byte, error) {
@@ -148,7 +148,7 @@ func (g *Generator) openVEXDocument(product *catalog.Product, stream, streamShow
 			}
 			body, err := json.Marshal(doc)
 			if err != nil {
-				return nil, fmt.Errorf("write the OpenVEX document about %s: %w", stream, err)
+				return nil, fmt.Errorf("write the OpenVEX document about %s: %w", branchOrTag, err)
 			}
 			return body, nil
 		},

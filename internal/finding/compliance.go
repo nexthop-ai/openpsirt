@@ -54,7 +54,7 @@ type Rate struct {
 // The open half is a statement about the present whatever period was asked
 // for, because reconstructing what stood open on a date gone by is the
 // reconstruction the register refuses — deadlines are recomputed when the
-// policy moves and dropped below the line and past end of life, so a deadline
+// policy moves and dropped below the minimum severity and past end of life, so a deadline
 // "as of" a past date is not recoverable.
 func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	scope Scope, since, until time.Time) ([]Rate, error) {
@@ -62,11 +62,11 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	// A product is required, for the reason every list here requires one: an
 	// occurrence identity carries no product, so a decision correlated without
 	// one would reach decisions made in every product in the deployment.
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &Filter{})
+	productID, visible, buildIDs, err := s.inScope(ctx, subject, scope, &Filter{})
 	if err != nil {
 		return nil, err
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return nil, nil
 	}
 
@@ -129,7 +129,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 			`AND "f"."due_at" < ? AND NOT `+deferred+` THEN 1 ELSE 0 END) AS "past_due"`,
 			append([]any{now}, covers...)...).
 		Where(kinds, kindArgs...).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		// A finding that was never present, or one a supplier stated is not
 		// affected, met or missed nothing: its deadline was set while it was

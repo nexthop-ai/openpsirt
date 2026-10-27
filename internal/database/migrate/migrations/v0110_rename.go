@@ -41,6 +41,17 @@ var tablesRenamedV0110 = []tableRename{
 	{"claim_comment", "decision_comment"},
 	{"claim_comment_revision", "decision_comment_revision"},
 	{"claim_build", "decision_build"},
+	{"exploited_here", "incident"},
+	{"exploited_fix", "incident_fix"},
+	{"obligation_window", "response_window"},
+	{"obligation_window_product", "response_window_product"},
+	{"routing_rule", "assignment_rule"},
+	{"advisory_source", "supplier_advisory_feed"},
+	{"finding_tag", "finding_label"},
+	{"vex_statement", "received_vex_statement"},
+	{"vex_issuance", "published_vex"},
+	{"stream", "branch_or_tag"},
+	{"target", "build"},
 }
 
 // columnRename is a column's name before and after, on its table as v0.11.0
@@ -59,7 +70,29 @@ var columnsRenamedV0110 = []columnRename{
 	{"decision_comment", "claim_id", "decision_id"},
 	{"decision_build", "claim_id", "decision_id"},
 	{"upgrade", "claim_id", "decision_id"},
+	{"advisory_agreed_status", "stream_id", "branch_or_tag_id"},
+	{"advisory_override", "stream_id", "branch_or_tag_id"},
+	{"api_key", "stream_id", "branch_or_tag_id"},
+	{"incident_fix", "stream_id", "branch_or_tag_id"},
+	{"incident_fix", "live_stream_id", "live_branch_or_tag_id"},
+	{"build", "stream_id", "branch_or_tag_id"},
+	{"decision_build", "target_id", "build_id"},
+	{"finding", "target_id", "build_id"},
+	{"graph_edge", "target_id", "build_id"},
+	{"graph_node", "target_id", "build_id"},
+	{"scan", "target_id", "build_id"},
+	{"scan_refusal", "target_id", "build_id"},
+	{"scan_run", "target_id", "build_id"},
+	{"suppression", "target_id", "build_id"},
+	{"upgrade", "target_id", "build_id"},
+	{"published_vex", "target_id", "build_id"},
 	{"finding", "place_identity", "occurrence_identity"},
+	{"incident_fix", "exploited_here_id", "incident_id"},
+	{"told_outside", "exploited_here_id", "incident_id"},
+	{"finding", "urgency_exploited_here", "urgency_incident"},
+	{"product", "triage_floor", "minimum_severity"},
+	{"finding", "routed_by", "assigned_by_rule"},
+	{"finding_label", "tag", "label"},
 }
 
 // nameKind is what a renamed name belongs to, which decides how each engine
@@ -141,14 +174,104 @@ var namesRenamedV0110 = []nameRename{
 	{aPrimaryKey, "decision_build", "claim_build_pkey", "decision_build_pkey"},
 	{aUnique, "decision_build", "claim_build_once", "decision_build_once"},
 	{aForeignKey, "decision_build", "claim_build_claim_fk", "decision_build_decision_fk"},
-	{aForeignKey, "decision_build", "claim_build_target_fk", "decision_build_target_fk"},
+	{aForeignKey, "decision_build", "claim_build_target_fk", "decision_build_build_fk"},
 
 	{anIndex, "finding", "finding_place_idx", "finding_occurrence_idx"},
+
+	{aPrimaryKey, "incident", "exploited_here_pkey", "incident_pkey"},
+	{aUnique, "incident", "exploited_here_live_unique", "incident_live_unique"},
+	{aForeignKey, "incident", "exploited_here_vulnerability_fk", "incident_vulnerability_fk"},
+	{aForeignKey, "incident", "exploited_here_product_fk", "incident_product_fk"},
+	{aForeignKey, "incident", "exploited_here_recorder_fk", "incident_recorder_fk"},
+	{aForeignKey, "incident", "exploited_here_clearer_fk", "incident_clearer_fk"},
+	{anIndex, "incident", "exploited_here_product_idx", "incident_product_idx"},
+	{anIndex, "incident", "exploited_here_issue_idx", "incident_issue_idx"},
+
+	{aPrimaryKey, "incident_fix", "exploited_fix_pkey", "incident_fix_pkey"},
+	{aUnique, "incident_fix", "exploited_fix_live_unique", "incident_fix_live_unique"},
+	{aForeignKey, "incident_fix", "exploited_fix_record_fk", "incident_fix_incident_fk"},
+	{aForeignKey, "incident_fix", "exploited_fix_stream_fk", "incident_fix_branch_or_tag_fk"},
+	{aForeignKey, "incident_fix", "exploited_fix_namer_fk", "incident_fix_namer_fk"},
+	{aForeignKey, "incident_fix", "exploited_fix_withdrawer_fk", "incident_fix_withdrawer_fk"},
+
+	{aForeignKey, "told_outside", "told_outside_record_fk", "told_outside_incident_fk"},
+	{anIndex, "told_outside", "told_outside_record_idx", "told_outside_incident_idx"},
+
+	{aPrimaryKey, "response_window", "obligation_window_pkey", "response_window_pkey"},
+	{aUnique, "response_window", "obligation_window_live_unique", "response_window_live_unique"},
+	{aForeignKey, "response_window", "obligation_window_declarer_fk", "response_window_declarer_fk"},
+	{aForeignKey, "response_window", "obligation_window_from_fk", "response_window_from_fk"},
+
+	{aPrimaryKey, "response_window_product", "obligation_window_product_pk", "response_window_product_pk"},
+	{aForeignKey, "response_window_product", "obligation_window_product_window_fk",
+		"response_window_product_window_fk"},
+	{aForeignKey, "response_window_product", "obligation_window_product_product_fk",
+		"response_window_product_product_fk"},
+
+	{anIndex, "job", "job_set_aside_idx", "job_failed_idx"},
+
+	{aPrimaryKey, "assignment_rule", "routing_rule_pkey", "assignment_rule_pkey"},
+	{aForeignKey, "assignment_rule", "routing_rule_product_fk", "assignment_rule_product_fk"},
+	{aForeignKey, "assignment_rule", "routing_rule_team_fk", "assignment_rule_team_fk"},
+	{aForeignKey, "assignment_rule", "routing_rule_by_fk", "assignment_rule_by_fk"},
+	{anIndex, "assignment_rule", "routing_rule_order_idx", "assignment_rule_order_idx"},
+
+	{aPrimaryKey, "supplier_advisory_feed", "advisory_source_pkey", "supplier_advisory_feed_pkey"},
+	{aUnique, "supplier_advisory_feed", "advisory_source_named_once", "supplier_advisory_feed_named_once"},
+	{aForeignKey, "supplier_advisory_feed", "advisory_source_product_fk", "supplier_advisory_feed_product_fk"},
+	{aForeignKey, "supplier_advisory_feed", "advisory_source_by_fk", "supplier_advisory_feed_by_fk"},
+	{anIndex, "supplier_advisory_feed", "advisory_source_due_idx", "supplier_advisory_feed_due_idx"},
+
+	{aPrimaryKey, "finding_label", "finding_tag_pkey", "finding_label_pkey"},
+	{aUnique, "finding_label", "finding_tag_once", "finding_label_once"},
+	{aForeignKey, "finding_label", "finding_tag_product_fk", "finding_label_product_fk"},
+	{aForeignKey, "finding_label", "finding_tag_issue_fk", "finding_label_issue_fk"},
+	{aForeignKey, "finding_label", "finding_tag_component_fk", "finding_label_component_fk"},
+	{aForeignKey, "finding_label", "finding_tag_by_fk", "finding_label_by_fk"},
+	{anIndex, "finding_label", "finding_tag_named_idx", "finding_label_named_idx"},
+
+	{aPrimaryKey, "received_vex_statement", "vex_statement_pkey", "received_vex_statement_pkey"},
+	{aForeignKey, "received_vex_statement", "vex_statement_product_fk", "received_vex_statement_product_fk"},
+	{aForeignKey, "received_vex_statement", "vex_statement_by_fk", "received_vex_statement_by_fk"},
+	{anIndex, "received_vex_statement", "vex_statement_about_idx", "received_vex_statement_about_idx"},
+	{anIndex, "received_vex_statement", "vex_statement_from_idx", "received_vex_statement_from_idx"},
+
+	{aPrimaryKey, "published_vex", "vex_issuance_pkey", "published_vex_pkey"},
+	{aUnique, "published_vex", "vex_issuance_once_per_kind", "published_vex_once_per_kind"},
+	{aForeignKey, "published_vex", "vex_issuance_target_fk", "published_vex_build_fk"},
+	{aForeignKey, "published_vex", "vex_issuance_by_fk", "published_vex_by_fk"},
+
+	{aPrimaryKey, "branch_or_tag", "stream_pkey", "branch_or_tag_pkey"},
+	{aUnique, "branch_or_tag", "stream_name_unique", "branch_or_tag_name_unique"},
+	{aForeignKey, "branch_or_tag", "stream_parent_fk", "branch_or_tag_parent_fk"},
+	{aForeignKey, "branch_or_tag", "stream_product_fk", "branch_or_tag_product_fk"},
+
+	{aPrimaryKey, "build", "target_pkey", "build_pkey"},
+	{aUnique, "build", "target_unique", "build_unique"},
+	{aForeignKey, "build", "target_stream_fk", "build_branch_or_tag_fk"},
+	{aForeignKey, "build", "target_variant_fk", "build_variant_fk"},
+	{anIndex, "build", "target_variant_idx", "build_variant_idx"},
+
+	{aForeignKey, "advisory_agreed_status", "advisory_agreed_status_stream_fk",
+		"advisory_agreed_status_branch_or_tag_fk"},
+	{aForeignKey, "advisory_override", "advisory_override_stream_fk", "advisory_override_branch_or_tag_fk"},
+	{aForeignKey, "api_key", "api_key_stream_fk", "api_key_branch_or_tag_fk"},
+	{aForeignKey, "finding", "finding_target_id_fk", "finding_build_id_fk"},
+	{aForeignKey, "graph_edge", "graph_edge_target_fk", "graph_edge_build_fk"},
+	{aForeignKey, "graph_node", "graph_node_target_fk", "graph_node_build_fk"},
+	{aForeignKey, "scan", "scan_target_fk", "scan_build_fk"},
+	{aForeignKey, "scan_refusal", "scan_refusal_target_fk", "scan_refusal_build_fk"},
+	{aUnique, "scan_refusal", "scan_refusal_target_unique", "scan_refusal_build_unique"},
+	{aForeignKey, "scan_run", "scan_run_target_id_fk", "scan_run_build_id_fk"},
+	{aForeignKey, "suppression", "suppression_target_id_fk", "suppression_build_id_fk"},
+	{aForeignKey, "upgrade", "upgrade_target_id_fk", "upgrade_build_id_fk"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
 // one. Each name changes once whichever list holds it, so one map serves a
-// table, a column and a constraint alike.
+// table, a column and a constraint alike. A column's name is renamed in every
+// declaration the map rewrites, so a column is listed only where no other
+// renamed table holds one of the same name: tag is finding_label's alone.
 var renamesV0110 = func() map[string]string {
 	out := map[string]string{}
 	add := func(from, to string) {
@@ -187,8 +310,29 @@ func renamedV0110(statements []string) []string {
 	return out
 }
 
-// declaredV0110 is v0.11.0's declaration of a table it renames, and the
-// indexes it makes: the declaration the table last had, renamed.
+// keptV0110 is each table v0.11.0 renames a column or an index of and keeps
+// the name of, with the declaration the table last had.
+var keptV0110 = map[string]func(*columnTypes) []string{
+	"upgrade":      upgradeBaseline,
+	"job":          jobBaseline,
+	"told_outside": obligationBaseline,
+	"product":      productV0100,
+
+	"advisory_agreed_status": advisoryJudgmentBaseline,
+	"advisory_override":      advisoryJudgmentBaseline,
+	"api_key":                accessBaseline,
+	"finding":                findingV0100,
+	"graph_edge":             graphEdgeBaseline,
+	"graph_node":             graphNodeV090,
+	"scan":                   scanBaseline,
+	"scan_refusal":           scanBaseline,
+	"scan_run":               issueBaseline,
+	"suppression":            suppressionV090,
+}
+
+// declaredV0110 is v0.11.0's declaration of a table it renames or renames
+// something in, and the indexes it makes: the declaration the table last had,
+// renamed.
 func declaredV0110(t *columnTypes, table string) []string {
 	var before string
 	var statements []string
@@ -208,11 +352,26 @@ func declaredV0110(t *columnTypes, table string) []string {
 		statements = commentHistoryBaseline(t)
 	case "claim_build":
 		statements = claimBuildBaseline(t)
+	case "exploited_here", "exploited_fix", "obligation_window", "obligation_window_product":
+		statements = obligationBaseline(t)
+	case "routing_rule":
+		statements = routingBaseline(t)
+	case "advisory_source":
+		statements = advisorySourceBaseline(t)
+	case "finding_tag":
+		statements = tagBaseline(t)
+	case "vex_statement":
+		statements = vexStatementV0100(t)
+	case "vex_issuance":
+		statements = vexIssuanceBaseline(t)
+	case "stream", "target":
+		statements = catalogBaseline(t)
 	case "":
-		if table != "upgrade" {
+		kept, ok := keptV0110[table]
+		if !ok {
 			panic("v0.11.0 gives no table the name " + table)
 		}
-		before, statements = table, upgradeBaseline(t)
+		before, statements = table, kept(t)
 	default:
 		statements = triageBaseline(t)
 	}
@@ -232,7 +391,7 @@ const (
 	renameHoldersShown = 20
 )
 
-// renameV0110 gives the triage tables, columns, indexes and constraints their
+// renameV0110 gives the renamed tables, columns, indexes and constraints their
 // v0.11.0 names. It runs before anything else the upgrade does, so the rest
 // of it, and the declarations it is written against, use the new names.
 //
@@ -377,9 +536,14 @@ func (r renamer) name(n nameRename) error {
 	case aPrimaryKey:
 		return nil
 	case aForeignKey:
-		if err := r.mysqlForeignKey(n); err != nil {
+		// The index first. MySQL drops the index it made for a foreign key
+		// along with the key when the key is declared again, and builds one
+		// under the new name, which reads every row; an index renamed first
+		// is no longer the key's own and serves the new key as it stands.
+		if err := r.mysqlIndex(n); err != nil {
 			return err
 		}
+		return r.mysqlForeignKey(n)
 	}
 	return r.mysqlIndex(n)
 }
@@ -443,8 +607,12 @@ func (r renamer) sqliteIndex(n nameRename) error {
 }
 
 // sequence names a renamed PostgreSQL table's identifier sequence after the
-// table.
+// table. A table keyed by the rows it joins has no identifier and no sequence.
 func (r renamer) sequence(table string) error {
+	identified, err := r.u.hasColumn(table, "id")
+	if err != nil || !identified {
+		return err
+	}
 	var had string
 	if err := r.u.tx.QueryRowContext(r.u.ctx, `SELECT pg_get_serial_sequence(?, 'id')`,
 		`"`+table+`"`).Scan(&had); err != nil {

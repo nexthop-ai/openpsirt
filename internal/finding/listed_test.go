@@ -29,18 +29,18 @@ func (f *fixture) listedOn(t *testing.T, identifier string) *time.Time {
 }
 
 // clockOf reads the one open finding of an issue in a build.
-func (f *fixture) clockOf(t *testing.T, target int64, identifier string) finding.Finding {
+func (f *fixture) clockOf(t *testing.T, build int64, identifier string) finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, target).
+		Where(`"build_id" = ?`, build).
 		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
 		Where(`"closed_at" IS NULL`).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if len(rows) != 1 {
-		t.Fatalf("%d open findings of %s in build %d, want one", len(rows), identifier, target)
+		t.Fatalf("%d open findings of %s in build %d, want one", len(rows), identifier, build)
 	}
 	return rows[0]
 }
@@ -102,17 +102,17 @@ func TestAFindingThatLearnsExploitationFromItsOwnBuildCountsFromTheListingDay(t 
 		f.shipped(t, twoConsumers())
 		first := f.run(t)
 		f.seenAt(t, first, time.Now().UTC().Add(-30*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, first,
+		if _, err := f.store.Apply(t.Context(), f.build, first,
 			[]finding.Reported{found("CVE-2026-LIST", swss)}); err != nil {
 			t.Fatal(err)
 		}
 
 		day := daysAgo(10)
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{listed("CVE-2026-LIST", &day)}); err != nil {
 			t.Fatal(err)
 		}
-		row := f.clockOf(t, f.target, "CVE-2026-LIST")
+		row := f.clockOf(t, f.build, "CVE-2026-LIST")
 		if !isAt(row.ExploitedLearnedAt, day) {
 			t.Errorf("exploitation counts from %v, want the listing day %s",
 				row.ExploitedLearnedAt, day)
@@ -130,7 +130,7 @@ func TestAFindingThatLearnsExploitationFromAnotherBuildCountsFromTheListingDay(t
 		f.shipped(t, twoConsumers())
 		first := f.run(t)
 		f.seenAt(t, first, time.Now().UTC().Add(-30*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, first,
+		if _, err := f.store.Apply(t.Context(), f.build, first,
 			[]finding.Reported{found("CVE-2026-LIST", swss)}); err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +142,7 @@ func TestAFindingThatLearnsExploitationFromAnotherBuildCountsFromTheListingDay(t
 			[]finding.Reported{listed("CVE-2026-LIST", &day)}); err != nil {
 			t.Fatal(err)
 		}
-		row := f.clockOf(t, f.target, "CVE-2026-LIST")
+		row := f.clockOf(t, f.build, "CVE-2026-LIST")
 		if !row.RankExploited || !isAt(row.ExploitedLearnedAt, day) {
 			t.Errorf("exploited %v, counting from %v, want exploited from the listing day %s",
 				row.RankExploited, row.ExploitedLearnedAt, day)
@@ -171,11 +171,11 @@ func TestAFindingFirstSeenAfterTheListingCountsFromWhenItWasSeen(t *testing.T) {
 		seen := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Microsecond)
 		run := f.run(t)
 		f.seenAt(t, run, seen)
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{listed("CVE-2026-LIST", &day)}); err != nil {
 			t.Fatal(err)
 		}
-		row := f.clockOf(t, f.target, "CVE-2026-LIST")
+		row := f.clockOf(t, f.build, "CVE-2026-LIST")
 		if !isAt(row.ExploitedLearnedAt, day) {
 			t.Errorf("exploitation counts from %v, want the listing day %s",
 				row.ExploitedLearnedAt, day)
@@ -196,7 +196,7 @@ func TestAListingDayArrivingLaterReclocksTheIssuesOpenExploitedFindings(t *testi
 		f.shipped(t, twoConsumers())
 		opened := f.run(t)
 		f.seenAt(t, opened, time.Now().UTC().Add(-60*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, opened,
+		if _, err := f.store.Apply(t.Context(), f.build, opened,
 			[]finding.Reported{found("CVE-2026-LIST", swss)}); err != nil {
 			t.Fatal(err)
 		}
@@ -225,7 +225,7 @@ func TestAListingDayArrivingLaterReclocksTheIssuesOpenExploitedFindings(t *testi
 			[]finding.Reported{listed("CVE-2026-LIST", &day)}); err != nil {
 			t.Fatal(err)
 		}
-		branch := f.clockOf(t, f.target, "CVE-2026-LIST")
+		branch := f.clockOf(t, f.build, "CVE-2026-LIST")
 		if !isAt(branch.ExploitedLearnedAt, day) {
 			t.Errorf("the branch counts exploitation from %v, want %s",
 				branch.ExploitedLearnedAt, day)
@@ -247,7 +247,7 @@ func TestAListingDayArrivingLaterReclocksTheIssuesOpenExploitedFindings(t *testi
 				[]finding.Reported{listed("CVE-2026-LIST", &again)}); err != nil {
 				t.Fatal(err)
 			}
-			row := f.clockOf(t, f.target, "CVE-2026-LIST")
+			row := f.clockOf(t, f.build, "CVE-2026-LIST")
 			if !isAt(row.ExploitedLearnedAt, day) || !isAt(row.DueAt, want) {
 				t.Errorf("a report listing it on %s moved the branch to %v, due %v",
 					again, row.ExploitedLearnedAt, row.DueAt)

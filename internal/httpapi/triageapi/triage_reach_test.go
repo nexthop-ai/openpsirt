@@ -134,11 +134,11 @@ func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
 		var reached struct {
 			Here      int `json:"here"`
 			Automatic []struct {
-				Stream string `json:"stream"`
+				BranchOrTag string `json:"branch_or_tag"`
 			} `json:"automatic"`
 			Differing []struct {
-				Stream  string `json:"stream"`
-				Version string `json:"version"`
+				BranchOrTag string `json:"branch_or_tag"`
+				Version     string `json:"version"`
 			} `json:"differing"`
 		}
 		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+

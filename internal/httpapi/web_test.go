@@ -47,7 +47,7 @@ func TestAPathThePageOwnsIsAnsweredWithThePage(t *testing.T) {
 	// Answering 404 would make every deep link fail on reload while working
 	// perfectly when navigated to.
 	handler := serving(t, built())
-	for _, path := range []string{"/", "/products", "/products/sonic/streams/master/variants/x/findings"} {
+	for _, path := range []string{"/", "/products", "/products/sonic/branches-and-tags/master/variants/x/findings"} {
 		got := fetch(t, handler, http.MethodGet, path)
 		if got.Code != http.StatusOK {
 			t.Errorf("GET %s answered %d, want the page", path, got.Code)

@@ -38,7 +38,7 @@ func TestTheOverviewCountsADecidedOccurrenceOnceHoweverManyDecisionsReachIt(t *t
 				t.Fatal(err)
 			}
 			for _, build := range builds {
-				if build.TargetID == f.target && (build.Agreed != whole.Agreed || build.Undecided != whole.Undecided) {
+				if build.BuildID == f.build && (build.Agreed != whole.Agreed || build.Undecided != whole.Undecided) {
 					t.Errorf("the build reads agreed %d, undecided %d where the product reads %d and %d",
 						build.Agreed, build.Undecided, whole.Agreed, whole.Undecided)
 				}
@@ -98,7 +98,7 @@ func TestEachRowOfALapsedPageSaysItLapsed(t *testing.T) {
 		for _, issue := range issues {
 			reported = append(reported, found(issue, libnl))
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 		by := f.somebodyElse(t)
@@ -173,7 +173,7 @@ func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryOccurrenceInBothIsAnswe
 		for _, build := range builds {
 			if build.Open != 2 || build.Agreed != 1 || build.Undecided != 1 {
 				t.Errorf("build %d: open %d, agreed %d, undecided %d; want 2, 1, 1",
-					build.TargetID, build.Open, build.Agreed, build.Undecided)
+					build.BuildID, build.Open, build.Agreed, build.Undecided)
 			}
 		}
 		if whole.Open != 2 || whole.Agreed != 1 || whole.Undecided != 1 {
@@ -211,12 +211,12 @@ func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing
 			t.Fatal(err)
 		}
 		now := time.Now().UTC()
-		for target, due := range map[int64]time.Time{
-			f.target: now.AddDate(0, 0, 30),
-			other:    now.AddDate(0, 0, -100),
+		for build, due := range map[int64]time.Time{
+			f.build: now.AddDate(0, 0, 30),
+			other:   now.AddDate(0, 0, -100),
 		} {
 			if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-				Set(`"due_at" = ?`, due).Where(`"target_id" = ?`, target).Exec(ctx); err != nil {
+				Set(`"due_at" = ?`, due).Where(`"build_id" = ?`, build).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -227,15 +227,15 @@ func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := map[int64][4]int{f.target: {1, 0, 0, 1}, other: {1, 1, 1, 0}}
+		want := map[int64][4]int{f.build: {1, 0, 0, 1}, other: {1, 1, 1, 0}}
 		if len(builds) != len(want) {
 			t.Fatalf("%d build rows, want %d", len(builds), len(want))
 		}
 		for _, build := range builds {
 			got := [4]int{build.Open, build.Overdue, build.Undecided, build.Agreed}
-			if got != want[build.TargetID] {
+			if got != want[build.BuildID] {
 				t.Errorf("build %d: open, overdue, undecided, agreed %v; want %v",
-					build.TargetID, got, want[build.TargetID])
+					build.BuildID, got, want[build.BuildID])
 			}
 		}
 		if got := [4]int{whole.Open, whole.Overdue, whole.Undecided, whole.Agreed}; got != [4]int{1, 1, 0, 0} {

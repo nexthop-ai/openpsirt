@@ -68,23 +68,23 @@ func TestADocumentRecordedAfterSomebodyElsesStatesTheLaterVersion(t *testing.T) 
 	})
 }
 
-// insertsIssuance runs rival before the first statement writing an issuance,
+// insertsPublished runs rival before the first statement writing an issuance,
 // on another connection, and counts the writes it sees.
-type insertsIssuance struct {
+type insertsPublished struct {
 	once   sync.Once
 	rival  func()
 	writes int
 }
 
-func (h *insertsIssuance) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
-	if strings.HasPrefix(e.Query, "INSERT ") && strings.Contains(e.Query, "vex_issuance") {
+func (h *insertsPublished) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if strings.HasPrefix(e.Query, "INSERT ") && strings.Contains(e.Query, "published_vex") {
 		h.writes++
 		h.once.Do(h.rival)
 	}
 	return ctx
 }
 
-func (h *insertsIssuance) AfterQuery(context.Context, *bun.QueryEvent) {}
+func (h *insertsPublished) AfterQuery(context.Context, *bun.QueryEvent) {}
 
 func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 	// Both read the same highest number inside their transactions, and the
@@ -108,7 +108,7 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 			map[int64][]access.Role{product.ID: {access.PublicTriage}}, 0)
 		named := publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}
 
-		hook := &insertsIssuance{rival: func() {
+		hook := &insertsPublished{rival: func() {
 			if _, err := vex.NewStore(db.DB).Issued(context.Background(), subject, named,
 				"sonic", "master", "broadcom", vex.Ours); err != nil {
 				t.Errorf("the rival issuance: %v", err)
@@ -147,7 +147,7 @@ func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
 		id    func(w *fixture.World) int64
 	}{
 		{"product", (*catalog.Product)(nil), func(w *fixture.World) int64 { return w.Product.ID }},
-		{"stream", (*catalog.Stream)(nil), func(w *fixture.World) int64 { return w.Branch.ID }},
+		{"branch_or_tag", (*catalog.BranchOrTag)(nil), func(w *fixture.World) int64 { return w.Branch.ID }},
 		{"variant", (*catalog.Variant)(nil), func(w *fixture.World) int64 { return w.Customer.ID }},
 	} {
 		t.Run(level.name, func(t *testing.T) {
@@ -178,7 +178,7 @@ func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
 					t.Errorf("recording a document for a build whose %s was renamed meanwhile answered %v",
 						level.name, err)
 				}
-				went, err := db.DB.NewSelect().Table("vex_issuance").Count(ctx)
+				went, err := db.DB.NewSelect().Table("published_vex").Count(ctx)
 				if err != nil {
 					t.Fatal(err)
 				}

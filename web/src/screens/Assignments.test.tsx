@@ -17,7 +17,7 @@ const HELD = {
   component: "frr",
   version: "8.5",
   product: "sonic",
-  stream: "master",
+  branch_or_tag: "master",
   variant: "broadcom",
   occurrences: 1,
   builds: 1,
@@ -34,16 +34,16 @@ async function drawn(row: Record<string, unknown>) {
   return mount.host().querySelector<HTMLAnchorElement>("td a")?.getAttribute("href");
 }
 
-describe("a lead in the work somebody holds", () => {
-  it("opens the lead's page and says it is a lead", async () => {
+describe("a code finding in the work somebody holds", () => {
+  it("opens the code finding's page and says it is a code finding", async () => {
     const to = await drawn({ ...HELD, occurrence: "abc" });
-    expect(to).toBe("/products/sonic/streams/master/variants/broadcom/leads/abc");
-    expect(mount.host().textContent).toContain("lead");
+    expect(to).toBe("/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc");
+    expect(mount.host().textContent).toContain("code finding");
   });
 
-  it("opens a finding's page where the row is no lead", async () => {
+  it("opens a finding's page where the row is no code finding", async () => {
     const to = await drawn({ ...HELD, vulnerability: "CVE-2026-1" });
-    expect(to).not.toContain("/leads/");
+    expect(to).not.toContain("/code-findings/");
   });
 });
 
@@ -61,16 +61,16 @@ describe("nobody else holding anything in a product", () => {
     mount.render(screen(<Assignments />, "/assignments?tab=people"));
     await settle();
     return Array.from(mount.host().querySelectorAll("a")).find((each) =>
-      each.textContent?.startsWith("Unassigned leads"),
+      each.textContent?.startsWith("Unassigned code findings"),
     );
   }
 
-  it("links the product's leads nobody holds", async () => {
+  it("links the product's code findings nobody holds", async () => {
     const link = await linked(true);
-    expect(link?.getAttribute("href")).toBe("/products/sonic/leads?assigned=nobody");
+    expect(link?.getAttribute("href")).toBe("/products/sonic/code-findings?assigned=nobody");
   });
 
-  it("links no leads for somebody who reads no internal material", async () => {
+  it("links no code findings for somebody who reads no internal material", async () => {
     expect(await linked(false)).toBeUndefined();
   });
 });

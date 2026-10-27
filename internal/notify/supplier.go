@@ -44,12 +44,12 @@ func (w *Watch) suppliersSilent(ctx context.Context) ([]Holds, error) {
 	after = max(after, 2*every)
 
 	var sources []struct {
-		supplier.Source `bun:"extend"`
+		supplier.Feed `bun:"extend"`
 
 		Product string `bun:"product"`
 	}
 	err = w.db.NewSelect().
-		Model((*supplier.Source)(nil)).
+		Model((*supplier.Feed)(nil)).
 		ColumnExpr("sp.*").
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "sp"."product_id"`).

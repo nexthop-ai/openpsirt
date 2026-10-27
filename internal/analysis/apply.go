@@ -33,7 +33,7 @@ type Applier struct {
 	db  *database.DB
 	now func() time.Time
 	// drops is told of each applied run that dropped sharply, and lapses of
-	// whose decisions on leads a run lapsed, once its transaction has committed.
+	// whose decisions on code findings a run lapsed, once its transaction has committed.
 	drops  func(context.Context, Drop)
 	lapses func(context.Context, []triage.ForPerson)
 }
@@ -49,10 +49,10 @@ func NewApplier(db *database.DB) *Applier {
 	return &Applier{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// Drop is an applied run that marked more of a build's open leads not
+// Drop is an applied run that marked more of a build's open code findings not
 // reproduced than the deployment expects of one run.
 type Drop struct {
-	RunID, SeriesID, TargetID int64
+	RunID, SeriesID, BuildID int64
 	// Missed is how many it marked, and Live how many it could have.
 	Missed, Live int
 }
@@ -65,7 +65,7 @@ func (a *Applier) TellingDrops(tell func(context.Context, Drop)) *Applier {
 	return a
 }
 
-// TellingLapses has the applier tell the proposers of the decisions on leads a
+// TellingLapses has the applier tell the proposers of the decisions on code findings a
 // run lapsed, on the terms TellingDrops tells.
 func (a *Applier) TellingLapses(tell func(context.Context, []triage.ForPerson)) *Applier {
 	a.lapses = tell
@@ -78,14 +78,14 @@ type Receipt struct {
 	Opened              int            `json:"opened" doc:"Results the run reported that the build did not hold open"`
 	Seen                int            `json:"seen" doc:"Results the build held open that the run reported again"`
 	Returned            int            `json:"returned" doc:"Of those seen again, the ones an earlier run had not reported"`
-	NotReproduced       int            `json:"not_reproduced" doc:"Results the build held open that this comparable run did not report"`
-	SharpDrop           bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers"`
-	Probable            int            `json:"probable,omitempty" doc:"Results paired with a lead on its function or its nearest line rather than its whole key"`
-	Inherited           int            `json:"inherited,omitempty" doc:"Results new to the build carried from a lead of the branch it was cut from"`
-	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the occurrence of a lead on the build that was closed"`
+	NoLongerDetected    int            `json:"no_longer_detected" doc:"Results the build held open that this comparable run did not report"`
+	SharpDrop           bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results no longer detected than the deployment expects of one run, which tells the product's internal readers"`
+	Probable            int            `json:"probable,omitempty" doc:"Results paired with a code finding on its function or its nearest line rather than its whole key"`
+	Inherited           int            `json:"inherited,omitempty" doc:"Results new to the build carried from a code finding of the branch it was cut from"`
+	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the occurrence of a code finding on the build that was closed"`
 	Uncompared          int            `json:"uncompared,omitempty" doc:"Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set"`
-	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build"`
-	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"`
+	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another branch or tag, from the last run on that branch or tag's build"`
+	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent"`
 	Scanners            []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
 	Discarded           map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
 }
@@ -99,7 +99,7 @@ const (
 	// DroppedNotAProblem is a result whose kind reports no problem: a check
 	// that passed, or one that did not apply.
 	DroppedNotAProblem = "not-a-problem"
-	DroppedSuppressed  = "suppressed"
+	DroppedSuppressed  = "suppressed-by-the-tool"
 	// DroppedAbsent is a result the tool says is no longer found.
 	DroppedAbsent = "absent"
 )
@@ -126,7 +126,7 @@ func (a *Applier) Apply(ctx context.Context, runID int64) (series.Status, error)
 	if !pending(run.Status) {
 		return run.Status, nil
 	}
-	built, err := inventoryOf(ctx, a.db.DB, run.TargetID)
+	built, err := inventoryOf(ctx, a.db.DB, run.BuildID)
 	if err != nil {
 		return "", err
 	}
@@ -287,14 +287,14 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		return "", err
 	}
 	// Only a run newer than the series' last on this build is applied. An
-	// older one arriving late would mark results not reproduced and the next
+	// older one arriving late would mark results no longer detected and the next
 	// run would reopen them.
 	if previous != nil && !run.BuiltAt.After(previous.BuiltAt) {
 		run.Status = series.Superseded
 		return run.Status, a.end(ctx, store, run, placed.Receipt)
 	}
 
-	inventory, err := inventoryOf(ctx, tx, run.TargetID)
+	inventory, err := inventoryOf(ctx, tx, run.BuildID)
 	if err != nil {
 		return "", err
 	}
@@ -332,11 +332,11 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		if err != nil {
 			return "", err
 		}
-		// The series' first run on a build cut from another stream is
-		// matched against the parent build's leads, so its fingerprints are
+		// The series' first run on a build cut from another branch or tag is
+		// matched against the parent build's code findings, so its fingerprints are
 		// compared with what that build last carried.
 		if last == "" && previous == nil {
-			parent, err := parentBuild(ctx, tx, run.TargetID)
+			parent, err := parentBuild(ctx, tx, run.BuildID)
 			if err != nil {
 				return "", err
 			}
@@ -348,7 +348,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		}
 		run.FingerprintsChanged = last != "" && last != run.Fingerprints
 	}
-	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.TargetID)
+	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.BuildID)
 	if err != nil {
 		return "", err
 	}
@@ -371,7 +371,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		}
 		if sharp {
 			receipt.SharpDrop = true
-			said.drop = &Drop{RunID: run.ID, SeriesID: set.ID, TargetID: run.TargetID,
+			said.drop = &Drop{RunID: run.ID, SeriesID: set.ID, BuildID: run.BuildID,
 				Missed: len(missed), Live: live(open)}
 		}
 	}
@@ -390,7 +390,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	if err != nil {
 		return "", err
 	}
-	components, err := componentsOf(ctx, tx, run.TargetID, fresh)
+	components, err := componentsOf(ctx, tx, run.BuildID, fresh)
 	if err != nil {
 		return "", err
 	}
@@ -399,8 +399,8 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		again = append(again, id)
 	}
 	sort.Slice(again, func(i, j int) bool { return again[i] < again[j] })
-	// Marked before the run reads a hand-off or writes a lead's source: a
-	// disclosure or a move of a lead it describes waits for it, or reads
+	// Marked before the run reads a flaw record or writes a code finding's source: a
+	// disclosure or an inclusion of a code finding it describes waits for it, or reads
 	// again.
 	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, freshOccurrences(set.ID, fresh, from), again); err != nil {
 		return "", err
@@ -412,10 +412,10 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	if err := describeAgain(ctx, tx, matched); err != nil {
 		return "", err
 	}
-	// What the run kept beside a lead disclosed with its flaw is stripped
+	// What the run kept beside a code finding disclosed with its flaw is stripped
 	// again, as disclosure stripped it.
 	described := append(append([]int64{}, opened...), again...)
-	if err := finding.StripDisclosedLeads(ctx, tx, set.ProductID, described); err != nil {
+	if err := finding.StripDisclosedCodeFindings(ctx, tx, set.ProductID, described); err != nil {
 		return "", err
 	}
 
@@ -432,7 +432,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		if err := store.Missed(ctx, run, missed); err != nil {
 			return "", err
 		}
-		receipt.NotReproduced = len(missed)
+		receipt.NoLongerDetected = len(missed)
 		receipt.Uncompared = uncompared
 	}
 	if err := store.Modules(ctx, run.ID, placed.Modules); err != nil {
@@ -466,8 +466,8 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	return run.Status, a.end(ctx, store, run, receipt)
 }
 
-// comparedTo is the leads a comparable run missed that it is also comparable
-// to the run that last saw: the same tool, version and rule set. A lead last
+// comparedTo is the code findings a comparable run missed that it is also comparable
+// to the run that last saw: the same tool, version and rule set. A code finding last
 // seen by another is left open and counted, since its absence says nothing
 // about the code. Each of those runs is read once.
 func comparedTo(ctx context.Context, store *series.Store, run *series.Run, open []series.Sighting,
@@ -503,8 +503,8 @@ func comparedTo(ctx context.Context, store *series.Store, run *series.Run, open 
 	return kept, uncompared, nil
 }
 
-// lapseProbable lapses the decisions dismissing each lead this run paired only
-// probably, on its function or its nearest line, whether it was a lead open on
+// lapseProbable lapses the decisions dismissing each code finding this run paired only
+// probably, on its function or its nearest line, whether it was a code finding open on
 // the build or one carried from elsewhere.
 func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map[int64]Keyed,
 	from map[int]carried, now time.Time) (triage.Lapsed, error) {
@@ -520,7 +520,7 @@ func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map
 		var some []string
 		if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
 			Where(`"f"."id" IN (?)`, bun.List(batch)).Scan(ctx, &some); err != nil {
-			return fmt.Errorf("read the occurrences of leads paired probably: %w", err)
+			return fmt.Errorf("read the occurrences of code findings paired probably: %w", err)
 		}
 		occurrences = append(occurrences, some...)
 		return nil
@@ -532,7 +532,7 @@ func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map
 			occurrences = append(occurrences, c.occurrence)
 		}
 	}
-	return triage.LapseLeads(ctx, tx, productID, occurrences, now)
+	return triage.LapseCodeFindings(ctx, tx, productID, occurrences, now)
 }
 
 // printsOf is what a run's results are fingerprinted with: the scheme each
@@ -580,7 +580,7 @@ func (a *Applier) end(ctx context.Context, store *series.Store, run *series.Run,
 	return store.Mark(ctx, run)
 }
 
-// live is the sightings a comparable run could mark not reproduced: those
+// live is the sightings a comparable run could mark no longer detected: those
 // the last comparable run saw.
 func live(open []series.Sighting) int {
 	n := 0
@@ -612,7 +612,7 @@ func sharpDrop(ctx context.Context, db bun.IDB, missed, live int) (bool, error) 
 	return missed >= floor && missed*100 > share*live, nil
 }
 
-// OpensAt is the visibility a lead opens at unless it was handed off, and the
-// one a receipt counting leads is read at: a result nobody has judged is
+// OpensAt is the visibility a code finding opens at unless it was recorded as a flaw, and the
+// one a receipt counting code findings is read at: a result nobody has judged is
 // internal.
 const OpensAt = access.Internal

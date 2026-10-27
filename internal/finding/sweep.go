@@ -16,7 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// Sweeper applies standing routing rules to work nobody holds.
+// Sweeper applies standing assignment rules to work nobody holds.
 //
 // Queued work, in bounded batches. One rule naming a source package sweeps
 // thousands of existing unowned issues across every occurrence each sits at, so
@@ -77,13 +77,13 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	// number an administrator changes takes effect on the next pass rather
 	// than on the next restart. Read before anything is claimed, so a failure
 	// here leaves no job held until its claim goes stale.
-	batch, err := setting.NewStore(s.db.DB).Count(ctx, setting.RoutingBatch,
-		setting.DefaultRoutingBatch)
+	batch, err := setting.NewStore(s.db.DB).Count(ctx, setting.AssignmentBatch,
+		setting.DefaultAssignmentBatch)
 	if err != nil {
 		return 0, err
 	}
 
-	job, err := s.queue.Claim(ctx, s.name, queue.Route)
+	job, err := s.queue.Claim(ctx, s.name, queue.AssignmentSweep)
 	if err != nil || job == nil {
 		return 0, err
 	}
@@ -97,7 +97,7 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 		// otherwise sits claimed until its lease runs out, and nobody hears.
 		if err := s.queue.Fail(settled, job.ID, s.name,
 			fmt.Errorf("not a product: %q", job.Reference)); err != nil {
-			return 0, fmt.Errorf("fail routing job %d, whose reference is not a product: %w", job.ID, err)
+			return 0, fmt.Errorf("fail assignment sweep %d, whose reference is not a product: %w", job.ID, err)
 		}
 		return 0, nil
 	}
@@ -109,7 +109,7 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	// sweep carries on past it — but a rule that has silently stopped placing
 	// reads exactly like a rule nobody has needed.
 	for _, rule := range outgrown {
-		s.logger.Warn("a routing rule names too much of the tree to run",
+		s.logger.Warn("an assignment rule names too much of the tree to run",
 			"product", productID, "rule", rule)
 	}
 	taken := release()
@@ -133,8 +133,8 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 		// settling has one: a shutdown must not be what loses the rest of the
 		// estate.
 		queuing, done := queue.Settling(ctx)
-		if _, queued := s.queue.Add(queuing, queue.Route, job.Reference); queued != nil {
-			err = fmt.Errorf("queue the rest of routing product %d: %w", productID, queued)
+		if _, queued := s.queue.Add(queuing, queue.AssignmentSweep, job.Reference); queued != nil {
+			err = fmt.Errorf("queue the rest of the assignment sweep of product %d: %w", productID, queued)
 		}
 		done()
 	}

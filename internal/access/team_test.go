@@ -44,7 +44,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 				team.Name, team.Called())
 		}
 		if team.PartyID == 0 {
-			t.Fatal("a team nothing can be routed to is not a team")
+			t.Fatal("a team nothing can be assigned to is not a team")
 		}
 
 		for _, who := range []int64{cleared.ID, plain.ID} {
@@ -162,7 +162,7 @@ func TestDeclaringATeamTwiceIsOneTeam(t *testing.T) {
 }
 
 func TestDeclaringARetiredTeamsNameBringsItBack(t *testing.T) {
-	// A retired team's row stays, so that work already routed to it resolves
+	// A retired team's row stays, so that work already assigned to it resolves
 	// to something a screen can name, and its name stays taken under the
 	// unique index. Declaring the name again brings the team back: declaring
 	// is idempotent everywhere else here, and this is what somebody typing a

@@ -75,7 +75,7 @@ func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
 		// The list the number opens: two rows, one per issue and
 		// component. The list is scoped by query rather than by path:
 		// with the branch and the variant named it is this one build.
-		const listing = "/v1/products/mine/findings?stream=master&variant=broadcom"
+		const listing = "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"
 		list := func(query string) (total int, code int) {
 			t.Helper()
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, listing+query, "")
@@ -103,7 +103,7 @@ func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
 			t.Errorf("beneath a name the build lacks answered %d, want 404, as every component lookup answers a name nothing holds", code)
 		}
 		got = httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/findings/components?stream=master&variant=broadcom&beneath=docker-b", "")
+			"/v1/products/mine/findings/components?branch_or_tag=master&variant=broadcom&beneath=docker-b", "")
 		var byComponent struct {
 			Total int `json:"total"`
 		}
@@ -124,12 +124,12 @@ func TestTheTreeIsReachedByNameAndVersionWhereANameIsNotEnough(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+		build, err := names.BuildFor(ctx, located.BranchOrTagID, located.VariantID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "versions", BuiltAt: time.Now().UTC(), ParserVersion: "test",
+			BuildID: build.ID, ContentHash: "versions", BuiltAt: time.Now().UTC(), ParserVersion: "test",
 		})
 		if err != nil || outcome != ingest.Accept {
 			t.Fatalf("record scan: %v %v", outcome, err)
@@ -137,7 +137,7 @@ func TestTheTreeIsReachedByNameAndVersionWhereANameIsNotEnough(t *testing.T) {
 		product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 		old := graph.Described{Purl: "pkg:golang/stdlib@go1.24.9", Name: "stdlib", Version: "go1.24.9"}
 		newer := graph.Described{Purl: "pkg:golang/stdlib@go1.25.6", Name: "stdlib", Version: "go1.25.6"}
-		if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
+		if _, err := fixture.ApplyGraph(ctx, r.DB.DB, build.ID, scan.ID, graph.Snapshot{
 			Root:       product,
 			Components: []graph.Described{old, newer},
 			Dependencies: []graph.Dependency{

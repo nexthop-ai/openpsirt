@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/analysisclient"
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
+	"github.com/nexthop-ai/openpsirt/internal/uploadclient"
 )
 
 // checkout is the reader fixtures' sources as a committed git checkout, with
@@ -56,19 +56,19 @@ func checkout(t *testing.T, remote string) string {
 // with, so the two cannot come to disagree about a field.
 func TestWhatTheClientWritesIsWhatTheDeploymentReads(t *testing.T) {
 	root := checkout(t, "git@github.com:example/sonic.git")
-	var inputs []analysisclient.Input
+	var inputs []uploadclient.Input
 	for _, name := range []string{"clang18-a.plist", "clang18-b.plist"} {
-		data, err := os.ReadFile(filepath.Join("..", "analysisclient", "testdata", name)) //nolint:gosec // G304: a path under the test's own directory
+		data, err := os.ReadFile(filepath.Join("..", "uploadclient", "testdata", name)) //nolint:gosec // G304: a path under the test's own directory
 		if err != nil {
 			t.Fatal(err)
 		}
-		inputs = append(inputs, analysisclient.Input{Name: name, Data: data})
+		inputs = append(inputs, uploadclient.Input{Name: name, Data: data})
 	}
 	two, exit := 2, 0
 	built := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
-	runs, _, err := analysisclient.Build(t.Context(), analysisclient.Options{
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
 		Root: root, Work: root, Series: "clang-sa/default", Built: built,
-		UnitsExpected: &two, ExitStatus: &exit, Client: "openpsirt-analysis test",
+		UnitsExpected: &two, ExitStatus: &exit, Client: "openpsirt-upload test",
 	}, inputs)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestWhatTheClientWritesIsWhatTheDeploymentReads(t *testing.T) {
 		t.Errorf("series %q built %v", stated.Series, stated.BuiltAt)
 	}
 	p := stated.Params
-	if p.ToolName != "clang" || p.ClientVersion != "openpsirt-analysis test" ||
+	if p.ToolName != "clang" || p.ClientVersion != "openpsirt-upload test" ||
 		p.UnitsExpected == nil || *p.UnitsExpected != 2 || p.UnitsAnalyzed == nil || *p.UnitsAnalyzed != 2 ||
 		p.ExitStatus == nil || *p.ExitStatus != 0 || p.Completed == nil || !*p.Completed {
 		t.Errorf("parameters %+v", p)

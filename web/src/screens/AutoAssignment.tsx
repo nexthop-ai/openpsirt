@@ -15,15 +15,14 @@ import { Loading } from "../ui/Loading";
 import { Suggest } from "../ui/Suggest";
 import { Wide } from "../ui/Wide";
 
-// The standing rules that hand work nobody holds to a team.
+// The assignment rules that hand work nobody holds to a team.
 //
 // First match wins, and the order is the whole of the precedence, so the
 // screen shows it as a numbered list rather than as a set.
 //
-// Called auto-assignment rather than routing, and kept beside the other things
-// an administrator sets up. "Routing" says where something goes and this says
-// who it becomes: the act it automates is assignment, and it is the only place
-// in the tool where something is assigned without a person doing it.
+// Called auto-assignment, and kept beside the other things an administrator
+// sets up. The act it automates is assignment, and it is the only place in the
+// tool where something is assigned without a person doing it.
 export function AutoAssignment() {
   const [params, setParams] = useSearchParams();
   const product = params.get("product") ?? "";
@@ -61,7 +60,7 @@ export function AutoAssignment() {
   //
   // Read with no term as well as with one, so that opening the field shows
   // what is there. Unnarrowed the endpoint answers most-carrying first, which
-  // is the right order for this: the packages a routing rule is worth writing
+  // is the right order for this: the packages an assignment rule is worth writing
   // about are the ones carrying the work.
   // The star is the rule's syntax, not the lookup's: `q` is a substring
   // search, so sending `linux-image*` through it asks for a literal asterisk
@@ -139,7 +138,7 @@ export function AutoAssignment() {
 
   const rules = useQuery({
     enabled: product !== "",
-    queryKey: ["routing-rules", product],
+    queryKey: ["assignment-rules", product],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/assignment-rules", {
@@ -171,7 +170,7 @@ export function AutoAssignment() {
       setName("");
       setUpstream("");
       setBeneath("");
-      void queries.invalidateQueries({ queryKey: ["routing-rules"] });
+      void queries.invalidateQueries({ queryKey: ["assignment-rules"] });
     },
   });
 
@@ -184,7 +183,7 @@ export function AutoAssignment() {
       ),
     onSuccess: () => {
       setSaid("Retired. What it placed stays assigned.");
-      void queries.invalidateQueries({ queryKey: ["routing-rules"] });
+      void queries.invalidateQueries({ queryKey: ["assignment-rules"] });
     },
   });
 
@@ -241,7 +240,7 @@ export function AutoAssignment() {
             <Loading />
           ) : items.length === 0 ? (
             <Empty
-              title="Nothing is routed automatically."
+              title="Nothing is assigned automatically."
               detail="Without a rule, work nobody holds stays in the unassigned list until somebody picks it up."
             />
           ) : (
@@ -483,7 +482,7 @@ export function AutoAssignment() {
 // The list is searchable rather than a bare select: a real image carries
 // several thousand components, and a select of several thousand is a worse
 // control than the text box it replaced. Unnarrowed it offers the ones
-// carrying the most work, which is what a routing rule gets written about.
+// carrying the most work, which is what an assignment rule gets written about.
 function Key({
   id,
   label,

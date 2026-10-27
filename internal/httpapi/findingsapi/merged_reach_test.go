@@ -39,9 +39,9 @@ func TestAnIssuePageNamesNoMergeOfARecordOutOfReach(t *testing.T) {
 		}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		theirs := r.TargetOf(t, httpapitest.Build{Product: "theirs", Stream: "master", Variant: "mellanox"})
+		theirs := r.BuildOf(t, httpapitest.Build{Product: "theirs", BranchOrTag: "master", Variant: "mellanox"})
 		var row finding.Finding
-		if err := db.NewSelect().Model(&row).Where(`"target_id" = ?`, theirs).Limit(1).Scan(ctx); err != nil {
+		if err := db.NewSelect().Model(&row).Where(`"build_id" = ?`, theirs).Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		row.ID, row.Kind, row.Visibility = 0, finding.Entered, access.Private

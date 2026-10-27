@@ -1,0 +1,283 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { type ReactNode, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { api, type Body } from "../api/client";
+import { unwrap } from "../api/queries";
+import { Failed } from "../ui/Failed";
+import { Icon } from "../ui/Icons";
+import { scanState } from "../ui/fixes";
+import { at, on, typedMoment, typedNow } from "../ui/when";
+import { useReseed } from "../ui/reseed";
+
+// The record that this product was attacked through the issue, and the form
+// for keeping one.
+//
+// Two things nothing else on the screen holds: when it became known, which is
+// what any window counts from, and what happened, which nothing re-checks. The
+// severity line beside it already names the issue and the product, so neither
+// is repeated here.
+// The row the server sends, taken from the generated types rather than
+// declared here. A hand-copied shape compiles perfectly while quietly missing
+// whatever the server grew since it was written.
+type Kept = Body<"IncidentBody">;
+
+export function Incident({
+  product,
+  vulnerability,
+  records,
+  mayTriage,
+}: {
+  product: string;
+  vulnerability: string;
+  records?: Kept[];
+  mayTriage: boolean;
+}) {
+  const queries = useQueryClient();
+  const [keeping, setKeeping] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  // A form opened on one issue is closed on arriving at another: the screen
+  // is not remounted when only its address changes.
+  useReseed(`${product}|${vulnerability}`, () => {
+    setKeeping(false);
+    setClearing(false);
+  });
+  const done = () => void queries.invalidateQueries({ queryKey: ["finding"] });
+
+  const kept = records ?? [];
+  const standing = kept.find((each) => each.standing);
+  const cleared = kept.filter((each) => !each.standing);
+
+  if (kept.length === 0) {
+    if (!mayTriage) return null;
+    if (!keeping) {
+      return (
+        <p>
+          <button
+            type="button"
+            className="btn ghost"
+            title="Our product was attacked through this issue. Not a feed flag"
+            onClick={() => setKeeping(true)}
+          >
+            <Icon name="shield" size={14} /> Record an incident
+          </button>
+        </p>
+      );
+    }
+    return (
+      <Keep
+        product={product}
+        vulnerability={vulnerability}
+        onClose={() => setKeeping(false)}
+        done={done}
+      />
+    );
+  }
+
+  return (
+    <div className="evblock">
+      <h4>Incidents</h4>
+      {standing ? (
+        <>
+          <p>
+            Known since <b style={{ color: "var(--ink)" }}>{at(standing.known_at)}</b>
+            {standing.recorded_by && <> · recorded by {standing.recorded_by}</>}
+          </p>
+          <p>{standing.grounds}</p>
+          {/* Who outside was told, recorded on the Incidents screen. */}
+          {(standing.told ?? []).map((one) => (
+            <p key={one.id} className="hint">
+              Told {one.recipient} at {at(one.told_at)}
+              {one.window && <> · for {one.window}</>}
+              {one.reference && <> · {one.reference}</>}
+            </p>
+          ))}
+          {/* The tags named as carrying the fix, named from the Incidents
+              screen. */}
+          {(standing.fixes ?? [])
+            .filter((fix) => !fix.withdrawn_at)
+            .map((fix) => (
+              <p key={`fix-${fix.id}`} className="hint">
+                Fix in {fix.release_name} ·{" "}
+                {fix.released_on ? `released ${fix.released_on}` : "no release date"} ·{" "}
+                {scanState(fix)}
+              </p>
+            ))}
+          {mayTriage && !clearing && (
+            <button type="button" className="linkish" onClick={() => setClearing(true)}>
+              Clear this
+            </button>
+          )}
+          {clearing && (
+            <Clear id={standing.id ?? 0} onClose={() => setClearing(false)} done={done} />
+          )}
+        </>
+      ) : (
+        <>
+          <p className="hint">Nothing stands. What was recorded before is below.</p>
+          {mayTriage &&
+            (keeping ? (
+              <Keep
+                product={product}
+                vulnerability={vulnerability}
+                onClose={() => setKeeping(false)}
+                done={done}
+              />
+            ) : (
+              <button type="button" className="linkish" onClick={() => setKeeping(true)}>
+                Record it again
+              </button>
+            ))}
+        </>
+      )}
+      {/* What was taken back, kept rather than hidden: it is part of the
+          answer to what was known and when. */}
+      {cleared.map((each) => (
+        <p key={each.id} className="hint">
+          Known since {at(each.known_at)}, cleared {on(each.cleared_at)}
+          {each.cleared_by && <> by {each.cleared_by}</>} — {each.cleared_because}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// The one form that records an attack, drawn on the finding and on the
+// Incidents screen. The screen asks for the product and the issue as
+// well, and hands that pick in to be drawn above the form's own fields.
+export function Keep({
+  product,
+  vulnerability,
+  onClose,
+  done,
+  pick,
+}: {
+  product: string;
+  vulnerability: string;
+  onClose: () => void;
+  done: () => void;
+  pick?: ReactNode;
+}) {
+  // Typed in UTC, as every moment on the card is drawn, and defaulting to now
+  // in UTC. The default and the reading are one rule, because this is the
+  // one column every window counts from.
+  const [knownAt, setKnownAt] = useState(() => typedNow());
+  const [grounds, setGrounds] = useState("");
+
+  const keep = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.POST("/v1/products/{product}/issues/{issue}/incidents", {
+          params: { path: { product, issue: vulnerability.trim() } },
+          body: { known_at: typedMoment(knownAt), grounds },
+        }),
+      ),
+    onSuccess: () => {
+      onClose();
+      setGrounds("");
+      done();
+    },
+  });
+
+  return (
+    <div className="rating">
+      {keep.error != null && <Failed error={keep.error} what="That could not be recorded." />}
+      {pick ?? (
+        <p className="hint" style={{ margin: "0 0 8px" }}>
+          Our product, attacked through this issue. Not a feed flag.
+        </p>
+      )}
+      <div className="field" style={{ marginBottom: 8 }}>
+        <label htmlFor="knownat">Known since (UTC)</label>
+        <input
+          id="knownat"
+          type="datetime-local"
+          style={{ width: "auto" }}
+          value={knownAt}
+          onChange={(event) => setKnownAt(event.target.value)}
+        />
+      </div>
+      <div className="field" style={{ marginBottom: 8, maxWidth: "78ch" }}>
+        <label htmlFor="grounds">Account</label>
+        <textarea
+          id="grounds"
+          style={{ minHeight: 64 }}
+          value={grounds}
+          placeholder="Who reported it, what they saw, and where the evidence is"
+          onChange={(event) => setGrounds(event.target.value)}
+        />
+      </div>
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          disabled={
+            !product ||
+            !vulnerability.trim() ||
+            grounds.trim() === "" ||
+            typedMoment(knownAt) === "" ||
+            keep.isPending
+          }
+          onClick={() => keep.mutate()}
+        >
+          Record
+        </button>
+        <button type="button" className="btn quiet" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Clear({ id, onClose, done }: { id: number; onClose: () => void; done: () => void }) {
+  const [because, setBecause] = useState("");
+
+  const clear = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.DELETE("/v1/incidents/{id}", {
+          params: { path: { id } },
+          body: { because },
+        }),
+      ),
+    onSuccess: () => {
+      onClose();
+      done();
+    },
+  });
+
+  return (
+    <div className="rating">
+      {clear.error != null && <Failed error={clear.error} what="That could not be cleared." />}
+      <p className="hint" style={{ margin: "0 0 8px" }}>
+        The record stays readable with your name on it. Approvals it took back stay taken back.
+      </p>
+      <div className="field" style={{ marginBottom: 8, maxWidth: "78ch" }}>
+        <label htmlFor="because">Reason</label>
+        <textarea
+          id="because"
+          style={{ minHeight: 48 }}
+          value={because}
+          placeholder="What makes the record wrong"
+          onChange={(event) => setBecause(event.target.value)}
+        />
+      </div>
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          disabled={because.trim() === "" || clear.isPending}
+          onClick={() => clear.mutate()}
+        >
+          Clear
+        </button>
+        <button type="button" className="btn quiet" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}

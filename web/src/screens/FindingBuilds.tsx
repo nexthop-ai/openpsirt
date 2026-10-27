@@ -80,8 +80,8 @@ export function AffectedBuilds({
           params: { path: { product, issue: vulnerability } },
           body: {
             builds: picked.map((each) => {
-              const { stream, variant } = fromBuildKey(each);
-              return { stream, variant };
+              const { branch_or_tag: branchOrTag, variant } = fromBuildKey(each);
+              return { branch_or_tag: branchOrTag, variant };
             }),
             ...(because.trim() ? { reason: because.trim() } : {}),
           },
@@ -158,7 +158,7 @@ export function AffectedBuilds({
                     }}
                   />{" "}
                   <span className="id">
-                    {build.stream} · {build.variant}
+                    {build.branch_or_tag} · {build.variant}
                   </span>{" "}
                   <span className="hint">{build.kind === "tag" ? "tag" : "branch"}</span>
                 </label>

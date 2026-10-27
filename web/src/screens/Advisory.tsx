@@ -69,7 +69,7 @@ export function Advisory() {
   return (
     <>
       <nav aria-label="Breadcrumb" className="hint" style={{ marginBottom: 8 }}>
-        <Link to="/advisories">Advisories</Link> / {advisory}
+        <Link to="/advisories">Published advisories</Link> / {advisory}
       </nav>
 
       <div className="screen-head">
@@ -297,12 +297,12 @@ function Releases({
                 const status = releaseStatus(row.status);
                 return (
                   <tr
-                    key={`${row.product} ${row.vulnerability} ${row.stream} ${row.variant}`}
+                    key={`${row.product} ${row.vulnerability} ${row.branch_or_tag} ${row.variant}`}
                     className="row"
                   >
                     <td className="id">{row.vulnerability}</td>
                     <td>
-                      {row.product_name || row.product} {row.stream} ({row.variant})
+                      {row.product_name || row.product} {row.branch_or_tag} ({row.variant})
                     </td>
                     <td>
                       <span className={`state ${status.tone}`}>{status.label}</span>
@@ -368,7 +368,7 @@ function Releases({
                               advisory,
                               product: row.product,
                               vulnerability: row.vulnerability,
-                              stream: row.stream,
+                              branch_or_tag: row.branch_or_tag,
                               variant: row.variant,
                               affected: !row.marked,
                             })

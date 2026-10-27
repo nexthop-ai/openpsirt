@@ -44,12 +44,12 @@ const (
 // package, so a decision about the issue in one of them is a decision about it
 // in both, and offering the occurrences of one binary alone would let somebody
 // answer a third of the work and read as having answered it.
-func inFoldOf(targetID, vulnerabilityID, componentID int64,
+func inFoldOf(buildID, vulnerabilityID, componentID int64,
 	visible []access.Visibility) func(*bun.SelectQuery) *bun.SelectQuery {
 
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		kinds, args := kind.Triage.Where(`"f"."kind"`)
-		return q.Where(`"f"."target_id" = ?`, targetID).
+		return q.Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 			Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE "c2"."id" = ?)`,
 				componentID).
@@ -101,10 +101,10 @@ type Deciding struct {
 	Summary       string
 	Exploited     bool
 	LikelihoodPPM int
-	// ExploitedHere is this product's own standing record of being attacked
+	// Incident is this product's own standing incident
 	// through the issue. A bulk act that sets such an issue aside is refused,
 	// so the screen building one says which they are before it is sent.
-	ExploitedHere bool
+	Incident bool
 	// Consumer is what pulls the component in here, for naming the occurrence to
 	// somebody choosing which of them a decision covers. Empty where that is
 	// the product itself.
@@ -130,8 +130,8 @@ type Deciding struct {
 // Authorized here, not by the caller: reaching a finding is what makes it yours
 // to argue about, so an occurrence is only returned where the subject can see
 // findings of that visibility on that product.
-func (s *Store) OccurrenceFor(ctx context.Context, subject access.Subject, targetID int64, vulnerabilityID int64, occurrenceIdentity string) (*Deciding, error) {
-	productID, err := productOf(ctx, s.db, targetID)
+func (s *Store) OccurrenceFor(ctx context.Context, subject access.Subject, buildID int64, vulnerabilityID int64, occurrenceIdentity string) (*Deciding, error) {
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (s *Store) OccurrenceFor(ctx context.Context, subject access.Subject, targe
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var rows []occurrenceRow
 	err = occurrenceColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(Decidable).
@@ -219,13 +219,13 @@ type At struct {
 // a handle because the caller opens the transaction: resolved beforehand, a
 // retry recomputes a gate from findings somebody closed in between.
 func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subject,
-	productID int64, targets []int64, occurrences []At) (*time.Time, error) {
+	productID int64, buildIDs []int64, occurrences []At) (*time.Time, error) {
 
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
 		return nil, err
 	}
-	if len(targets) == 0 || len(occurrences) == 0 {
+	if len(buildIDs) == 0 || len(occurrences) == 0 {
 		return nil, nil
 	}
 
@@ -256,7 +256,7 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
 		Where(`"f"."occurrence_identity" IN (?)`, bun.List(identities)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -326,16 +326,16 @@ func distinctVersions(rows []occurrenceRow) int {
 	return len(seen)
 }
 
-// InBundle is one component of a fix bundle, with the occurrences the bundle
+// InPlannedUpgrade is one component of a planned upgrade, with the occurrences the upgrade
 // reaches in it.
 //
 // Grouped by component and issue because that is the grain a decision and a
-// fix target are both keyed on: a bundle spanning two binary packages of one
+// fix target are both keyed on: an upgrade spanning two binary packages of one
 // source is two of these, and one act covers both.
-type InBundle struct {
+type InPlannedUpgrade struct {
 	VulnerabilityID int64
 	ComponentID     int64
-	TargetID        int64
+	BuildID         int64
 	Occurrences     []Deciding
 }
 
@@ -355,18 +355,18 @@ type InBundle struct {
 // resolves the occurrences it writes about from inside it: resolved beforehand, a
 // retry can propose about a finding somebody closed in between.
 func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
-	subject access.Subject, productID int64, targets []int64,
-	component, version string) ([]InBundle, error) {
+	subject access.Subject, productID int64, buildIDs []int64,
+	component, version string) ([]InPlannedUpgrade, error) {
 
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
 		return nil, err
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return nil, nil
 	}
 
-	folds, err := OneFoldNamed(ctx, db, targets, component, version)
+	folds, err := OneFoldNamed(ctx, db, buildIDs, component, version)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 		occurrenceRow
 		VulnerabilityID    int64  `bun:"vulnerability_id"`
 		ComponentID        int64  `bun:"component_id"`
-		TargetID           int64  `bun:"target_id"`
+		BuildID            int64  `bun:"build_id"`
 		OccurrenceIdentity string `bun:"occurrence_identity"`
 		Consumer           string `bun:"consumer"`
 		FixedIn            string `bun:"fixed_in"`
@@ -386,11 +386,11 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 	query := occurrenceColumns(db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
@@ -402,7 +402,7 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// nothing here has and would leave out everything fixed in an
 		// earlier release of the same line.
 		//
-		// Matched on the fold, which is the reason the bundle view
+		// Matched on the fold, which is the reason the upgrade view
 		// existed: curl, libcurl4t64 and libcurl3t64 are one source package
 		// bumping once, and keying on the binary name would make upgrading
 		// them three acts that can disagree. Naming any of the three reaches
@@ -412,22 +412,22 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// fold it names in the builds asked about, so a source package named
 		// in two builds at two versions moves both.
 		Where(FoldedOn+` IN (?)`, bun.List(folds)).
-		OrderExpr(`"f"."vulnerability_id", "f"."component_id", "f"."target_id", "occurrence_identity"`)
+		OrderExpr(`"f"."vulnerability_id", "f"."component_id", "f"."build_id", "occurrence_identity"`)
 	err = query.Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where that bump would reach: %w", err)
 	}
 
 	order := []string{}
-	grouped := map[string]*InBundle{}
+	grouped := map[string]*InPlannedUpgrade{}
 	seen := map[string]bool{}
 	for _, row := range rows {
-		at := fmt.Sprintf("%d\x00%d\x00%d", row.VulnerabilityID, row.ComponentID, row.TargetID)
+		at := fmt.Sprintf("%d\x00%d\x00%d", row.VulnerabilityID, row.ComponentID, row.BuildID)
 		one, held := grouped[at]
 		if !held {
-			one = &InBundle{
+			one = &InPlannedUpgrade{
 				VulnerabilityID: row.VulnerabilityID, ComponentID: row.ComponentID,
-				TargetID: row.TargetID,
+				BuildID: row.BuildID,
 			}
 			grouped[at] = one
 			order = append(order, at)
@@ -454,7 +454,7 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 			Occurrences:        1,
 		})
 	}
-	bundled := make([]InBundle, 0, len(order))
+	bundled := make([]InPlannedUpgrade, 0, len(order))
 	for _, at := range order {
 		bundled = append(bundled, *grouped[at])
 	}
@@ -472,10 +472,10 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 // occurrence is a pair of names and the rows under one are ordered the same way
 // OccurrenceFor orders them, so which version a decision occurrence is keyed on
 // does not depend on what the database happened to return first.
-func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, buildID int64,
 	vulnerabilityID, componentID int64) ([]Deciding, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -495,7 +495,7 @@ func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, targ
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
-		Apply(inFoldOf(targetID, vulnerabilityID, componentID, visible)).
+		Apply(inFoldOf(buildID, vulnerabilityID, componentID, visible)).
 		OrderExpr(`consumer, "occurrence_identity", component_upstream, consumer_upstream`).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -553,8 +553,8 @@ func occurrenceColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, productID).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		// The upstream version where one is stated, and the component's own
 		// where none is. Most packages are not forks and state no upstream at

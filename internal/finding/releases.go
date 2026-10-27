@@ -18,11 +18,11 @@ import (
 
 // Release is one build of a product and how much stands open against it.
 type Release struct {
-	Stream  string
-	Kind    string
-	Variant string
+	BranchOrTag string
+	Kind        string
+	Variant     string
 	// Open is what the findings list would show for this build, before any
-	// triage line: one per issue at a component, however many occurrences it sits
+	// minimum severity: one per issue at a component, however many occurrences it sits
 	// at there.
 	//
 	// Not a row count. Rows are occurrences, and a component reached twenty
@@ -63,11 +63,11 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	_, all := subject.Products()
 
 	var rows []struct {
-		Stream  string `bun:"stream"`
-		Kind    string `bun:"kind"`
-		Variant string `bun:"variant"`
-		Band    string `bun:"band"`
-		Open    int    `bun:"open"`
+		BranchOrTag string `bun:"branch_or_tag"`
+		Kind        string `bun:"kind"`
+		Variant     string `bun:"variant"`
+		Band        string `bun:"band"`
+		Open        int    `bun:"open"`
 	}
 	// The distinct pairs first, counted after. Counting distinct over two
 	// columns at once is not something every engine spells the same way, and
@@ -81,39 +81,39 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`)
+		GroupExpr(`"f"."build_id", "f"."vulnerability_id", "f"."component_id"`)
 	pairs = inOneProduct(pairs, subject, productID, all)
 	inner := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, pairs).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "grouped"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "grouped"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
 		Join(rating.Here, productID).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"st"."kind" AS "kind"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(rating.BandExpr + ` AS "band"`)
 
 	query := s.db.NewSelect().
 		TableExpr(`(?) AS "at"`, inner).
-		ColumnExpr(`"at"."stream" AS "stream"`).
+		ColumnExpr(`"at"."branch_or_tag" AS "branch_or_tag"`).
 		ColumnExpr(`"at"."kind" AS "kind"`).
 		ColumnExpr(`"at"."variant" AS "variant"`).
 		ColumnExpr(`"at"."band" AS "band"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr(`"at"."stream", "at"."kind", "at"."variant", "at"."band"`).
+		GroupExpr(`"at"."branch_or_tag", "at"."kind", "at"."variant", "at"."band"`).
 		// Ordered here rather than in the caller, so every reader of this gets
 		// the same sequence. A chart whose points move between requests is
 		// worse than one that is wrong in a fixed way.
-		OrderExpr(`"at"."stream", "at"."variant"`)
+		OrderExpr(`"at"."branch_or_tag", "at"."variant"`)
 
 	if err := query.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what is open against each build: %w", err)
@@ -128,20 +128,20 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// of what it is, and the chart showing the estate getting better needs
 	// it.
 	var scanned []struct {
-		Stream  string `bun:"stream"`
-		Kind    string `bun:"kind"`
-		Variant string `bun:"variant"`
+		BranchOrTag string `bun:"branch_or_tag"`
+		Kind        string `bun:"kind"`
+		Variant     string `bun:"variant"`
 	}
 	builds := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"st"."kind" AS "kind"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
-			WHERE "sr"."target_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
+			WHERE "sr"."build_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
 		OrderExpr(`"st"."name", "va"."name"`)
 	if err := builds.Scan(ctx, &scanned); err != nil {
 		return nil, fmt.Errorf("read which builds have been scanned: %w", err)
@@ -153,24 +153,24 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// after everything that has something.
 	var releases []Release
 	at := map[string]int{}
-	occurrence := func(stream, kind, variant string) int {
-		key := stream + "\x00" + variant
+	occurrence := func(branchOrTag, kind, variant string) int {
+		key := branchOrTag + "\x00" + variant
 		index, seen := at[key]
 		if !seen {
 			index = len(releases)
 			at[key] = index
 			releases = append(releases, Release{
-				Stream: stream, Kind: kind, Variant: variant,
+				BranchOrTag: branchOrTag, Kind: kind, Variant: variant,
 				BySeverity: map[string]int{},
 			})
 		}
 		return index
 	}
 	for _, build := range scanned {
-		occurrence(build.Stream, build.Kind, build.Variant)
+		occurrence(build.BranchOrTag, build.Kind, build.Variant)
 	}
 	for _, row := range rows {
-		index := occurrence(row.Stream, row.Kind, row.Variant)
+		index := occurrence(row.BranchOrTag, row.Kind, row.Variant)
 		releases[index].Open += row.Open
 		releases[index].BySeverity[row.Band] += row.Open
 	}
@@ -184,14 +184,14 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 // carried it and nothing showed it, so a reader had no way to tell a build
 // with nothing wrong from one last measured against a database from March.
 func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
-	targetID int64) (*Run, error) {
+	buildID int64) (*Run, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
 	// A person, and one who may see this product. `Sees` alone is true for a
-	// pipeline credential naming the product, which ignores the stream and
+	// pipeline credential naming the product, which ignores the branch or tag and
 	// variant that credential is pinned to, so the kind is checked here as
 	// `Releases` beside this checks it. No pipeline route reaches it; a route
 	// that admits a pipeline must pass the build scope explicitly.
@@ -203,7 +203,7 @@ func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
 	}
 	var runs []Run
 	err = s.db.NewSelect().Model(&runs).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"finished_at" IS NOT NULL`).
 		Order("id DESC").
 		Limit(1).
@@ -223,12 +223,12 @@ func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
 // The component lookup raises an ambiguity before it knows which issue is
 // being asked about, so on its own it can only offer every version of the
 // name. A real image ships one library at fifteen, of which three carry a
-// given issue — offering all fifteen is a list where four in five choices lead
+// given issue — offering all fifteen is a list where four in five choices code finding
 // to "no such finding", which is a worse answer than the refusal it replaced.
 func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
-	targetID, vulnerabilityID int64, name string) ([]graph.Choice, error) {
+	buildID, vulnerabilityID int64, name string) ([]graph.Choice, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"c"."version" AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
 		ColumnExpr(`"c"."name" AS "name"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
 		// Matched as the component lookup matches a typed name: on the

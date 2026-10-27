@@ -1,0 +1,133 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package finding
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+)
+
+// standingExploitationHere is the left join that brings a product's standing
+// record of having been attacked into a query that already joins
+// vulnerability AS v.
+//
+// Left, because most issues carry no such record and those are the rows every
+// query is almost entirely made of. Keyed on the live column rather than on
+// the issue, so a cleared record joins nothing: clearing is what releases that
+// column, and a join on the issue would keep answering after somebody took the
+// record back.
+//
+// The product is bound. A placeholder cannot bind a column name, and this side
+// of the join is one product in every caller.
+const standingExploitationHere = `LEFT JOIN "incident" AS "eh"` +
+	` ON "eh"."live_vulnerability_id" = "v"."id" AND "eh"."product_id" = ?`
+
+// Incident reports whether this product has a standing record of being
+// attacked through each of these issues.
+//
+// Read for a set rather than one at a time: the paths that ask are applying a
+// scan and recording a flaw, and both hold every issue they are about before
+// they rank any of them.
+//
+// Takes the handle because every caller is inside a transaction of its own.
+// The answer decides what gets written, so reading it outside would describe a
+// world a retry has left behind.
+func Incident(ctx context.Context, tx bun.IDB, productID int64,
+	issues []int64) (map[int64]bool, error) {
+
+	standing := map[int64]bool{}
+	if len(issues) == 0 {
+		return standing, nil
+	}
+	var rows []struct {
+		VulnerabilityID int64 `bun:"vulnerability_id"`
+	}
+	// Answered for the issue asked about, which is what the standing record
+	// is keyed on: a record filed under an issue that merged into this one
+	// stands under this one.
+	err := tx.NewSelect().
+		TableExpr(`"incident" AS "eh"`).
+		ColumnExpr(`"eh"."live_vulnerability_id" AS "vulnerability_id"`).
+		Where(`"eh"."product_id" = ?`, productID).
+		// The standing record. A cleared one has released this column, so it
+		// joins and answers nothing, which is what clearing means.
+		Where(`"eh"."live_vulnerability_id" IN (?)`, bun.List(issues)).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read what this product has been attacked through: %w", err)
+	}
+	for _, row := range rows {
+		standing[row.VulnerabilityID] = true
+	}
+	return standing, nil
+}
+
+// IncidentChanged puts this product's open findings of one issue back
+// where the signals now say they belong, after an incident
+// started or stopped standing.
+//
+// Two statements rather than one. The flag is what the packed number is
+// written from, so it is written first and the number is composed from it —
+// which keeps one expression as the only place the number is ever assembled,
+// rather than a second one here that agrees until somebody moves a band.
+//
+// One product, because a record belongs to one. Another product's findings of
+// the same issue keep the order their own signals give them, the same way a
+// rating recorded in one product reaches no other.
+//
+// The deadline is recounted for the reason a rating's is: the line admits
+// either exploitation signal, so a finding that was below the line and is now
+// above it has a clock it did not have, and one whose record was cleared may
+// have lost it. The window itself does not move — how long a fix may take is a
+// question about upstream, and being attacked here says nothing about that.
+//
+// Takes the handle because the caller writes inside its own transaction: the
+// record and the order it forces are one act. The moment is the caller's store
+// clock, which the recount reasons at.
+func IncidentChanged(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
+	standing bool, now time.Time) error {
+
+	// The findings of the issue the record is read as, and whatever record
+	// stands for it: one filed under an issue that merged into another may be
+	// cleared while the other's still stands.
+	vulnerabilityID, err := issueOf(ctx, tx, vulnerabilityID)
+	if err != nil {
+		return err
+	}
+	still, err := Incident(ctx, tx, productID, []int64{vulnerabilityID})
+	if err != nil {
+		return err
+	}
+	standing = standing || still[vulnerabilityID]
+	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
+	_, err = tx.NewUpdate().
+		Model((*Finding)(nil)).
+		Set(`"urgency_incident" = ?`, standing).
+		Where(kinds, kindArgs...).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"closed_at" IS NULL`).
+		Where(inThisProduct, productID).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("mark what this product was attacked through: %w", err)
+	}
+
+	// This product's rating of the issue, which is the other half of what the
+	// number is made of. Read rather than passed: nothing about the record
+	// touches the rating, so what is in force is whatever was in force before.
+	rated, err := RatingsIn(ctx, tx, []int64{productID}, []int64{vulnerabilityID})
+	if err != nil {
+		return err
+	}
+	assessed := rated[RatedKey{ProductID: productID, VulnerabilityID: vulnerabilityID}]
+	if err := rerank(ctx, tx, productID, vulnerabilityID, assessed); err != nil {
+		return err
+	}
+	return redue(ctx, tx, productID, vulnerabilityID, now)
+}

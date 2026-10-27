@@ -69,8 +69,8 @@ type world struct {
 	server    *served
 	fork      *catalog.Product
 	// forkBuild ships the upstream's openssl, and forkLater a later one.
-	forkBuild *catalog.Target
-	forkLater *catalog.Target
+	forkBuild *catalog.Build
+	forkLater *catalog.Build
 	admin     access.Subject
 	reader    *upstream.Reader
 }
@@ -81,10 +81,10 @@ type world struct {
 func newWorld(t *testing.T, f *fixture.World) *world {
 	t.Helper()
 	w := bare(t, f)
-	w.ship(w.Target, sonicRoot, sonicRoot, openssl, sonicRoot, swss, swss, libnl)
-	w.report(w.Target, portable, openssl, ownBuild, libnl)
-	w.decide(w.Target, portable, openssl.Name, triage.CodeNotPresent)
-	w.decide(w.Target, ownBuild, libnl.Name, triage.CodeNotInExecutePath)
+	w.ship(w.Build, sonicRoot, sonicRoot, openssl, sonicRoot, swss, swss, libnl)
+	w.report(w.Build, portable, openssl, ownBuild, libnl)
+	w.decide(w.Build, portable, openssl.Name, triage.CodeNotPresent)
+	w.decide(w.Build, ownBuild, libnl.Name, triage.CodeNotInExecutePath)
 	if err := w.Catalog.SetPublishes(t.Context(), w.Product.ID, true); err != nil {
 		t.Fatal(err)
 	}
@@ -120,9 +120,9 @@ func bare(t *testing.T, f *fixture.World) *world {
 	w.proposer, w.approver = person("ana@example.com", false), person("ben@example.com", false)
 	w.admin = person("root@example.com", true)
 	w.server = serve(t, w)
-	w.forkBuild = w.TargetFor(w.DeclareStream(w.fork, "main", catalog.Branch, nil),
+	w.forkBuild = w.BuildFor(w.DeclareBranchOrTag(w.fork, "main", catalog.Branch, nil),
 		w.DeclareVariant(w.fork, "x86", true))
-	w.forkLater = w.TargetFor(w.DeclareStream(w.fork, "next", catalog.Branch, nil),
+	w.forkLater = w.BuildFor(w.DeclareBranchOrTag(w.fork, "next", catalog.Branch, nil),
 		w.DeclareVariant(w.fork, "arm", true))
 	w.reader = upstream.NewReader(db, sbom.Limits{}, w.server.roots)
 	return w
@@ -130,12 +130,12 @@ func bare(t *testing.T, f *fixture.World) *world {
 
 // ship records a scan of a build: its root and the edges beneath it, given as
 // parent and child in turn.
-func (w *world) ship(target *catalog.Target, root graph.Described, edges ...graph.Described) {
+func (w *world) ship(build *catalog.Build, root graph.Described, edges ...graph.Described) {
 	w.t.Helper()
 	ctx := w.t.Context()
 	w.built = w.built.Add(time.Minute)
 	scan, outcome, err := ingest.NewStore(w.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "hash-" + w.built.Format(time.RFC3339Nano),
+		BuildID: build.ID, ContentHash: "hash-" + w.built.Format(time.RFC3339Nano),
 		BuiltAt: w.built, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -152,7 +152,7 @@ func (w *world) ship(target *catalog.Target, root graph.Described, edges ...grap
 		}
 		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: edges[i], Child: edges[i+1]})
 	}
-	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, target.ID, scan.ID, snap); err != nil {
+	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, build.ID, scan.ID, snap); err != nil {
 		w.t.Fatal(err)
 	}
 	if _, err := w.DB.DB.NewUpdate().TableExpr(`"scan"`).Set(`"root_identifier" = ?`, root.Purl).
@@ -163,10 +163,10 @@ func (w *world) ship(target *catalog.Target, root graph.Described, edges ...grap
 
 // report runs a scanner over a build, reporting these issues at these
 // components, given as issue and component in turn.
-func (w *world) report(target *catalog.Target, found ...any) {
+func (w *world) report(build *catalog.Build, found ...any) {
 	w.t.Helper()
 	ctx := w.t.Context()
-	run, err := w.findings.Begin(ctx, finding.Run{TargetID: target.ID, Scanner: "grype", RanHere: true})
+	run, err := w.findings.Begin(ctx, finding.Run{BuildID: build.ID, Scanner: "grype", RanHere: true})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func (w *world) report(target *catalog.Target, found ...any) {
 			Component: found[i+1].(graph.Described),
 		})
 	}
-	if _, err := w.findings.Apply(ctx, target.ID, run.ID, rows); err != nil {
+	if _, err := w.findings.Apply(ctx, build.ID, run.ID, rows); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -192,22 +192,22 @@ func (w *world) rescan() {
 
 // decide records an approved decision of not applicable, for the reason given,
 // at every open occurrence of an issue in one component of a build.
-func (w *world) decide(target *catalog.Target, issue, component string, why triage.Justification) {
+func (w *world) decide(build *catalog.Build, issue, component string, why triage.Justification) {
 	w.t.Helper()
-	w.decision(target, issue, component, triage.NotApplicable, why)
+	w.decision(build, issue, component, triage.NotApplicable, why)
 }
 
 // decision records one decision at every open occurrence of an issue in one component of
 // a build, agreed by the second person where it needs one.
-func (w *world) decision(target *catalog.Target, issue, component string, outcome triage.Outcome,
+func (w *world) decision(build *catalog.Build, issue, component string, outcome triage.Outcome,
 	why triage.Justification) {
 
 	w.t.Helper()
-	w.decisionCiting(target, issue, component, outcome, why, nil)
+	w.decisionCiting(build, issue, component, outcome, why, nil)
 }
 
 // decisionCiting is decision, started from the statement cited where one is.
-func (w *world) decisionCiting(target *catalog.Target, issue, component string, outcome triage.Outcome,
+func (w *world) decisionCiting(build *catalog.Build, issue, component string, outcome triage.Outcome,
 	why triage.Justification, cited *int64) {
 
 	w.t.Helper()
@@ -219,7 +219,7 @@ func (w *world) decisionCiting(target *catalog.Target, issue, component string, 
 	var open []finding.Finding
 	if err := w.DB.DB.NewSelect().Model(&open).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Where(`"f"."target_id" = ?`, target.ID).
+		Where(`"f"."build_id" = ?`, build.ID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerability).
 		Where(`"c"."name" = ?`, component).
 		Where(`"f"."closed_at" IS NULL`).
@@ -233,7 +233,7 @@ func (w *world) decisionCiting(target *catalog.Target, issue, component string, 
 			continue
 		}
 		placed[one.OccurrenceIdentity] = true
-		at, err := w.findings.OccurrenceFor(ctx, w.proposer, target.ID, vulnerability, one.OccurrenceIdentity)
+		at, err := w.findings.OccurrenceFor(ctx, w.proposer, build.ID, vulnerability, one.OccurrenceIdentity)
 		if err != nil {
 			w.t.Fatal(err)
 		}
@@ -245,8 +245,8 @@ func (w *world) decisionCiting(target *catalog.Target, issue, component string, 
 				OnTag: at.OnTag,
 			},
 			Outcome: outcome, Justification: why, FromStatement: cited,
-			Reasoning: "Read the code.", By: w.proposer.ID, MadeOn: []int64{target.ID},
-			BindingAcross: []int64{target.ID},
+			Reasoning: "Read the code.", By: w.proposer.ID, MadeOn: []int64{build.ID},
+			BindingAcross: []int64{build.ID},
 		})
 	}
 	recorded, err := w.decisions.ProposeMany(ctx, w.proposer, proposals)
@@ -315,7 +315,7 @@ type at struct {
 }
 
 // state reads how an issue stands at a component of a build.
-func (w *world) state(target *catalog.Target, issue string, component graph.Described) at {
+func (w *world) state(build *catalog.Build, issue string, component graph.Described) at {
 	w.t.Helper()
 	ctx := w.t.Context()
 	vulnerability, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, issue)
@@ -330,7 +330,7 @@ func (w *world) state(target *catalog.Target, issue string, component graph.Desc
 	if err := w.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(`"f"."closed_at", COALESCE("f"."closed_because", '') AS "closed_because", "f"."stated_by"`).
-		Where(`"f"."target_id" = ?`, target.ID).
+		Where(`"f"."build_id" = ?`, build.ID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerability).
 		Where(`"c"."purl" = ?`, component.Purl).
 		OrderExpr(`"f"."id" DESC`).Limit(1).

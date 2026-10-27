@@ -24,7 +24,7 @@ import (
 // site, which is what makes them greppable, and a third spelling kept beside
 // them to satisfy a test would be a third thing to keep right.
 func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
-	asked := regexp.MustCompile(`weblink\.Report\("([a-z-]+)", ([a-zA-Z]+)\)`)
+	asked := regexp.MustCompile(`weblink\.AnalyticsReport\("([a-z-]+)", ([a-zA-Z]+)\)`)
 	source, err := os.ReadFile("health.go")
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
 	}
 
 	// The sheet each report slug names, by the address the catalog gives it.
-	sheets := map[string]string{"approval-quality": "../../web/src/screens/reports/Scrutiny.tsx"}
+	sheets := map[string]string{"approval-quality": "../../web/src/screens/analytics/Scrutiny.tsx"}
 	offers := regexp.MustCompile(`const WINDOWS = \[([0-9, ]+)\]`)
 
 	for _, link := range links {
@@ -56,7 +56,7 @@ func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
 		}
 		sheet, known := sheets[slug]
 		if !known {
-			t.Errorf("a condition links /reports/%s with a window and this test does "+
+			t.Errorf("a condition links /analytics/%s with a window and this test does "+
 				"not know which sheet that is", slug)
 			continue
 		}
@@ -76,7 +76,7 @@ func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("the condition opens /reports/%s at %s days and the sheet offers %s: "+
+			t.Errorf("the condition opens /analytics/%s at %s days and the sheet offers %s: "+
 				"a window it will not take falls back to the sheet's own default, which is "+
 				"the narrowing the link exists to get past", slug, days, windows[1])
 		}

@@ -51,7 +51,7 @@ func TestAReportNamingOneNameTwiceAppliesAsOneIssueWithTheNameOnce(t *testing.T)
 			},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{reported}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{reported}); err != nil {
 			t.Fatalf("a report naming one name twice did not apply: %v", err)
 		}
 		opened := f.open(t)
@@ -68,7 +68,7 @@ func TestAReportNamingOneNameTwiceAppliesAsOneIssueWithTheNameOnce(t *testing.T)
 			t.Errorf("the issue is recorded under %q, want %q", got, want)
 		}
 		// The same report again finds every name recorded and writes none.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{reported}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{reported}); err != nil {
 			t.Fatalf("the same report again did not apply: %v", err)
 		}
 	})

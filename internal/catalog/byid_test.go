@@ -17,7 +17,7 @@ import (
 
 // Branches and variants named by identifier in one read are the rows each
 // identifier names, and an identifier naming nothing is absent.
-func TestStreamsAndVariantsReadByIdentifierAreTheRowsTheyName(t *testing.T) {
+func TestBranchesAndTagsAndVariantsReadByIdentifierAreTheRowsTheyName(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		names := catalog.NewStore(db.DB)
@@ -25,11 +25,11 @@ func TestStreamsAndVariantsReadByIdentifierAreTheRowsTheyName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		master, err := names.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		master, err := names.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		release, err := names.DeclareStream(ctx, product.ID, "202505", catalog.Branch, nil)
+		release, err := names.DeclareBranchOrTag(ctx, product.ID, "202505", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -38,12 +38,12 @@ func TestStreamsAndVariantsReadByIdentifierAreTheRowsTheyName(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		streams, err := names.StreamsByID(ctx, []int64{master.ID, release.ID, -1})
+		branchesAndTags, err := names.BranchesAndTagsByID(ctx, []int64{master.ID, release.ID, -1})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(streams) != 2 || streams[master.ID].Name != "master" || streams[release.ID].Name != "202505" {
-			t.Errorf("read the branches as %+v", streams)
+		if len(branchesAndTags) != 2 || branchesAndTags[master.ID].Name != "master" || branchesAndTags[release.ID].Name != "202505" {
+			t.Errorf("read the branches as %+v", branchesAndTags)
 		}
 		variants, err := names.VariantsByID(ctx, []int64{broadcom.ID, -1})
 		if err != nil {
@@ -52,7 +52,7 @@ func TestStreamsAndVariantsReadByIdentifierAreTheRowsTheyName(t *testing.T) {
 		if len(variants) != 1 || variants[broadcom.ID].Name != "broadcom" {
 			t.Errorf("read the variants as %+v", variants)
 		}
-		none, err := names.StreamsByID(ctx, nil)
+		none, err := names.BranchesAndTagsByID(ctx, nil)
 		if err != nil || len(none) != 0 {
 			t.Errorf("no identifiers read %+v, %v", none, err)
 		}
@@ -83,16 +83,16 @@ func byIDReads(tag func() int64) []byID {
 			_, err := s.ProductByID(ctx, id)
 			return err
 		}},
-		{"TargetMoves", func(ctx context.Context, s *catalog.Store, id int64) error {
-			_, err := s.TargetMoves(ctx, id)
+		{"BuildMoves", func(ctx context.Context, s *catalog.Store, id int64) error {
+			_, err := s.BuildMoves(ctx, id)
 			return err
 		}},
-		{"EndOfLifeForTarget", func(ctx context.Context, s *catalog.Store, id int64) error {
-			_, err := s.EndOfLifeForTarget(ctx, id)
+		{"EndOfLifeForBuild", func(ctx context.Context, s *catalog.Store, id int64) error {
+			_, err := s.EndOfLifeForBuild(ctx, id)
 			return err
 		}},
-		{"ExistingTarget", func(ctx context.Context, s *catalog.Store, id int64) error {
-			_, err := s.ExistingTarget(ctx, id, id)
+		{"ExistingBuild", func(ctx context.Context, s *catalog.Store, id int64) error {
+			_, err := s.ExistingBuild(ctx, id, id)
 			return err
 		}},
 		{"FillInParent of a release nobody declared", func(ctx context.Context, s *catalog.Store, id int64) error {
@@ -117,7 +117,7 @@ func TestAnIdentifierNothingHoldsIsNotDeclared(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tag, err := s.DeclareStream(ctx, product.ID, "v1.0", catalog.Tag, nil)
+		tag, err := s.DeclareBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,9 +127,9 @@ func TestAnIdentifierNothingHoldsIsNotDeclared(t *testing.T) {
 				t.Errorf("%s of an identifier nothing holds answered %v", read.name, err)
 				continue
 			}
-			// ExistingTarget is asked by a pair, and says which build in
+			// ExistingBuild is asked by a pair, and says which build in
 			// words rather than by either identifier.
-			if read.name != "ExistingTarget" && !strings.Contains(err.Error(), strconv.FormatInt(nobody, 10)) {
+			if read.name != "ExistingBuild" && !strings.Contains(err.Error(), strconv.FormatInt(nobody, 10)) {
 				t.Errorf("%s answered %q, which does not name the identifier", read.name, err)
 			}
 		}

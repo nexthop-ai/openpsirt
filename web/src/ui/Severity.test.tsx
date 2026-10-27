@@ -7,7 +7,7 @@ import { cssRules } from "../../scripts/class-rules.mjs";
 // @ts-expect-error - plain ESM with no types of its own
 import { stylesheets } from "../../scripts/source.mjs";
 import { mounted } from "../test/mount";
-import { Exploited, ExploitedHere } from "./Severity";
+import { Exploited, Incident } from "./Severity";
 
 const mount = mounted();
 
@@ -35,11 +35,11 @@ describe("the two exploitation badges", () => {
     expect(badge()?.title).toContain("Not, on its own, a sign this product was attacked");
   });
 
-  it("marks only the record of being exploited here with the class that tells them apart", () => {
+  it("marks only an incident with the class that tells them apart", () => {
     mount.render(<Exploited when />);
     expect(badge()?.classList.contains("here")).toBe(false);
-    mount.render(<ExploitedHere when />);
-    expect(badge()?.textContent).toBe("Exploited here");
+    mount.render(<Incident when />);
+    expect(badge()?.textContent).toBe("Incident");
     expect(badge()?.classList.contains("here")).toBe(true);
   });
 
@@ -49,7 +49,7 @@ describe("the two exploitation badges", () => {
     expect(set.at(-1)).toBe("transparent");
   });
 
-  it("draws a record of being exploited here filled in the exploited color", () => {
+  it("draws an incident filled in the exploited color", () => {
     const set = backgrounds(".kev.here");
     expect(set, "no rule for the record's badge was found, so this checked nothing").not.toEqual(
       [],
@@ -61,7 +61,7 @@ describe("the two exploitation badges", () => {
     mount.render(
       <>
         <Exploited when={false} />
-        <ExploitedHere />
+        <Incident />
       </>,
     );
     expect(mount.host().textContent).toBe("");

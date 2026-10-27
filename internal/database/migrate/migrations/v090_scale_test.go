@@ -13,7 +13,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
@@ -27,15 +26,15 @@ func TestMeasureTheV090UpgradeOnTenNightlyBuilds(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v080)
-		d, err := world.Declare(ctx, db)
+		d, err := declareBeforeV0110(ctx, db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := d.Target.ID
+		target := d.Build.ID
 		var scans []int64
 		at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 		for i := range 10 {
-			rec, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{TargetID: target,
+			rec, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{BuildID: target,
 				ContentHash: fmt.Sprintf("h%d", i), BuiltAt: at.Add(time.Duration(i) * time.Hour), ParserVersion: "t"})
 			if err != nil {
 				t.Fatal(err)

@@ -36,7 +36,7 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		aScannedTarget(t, w)
+		aScannedBuild(t, w)
 		product := w.Product
 		if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
@@ -47,7 +47,7 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 		}
 		configured := func(name string, created, reached *time.Time, failed string, retired bool) {
 			t.Helper()
-			source := &supplier.Source{
+			source := &supplier.Feed{
 				ProductID: product.ID, Name: name, Display: name,
 				URL:       "https://" + name + ".example.test/.well-known/csaf/provider-metadata.json",
 				CreatedBy: admin.ID, CreatedAt: *created, ReachedAt: reached, Failed: failed,

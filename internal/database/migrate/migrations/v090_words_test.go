@@ -19,14 +19,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // claimsV080 is what seedV080Claims wrote.
 type claimsV080 struct {
 	declared  world.Declared
-	rec       *ingest.Scan
+	scan      int64
 	claims    []sbom.Suppression
 	addresses []string
 }
@@ -45,7 +45,7 @@ var (
 // issue's references as v0.8.0 stored them.
 func seedV080Claims(t *testing.T, ctx context.Context, db *database.DB) claimsV080 {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,11 +54,9 @@ func seedV080Claims(t *testing.T, ctx context.Context, db *database.DB) claimsV0
 		t.Fatal(err)
 	}
 	at := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
-	rec, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-		TargetID: declared.Target.ID, ContentHash: "claims-night", BuiltAt: at, ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record a scan: %v %v", outcome, err)
+	scan, err := recordScanBeforeV0110(ctx, db, declared.Build.ID, "claims-night", at)
+	if err != nil {
+		t.Fatal(err)
 	}
 	exec := func(query string, args ...any) {
 		t.Helper()
@@ -94,9 +92,9 @@ func seedV080Claims(t *testing.T, ctx context.Context, db *database.DB) claimsV0
 			exec(`INSERT INTO "suppression" ("target_id", "identity", "vulnerability", "status",
 				"justification", "statement", "origin", "subject_purl", "subject_name", "subject_folded",
 				"opened_scan_id") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				declared.Target.ID, "v080-key-"+string(rune('a'+i))+subject.Name, claim.Vulnerability,
+				declared.Build.ID, "v080-key-"+string(rune('a'+i))+subject.Name, claim.Vulnerability,
 				string(claim.Status), justification, statement, string(claim.Origin), "", subject.Name,
-				graph.Folded(subject.Name), rec.ID)
+				graph.Folded(subject.Name), scan)
 		}
 	}
 	for _, component := range []string{"zlib", "openssl"} {
@@ -118,8 +116,8 @@ func seedV080Claims(t *testing.T, ctx context.Context, db *database.DB) claimsV0
 		exec(`INSERT INTO "suppression" ("target_id", "identity", "vulnerability", "status",
 			"justification", "origin", "subject_purl", "subject_name", "subject_folded", "subject_version",
 			"opened_scan_id") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			declared.Target.ID, "v080-key-published", "CVE-2026-3", "not_affected", longJustification,
-			"published", "", "libnl", graph.Folded("libnl"), longAbout, rec.ID)
+			declared.Build.ID, "v080-key-published", "CVE-2026-3", "not_affected", longJustification,
+			"published", "", "libnl", graph.Folded("libnl"), longAbout, scan)
 	}
 	exec(`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "exploited", "first_seen_at", "issue_id")
 		VALUES (?, ?, ?, ?, ?)`, "CVE-2026-1", "cve-2026-1", false, at, 0)
@@ -134,7 +132,7 @@ func seedV080Claims(t *testing.T, ctx context.Context, db *database.DB) claimsV0
 		exec(`INSERT INTO "vulnerability_reference" ("vulnerability_id", "url", "kind", "url_identity")
 			VALUES (?, ?, ?, ?)`, issue, address, "report", "v080-reference-"+string(rune('a'+i)))
 	}
-	return claimsV080{declared: declared, rec: rec, claims: claims, addresses: addresses}
+	return claimsV080{declared: declared, scan: scan, claims: claims, addresses: addresses}
 }
 
 // claimsAreMovedV090 checks what the upgrade made of seedV080Claims.
@@ -174,16 +172,6 @@ func claimsAreMovedV090(t *testing.T, ctx context.Context, db *database.DB, w cl
 		}
 	}
 
-	// The next scan restating every claim finds each one held.
-	applied, err := world.RecordClaims(ctx, db.DB, w.declared.Target.ID, w.rec.ID, w.claims,
-		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if applied.Opened != 0 || applied.Closed != 0 {
-		t.Errorf("the first scan after the upgrade wrote %+v, want every claim held", applied)
-	}
-
 	var keys []struct {
 		URL      string `bun:"url"`
 		Identity string `bun:"url_identity"`
@@ -219,6 +207,20 @@ func claimsAreMovedV090(t *testing.T, ctx context.Context, db *database.DB, w cl
 				statement, claim, want)
 		}
 	}
+
+	// The next scan restating every claim finds each one held. It is the
+	// running release's scan, so it meets the running release's schema.
+	if err := schema.Up(ctx, db, quiet()); err != nil {
+		t.Fatalf("migrate to the latest: %v", err)
+	}
+	applied, err := world.RecordClaims(ctx, db.DB, w.declared.Build.ID, w.scan, w.claims,
+		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if applied.Opened != 0 || applied.Closed != 0 {
+		t.Errorf("the first scan after the upgrade wrote %+v, want every claim held", applied)
+	}
 }
 
 // A v0.8.0 database holding a build's claims, a supplier's statements and an
@@ -234,11 +236,10 @@ func TestAV080DatabaseStoresEachClaimsReasoningOnce(t *testing.T) {
 		dbtest.MigrateTo(t, db, v080)
 		w := seedV080Claims(t, ctx, db)
 		dbtest.MigrateTo(t, db, v090)
-		claimsAreMovedV090(t, ctx, db, w)
-
 		t.Run("TheDeclarationsAreTheTablesTheMigrationsBuild", func(t *testing.T) {
 			declarationsAreBuilt(t, ctx, db, migrations.StatementsV090(db.Server.Engine))
 		})
+		claimsAreMovedV090(t, ctx, db, w)
 		leaveAtLatest(t, ctx, db)
 	})
 }

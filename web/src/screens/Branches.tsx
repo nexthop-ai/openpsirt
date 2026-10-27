@@ -16,7 +16,7 @@ import { Empty } from "../ui/Empty";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
-import { streamAt } from "../app/routes";
+import { branchOrTagAt } from "../app/routes";
 
 // A branch and a tag are different shapes of thing — one moves and is rebuilt,
 // one never changes again — so they are labeled rather than blended into a
@@ -34,10 +34,10 @@ export function Branches() {
   // closed, so one piece of state answers both which row and whether.
   const [editing, setEditing] = useState("");
   const [renameTo, setRenameTo] = useState("");
-  const streams = useQuery({
+  const branchesAndTags = useQuery({
     // Keyed as counted, so this and the picker's uncounted read of the same
     // list are two cache entries rather than a race between them.
-    queryKey: ["streams", product, "counts"],
+    queryKey: ["branches_and_tags", product, "counts"],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/branches-and-tags", {
@@ -62,49 +62,49 @@ export function Branches() {
       setName("");
       setParent("");
       setAdding(false);
-      void queries.invalidateQueries({ queryKey: ["streams", product] });
+      void queries.invalidateQueries({ queryKey: ["branches_and_tags", product] });
     },
   });
 
   const amend = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.PATCH("/v1/products/{product}/branches-and-tags/{stream}", {
-          params: { path: { product, stream: editing } },
+        await api.PATCH("/v1/products/{product}/branches-and-tags/{branch_or_tag}", {
+          params: { path: { product, branch_or_tag: editing } },
           body: { name: renameTo.trim() },
         }),
       ),
     onSuccess: () => {
       setEditing("");
-      void queries.invalidateQueries({ queryKey: ["streams", product] });
+      void queries.invalidateQueries({ queryKey: ["branches_and_tags", product] });
     },
   });
 
   const retire = useMutation({
-    mutationFn: async (stream: string) =>
+    mutationFn: async (branchOrTag: string) =>
       unwrap(
-        await api.DELETE("/v1/products/{product}/branches-and-tags/{stream}", {
-          params: { path: { product, stream } },
+        await api.DELETE("/v1/products/{product}/branches-and-tags/{branch_or_tag}", {
+          params: { path: { product, branch_or_tag: branchOrTag } },
         }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["streams", product] }),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["branches_and_tags", product] }),
   });
 
-  const edit = (stream: { name?: string }) => {
-    setEditing(stream.name ?? "");
-    setRenameTo(stream.name ?? "");
+  const edit = (branchOrTag: { name?: string }) => {
+    setEditing(branchOrTag.name ?? "");
+    setRenameTo(branchOrTag.name ?? "");
     amend.reset();
   };
 
   const setEndOfLife = useMutation({
-    mutationFn: async ({ stream, on }: { stream: string; on: string }) =>
+    mutationFn: async ({ branch_or_tag: branchOrTag, on }: { branch_or_tag: string; on: string }) =>
       unwrap(
-        await api.PUT("/v1/products/{product}/branches-and-tags/{stream}/end-of-life", {
-          params: { path: { product, stream } },
+        await api.PUT("/v1/products/{product}/branches-and-tags/{branch_or_tag}/end-of-life", {
+          params: { path: { product, branch_or_tag: branchOrTag } },
           body: { on },
         }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["streams", product] }),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["branches_and_tags", product] }),
   });
   // The day a release went out, and the branch it was cut from. Both after the
   // fact, because that is when they are usually known: a tag is declared here
@@ -112,27 +112,35 @@ export function Branches() {
   // it — and fixed at declaration, the release-over-release chart is an
   // accident of administration.
   const setRelease = useMutation({
-    mutationFn: async ({ stream, on, from }: { stream: string; on: string; from: string }) =>
+    mutationFn: async ({
+      branch_or_tag: branchOrTag,
+      on,
+      from,
+    }: {
+      branch_or_tag: string;
+      on: string;
+      from: string;
+    }) =>
       unwrap(
-        await api.PUT("/v1/products/{product}/branches-and-tags/{stream}/release", {
-          params: { path: { product, stream } },
+        await api.PUT("/v1/products/{product}/branches-and-tags/{branch_or_tag}/release", {
+          params: { path: { product, branch_or_tag: branchOrTag } },
           body: { released_on: on, ...(from ? { cut_from: from } : {}) },
         }),
       ),
     onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["streams", product] });
+      void queries.invalidateQueries({ queryKey: ["branches_and_tags", product] });
       // The release-over-release charts on the front page read the dates.
       void queries.invalidateQueries({ queryKey: ["home", "trend"] });
       void queries.invalidateQueries({ queryKey: ["home", "release-trend"] });
     },
   });
 
-  if (streams.isPending) return <Loading />;
-  if (streams.isError) {
-    return <Failed error={streams.error} what="The branches and tags could not be read." />;
+  if (branchesAndTags.isPending) return <Loading />;
+  if (branchesAndTags.isError) {
+    return <Failed error={branchesAndTags.error} what="The branches and tags could not be read." />;
   }
 
-  const items = streams.data?.items ?? [];
+  const items = branchesAndTags.data?.items ?? [];
   const branches = items.filter((s) => s.kind !== "tag").map((s) => s.name ?? "");
   return (
     <>
@@ -179,16 +187,16 @@ export function Branches() {
               </tr>
             </thead>
             <tbody>
-              {items.map((stream) => (
-                <tr key={stream.name} className="row">
+              {items.map((branchOrTag) => (
+                <tr key={branchOrTag.name} className="row">
                   <td>
-                    <Link to={streamAt(product, stream.name ?? "")} className="id">
-                      {stream.name}
+                    <Link to={branchOrTagAt(product, branchOrTag.name ?? "")} className="id">
+                      {branchOrTag.name}
                     </Link>
                   </td>
                   <td>
-                    <span className={stream.kind === "tag" ? "state agreed" : "state open"}>
-                      {stream.kind === "tag" ? "Tag" : "Branch"}
+                    <span className={branchOrTag.kind === "tag" ? "state agreed" : "state open"}>
+                      {branchOrTag.kind === "tag" ? "Tag" : "Branch"}
                     </span>
                   </td>
                   <td>
@@ -198,13 +206,15 @@ export function Branches() {
                         A tag came from wherever it came from, so once it says
                         so the picker is gone rather than offering a change
                         the server would refuse. */}
-                    {stream.kind === "tag" && !stream.parent && (who.data?.admin ?? false) ? (
+                    {branchOrTag.kind === "tag" &&
+                    !branchOrTag.parent &&
+                    (who.data?.admin ?? false) ? (
                       <select
-                        value={stream.parent ?? ""}
+                        value={branchOrTag.parent ?? ""}
                         onChange={(event) =>
                           setRelease.mutate({
-                            stream: stream.name ?? "",
-                            on: stream.released_on ?? "",
+                            branch_or_tag: branchOrTag.name ?? "",
+                            on: branchOrTag.released_on ?? "",
                             from: event.target.value,
                           })
                         }
@@ -216,14 +226,14 @@ export function Branches() {
                           </option>
                         ))}
                       </select>
-                    ) : stream.parent ? (
-                      <span className="id">{stream.parent}</span>
+                    ) : branchOrTag.parent ? (
+                      <span className="id">{branchOrTag.parent}</span>
                     ) : (
                       <span style={{ color: "var(--faint)" }}>—</span>
                     )}
                   </td>
                   <td>
-                    {stream.kind !== "tag" ? (
+                    {branchOrTag.kind !== "tag" ? (
                       <span
                         style={{ color: "var(--faint)" }}
                         title="A branch is rebuilt rather than released"
@@ -232,19 +242,19 @@ export function Branches() {
                       </span>
                     ) : (who.data?.admin ?? false) ? (
                       <ReleasedOn
-                        key={`${stream.name} ${stream.released_on ?? ""}`}
-                        on={stream.released_on ?? ""}
+                        key={`${branchOrTag.name} ${branchOrTag.released_on ?? ""}`}
+                        on={branchOrTag.released_on ?? ""}
                         busy={setRelease.isPending}
                         onSet={(on) =>
                           setRelease.mutate({
-                            stream: stream.name ?? "",
+                            branch_or_tag: branchOrTag.name ?? "",
                             on,
-                            from: stream.parent ?? "",
+                            from: branchOrTag.parent ?? "",
                           })
                         }
                       />
-                    ) : stream.released_on ? (
-                      on(stream.released_on)
+                    ) : branchOrTag.released_on ? (
+                      on(branchOrTag.released_on)
                     ) : (
                       <span
                         className="hint"
@@ -254,28 +264,30 @@ export function Branches() {
                       </span>
                     )}
                   </td>
-                  <td className="num">{(stream.open ?? 0).toLocaleString()}</td>
+                  <td className="num">{(branchOrTag.open ?? 0).toLocaleString()}</td>
                   <td>
                     <EndOfLife
-                      what={`${stream.name} goes out of support`}
-                      on={stream.end_of_life ?? ""}
-                      inherited={stream.end_of_life_inherited}
+                      what={`${branchOrTag.name} goes out of support`}
+                      on={branchOrTag.end_of_life ?? ""}
+                      inherited={branchOrTag.end_of_life_inherited}
                       admin={who.data?.admin ?? false}
-                      onSet={(on) => setEndOfLife.mutate({ stream: stream.name, on })}
+                      onSet={(on) => setEndOfLife.mutate({ branch_or_tag: branchOrTag.name, on })}
                     />
                   </td>
                   <td className="hint">
-                    {stream.last_scan_at ? (
+                    {branchOrTag.last_scan_at ? (
                       /* When it last ran is asked as "is this stale", so the
-                         relative form leads and the exact day is on the title
+                         relative form code findings and the exact day is on the title
                          rather than lost. */
-                      <span title={on(stream.last_scan_at)}>{since(stream.last_scan_at)}</span>
+                      <span title={on(branchOrTag.last_scan_at)}>
+                        {since(branchOrTag.last_scan_at)}
+                      </span>
                     ) : (
                       "never"
                     )}
                   </td>
                   <td className="rowacts">
-                    <Link to={streamAt(product, stream.name ?? "")} className="linkish">
+                    <Link to={branchOrTagAt(product, branchOrTag.name ?? "")} className="linkish">
                       Variants
                     </Link>
                     {who.data?.admin && (
@@ -284,7 +296,7 @@ export function Branches() {
                           type="button"
                           className="linkish"
                           title="Correct what it is called."
-                          onClick={() => edit(stream)}
+                          onClick={() => edit(branchOrTag)}
                         >
                           Edit
                         </button>
@@ -294,7 +306,7 @@ export function Branches() {
                           style={{ color: "var(--muted)" }}
                           title="Take it out of use. Findings, decisions and published documents keep naming it. Not the same as an end-of-support date."
                           disabled={retire.isPending}
-                          onClick={() => retire.mutate(stream.name ?? "")}
+                          onClick={() => retire.mutate(branchOrTag.name ?? "")}
                         >
                           Retire
                         </button>

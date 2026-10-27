@@ -68,8 +68,8 @@ func TestAServedDocumentHoldsOnlyTheNamesItMayCarry(t *testing.T) {
 		product := func(id int64) func() (bool, error) {
 			return func() (bool, error) { return publish.AnyPublishedForProduct(ctx, db, id) }
 		}
-		stream := func(s *catalog.Stream) func() (bool, error) {
-			return func() (bool, error) { return publish.AnyPublishedForStream(ctx, db, s.ID) }
+		branchOrTag := func(s *catalog.BranchOrTag) func() (bool, error) {
+			return func() (bool, error) { return publish.AnyPublishedForBranchOrTag(ctx, db, s.ID) }
 		}
 		variant := func(v *catalog.Variant) func() (bool, error) {
 			return func() (bool, error) { return publish.AnyPublishedForVariant(ctx, db, v.ID) }
@@ -89,7 +89,7 @@ func TestAServedDocumentHoldsOnlyTheNamesItMayCarry(t *testing.T) {
 
 		check("nothing served", []asked{
 			{"the product", product(w.Product.ID), false},
-			{"the scanned release", stream(w.Branch), false},
+			{"the scanned release", branchOrTag(w.Branch), false},
 			{"the scanned variant", variant(w.Customer), false},
 		})
 
@@ -98,8 +98,8 @@ func TestAServedDocumentHoldsOnlyTheNamesItMayCarry(t *testing.T) {
 		check("one withdrawn CSAF VEX document", []asked{
 			{"the product", product(w.Product.ID), true},
 			{"another product", product(other.ID), false},
-			{"the scanned release", stream(w.Branch), true},
-			{"a release nothing was scanned for", stream(w.Tag), false},
+			{"the scanned release", branchOrTag(w.Branch), true},
+			{"a release nothing was scanned for", branchOrTag(w.Tag), false},
 			{"the scanned variant", variant(w.Customer), true},
 			{"a variant nothing was scanned for", variant(w.Internal), false},
 		})
@@ -109,8 +109,8 @@ func TestAServedDocumentHoldsOnlyTheNamesItMayCarry(t *testing.T) {
 			publish.OpenVEXPath+"sonic/"+w.Tag.Name+".json", false)
 		check("one OpenVEX document about the release nothing was scanned for", []asked{
 			{"the product", product(w.Product.ID), true},
-			{"the release it is about", stream(w.Tag), true},
-			{"another release", stream(w.Branch), false},
+			{"the release it is about", branchOrTag(w.Tag), true},
+			{"another release", branchOrTag(w.Branch), false},
 			{"the scanned variant", variant(w.Customer), true},
 			{"a variant nothing was scanned for", variant(w.Internal), false},
 		})

@@ -54,7 +54,7 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 			"higher band on a decision a severity bears on. `code_moved` and `rated_worse` say " +
 			"which, and both can hold.\n\n" +
 			"Narrowed to the decisions you may still argue about, every lapsed occurrence of them. A " +
-			"lapsed occurrence at a lead past its end of life is not counted, and a decision with no " +
+			"lapsed occurrence at a code finding past its end of life is not counted, and a decision with no " +
 			"other is not listed.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may act on."), func(ctx context.Context, input *struct {
@@ -120,7 +120,7 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 			"re-affirming one decision follows. `waiting` on each entry says which.\n\n" +
 			"Only the person who made a decision may re-affirm it. Where somebody else made any of " +
 			"them the whole act is refused, naming the issues. A decision with no lapsed occurrence that " +
-			"nothing has replaced answers as though it were not there. A lead past its end of " +
+			"nothing has replaced answers as though it were not there. A code finding past its end of " +
 			"life is not re-made, and a decision with no other occurrence refuses the whole act with 409.\n\n" +
 			"Bounded over the whole act, promises to upgrade aside. The issues it covers count " +
 			"against `triage.agreed-issues` where no decision goes back to an approver, and " +

@@ -34,24 +34,24 @@ func TestAnIssuanceRetriedAfterADecisionWasWithdrawnRecordsTheDocumentAsItNowSta
 	root := graph.Described{Purl: "pkg:deb/debian/sonic@1.0", Name: "sonic", Version: "1.0"}
 	carrier := graph.Described{Purl: "pkg:deb/debian/libnl@3.7.0", Name: "libnl", Version: "3.7.0"}
 	scan, outcome, err := ingest.NewStore(db).Record(ctx, ingest.Arriving{
-		TargetID: w.Target.ID, ContentHash: "hash-1",
+		BuildID: w.Build.ID, ContentHash: "hash-1",
 		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixture.ApplyGraph(ctx, db, w.Target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, db, w.Build.ID, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{carrier},
 		Dependencies: []graph.Dependency{{Parent: root, Child: carrier}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	findings := finding.NewStore(db)
-	run, err := findings.Begin(ctx, finding.Run{TargetID: w.Target.ID, Scanner: "grype", RanHere: true})
+	run, err := findings.Begin(ctx, finding.Run{BuildID: w.Build.ID, Scanner: "grype", RanHere: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := findings.Apply(ctx, w.Target.ID, run.ID, []finding.Reported{{
+	if _, err := findings.Apply(ctx, w.Build.ID, run.ID, []finding.Reported{{
 		Issue: finding.Named{Identifier: "CVE-2026-0001", Severity: "high"}, Component: carrier,
 	}}); err != nil {
 		t.Fatal(err)
@@ -73,11 +73,11 @@ func TestAnIssuanceRetriedAfterADecisionWasWithdrawnRecordsTheDocumentAsItNowSta
 	}
 	proposer, approver := person("ana@example.com"), person("ben@example.com")
 	var open []finding.Finding
-	if err := db.NewSelect().Model(&open).Where(`"target_id" = ?`, w.Target.ID).Scan(ctx); err != nil ||
+	if err := db.NewSelect().Model(&open).Where(`"build_id" = ?`, w.Build.ID).Scan(ctx); err != nil ||
 		len(open) != 1 {
 		t.Fatalf("the scan opened %d findings: %v", len(open), err)
 	}
-	at, err := findings.OccurrenceFor(ctx, proposer, w.Target.ID, issue, open[0].OccurrenceIdentity)
+	at, err := findings.OccurrenceFor(ctx, proposer, w.Build.ID, issue, open[0].OccurrenceIdentity)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestAnIssuanceRetriedAfterADecisionWasWithdrawnRecordsTheDocumentAsItNowSta
 		},
 		Outcome: triage.NotApplicable, Justification: triage.CodeNotPresent,
 		Reasoning: "The routine is not built into any image we ship.",
-		By:        proposer.ID, NeedsApproval: true, MadeOn: []int64{w.Target.ID},
+		By:        proposer.ID, NeedsApproval: true, MadeOn: []int64{w.Build.ID},
 	})
 	if err != nil {
 		t.Fatal(err)

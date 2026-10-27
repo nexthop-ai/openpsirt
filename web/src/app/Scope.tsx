@@ -35,7 +35,7 @@ export function Scope() {
   // The picks made in here and not yet gone anywhere. Seeded from the
   // address so opening the panel starts where you are.
   const [product, setProduct] = useState(at.product ?? "");
-  const [stream, setStream] = useState(at.stream ?? "");
+  const [branchOrTag, setBranchOrTag] = useState(at.branch_or_tag ?? "");
   // A build is required here, so "all" is not on offer at any level.
   const whole = needsBuild(pathname);
 
@@ -43,9 +43,9 @@ export function Scope() {
   // so the pending pick follows what was applied. The panel stays open across
   // it — which is why this re-seeds the two fields rather than remounting the
   // panel, since a remount would close it on the first of the three choices.
-  useReseed(`${at.product ?? ""}\u001f${at.stream ?? ""}`, () => {
+  useReseed(`${at.product ?? ""}\u001f${at.branch_or_tag ?? ""}`, () => {
     setProduct(at.product ?? "");
-    setStream(at.stream ?? "");
+    setBranchOrTag(at.branch_or_tag ?? "");
   });
 
   useClickAway(box, open, () => setOpen(false));
@@ -61,12 +61,12 @@ export function Scope() {
     [],
   );
 
-  const { products, streams, variants: declared } = useCatalog(open, product);
+  const { products, branchesAndTags, variants: declared } = useCatalog(open, product);
   // The variants one release was built as. With a branch or tag chosen this is
   // the set to offer; with every branch selected it is the product's own, which
   // is what `declared` holds — the per-release list would be an arbitrary one
   // of them.
-  const variants = useReleaseVariants(open, product, stream);
+  const variants = useReleaseVariants(open, product, branchOrTag);
   // The variant column's own rows, which are not simply whichever of the two
   // the branch selects.
   //
@@ -88,7 +88,7 @@ export function Scope() {
   // sit. A picker is a list of choices, and a retired variant is not one — so
   // they come out here rather than out of the answer.
   const offered = (
-    stream ? (variants.data?.items ?? declared.data?.items) : declared.data?.items
+    branchOrTag ? (variants.data?.items ?? declared.data?.items) : declared.data?.items
   )?.filter((one) => !one.retired);
 
   // Applied as soon as it is chosen, at whatever level. A partial selection is
@@ -130,7 +130,7 @@ export function Scope() {
   // cannot leave either beside it.
   function pickProduct(name: string) {
     setProduct(name);
-    setStream("");
+    setBranchOrTag("");
     if (!name) {
       apply({});
       return;
@@ -155,13 +155,13 @@ export function Scope() {
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        {at.stream || (at.product ? "all" : "—")}
+        {at.branch_or_tag || (at.product ? "all" : "—")}
         <span className="caret">▾</span>
       </button>
       <span className="sep">/</span>
       <button
         type="button"
-        className={at.stream ? "scope" : "scope only"}
+        className={at.branch_or_tag ? "scope" : "scope only"}
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
@@ -208,35 +208,35 @@ export function Scope() {
             <button
               type="button"
               className="opt"
-              aria-current={!stream ? "true" : undefined}
+              aria-current={!branchOrTag ? "true" : undefined}
               disabled={whole}
               title={whole ? "This screen is about one build, so it needs all three" : undefined}
               onClick={() => {
-                setStream("");
+                setBranchOrTag("");
                 if (!whole) apply({ product });
               }}
             >
               Every branch and tag
             </button>
           )}
-          {(streams.data?.items ?? []).map((each) => (
+          {(branchesAndTags.data?.items ?? []).map((each) => (
             <button
               key={each.name}
               type="button"
               className="opt"
-              aria-current={each.name === stream ? "true" : undefined}
+              aria-current={each.name === branchOrTag ? "true" : undefined}
               onClick={() => {
-                setStream(each.name ?? "");
-                if (!whole) apply({ product, stream: each.name });
+                setBranchOrTag(each.name ?? "");
+                if (!whole) apply({ product, branch_or_tag: each.name });
               }}
             >
               {each.name} <span className="hint">{each.kind}</span>
             </button>
           ))}
-          {product && streams.isError && (
-            <Unreadable error={streams.error} what="the branches and tags" />
+          {product && branchesAndTags.isError && (
+            <Unreadable error={branchesAndTags.error} what="the branches and tags" />
           )}
-          {product && streams.data && (streams.data.items ?? []).length === 0 && (
+          {product && branchesAndTags.data && (branchesAndTags.data.items ?? []).length === 0 && (
             <p className="hint">Nothing is declared under this product yet.</p>
           )}
         </div>
@@ -251,7 +251,7 @@ export function Scope() {
               aria-current={!at.variant ? "true" : undefined}
               disabled={whole}
               title={whole ? "This screen is about one build, so it needs all three" : undefined}
-              onClick={() => apply({ product, stream }, true)}
+              onClick={() => apply({ product, branch_or_tag: branchOrTag }, true)}
             >
               Every variant
             </button>
@@ -262,17 +262,19 @@ export function Scope() {
               type="button"
               className="opt"
               aria-current={each.name === at.variant ? "true" : undefined}
-              disabled={whole && !stream}
-              title={whole && !stream ? "Pick a branch or tag first" : undefined}
-              onClick={() => apply({ product, stream, variant: each.name }, true)}
+              disabled={whole && !branchOrTag}
+              title={whole && !branchOrTag ? "Pick a branch or tag first" : undefined}
+              onClick={() =>
+                apply({ product, branch_or_tag: branchOrTag, variant: each.name }, true)
+              }
             >
               {each.name}
             </button>
           ))}
-          {product && (stream ? variants : declared).isError && (
-            <Unreadable error={(stream ? variants : declared).error} what="the variants" />
+          {product && (branchOrTag ? variants : declared).isError && (
+            <Unreadable error={(branchOrTag ? variants : declared).error} what="the variants" />
           )}
-          {stream && variants.data && (variants.data.items ?? []).length === 0 && (
+          {branchOrTag && variants.data && (variants.data.items ?? []).length === 0 && (
             <p className="hint">Nothing has been scanned on this line yet.</p>
           )}
         </div>

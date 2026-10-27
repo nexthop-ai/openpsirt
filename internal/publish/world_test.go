@@ -92,12 +92,12 @@ func (w *world) hold(product *catalog.Product) {
 type edge struct{ parent, child graph.Described }
 
 // ship records a scan of a build: its root and what hangs beneath it.
-func (w *world) ship(target *catalog.Target, root graph.Described, edges ...edge) {
+func (w *world) ship(build *catalog.Build, root graph.Described, edges ...edge) {
 	w.t.Helper()
 	ctx := w.t.Context()
 	w.built = w.built.Add(time.Minute)
 	scan, outcome, err := ingest.NewStore(w.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "hash-" + w.built.Format(time.RFC3339Nano),
+		BuildID: build.ID, ContentHash: "hash-" + w.built.Format(time.RFC3339Nano),
 		BuiltAt: w.built, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -114,7 +114,7 @@ func (w *world) ship(target *catalog.Target, root graph.Described, edges ...edge
 		}
 		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: one.parent, Child: one.child})
 	}
-	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, target.ID, scan.ID, snap); err != nil {
+	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, build.ID, scan.ID, snap); err != nil {
 		w.t.Fatal(err)
 	}
 	if root.Purl != "" {
@@ -133,10 +133,10 @@ type reported struct {
 }
 
 // report runs a scanner over a build, reporting these and nothing else.
-func (w *world) report(target *catalog.Target, found ...reported) {
+func (w *world) report(build *catalog.Build, found ...reported) {
 	w.t.Helper()
 	ctx := w.t.Context()
-	run, err := w.findings.Begin(ctx, finding.Run{TargetID: target.ID, Scanner: "grype", RanHere: true})
+	run, err := w.findings.Begin(ctx, finding.Run{BuildID: build.ID, Scanner: "grype", RanHere: true})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func (w *world) report(target *catalog.Target, found ...reported) {
 			Component: one.component,
 		})
 	}
-	if _, err := w.findings.Apply(ctx, target.ID, run.ID, rows); err != nil {
+	if _, err := w.findings.Apply(ctx, build.ID, run.ID, rows); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -168,7 +168,7 @@ type decision struct {
 
 // decide records a decision at every open occurrence of an issue in one component of
 // a build, and has the second person agree to it where it needs one.
-func (w *world) decide(target *catalog.Target, issue string, component graph.Described, said decision) {
+func (w *world) decide(build *catalog.Build, issue string, component graph.Described, said decision) {
 	w.t.Helper()
 	ctx := w.t.Context()
 	vulnerability, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, issue)
@@ -178,7 +178,7 @@ func (w *world) decide(target *catalog.Target, issue string, component graph.Des
 	var open []finding.Finding
 	if err := w.DB.DB.NewSelect().Model(&open).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Where(`"f"."target_id" = ?`, target.ID).
+		Where(`"f"."build_id" = ?`, build.ID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerability).
 		Where(`"c"."name" = ?`, component.Name).
 		Where(`"f"."closed_at" IS NULL`).
@@ -194,7 +194,7 @@ func (w *world) decide(target *catalog.Target, issue string, component graph.Des
 			continue
 		}
 		placed[one.OccurrenceIdentity] = true
-		at, err := w.findings.OccurrenceFor(ctx, w.proposer, target.ID, vulnerability, one.OccurrenceIdentity)
+		at, err := w.findings.OccurrenceFor(ctx, w.proposer, build.ID, vulnerability, one.OccurrenceIdentity)
 		if err != nil {
 			w.t.Fatal(err)
 		}
@@ -208,8 +208,8 @@ func (w *world) decide(target *catalog.Target, issue string, component graph.Des
 			Outcome: said.outcome, Justification: said.justification, Mitigation: said.mitigation,
 			Scope: said.scope, FixedVersion: said.fixedVersion, CommittedTo: said.committedTo,
 			DeferredUntil: said.deferredUntil,
-			Reasoning:     "Read the code.", By: w.proposer.ID, MadeOn: []int64{target.ID},
-			BindingAcross: []int64{target.ID},
+			Reasoning:     "Read the code.", By: w.proposer.ID, MadeOn: []int64{build.ID},
+			BindingAcross: []int64{build.ID},
 		})
 	}
 	recorded, err := w.decisions.ProposeMany(ctx, w.proposer, proposals)
@@ -286,9 +286,9 @@ func (w *world) csafAbout(product *catalog.Product, issue string) *advisory.Docu
 
 // openVEXAbout is the OpenVEX document about a branch or tag of a product,
 // or nil where none is.
-func (w *world) openVEXAbout(product *catalog.Product, stream string) *vex.Statements {
+func (w *world) openVEXAbout(product *catalog.Product, branchOrTag string) *vex.Statements {
 	w.t.Helper()
-	path := publish.OpenVEXPath + product.Name + "/" + stream + ".json"
+	path := publish.OpenVEXPath + product.Name + "/" + branchOrTag + ".json"
 	doc, err := w.documents.At(w.t.Context(), w.anybody(), path, "all")
 	if err != nil {
 		return nil
@@ -323,7 +323,7 @@ func (w *world) issued(disclosed bool) (advisoryName, flaw string) {
 	w.t.Helper()
 	ctx := w.t.Context()
 	_, flaw, err := w.findings.Enter(ctx, w.proposer, finding.Entering{
-		TargetIDs: []int64{w.Target.ID}, Component: swss.Name, Severity: "high",
+		BuildIDs: []int64{w.Build.ID}, Component: swss.Name, Severity: "high",
 		Summary:   "The management socket answers before anyone authenticated.",
 		Disclosed: disclosed, Told: finding.Told{FoundHere: true},
 	})

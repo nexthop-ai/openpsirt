@@ -5,7 +5,7 @@
 // branches and tags within them, and the variants each of those is built as.
 //
 // Everything here is declared before it can be targeted. A scan naming
-// something undeclared is rejected, because a mistyped stream name would
+// something undeclared is rejected, because a mistyped branch or tag name would
 // otherwise create one that looks entirely real — its own findings, its own
 // counts, its own place in every report — while the real one appears to have
 // stopped being scanned.
@@ -57,7 +57,7 @@ var ErrExists = refusal.New("already declared")
 // does not exist" for a database it could not reach, and a caller that trusts
 // it says so to whoever asked.
 //
-// absent names the thing, in the words a reader sees: "product 12", "target 4".
+// absent names the thing, in the words a reader sees: "product 12", "build 4".
 // reading names the act, for the line an operator gets: "look up product 12".
 func missingOr(err error, absent, reading string) error {
 	return database.FromRead(err, fmt.Errorf("%s: %w", absent, ErrNotFound), reading)
@@ -71,11 +71,6 @@ type Product struct {
 	Name        string     `bun:"name,notnull"`
 	DisplayName string     `bun:"display_name,notnull"`
 	EOLOn       *time.Time `bun:"eol_on"`
-	// TriageFloor is what this product considers worth triaging, where it
-	// has an opinion of its own. Empty means the deployment's line applies
-	// — stating the default instead would stop this product following it
-	// when the default changed.
-	TriageFloor *string `bun:"triage_floor"`
 	// PairShare and PairApprovers are this product's own thresholds for
 	// raising one pair agreeing to each other's work, where it states them.
 	// Nil follows the deployment.
@@ -92,12 +87,12 @@ type Product struct {
 // Retired reports whether this product has been taken out of use.
 func (p Product) Retired() bool { return p.RetiredAt != nil }
 
-// Stream is a branch or a tag of a product.
+// BranchOrTag is a branch or a tag of a product.
 //
 // Both live here because they differ in one respect only — a branch moves and
 // a tag does not — and share everything else.
-type Stream struct {
-	bun.BaseModel `bun:"table:stream,alias:s"`
+type BranchOrTag struct {
+	bun.BaseModel `bun:"table:branch_or_tag,alias:s"`
 
 	ID          int64  `bun:"id,pk,autoincrement"`
 	ProductID   int64  `bun:"product_id,notnull"`
@@ -122,9 +117,9 @@ type Stream struct {
 }
 
 // Retired reports whether this release has been taken out of use.
-func (s Stream) Retired() bool { return s.RetiredAt != nil }
+func (s BranchOrTag) Retired() bool { return s.RetiredAt != nil }
 
-// Variant is one of the ways a stream is built — a chip variant, an operating
+// Variant is one of the ways a branch or tag is built — a chip variant, an operating
 // system, an architecture.
 //
 // It belongs to the product rather than to any one release, so one introduced in a
@@ -225,9 +220,9 @@ func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*
 type EndOfLife struct {
 	// On is the date, or absent where nothing has said one.
 	On *time.Time
-	// FromStream says the release stated this rather than inheriting the
+	// FromBranchOrTag says the release stated this rather than inheriting the
 	// product's. Carried so a screen can say whose decision it is looking at.
-	FromStream bool
+	FromBranchOrTag bool
 }
 
 // Past reports whether the date has passed, as of when.
@@ -248,15 +243,15 @@ func (s *Store) SetProductEndOfLife(ctx context.Context, productID int64, on *ti
 	return s.setEndOfLife(ctx, (*Product)(nil), productID, on, "product")
 }
 
-// SetStreamEndOfLife records when one release goes out of support, or clears
+// SetBranchOrTagEndOfLife records when one release goes out of support, or clears
 // it so the release follows its product again.
 //
 // Cleared rather than set to the product's date, for the reason a product's
-// triage line is cleared rather than copied: a release holding the product's
+// minimum severity is cleared rather than copied: a release holding the product's
 // current date would stop following it the next time the product moved, and
 // nobody would see that happen.
-func (s *Store) SetStreamEndOfLife(ctx context.Context, streamID int64, on *time.Time) error {
-	return s.setEndOfLife(ctx, (*Stream)(nil), streamID, on, "release")
+func (s *Store) SetBranchOrTagEndOfLife(ctx context.Context, branchOrTagID int64, on *time.Time) error {
+	return s.setEndOfLife(ctx, (*BranchOrTag)(nil), branchOrTagID, on, "release")
 }
 
 // SetReleasedOn records when a release actually went out, or clears it.
@@ -269,8 +264,8 @@ func (s *Store) SetStreamEndOfLife(ctx context.Context, streamID int64, on *time
 //
 // A date rather than a moment: a release goes out on a day, and the hour a
 // deployment happens to be asked is not part of the answer.
-func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time) error {
-	q := s.db.NewUpdate().Model((*Stream)(nil)).Where(`"id" = ?`, streamID)
+func (s *Store) SetReleasedOn(ctx context.Context, branchOrTagID int64, on *time.Time) error {
+	q := s.db.NewUpdate().Model((*BranchOrTag)(nil)).Where(`"id" = ?`, branchOrTagID)
 	if on == nil {
 		q = q.Set(`"released_on" = NULL`)
 	} else {
@@ -280,7 +275,7 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 	if err != nil {
 		return fmt.Errorf("record when this release went out: %w", err)
 	}
-	return counted(res, "release", streamID, "record when this release went out")
+	return counted(res, "release", branchOrTagID, "record when this release went out")
 }
 
 // FillInParent records which branch a tag was cut from, where nothing has been
@@ -303,22 +298,22 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 //
 // It reports whether it filled one in, so the act can be recorded where it
 // happened and nowhere else.
-func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) (bool, error) {
-	var child Stream
+func (s *Store) FillInParent(ctx context.Context, branchOrTagID, parent int64) (bool, error) {
+	var child BranchOrTag
 	if err := s.db.NewSelect().Model(&child).Column("kind", "product_id").
-		Where(`"id" = ?`, streamID).Scan(ctx); err != nil {
-		return false, missingOr(err, fmt.Sprintf("release %d", streamID),
-			fmt.Sprintf("look up what release %d is", streamID))
+		Where(`"id" = ?`, branchOrTagID).Scan(ctx); err != nil {
+		return false, missingOr(err, fmt.Sprintf("release %d", branchOrTagID),
+			fmt.Sprintf("look up what release %d is", branchOrTagID))
 	}
-	if err := s.validParent(ctx, child.Kind, streamID, child.ProductID, parent); err != nil {
+	if err := s.validParent(ctx, child.Kind, branchOrTagID, child.ProductID, parent); err != nil {
 		return false, err
 	}
 	// Only where nothing stands, asked in the write rather than before it: a
 	// check and a write that are two statements are two moments, and what is
 	// being protected here is that a stated parent never changes.
-	res, err := s.db.NewUpdate().Model((*Stream)(nil)).
+	res, err := s.db.NewUpdate().Model((*BranchOrTag)(nil)).
 		Set(`"parent_id" = ?`, parent).
-		Where(`"id" = ?`, streamID).
+		Where(`"id" = ?`, branchOrTagID).
 		Where(`"parent_id" IS NULL`).
 		Exec(ctx)
 	if err != nil {
@@ -330,10 +325,10 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) (bool,
 	}
 	if n == 0 {
 		var stood *int64
-		if err := s.db.NewSelect().Model((*Stream)(nil)).Column("parent_id").
-			Where(`"id" = ?`, streamID).Scan(ctx, &stood); err != nil {
-			return false, missingOr(err, fmt.Sprintf("release %d", streamID),
-				fmt.Sprintf("read what release %d was cut from", streamID))
+		if err := s.db.NewSelect().Model((*BranchOrTag)(nil)).Column("parent_id").
+			Where(`"id" = ?`, branchOrTagID).Scan(ctx, &stood); err != nil {
+			return false, missingOr(err, fmt.Sprintf("release %d", branchOrTagID),
+				fmt.Sprintf("read what release %d was cut from", branchOrTagID))
 		}
 		if stood != nil && *stood == parent {
 			return false, nil
@@ -357,7 +352,7 @@ func (s *Store) validParent(ctx context.Context, childKind Kind, childID, produc
 	if parent == childID {
 		return refusal.Errorf("a release cannot be cut from itself")
 	}
-	var from Stream
+	var from BranchOrTag
 	if err := s.db.NewSelect().Model(&from).Column("kind", "product_id").
 		Where(`"id" = ?`, parent).Scan(ctx); err != nil {
 		return missingOr(err, fmt.Sprintf("release %d", parent),
@@ -389,7 +384,7 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 	return counted(res, what, id, "record when this "+what+" goes out of support")
 }
 
-// EndOfLifeForTarget reads the date in force for the release one build belongs
+// EndOfLifeForBuild reads the date in force for the release one build belongs
 // to.
 //
 // The release's own where it has stated one, the product's otherwise. A
@@ -399,21 +394,21 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 // A build is of a release, and support ends for the release rather than for
 // one of the ways it is built: shipping two chip variants of a version does
 // not make one of them supported for longer than the other.
-func (s *Store) EndOfLifeForTarget(ctx context.Context, targetID int64) (EndOfLife, error) {
+func (s *Store) EndOfLifeForBuild(ctx context.Context, buildID int64) (EndOfLife, error) {
 	return s.endOfLife(ctx,
-		`"s"."id" IN (SELECT "tg"."stream_id" FROM "target" AS "tg" WHERE "tg"."id" = ?)`, targetID,
-		"build", targetID)
+		`"s"."id" IN (SELECT "tg"."branch_or_tag_id" FROM "build" AS "tg" WHERE "tg"."id" = ?)`, buildID,
+		"build", buildID)
 }
 
 func (s *Store) endOfLife(ctx context.Context, where string, arg any, what string, id int64) (EndOfLife, error) {
 	var stated struct {
-		Stream  *time.Time `bun:"stream_eol"`
-		Product *time.Time `bun:"product_eol"`
+		BranchOrTag *time.Time `bun:"branch_or_tag_eol"`
+		Product     *time.Time `bun:"product_eol"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`"stream" AS "s"`).
+		TableExpr(`"branch_or_tag" AS "s"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
-		ColumnExpr(`"s"."eol_on" AS "stream_eol"`).
+		ColumnExpr(`"s"."eol_on" AS "branch_or_tag_eol"`).
 		ColumnExpr(`"p"."eol_on" AS "product_eol"`).
 		Where(where, arg).
 		Scan(ctx, &stated)
@@ -423,43 +418,43 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 		}
 		return EndOfLife{}, fmt.Errorf("read when this %s goes out of support: %w", what, err)
 	}
-	if stated.Stream != nil {
-		return EndOfLife{On: stated.Stream, FromStream: true}, nil
+	if stated.BranchOrTag != nil {
+		return EndOfLife{On: stated.BranchOrTag, FromBranchOrTag: true}, nil
 	}
 	return EndOfLife{On: stated.Product}, nil
 }
 
-// TargetMoves reports whether a build's release can change.
+// BuildMoves reports whether a build's release can change.
 //
 // A branch moves: it is rebuilt, and its current state changes. A tag never
 // does — it was built once and is what somebody received. Everything that turns
 // on "can this still be fixed" asks here rather than reading the kind for
 // itself, so the two cannot come to disagree.
-func (s *Store) TargetMoves(ctx context.Context, targetID int64) (bool, error) {
+func (s *Store) BuildMoves(ctx context.Context, buildID int64) (bool, error) {
 	var kind string
 	err := s.db.NewSelect().
-		TableExpr(`"stream" AS "s"`).
+		TableExpr(`"branch_or_tag" AS "s"`).
 		ColumnExpr(`"s"."kind"`).
-		Where(`"s"."id" IN (SELECT "tg"."stream_id" FROM "target" AS "tg" WHERE "tg"."id" = ?)`, targetID).
+		Where(`"s"."id" IN (SELECT "tg"."branch_or_tag_id" FROM "build" AS "tg" WHERE "tg"."id" = ?)`, buildID).
 		Scan(ctx, &kind)
 	if err != nil {
 		if database.IsNoRows(err) {
-			return false, fmt.Errorf("build %d: %w", targetID, ErrNotFound)
+			return false, fmt.Errorf("build %d: %w", buildID, ErrNotFound)
 		}
 		return false, fmt.Errorf("read whether that release moves: %w", err)
 	}
 	return Kind(kind) == Branch, nil
 }
 
-// TagStreams is which releases were built once and cannot change.
+// TagBranchesAndTags is which releases were built once and cannot change.
 //
-// The counterpart of StreamsPastEndOfLife, and used the same way: a sweep takes
+// The counterpart of BranchesAndTagsPastEndOfLife, and used the same way: a sweep takes
 // the deadline off everything on one of them, because a deadline on a release
 // nothing will ever land in was unmeetable the moment it was written.
-func (s *Store) TagStreams(ctx context.Context) ([]int64, error) {
+func (s *Store) TagBranchesAndTags(ctx context.Context) ([]int64, error) {
 	var ids []int64
 	if err := s.db.NewSelect().
-		TableExpr(`"stream" AS "s"`).
+		TableExpr(`"branch_or_tag" AS "s"`).
 		ColumnExpr(`"s"."id"`).
 		Where(`"s"."kind" = ?`, Tag).Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which releases were built once: %w", err)
@@ -467,35 +462,35 @@ func (s *Store) TagStreams(ctx context.Context) ([]int64, error) {
 	return ids, nil
 }
 
-// StreamsPastEndOfLife is which releases have gone out of support by a date.
+// BranchesAndTagsPastEndOfLife is which releases have gone out of support by a date.
 //
 // The date comparison is spelled here and nowhere else. What "past end of
 // life" means decides three separate things — whether a finding carries a
 // deadline, whether a build going quiet is a fault, and what a screen says —
 // and this project's bugs have all come from letting one fact into two rules.
-func (s *Store) StreamsPastEndOfLife(ctx context.Context, at time.Time) ([]int64, error) {
-	return s.streamsEndingBy(ctx, at)
+func (s *Store) BranchesAndTagsPastEndOfLife(ctx context.Context, at time.Time) ([]int64, error) {
+	return s.branchesAndTagsEndingBy(ctx, at)
 }
 
-// StreamsEndingBy is which releases will have gone out of support by a date.
+// BranchesAndTagsEndingBy is which releases will have gone out of support by a date.
 //
 // The same question asked of a day that has not arrived. Nothing warns
 // before a release crosses: the day it does, the deadline comes off every
 // open finding on it, and a pile of work leaves every overdue count at once
 // with nobody having decided anything. Asking ahead is what makes that a date
 // somebody can plan for rather than a figure that moves overnight.
-func (s *Store) StreamsEndingBy(ctx context.Context, by time.Time) ([]int64, error) {
-	return s.streamsEndingBy(ctx, by)
+func (s *Store) BranchesAndTagsEndingBy(ctx context.Context, by time.Time) ([]int64, error) {
+	return s.branchesAndTagsEndingBy(ctx, by)
 }
 
-// streamsEndingBy is the predicate both of those ask, spelled once: a release
+// branchesAndTagsEndingBy is the predicate both of those ask, spelled once: a release
 // answering to its own date where it states one and to its product's
 // otherwise.
-func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, error) {
+func (s *Store) branchesAndTagsEndingBy(ctx context.Context, at time.Time) ([]int64, error) {
 	past, args := PastEndOfLife("s", "p", at)
 	var ids []int64
 	err := s.db.NewSelect().
-		TableExpr(`"stream" AS "s"`).
+		TableExpr(`"branch_or_tag" AS "s"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
 		ColumnExpr(`"s"."id"`).
 		Where(past, args...).
@@ -508,38 +503,38 @@ func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, err
 }
 
 // PastEndOfLife is the condition, as SQL, under which a release has gone out
-// of support by a date, over a stream and its product under the aliases given.
+// of support by a date, over a branch or tag and its product under the aliases given.
 //
 // The release's own date where it has one, the product's otherwise — the same
 // precedence a single read applies, written as a condition rather than fetched
 // and compared, so a deployment with thousands of releases is one statement.
-func PastEndOfLife(stream, product string, at time.Time) (string, []any) {
+func PastEndOfLife(branchOrTag, product string, at time.Time) (string, []any) {
 	day := at.UTC().Truncate(24 * time.Hour)
-	s, p := `"`+stream+`"."eol_on"`, `"`+product+`"."eol_on"`
+	s, p := `"`+branchOrTag+`"."eol_on"`, `"`+product+`"."eol_on"`
 	return `((` + s + ` IS NOT NULL AND ` + s + ` <= ?)
 			OR (` + s + ` IS NULL AND ` + p + ` IS NOT NULL AND ` + p + ` <= ?))`, []any{day, day}
 }
 
 // OnTheClock is the condition, as SQL, under which a release carries
 // deadlines at a moment: it moves, and it has not gone out of support. The
-// stream and its product are joined by the caller under the aliases given.
+// branch or tag and its product are joined by the caller under the aliases given.
 //
 // The condition a scan applies to the build it writes, as one expression, so
 // that a recount reaching findings across many releases leaves the same ones
 // off the clock that the scan did.
-func OnTheClock(stream, product string, at time.Time) (string, []any) {
-	past, args := PastEndOfLife(stream, product, at)
-	return `("` + stream + `"."kind" = ? AND NOT ` + past + `)`, append([]any{string(Branch)}, args...)
+func OnTheClock(branchOrTag, product string, at time.Time) (string, []any) {
+	past, args := PastEndOfLife(branchOrTag, product, at)
+	return `("` + branchOrTag + `"."kind" = ? AND NOT ` + past + `)`, append([]any{string(Branch)}, args...)
 }
 
 // Retired is a release that has gone out of support, with what it belongs to
 // and which date put it there.
 type Retired struct {
-	StreamID  int64
-	ProductID int64
-	Product   string
-	Stream    string
-	Kind      Kind
+	BranchOrTagID int64
+	ProductID     int64
+	Product       string
+	BranchOrTag   string
+	Kind          Kind
 	// EndedOn is the date support ended: the release's own where it stated
 	// one, its product's otherwise.
 	EndedOn time.Time
@@ -552,7 +547,7 @@ type Retired struct {
 // OutOfSupport lists the releases somebody may see that have gone out of
 // support.
 //
-// The releases themselves are asked of StreamsEndingBy rather than spelled
+// The releases themselves are asked of BranchesAndTagsEndingBy rather than spelled
 // again. The date comparison lives in exactly one place. A report that works
 // it out for itself eventually describes a different set of releases from the
 // one whose deadlines were stripped, and it is the report people believe.
@@ -579,7 +574,7 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 	if by.Before(at) {
 		by = at
 	}
-	past, err := s.StreamsEndingBy(ctx, by)
+	past, err := s.BranchesAndTagsEndingBy(ctx, by)
 	if err != nil {
 		return nil, err
 	}
@@ -590,19 +585,19 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 	out := make([]Retired, 0, len(past))
 	err = database.IDsInBatches(ctx, past, func(ctx context.Context, batch []int64) error {
 		var rows []struct {
-			StreamID   int64      `bun:"stream_id"`
-			ProductID  int64      `bun:"product_id"`
-			Product    string     `bun:"product"`
-			Stream     string     `bun:"stream"`
-			Kind       Kind       `bun:"kind"`
-			OwnEOL     *time.Time `bun:"own_eol"`
-			ProductEOL *time.Time `bun:"product_eol"`
+			BranchOrTagID int64      `bun:"branch_or_tag_id"`
+			ProductID     int64      `bun:"product_id"`
+			Product       string     `bun:"product"`
+			BranchOrTag   string     `bun:"branch_or_tag"`
+			Kind          Kind       `bun:"kind"`
+			OwnEOL        *time.Time `bun:"own_eol"`
+			ProductEOL    *time.Time `bun:"product_eol"`
 		}
 		q := s.db.NewSelect().
-			TableExpr(`"stream" AS "s"`).
+			TableExpr(`"branch_or_tag" AS "s"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
-			ColumnExpr(`"s"."id" AS "stream_id"`).
-			ColumnExpr(`"s"."name" AS "stream"`).
+			ColumnExpr(`"s"."id" AS "branch_or_tag_id"`).
+			ColumnExpr(`"s"."name" AS "branch_or_tag"`).
 			ColumnExpr(`"s"."kind" AS "kind"`).
 			ColumnExpr(`"s"."eol_on" AS "own_eol"`).
 			ColumnExpr(`"p"."id" AS "product_id"`).
@@ -618,8 +613,8 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 		}
 		for _, row := range rows {
 			ended := Retired{
-				StreamID: row.StreamID, ProductID: row.ProductID,
-				Product: row.Product, Stream: row.Stream, Kind: row.Kind,
+				BranchOrTagID: row.BranchOrTagID, ProductID: row.ProductID,
+				Product: row.Product, BranchOrTag: row.BranchOrTag, Kind: row.Kind,
 			}
 			switch {
 			case row.OwnEOL != nil:
@@ -645,7 +640,7 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 
 // SetPairThresholds records this product's own thresholds for raising one pair
 // agreeing to each other's work. Nil clears one, so the product follows the
-// deployment again, for the reason clearing the triage line does.
+// deployment again, for the reason clearing the minimum severity does.
 func (s *Store) SetPairThresholds(ctx context.Context, productID int64,
 	share, approvers *int) error {
 
@@ -719,19 +714,60 @@ func (s *Store) publishing(ctx context.Context, inUse bool) ([]int64, error) {
 	return ids, nil
 }
 
-// SetTriageFloor records what a product considers worth triaging, or clears it
-// so the product follows the deployment again.
+// MinimumSeverities is the minimum severity each product states of its own, by
+// identifier. A product following the deployment is absent.
+//
+// Read by its column rather than through the product's model, as whether a
+// product publishes is: the catalog listing, a product's overview and the act
+// setting it ask, and nowhere a product is otherwise read or declared.
+func (s *Store) MinimumSeverities(ctx context.Context) (map[int64]string, error) {
+	var rows []struct {
+		ID   int64  `bun:"id"`
+		Word string `bun:"minimum_severity"`
+	}
+	if err := s.db.NewSelect().TableExpr(`"product" AS "p"`).
+		ColumnExpr(`"p"."id"`).ColumnExpr(`"p"."minimum_severity"`).
+		Where(`"p"."minimum_severity" IS NOT NULL`).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what each product triages: %w", err)
+	}
+	out := make(map[int64]string, len(rows))
+	for _, row := range rows {
+		out[row.ID] = row.Word
+	}
+	return out, nil
+}
+
+// MinimumSeverityOf is the minimum severity one product states of its own, or
+// nil where it follows the deployment.
+func (s *Store) MinimumSeverityOf(ctx context.Context, productID int64) (*string, error) {
+	var stated struct {
+		Word *string `bun:"minimum_severity"`
+	}
+	err := s.db.NewSelect().TableExpr(`"product" AS "p"`).
+		ColumnExpr(`"p"."minimum_severity"`).
+		Where(`"p"."id" = ?`, productID).
+		Scan(ctx, &stated)
+	if err != nil {
+		return nil, missingOr(err, fmt.Sprintf("product %d", productID),
+			fmt.Sprintf("read what product %d triages", productID))
+	}
+	return stated.Word, nil
+}
+
+// SetMinimumSeverity records what a product considers worth triaging, or clears
+// it so the product follows the deployment again.
 //
 // Cleared rather than set to the deployment's current value. A product that
-// copied the line the day somebody looked at it would stop following the
+// copied it the day somebody looked at it would stop following the
 // deployment the next time the deployment changed its mind, and nobody would
 // see that happen.
-func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string) error {
+func (s *Store) SetMinimumSeverity(ctx context.Context, productID int64, word string) error {
 	q := s.db.NewUpdate().Model((*Product)(nil)).Where(`"id" = ?`, productID)
 	if word == "" {
-		q = q.Set(`"triage_floor" = NULL`)
+		q = q.Set(`"minimum_severity" = NULL`)
 	} else {
-		q = q.Set(`"triage_floor" = ?`, word)
+		q = q.Set(`"minimum_severity" = ?`, word)
 	}
 	res, err := q.Exec(ctx)
 	if err != nil {
@@ -753,16 +789,16 @@ func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error
 	return p, nil
 }
 
-// DeclareStream records a branch or tag of a product.
-func (s *Store) DeclareStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, error) {
-	if err := validName("stream", name); err != nil {
+// DeclareBranchOrTag records a branch or tag of a product.
+func (s *Store) DeclareBranchOrTag(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*BranchOrTag, error) {
+	if err := validName("branch_or_tag", name); err != nil {
 		return nil, err
 	}
 	if !kind.Valid() {
-		return nil, refusal.Errorf("stream kind %q: want %q or %q", kind, Branch, Tag)
+		return nil, refusal.Errorf("branch or tag kind %q: want %q or %q", kind, Branch, Tag)
 	}
-	if _, err := s.StreamByName(ctx, productID, name); err == nil {
-		return nil, fmt.Errorf("stream %q: %w", name, ErrExists)
+	if _, err := s.BranchOrTagByName(ctx, productID, name); err == nil {
+		return nil, fmt.Errorf("branch or tag %q: %w", name, ErrExists)
 	} else if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
@@ -772,26 +808,26 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 		}
 	}
 
-	st := &Stream{
+	st := &BranchOrTag{
 		ProductID: productID, Name: typedname.Matching(name), DisplayName: strings.TrimSpace(name),
 		Kind: kind, ParentID: parentID, CreatedAt: now(),
 	}
 	if _, err := s.db.NewInsert().Model(st).Exec(ctx); err != nil {
-		return nil, fmt.Errorf("declare stream %q: %w", name, err)
+		return nil, fmt.Errorf("declare branch or tag %q: %w", name, err)
 	}
 	return st, nil
 }
 
-// StreamByName finds a stream within a product.
-func (s *Store) StreamByName(ctx context.Context, productID int64, name string) (*Stream, error) {
-	st := new(Stream)
+// BranchOrTagByName finds a branch or tag within a product.
+func (s *Store) BranchOrTagByName(ctx context.Context, productID int64, name string) (*BranchOrTag, error) {
+	st := new(BranchOrTag)
 	err := s.db.NewSelect().Model(st).
 		Where(`"product_id" = ?`, productID).Where(`"name" = ?`, typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
-			return nil, fmt.Errorf("stream %q: %w", name, ErrNotFound)
+			return nil, fmt.Errorf("branch or tag %q: %w", name, ErrNotFound)
 		}
-		return nil, fmt.Errorf("look up stream %q: %w", name, err)
+		return nil, fmt.Errorf("look up branch or tag %q: %w", name, err)
 	}
 	return st, nil
 }
@@ -838,7 +874,7 @@ func (s *Store) VariantByName(ctx context.Context, productID int64, name string)
 	return v, nil
 }
 
-// Resolve turns the names a scan supplies into the target it is filed against.
+// Resolve turns the names a scan supplies into the build it is filed against.
 //
 // Every part must already be declared. The error names exactly which part is
 // missing, because whoever sees the failed upload needs to know what to add
@@ -849,36 +885,36 @@ func (s *Store) VariantByName(ctx context.Context, productID int64, name string)
 // reporting a fact rather than naming something new, so the row is recorded on
 // first use. It is also why a variant introduced later stays out of earlier
 // releases: nothing ever filed a scan for it there.
-func (s *Store) Resolve(ctx context.Context, product, stream, variant string) (*Target, error) {
-	named, err := s.Locate(ctx, product, stream, variant)
+func (s *Store) Resolve(ctx context.Context, product, branchOrTag, variant string) (*Build, error) {
+	named, err := s.Locate(ctx, product, branchOrTag, variant)
 	if err != nil {
 		return nil, err
 	}
-	return s.TargetFor(ctx, named.StreamID, named.VariantID)
+	return s.BuildFor(ctx, named.BranchOrTagID, named.VariantID)
 }
 
 // Named is what an upload said it was for, resolved to rows but not yet
-// recorded as a target.
+// recorded as a build.
 //
 // The three names are the stored ones rather than the ones that were typed. A
 // name people type is matched without regard to capitals, so two callers
 // naming one build spell it two ways, and anything a document is identified by
 // has to be the same string both times.
 type Named struct {
-	ProductID int64
-	StreamID  int64
-	VariantID int64
-	Product   string
-	Stream    string
-	Variant   string
-	// ProductRetired, StreamRetired and VariantRetired say which part of the
+	ProductID     int64
+	BranchOrTagID int64
+	VariantID     int64
+	Product       string
+	BranchOrTag   string
+	Variant       string
+	// ProductRetired, BranchOrTagRetired and VariantRetired say which part of the
 	// build named here is out of use. Carried rather than refused inside the
 	// lookup, because resolving the names is how a document already issued
 	// for it is still found and how its findings are still read. Filing a
 	// scan is the one act that refuses.
-	ProductRetired bool
-	StreamRetired  bool
-	VariantRetired bool
+	ProductRetired     bool
+	BranchOrTagRetired bool
+	VariantRetired     bool
 }
 
 // LocateVisible is Locate for one sender, reporting anything they may not file
@@ -888,7 +924,7 @@ type Named struct {
 // product; without this, presenting it and guessing at names elsewhere would
 // return a different error for a name that exists — which turns a stolen build
 // credential into a reader of the whole shipping catalog.
-func (s *Store) LocateVisible(ctx context.Context, subject access.Subject, product, stream, variant string) (*Named, error) {
+func (s *Store) LocateVisible(ctx context.Context, subject access.Subject, product, branchOrTag, variant string) (*Named, error) {
 	p, err := s.ProductByName(ctx, product)
 	if err != nil {
 		return nil, err
@@ -901,21 +937,21 @@ func (s *Store) LocateVisible(ctx context.Context, subject access.Subject, produ
 	if !subject.Reaches(p.ID) {
 		return nil, fmt.Errorf("product %q: %w", product, ErrNotFound)
 	}
-	return s.Locate(ctx, product, stream, variant)
+	return s.Locate(ctx, product, branchOrTag, variant)
 }
 
-// LocateForLead is LocateVisible for a read of one lead, which somebody
-// granted a handed-off lead in the product may also make. Every read past it
-// asks about the lead.
-func (s *Store) LocateForLead(ctx context.Context, subject access.Subject, product, stream, variant string) (*Named, error) {
+// LocateForCodeFinding is LocateVisible for a read of one code finding, which somebody
+// granted a code finding recorded as a flaw in the product may also make. Every read past it
+// asks about the code finding.
+func (s *Store) LocateForCodeFinding(ctx context.Context, subject access.Subject, product, branchOrTag, variant string) (*Named, error) {
 	p, err := s.ProductByName(ctx, product)
 	if err != nil {
 		return nil, err
 	}
-	if !subject.ReachesLead(p.ID) {
+	if !subject.ReachesCodeFinding(p.ID) {
 		return nil, fmt.Errorf("product %q: %w", product, ErrNotFound)
 	}
-	return s.Locate(ctx, product, stream, variant)
+	return s.Locate(ctx, product, branchOrTag, variant)
 }
 
 // Locate turns the names an upload states into the things they refer to,
@@ -924,12 +960,12 @@ func (s *Store) LocateForLead(ctx context.Context, subject access.Subject, produ
 // Separate from Resolve so that whether the sender is allowed to file against
 // this can be decided before the pair is written down. Recording first and
 // checking afterwards leaves a row created by a request that was refused.
-func (s *Store) Locate(ctx context.Context, product, stream, variant string) (*Named, error) {
+func (s *Store) Locate(ctx context.Context, product, branchOrTag, variant string) (*Named, error) {
 	p, err := s.ProductByName(ctx, product)
 	if err != nil {
 		return nil, err
 	}
-	st, err := s.StreamByName(ctx, p.ID, stream)
+	st, err := s.BranchOrTagByName(ctx, p.ID, branchOrTag)
 	if err != nil {
 		return nil, fmt.Errorf("product %q: %w", product, err)
 	}
@@ -938,69 +974,69 @@ func (s *Store) Locate(ctx context.Context, product, stream, variant string) (*N
 		return nil, fmt.Errorf("product %q: %w", product, err)
 	}
 	return &Named{
-		ProductID: p.ID, StreamID: st.ID, VariantID: v.ID,
-		Product: p.Name, Stream: st.Name, Variant: v.Name,
-		ProductRetired: p.Retired(), StreamRetired: st.Retired(), VariantRetired: v.Retired(),
+		ProductID: p.ID, BranchOrTagID: st.ID, VariantID: v.ID,
+		Product: p.Name, BranchOrTag: st.Name, Variant: v.Name,
+		ProductRetired: p.Retired(), BranchOrTagRetired: st.Retired(), VariantRetired: v.Retired(),
 	}, nil
 }
 
-// TargetFor returns the row for a release built as a variant, recording it the
+// BuildFor returns the row for a release built as a variant, recording it the
 // first time.
-func (s *Store) TargetFor(ctx context.Context, streamID, variantID int64) (*Target, error) {
-	target := new(Target)
-	err := s.db.NewSelect().Model(target).
-		Where(`"stream_id" = ?`, streamID).Where(`"variant_id" = ?`, variantID).Scan(ctx)
+func (s *Store) BuildFor(ctx context.Context, branchOrTagID, variantID int64) (*Build, error) {
+	build := new(Build)
+	err := s.db.NewSelect().Model(build).
+		Where(`"branch_or_tag_id" = ?`, branchOrTagID).Where(`"variant_id" = ?`, variantID).Scan(ctx)
 	if err == nil {
-		return target, nil
+		return build, nil
 	}
 	if !database.IsNoRows(err) {
 		return nil, fmt.Errorf("look up what a scan is filed against: %w", err)
 	}
 
-	target = &Target{StreamID: streamID, VariantID: variantID, CreatedAt: now()}
-	if _, err := s.db.NewInsert().Model(target).Exec(ctx); err != nil {
+	build = &Build{BranchOrTagID: branchOrTagID, VariantID: variantID, CreatedAt: now()}
+	if _, err := s.db.NewInsert().Model(build).Exec(ctx); err != nil {
 		if database.IsDuplicate(err) {
 			// Two pipelines filed the first scan for this pair at once. The
 			// row the other one wrote is the row: the read above and this
 			// write are two statements, so both found nothing and both
 			// inserted, and the unique index refused whichever arrived
 			// second. Nothing here is the loser's to report.
-			return s.ExistingTarget(ctx, streamID, variantID)
+			return s.ExistingBuild(ctx, branchOrTagID, variantID)
 		}
 		return nil, fmt.Errorf("record that this release is built as this variant: %w", err)
 	}
-	return target, nil
+	return build, nil
 }
 
 func now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 
-// Target is one release built as one variant. It is what a scan is filed
+// Build is one release built as one variant. It is what a scan is filed
 // against, and what everything downstream points at, so a single identifier
 // runs from a scan through to a finding.
-type Target struct {
-	bun.BaseModel `bun:"table:target,alias:tg"`
+type Build struct {
+	bun.BaseModel `bun:"table:build,alias:tg"`
 
-	ID        int64     `bun:"id,pk,autoincrement"`
-	StreamID  int64     `bun:"stream_id,notnull"`
-	VariantID int64     `bun:"variant_id,notnull"`
-	CreatedAt time.Time `bun:"created_at,notnull"`
+	ID            int64     `bun:"id,pk,autoincrement"`
+	BranchOrTagID int64     `bun:"branch_or_tag_id,notnull"`
+	VariantID     int64     `bun:"variant_id,notnull"`
+	CreatedAt     time.Time `bun:"created_at,notnull"`
 	// LastScanID is which scan last wrote here, and taking it is how two
-	// workers applying two scans of one target are kept apart.
+	// workers applying two scans of one build are kept apart.
 	LastScanID *int64 `bun:"last_scan_id"`
 	// LastRunID is the same thing for the pass that records what a scanner
-	// found. It is a separate write over the same target, so it needs its own
+	// found. It is a separate write over the same build, so it needs its own
 	// hold on the row.
 	LastRunID *int64 `bun:"last_run_id"`
 }
 
-// Placement is a target with everything above it named: what it is of, whether
+// Placement is a build with everything above it named: what it is of, whether
 // that line moves, and what to call the thing a scan is about when the scan
 // does not name it.
 type Placement struct {
-	Product string
-	Stream  string
-	Kind    Kind
-	Variant string
+	Product     string
+	BranchOrTag string
+	Kind        Kind
+	Variant     string
 	// Moves says whether the line this was filed against is one that advances.
 	// A branch is superseded by the next build; a tag never is, so what it
 	// shipped has to be answerable years later.
@@ -1012,26 +1048,26 @@ type Placement struct {
 	// carrying a link needs both: the names above for the sentence, and these
 	// for the address.
 	Addressed struct {
-		Product, Stream, Variant string
+		Product, BranchOrTag, Variant string
 	}
 }
 
-// Describe reads back what a target is.
-func (s *Store) Describe(ctx context.Context, targetID int64) (*Placement, error) {
-	var t Target
-	if err := s.db.NewSelect().Model(&t).Where(`"id" = ?`, targetID).Scan(ctx); err != nil {
-		return nil, missingOr(err, fmt.Sprintf("target %d", targetID),
-			fmt.Sprintf("look up target %d", targetID))
+// Describe reads back what a build is.
+func (s *Store) Describe(ctx context.Context, buildID int64) (*Placement, error) {
+	var t Build
+	if err := s.db.NewSelect().Model(&t).Where(`"id" = ?`, buildID).Scan(ctx); err != nil {
+		return nil, missingOr(err, fmt.Sprintf("build %d", buildID),
+			fmt.Sprintf("look up build %d", buildID))
 	}
 	var v Variant
 	if err := s.db.NewSelect().Model(&v).Where(`"id" = ?`, t.VariantID).Scan(ctx); err != nil {
 		return nil, missingOr(err, fmt.Sprintf("variant %d", t.VariantID),
-			fmt.Sprintf("look up the variant target %d is built as", targetID))
+			fmt.Sprintf("look up the variant build %d is built as", buildID))
 	}
-	var st Stream
-	if err := s.db.NewSelect().Model(&st).Where(`"id" = ?`, t.StreamID).Scan(ctx); err != nil {
-		return nil, missingOr(err, fmt.Sprintf("stream %d", t.StreamID),
-			fmt.Sprintf("look up the release target %d belongs to", targetID))
+	var st BranchOrTag
+	if err := s.db.NewSelect().Model(&st).Where(`"id" = ?`, t.BranchOrTagID).Scan(ctx); err != nil {
+		return nil, missingOr(err, fmt.Sprintf("branch or tag %d", t.BranchOrTagID),
+			fmt.Sprintf("look up the release build %d belongs to", buildID))
 	}
 	var p Product
 	if err := s.db.NewSelect().Model(&p).Where(`"id" = ?`, st.ProductID).Scan(ctx); err != nil {
@@ -1039,10 +1075,10 @@ func (s *Store) Describe(ctx context.Context, targetID int64) (*Placement, error
 			fmt.Sprintf("look up the product release %d belongs to", st.ID))
 	}
 	placed := &Placement{
-		Product: p.DisplayName, Stream: st.DisplayName, Kind: st.Kind, Variant: v.DisplayName,
+		Product: p.DisplayName, BranchOrTag: st.DisplayName, Kind: st.Kind, Variant: v.DisplayName,
 		Moves: st.Kind == Branch, ProductID: p.ID,
 	}
-	placed.Addressed.Product, placed.Addressed.Stream, placed.Addressed.Variant =
+	placed.Addressed.Product, placed.Addressed.BranchOrTag, placed.Addressed.Variant =
 		p.Name, st.Name, v.Name
 	return placed, nil
 }
@@ -1061,21 +1097,21 @@ func (s *Store) ProductByID(ctx context.Context, id int64) (*Product, error) {
 	return p, nil
 }
 
-// ExistingTarget finds a release built as a variant, without recording one.
+// ExistingBuild finds a release built as a variant, without recording one.
 //
 // Reading is not filing. Asking what is open against a build that has never
 // been scanned should not create the record that says it was.
-func (s *Store) ExistingTarget(ctx context.Context, streamID, variantID int64) (*Target, error) {
-	target := new(Target)
-	err := s.db.NewSelect().Model(target).
-		Where(`"stream_id" = ?`, streamID).Where(`"variant_id" = ?`, variantID).Scan(ctx)
+func (s *Store) ExistingBuild(ctx context.Context, branchOrTagID, variantID int64) (*Build, error) {
+	build := new(Build)
+	err := s.db.NewSelect().Model(build).
+		Where(`"branch_or_tag_id" = ?`, branchOrTagID).Where(`"variant_id" = ?`, variantID).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("nothing has been filed against this build: %w", ErrNotFound)
 		}
 		return nil, fmt.Errorf("look up what is filed against this build: %w", err)
 	}
-	return target, nil
+	return build, nil
 }
 
 // ProductsCalled is the name each of these products goes by, as an address
@@ -1111,21 +1147,21 @@ func (s *Store) ProductNames(ctx context.Context, ids []int64) (map[int64]string
 // ReadsBuild refuses a subject who may not read what one build sent or what
 // was filed against it, by the rule access.Subject.ReadsBuild states. A build
 // nobody declared is ErrNotFound.
-func ReadsBuild(ctx context.Context, db bun.IDB, subject access.Subject, targetID int64) error {
+func ReadsBuild(ctx context.Context, db bun.IDB, subject access.Subject, buildID int64) error {
 	var build struct {
-		ProductID int64 `bun:"product_id"`
-		StreamID  int64 `bun:"stream_id"`
-		VariantID int64 `bun:"variant_id"`
+		ProductID     int64 `bun:"product_id"`
+		BranchOrTagID int64 `bun:"branch_or_tag_id"`
+		VariantID     int64 `bun:"variant_id"`
 	}
 	if err := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"st"."product_id", "tg"."stream_id", "tg"."variant_id"`).
-		Where(`"tg"."id" = ?`, targetID).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		ColumnExpr(`"st"."product_id", "tg"."branch_or_tag_id", "tg"."variant_id"`).
+		Where(`"tg"."id" = ?`, buildID).
 		Scan(ctx, &build); err != nil {
-		return missingOr(err, fmt.Sprintf("build %d", targetID), fmt.Sprintf("look up which build %d is", targetID))
+		return missingOr(err, fmt.Sprintf("build %d", buildID), fmt.Sprintf("look up which build %d is", buildID))
 	}
-	if !subject.ReadsBuild(build.ProductID, build.StreamID, build.VariantID) {
+	if !subject.ReadsBuild(build.ProductID, build.BranchOrTagID, build.VariantID) {
 		return access.Denied(fmt.Sprintf("read what a build of product %d sent", build.ProductID))
 	}
 	return nil

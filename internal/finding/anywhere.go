@@ -84,15 +84,15 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// The line is applied per product below rather than from the filter's one
 	// word, so the filter's own is turned off — including its inverse, which
 	// would otherwise ask for what is beneath a line that is not in the query.
-	line := filter.Floor
-	filter.Floor = Floor{}
-	wasBelow := filter.BelowFloor
-	filter.BelowFloor = true
+	line := filter.MinimumSeverity
+	filter.MinimumSeverity = MinimumSeverity{}
+	wasBelow := filter.BelowMinimumSeverity
+	filter.BelowMinimumSeverity = true
 
 	// The deployment's line, which a product that states none inherits.
-	deployment := NoFloor
+	deployment := NoMinimumSeverity
 	if !wasBelow {
-		word, set, err := setting.NewStore(s.db).Get(ctx, setting.TriageFloor)
+		word, set, err := setting.NewStore(s.db).Get(ctx, setting.MinimumSeverity)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -102,8 +102,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	}
 	// A caller may raise the line for the whole page — that is what the
 	// severity control on the list does — but never lower it below what a
-	// product decided, because the line is the product's decision. So the
-	// raise is a second condition beside each product's own line, and a row
+	// product decided, because the minimum severity is the product's decision. So the
+	// raise is a second condition beside each product's own minimum severity, and a row
 	// passes both: the higher of the two.
 	raised := 0
 	if !wasBelow && line.Hides() {
@@ -118,13 +118,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	if filter.Workable.asks() && len(filter.Workable.Support) == 1 {
 		var err error
 		if pastEOL, err = catalog.NewStore(s.db).
-			StreamsPastEndOfLife(ctx, s.now().UTC()); err != nil {
+			BranchesAndTagsPastEndOfLife(ctx, s.now().UTC()); err != nil {
 			return nil, 0, err
 		}
 	}
 
 	// readable is the open occurrences this subject may read, in the releases
-	// asked for, with the build and its stream joined.
+	// asked for, with the build and its branch or tag joined.
 	readable := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if len(filter.Workable.Kinds) == 1 {
 			q = q.Where(`"st"."kind" = ?`, filter.Workable.Kinds[0])
@@ -141,8 +141,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`)
 		return onlyReadable(q, subject, products, all)
@@ -161,7 +161,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// Never below the line where somebody is using one, and being exploited
 	// is not a claim about how bad something is — it is a fact, and the one
 	// thing a line cannot set aside. Read off the urgency, whose two top bands
-	// are the feed's word and this product's own record of being attacked (the
+	// are the feed's word and this product's own incident (the
 	// exploiting threshold).
 	lined := func(q *bun.SelectQuery, urgent string, args ...any) *bun.SelectQuery {
 		if wasBelow {
@@ -185,7 +185,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// page's own rows (see Filter.ofPage).
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = withRating(readable(q).
-			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`), rating.OnStream).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`), rating.OnBranchOrTag).
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
@@ -205,7 +205,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		// A condition on the rating in force is asked of each occurrence, so
 		// where one is asked the rating is joined below the grouping as well.
 		if len(filter.severities()) > 0 || filter.Reassessed {
-			rows = withRating(rows, rating.OnStream)
+			rows = withRating(rows, rating.OnBranchOrTag)
 		}
 		hot := `CASE WHEN "f"."urgency" >= ? THEN 1 ELSE 0 END`
 		keys := []partKey{
@@ -288,7 +288,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		Product         string `bun:"product"`
 		ProductName     string `bun:"product_name"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Stream          string `bun:"stream"`
+		BranchOrTag     string `bun:"branch_or_tag"`
 		Variant         string `bun:"variant"`
 		Builds          int    `bun:"builds"`
 		decorated
@@ -303,16 +303,16 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
-		ColumnExpr(`MIN("st"."name") AS "stream"`).
+		ColumnExpr(`MIN("st"."name") AS "branch_or_tag"`).
 		ColumnExpr(`MIN("va"."name") AS "variant"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 		// The two exploitation flags, which the packed number above cannot
 		// tell apart. A column this query does not select is left at its zero
 		// value, so both are selected here as on the per-product list.
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
+		ColumnExpr(incidentAcross+` AS "incident"`).
 		ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
 		// Whether anything here carries a score at all, and the scheme it is
@@ -338,7 +338,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		// group is waiting on a rating rather than off the clock.
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN(COALESCE("f"."matched", '')) AS "matched"`).
-		ColumnExpr(`MIN("f"."target_id") AS "target_id"`).
+		ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
 		ColumnExpr(`MIN("f"."consumer_id") AS "consumer_id"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
 		ColumnExpr(`SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END) AS "direct"`).
@@ -388,7 +388,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	for _, head := range heads {
 		wanted[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}] = true
 	}
-	marks, err := s.tagsAcross(ctx, subject, products, all, wanted)
+	marks, err := s.labelsAcross(ctx, subject, products, all, wanted)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -411,13 +411,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// compared against. One word chosen for a page that spans
 			// products would answer for none of them, and neither would one
 			// rating.
-			Floor{Word: deployment, ProductID: head.ProductID})
+			MinimumSeverity{Word: deployment, ProductID: head.ProductID})
 		group.Product, group.ProductName = row.Product, row.ProductName
 		// One build of possibly several, so a row has somewhere to link to and
 		// an action has a build to name. What says there are others is the
 		// count beside it.
-		group.Builds, group.Stream, group.Variant = row.Builds, row.Stream, row.Variant
-		group.Tags = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}]
+		group.Builds, group.BranchOrTag, group.Variant = row.Builds, row.BranchOrTag, row.Variant
+		group.Labels = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}]
 		groups = append(groups, group)
 	}
 	return groups, total, nil
@@ -436,4 +436,4 @@ var ratedAt = rankCase(rating.BandExpr, 0)
 //
 // Zero for anything that is not a band, which is what makes the sentinel for
 // "no line" compare below every rating.
-var lineAt = rankCase(`COALESCE(NULLIF("p"."triage_floor", ''), ?)`, 0)
+var lineAt = rankCase(`COALESCE(NULLIF("p"."minimum_severity", ''), ?)`, 0)

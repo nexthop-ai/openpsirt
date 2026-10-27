@@ -36,13 +36,13 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 	kernel := graph.Described{
 		Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10",
 	}
-	target, scan := r.Shipped(t, SeededBuild, hash, graph.Snapshot{
+	build, scan := r.Shipped(t, SeededBuild, hash, graph.Snapshot{
 		Root:         SeededRoot,
 		Components:   []graph.Described{kernel},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: kernel}},
 	})
-	r.Argued(t, target, scan, claims)
-	r.Ran(t, target, []finding.Reported{
+	r.Argued(t, build, scan, claims)
+	r.Ran(t, build, []finding.Reported{
 		{
 			Issue: finding.Named{
 				Identifier: "CVE-2026-9999", Severity: "high",
@@ -176,14 +176,14 @@ func (r *Reach) CurlMovedTo(t *testing.T, upstream string) {
 		Where(`"name" LIKE ?`, "%curl%").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	var targets []int64
-	if err := r.DB.DB.NewSelect().TableExpr(`"target" AS "t"`).
-		ColumnExpr(`"t"."id"`).Scan(ctx, &targets); err != nil {
+	var buildIDs []int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"build" AS "t"`).
+		ColumnExpr(`"t"."id"`).Scan(ctx, &buildIDs); err != nil {
 		t.Fatal(err)
 	}
 	store := triage.NewStore(r.DB.DB)
-	for _, target := range targets {
-		if _, err := store.Lapse(ctx, target); err != nil {
+	for _, build := range buildIDs {
+		if _, err := store.Lapse(ctx, build); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -372,12 +372,14 @@ func AgreedTo(t *testing.T, r *Reach, at string) {
 	}
 }
 
-func (r *Reach) Claim(t *testing.T, summary string) string {
+// Reported records a vulnerability report saying this and returns its
+// reference.
+func (r *Reach) Reported(t *testing.T, problem string) string {
 	t.Helper()
 	got := AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
-		`{"summary":"`+summary+`"}`)
+		`{"reported_problem":"`+problem+`"}`)
 	if got.Code != http.StatusCreated {
-		t.Fatalf("recording a claim answered %d: %s", got.Code, got.Body.String())
+		t.Fatalf("recording a report answered %d: %s", got.Code, got.Body.String())
 	}
 	var recorded ReportRead
 	if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
@@ -386,7 +388,7 @@ func (r *Reach) Claim(t *testing.T, summary string) string {
 	return recorded.Reference
 }
 
-// Swept runs the routing sweep the way the worker does.
+// Swept runs the assignment sweep the way the worker does.
 func (r *Reach) Swept(t *testing.T) int {
 	t.Helper()
 	work := queue.New(r.DB, queue.DefaultOptions())
@@ -412,7 +414,7 @@ func (r *Reach) Preview(t *testing.T, query string) caught {
 	return out
 }
 
-// PreviewAs is the routing preview read as somebody in particular, because
+// PreviewAs is the assignment rule preview read as somebody in particular, because
 // what it answers is supposed to depend on that.
 func (r *Reach) PreviewAs(t *testing.T, who, query string) caught {
 	t.Helper()
@@ -505,7 +507,7 @@ func (r *Reach) DeclaredAs(t *testing.T, body string) int {
 func (r *Reach) Embargoed(t *testing.T) string {
 	t.Helper()
 	got := AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-		`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+		`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 			`"summary":"The management socket answers before anyone has authenticated.",`+
 			`"severity":"high","component":"libnl-3-200"}`)
 	if got.Code != http.StatusCreated {
@@ -528,18 +530,18 @@ func FindingAt(vulnerability string) string {
 
 // ReportRead is what the report routes answer, as a test reads it.
 type ReportRead struct {
-	Reference      string `json:"reference"`
-	Summary        string `json:"summary"`
-	ReportedBy     string `json:"reported_by"`
-	Contact        string `json:"contact"`
-	Received       string `json:"received"`
-	Acknowledged   string `json:"acknowledged"`
-	AcknowledgedBy string `json:"acknowledged_by"`
-	Issue          string `json:"issue"`
-	Evaluated      string `json:"evaluated"`
-	EvaluatedBy    string `json:"evaluated_by"`
-	RecordedBy     string `json:"recorded_by"`
-	RecordedAt     string `json:"recorded_at"`
+	Reference       string `json:"reference"`
+	ReportedProblem string `json:"reported_problem"`
+	ReportedBy      string `json:"reported_by"`
+	Contact         string `json:"contact"`
+	Received        string `json:"received"`
+	Acknowledged    string `json:"acknowledged"`
+	AcknowledgedBy  string `json:"acknowledged_by"`
+	Issue           string `json:"issue"`
+	Evaluated       string `json:"evaluated"`
+	EvaluatedBy     string `json:"evaluated_by"`
+	RecordedBy      string `json:"recorded_by"`
+	RecordedAt      string `json:"recorded_at"`
 }
 
 // EndingIn declares a second release of the product with its own end-of-life
@@ -547,23 +549,23 @@ type ReportRead struct {
 //
 // A second release rather than a second variant: the report is per release,
 // and two variants of one are one row.
-func (r *Reach) EndingIn(t *testing.T, stream string, days int) {
+func (r *Reach) EndingIn(t *testing.T, branchOrTag string, days int) {
 	t.Helper()
 	made := AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/branches-and-tags",
-		fmt.Sprintf(`{"name":%q,"kind":"tag","parent":"master"}`, stream))
+		fmt.Sprintf(`{"name":%q,"kind":"tag","parent":"master"}`, branchOrTag))
 	if made.Code != http.StatusCreated {
 		t.Fatalf("declaring a release answered %d: %s", made.Code, made.Body.String())
 	}
 	on := time.Now().UTC().AddDate(0, 0, days).UTC().Format(time.DateOnly)
 	ended := AsPerson(t, r, "admin", http.MethodPut,
-		"/v1/products/mine/branches-and-tags/"+stream+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
+		"/v1/products/mine/branches-and-tags/"+branchOrTag+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
 	if ended.Code != http.StatusNoContent {
 		t.Fatalf("giving it an end date answered %d: %s", ended.Code, ended.Body.String())
 	}
 }
 
-// SetAside queues one job and sets it aside, answering its identifier.
-func (r *Reach) SetAside(t *testing.T, kind, reference string) int64 {
+// FailJob queues one job and fails it, answering its identifier.
+func (r *Reach) FailJob(t *testing.T, kind, reference string) int64 {
 	t.Helper()
 	ctx := t.Context()
 	job, err := queue.New(r.DB, queue.DefaultOptions()).Add(ctx, kind, reference)
@@ -571,7 +573,7 @@ func (r *Reach) SetAside(t *testing.T, kind, reference string) int64 {
 		t.Fatal(err)
 	}
 	if _, err := r.DB.NewUpdate().Model((*queue.Job)(nil)).
-		Set(`"state" = ?`, queue.Dead).Set(`"attempts" = "max_attempts"`).
+		Set(`"state" = ?`, queue.Failed).Set(`"attempts" = "max_attempts"`).
 		Where(`"id" = ?`, job.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +592,7 @@ func (r *Reach) RanReading(t *testing.T, version, records string, started time.T
 	t.Helper()
 	finished := started.Add(time.Minute)
 	if _, err := r.DB.NewInsert().Model(&finding.Run{
-		TargetID: r.TargetOf(t, SeededBuild), Scanner: seededScanner, DatabaseVersion: version, RecordsVersion: records,
+		BuildID: r.BuildOf(t, SeededBuild), Scanner: seededScanner, DatabaseVersion: version, RecordsVersion: records,
 		RanHere: true, StartedAt: started, FinishedAt: &finished,
 	}).Exec(t.Context()); err != nil {
 		t.Fatal(err)

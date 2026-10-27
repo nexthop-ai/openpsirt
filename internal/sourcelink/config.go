@@ -82,7 +82,7 @@ type Path struct {
 	// Snippets is whether source under the prefix is kept, or nil where the
 	// nearest prefix stating it decides.
 	Snippets *bool `bun:"snippets"`
-	// DisclosedSnippets is whether the snippets of a lead moved into a case
+	// DisclosedSnippets is whether the snippets of a code finding included in its flaw's disclosure
 	// are disclosed with its flaw, or nil where the nearest prefix stating it
 	// decides.
 	DisclosedSnippets *bool `bun:"disclosed_snippets"`

@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// staged is the obligation list as one person reads it, with what a window
+// staged is the incident list as one person reads it, with what a window
 // counts from and what a notice carried.
 type staged struct {
 	Items []struct {
@@ -59,7 +59,7 @@ func TestAWindowCountingFromANoticeRaisesNothingUntilTheNotice(t *testing.T) {
 		if final.Started || final.StartsAt != "" || final.EndsAt != "" {
 			t.Errorf("before any notice the window reads %+v, want no start and no end", final)
 		}
-		if open := r.Alerts(t, "private-triage", "obligation-open"); len(open) != 1 ||
+		if open := r.Alerts(t, "private-triage", "response-window-open"); len(open) != 1 ||
 			!strings.Contains(open[0], "Notification") {
 			t.Errorf("before any notice the running windows are %v, want the notification alone", open)
 		}
@@ -77,7 +77,7 @@ func TestAWindowCountingFromANoticeRaisesNothingUntilTheNotice(t *testing.T) {
 		if !final.Started || final.StartsAt != told.Format(time.RFC3339) {
 			t.Errorf("after the notice the window reads %+v, want it started at %s", final, told)
 		}
-		open := r.Alerts(t, "private-triage", "obligation-open")
+		open := r.Alerts(t, "private-triage", "response-window-open")
 		if len(open) != 1 || !strings.Contains(open[0], `the first notice for "Notification"`) {
 			t.Errorf("after the notice the running windows are %v, want the final report", open)
 		}

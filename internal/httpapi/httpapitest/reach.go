@@ -43,7 +43,7 @@ import (
 // about who may do what.
 func DeclaredBody(method, path, name string) io.Reader {
 	if method == http.MethodPut && strings.HasSuffix(path, "/minimum-severity") {
-		return strings.NewReader(`{"floor": "high"}`)
+		return strings.NewReader(`{"minimum_severity": "high"}`)
 	}
 	if method == http.MethodPut && strings.HasSuffix(path, "/pair-thresholds") {
 		return strings.NewReader(`{"share": 90, "approvers": 4}`)
@@ -73,7 +73,7 @@ func DeclaredBody(method, path, name string) io.Reader {
 		return strings.NewReader(`{"because": "` + name + `", "fixed_in": 1}`)
 	}
 	if strings.HasSuffix(path, "/reports") {
-		return strings.NewReader(`{"summary": "` + name + `"}`)
+		return strings.NewReader(`{"reported_problem": "` + name + `"}`)
 	}
 	if strings.HasSuffix(path, "/branches-and-tags") {
 		return strings.NewReader(`{"name": "` + name + `", "kind": "branch"}`)
@@ -100,7 +100,7 @@ func reportBody(method, path, name string) io.Reader {
 	case strings.Contains(rest, "/notes"):
 		return strings.NewReader(`{"body": "` + name + `"}`)
 	case method == http.MethodPut && !strings.Contains(rest, "/"):
-		return strings.NewReader(`{"summary": "` + name + `"}`)
+		return strings.NewReader(`{"reported_problem": "` + name + `"}`)
 	}
 	return nil
 }
@@ -196,7 +196,7 @@ func (r *Reach) SentByTheKey(t *testing.T) int64 {
 		t.Fatal(err)
 	}
 	made, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: r.TargetOf(t, SeededBuild), ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
+		BuildID: r.BuildOf(t, SeededBuild), ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
 		ParserVersion: "test", Credential: access.Sender(key),
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -269,10 +269,10 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
-	// The streams and variants are declared with a capital, so each is spelled
+	// The branches and tags and variants are declared with a capital, so each is spelled
 	// differently from the name a path addresses it by and a test can tell
 	// which of the two a field carries.
-	if _, err := cat.DeclareStream(ctx, mine.ID, "Master", catalog.Branch, nil); err != nil {
+	if _, err := cat.DeclareBranchOrTag(ctx, mine.ID, "Master", catalog.Branch, nil); err != nil {
 		return cast{}, err
 	}
 	if _, err := cat.DeclareVariant(ctx, mine.ID, "Broadcom", true); err != nil {
@@ -282,7 +282,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
-	theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "Master", catalog.Branch, nil)
+	theirBranch, err := cat.DeclareBranchOrTag(ctx, theirs.ID, "Master", catalog.Branch, nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -306,7 +306,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// products and no builds, and every test of what a reader may see is
 	// satisfied by an empty list — which is also what a missing visibility
 	// filter looks like.
-	mineBranch, err := cat.StreamByName(ctx, mine.ID, "master")
+	mineBranch, err := cat.BranchOrTagByName(ctx, mine.ID, "master")
 	if err != nil {
 		return cast{}, err
 	}
@@ -314,11 +314,11 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
-	if _, err := cat.TargetFor(ctx, mineBranch.ID, mineVariant.ID); err != nil {
+	if _, err := cat.BuildFor(ctx, mineBranch.ID, mineVariant.ID); err != nil {
 		return cast{}, err
 	}
 	for _, variant := range []*catalog.Variant{theirVariant, theirBroadcom} {
-		if _, err := cat.TargetFor(ctx, theirBranch.ID, variant.ID); err != nil {
+		if _, err := cat.BuildFor(ctx, theirBranch.ID, variant.ID); err != nil {
 			return cast{}, err
 		}
 	}
@@ -401,15 +401,15 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		"internal-reader":  {access.InternalRead},
 		"internal-triager": {access.InternalTriage},
 		// The right to agree with the internal material it reads, which is
-		// what a second person on a lead holds.
+		// what a second person on a code finding holds.
 		"internal-reviewer": {access.InternalRead, access.Approver},
 		// Both halves on internal material, for the rules that keep one
 		// person from being both.
-		"internal-lead": {access.InternalTriage, access.Approver},
-		// Working the internal lead and the private flaw it becomes, which a
-		// hand-off takes, and the disclosed work the flaw becomes.
-		"lead-handler": {access.PublicRead, access.InternalTriage, access.PrivateTriage},
-		"approver":     {access.Approver},
+		"internal-code-finding": {access.InternalTriage, access.Approver},
+		// Working the internal code finding and the private flaw it becomes, which a
+		// flaw record takes, and the disclosed work the flaw becomes.
+		"code-finding-handler": {access.PublicRead, access.InternalTriage, access.PrivateTriage},
+		"approver":             {access.Approver},
 		// Assigning is the other capability that grants
 		// nothing on its own, and the dispatcher above holds
 		// it alongside a read role, so this is the identity

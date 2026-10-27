@@ -63,14 +63,14 @@ func TestCarryingWritesDecisionsWaitingForASecondPerson(t *testing.T) {
 		var waiting struct {
 			Items []struct {
 				Finding *struct {
-					Stream  string `json:"stream"`
-					Version string `json:"version"`
+					BranchOrTag string `json:"branch_or_tag"`
+					Version     string `json:"version"`
 				} `json:"finding"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "reviewer", "/v1/review-queue", &waiting)
 		if len(waiting.Items) != 1 || waiting.Items[0].Finding == nil ||
-			waiting.Items[0].Finding.Stream != "v2.0" || waiting.Items[0].Finding.Version != "3.7.1" {
+			waiting.Items[0].Finding.BranchOrTag != "v2.0" || waiting.Items[0].Finding.Version != "3.7.1" {
 			t.Errorf("the review queue holds %+v, want one decision waiting on the tag", waiting.Items)
 		}
 	})

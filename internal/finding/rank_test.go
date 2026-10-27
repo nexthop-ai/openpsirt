@@ -57,7 +57,7 @@ func TestTheOrderWithinABandIsSeverityThenLikelihood(t *testing.T) {
 	// differences nobody should act on — while a 2004 negligible with no score
 	// outranked every critical on a likelihood of 0.80.
 	//
-	// So severity leads, and likelihood orders what is equally severe.
+	// So severity code findings, and likelihood orders what is equally severe.
 	base := finding.Ranked{Shipped: true, ScoreCenti: 500}
 	likelier := finding.Ranked{Shipped: true, ScoreCenti: 500, LikelihoodPPM: 900_000}
 	worse := finding.Ranked{Shipped: true, ScoreCenti: 900}

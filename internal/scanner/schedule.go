@@ -33,7 +33,7 @@ type Schedule struct {
 	leases *queue.Leases
 	logger *slog.Logger
 	// replica names this process in the lease. Every replica runs this and one
-	// of them asks, because asking twice would put two scans of one target on
+	// of them asks, because asking twice would put two scans of one build on
 	// the queue and the second would find nothing to do.
 	replica string
 	now     func() time.Time
@@ -115,11 +115,11 @@ func (s *Schedule) Once(ctx context.Context) (int, error) {
 	}
 
 	asked := 0
-	for _, targetID := range due {
+	for _, buildID := range due {
 		if err := ctx.Err(); err != nil {
 			return asked, nil
 		}
-		_, err := s.queue.Add(ctx, queue.Scan, strconv.FormatInt(targetID, 10))
+		_, err := s.queue.Add(ctx, queue.Scan, strconv.FormatInt(buildID, 10))
 		if errors.Is(err, queue.ErrBacklogFull) {
 			// The queue is as deep as it is allowed to be, so the rest wait
 			// for the next cycle. Not an error: what is due stays due, and
@@ -130,7 +130,7 @@ func (s *Schedule) Once(ctx context.Context) (int, error) {
 			return asked, nil
 		}
 		if err != nil {
-			return asked, fmt.Errorf("ask for build %d to be scanned again: %w", targetID, err)
+			return asked, fmt.Errorf("ask for build %d to be scanned again: %w", buildID, err)
 		}
 		asked++
 	}
@@ -172,7 +172,7 @@ const dueLimit = 200
 // alreadyQueued is the builds a scan is already waiting or running for.
 //
 // Read as identifiers rather than joined in the statement. A job's
-// reference is text, because a job may be about anything, and a target's
+// reference is text, because a job may be about anything, and a build's
 // identifier is a number, so joining them means converting one inside the
 // query — and there is no spelling of that all four engines agree on. The one
 // that looked portable, `CAST(id AS CHAR)`, is `char(1)` on PostgreSQL: it
@@ -207,7 +207,7 @@ func (s *Schedule) alreadyQueued(ctx context.Context) ([]int64, error) {
 
 // due is which builds have not been scanned within the interval.
 //
-// Only builds that hold an inventory. A target is declared before anything
+// Only builds that hold an inventory. A build is declared before anything
 // is filed against it, and scanning one with no components would record a run
 // that found nothing against a build that has nothing — an empty answer that
 // reads exactly like a clean one.
@@ -219,12 +219,12 @@ func (s *Schedule) due(ctx context.Context, every time.Duration, queued []int64)
 	before := s.now().Add(-every).Truncate(time.Microsecond)
 
 	q := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
+		TableExpr(`"build" AS "tg"`).
 		ColumnExpr(`"tg"."id"`).
 		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "gn"
-			WHERE "gn"."target_id" = "tg"."id" AND "gn"."closed_scan_id" IS NULL)`).
+			WHERE "gn"."build_id" = "tg"."id" AND "gn"."closed_scan_id" IS NULL)`).
 		Where(`NOT EXISTS (SELECT 1 FROM "scan_run" AS "r"
-			WHERE "r"."target_id" = "tg"."id" AND "r"."started_at" >= ?)`, before).
+			WHERE "r"."build_id" = "tg"."id" AND "r"."started_at" >= ?)`, before).
 		OrderExpr(`"tg"."id"`).
 		Limit(dueLimit)
 	if len(queued) > 0 {

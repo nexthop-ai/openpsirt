@@ -13,9 +13,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/series"
@@ -81,17 +81,21 @@ type Justification string
 // Schema answers with the reasons the exchange format defines.
 func (Justification) Schema(huma.Registry) *huma.Schema { return words(triage.Justifications()) }
 
-// LeadOutcome is what a decision about a lead says it is.
-type LeadOutcome string
+// CodeFindingOutcome is what a decision about a code finding says it is.
+type CodeFindingOutcome string
 
-// Schema answers with the outcomes a decision about a lead records.
-func (LeadOutcome) Schema(huma.Registry) *huma.Schema { return words(triage.LeadOutcomes()) }
+// Schema answers with the outcomes a decision about a code finding records.
+func (CodeFindingOutcome) Schema(huma.Registry) *huma.Schema {
+	return words(triage.CodeFindingOutcomes())
+}
 
-// LeadReason is the reason a lead was dismissed.
-type LeadReason string
+// CodeFindingReason is the reason a code finding was dismissed.
+type CodeFindingReason string
 
-// Schema answers with the reasons a lead is dismissed for.
-func (LeadReason) Schema(huma.Registry) *huma.Schema { return words(triage.LeadReasons()) }
+// Schema answers with the reasons a code finding is dismissed for.
+func (CodeFindingReason) Schema(huma.Registry) *huma.Schema {
+	return words(triage.CodeFindingReasons())
+}
 
 // StatementScope is whom a statement published from a decision holds for.
 type StatementScope string
@@ -291,19 +295,21 @@ type Recordable string
 // Schema offers every severity word somebody may record, worst first.
 func (Recordable) Schema(huma.Registry) *huma.Schema { return words(finding.Recordable()) }
 
-// Line is a triage line, or the word for none.
-type Line string
+// MinimumSeverityWord is a minimum severity, or the word for none.
+type MinimumSeverityWord string
 
-// Schema offers the words a line may be set to.
-func (Line) Schema(huma.Registry) *huma.Schema { return words(finding.TriageFloors()) }
+// Schema offers the words a minimum severity may be set to.
+func (MinimumSeverityWord) Schema(huma.Registry) *huma.Schema {
+	return words(finding.MinimumSeverities())
+}
 
-// lineOrClear is a triage line, the word for none, or empty to follow the
-// deployment.
-type lineOrClear string
+// minimumSeverityOrClear is a minimum severity, the word for none, or empty to
+// follow the deployment.
+type minimumSeverityOrClear string
 
-// Schema offers the words a line may be set to, and the empty word.
-func (lineOrClear) Schema(huma.Registry) *huma.Schema {
-	return words(append(finding.TriageFloors(), ""))
+// Schema offers the words a minimum severity may be set to, and the empty word.
+func (minimumSeverityOrClear) Schema(huma.Registry) *huma.Schema {
+	return words(append(finding.MinimumSeverities(), ""))
 }
 
 // ScoreBand is the band a score falls in.
@@ -520,7 +526,7 @@ func (TrailActor) Schema(huma.Registry) *huma.Schema { return words(trail.Actors
 type Malice string
 
 // Schema offers every word a notice may say about malice.
-func (Malice) Schema(huma.Registry) *huma.Schema { return words(obligation.Malice) }
+func (Malice) Schema(huma.Registry) *huma.Schema { return words(incident.Malice) }
 
 // AdvisoryStatus is where an advisory document is in its life.
 type AdvisoryStatus string

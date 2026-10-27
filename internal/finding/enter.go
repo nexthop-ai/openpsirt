@@ -33,7 +33,7 @@ import (
 // usually before anybody outside knows about it — which is why it starts
 // undisclosed and why the whole disclosure apparatus hangs off it.
 type Entering struct {
-	// TargetIDs are the builds it is in. A flaw is in something we shipped,
+	// BuildIDs are the builds it is in. A flaw is in something we shipped,
 	// and which releases is the first question anybody asks — usually more
 	// than one, because the same code ships on several lines and as several
 	// variants at once.
@@ -45,7 +45,7 @@ type Entering struct {
 	// scheme of its own that everything downstream would need to know about.
 	// A component two things pull in is two occurrences, and a decision
 	// occurrence is keyed on one of them.
-	TargetIDs []int64
+	BuildIDs []int64
 	// Component names what in the build carries it, as the build calls it.
 	// Empty is the build itself, which is the honest answer where the flaw is
 	// in how the pieces are put together rather than in one of them.
@@ -108,7 +108,7 @@ type Entering struct {
 	FromReport string
 	// Then runs last inside the transaction that records the flaw, with the
 	// issue minted, so what is recorded beside the flaw stands or falls with
-	// it. A static analysis lead handed off is recorded this way.
+	// it. A static analysis code finding recorded as a flaw is recorded this way.
 	Then func(ctx context.Context, tx bun.IDB, vulnerabilityID int64, now time.Time) error
 }
 
@@ -178,22 +178,22 @@ var ErrNothingScanned = refusal.New(
 // reads the row rather than the run. A scan will not close it either: a run is
 // the authority on what it found, and it found none of this.
 func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) ([]Finding, string, error) {
-	if len(in.TargetIDs) == 0 {
+	if len(in.BuildIDs) == 0 {
 		return nil, "", ErrNoBuild
 	}
 	// A build named twice is one build: a finding is a component at an
 	// occurrence, and two rows at one occurrence are two findings for one flaw.
-	in.TargetIDs = distinct(in.TargetIDs)
+	in.BuildIDs = distinct(in.BuildIDs)
 	// One product, because an identifier is minted per product and a flaw
 	// recorded across two would have to be two records. Read from the builds
 	// rather than taken from the caller, and disagreement is refused rather
 	// than resolved by taking the first.
-	productID, err := productOf(ctx, s.db, in.TargetIDs[0])
+	productID, err := productOf(ctx, s.db, in.BuildIDs[0])
 	if err != nil {
 		return nil, "", err
 	}
-	for _, target := range in.TargetIDs[1:] {
-		other, err := productOf(ctx, s.db, target)
+	for _, build := range in.BuildIDs[1:] {
+		other, err := productOf(ctx, s.db, build)
 		if err != nil {
 			return nil, "", err
 		}
@@ -279,7 +279,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	}
 
 	type at struct {
-		target    int64
+		build     int64
 		component int64
 		name      string
 		// The component's occurrence in that build, which is what a decision
@@ -339,9 +339,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// an occurrence the build no longer holds. Each of these is one
 		// indexed lookup, so asking again costs about what carrying
 		// the answer in did.
-		occurrences := make([]at, 0, len(in.TargetIDs))
-		for _, target := range in.TargetIDs {
-			componentID, componentName, err := carrying(ctx, tx, target, in)
+		occurrences := make([]at, 0, len(in.BuildIDs))
+		for _, build := range in.BuildIDs {
+			componentID, componentName, err := carrying(ctx, tx, build, in)
 			if err != nil {
 				return err
 			}
@@ -351,13 +351,13 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// "directly under the product" when the component is nested is a
 			// key no scanned row will ever share, which is two findings and
 			// two decision occurrences for one flaw.
-			sittings, err := sittingsOf(ctx, tx, target, componentID)
+			sittings, err := sittingsOf(ctx, tx, build, componentID)
 			if err != nil {
 				return err
 			}
 			for _, sitting := range sittings {
 				occurrences = append(occurrences, at{
-					target: target, component: componentID, name: componentName,
+					build: build, component: componentID, name: componentName,
 					consumerID: sitting.consumerID, consumer: sitting.consumer,
 				})
 			}
@@ -381,12 +381,12 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// transaction for the refusal — a request is authorized before a name
 		// in it is resolved, so that read has to stay — and then used inside
 		// to mint the identifier, to name the product in it, and to read the
-		// triage floor. A retry runs against a database where a stream may
+		// minimum severity. A retry runs against a database where a branch or tag may
 		// have been re-pointed, and the identifier would have been minted
 		// from a product that is gone, under an authorization taken against
 		// it. Refused rather than guessed at, the way widening a flaw's build
 		// set is.
-		if still, err := productOf(ctx, tx, in.TargetIDs[0]); err != nil {
+		if still, err := productOf(ctx, tx, in.BuildIDs[0]); err != nil {
 			return err
 		} else if still != productID {
 			return refusal.Errorf("the builds changed products while this was being written; try again")
@@ -431,7 +431,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
-		floor, err := FloorFor(ctx, tx, productID)
+		floor, err := MinimumSeverityFor(ctx, tx, productID)
 		if err != nil {
 			return err
 		}
@@ -439,7 +439,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// attacked through ranks where that says it does. An entered finding
 		// is opened and closed by people and no scan ever touches it, so a
 		// row that missed the signal here would never pick it up.
-		attacked, err := ExploitedHere(ctx, tx, productID, []int64{vulnerabilityID})
+		attacked, err := Incident(ctx, tx, productID, []int64{vulnerabilityID})
 		if err != nil {
 			return err
 		}
@@ -449,11 +449,11 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
 		var onClock []int64
 		if err := tx.NewSelect().
-			TableExpr(`"target" AS "tg"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			TableExpr(`"build" AS "tg"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			ColumnExpr(`"tg"."id"`).
-			Where(`"tg"."id" IN (?)`, bun.List(in.TargetIDs)).
+			Where(`"tg"."id" IN (?)`, bun.List(in.BuildIDs)).
 			Where(clocked, clockedArgs...).
 			Scan(ctx, &onClock); err != nil {
 			return fmt.Errorf("read which builds carry deadlines: %w", err)
@@ -471,7 +471,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		rows = make([]Finding, 0, len(occurrences))
 		for _, occurrence := range occurrences {
 			row := Finding{
-				TargetID: occurrence.target, Kind: Entered, Visibility: visibility,
+				BuildID: occurrence.build, Kind: Entered, Visibility: visibility,
 				VulnerabilityID:    vulnerabilityID,
 				ComponentID:        occurrence.component,
 				ConsumerID:         optional(occurrence.consumerID),
@@ -503,8 +503,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// Ranked and clocked exactly as a scanned finding is, from the
 			// same signals. A finding that sorted or expired differently
 			// because a person typed it would be a second policy nobody chose.
-			ranked := Ranked{Shipped: true, ExploitedHere: attacked[row.VulnerabilityID]}
-			row.RankExploitedHere = ranked.ExploitedHere
+			ranked := Ranked{Shipped: true, Incident: attacked[row.VulnerabilityID]}
+			row.RankIncident = ranked.Incident
 			row.Urgency = int64(ranked.Rank())
 			// Rated as it is recorded, where a severity was given, which is
 			// when the clock starts. The own-product windows, and the one rule
@@ -513,9 +513,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				rated := now
 				row.RatedAt = &rated
 			}
-			if carriesDeadlines[occurrence.target] {
+			if carriesDeadlines[occurrence.build] {
 				row.DueAt = ownDeadline(own, severity, row.RatedAt, row.FixState,
-					false, ranked.ExploitedHere, now, nil, row.FixedAt, floor)
+					false, ranked.Incident, now, nil, row.FixedAt, floor)
 			}
 			rows = append(rows, row)
 		}
@@ -542,7 +542,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			return then()
 		}
 		// Every flaw has a report, whether it was sent in or found here, so
-		// the Inbox is the one list of where flaws came from and the same
+		// the vulnerability reports are the one list of where flaws came from and the same
 		// fields answer it for both.
 		told := in.Told
 		reference, err := mintReference(ctx, tx, s.drawer(), product, now.Year())
@@ -557,12 +557,12 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			ProductID: productID,
 			// What was claimed is the flaw's own summary, so no report is
 			// written with nothing claimed.
-			Summary:    strings.TrimSpace(in.Summary),
-			ReportedBy: strings.TrimSpace(told.ReportedBy),
-			Contact:    strings.TrimSpace(told.Contact),
-			Credit:     strings.TrimSpace(told.Credit),
-			ReceivedOn: told.When(),
-			FoundHere:  told.FoundHere,
+			ReportedProblem: strings.TrimSpace(in.Summary),
+			ReportedBy:      strings.TrimSpace(told.ReportedBy),
+			Contact:         strings.TrimSpace(told.Contact),
+			Credit:          strings.TrimSpace(told.Credit),
+			ReceivedOn:      told.When(),
+			FoundHere:       told.FoundHere,
 			// Judged at the moment it was recorded: whoever typed this in
 			// said what the flaw is in the same act.
 			EvaluatedAt: &now, EvaluatedBy: &subject.ID,
@@ -592,7 +592,7 @@ var (
 
 // carrying resolves what in the build holds the flaw, defaulting to the build
 // itself.
-func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int64, string, error) {
+func carrying(ctx context.Context, db bun.IDB, buildID int64, in Entering) (int64, string, error) {
 	name := strings.TrimSpace(in.Component)
 	if name != "" {
 		// The resolver every other component lookup goes through. An
@@ -600,7 +600,7 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 		// vendored versions of one library under one name, and taking the
 		// first row the name matches files a flaw against whichever was
 		// interned first.
-		id, err := graph.ComponentAsIn(ctx, db, targetID, name, graph.Choice{
+		id, err := graph.ComponentAsIn(ctx, db, buildID, name, graph.Choice{
 			Version:   strings.TrimSpace(in.Version),
 			Ecosystem: strings.TrimSpace(in.Ecosystem),
 			Namespace: strings.TrimSpace(in.Namespace),
@@ -615,7 +615,7 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 		// branch below, because it is the same occurrence: the root's name
 		// differs per variant, and an occurrence keyed on it is a different
 		// occurrence in each of them.
-		root, err := isRootIn(ctx, db, targetID, id)
+		root, err := isRootIn(ctx, db, buildID, id)
 		if err != nil {
 			return 0, "", err
 		}
@@ -641,7 +641,7 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"c"."id" AS "id"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).
 		Limit(1).
@@ -657,10 +657,10 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 
 // isRootIn says whether a component is what a build is, rather than something
 // the build contains.
-func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (bool, error) {
+func isRootIn(ctx context.Context, db bun.IDB, buildID, componentID int64) (bool, error) {
 	found, err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."component_id" = ?`, componentID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).

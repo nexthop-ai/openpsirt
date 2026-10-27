@@ -75,10 +75,10 @@ var (
 )
 
 type runFixture struct {
-	db     *database.DB
-	world  *fixture.World
-	queue  *queue.Queue
-	target int64
+	db    *database.DB
+	world *fixture.World
+	queue *queue.Queue
+	build int64
 }
 
 func eachRun(t *testing.T, fn func(t *testing.T, f *runFixture)) {
@@ -93,17 +93,17 @@ func newRun(t *testing.T, w *fixture.World) *runFixture {
 	t.Helper()
 	ctx := t.Context()
 	db := w.DB
-	target := w.Target
+	build := w.Build
 
 	// The inventory the build shipped, already read and stored.
 	scan, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "hash-1",
+		BuildID: build.ID, ContentHash: "hash-1",
 		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	_, err = fixture.ApplyGraph(ctx, db.DB, target.ID, scan.ID, graph.Snapshot{
+	_, err = fixture.ApplyGraph(ctx, db.DB, build.ID, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{swss, libnl},
 		Dependencies: []graph.Dependency{
 			{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
@@ -113,18 +113,18 @@ func newRun(t *testing.T, w *fixture.World) *runFixture {
 		t.Fatal(err)
 	}
 
-	return &runFixture{db: db, world: w, queue: queue.New(db, queue.DefaultOptions()), target: target.ID}
+	return &runFixture{db: db, world: w, queue: queue.New(db, queue.DefaultOptions()), build: build.ID}
 }
 
 // waiting leaves the work behind that an arriving inventory would.
 func (f *runFixture) waiting(t *testing.T) {
 	t.Helper()
-	if _, err := f.queue.Add(t.Context(), queue.Scan, strconv.FormatInt(f.target, 10)); err != nil {
+	if _, err := f.queue.Add(t.Context(), queue.Scan, strconv.FormatInt(f.build, 10)); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestScanningATargetProducesFindings(t *testing.T) {
+func TestScanningABuildProducesFindings(t *testing.T) {
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		s := &stub{reported: []finding.Reported{{
 			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
@@ -165,13 +165,13 @@ func TestABuildHoldingNothingButItselfIsScannedWithoutTheScanner(t *testing.T) {
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
 		scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
-			TargetID: f.target, ContentHash: "hash-root-only",
+			BuildID: f.build, ContentHash: "hash-root-only",
 			BuiltAt: time.Now().UTC().Add(-time.Minute), ParserVersion: "test",
 		})
 		if err != nil || outcome != ingest.Accept {
 			t.Fatalf("record scan: %v %v", outcome, err)
 		}
-		if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.target, scan.ID,
+		if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.build, scan.ID,
 			graph.Snapshot{Root: root}); err != nil {
 			t.Fatal(err)
 		}
@@ -293,7 +293,7 @@ func (f *runFixture) decided(t *testing.T) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, people[0], f.target, issue,
+	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, people[0], f.build, issue,
 		finding.OccurrenceIdentity("libnl-3-200", "libswsscommon"))
 	if err != nil {
 		t.Fatal(err)
@@ -326,13 +326,13 @@ func (f *runFixture) rebuilt(t *testing.T, library graph.Described) {
 	t.Helper()
 	ctx := t.Context()
 	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: f.target, ContentHash: "hash-2",
+		BuildID: f.build, ContentHash: "hash-2",
 		BuiltAt: time.Now().UTC(), ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.target, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.build, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{swss, library},
 		Dependencies: []graph.Dependency{
 			{Parent: root, Child: swss}, {Parent: swss, Child: library},
@@ -652,14 +652,14 @@ func TestTheRunnerScansUntilTheQueueIsEmptyAndReturnsQuietlyOnShutdown(t *testin
 // finishedRuns is how many scan runs have finished against this build.
 func (f *runFixture) finishedRuns(t *testing.T) int {
 	t.Helper()
-	return f.finishedRunsOn(t, f.target)
+	return f.finishedRunsOn(t, f.build)
 }
 
 // finishedRunsOn is how many scan runs have finished against a build.
-func (f *runFixture) finishedRunsOn(t *testing.T, target int64) int {
+func (f *runFixture) finishedRunsOn(t *testing.T, build int64) int {
 	t.Helper()
 	n, err := f.db.DB.NewSelect().Model((*finding.Run)(nil)).
-		Where(`"target_id" = ?`, target).
+		Where(`"build_id" = ?`, build).
 		Where(`"finished_at" IS NOT NULL`).
 		Count(t.Context())
 	if err != nil {
@@ -764,7 +764,7 @@ func TestARunRecordsTheCVERecordSnapshotItRead(t *testing.T) {
 func TestAScanWithAnUnreadableSnapshotWaitsWithoutSpendingAnAttempt(t *testing.T) {
 	// Run without it, every finding a record had closed would open again and
 	// close again on the next run that reads one. Failed instead, the job
-	// would be set aside within minutes and the run would keep the schedule
+	// would run out of attempts within minutes and the run would keep the schedule
 	// from asking again for a day.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		dir := t.TempDir()
@@ -842,13 +842,13 @@ func (f *runFixture) kernelShipped(t *testing.T, version string) graph.Described
 		CPE: "cpe:2.3:o:linux:linux_kernel:" + version + ":*:*:*:*:*:*:*",
 	}
 	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: f.target, ContentHash: "hash-kernel-" + version,
+		BuildID: f.build, ContentHash: "hash-kernel-" + version,
 		BuiltAt: time.Now().UTC(), ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.target, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.build, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{kernel},
 		Dependencies: []graph.Dependency{{Parent: root, Child: kernel}},
 	}); err != nil {
@@ -922,7 +922,7 @@ func TestABuildEverScannedWithASnapshotWaitsForOne(t *testing.T) {
 		// narrow, or by hand — does not wear the wait off: the closures the
 		// first run made still stand.
 		if _, err := f.db.DB.NewInsert().Model(&finding.Run{
-			TargetID: f.target, Scanner: "stub", RanHere: true,
+			BuildID: f.build, Scanner: "stub", RanHere: true,
 			StartedAt: time.Now().UTC(), FinishedAt: func() *time.Time { n := time.Now().UTC(); return &n }(),
 		}).Exec(t.Context()); err != nil {
 			t.Fatal(err)

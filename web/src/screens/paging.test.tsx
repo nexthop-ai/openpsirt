@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Disclosing } from "./Disclosing";
+import { DisclosureDeadlines } from "./DisclosureDeadlines";
 import { Assignments } from "./Assignments";
 import { location, screen, serve, settle, mounted } from "../test/mount";
 
@@ -49,7 +49,7 @@ describe("the assignments screen", () => {
   });
 });
 
-describe("the disclosing screen", () => {
+describe("the disclosure deadlines screen", () => {
   it("starts a narrowed list at its beginning", async () => {
     const asked: unknown[] = [];
     serve((path, init) => {
@@ -59,7 +59,7 @@ describe("the disclosing screen", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Disclosing />, "/disclosing"));
+    mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
     await settle();
     const next = Array.from(mount.host().querySelectorAll<HTMLButtonElement>("button.chip")).at(-1);
     act(() => next?.click());

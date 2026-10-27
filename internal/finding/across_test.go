@@ -60,7 +60,7 @@ func TestOneIssueInTwoBuildsIsOneRowAcrossThemAndSaysHowMany(t *testing.T) {
 		if one[0].Parent == "" || one[0].Chains == 0 {
 			t.Errorf("a build's own row lost its way down: %+v", one[0])
 		}
-		if one[0].Builds > 1 || one[0].Stream != "" || one[0].Variant != "" {
+		if one[0].Builds > 1 || one[0].BranchOrTag != "" || one[0].Variant != "" {
 			t.Errorf("a build's own row names a build it is already scoped to: %+v", one[0])
 		}
 
@@ -79,7 +79,7 @@ func TestOneIssueInTwoBuildsIsOneRowAcrossThemAndSaysHowMany(t *testing.T) {
 		if row.Builds != 2 {
 			t.Errorf("the row says %d builds hold it, want 2", row.Builds)
 		}
-		if row.Stream == "" || row.Variant == "" {
+		if row.BranchOrTag == "" || row.Variant == "" {
 			t.Errorf("the row names no build to link to: %+v", row)
 		}
 		// The way down is absent rather than taken from the build the row

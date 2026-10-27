@@ -24,9 +24,9 @@ import (
 // release, and it is why this is a snapshot per release rather than a
 // timeline.
 type ReleasePoint struct {
-	// Stream is the name a path addresses the release by, and StreamName the
+	// BranchOrTag is the name a path addresses the release by, and BranchOrTagName the
 	// spelling shown.
-	Stream, StreamName string
+	BranchOrTag, BranchOrTagName string
 	// Cut is when the release went out, where somebody said, and when it was
 	// declared here otherwise. It is what orders them and it is not the axis:
 	// the axis is the sequence, and the dates are labels.
@@ -91,11 +91,11 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	limit = database.APlot.Of(limit)
 
 	var rows []struct {
-		Stream     string    `bun:"stream"`
-		StreamName string    `bun:"stream_name"`
-		CreatedAt  time.Time `bun:"created_at"`
-		Band       string    `bun:"band"`
-		Open       int       `bun:"open"`
+		BranchOrTag     string    `bun:"branch_or_tag"`
+		BranchOrTagName string    `bun:"branch_or_tag_name"`
+		CreatedAt       time.Time `bun:"created_at"`
+		Band            string    `bun:"band"`
+		Open            int       `bun:"open"`
 	}
 	// The distinct issues per release, then the band of each, counted after.
 	// The issues are reduced on the finding alone, before the issue or its
@@ -106,23 +106,23 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	issues := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"tg"."stream_id" AS "stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		ColumnExpr(`"tg"."branch_or_tag_id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		Where(`"st"."kind" = ?`, catalog.Tag).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"tg"."stream_id", "f"."vulnerability_id"`)
+		GroupExpr(`"tg"."branch_or_tag_id", "f"."vulnerability_id"`)
 	issues = scope.Narrow(onlyReadable(issues, subject, products, all))
 
 	inner := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, issues).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "grouped"."stream_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "grouped"."branch_or_tag_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
-		Join(rating.For(rating.OnStream)).
-		ColumnExpr(`"st"."name" AS "stream"`).
-		ColumnExpr(catalog.ShownExpr("st") + ` AS "stream_name"`).
+		Join(rating.For(rating.OnBranchOrTag)).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
+		ColumnExpr(catalog.ShownExpr("st") + ` AS "branch_or_tag_name"`).
 		// The day it went out, where somebody said, and the day it was declared
 		// here otherwise. Ordered by the declaration alone, the chart is an
 		// accident of administration: a release recorded months after it
@@ -133,14 +133,14 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_release"`, inner).
-		ColumnExpr(`"per_release"."stream" AS "stream"`).
-		ColumnExpr(`"per_release"."stream_name" AS "stream_name"`).
+		ColumnExpr(`"per_release"."branch_or_tag" AS "branch_or_tag"`).
+		ColumnExpr(`"per_release"."branch_or_tag_name" AS "branch_or_tag_name"`).
 		ColumnExpr(`"per_release"."created_at" AS "created_at"`).
 		ColumnExpr(`"per_release"."band" AS "band"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr(`"per_release"."stream", "per_release"."stream_name", "per_release"."created_at", "per_release"."band"`).
+		GroupExpr(`"per_release"."branch_or_tag", "per_release"."branch_or_tag_name", "per_release"."created_at", "per_release"."band"`).
 		// Newest last, so the chart reads left to right the way time does.
-		OrderExpr(`"created_at", stream, band`).
+		OrderExpr(`"created_at", "branch_or_tag", "band"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what each release shipped with: %w", err)
 	}
@@ -149,14 +149,14 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	var out []ReleasePoint
 	at := map[string]int{}
 	for _, row := range rows {
-		i, held := at[row.Stream]
+		i, held := at[row.BranchOrTag]
 		if !held {
 			out = append(out, ReleasePoint{
-				Stream: row.Stream, StreamName: row.StreamName, Cut: row.CreatedAt,
+				BranchOrTag: row.BranchOrTag, BranchOrTagName: row.BranchOrTagName, Cut: row.CreatedAt,
 				BySeverity: map[string]int{},
 			})
 			i = len(out) - 1
-			at[row.Stream] = i
+			at[row.BranchOrTag] = i
 		}
 		out[i].Open += row.Open
 		out[i].BySeverity[row.Band] += row.Open

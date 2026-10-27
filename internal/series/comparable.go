@@ -4,7 +4,7 @@
 package series
 
 // Reason is why a run's absences are not evidence. A run that is not
-// comparable adds and updates results and marks none not reproduced.
+// comparable adds and updates results and marks none no longer detected.
 type Reason string
 
 const (

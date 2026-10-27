@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { THE_LINE } from "../ui/severities";
+import { MINIMUM_SEVERITIES } from "../ui/severities";
 import { useState } from "react";
 import { Loading } from "../ui/Loading";
 import { DAY_MS, on, since } from "../ui/when";
@@ -16,7 +16,7 @@ import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
-import { productAt, repositoriesAt, streamsAt } from "../app/routes";
+import { productAt, repositoriesAt, branchesAndTagsAt } from "../app/routes";
 import { UpstreamDrawer } from "./Upstream";
 
 // You pick a product first, and everything below is bound to it. What each one
@@ -108,12 +108,12 @@ export function Products({ who }: { who: Who }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
   });
 
-  const setFloor = useMutation({
-    mutationFn: async ({ product, floor }: { product: string; floor: Line }) =>
+  const setMinimumSeverity = useMutation({
+    mutationFn: async ({ product, minimum }: { product: string; minimum: Minimum }) =>
       unwrap(
         await api.PUT("/v1/products/{product}/minimum-severity", {
           params: { path: { product } },
-          body: { floor },
+          body: { minimum_severity: minimum },
         }),
       ),
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
@@ -183,8 +183,8 @@ export function Products({ who }: { who: Who }) {
       {setEndOfLife.isError && (
         <Failed error={setEndOfLife.error} what="That support date could not be set." />
       )}
-      {setFloor.isError && (
-        <Failed error={setFloor.error} what="That triage line could not be set." />
+      {setMinimumSeverity.isError && (
+        <Failed error={setMinimumSeverity.error} what="That minimum severity could not be set." />
       )}
       {setPairs.isError && (
         <Failed error={setPairs.error} what="Those pair thresholds could not be set." />
@@ -218,7 +218,7 @@ export function Products({ who }: { who: Who }) {
                 <th className="num" title="Open findings — an issue at a component, per build">
                   Open findings
                 </th>
-                <th>Triage from</th>
+                <th>Minimum severity</th>
                 <th title="Raised when one proposer and approver pair makes this share of agreements, with at least this many approvers">
                   One pair
                 </th>
@@ -240,8 +240,8 @@ export function Products({ who }: { who: Who }) {
                   <tr key={product.name} className="row">
                     <td>
                       {/* The product's own page rather than its branches.
-                          This table is an administration surface — a triage
-                          line in a select, a date in an input — and "how is
+                          This table is an administration surface — a minimum
+                          severity in a select, a date in an input — and "how is
                           this one doing" is a different question. */}
                       <Link to={productAt(product.name)} className="id">
                         {product.display_name || product.name}
@@ -260,11 +260,13 @@ export function Products({ who }: { who: Who }) {
                     <td className="num">{product.variants ?? 0}</td>
                     <td className="num">{(product.open ?? 0).toLocaleString()}</td>
                     <td>
-                      <Floor
+                      <MinimumSeverity
                         product={product.name ?? ""}
-                        stated={product.triage_floor ?? ""}
+                        stated={product.minimum_severity ?? ""}
                         admin={who.admin}
-                        onSet={(floor) => setFloor.mutate({ product: product.name ?? "", floor })}
+                        onSet={(minimum) =>
+                          setMinimumSeverity.mutate({ product: product.name ?? "", minimum })
+                        }
                       />
                     </td>
                     <td>
@@ -318,7 +320,7 @@ export function Products({ who }: { who: Who }) {
                       )}
                     </td>
                     <td className="rowacts">
-                      <Link to={streamsAt(product.name)} className="linkish">
+                      <Link to={branchesAndTagsAt(product.name)} className="linkish">
                         Manage
                       </Link>
                       {who.admin && (
@@ -432,43 +434,43 @@ export function Products({ who }: { who: Who }) {
   );
 }
 
-// The words a line may be, plus the one that is not a word at all: following
-// the deployment. Following is not the same as stating the deployment's
-// current line — a product that stated it would stop following the next time
+// The words a minimum severity may be, plus the one that is not a word at all:
+// following the deployment. Following is not the same as stating the
+// deployment's current minimum severity — a product that stated it would stop following the next time
 // the deployment changed its mind, and nobody would see that happen.
-type Line = "" | (typeof THE_LINE)[number];
+type Minimum = "" | (typeof MINIMUM_SEVERITIES)[number];
 
-const lines: Line[] = ["", ...THE_LINE];
+const minimums: Minimum[] = ["", ...MINIMUM_SEVERITIES];
 
 // The least severity a product triages, and a way to say something else.
 //
-// Below the line a finding is still recorded, still counted and still
+// Below it a finding is still recorded, still counted and still
 // reportable; it is out of the working list, not out of the system. Shown to
 // everybody because it explains a number, and editable by an administrator
 // because hiding findings is what every other part of this gates.
-function Floor({
+function MinimumSeverity({
   product,
   stated,
   admin,
   onSet,
 }: {
   product: string;
-  stated: Line;
+  stated: Minimum;
   admin: boolean;
-  onSet: (floor: Line) => void;
+  onSet: (minimum: Minimum) => void;
 }) {
   if (!admin) {
     return stated ? <span>{stated}</span> : <span className="hint">deployment&rsquo;s</span>;
   }
   return (
     <select
-      className="triageline"
+      className="minimumseverity"
       value={stated}
       aria-label={`What ${product} considers worth triaging`}
-      onChange={(event) => onSet(event.target.value as Line)}
-      title="Below this line a finding is still recorded and counted, and is out of the working list"
+      onChange={(event) => onSet(event.target.value as Minimum)}
+      title="Below this a finding is still recorded and counted, and is out of the working list"
     >
-      {lines.map((word) => (
+      {minimums.map((word) => (
         <option key={word || "inherit"} value={word}>
           {word || "deployment\u2019s"}
         </option>

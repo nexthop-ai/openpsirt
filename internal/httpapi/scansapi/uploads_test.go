@@ -133,13 +133,13 @@ func TestABuildsUploadsSayWhatBecameOfTheNewestOfEachKind(t *testing.T) {
 
 		// An upload turned away after the newest one taken is the newest, and
 		// it is not counted: nothing of it is held.
-		target := r.TargetOf(t, httpapitest.SeededBuild)
+		build := r.BuildOf(t, httpapitest.SeededBuild)
 		if err := ingest.NewStore(r.DB.DB).Refused(ctx, access.Everything("test"),
-			ingest.Refusal{TargetID: target, Reason: "that is not an inventory"}); err != nil {
+			ingest.Refusal{BuildID: build, Reason: "that is not an inventory"}); err != nil {
 			t.Fatal(err)
 		}
 		if err := series.NewStore(r.DB.DB).Refused(ctx, series.Refusal{
-			TargetID: target, Series: "nightly", Kind: kind.Analysis, Reason: "it names no commit",
+			BuildID: build, Series: "nightly", Kind: kind.Analysis, Reason: "it names no commit",
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -157,7 +157,7 @@ func TestABuildsUploadsSayWhatBecameOfTheNewestOfEachKind(t *testing.T) {
 		}
 
 		// An upload taken after the refusal is the newest again.
-		r.Recorded(t, target, "after-the-refusal")
+		r.Recorded(t, build, "after-the-refusal")
 		_, kinds, _ = uploadKinds(t, r, "internal-reader")
 		if sbom := kinds["sbom"]; sbom.Total != 2 || sbom.Latest == nil || sbom.Latest.Status != "in-progress" {
 			t.Errorf("the SBOMs read %+v; want the upload still being read", sbom.Latest)

@@ -45,12 +45,12 @@ func ReportActs() []ReportAct {
 type ReportEvent struct {
 	At  time.Time
 	Act ReportAct
-	// By is the person who did it. Absent where a standing rule placed the
+	// By is the person who did it. Absent where an assignment rule placed the
 	// report, or an administrator's hand-over moved it.
 	By *int64
 	// Party is who it went to, on an assignment.
 	Party *int64
-	// RuleID is the standing rule that placed it, where one did.
+	// RuleID is the assignment rule that placed it, where one did.
 	RuleID *int64
 	// Ordinal is the version an edit replaced, or the note's version.
 	Ordinal int
@@ -140,7 +140,7 @@ func (s *Store) ReportHistory(ctx context.Context, subject access.Subject, produ
 			act = ActHandedBack
 		}
 		out = append(out, ReportEvent{At: h.AssignedAt, Act: act, By: h.AssignedBy,
-			Party: h.AssignedTo, RuleID: h.RoutedBy})
+			Party: h.AssignedTo, RuleID: h.AssignedByRule})
 	}
 
 	var rulings []ReportRuling

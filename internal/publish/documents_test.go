@@ -29,13 +29,13 @@ var sonicRoot = graph.Described{Purl: "pkg:generic/sonic@master.42", Name: "soni
 // swss.
 func (w *world) shipped() {
 	w.t.Helper()
-	w.ship(w.Target, sonicRoot,
+	w.ship(w.Build, sonicRoot,
 		edge{sonicRoot, openssl}, edge{sonicRoot, swss}, edge{swss, libnl})
 }
 
 // buildID is how a CSAF document names a build of the default product.
-func buildID(stream, variant string) string {
-	return fixture.ProductName + ":" + stream + ":" + variant
+func buildID(branchOrTag, variant string) string {
+	return fixture.ProductName + ":" + branchOrTag + ":" + variant
 }
 
 // A statement whose reason holds for anybody shipping the component names the
@@ -47,10 +47,10 @@ func TestAStatementHoldingForAnybodyNamesTheComponentAlone(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
-		w.decide(w.Target, "CVE-2026-1001", openssl,
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
-		w.decide(w.Target, "CVE-2026-1002", libnl,
+		w.decide(w.Build, "CVE-2026-1002", libnl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 		w.publishes(w.Product, true)
 		w.write()
@@ -88,12 +88,12 @@ func TestAStatementHoldingForAnybodyNamesTheComponentAlone(t *testing.T) {
 			t.Errorf("the build is named %+v, want it by the package identifier its inventory gave it", leaf)
 		}
 
-		stream := w.openVEXAbout(w.Product, fixture.BranchName)
-		if stream == nil {
+		branchOrTag := w.openVEXAbout(w.Product, fixture.BranchName)
+		if branchOrTag == nil {
 			t.Fatal("no OpenVEX document about the branch")
 		}
 		saw := 0
-		for _, statement := range stream.Statements {
+		for _, statement := range branchOrTag.Statements {
 			switch statement.Vulnerability.Name {
 			case "CVE-2026-1001":
 				saw++
@@ -134,12 +134,12 @@ func TestADecisionStatesWhomItsStatementHoldsFor(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
 		// The reason says anybody, and the decision says this build only.
-		w.decide(w.Target, "CVE-2026-1001", openssl, decision{outcome: triage.NotApplicable,
+		w.decide(w.Build, "CVE-2026-1001", openssl, decision{outcome: triage.NotApplicable,
 			justification: triage.CodeNotPresent, scope: triage.BuildSpecific})
 		// The reason says this build, and the decision says anybody.
-		w.decide(w.Target, "CVE-2026-1002", libnl, decision{outcome: triage.NotApplicable,
+		w.decide(w.Build, "CVE-2026-1002", libnl, decision{outcome: triage.NotApplicable,
 			justification: triage.CodeNotInExecutePath, scope: triage.Portable})
 		w.publishes(w.Product, true)
 		w.write()
@@ -165,12 +165,12 @@ func TestAStatementTheBuildsDisagreeOnIsStatedPerBuild(t *testing.T) {
 		w.shipped()
 		// The lab build ships the same openssl beneath swss, an occurrence the
 		// decision below does not reach.
-		lab := w.TargetFor(w.Branch, w.Internal)
+		lab := w.BuildFor(w.Branch, w.Internal)
 		labRoot := graph.Described{Purl: "pkg:generic/sonic@lab.7", Name: "sonic", Version: "lab.7"}
 		w.ship(lab, labRoot, edge{labRoot, swss}, edge{swss, openssl})
-		w.report(w.Target, reported{"CVE-2026-1001", openssl})
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
 		w.report(lab, reported{"CVE-2026-1001", openssl})
-		w.decide(w.Target, "CVE-2026-1001", openssl,
+		w.decide(w.Build, "CVE-2026-1001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.decide(lab, "CVE-2026-1001", openssl, decision{outcome: triage.Affected})
 		w.publishes(w.Product, true)
@@ -201,18 +201,18 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1003", zlibUnder(w)},
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1003", zlibUnder(w)},
 			reported{"CVE-2026-1004", libnl}, reported{"CVE-2026-1005", openssl},
 			reported{"CVE-2026-1006", libnl})
-		w.decide(w.Target, "CVE-2026-1001", openssl,
+		w.decide(w.Build, "CVE-2026-1001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
-		w.decide(w.Target, "CVE-2026-1004", libnl, decision{outcome: triage.Affected})
+		w.decide(w.Build, "CVE-2026-1004", libnl, decision{outcome: triage.Affected})
 		// A dismissal nobody has agreed to yet, and a deferral: neither is a
 		// decision that the issue applies, and neither is published.
-		w.decide(w.Target, "CVE-2026-1005", openssl, decision{outcome: triage.NotApplicable,
+		w.decide(w.Build, "CVE-2026-1005", openssl, decision{outcome: triage.NotApplicable,
 			justification: triage.CodeNotPresent, waiting: true})
 		later := time.Now().UTC().Add(30 * 24 * time.Hour).Truncate(24 * time.Hour)
-		w.decide(w.Target, "CVE-2026-1006", libnl, decision{outcome: triage.Deferred, deferredUntil: &later})
+		w.decide(w.Build, "CVE-2026-1006", libnl, decision{outcome: triage.Deferred, deferredUntil: &later})
 		w.publishes(w.Product, true)
 		w.write()
 
@@ -256,8 +256,8 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 		if !slices.Equal(issues, []string{"CVE-2026-1001"}) {
 			t.Errorf("published %v under the narrower setting, want the one not affected", issues)
 		}
-		stream := w.openVEXAbout(w.Product, fixture.BranchName)
-		for _, statement := range stream.Statements {
+		branchOrTag := w.openVEXAbout(w.Product, fixture.BranchName)
+		for _, statement := range branchOrTag.Statements {
 			if statement.Status != vex.NotAffected && statement.Status != vex.Fixed {
 				t.Errorf("the OpenVEX document states %s under the narrower setting", statement.Status)
 			}
@@ -268,7 +268,7 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 // zlibUnder ships zlib in the default build beneath swss, and answers it.
 func zlibUnder(w *world) graph.Described {
 	w.t.Helper()
-	w.ship(w.Target, sonicRoot,
+	w.ship(w.Build, sonicRoot,
 		edge{sonicRoot, openssl}, edge{sonicRoot, swss}, edge{swss, libnl}, edge{swss, zlib})
 	return zlib
 }
@@ -280,10 +280,10 @@ func TestADocumentIsRevisedOnlyWhenItsAnswerMoves(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl})
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
 		// The build's own reason, so the document names each build it holds
 		// for.
-		w.decide(w.Target, "CVE-2026-1001", openssl,
+		w.decide(w.Build, "CVE-2026-1001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 		w.publishes(w.Product, true)
 		first := w.write()
@@ -298,7 +298,7 @@ func TestADocumentIsRevisedOnlyWhenItsAnswerMoves(t *testing.T) {
 
 		// The lab build ships the same openssl at the same occurrence, and the
 		// decision reaches it: the document now speaks for a second build.
-		lab := w.TargetFor(w.Branch, w.Internal)
+		lab := w.BuildFor(w.Branch, w.Internal)
 		labRoot := graph.Described{Purl: "pkg:generic/sonic@lab.7", Name: "sonic", Version: "lab.7"}
 		w.ship(lab, labRoot, edge{labRoot, openssl})
 		w.report(lab, reported{"CVE-2026-1001", openssl})
@@ -329,8 +329,8 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
-		w.decide(w.Target, "CVE-2026-1002", libnl,
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1002", libnl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()
@@ -340,7 +340,7 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 		}
 
 		// The scanner stops reporting it.
-		w.report(w.Target, reported{"CVE-2026-1001", openssl})
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
 		// The branch's OpenVEX document said nothing else, so it goes too.
 		if wrote := w.write(); wrote.Withdrawn != 2 {
 			t.Errorf("withdrew %d documents, want the CSAF and the OpenVEX one", wrote.Withdrawn)
@@ -353,7 +353,7 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 			t.Errorf("a withdrawn document is served at %s", path)
 		}
 
-		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
 		w.write()
 		after := w.csafAbout(w.Product, "CVE-2026-1002")
 		if after == nil || after.Document.Tracking.Version != before.Document.Tracking.Version {
@@ -369,20 +369,20 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
-		var targets []*catalog.Target
+		var buildIDs []*catalog.Build
 		for _, name := range []string{"edge.os", "edge os"} {
 			product := w.DeclareProduct(name, name)
 			w.hold(product)
-			target := w.TargetFor(w.DeclareStream(product, "main", catalog.Branch, nil),
+			build := w.BuildFor(w.DeclareBranchOrTag(product, "main", catalog.Branch, nil),
 				w.DeclareVariant(product, "x86", true))
-			root := graph.Described{Purl: "pkg:generic/edge@1." + fmt.Sprint(len(targets)), Name: "edge",
-				Version: "1." + fmt.Sprint(len(targets))}
-			w.ship(target, root, edge{root, openssl})
-			w.report(target, reported{"CVE-2026-1001", openssl})
-			w.decide(target, "CVE-2026-1001", openssl,
+			root := graph.Described{Purl: "pkg:generic/edge@1." + fmt.Sprint(len(buildIDs)), Name: "edge",
+				Version: "1." + fmt.Sprint(len(buildIDs))}
+			w.ship(build, root, edge{root, openssl})
+			w.report(build, reported{"CVE-2026-1001", openssl})
+			w.decide(build, "CVE-2026-1001", openssl,
 				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 			w.publishes(product, true)
-			targets = append(targets, target)
+			buildIDs = append(buildIDs, build)
 		}
 		wrote, err := w.pass.Once(t.Context())
 		if err != nil {
@@ -438,8 +438,8 @@ func TestMovingTheAddressRevisesEveryDocument(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl})
-		w.decide(w.Target, "CVE-2026-1001", openssl,
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()

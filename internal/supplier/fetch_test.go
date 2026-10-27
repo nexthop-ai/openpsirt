@@ -260,7 +260,7 @@ const vexDocument = `{
 type ships struct {
 	db      *database.DB
 	product int64
-	target  int64
+	build   int64
 	by      access.Subject
 }
 
@@ -271,9 +271,9 @@ func shipping(t *testing.T, fn func(t *testing.T, f *ships)) {
 		ctx := t.Context()
 
 		product := w.Product
-		target := w.Target
+		build := w.Build
 		scan, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "hash-1",
+			BuildID: build.ID, ContentHash: "hash-1",
 			BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
 		})
 		if err != nil || outcome != ingest.Accept {
@@ -283,7 +283,7 @@ func shipping(t *testing.T, fn func(t *testing.T, f *ships)) {
 		held := graph.Described{
 			Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
 		}
-		if _, err := fixture.ApplyGraph(ctx, db.DB, target.ID, scan.ID, graph.Snapshot{
+		if _, err := fixture.ApplyGraph(ctx, db.DB, build.ID, scan.ID, graph.Snapshot{
 			Root: root, Components: []graph.Described{held},
 			Dependencies: []graph.Dependency{{Parent: root, Child: held}},
 		}); err != nil {
@@ -294,7 +294,7 @@ func shipping(t *testing.T, fn func(t *testing.T, f *ships)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fn(t, &ships{db: db, product: product.ID, target: target.ID, by: access.Subject{
+		fn(t, &ships{db: db, product: product.ID, build: build.ID, by: access.Subject{
 			Kind: access.Person, ID: who.ID, Identity: who.Email, Admin: true,
 		}})
 	})
@@ -307,13 +307,13 @@ func (f *ships) reported(t *testing.T, issue, component, version string) int64 {
 	ctx := t.Context()
 	store := finding.NewStore(f.db.DB)
 	run, err := store.Begin(ctx, finding.Run{
-		TargetID: f.target, Scanner: "test",
+		BuildID: f.build, Scanner: "test",
 		ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Apply(ctx, f.target, run.ID, []finding.Reported{{
+	if _, err := store.Apply(ctx, f.build, run.ID, []finding.Reported{{
 		Issue: finding.Named{Identifier: issue, Severity: "high"},
 		Component: graph.Described{
 			Purl: "pkg:deb/debian/" + component + "@" + version,
@@ -328,7 +328,7 @@ func (f *ships) reported(t *testing.T, issue, component, version string) int64 {
 	}
 	var id int64
 	if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-		ColumnExpr(`"f"."id"`).Where(`"f"."target_id" = ?`, f.target).
+		ColumnExpr(`"f"."id"`).Where(`"f"."build_id" = ?`, f.build).
 		Limit(1).Scan(ctx, &id); err != nil {
 		t.Fatal(err)
 	}
@@ -350,7 +350,7 @@ func fetching(t *testing.T, f *ships, p *publisher) *supplier.Fetcher {
 var long = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // from is the source row for one publisher.
-func from(t *testing.T, f *ships, p *publisher) supplier.Source {
+func from(t *testing.T, f *ships, p *publisher) supplier.Feed {
 	t.Helper()
 	row, err := supplier.NewStore(f.db.DB).Add(t.Context(), f.by, f.product, "Example Linux",
 		p.described())
@@ -370,14 +370,14 @@ func from(t *testing.T, f *ships, p *publisher) supplier.Source {
 // passOver configures one publisher as a supplier, wound back so the documents
 // in a test are ahead of its mark, and a pass reading it through the test's
 // client.
-func passOver(t *testing.T, f *ships, p *publisher, replica string) (*supplier.Store, *supplier.Source, *supplier.Pass) {
+func passOver(t *testing.T, f *ships, p *publisher, replica string) (*supplier.Store, *supplier.Feed, *supplier.Pass) {
 	t.Helper()
 	store := supplier.NewStore(f.db.DB)
 	row, err := store.Add(t.Context(), f.by, f.product, "Example Linux", p.described())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
+	if _, err := f.db.DB.NewUpdate().Model((*supplier.Feed)(nil)).
 		Set(`"caught_up_to" = ?`, long).Where(`"id" = ?`, row.ID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -403,7 +403,7 @@ func TestAnAdvisoryAboutSomethingThisProductShipsIsRecordedAsEvidence(t *testing
 
 		said, err := finding.NewStore(f.db.DB).SaidAbout(ctx,
 			access.Everything("the test"), f.product, 0,
-			[]string{"CVE-2026-1111"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0", f.target, 0)
+			[]string{"CVE-2026-1111"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -518,7 +518,7 @@ func TestAVexDocumentInAPublishersFeedIsLeftAlone(t *testing.T) {
 		}
 		said, err := finding.NewStore(f.db.DB).SaidAbout(ctx,
 			access.Everything("the test"), f.product, 0,
-			[]string{"CVE-2026-4444"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0", f.target, 0)
+			[]string{"CVE-2026-4444"}, "libnl-3-200", "pkg:deb/debian/libnl-3-200@3.7.0", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -185,7 +185,7 @@ func TestASweepLapsingMoreThanOneBatchTellsEachProposerOnce(t *testing.T) {
 		for i := range size {
 			occurrence := fmt.Sprintf("place-%04d", i)
 			findings = append(findings, finding.Finding{
-				TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+				BuildID: in.build, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 				Visibility: access.Public, ComponentID: moved, OccurrenceIdentity: occurrence,
 				OpenedAt: now, OpenedRunID: &in.run,
 			})
@@ -205,7 +205,7 @@ func TestASweepLapsingMoreThanOneBatchTellsEachProposerOnce(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		lapsed, err := f.store.Lapse(ctx, in.target)
+		lapsed, err := f.store.Lapse(ctx, in.build)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -555,10 +555,10 @@ func TestADecisionWithAWithdrawnRowIsNotReaffirmedAmongMany(t *testing.T) {
 		at := f.selection(t)
 		var run int64
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).Column("opened_run_id").
-			Where(`"target_id" = ?`, at.TargetID).Limit(1).Scan(ctx, &run); err != nil {
+			Where(`"build_id" = ?`, at.BuildID).Limit(1).Scan(ctx, &run); err != nil {
 			t.Fatal(err)
 		}
-		f.finds(t, build{target: at.TargetID, run: run}, at.ComponentID, "second-place-of-libfoo",
+		f.finds(t, build{build: at.BuildID, run: run}, at.ComponentID, "second-place-of-libfoo",
 			access.Public)
 		decisionID, recorded, _, err := f.store.BulkDecision(ctx, f.triager, at, f.wontFix(),
 			triage.DefaultBounds())

@@ -191,12 +191,12 @@ func (g *Generator) treeFor(product *catalog.Product, facts []placed) (advisory.
 			withinName = fact.Within
 		} else {
 			within = one.build.id(product.Name)
-			withinName = product.DisplayName + " " + one.build.streamShown + " (" + one.build.variantShown + ")"
+			withinName = product.DisplayName + " " + one.build.branchOrTagShown + " (" + one.build.variantShown + ")"
 			if _, ok := versions[within]; !ok {
 				leaf := &advisory.Named{Name: withinName, ID: within, Helper: helperOf(one.build.root)}
 				versions[within] = advisory.Branch{
 					Category: "product_version",
-					Name:     one.build.stream + " (" + one.build.variant + ")",
+					Name:     one.build.branchOrTag + " (" + one.build.variant + ")",
 					Product:  leaf,
 				}
 			}

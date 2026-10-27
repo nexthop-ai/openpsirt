@@ -18,8 +18,12 @@ describe("handing rows over", () => {
     seen = useHandOver({
       product: "sonic",
       query: listQuery(new URLSearchParams("state=undecided&offset=50&page=50")),
-      selection: { stream: "main" },
-      buildOf: (row: Row) => ({ product: "sonic", stream: row.stream ?? "", variant: "x86" }),
+      selection: { branch_or_tag: "main" },
+      buildOf: (row: Row) => ({
+        product: "sonic",
+        branch_or_tag: row.branch_or_tag ?? "",
+        variant: "x86",
+      }),
     });
     return null;
   }
@@ -41,7 +45,7 @@ describe("handing rows over", () => {
       params: { query: Record<string, unknown> };
       body: Record<string, unknown>;
     };
-    expect(init.params.query).toMatchObject({ state: ["undecided"], stream: "main" });
+    expect(init.params.query).toMatchObject({ state: ["undecided"], branch_or_tag: "main" });
     expect(init.params.query).not.toHaveProperty("offset");
     expect(init.params.query).not.toHaveProperty("limit");
     expect(init.body).toEqual({
@@ -58,7 +62,7 @@ describe("handing rows over", () => {
     await settle();
     await act(async () => {
       await seen?.hand.mutateAsync({
-        row: { vulnerability: "CVE-2026-0001", component: "zlib", stream: "rel" } as Row,
+        row: { vulnerability: "CVE-2026-0001", component: "zlib", branch_or_tag: "rel" } as Row,
         who: "core",
         team: true,
       });
@@ -69,7 +73,7 @@ describe("handing rows over", () => {
     };
     expect(init.params.path).toEqual({
       product: "sonic",
-      stream: "rel",
+      branch_or_tag: "rel",
       variant: "x86",
       issue: "CVE-2026-0001",
       component: "zlib",

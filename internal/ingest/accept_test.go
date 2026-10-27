@@ -28,10 +28,10 @@ import (
 
 // each gives every engine the default world, whose build scans are filed
 // against.
-func each(t *testing.T, fn func(t *testing.T, s *ingest.Store, targetID int64)) {
+func each(t *testing.T, fn func(t *testing.T, s *ingest.Store, buildID int64)) {
 	t.Helper()
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
-		fn(t, ingest.NewStore(w.DB.DB), w.Target.ID)
+		fn(t, ingest.NewStore(w.DB.DB), w.Build.ID)
 	})
 }
 
@@ -42,8 +42,8 @@ func TestTwoUploadsOfOneFileRacingToWriteAnswerThatItIsHeld(t *testing.T) {
 	// serializes writers and never races.
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		target := fixture.New(t, db).Target.ID
-		upload := arriving(target, "raced", time.Now().UTC().Add(-time.Hour))
+		build := fixture.New(t, db).Build.ID
+		upload := arriving(build, "raced", time.Now().UTC().Add(-time.Hour))
 
 		first, err := db.BeginTx(ctx, nil)
 		if err != nil {
@@ -87,7 +87,7 @@ func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 	// build's refusal is recorded either way, so that is not a failure.
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		target := fixture.New(t, db).Target.ID
+		build := fixture.New(t, db).Build.ID
 		sender := access.NewPipeline(1, "ci", access.Scope{})
 
 		first, err := db.BeginTx(ctx, nil)
@@ -96,13 +96,13 @@ func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 		}
 		defer func() { _ = first.Rollback() }()
 		if err := ingest.NewStore(first).Refused(ctx, sender,
-			ingest.Refusal{TargetID: target, Reason: "first"}); err != nil {
+			ingest.Refusal{BuildID: build, Reason: "first"}); err != nil {
 			t.Fatal(err)
 		}
 		second := make(chan error, 1)
 		go func() {
 			second <- ingest.NewStore(db.DB).Refused(ctx, sender,
-				ingest.Refusal{TargetID: target, Reason: "second"})
+				ingest.Refusal{BuildID: build, Reason: "second"})
 		}()
 		time.Sleep(500 * time.Millisecond)
 		if err := first.Commit(); err != nil {
@@ -114,9 +114,9 @@ func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 	})
 }
 
-func arriving(targetID int64, hash string, builtAt time.Time) ingest.Arriving {
+func arriving(buildID int64, hash string, builtAt time.Time) ingest.Arriving {
 	return ingest.Arriving{
-		TargetID: targetID, ContentHash: hash, BuiltAt: builtAt,
+		BuildID: buildID, ContentHash: hash, BuiltAt: builtAt,
 		ParserVersion: "test", Credential: "key-1",
 	}
 }
@@ -346,9 +346,9 @@ func TestAFailureQuotingAProducersOwnTextIsStoredAsText(t *testing.T) {
 	// SQLite stores it happily, which is why the quick loop never saw this
 	// and why only the early return had ever executed: no test had ever
 	// passed MarkFailed a message long enough to cut.
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
-		scan, _, err := s.Record(ctx, arriving(targetID, "cut-inside-a-rune", time.Now().UTC()))
+		scan, _, err := s.Record(ctx, arriving(buildID, "cut-inside-a-rune", time.Now().UTC()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -383,9 +383,9 @@ func TestAReceiptSaysNothingOfTheDatabaseAScanFailedOn(t *testing.T) {
 	// The receipt is read back by the key that sent the scan. A database's
 	// own failure names the address and the user it dialed, so a scan that
 	// failed on one says it could not be applied and no more.
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
-		scan, _, err := s.Record(ctx, arriving(targetID, "failed-on-the-database", time.Now().UTC()))
+		scan, _, err := s.Record(ctx, arriving(buildID, "failed-on-the-database", time.Now().UTC()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -411,7 +411,7 @@ func TestAReceiptSaysNothingOfTheDatabaseAScanFailedOn(t *testing.T) {
 // endpoint and the credential it signed with, and no engine's error types
 // recognize it.
 func TestAReceiptCarriesOnlyARefusalsOwnWords(t *testing.T) {
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
 		for _, c := range []struct {
 			name  string
@@ -425,7 +425,7 @@ func TestAReceiptCarriesOnlyARefusalsOwnWords(t *testing.T) {
 				"GET https://objects.internal.example:9000/scans/7: AccessDenied for AKIAEXAMPLE")),
 				"the scan could not be applied"},
 		} {
-			scan, _, err := s.Record(ctx, arriving(targetID, "receipt-"+c.name, time.Now().UTC()))
+			scan, _, err := s.Record(ctx, arriving(buildID, "receipt-"+c.name, time.Now().UTC()))
 			if err != nil {
 				t.Fatal(err)
 			}

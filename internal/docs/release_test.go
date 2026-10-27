@@ -35,7 +35,7 @@ var (
 // example.
 var notReleases = map[string][]string{
 	"docs/pipeline.md": {
-		"v2.4.1", // a product tag in the stream examples
+		"v2.4.1", // a product tag in the branch or tag examples
 		"8.4.0",  // curl, in an inventory comparison
 		"1.3.1",  // zlib, in the same comparison
 	},

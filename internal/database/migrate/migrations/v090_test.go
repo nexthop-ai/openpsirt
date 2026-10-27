@@ -51,11 +51,11 @@ type v080World struct {
 // another stamp in the third.
 func seedV080Images(t *testing.T, ctx context.Context, db *database.DB) v080World {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := v080World{product: declared.Product.ID, target: declared.Target.ID, place: "place-libnl-under-swss",
+	w := v080World{product: declared.Product.ID, target: declared.Build.ID, place: "place-libnl-under-swss",
 		onImage: "place-swss"}
 	who, err := access.NewStore(db.DB).Ensure(ctx, "image-triager", "", nil, nil)
 	if err != nil {
@@ -63,16 +63,13 @@ func seedV080Images(t *testing.T, ctx context.Context, db *database.DB) v080Worl
 	}
 	w.person = who.ID
 	at := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
-	scans := ingest.NewStore(db.DB)
 	for i := range 3 {
-		rec, outcome, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: w.target, ContentHash: "night-" + string(rune('a'+i)),
-			BuiltAt: at.Add(time.Duration(i) * 24 * time.Hour), ParserVersion: "test",
-		})
-		if err != nil || outcome != ingest.Accept {
-			t.Fatalf("record a scan: %v %v", outcome, err)
+		scan, err := recordScanBeforeV0110(ctx, db, w.target, "night-"+string(rune('a'+i)),
+			at.Add(time.Duration(i)*24*time.Hour))
+		if err != nil {
+			t.Fatal(err)
 		}
-		w.scans = append(w.scans, rec.ID)
+		w.scans = append(w.scans, scan)
 	}
 	s1, s2, s3 := w.scans[0], w.scans[1], w.scans[2]
 
@@ -274,7 +271,7 @@ func TestAV080DatabaseUpgradesItsImagesToTheirNames(t *testing.T) {
 				t.Fatalf("migrate to the latest: %v", err)
 			}
 			rec, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-				TargetID: w.target, ContentHash: "night-d",
+				BuildID: w.target, ContentHash: "night-d",
 				BuiltAt: time.Date(2026, 10, 4, 2, 0, 0, 0, time.UTC), ParserVersion: "test",
 			})
 			if err != nil || outcome != ingest.Accept {
@@ -424,8 +421,9 @@ func imagesAreMergedV090(t *testing.T, ctx context.Context, db *database.DB, w v
 	nodesOf := func(componentID int64) []graph.Node {
 		t.Helper()
 		var nodes []graph.Node
-		// The repository column is v0.11.0's, and this is v0.9.0's table.
-		if err := db.DB.NewSelect().Model(&nodes).ExcludeColumn("repository").
+		// The repository and build_id columns are v0.11.0's, and this is
+		// v0.9.0's table.
+		if err := db.DB.NewSelect().Model(&nodes).ExcludeColumn("repository", "build_id").
 			Where(`"component_id" = ?`, componentID).
 			Order("opened_scan_id").Scan(ctx); err != nil {
 			t.Fatal(err)
@@ -455,7 +453,7 @@ func imagesAreMergedV090(t *testing.T, ctx context.Context, db *database.DB, w v
 		t.Fatalf("the image's nodes are %+v, want one open since the first scan", nodes)
 	}
 	var edges []graph.Edge
-	if err := db.DB.NewSelect().Model(&edges).
+	if err := db.DB.NewSelect().Model(&edges).ExcludeColumn("build_id").
 		Where(`"parent_id" = ? OR "child_id" = ?`, nodes[0].ID, nodes[0].ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}

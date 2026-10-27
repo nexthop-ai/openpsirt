@@ -35,11 +35,11 @@ export const BELOW_LOW = ["negligible", "none"] as const;
 // all.
 export const RECORDABLE = [...BANDS, ...BELOW_LOW] as const;
 
-// THE_LINE is what a triage floor may be set to: the four, least first, with
-// "everything" in front for the deployment that keeps all of it. The word is
-// not a severity — it is the absence of a floor — which is why it lives here
-// rather than in the ladder above.
-export const THE_LINE = ["everything", ...FLOORS] as const;
+// MINIMUM_SEVERITIES is what a minimum severity may be set to: the four, least
+// first, with "everything" in front for the deployment that keeps all of it.
+// The word is not a severity — it is the absence of a minimum — which is why it
+// lives here rather than in the ladder above.
+export const MINIMUM_SEVERITIES = ["everything", ...FLOORS] as const;
 
 type Band = (typeof BANDS)[number];
 

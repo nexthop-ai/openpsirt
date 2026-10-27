@@ -122,7 +122,7 @@ func readableBy(query *bun.SelectQuery, subject access.Subject, column string) *
 
 // readableWhere is the condition a decision occurrence under the alias named meets
 // where the subject may read it: its finding's visibility, the cases they
-// were brought into, and a lead included in its flaw's case.
+// were brought into, and a code finding included in its flaw's case.
 func readableWhere(subject access.Subject, column string) (string, []any) {
 	where, args := visibleCondition(subject, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
 		`"`+column+`"."vulnerability_id"`, readable, onCases)
@@ -141,7 +141,7 @@ func readableWhere(subject access.Subject, column string) (string, []any) {
 // to its findings carries this.
 //
 // The finding's visibility is read through the given alias, and the product
-// through the expression given — the stream's product where the read has
+// through the expression given — the branch or tag's product where the read has
 // joined that far, and the row's where the match already requires the two
 // to agree.
 func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, product string) *bun.SelectQuery {
@@ -165,11 +165,11 @@ func readableFindingsOn(subject access.Subject, finding, product string) (string
 	return orIncluded(subject, where, args, product, `"`+finding+`"."visibility"`, `"`+finding+`"."occurrence_identity"`)
 }
 
-// orIncluded widens a reading narrowing by the leads included in an
+// orIncluded widens a reading narrowing by the code findings included in an
 // undisclosed flaw's case, for the flaw's readers: somebody who reads
-// undisclosed work in the product, and somebody on the flaw's case. A lead and
+// undisclosed work in the product, and somebody on the flaw's case. A code finding and
 // the decisions at its occurrence stay internal while the flaw is undisclosed, so the
-// widening is the internal rows at an included lead's occurrence and nothing else.
+// widening is the internal rows at an included code finding's occurrence and nothing else.
 //
 // Only where the subject does not read internal work in the product already,
 // for the reason orBrought gives.
@@ -204,9 +204,9 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 	if len(audience) == 0 {
 		return where, args
 	}
-	included := "(" + visibility + ` = ? AND EXISTS (SELECT 1 FROM "lead_handoff" AS "ilh"
+	included := "(" + visibility + ` = ? AND EXISTS (SELECT 1 FROM "code_finding_flaw" AS "ilh"
 		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."occurrence_identity" = ` + occurrence + `
-		  AND "ilh"."moved_at" IS NOT NULL AND "ilh"."disclosed_at" IS NULL
+		  AND "ilh"."included_at" IS NOT NULL AND "ilh"."disclosed_at" IS NULL
 		  AND (` + strings.Join(audience, " OR ") + `)))`
 	args = append(append(append([]any{}, args...), access.Internal), audienceArgs...)
 	return "(" + where + " OR " + included + ")", args
@@ -247,7 +247,7 @@ func orBrought(subject access.Subject, where string, args []any,
 //
 // Written here rather than through narrowedBy because the product and the
 // visibility sit on different tables in this statement — the product on the
-// stream, the visibility on the finding — and narrowedBy takes one alias for
+// branch or tag, the visibility on the finding — and narrowedBy takes one alias for
 // both.
 func onlyDecidable(query *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	where, args := visibleCondition(subject, `"st"."product_id"`, `"f"."visibility"`, `"f"."vulnerability_id"`,

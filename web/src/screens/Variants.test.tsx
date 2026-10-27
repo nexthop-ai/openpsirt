@@ -23,7 +23,7 @@ async function drawn(at: string, pattern: string, admin = true) {
         data: { identity: "ana", name: "Ana", admin, kind: "person", reach: [], outcomes: [] },
       };
     if (path === "/v1/products/{product}/variants") return { data: { items: ITEMS } };
-    if (path === "/v1/products/{product}/branches-and-tags/{stream}/variants")
+    if (path === "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants")
       return { data: { items: ITEMS } };
     return undefined;
   });
@@ -96,15 +96,15 @@ describe("the variants a product is built as", () => {
 describe("the variants one release was built as", () => {
   it("asks the release, links each build's findings and names a retired one", async () => {
     const { spy } = await drawn(
-      "/products/sonic/streams/master/variants",
-      "/products/:product/streams/:stream/variants",
+      "/products/sonic/branches-and-tags/master/variants",
+      "/products/:product/branches-and-tags/:branch_or_tag/variants",
     );
     const asked = (spy.mock.calls as unknown as [string][]).map(([path]) => path);
-    expect(asked).toContain("/v1/products/{product}/branches-and-tags/{stream}/variants");
+    expect(asked).toContain("/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants");
     expect(asked).not.toContain("/v1/products/{product}/variants");
     expect(text()).toContain("Retired");
     expect(buttons()).not.toContain("Edit");
     const link = mount.host().querySelector("tbody a");
-    expect(link?.getAttribute("href")).toContain("/streams/master/variants/arm");
+    expect(link?.getAttribute("href")).toContain("/branches-and-tags/master/variants/arm");
   });
 });

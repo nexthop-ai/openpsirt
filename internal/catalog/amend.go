@@ -151,41 +151,41 @@ func (s *Store) restoreProduct(ctx context.Context, productID int64) (bool, erro
 	return s.restore(ctx, (*Product)(nil), productID, "product")
 }
 
-// RenameStream corrects what a release is called.
+// RenameBranchOrTag corrects what a release is called.
 //
 // Both halves, the way a variant's name moves: the matching name and the
 // spelling shown back are derived from one string, and a release has no
 // display name of its own that anything sets apart from it.
-func (s *Store) RenameStream(ctx context.Context, productID, streamID int64, name string) error {
+func (s *Store) RenameBranchOrTag(ctx context.Context, productID, branchOrTagID int64, name string) error {
 	if err := validName("release", name); err != nil {
 		return err
 	}
-	existing, err := s.StreamByName(ctx, productID, name)
+	existing, err := s.BranchOrTagByName(ctx, productID, name)
 	switch {
-	case err == nil && existing.ID != streamID:
+	case err == nil && existing.ID != branchOrTagID:
 		return fmt.Errorf("release %q: %w", name, ErrExists)
 	case err == nil:
 	case !errors.Is(err, ErrNotFound):
 		return err
 	}
-	res, err := s.db.NewUpdate().Model((*Stream)(nil)).
+	res, err := s.db.NewUpdate().Model((*BranchOrTag)(nil)).
 		Set(`"name" = ?`, typedname.Matching(name)).
 		Set(`"display_name" = ?`, name).
-		Where(`"id" = ?`, streamID).
+		Where(`"id" = ?`, branchOrTagID).
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("rename release %d: %w", streamID, err)
+		return fmt.Errorf("rename release %d: %w", branchOrTagID, err)
 	}
-	return counted(res, "release", streamID, "rename")
+	return counted(res, "release", branchOrTagID, "rename")
 }
 
-// RetireStream takes a release out of use.
-func (s *Store) RetireStream(ctx context.Context, streamID int64) error {
-	return s.retire(ctx, (*Stream)(nil), streamID, "release")
+// RetireBranchOrTag takes a release out of use.
+func (s *Store) RetireBranchOrTag(ctx context.Context, branchOrTagID int64) error {
+	return s.retire(ctx, (*BranchOrTag)(nil), branchOrTagID, "release")
 }
 
-func (s *Store) restoreStream(ctx context.Context, streamID int64) (bool, error) {
-	return s.restore(ctx, (*Stream)(nil), streamID, "release")
+func (s *Store) restoreBranchOrTag(ctx context.Context, branchOrTagID int64) (bool, error) {
+	return s.restore(ctx, (*BranchOrTag)(nil), branchOrTagID, "release")
 }
 
 // EveryProduct lists every product, retired ones included.

@@ -17,7 +17,7 @@ func TestAFindingsHolderIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +47,7 @@ func TestAFindingsHolderIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicTriage)
-		evidence, err := f.store.Detail(ctx, who, f.target, open[0].VulnerabilityID, open[0].ComponentID)
+		evidence, err := f.store.Detail(ctx, who, f.build, open[0].VulnerabilityID, open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,14 +57,14 @@ func TestAFindingsHolderIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 	})
 }
 
-func TestAFindingsRoutingRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
+func TestAFindingsAssignmentRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 	// The rule that placed a finding is one name where its occurrences agree. A
 	// rule read off an occurrence the reader may not read names how undisclosed
-	// work is routed.
+	// work is assigned.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -80,7 +80,7 @@ func TestAFindingsRoutingRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.
 				t.Fatal(err)
 			}
 			q := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set(`"routed_by" = ?`, rule.ID).Where(`"id" = ?`, open[i].ID)
+				Set(`"assigned_by_rule" = ?`, rule.ID).Where(`"id" = ?`, open[i].ID)
 			if i == 1 {
 				q = q.Set(`"visibility" = ?`, access.Private)
 			}
@@ -90,12 +90,12 @@ func TestAFindingsRoutingRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.
 		}
 
 		who := f.holding(t, access.PublicTriage)
-		evidence, err := f.store.Detail(ctx, who, f.target, open[0].VulnerabilityID, open[0].ComponentID)
+		evidence, err := f.store.Detail(ctx, who, f.build, open[0].VulnerabilityID, open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if evidence.RoutedBy != "in the open" {
-			t.Errorf("a reader of the disclosed occurrence reads its rule as %q", evidence.RoutedBy)
+		if evidence.AssignedByRule != "in the open" {
+			t.Errorf("a reader of the disclosed occurrence reads its rule as %q", evidence.AssignedByRule)
 		}
 	})
 }

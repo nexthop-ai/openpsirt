@@ -30,7 +30,7 @@ func TestTheViewByComponentHoldsTheListsPopulationUnderAGroupFilter(t *testing.T
 				Component: swss, FixState: finding.NoFix,
 			})
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)

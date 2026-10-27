@@ -189,7 +189,7 @@ func TestDeclaringUnderSomethingUndeclaredSaysWhichPart(t *testing.T) {
 	twoCatalog(t, func(t *testing.T, d *declaring) {
 		code, body := d.post(t, "/v1/products/sonic/branches-and-tags", `{"name": "master", "kind": "branch"}`)
 		if code != http.StatusNotFound {
-			t.Fatalf("a stream under an undeclared product returned %d, want 404", code)
+			t.Fatalf("a branch or tag under an undeclared product returned %d, want 404", code)
 		}
 		if detail, _ := body["detail"].(string); !bytes.Contains([]byte(detail), []byte("sonic")) {
 			t.Errorf("the refusal does not name what is missing: %v", body)
@@ -233,7 +233,7 @@ func TestWhatHasBeenDeclaredCanBeListed(t *testing.T) {
 		_, body = d.get(t, "/v1/products/sonic/branches-and-tags")
 		items, _ = body["items"].([]any)
 		if len(items) != 1 {
-			t.Errorf("listed %d streams, want 1", len(items))
+			t.Errorf("listed %d branches and tags, want 1", len(items))
 		}
 		_, body = d.get(t, "/v1/products/sonic/variants")
 		items, _ = body["items"].([]any)
@@ -243,7 +243,7 @@ func TestWhatHasBeenDeclaredCanBeListed(t *testing.T) {
 	})
 }
 
-func TestADeclaredTargetCanBeUploadedAgainst(t *testing.T) {
+func TestADeclaredBuildCanBeUploadedAgainst(t *testing.T) {
 	// The two halves have to meet: what declaration writes is what an upload
 	// resolves. Testing them apart would let the names diverge.
 	eachCatalog(t, func(t *testing.T, d *declaring) {
@@ -266,7 +266,7 @@ func TestADeclaredTargetCanBeUploadedAgainst(t *testing.T) {
 		rec := httptest.NewRecorder()
 		d.handler.ServeHTTP(rec, req)
 		if rec.Code != http.StatusAccepted {
-			t.Errorf("an upload against a freshly declared target returned %d: %s", rec.Code, rec.Body)
+			t.Errorf("an upload against a freshly declared build returned %d: %s", rec.Code, rec.Body)
 		}
 	})
 }
@@ -289,8 +289,8 @@ func (d *declaring) grants(t *testing.T, identity, product string, role access.R
 	}
 }
 
-// floorOf reads back what the catalog says a product triages from.
-func (d *declaring) floorOf(t *testing.T, name string) (string, bool) {
+// minimumSeverityOf reads back what the catalog says a product triages from.
+func (d *declaring) minimumSeverityOf(t *testing.T, name string) (string, bool) {
 	t.Helper()
 	_, body := d.get(t, "/v1/products")
 	items, _ := body["items"].([]any)
@@ -299,7 +299,7 @@ func (d *declaring) floorOf(t *testing.T, name string) (string, bool) {
 		if row["name"] != name {
 			continue
 		}
-		word, stated := row["triage_floor"].(string)
+		word, stated := row["minimum_severity"].(string)
 		return word, stated
 	}
 	t.Fatalf("product %q is not in the catalog: %v", name, body)
@@ -321,27 +321,27 @@ func TestAProductStatesWhatItTriagesAndCanStopSayingSo(t *testing.T) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
 		d.post(t, "/v1/products", `{"name": "onie"}`)
 
-		if word, stated := d.floorOf(t, "sonic"); stated {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); stated {
 			t.Errorf("a product nobody has set a line on reports %q", word)
 		}
 
-		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": "high"}`)
+		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"minimum_severity": "high"}`)
 		if code != http.StatusNoContent {
 			t.Fatalf("stating a line returned %d, want 204: %v", code, body)
 		}
-		if word, stated := d.floorOf(t, "sonic"); !stated || word != "high" {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); !stated || word != "high" {
 			t.Errorf("the product reports %q (stated=%v), want high", word, stated)
 		}
 		// And only that product.
-		if word, stated := d.floorOf(t, "onie"); stated {
+		if word, stated := d.minimumSeverityOf(t, "onie"); stated {
 			t.Errorf("another product picked up the line as %q", word)
 		}
 
-		code, body = d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": ""}`)
+		code, body = d.put(t, "/v1/products/sonic/minimum-severity", `{"minimum_severity": ""}`)
 		if code != http.StatusNoContent {
 			t.Fatalf("clearing a line returned %d, want 204: %v", code, body)
 		}
-		if word, stated := d.floorOf(t, "sonic"); stated {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); stated {
 			t.Errorf("after clearing, the product still states %q", word)
 		}
 	})
@@ -393,29 +393,29 @@ func TestAProductStatesItsOwnPairThresholdsAndClearsThem(t *testing.T) {
 	})
 }
 
-func TestALineAProductCannotHoldIsRefused(t *testing.T) {
+func TestAMinimumSeverityAProductCannotHoldIsRefused(t *testing.T) {
 	// The same words the deployment's line takes, checked the same way. A
 	// product that could be set to something the deployment could not would be
 	// a second vocabulary for one idea, and a value nothing reads is a policy
 	// that silently reverted.
 	twoCatalog(t, func(t *testing.T, d *declaring) {
 		d.post(t, "/v1/products", `{"name": "sonic"}`)
-		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"floor": "catastrophic"}`)
+		code, body := d.put(t, "/v1/products/sonic/minimum-severity", `{"minimum_severity": "catastrophic"}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("a line nobody recognizes returned %d, want 422: %v", code, body)
 		}
 		if detail, _ := body["detail"].(string); detail == "" {
 			t.Errorf("the refusal says nothing: %v", body)
 		}
-		if word, stated := d.floorOf(t, "sonic"); stated {
+		if word, stated := d.minimumSeverityOf(t, "sonic"); stated {
 			t.Errorf("a refused line was stored as %q", word)
 		}
 	})
 }
 
-func TestStatingALineOnAProductNobodyDeclaredSaysSo(t *testing.T) {
+func TestStatingAMinimumSeverityOnAProductNobodyDeclaredSaysSo(t *testing.T) {
 	twoCatalog(t, func(t *testing.T, d *declaring) {
-		code, body := d.put(t, "/v1/products/nowhere/minimum-severity", `{"floor": "high"}`)
+		code, body := d.put(t, "/v1/products/nowhere/minimum-severity", `{"minimum_severity": "high"}`)
 		if code != http.StatusNotFound {
 			t.Fatalf("a line on an undeclared product returned %d, want 404: %v", code, body)
 		}
@@ -440,19 +440,19 @@ func (d *declaring) endOfLifeOf(t *testing.T, product string) string {
 }
 
 // releaseEndOfLife reads back a release's date and whether it is the product's.
-func (d *declaring) releaseEndOfLife(t *testing.T, product, stream string) (string, bool) {
+func (d *declaring) releaseEndOfLife(t *testing.T, product, branchOrTag string) (string, bool) {
 	t.Helper()
 	_, body := d.get(t, "/v1/products/"+product+"/branches-and-tags")
 	items, _ := body["items"].([]any)
 	for _, each := range items {
 		row, _ := each.(map[string]any)
-		if row["name"] == stream {
+		if row["name"] == branchOrTag {
 			word, _ := row["end_of_life"].(string)
 			inherited, _ := row["end_of_life_inherited"].(bool)
 			return word, inherited
 		}
 	}
-	t.Fatalf("release %q is not in %q: %v", stream, product, body)
+	t.Fatalf("release %q is not in %q: %v", branchOrTag, product, body)
 	return "", false
 }
 
@@ -480,10 +480,10 @@ func TestSomethingSaysWhenItGoesOutOfSupportAndCanTakeItBack(t *testing.T) {
 		}
 		// Every release follows it, and says that it is following rather than
 		// stating one of its own.
-		for _, stream := range []string{"master", "2.4.0"} {
-			held, inherited := d.releaseEndOfLife(t, "sonic", stream)
+		for _, branchOrTag := range []string{"master", "2.4.0"} {
+			held, inherited := d.releaseEndOfLife(t, "sonic", branchOrTag)
 			if held != "2027-03-01" || !inherited {
-				t.Errorf("%s reports %q (inherited=%v), want the product's date", stream, held, inherited)
+				t.Errorf("%s reports %q (inherited=%v), want the product's date", branchOrTag, held, inherited)
 			}
 		}
 
@@ -530,7 +530,7 @@ func TestADateNobodyCanReadIsRefused(t *testing.T) {
 	})
 }
 
-func TestTheStreamsListSaysWhatEachTagWasCutFrom(t *testing.T) {
+func TestTheBranchesAndTagsListSaysWhatEachTagWasCutFrom(t *testing.T) {
 	// The screen has had a "Cut from" column all along and this list never
 	// resolved the parent, so it was empty whatever the data said — which
 	// reads as "none of these was cut from anything". Release readiness
@@ -566,7 +566,7 @@ func TestTheStreamsListSaysWhatEachTagWasCutFrom(t *testing.T) {
 }
 
 // A tag cut from a branch since retired still names it, whether or not retired
-// streams are asked for: the tag is listed, and what it was cut from is a fact
+// branches and tags are asked for: the tag is listed, and what it was cut from is a fact
 // about the tag.
 func TestATagCutFromARetiredBranchStillNamesIt(t *testing.T) {
 	eachCatalog(t, func(t *testing.T, d *declaring) {
@@ -628,20 +628,20 @@ func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 			`{"released_on":"2026-03-31","cut_from":"master"}`); got.Code >= 300 {
 			t.Fatalf("recording the release answered %d: %s", got.Code, got.Body.String())
 		}
-		var streams struct {
+		var branchesAndTags struct {
 			Items []struct {
 				Name       string `json:"name"`
 				Parent     string `json:"parent"`
 				ReleasedOn string `json:"released_on"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/products/mine/branches-and-tags", &streams)
+		httpapitest.Read(t, r, "admin", "/v1/products/mine/branches-and-tags", &branchesAndTags)
 		var one struct {
 			Name       string `json:"name"`
 			Parent     string `json:"parent"`
 			ReleasedOn string `json:"released_on"`
 		}
-		for _, row := range streams.Items {
+		for _, row := range branchesAndTags.Items {
 			if row.Name == "v2.0" {
 				one = row
 			}

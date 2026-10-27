@@ -19,8 +19,8 @@ import (
 // answer on nearly every pass.
 const betweenBurials = 5 * time.Minute
 
-// BurialLease is the name one replica holds while setting aside abandoned
-// work. Named here beside the pass that takes it, like the other lease names.
+// BurialLease is the name one replica holds while failing abandoned work.
+// Named here beside the pass that takes it, like the other lease names.
 const BurialLease = "queue.bury"
 
 // burialLease outlasts a cycle of the work, which is the rule for every lease
@@ -28,7 +28,7 @@ const BurialLease = "queue.bury"
 // mid-pass would let a second replica start the same range update.
 const burialLease = 2 * betweenBurials
 
-// Undertaker sets aside work whose worker never came back.
+// Undertaker fails the jobs whose worker never came back.
 //
 // Its own pass rather than work done on the way past a claim: a worker that
 // died reports nothing, so no act by anybody is the moment to notice. One
@@ -49,7 +49,7 @@ func NewUndertaker(q *Queue, leases *Leases, replica string, logger *slog.Logger
 	return &Undertaker{queue: q, leases: leases, replica: replica, logger: logger}
 }
 
-// Once sets aside whatever has run out of attempts with nobody left to say so.
+// Once fails whatever has run out of attempts with nobody left to say so.
 func (u *Undertaker) Once(ctx context.Context) (int, error) {
 	if u == nil {
 		return 0, nil
@@ -76,14 +76,14 @@ func (u *Undertaker) Run(ctx context.Context, interval time.Duration) {
 	background.Every(ctx, interval, betweenBurials, func(ctx context.Context) {
 		// Logged and carried on, like every other background pass here: a
 		// pass that cannot run is not a reason to stop serving, and what it
-		// failed to set aside is still there on the next one.
+		// failed to mark is still there on the next one.
 		buried, err := u.Once(ctx)
 		if err != nil && u.logger != nil {
-			u.logger.ErrorContext(ctx, "setting aside work whose worker never came back", "error", err)
+			u.logger.ErrorContext(ctx, "failing the jobs whose worker never came back", "error", err)
 		} else if buried > 0 && u.logger != nil {
 			// Worth a line at info: work that stopped being retried is
 			// something an operator has to know happened.
-			u.logger.InfoContext(ctx, "set aside work whose worker never came back", "jobs", buried)
+			u.logger.InfoContext(ctx, "failed the jobs whose worker never came back", "jobs", buried)
 		}
 	})
 }

@@ -55,7 +55,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// Found however the asker spells it, on every engine.
 		for _, spelling := range []string{component, strings.ToLower(component), "LIBFÜNF"} {
 			said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-				[]string{"cve-2026-1", "CVE-2026-1"}, spelling, "", f.target, 0)
+				[]string{"cve-2026-1", "CVE-2026-1"}, spelling, "", f.build, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -81,7 +81,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 			t.Errorf("a second document set aside %d of the first's statements", setAside)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-			[]string{"CVE-2026-1"}, component, "", f.target, 0)
+			[]string{"CVE-2026-1"}, component, "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// than with somebody else's VEX evidence.
 		stranger := f.planner(t)
 		if _, err := f.store.SaidAbout(ctx, stranger, f.productID+9999, issue,
-			[]string{"CVE-2026-1"}, component, "", f.target, 0); err == nil {
+			[]string{"CVE-2026-1"}, component, "", f.build, 0); err == nil {
 			t.Error("a product nobody holds anything on answered with statements")
 		}
 	})
@@ -122,7 +122,7 @@ func TestAVexStatementAboutALongNameIsFoldedToTheComponentsWidth(t *testing.T) {
 			t.Fatalf("a statement about a long name was refused: %v", err)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, strings.ToUpper(long), "", f.target, 0)
+			[]string{"CVE-2026-1"}, strings.ToUpper(long), "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -173,7 +173,7 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 			{"a component that carries no identifier", "", 1},
 		} {
 			said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-				[]string{"CVE-2026-1"}, "parser", c.purl, f.target, 0)
+				[]string{"CVE-2026-1"}, "parser", c.purl, f.build, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -225,7 +225,7 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 			t.Fatal(err)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
-			[]string{"CVE-2026-2"}, "thrift", "pkg:deb/debian/thrift@0.14.1", f.target, 0)
+			[]string{"CVE-2026-2"}, "thrift", "pkg:deb/debian/thrift@0.14.1", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -279,7 +279,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 			t.Errorf("a second advisory set aside %d claims of the first", setAside)
 		}
 		still, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, "libnl", "", f.target, 0)
+			[]string{"CVE-2026-1"}, "libnl", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -302,7 +302,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 				replaced)
 		}
 		other, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-2"],
-			[]string{"CVE-2026-2"}, "zlib", "", f.target, 0)
+			[]string{"CVE-2026-2"}, "zlib", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -347,7 +347,7 @@ func TestAStatementSetAndAnAdvisoryDoNotReplaceEachOther(t *testing.T) {
 			t.Errorf("a statement set put aside %d claims from an advisory", setAside)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, "libnl", "", f.target, 0)
+			[]string{"CVE-2026-1"}, "libnl", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -468,7 +468,7 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 		// The same claims, the way a retry hands them back, carrying the keys
 		// a pass before was given.
 		var given []int64
-		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Order("id").
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("id").Order("id").
 			Limit(int64(len(claims))).Scan(ctx, &given); err != nil {
 			t.Fatal(err)
 		}
@@ -533,7 +533,7 @@ func TestTheSameDocumentReadDifferentlyReplacesWhatStands(t *testing.T) {
 			t.Errorf("the same bytes read another way set aside %d statements, want 1", setAside)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
-			[]string{"CVE-2026-1"}, "libstdc++6", "", f.target, 0)
+			[]string{"CVE-2026-1"}, "libstdc++6", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

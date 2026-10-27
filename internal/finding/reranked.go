@@ -29,7 +29,7 @@ import (
 // holding the issue rather than once for the deployment. The order is stored
 // per finding, so every build nothing rescanned holds a number computed from
 // the signals as they were. A known-exploited issue in a shipped tag would sit
-// below the triage line, answer no exploited filter, carry no exploited
+// below the minimum severity, answer no exploited filter, carry no exploited
 // deadline and sort at the bottom until somebody rescanned that tag, which for
 // a tag is never.
 //
@@ -155,7 +155,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 				Where(`"vulnerability_id" IN (?)`, bun.List(ids)).
 				Where(kinds, kindArgs...)
 			if scanned != 0 {
-				q = q.Where(`NOT ("target_id" = ? AND "kind" = ?)`, scanned, Vulnerable)
+				q = q.Where(`NOT ("build_id" = ? AND "kind" = ?)`, scanned, Vulnerable)
 			}
 			if _, err := q.Exec(ctx); err != nil {
 				return fmt.Errorf("move these issues in the order: %w", err)
@@ -240,8 +240,8 @@ func productsHoldingAll(ctx context.Context, tx bun.IDB, issues []int64,
 		kinds, kindArgs := kind.Ranking.Where(`"f"."kind"`)
 		q := tx.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 			ColumnExpr(`"st"."product_id" AS "product_id"`).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(batch)).
@@ -250,7 +250,7 @@ func productsHoldingAll(ctx context.Context, tx bun.IDB, issues []int64,
 			GroupExpr(`"f"."vulnerability_id", "st"."product_id"`).
 			OrderExpr(`"f"."vulnerability_id", "st"."product_id"`)
 		if scanned != 0 {
-			q = q.Where(`NOT ("f"."target_id" = ? AND "f"."kind" = ?)`, scanned, Vulnerable)
+			q = q.Where(`NOT ("f"."build_id" = ? AND "f"."kind" = ?)`, scanned, Vulnerable)
 		}
 		if err := q.Scan(ctx, &rows); err != nil {
 			return err

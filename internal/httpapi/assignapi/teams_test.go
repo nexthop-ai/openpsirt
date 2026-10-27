@@ -55,7 +55,7 @@ func TestATeamIsManagedAndGrantsNothing(t *testing.T) {
 		}
 
 		// Names to anybody who may hand work around, membership to an
-		// administrator: routing means naming a team, and who is on one is
+		// administrator: assigning means naming a team, and who is on one is
 		// the same question as who is here.
 		var seen struct {
 			Items []struct {
@@ -186,7 +186,7 @@ func TestAnAssignmentNamesAPartyRatherThanAPerson(t *testing.T) {
 }
 
 func TestATeamQueueIsTakenFromWithTriageAndFilledWithDispatch(t *testing.T) {
-	// Work routed to a team is unheld until somebody takes it, so taking
+	// Work assigned to a team is unheld until somebody takes it, so taking
 	// it is picking up what nobody owns — triage alone. Putting it there
 	// is dispatching, which is the act the assigner right names.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -205,12 +205,12 @@ func TestATeamQueueIsTakenFromWithTriageAndFilledWithDispatch(t *testing.T) {
 		// been answered this way.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
 			`{"team":"kernel"}`); got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("a triager routed work to a team, answering %d: %s",
+			t.Errorf("a triager assigned work to a team, answering %d: %s",
 				got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at,
 			`{"team":"kernel"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("an assigner could not route work to a team: %d %s",
+			t.Fatalf("an assigner could not assign work to a team: %d %s",
 				got.Code, got.Body.String())
 		}
 
@@ -267,9 +267,9 @@ func TestATeamQueueIsTakenFromWithTriageAndFilledWithDispatch(t *testing.T) {
 	})
 }
 
-func TestWorkIsNotRoutedWhereNobodyOnTheTeamCanSeeIt(t *testing.T) {
+func TestWorkIsNotAssignedWhereNobodyOnTheTeamCanSeeIt(t *testing.T) {
 	// At least one member, not every member: requiring all of them turns
-	// routing pressure into access pressure. Requiring none is the failure
+	// assignment pressure into access pressure. Requiring none is the failure
 	// in the other direction — a queue nobody can see, which shows as held
 	// in every administrative view and sits in nobody's list.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -283,7 +283,7 @@ func TestWorkIsNotRoutedWhereNobodyOnTheTeamCanSeeIt(t *testing.T) {
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		refused := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at, `{"team":"outsiders"}`)
 		if refused.Code != http.StatusUnprocessableEntity {
-			t.Fatalf("routing work to a team that cannot read it answered %d: %s",
+			t.Fatalf("assigning work to a team that cannot read it answered %d: %s",
 				refused.Code, refused.Body.String())
 		}
 
@@ -346,7 +346,7 @@ func TestATeamQueueAndItsCountsAreNarrowedPerMember(t *testing.T) {
 				issue + "/components/linux-image/assignment"
 			if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, at,
 				`{"team":"kernel"}`); got.Code != http.StatusNoContent {
-				t.Fatalf("routing %s answered %d: %s", issue, got.Code, got.Body.String())
+				t.Fatalf("assigning %s answered %d: %s", issue, got.Code, got.Body.String())
 			}
 		}
 

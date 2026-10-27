@@ -66,7 +66,7 @@ type Run struct {
 
 	ID           int64     `bun:"id,pk,autoincrement"`
 	SeriesID     int64     `bun:"series_id,notnull"`
-	TargetID     int64     `bun:"target_id,notnull"`
+	BuildID      int64     `bun:"build_id,notnull"`
 	ContentHash  string    `bun:"content_hash,notnull"`
 	SourceCommit string    `bun:"source_commit,nullzero"`
 	BuiltAt      time.Time `bun:"built_at,notnull"`
@@ -133,7 +133,7 @@ func NewStore(db bun.IDB) *Store {
 // Arriving is a run as it arrives.
 type Arriving struct {
 	ProductID   int64
-	TargetID    int64
+	BuildID     int64
 	Kind        kind.Kind
 	Series      string
 	ContentHash string
@@ -179,7 +179,7 @@ func (s *Store) Receive(ctx context.Context, a Arriving) (*Run, bool, error) {
 	var held Run
 	err = s.db.NewSelect().Model(&held).
 		Where(`"sr"."series_id" = ?`, series.ID).
-		Where(`"sr"."target_id" = ?`, a.TargetID).
+		Where(`"sr"."build_id" = ?`, a.BuildID).
 		Where(`"sr"."content_hash" = ?`, a.ContentHash).
 		Scan(ctx)
 	switch {
@@ -190,7 +190,7 @@ func (s *Store) Receive(ctx context.Context, a Arriving) (*Run, bool, error) {
 	}
 	now := s.now().Truncate(time.Microsecond)
 	run := &Run{
-		SeriesID: series.ID, TargetID: a.TargetID, ContentHash: a.ContentHash,
+		SeriesID: series.ID, BuildID: a.BuildID, ContentHash: a.ContentHash,
 		SourceCommit: a.Commit, BuiltAt: a.BuiltAt.UTC().Truncate(time.Microsecond),
 		ReceivedAt: now, Credential: a.Credential, Status: Queued, Params: a.Params,
 	}
@@ -257,7 +257,7 @@ func (s *Store) Previous(ctx context.Context, run *Run) (*Run, error) {
 	var prev Run
 	err := s.db.NewSelect().Model(&prev).
 		Where(`"sr"."series_id" = ?`, run.SeriesID).
-		Where(`"sr"."target_id" = ?`, run.TargetID).
+		Where(`"sr"."build_id" = ?`, run.BuildID).
 		Where(`"sr"."status" = ?`, Applied).
 		Where(`"sr"."id" <> ?`, run.ID).
 		OrderExpr(`"sr"."built_at" DESC, "sr"."id" DESC`).
@@ -275,17 +275,17 @@ func (s *Store) Previous(ctx context.Context, run *Run) (*Run, error) {
 // LastPrinted is the fingerprints of the newest run applied to this run's
 // build that reported anything, or empty where none has.
 func (s *Store) LastPrinted(ctx context.Context, run *Run) (string, error) {
-	return s.LastPrintedOn(ctx, run, run.TargetID)
+	return s.LastPrintedOn(ctx, run, run.BuildID)
 }
 
 // LastPrintedOn is the fingerprints of the newest run of this run's series
 // applied to a build that reported anything, other than this run, or empty
 // where none has.
-func (s *Store) LastPrintedOn(ctx context.Context, run *Run, targetID int64) (string, error) {
+func (s *Store) LastPrintedOn(ctx context.Context, run *Run, buildID int64) (string, error) {
 	var prints []string
 	err := s.db.NewSelect().Model((*Run)(nil)).Column("fingerprints").
 		Where(`"sr"."series_id" = ?`, run.SeriesID).
-		Where(`"sr"."target_id" = ?`, targetID).
+		Where(`"sr"."build_id" = ?`, buildID).
 		Where(`"sr"."status" = ?`, Applied).
 		Where(`"sr"."fingerprints" IS NOT NULL`).
 		Where(`"sr"."id" <> ?`, run.ID).

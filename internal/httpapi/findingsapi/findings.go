@@ -43,7 +43,7 @@ type FindingBody struct {
 	Component string        `json:"component" doc:"The component that carries it"`
 	Version   string        `json:"version" doc:"The version that ships"`
 	Upstream  string        `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
-	Source    string        `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"`
+	Source    string        `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, assigned by one rule"`
 	Ecosystem string        `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
 	Namespace string        `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version"`
 	FixState  core.FixState `json:"fix_state,omitempty" doc:"Upstream's answer about it"`
@@ -68,20 +68,20 @@ type FindingBody struct {
 	// Builds is where the selection is more than one build, the four above
 	// are absent — a chain belongs to one build's graph — and these three
 	// take their place.
-	Builds      int    `json:"builds,omitempty" doc:"The number of builds in the selection holding this. Absent where the selection is one build"`
-	Stream      string `json:"stream,omitempty" doc:"A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant     string `json:"variant,omitempty" doc:"The variant of that build"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	Builds          int    `json:"builds,omitempty" doc:"The number of builds in the selection holding this. Absent where the selection is one build"`
+	BranchOrTag     string `json:"branch_or_tag,omitempty" doc:"A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"`
+	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant         string `json:"variant,omitempty" doc:"The variant of that build"`
+	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 
-	// Tags are the words people put on this, as they were typed. On the
+	// Labels are the words people put on this, as they were typed. On the
 	// row because the point of marking work is finding it again in a list,
 	// and a mark only the detail screen shows is one nobody sees.
-	Tags []string `json:"tags,omitempty" doc:"Words somebody put on this. Free text, no fixed vocabulary"`
+	Labels []string `json:"labels,omitempty" doc:"The labels somebody put on this. Free text, no fixed vocabulary"`
 
 	// Fold is the row's subject: the source package at the version it was
 	// built at. Two binaries of one source are one row, because deciding about
-	// them is one decision, upgrading them is one act and routing them is one
+	// them is one decision, upgrading them is one act and assigning them is one
 	// rule.
 	Fold string `json:"fold" doc:"The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from"`
 	// Packages and Consumers are the numbers a reader is shown, counted in
@@ -110,17 +110,17 @@ type FindingBody struct {
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"Nothing here has been announced. Anything said about it outside this deployment discloses it"`
 	DiscloseAt  string `json:"disclose_at,omitempty" doc:"The date the embargo ends. Reaching it discloses nothing by itself"`
 
-	NoDeadline core.NoDeadline `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	// Exploited is the reason a row sits at the top. A position nobody
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
 	Exploited bool `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	// ExploitedHere is the other reason a row sits at the top, and the one
+	// Incident is the other reason a row sits at the top, and the one
 	// that outranks everything: a person here recorded this product being
 	// attacked through the issue. Carried apart from the flag above because
 	// the two are different facts, and a row showing one where the other
 	// holds is the confusion the pair exists to prevent.
-	ExploitedHere bool `json:"exploited_here,omitempty" doc:"This product is recorded as having been exploited through this issue"`
+	Incident bool `json:"incident,omitempty" doc:"Whether an incident stands in this product through this issue"`
 	// Likelihood separates one medium from another, and from a high. It ranks
 	// between reachability and severity, so a list ordering by it and not
 	// showing it reads as unsorted.
@@ -144,28 +144,28 @@ type FindingsOutput struct {
 		// findings: one issue in one component can occupy sixty
 		// occurrences and is one decision.
 		Total int `json:"total"`
-		// Hidden counts the rows the triage line keeps out, and Floor
-		// is the line itself. Stated rather than silently subtracted: a list
+		// Hidden counts the rows the minimum severity keeps out, and
+		// MinimumSeverity is the severity itself. Stated rather than silently subtracted: a list
 		// showing a smaller number with nothing explaining it is how
 		// two people quote different figures for one question.
-		Hidden int    `json:"hidden,omitempty" doc:"Findings this product does not consider worth triaging, kept out of the list. Still recorded and still counted"`
-		Floor  string `json:"floor,omitempty" doc:"The line they are below"`
+		Hidden          int    `json:"hidden,omitempty" doc:"Findings this product does not consider worth triaging, kept out of the list. Still recorded and still counted"`
+		MinimumSeverity string `json:"minimum_severity,omitempty" doc:"The minimum severity they are below"`
 	}
 }
 
 // ComponentFindingBody is one component at one version, with what is open
 // against it counted.
 type ComponentFindingBody struct {
-	Component     string `json:"component"`
-	Version       string `json:"version"`
-	Upstream      string `json:"upstream,omitempty" doc:"The upstream a fork was cut from, where one is known"`
-	Source        string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
-	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
-	Namespace     string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version"`
-	Issues        int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
-	Occurrences   int    `json:"occurrences" doc:"The number of times those sit somewhere in the build"`
-	Exploited     bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
-	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of them"`
+	Component   string `json:"component"`
+	Version     string `json:"version"`
+	Upstream    string `json:"upstream,omitempty" doc:"The upstream a fork was cut from, where one is known"`
+	Source      string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What an assignment rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
+	Ecosystem   string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
+	Namespace   string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version"`
+	Issues      int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
+	Occurrences int    `json:"occurrences" doc:"The number of times those sit somewhere in the build"`
+	Exploited   bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
+	Incident    bool   `json:"incident,omitempty" doc:"Whether an incident stands in this product through any of them"`
 	// BySeverity and Worst are the parts of the weight. Ranking by count
 	// alone answers this view's own question with the opposite of what
 	// somebody needs: a package with forty-four issues outranks one with three
@@ -202,30 +202,30 @@ func registerFindings(api huma.API, in core.Deps) {
 			"count counts. The tree counts distinct issues and this list is one row per issue " +
 			"and component, so a subtree holding one issue at two components is two rows here " +
 			"and one there.\n\n" +
-			"`stream` and `variant` are optional and independent. With both named the list is " +
+			"`branch_or_tag` and `variant` are optional and independent. With both named the list is " +
 			"one build. With either left out it answers for every build under the product " +
 			"that matches the rest: a row is still one issue in one component, its occurrence " +
 			"count is across every build it is in, and `builds` says how many those are. " +
-			"Across more than one build a row carries `stream` and `variant` naming one of " +
+			"Across more than one build a row carries `branch_or_tag` and `variant` naming one of " +
 			"them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a " +
 			"chain belongs to one build's graph. `beneath` is a walk over one build's edges " +
 			"and is refused unless both are named.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+		Product     string `path:"product"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 		core.AtOneBuild
 		core.Narrowing
 		core.Paging
 	}) (*FindingsOutput, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
 		}
-		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.Floor, at.Filter, at.Store
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.MinimumSeverity, at.Filter, at.Store
 		groups, total, err := store.Groups(ctx, subject, scope,
 			input.Limit, input.Offset, narrowed)
 		if err != nil {
@@ -240,7 +240,7 @@ func registerFindings(api huma.API, in core.Deps) {
 		out.Body.Total = total
 		out.Body.Hidden = hidden
 		if hidden > 0 {
-			out.Body.Floor = floor.Word
+			out.Body.MinimumSeverity = floor.Word
 		}
 		out.Body.Items = make([]FindingBody, 0, len(groups))
 		now := time.Now().UTC()
@@ -269,14 +269,14 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Matched: core.MatchRoute(group.Matched),
 		Owner:   group.Owner, Parent: group.Parent,
 		Middle: group.Middle, Chains: group.Chains,
-		Builds: group.Builds, Stream: group.Stream, Variant: group.Variant,
-		StreamName:  group.StreamName,
-		VariantName: group.VariantName,
-		Tags:        group.Tags,
-		Fold:        group.Fold, Packages: group.Packages, Consumers: group.Consumers,
+		Builds: group.Builds, BranchOrTag: group.BranchOrTag, Variant: group.Variant,
+		BranchOrTagName: group.BranchOrTagName,
+		VariantName:     group.VariantName,
+		Labels:          group.Labels,
+		Fold:            group.Fold, Packages: group.Packages, Consumers: group.Consumers,
 		Occurrences: group.Occurrences, Answered: group.Answered,
 		State: core.Standing(group.State), SentBack: group.SentBack,
-		Exploited: group.Exploited, ExploitedHere: group.ExploitedHere,
+		Exploited: group.Exploited, Incident: group.Incident,
 		Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
 		Score:        float64(group.ScoreCenti) / 100,
 		ScoreVersion: group.ScoreVersion,
@@ -323,22 +323,22 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 			"finding — the worst of what is open against it (`severity`, `urgency`, `epss`), " +
 			"the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how " +
 			"far it reaches (`occurrences`) — and `asc` orders the other way.\n\n" +
-			"`stream` and `variant` are optional and independent, as they are on the findings " +
+			"`branch_or_tag` and `variant` are optional and independent, as they are on the findings " +
 			"list: with either left out this counts across every build under the product that " +
 			"matches the rest. `beneath` is a walk over one build's edges and is refused " +
 			"unless both are named.\n\n" +
 			"`limit=0` returns `total` alone, with no rows.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+		Product     string `path:"product"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 		core.AtOneBuild
 		core.Narrowing
 		core.CountedPaging
 	}) (*ComponentFindingsOutput, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
@@ -376,8 +376,8 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 				Namespace:  group.Namespace,
 				BySeverity: group.BySeverity, Worst: core.Band(group.Worst),
 				Issues: group.Issues, Occurrences: group.Occurrences, Exploited: group.Exploited,
-				ExploitedHere: group.ExploitedHere,
-				Upgrades:      upgrades,
+				Incident: group.Incident,
+				Upgrades: upgrades,
 			})
 		}
 		return out, nil
@@ -505,14 +505,14 @@ type EvidenceBody struct {
 	Ratings      []RatingBody `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first"`
 	Exploited    bool         `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64      `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
-	// ExploitedHere is what has been recorded in this product about being
+	// Incident is what has been recorded in this product about being
 	// exploited through the issue, newest first. Not the flag above: that is a
 	// feed's word about the world, and this is somebody here saying this
 	// product was the thing attacked.
 	//
 	// Cleared records are among them rather than hidden. What was said and
 	// then taken back is part of the answer to what was known and when.
-	ExploitedHere []core.ExploitedHereBody `json:"exploited_here,omitempty" doc:"What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared"`
+	Incidents []core.IncidentBody `json:"incidents,omitempty" doc:"The incidents recorded in this product through this issue, newest first. At most one of them stands; the rest were cleared"`
 	// LikelihoodPercentile ranks the estimate against every other published
 	// one, and the day beside it dates the forecast. The probability alone is
 	// unreadable — nobody acts on 0.00042 — and it is a thirty-day forecast
@@ -555,8 +555,8 @@ type EvidenceBody struct {
 	// rather than whoever triages.
 	ArrivedFrom string `json:"arrived_from,omitempty" doc:"The version this was upgraded from, where the upgrade did not resolve it"`
 
-	// Tags are the words people put on this, as they were typed.
-	Tags []string `json:"tags,omitempty" doc:"Words somebody put on this. Free text, no fixed vocabulary"`
+	// Labels are the words people put on this, as they were typed.
+	Labels []string `json:"labels,omitempty" doc:"The labels somebody put on this. Free text, no fixed vocabulary"`
 
 	// Opened and FoundBy are when this first appeared here and what
 	// produced it. The run that answered is not the run that answers now,
@@ -571,7 +571,7 @@ type EvidenceBody struct {
 	// The same words the list body declares, and the words the store emits.
 	// A consumer validating against the published document rejects a body
 	// carrying a word the enum omits, and a TypeScript one cannot narrow on it.
-	NoDeadline core.NoDeadline    `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline    `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	FoundBy    *core.MeasuredBody `json:"found_by,omitempty" doc:"The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
 	// Recorded says a person entered this rather than a scanner reporting it,
@@ -607,10 +607,10 @@ type EvidenceBody struct {
 	// group at once. Where the occurrences somehow disagree it is left empty rather
 	// than naming one of them, which is the same rule the deadline list uses.
 	AssignedTo string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person"`
-	// RoutedBy names the standing rule that placed this, where a rule did
+	// AssignedByRule names the assignment rule that placed this, where a rule did
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
-	RoutedBy string `json:"routed_by,omitempty" doc:"The standing rule that placed this, where one did. Empty means a person did, or nobody has"`
+	AssignedByRule string `json:"assigned_by_rule,omitempty" doc:"The assignment rule that placed this, where one did. Empty means a person did, or nobody has"`
 
 	// Standing is the decisions in force here, so the finding is the
 	// working screen after a decision as well as before it: the live
@@ -637,7 +637,7 @@ type EvidenceBody struct {
 func registerFindingDetail(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-finding", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/findings/{issue}/components/{component}",
 		Summary: "Get everything known about one finding",
 		Description: "Returns the full record for one issue in one component of a build: the " +
@@ -655,7 +655,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Stream        string `path:"stream"`
+		BranchOrTag   string `path:"branch_or_tag"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component's name, as the findings list gives it"`
@@ -665,11 +665,11 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, err
 		}
@@ -682,13 +682,13 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// real image ships three vendored versions of one library, and
 		// resolving the name on its own answers about whichever was interned
 		// first — for two of the three rows, an issue it does not carry.
-		component, err := core.ComponentCarrying(ctx, in, subject, target.ID, issue,
+		component, err := core.ComponentCarrying(ctx, in, subject, build.ID, issue,
 			input.Component, input.Choice(), func(err error) error { return core.AmbiguousOrMissing(in.Logger, err) })
 		if err != nil {
 			return nil, err
 		}
 
-		evidence, err := finding.NewStore(in.DB.DB).Detail(ctx, subject, target.ID, issue, component)
+		evidence, err := finding.NewStore(in.DB.DB).Detail(ctx, subject, build.ID, issue, component)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that finding could not be read", core.NoSuchFinding)
 		}
@@ -704,7 +704,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// carries — the moment something became known, the grounds, who wrote
 		// them — is what a reader of the finding is asking about when the row
 		// is at the top of the list and nothing on the page says why.
-		if body.ExploitedHere, err = exploitedHereAt(ctx, in, subject,
+		if body.Incidents, err = incidentAt(ctx, in, subject,
 			named.ProductID, issue, input.Vulnerability); err != nil {
 			return nil, core.WentWrong(in.Logger,
 				"what this product was exploited through could not be read", err)
@@ -713,7 +713,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// The build's own occurrences, with the versions it ships at each:
 		// what stands is matched by key, and a key carries versions an
 		// occurrence's name alone does not.
-		keyed, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, target.ID, issue, component)
+		keyed, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, build.ID, issue, component)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "where this sits could not be read", err)
 		}
@@ -728,7 +728,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// database they consulted rather than a property of the issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
 			issue, append([]string{body.Vulnerability}, body.Aliases...),
-			body.Component, evidence.Purl, target.ID, component)
+			body.Component, evidence.Purl, build.ID, component)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what publishers say could not be read", err)
 		}
@@ -784,8 +784,8 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Matched: core.MatchRoute(e.Matched), MatchedFrom: e.MatchedFrom,
 		MatchedIn: e.MatchedIn, MatchedRange: e.MatchedRange, Recorded: e.Recorded,
 		LatestVersion: e.LatestVersion, NothingSince: e.NothingSince,
-		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, RoutedBy: e.RoutedBy,
-		Tags:        e.Tags,
+		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, AssignedByRule: e.AssignedByRule,
+		Labels:      e.Labels,
 		Occurrences: make([]SittingBody, 0, len(e.Occurrences)),
 		Claimed:     make([]BuildClaimBody, 0, len(e.Claimed)),
 		Standing:    []core.StandingDecisionBody{}, Previous: []core.EarlierBody{}, Similar: []core.SimilarBody{},

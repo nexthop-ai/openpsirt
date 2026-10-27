@@ -453,8 +453,8 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	err := s.db.NewSelect().
 		TableExpr(finding.DecisionOccurrences).
 		Join(`JOIN "finding" AS "f" ON `+finding.DecisionOccurrenceOf("f")).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
@@ -541,12 +541,12 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (decisions, rows i
 }
 
 // closingUnconditionally is what the condition counts whatever the gate's
-// verdict: the vulnerability outcomes that dismiss, and a lead dismissed or
+// verdict: the vulnerability outcomes that dismiss, and a code finding dismissed or
 // called no security issue. Each closes the question and always needs a
 // second person.
 func closingUnconditionally() []Outcome {
 	out := OutcomesDismissing()
-	for _, each := range LeadOutcomes() {
+	for _, each := range CodeFindingOutcomes() {
 		if each.HidesRisk() {
 			out = append(out, each)
 		}

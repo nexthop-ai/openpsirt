@@ -110,8 +110,8 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// reason: what is being counted is acts, and an act is one row of the
 			// decision_occurrence table however many builds share the occurrence it names.
 			Join(`LEFT JOIN "finding" AS "pf" ON `+finding.DecisionOccurrenceOf("pf")+`
-			AND "pf"."target_id" IN (SELECT "et"."id" FROM "target" AS "et"
-				JOIN "stream" AS "es" ON "es"."id" = "et"."stream_id"
+			AND "pf"."build_id" IN (SELECT "et"."id" FROM "build" AS "et"
+				JOIN "branch_or_tag" AS "es" ON "es"."id" = "et"."branch_or_tag_id"
 				WHERE "es"."product_id" = "de"."product_id")
 			AND `+kinds+` AND `+readableHere, onArgs...).
 			Join(`LEFT JOIN "component" AS "pc" ON "pc"."id" = "pf"."component_id"`).

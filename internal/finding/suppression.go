@@ -31,7 +31,7 @@ type Claim struct {
 	bun.BaseModel `bun:"table:suppression,alias:sup"`
 
 	ID       int64  `bun:"id,pk,autoincrement"`
-	TargetID int64  `bun:"target_id,notnull"`
+	BuildID  int64  `bun:"build_id,notnull"`
 	Identity string `bun:"identity,notnull"`
 	// Vulnerability is the identifier the build argued about, as it wrote it.
 	Vulnerability string `bun:"vulnerability,notnull"`
@@ -87,8 +87,8 @@ type Claim struct {
 // a run keeps these in step with the statements that stand.
 const Published = "published"
 
-// within is the product a claim's target ships inside, and nil where the
-// document named the target alone.
+// within is the product a claim's build ships inside, and nil where the
+// document named the build alone.
 func (c Claim) within() *sbom.Target {
 	if c.WithinPurl == "" && c.WithinName == "" {
 		return nil
@@ -190,7 +190,7 @@ type ClaimsApplied struct {
 // Ingest applies a graph and records what the build argued about its own
 // patches as one act: claims recorded without the graph, or a graph without
 // them, is a build reading as having withdrawn every patch it carries.
-func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
+func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	claims []sbom.Suppression, stated map[sbom.Origin]bool) (ClaimsApplied, error) {
 
 	var applied ClaimsApplied
@@ -205,7 +205,7 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			words := WordsOf(claim.Statement)
 			for _, subject := range claim.Targets {
 				row := Claim{
-					TargetID: targetID, Vulnerability: vulnerability,
+					BuildID: buildID, Vulnerability: vulnerability,
 					Status: string(claim.Status), Justification: justification,
 					Statement: words, Origin: string(claim.Origin),
 					SubjectPurl: subject.Purl, SubjectName: subject.Name,
@@ -227,7 +227,7 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		// restate or withdraw.
 		var open []Claim
 		err := tx.NewSelect().Model(&open).
-			Where(`"target_id" = ?`, targetID).Where(`"closed_scan_id" IS NULL`).
+			Where(`"build_id" = ?`, buildID).Where(`"closed_scan_id" IS NULL`).
 			Where(`"origin" <> ?`, Published).Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("read what this build argued before: %w", err)
@@ -302,18 +302,18 @@ func pointAtWords(ctx context.Context, tx bun.IDB, claims []Claim) error {
 	return nil
 }
 
-func openClaims(ctx context.Context, db bun.IDB, targetID int64) ([]Claim, error) {
+func openClaims(ctx context.Context, db bun.IDB, buildID int64) ([]Claim, error) {
 	// Ordered so that reading them twice gives the same answer. Where two
 	// claims cover one finding and neither is the precise sort, which one is
 	// recorded should not depend on what a map felt like doing.
 	var rows []Claim
 	err := db.NewSelect().Model(&rows).
 		ColumnExpr("sup.*").
-		Join(`JOIN "target" AS "t" ON "t"."id" = "sup"."target_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "sup"."build_id"`).
 		Join(`JOIN "scan" AS "latest" ON "latest"."id" = "t"."last_scan_id"`).
-		Join(`LEFT JOIN "vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
+		Join(`LEFT JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
 		ColumnExpr(`COALESCE("ss"."restated_at", "ss"."uploaded_at", "latest"."received_at") AS "said"`).
-		Where(`"sup"."target_id" = ?`, targetID).Where(`"sup"."closed_scan_id" IS NULL`).
+		Where(`"sup"."build_id" = ?`, buildID).Where(`"sup"."closed_scan_id" IS NULL`).
 		Order("sup.id").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build argues: %w", err)
@@ -370,13 +370,13 @@ type Carried struct {
 // rather than a list of what is true tonight. A claim that stopped is the
 // interesting row — somebody dropped a patch, and the finding it answered is
 // back — and it is the row a list of what is current would not have.
-func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, buildID int64,
 	component string, limit, offset int) ([]Carried, int, error) {
 
 	// A build's own claims say what it ships and what it has patched, which is
 	// as much about the build as its inventory is — so it is read by whoever
 	// may read the product's findings and by nobody else.
-	_, _, err := readableIn(ctx, s.db, subject, targetID)
+	_, _, err := readableIn(ctx, s.db, subject, buildID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -386,7 +386,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// What the build sent with its inventories. A claim taken from a
 		// document uploaded on its own is shown on the findings it covers,
 		// and it is held over no stretch of the build's own scans.
-		q = q.Where(`"sup"."target_id" = ?`, targetID).Where(`"sup"."origin" <> ?`, Published)
+		q = q.Where(`"sup"."build_id" = ?`, buildID).Where(`"sup"."origin" <> ?`, Published)
 		if name := strings.TrimSpace(component); name != "" {
 			// Matched on what the claim says it is about rather than on a
 			// component row, because a claim naming something this build does

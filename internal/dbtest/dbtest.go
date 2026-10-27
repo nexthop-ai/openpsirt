@@ -860,7 +860,7 @@ func Tables() []string { return slices.Clone(tables) }
 // that enforce foreign keys during a bulk delete — which is not all of them,
 // so it will look engine-specific rather than like the ordering mistake it is.
 var tables = []string{
-	// Before flaw_report, party, person and routing_rule, all of which it
+	// Before flaw_report, party, person and assignment_rule, all of which it
 	// points at.
 	"report_assignment",
 	// Before the note it belongs to.
@@ -889,13 +889,13 @@ var tables = []string{
 	"chat_preference",
 	// Before person, which it points at.
 	"notification",
-	// Before person and target, both of which it points at.
+	// Before person and build, both of which it points at.
 	"upgrade",
 	// Before person, vulnerability and product, all of which it points at.
 	"disclosure_movement",
 	// Before product, vulnerability, component and person, all of which it
 	// points at.
-	"finding_tag",
+	"finding_label",
 	// Before person and product, both of which it points at.
 	"saved_filter",
 	// Before the comment it belongs to.
@@ -912,7 +912,7 @@ var tables = []string{
 	"decision_occurrence",
 	// After the rows that point at it, and before the decision it hangs off.
 	"decision_revision",
-	// Before decision and target, both of which it points at.
+	// Before decision and build, both of which it points at.
 	"decision_build",
 	// Before decision, which it points at.
 	"decision_stamp",
@@ -925,18 +925,17 @@ var tables = []string{
 	"issue_note",
 	// Before the notice it belongs to.
 	"told_place",
-	// Before the record of being exploited, the release and the people it
-	// points at.
-	"exploited_fix",
-	// Before the record of being exploited and the window it points at.
+	// Before the incident, the release and the people it points at.
+	"incident_fix",
+	// Before the incident and the window it points at.
 	"told_outside",
 	// Before the window and the product it points at.
-	"obligation_window_product",
+	"response_window_product",
 	// Before person, which it points at, and after the rows naming it.
-	"obligation_window",
+	"response_window",
 	// Before person, product and vulnerability, all of which it points at,
 	// and after the notices that point at it.
-	"exploited_here",
+	"incident",
 	// Before person, product and vulnerability, which it points at.
 	"assessment",
 	// Before product and vulnerability, both of which it points at.
@@ -959,17 +958,17 @@ var tables = []string{
 	"role_grant_all",
 	"role_grant",
 	// Before person and product, which they point at.
-	"vex_statement",
-	// Before advisory_source and product, both of which it points at.
+	"received_vex_statement",
+	// Before supplier_advisory_feed and product, both of which it points at.
 	"document_upload",
 	// Before product and person, both of which it points at.
-	"advisory_source",
-	// Before target and person, both of which it points at.
-	"vex_issuance",
+	"supplier_advisory_feed",
+	// Before build and person, both of which it points at.
+	"published_vex",
 	// Before person, which they point at.
 	"admin_change",
 	// Before team, person and product, all of which it points at.
-	"routing_rule",
+	"assignment_rule",
 	// Before person, product and vulnerability, all of which it points at.
 	"case_collaborator",
 	// Before flaw_report and report_ruling, both of which it points at.
@@ -985,10 +984,10 @@ var tables = []string{
 	// Before advisory, product, vulnerability and person, all of which it
 	// points at.
 	"advisory_issue",
-	// Before advisory, product, vulnerability, stream, variant and person,
+	// Before advisory, product, vulnerability, branch or tag, variant and person,
 	// all of which it points at.
 	"advisory_override",
-	// Before advisory_approval, product, vulnerability, stream and variant,
+	// Before advisory_approval, product, vulnerability, branch or tag and variant,
 	// all of which it points at.
 	"advisory_agreed_status",
 	// Before advisory_edition, advisory and person, all of which it points
@@ -1003,15 +1002,15 @@ var tables = []string{
 	// Before person, which it points at.
 	"outbound",
 	// Before person and product, which it points at.
-	"lead_rule",
+	"suppression_rule",
 	// Before person, product and vulnerability, which they point at.
-	"lead_handoff",
-	// Before flaw_lead and target, which it points at.
-	"flaw_lead_build",
+	"code_finding_flaw",
+	// Before flaw_code_finding and build, which it points at.
+	"flaw_code_finding_build",
 	// Before person, product and vulnerability, which it points at.
-	"flaw_lead",
-	"lead_component",
-	"lead_collaborator",
+	"flaw_code_finding",
+	"code_finding_component",
+	"code_finding_collaborator",
 	// Before team and person, both of which they point at.
 	"team_member",
 	"team",
@@ -1025,20 +1024,20 @@ var tables = []string{
 	"analysis_location",
 	"analysis_result",
 	"sighting",
-	// Before target, which it points at.
+	// Before build, which it points at.
 	"series_refusal",
 	// Before series_run, which they point at.
 	"series_module",
 	"series_document_chunk",
 	"series_document",
-	// Before series, scan and target, all of which it points at.
+	// Before series, scan and build, all of which it points at.
 	"series_run",
 	// Before product, which it points at.
 	"series",
 	"finding",
 	"suppression",
-	// After suppression and vex_statement, whose rows point at it with no
-	// foreign key.
+	// After suppression and received_vex_statement, whose rows point at it with
+	// no foreign key.
 	"statement_text",
 	// Before scan_run and vulnerability, both of which it points at, and
 	// after decision_occurrence_superseded, which points at it.
@@ -1060,9 +1059,9 @@ var tables = []string{
 	"job",
 	"scan_refusal",
 	"scan",
-	"target",
+	"build",
 	"variant",
-	"stream",
+	"branch_or_tag",
 	"product",
 	"application_setting",
 }
@@ -1141,9 +1140,9 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 		// A tag points at the branch it was cut from. MySQL and MariaDB
 		// enforce that self-reference during a bulk delete even though every
 		// row is going; PostgreSQL and SQLite happen not to.
-		if occupied["stream"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "stream" SET "parent_id" = NULL`); err != nil {
-				return fmt.Errorf("detach stream parents: %w", err)
+		if occupied["branch_or_tag"] {
+			if _, err := tx.ExecContext(ctx, `UPDATE "branch_or_tag" SET "parent_id" = NULL`); err != nil {
+				return fmt.Errorf("detach branch or tag parents: %w", err)
 			}
 		}
 		// A decision points at the decision it was derived from, which is the
@@ -1154,8 +1153,8 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 			}
 		}
 		// A window points at the window it counts from, the same shape again.
-		if occupied["obligation_window"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "obligation_window" SET "from_window_id" = NULL`); err != nil {
+		if occupied["response_window"] {
+			if _, err := tx.ExecContext(ctx, `UPDATE "response_window" SET "from_window_id" = NULL`); err != nil {
 				return fmt.Errorf("detach windows counting from others: %w", err)
 			}
 		}

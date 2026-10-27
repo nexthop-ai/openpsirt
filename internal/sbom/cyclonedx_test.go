@@ -187,7 +187,7 @@ func TestReadsAGoModuleDocument(t *testing.T) {
 func TestADocumentNamingNoComponentOfItsOwnIsFiledAgainstItsTarget(t *testing.T) {
 	// The format requires only a format and a version, so a document that
 	// names no component of its own is ordinary. It was filed against a
-	// declared product, stream and variant, and that is what it is about —
+	// declared product, branch or tag and variant, and that is what it is about —
 	// standing in costs nothing, because what a root says about itself is
 	// excluded from identity and expiry either way.
 	doc, err := sbom.Read(fixture(t, "build-fragment.cdx.json"), sbom.Limits{})

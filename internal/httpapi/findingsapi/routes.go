@@ -23,8 +23,8 @@ func Register(api huma.API, in core.Deps) {
 	registerKinds(api, in)
 	registerHolders(api, in)
 	registerFindingDetail(api, in)
-	registerLeads(api, in)
-	registerLeadQueue(api, in)
+	registerCodeFindings(api, in)
+	registerCodeFindingQueue(api, in)
 	registerEntry(api, in)
 	registerDisclosure(api, in)
 	registerResolution(api, in)
@@ -35,11 +35,11 @@ func Register(api huma.API, in core.Deps) {
 	registerAffects(api, in)
 	registerMovements(api, in)
 	registerGraph(api, in)
-	registerMatchCoverage(api, in)
-	registerMatchCoverageExport(api, in)
+	registerUnmatchedComponents(api, in)
+	registerUnmatchedComponentsExport(api, in)
 	// Components with no upstream answer, and the reason for each.
 	registerUpstream(api, in)
-	registerPatchBranches(api, in)
+	registerPatchBranchLookups(api, in)
 	registerMentions(api, in)
 	registerCarried(api, in)
 	registerIssueNotes(api, in)
@@ -57,10 +57,10 @@ func Register(api huma.API, in core.Deps) {
 	registerCollaborators(api, in, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
 	})
-	// A confirmed lead recorded as a flaw, and the people granted it.
-	registerHandoff(api, in)
-	registerFlawLead(api, in)
-	registerLeadCollaborators(api, in, core.Administering{
+	// A confirmed code finding recorded as a flaw, and the people granted it.
+	registerFlaw(api, in)
+	registerFlawCodeFinding(api, in)
+	registerCodeFindingCollaborators(api, in, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
 	})
 }

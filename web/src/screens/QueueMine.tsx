@@ -105,10 +105,10 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         <td className="id">{row.finding?.component ?? "—"}</td>
         <td className="hint">
           {row.occurrence?.product_name || row.occurrence?.product}
-          {row.finding?.stream && (
+          {row.finding?.branch_or_tag && (
             <>
               {" "}
-              · {row.finding.stream_name || row.finding.stream} ·{" "}
+              · {row.finding.branch_or_tag_name || row.finding.branch_or_tag} ·{" "}
               {row.finding.variant_name || row.finding.variant}
             </>
           )}

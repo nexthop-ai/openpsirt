@@ -21,7 +21,7 @@ func FixedBecause(because Closure) string { return fixedBecause(because) }
 // test.
 //
 // Exported for the test alone: the two are what every list orders by and what
-// the bundle page turns a rank back into, and a mapping that disagrees with
+// the upgrade page turns a rank back into, and a mapping that disagrees with
 // its own inverse about a band is the defect they were written to end.
 func RankCase(over string, otherwise int) string { return rankCase(over, otherwise) }
 

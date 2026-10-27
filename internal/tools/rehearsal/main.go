@@ -58,6 +58,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
@@ -250,11 +251,14 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.note("%d tables, %d findings, %d decisions, %d claims", len(held), held["finding"], held["decision"], held["claim"])
+	// Every count below is under the name this tree gives its table.
+	held = AsRenamed(record.Last, held, migrations.TablesRenamedV0110())
+	r.note("%d tables, %d findings, %d decisions, %d decision occurrences", len(held), held["finding"],
+		held["decision"], held["decision_occurrence"])
 	// An upgrade of an empty database passes every check here, so a seed
 	// that filled nothing is a failed rehearsal rather than a clean one.
 	var empty []string
-	for _, table := range []string{"finding", "decision", "claim", "vex_statement", "flaw_report"} {
+	for _, table := range []string{"finding", "decision", "decision_occurrence", "received_vex_statement", "flaw_report"} {
 		if held[table] == 0 {
 			empty = append(empty, table)
 		}
@@ -776,7 +780,7 @@ func (r *run) open(ctx context.Context, builds Totals) (Totals, error) {
 	out := Totals{}
 	for build := range builds {
 		parts := strings.SplitN(build, "/", 3)
-		q := url.Values{"stream": {parts[1]}, "variant": {parts[2]}, "limit": {"1"}}
+		q := url.Values{"branch_or_tag": {parts[1]}, "variant": {parts[2]}, "limit": {"1"}}
 		status, body, err := r.get(ctx, "/v1/products/"+url.PathEscape(parts[0])+"/findings?"+q.Encode())
 		if err != nil {
 			return nil, err
@@ -810,11 +814,11 @@ func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return nil, err
 	}
-	product, stream, variant, ok := firstBuild(builds)
+	product, branchOrTag, variant, ok := firstBuild(builds)
 	if !ok {
 		return nil, errors.New("the release reported no build, so the sweep has no names to ask with")
 	}
-	names := map[string]string{"product": product, "stream": stream, "variant": variant,
+	names := map[string]string{"product": product, "branch_or_tag": branchOrTag, "variant": variant,
 		"team": "platform", "identity": admin, "format": "csv"}
 	paths := make([]string, 0, len(doc.Paths))
 	for path, ops := range doc.Paths {

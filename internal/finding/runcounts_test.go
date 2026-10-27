@@ -23,7 +23,7 @@ func TestARunsCountsAreIssuesAtComponentsTheReaderMaySee(t *testing.T) {
 		// The first run opens an issue at a component at two occurrences,
 		// and one at each of two components sitting in one.
 		first := f.run(t)
-		if _, err := f.store.Apply(ctx, f.target, first, []finding.Reported{
+		if _, err := f.store.Apply(ctx, f.build, first, []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss), found("CVE-2026-3", teamd),
 		}); err != nil {
 			t.Fatal(err)
@@ -31,7 +31,7 @@ func TestARunsCountsAreIssuesAtComponentsTheReaderMaySee(t *testing.T) {
 		// One of them undisclosed.
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
 			Set(`"visibility" = ?`, access.Private).
-			Where(`"target_id" = ?`, f.target).
+			Where(`"build_id" = ?`, f.build).
 			Where(`"vulnerability_id" = ?`, f.issueID(t, "CVE-2026-2")).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -39,14 +39,14 @@ func TestARunsCountsAreIssuesAtComponentsTheReaderMaySee(t *testing.T) {
 		// The second stops reporting both single-occurrence issues and opens
 		// another at the component at two occurrences.
 		second := f.run(t)
-		if _, err := f.store.Apply(ctx, f.target, second, []finding.Reported{
+		if _, err := f.store.Apply(ctx, f.build, second, []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-4", libnl),
 		}); err != nil {
 			t.Fatal(err)
 		}
 		// A run that changed nothing.
 		third := f.run(t)
-		if _, err := f.store.Apply(ctx, f.target, third, []finding.Reported{
+		if _, err := f.store.Apply(ctx, f.build, third, []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-4", libnl),
 		}); err != nil {
 			t.Fatal(err)
@@ -75,7 +75,7 @@ func TestARunsCountsAreIssuesAtComponentsTheReaderMaySee(t *testing.T) {
 				finding.Change{Opened: 3}, finding.Change{Opened: 1, Closed: 2}},
 		} {
 			t.Run(reader.what, func(t *testing.T) {
-				changed, err := f.store.Changes(ctx, reader.who, f.target,
+				changed, err := f.store.Changes(ctx, reader.who, f.build,
 					[]int64{first, second, third, foreign})
 				if err != nil {
 					t.Fatal(err)
@@ -93,7 +93,7 @@ func TestARunsCountsAreIssuesAtComponentsTheReaderMaySee(t *testing.T) {
 					if run == foreign {
 						continue
 					}
-					ran, err := f.store.Ran(ctx, reader.who, f.target, run)
+					ran, err := f.store.Ran(ctx, reader.who, f.build, run)
 					if err != nil {
 						t.Fatal(err)
 					}

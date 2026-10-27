@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { notACredential } from "../ui/noautofill";
-import { WaitingRulings } from "./InboxRuling";
+import { WaitingRulings } from "./ReportRuling";
 import { UpstreamOffers } from "./QueueOffers";
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";

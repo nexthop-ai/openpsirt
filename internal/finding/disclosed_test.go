@@ -172,7 +172,7 @@ func TestAFlawWithNoDateNeedsASecondPersonToDisclose(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "high",
+			BuildIDs: []int64{f.build}, Severity: "high",
 			Summary: "Found in our own review.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -250,7 +250,7 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 			t.Fatal(err)
 		}
 		there.ID = 0
-		there.TargetID = elsewhere
+		there.BuildID = elsewhere
 		farOff := time.Now().Add(90 * 24 * time.Hour).UTC()
 		there.DiscloseAt = &farOff
 		if _, err := f.db.DB.NewInsert().Model(&there).Exec(ctx); err != nil {
@@ -277,7 +277,7 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 		}
 		var private int64
 		private, err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			Where(`"target_id" = ?`, elsewhere).
+			Where(`"build_id" = ?`, elsewhere).
 			Where(`"visibility" = ?`, access.Private).Count(ctx)
 		if err != nil || private != 1 {
 			t.Errorf("the other product's finding is undisclosed %d times (%v), want once", private, err)

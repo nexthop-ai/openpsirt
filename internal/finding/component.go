@@ -35,16 +35,16 @@ import (
 // the page, because it has already counted them: the caller asked for both and
 // was running the whole narrowing twice for the second — on a set the store's
 // own comment sizes at 222,435 of 272,539 open rows.
-func (s *Store) AtComponent(ctx context.Context, subject access.Subject, targetID,
+func (s *Store) AtComponent(ctx context.Context, subject access.Subject, buildID,
 	componentID int64, contains string, limit, offset int) ([]Deciding, int, int, error) {
 
-	return s.atComponent(ctx, subject, targetID, componentID, contains, limit, offset)
+	return s.atComponent(ctx, subject, buildID, componentID, contains, limit, offset)
 }
 
-func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetID,
+func (s *Store) atComponent(ctx context.Context, subject access.Subject, buildID,
 	componentID int64, contains string, limit, offset int) ([]Deciding, int, int, error) {
 
-	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, buildID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -64,7 +64,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible))
@@ -142,7 +142,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		FixedIn         string     `bun:"fixed_in"`
 		Description     string     `bun:"description"`
 		Exploited       int        `bun:"exploited"`
-		ExploitedHere   int        `bun:"exploited_here"`
+		Incident        int        `bun:"incident"`
 		LikelihoodPPM   int        `bun:"likelihood_ppm"`
 		DueAt           *time.Time `bun:"due_at"`
 	}
@@ -168,14 +168,14 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			ColumnExpr(`MAX(CASE WHEN "v"."exploited" THEN 1 ELSE 0 END) AS "exploited"`).
 			// Read off the finding, where a standing record of this product
 			// being attacked is already written for ranking.
-			ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited_here" THEN 1 ELSE 0 END) AS "exploited_here"`).
+			ColumnExpr(`MAX(CASE WHEN "f"."urgency_incident" THEN 1 ELSE 0 END) AS "incident"`).
 			// The earliest deadline among this issue's occurrences here, which
 			// is the one that makes it late. Read with the rest of what a row
 			// shows rather than off the occurrences: the occurrences are read
 			// for what a decision is keyed on, and that read carries no clock.
 			ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 			Where(kinds, kindArgs...).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -201,7 +201,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	// arbitrary occurrence per issue. A decision is recorded per occurrence, so
 	// one built from MIN(occurrence_identity) covers one consumer and leaves
 	// the rest open while reporting that it covered them.
-	everywhere, err := s.occurrencesOf(ctx, targetID, fold, issues, visible)
+	everywhere, err := s.occurrencesOf(ctx, buildID, fold, issues, visible)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -216,7 +216,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			occurrence.FixedIn = row.FixedIn
 			occurrence.Summary = firstLineOf(row.Description)
 			occurrence.Exploited = row.Exploited == 1
-			occurrence.ExploitedHere = row.ExploitedHere == 1
+			occurrence.Incident = row.Incident == 1
 			occurrence.LikelihoodPPM = row.LikelihoodPPM
 			occurrence.DueAt = row.DueAt
 			occurrence.Occurrences = head.Occurrences
@@ -227,7 +227,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 }
 
 // occurrencesOf reads every occurrence a set of issues has at one component.
-func (s *Store) occurrencesOf(ctx context.Context, targetID int64, fold []int64, issues []int64,
+func (s *Store) occurrencesOf(ctx context.Context, buildID int64, fold []int64, issues []int64,
 	visible []access.Visibility) (map[int64][]Deciding, error) {
 
 	everywhere := map[int64][]Deciding{}
@@ -252,7 +252,7 @@ func (s *Store) occurrencesOf(ctx context.Context, targetID int64, fold []int64,
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		Where(kinds, kindArgs...).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
@@ -275,7 +275,7 @@ func (s *Store) occurrencesOf(ctx context.Context, targetID int64, fold []int64,
 // Candidate is a version a component could go to, and how much reaching it
 // would close.
 //
-// This is the fix-bundle grouping read per component rather than as a list of
+// This is the planned-upgrade grouping read per component rather than as a list of
 // its own: a package at a version, and where it could go.
 //
 // Two counts, because they answer different questions. `FixedHere` is how
@@ -316,7 +316,7 @@ type ComponentGroup struct {
 	// carried on a finding: a version nobody recognizes needs it.
 	Upstream string
 	// UpstreamName is the source package this was built from, where one is
-	// recorded. It is what a routing rule matches on, and without it a
+	// recorded. It is what an assignment rule matches on, and without it a
 	// component row cannot say what a rule about it would have to name — so
 	// somebody types the binary package's own name into a field matching
 	// source packages and is told, truthfully and uselessly, that nothing is
@@ -353,12 +353,12 @@ type ComponentGroup struct {
 	// taking. Most components have exactly one.
 	Upgrades []Candidate
 	// Exploited says whether a feed reports any of them being used in the
-	// world, and ExploitedHere whether this product was recorded as attacked
+	// world, and Incident whether this product was recorded as attacked
 	// through one. Either is what stops a component being put aside on the
 	// strength of its size alone.
-	Exploited     bool
-	ExploitedHere bool
-	Urgency       int64
+	Exploited bool
+	Incident  bool
+	Urgency   int64
 }
 
 // Narrowing is a bulk selection as something other than the caller's word for
@@ -389,10 +389,10 @@ type Narrowing struct {
 // count sent along with the request is the caller's word twice over. Read with
 // the same visibility rule the candidate list used, so the two numbers compare
 // against each other rather than against different populations.
-func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, targetID int64,
+func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, buildID int64,
 	fold []int64, contains string, named int) (Narrowing, error) {
 
-	_, visible, err := readableIn(ctx, tx, subject, targetID)
+	_, visible, err := readableIn(ctx, tx, subject, buildID)
 	if err != nil {
 		return Narrowing{}, err
 	}
@@ -402,7 +402,7 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(kinds, kindArgs...).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).

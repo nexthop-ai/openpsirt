@@ -122,13 +122,13 @@ type statedImage struct {
 // stating another closes it and opens one for what it stated; a scan in which
 // the image is gone, or stated at more than one version, closes it. An image
 // rebuilt at the same version writes nothing.
-func reconcileImageVersions(ctx context.Context, tx bun.IDB, targetID, scanID int64,
+func reconcileImageVersions(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	stated map[int64]statedImage) (int, int, error) {
 
 	var open []ImageVersion
 	if err := tx.NewSelect().Model(&open).
 		Join(`JOIN "graph_node" AS "n" ON "n"."id" = "iv"."node_id"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"iv"."closed_scan_id" IS NULL`).
 		Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read the versions the build states for its images: %w", err)
@@ -177,7 +177,7 @@ func reconcileImageVersions(ctx context.Context, tx bun.IDB, targetID, scanID in
 // A claim or a statement naming an image at a version is about the image the
 // build states at that version, and the component row carries no version to
 // compare it with.
-func StatedImages(ctx context.Context, db bun.IDB, targetID int64) (map[int64]ImageVersion, error) {
+func StatedImages(ctx context.Context, db bun.IDB, buildID int64) (map[int64]ImageVersion, error) {
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
 		Version     string `bun:"version"`
@@ -189,7 +189,7 @@ func StatedImages(ctx context.Context, db bun.IDB, targetID int64) (map[int64]Im
 		ColumnExpr(`"n"."component_id" AS "component_id"`).
 		ColumnExpr(`"iv"."version" AS "version"`).
 		ColumnExpr(`COALESCE("iv"."purl", '') AS "purl"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"iv"."closed_scan_id" IS NULL`).
 		Scan(ctx, &rows); err != nil {
@@ -213,23 +213,23 @@ type Stated struct {
 	Until   *time.Time
 }
 
-// TargetComponent is one component in one build.
-type TargetComponent struct {
-	TargetID, ComponentID int64
+// BuildComponent is one component in one build.
+type BuildComponent struct {
+	BuildID, ComponentID int64
 }
 
 // StatedVersions is every version these builds stated for these images,
 // newest first, by build and component. A component no build holds by name has
 // none.
-func StatedVersions(ctx context.Context, db bun.IDB, targets, components []int64) (
-	map[TargetComponent][]Stated, error) {
+func StatedVersions(ctx context.Context, db bun.IDB, buildIDs, components []int64) (
+	map[BuildComponent][]Stated, error) {
 
-	out := map[TargetComponent][]Stated{}
-	if len(targets) == 0 || len(components) == 0 {
+	out := map[BuildComponent][]Stated{}
+	if len(buildIDs) == 0 || len(components) == 0 {
 		return out, nil
 	}
 	type statedRow struct {
-		TargetID    int64      `bun:"target_id"`
+		BuildID     int64      `bun:"build_id"`
 		ComponentID int64      `bun:"component_id"`
 		Version     string     `bun:"version"`
 		Purl        string     `bun:"purl"`
@@ -244,13 +244,13 @@ func StatedVersions(ctx context.Context, db bun.IDB, targets, components []int64
 			Join(`JOIN "graph_node" AS "n" ON "n"."id" = "iv"."node_id"`).
 			Join(`JOIN "scan" AS "so" ON "so"."id" = "iv"."opened_scan_id"`).
 			Join(`LEFT JOIN "scan" AS "sc" ON "sc"."id" = "iv"."closed_scan_id"`).
-			ColumnExpr(`"n"."target_id" AS "target_id"`).
+			ColumnExpr(`"n"."build_id" AS "build_id"`).
 			ColumnExpr(`"n"."component_id" AS "component_id"`).
 			ColumnExpr(`"iv"."version" AS "version"`).
 			ColumnExpr(`COALESCE("iv"."purl", '') AS "purl"`).
 			ColumnExpr(`"so"."built_at" AS "from_at"`).
 			ColumnExpr(`"sc"."built_at" AS "until_at"`).
-			Where(`"n"."target_id" IN (?)`, bun.List(targets)).
+			Where(`"n"."build_id" IN (?)`, bun.List(buildIDs)).
 			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
 			OrderExpr(`"iv"."opened_scan_id" DESC, "iv"."id" DESC`).
 			Scan(ctx, &some); err != nil {
@@ -263,7 +263,7 @@ func StatedVersions(ctx context.Context, db bun.IDB, targets, components []int64
 		return nil, fmt.Errorf("read the versions builds stated for their images: %w", err)
 	}
 	for _, row := range rows {
-		key := TargetComponent{row.TargetID, row.ComponentID}
+		key := BuildComponent{row.BuildID, row.ComponentID}
 		out[key] = append(out[key], Stated{Version: row.Version, Purl: row.Purl, From: row.From, Until: row.Until})
 	}
 	return out, nil

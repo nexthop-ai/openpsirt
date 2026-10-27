@@ -80,7 +80,7 @@ func TestARatingSaysWhetherItIsYourOwn(t *testing.T) {
 
 func TestRatingAnIssueAsksForTriageOnTheProductInThePath(t *testing.T) {
 	// The endpoint half of the rule the store holds. A rating moves that
-	// product's deadlines and its triage line, so the role is asked for on the
+	// product's deadlines and its minimum severity, so the role is asked for on the
 	// product the path names — and a product somebody holds nothing on answers
 	// as one that is not declared, before the issue name is looked at.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {

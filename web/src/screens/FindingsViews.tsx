@@ -21,7 +21,7 @@ import { own } from "../ui/own";
 import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Exploited, ExploitedHere, Severity } from "../ui/Severity";
+import { Exploited, Incident, Severity } from "../ui/Severity";
 
 import { PAGE, type Row, type SortWord } from "./list";
 import { useRowOpener } from "../ui/opens";
@@ -45,7 +45,7 @@ export function Sits({ row }: { row: Row }) {
             itself; the note about the other builds is a second, and may
             take a line of its own where the column is narrow. */}
         <span className="ends">
-          <span className="hop id">{row.stream_name || row.stream}</span>
+          <span className="hop id">{row.branch_or_tag_name || row.branch_or_tag}</span>
           <span className="arrow">/</span>
           <span className="hop id">{row.variant_name || row.variant}</span>
         </span>
@@ -112,7 +112,7 @@ export function ByComponent({
   onPage,
   size,
 }: {
-  at: { product: string; stream?: string; variant?: string };
+  at: { product: string; branch_or_tag?: string; variant?: string };
   query: Record<string, unknown>;
   offset: number;
   onHide: (component: string) => void;
@@ -136,7 +136,7 @@ export function ByComponent({
             path: { product: at.product },
             query: {
               ...(query as Record<string, never>),
-              ...(at.stream ? { stream: at.stream } : {}),
+              ...(at.branch_or_tag ? { branch_or_tag: at.branch_or_tag } : {}),
               ...(at.variant ? { variant: at.variant } : {}),
             },
           },
@@ -231,11 +231,10 @@ export function ByComponent({
                     <Link className="linkish id" title={`Open ${name}`} to={to}>
                       {name}
                     </Link>
-                    {(row.exploited || row.exploited_here) && (
+                    {(row.exploited || row.incident) && (
                       <>
                         {" "}
-                        <ExploitedHere when={row.exploited_here} />{" "}
-                        <Exploited when={row.exploited} />
+                        <Incident when={row.incident} /> <Exploited when={row.exploited} />
                       </>
                     )}
                     <br />
@@ -337,7 +336,7 @@ export function ByComponent({
 // count built from a second narrowing would be a number that disagrees with
 // the list it opens.
 export function bumpQuery(
-  at: { product: string; stream?: string; variant?: string },
+  at: { product: string; branch_or_tag?: string; variant?: string },
   query: Record<string, unknown>,
   limit: number,
   offset: number,
@@ -347,7 +346,7 @@ export function bumpQuery(
   return {
     limit,
     offset,
-    ...(at.stream ? { stream: at.stream } : {}),
+    ...(at.branch_or_tag ? { branch_or_tag: at.branch_or_tag } : {}),
     ...(at.variant ? { variant: at.variant } : {}),
     ...(query.severity ? { severity: query.severity } : {}),
     ...(query.exploited ? { exploited: true } : {}),
@@ -367,7 +366,7 @@ export function bumpQuery(
 
 // One row per upstream bump, with what moving it would close.
 //
-// The other end of the same query the pending-upgrades screen reads: a
+// The other end of the same query a build's planned upgrades screen reads: a
 // coordinator reads a build and the upgrades it is waiting on, and a triager
 // reads a bump and the issues it closes. Keyed on the fold, so packages built
 // from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
@@ -383,7 +382,7 @@ export function ByBump({
   onPage,
   cannot,
 }: {
-  at: { product: string; stream?: string; variant?: string };
+  at: { product: string; branch_or_tag?: string; variant?: string };
   query: Record<string, unknown>;
   offset: number;
   size: number;
@@ -397,7 +396,7 @@ export function ByBump({
   const narrowed = bumpQuery(at, query, size, offset);
 
   const bundles = useQuery({
-    queryKey: ["fix-bundles", at, narrowed],
+    queryKey: ["planned-upgrades", at, narrowed],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/planned-upgrades", {
@@ -461,8 +460,8 @@ export function ByBump({
             {rows.map((row) => (
               <tr key={`${row.upstream} ${row.from} ${row.to}`} className="row">
                 <td>
-                  <span className="id">{row.upstream}</span>{" "}
-                  <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
+                  <span className="id">{row.upstream}</span> <Incident when={row.incident} />{" "}
+                  <Exploited when={row.exploited} />
                   <br />
                   <span className="id" style={{ color: "var(--faint)" }}>
                     {row.from}
@@ -496,7 +495,7 @@ export function ByBump({
                 <td className="num">{(row.issues ?? 0).toLocaleString()}</td>
                 <td className="hint">
                   {(row.in ?? [])
-                    .map((build) => `${build.stream} \u00b7 ${build.variant}`)
+                    .map((build) => `${build.branch_or_tag} \u00b7 ${build.variant}`)
                     .join(", ")}
                 </td>
               </tr>
@@ -533,7 +532,7 @@ export function Peek({
   to: link,
   onDecided,
 }: {
-  at: { product: string; stream: string; variant: string };
+  at: { product: string; branch_or_tag: string; variant: string };
   vulnerability: string;
   component: string;
   version: string;
@@ -549,7 +548,7 @@ export function Peek({
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}",
           {
             params: {
               path: { ...at, issue: vulnerability, component },
@@ -645,7 +644,7 @@ export function Pager({
     </span>
   );
 }
-// The address the fix-bundle view comes from as a file.
+// The address the planned upgrades view comes from as a file.
 //
 // The same filters the table was read with, so the file and the table cannot
 // disagree about what was asked for — and a link somebody follows rather than
@@ -673,14 +672,14 @@ function bundlesFile(
 // the session it already has. The filters are the ones on screen, so the file
 // and the table cannot disagree about what was asked for.
 function componentsFile(
-  at: { product: string; stream?: string; variant?: string },
+  at: { product: string; branch_or_tag?: string; variant?: string },
   query: Record<string, unknown>,
   format: "csv" | "json",
 ): string {
   const asked = new URLSearchParams();
   for (const [key, value] of Object.entries({
     ...query,
-    ...(at.stream ? { stream: at.stream } : {}),
+    ...(at.branch_or_tag ? { branch_or_tag: at.branch_or_tag } : {}),
     ...(at.variant ? { variant: at.variant } : {}),
   })) {
     // Only what the export takes, and never the paging: a file is every row

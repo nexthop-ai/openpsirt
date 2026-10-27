@@ -77,7 +77,7 @@ func personAdmits(person *access.Account, productID int64) finding.Admits {
 	}
 }
 
-// teamAdmits refuses routing work to a team none of whose members may read it,
+// teamAdmits refuses assigning work to a team none of whose members may read it,
 // where it would sit in a queue nobody on it can see.
 func teamAdmits(team *access.Team, productID int64) finding.Admits {
 	return func(ctx context.Context, db bun.IDB, withheld []access.Visibility) error {
@@ -104,7 +104,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			"`GET /v1/products/{product}/findings`.\n\n" +
 			"Each row is assigned the way one finding is: across every build of the product, " +
 			"at every package the row folds together. Send `person` as an empty string to " +
-			"hand the rows back to nobody, or `team` to route them to a team.\n\n" +
+			"hand the rows back to nobody, or `team` to assign them to a team.\n\n" +
 			"`only` limits the act to rows somebody picked from the list. A picked row the " +
 			"filter no longer matches is not assigned; `pieces` says how many were.\n\n" +
 			"Without the assigner right you may take what nobody holds and hand back your own. " +
@@ -115,9 +115,9 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Giving work to somebody else also needs assigner. Taking unowned work, "+
 		"or handing back your own, does not.", core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product"`
+		Product     string `path:"product"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product"`
 		core.AtOneBuild
 		core.Narrowing
 		Body struct {
@@ -127,7 +127,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		}
 	}) (*struct{ Body AssignedMatchingBody }, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err

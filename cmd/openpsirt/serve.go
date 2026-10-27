@@ -85,11 +85,11 @@ type passes struct {
 	post    *notify.Post
 	outward *notify.Signal
 	// talk carries notifications to chat. Nil where no platform is configured.
-	talk    *notify.Talk
-	keeper  *attach.Keeper
-	routing *finding.Sweeper
-	analyze *analysis.Worker
-	// undertaker sets aside work whose worker never came back, which is the
+	talk      *notify.Talk
+	keeper    *attach.Keeper
+	assigning *finding.Sweeper
+	analyze   *analysis.Worker
+	// undertaker fails the jobs whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
 	undertaker *queue.Undertaker
 	// publish writes the advisories that have gone out as a directory
@@ -145,9 +145,9 @@ func (p passes) loops() []loop {
 		{"look up the branches patches are on", p.branches.Run, 0},
 		{"watch for quiet builds", p.watch.Run, 0},
 		{"send what is owed outward", p.outward.Run, 0},
-		{"route unheld work to teams", p.routing.Run, readInterval},
+		{"assign unheld work to teams", p.assigning.Run, readInterval},
 		{"apply analyzer runs", p.analyze.Run, readInterval},
-		{"set aside work whose worker died", p.undertaker.Run, 0},
+		{"fail jobs whose worker died", p.undertaker.Run, 0},
 	}
 	// And the ones a deployment may not have, each nil where what it works
 	// on is not configured: NewPost where no mail channel is, the chat sender

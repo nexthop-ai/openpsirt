@@ -85,29 +85,29 @@ func planned(word Planned) finding.PlannedFilter {
 // One mapping for both lists, for the same reason the parameters are one
 // struct: two of these drift, and the drift is a filter that answers on one
 // list and is quietly ignored on the other.
-func (n Narrowing) Filter(floor finding.Floor) (finding.Filter, error) {
+func (n Narrowing) Filter(floor finding.MinimumSeverity) (finding.Filter, error) {
 	narrowed := finding.Filter{
-		MinSeverity:   string(n.Severity),
-		Exploited:     n.Exploited,
-		HasFix:        n.Fixable,
-		Components:    n.Component,
-		Tags:          n.Tag,
-		Search:        n.Search,
-		Ecosystems:    n.Ecosystem,
-		Under:         n.Under,
-		UnderTheBuild: n.UnderBuild,
-		DeclaredAs:    plainly(n.DeclaredAs),
-		States:        as[finding.DecisionStanding](n.State),
-		Outcomes:      plainly(n.Outcome),
-		Assigned:      plainly(n.Assigned),
-		Reassessed:    n.Reassessed,
-		Origin:        finding.Origin(n.Origin),
-		Planned:       planned(n.Planned),
-		Unconfirmed:   n.Unconfirmed,
-		Exclude:       n.Exclude,
-		Floor:         floor,
-		BelowFloor:    n.BelowFloor,
-		Workable:      finding.Working(plainly(n.On), plainly(n.Support)),
+		MinSeverity:          string(n.Severity),
+		Exploited:            n.Exploited,
+		HasFix:               n.Fixable,
+		Components:           n.Component,
+		Labels:               n.Label,
+		Search:               n.Search,
+		Ecosystems:           n.Ecosystem,
+		Under:                n.Under,
+		UnderTheBuild:        n.UnderBuild,
+		DeclaredAs:           plainly(n.DeclaredAs),
+		States:               as[finding.DecisionStanding](n.State),
+		Outcomes:             plainly(n.Outcome),
+		Assigned:             plainly(n.Assigned),
+		Reassessed:           n.Reassessed,
+		Origin:               finding.Origin(n.Origin),
+		Planned:              planned(n.Planned),
+		Unconfirmed:          n.Unconfirmed,
+		Exclude:              n.Exclude,
+		MinimumSeverity:      floor,
+		BelowMinimumSeverity: n.BelowMinimumSeverity,
+		Workable:             finding.Working(plainly(n.On), plainly(n.Support)),
 		// Straight through: what reaches the statement is the
 		// allowlist's own expression, chosen by this key, never the
 		// key itself. A word that is not one of them is not a sort
@@ -185,14 +185,14 @@ func earlier(a, b *time.Time) *time.Time {
 // of words from a fixed set is bounded by that set, which holds only where a
 // word may appear once.
 type Narrowing struct {
-	Severity   Rating   `query:"severity" doc:"Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating"`
-	Exploited  bool     `query:"exploited" doc:"Keep only issues somebody is known to be exploiting"`
-	Fixable    bool     `query:"fixable" doc:"Keep only issues where an upstream fixed version is known"`
-	BelowFloor bool     `query:"below_minimum_severity" doc:"Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list"`
-	Component  []string `query:"component,explode" maxItems:"200" maxLength:"191" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
-	Tag        []string `query:"label,explode" maxItems:"200" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels"`
-	Search     string   `query:"q" maxLength:"200" doc:"Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name"`
-	Ecosystem  []string `query:"ecosystem,explode" maxItems:"200" maxLength:"64" doc:"Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi"`
+	Severity             Rating   `query:"severity" doc:"Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating"`
+	Exploited            bool     `query:"exploited" doc:"Keep only issues somebody is known to be exploiting"`
+	Fixable              bool     `query:"fixable" doc:"Keep only issues where an upstream fixed version is known"`
+	BelowMinimumSeverity bool     `query:"below_minimum_severity" doc:"Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list"`
+	Component            []string `query:"component,explode" maxItems:"200" maxLength:"191" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
+	Label                []string `query:"label,explode" maxItems:"200" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels"`
+	Search               string   `query:"q" maxLength:"200" doc:"Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name"`
+	Ecosystem            []string `query:"ecosystem,explode" maxItems:"200" maxLength:"64" doc:"Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi"`
 	// The two questions about the release itself, kept apart because a tag
 	// can be in support and a branch can be past end-of-life. Both default to
 	// the working population, and both say so on the screen: a default that
@@ -233,18 +233,18 @@ type Narrowing struct {
 	Ascending     bool                   `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest occurrences, lowest first"`
 }
 
-// OnlyOrders reports whether the narrowing asks nothing of a lead but the
+// OnlyOrders reports whether the narrowing asks nothing of a code finding but the
 // order the list is paged in. A filter added to the list is a narrowing here
 // without anything naming it.
 //
-// Three questions every lead answers the same way, so asking them narrows no
-// lead out: the floor, which a lead has none of; work no promised upgrade
-// covers, which is every lead; and the release questions at their defaults,
+// Three questions every code finding answers the same way, so asking them narrows no
+// code finding out: the floor, which a code finding has none of; work no promised upgrade
+// covers, which is every code finding; and the release questions at their defaults,
 // branches still in support, which are what a list asked nothing about them
 // reads anyway. The screen writes those defaults into every address it
 // exports.
 func (n Narrowing) OnlyOrders() bool {
-	n.Sort, n.Ascending, n.BelowFloor = "", false, false
+	n.Sort, n.Ascending, n.BelowMinimumSeverity = "", false, false
 	if n.Planned == Planned(finding.NotPlanned) || n.Planned == PlannedEither {
 		n.Planned = ""
 	}
@@ -332,16 +332,16 @@ func BeneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
 				" needs a product, a branch and a variant that name exactly one build")
 	}
-	targets, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
+	buildIDs, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
 	if err != nil {
 		return nil, WentWrong(in.Logger, "cannot tell which builds are in scope", err)
 	}
-	if len(targets) != 1 {
+	if len(buildIDs) != 1 {
 		return nil, huma.Error422UnprocessableEntity(
 			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
 				" needs a branch and a variant that name exactly one build")
 	}
-	componentID, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targets[0], name, which)
+	componentID, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, buildIDs[0], name, which)
 	if err != nil {
 		var several *graph.Ambiguous
 		if errors.As(err, &several) {

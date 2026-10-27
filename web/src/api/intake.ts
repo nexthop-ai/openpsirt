@@ -38,7 +38,7 @@ export function useAfterReport() {
     void queries.invalidateQueries({ queryKey: ["finding"] });
     void queries.invalidateQueries({ queryKey: ["findings"] });
     void queries.invalidateQueries({ queryKey: ["issue"] });
-    void queries.invalidateQueries({ queryKey: ["disclosing"] });
+    void queries.invalidateQueries({ queryKey: ["disclosure-deadlines"] });
     void queries.invalidateQueries({ queryKey: ["home"] });
   };
 }
@@ -93,7 +93,7 @@ export function useRulings(
 }
 
 // Rulings in every product the reader may work reports in, narrowed the way
-// the review queue and the record narrow what they list.
+// the review queue and the audit log narrow what they list.
 export function useRulingsAcross(asked: {
   waiting?: boolean;
   approvable?: boolean;
@@ -166,7 +166,7 @@ export function useDuplicates(product: string, vulnerability: string) {
 export function useRecordReport(product: string) {
   const after = useAfterReport();
   return useMutation({
-    mutationFn: async (body: Body<"ClaimedBody">) =>
+    mutationFn: async (body: Body<"NewReportBody">) =>
       unwrap(
         await api.POST("/v1/products/{product}/reports", {
           params: { path: { product } },
@@ -329,7 +329,7 @@ export const handedBack = [
   "holdings",
   "held-reports",
   "findings",
-  "leads",
+  "code-findings",
   "reports",
   "assigned",
   "team-assigned",

@@ -62,7 +62,7 @@ func assignOne(t *testing.T, w *fixture.World, holder int64) {
 	t.Helper()
 	db := w.DB
 	ctx := t.Context()
-	target := w.Target
+	build := w.Build
 	named, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 		{Identifier: "CVE-2026-1", Severity: "high"},
 	})
@@ -78,7 +78,7 @@ func assignOne(t *testing.T, w *fixture.World, holder int64) {
 	}
 	for _, id := range named {
 		row := &finding.Finding{
-			TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
+			BuildID: build.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
 			Visibility: access.Public, ComponentID: component.ID,
 			OccurrenceIdentity: "place-1", Urgency: 1,
 			OpenedAt: time.Now().UTC(), AssignedTo: &holder,
@@ -132,7 +132,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		}
 
 		// A build with two findings, one held by each of the two who hold any.
-		target := w.Target
+		build := w.Build
 		issues := finding.NewVulnerabilities(db.DB)
 		named, err := issues.Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-1", Severity: "high"},
@@ -152,7 +152,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		for identifier, id := range named {
 			held := holder[identifier]
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
+				BuildID: build.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
 				Visibility: access.Public, ComponentID: component.ID,
 				OccurrenceIdentity: "place-" + identifier, Urgency: 1,
 				OpenedAt: time.Now().UTC(), AssignedTo: &held,
@@ -300,7 +300,7 @@ func TestSomebodyAwayHoldingOnlyReportsIsRaised(t *testing.T) {
 		report := func(reference string, holder int64, judged bool) {
 			t.Helper()
 			row := &finding.FlawReport{
-				Reference: reference, ProductID: w.Product.ID, Summary: "A claim.",
+				Reference: reference, ProductID: w.Product.ID, ReportedProblem: "A report.",
 				RecordedBy: admin.ID, RecordedAt: now, AssignedTo: &holder, AssignedAt: &now,
 			}
 			if judged {

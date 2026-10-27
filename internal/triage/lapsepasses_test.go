@@ -45,7 +45,7 @@ func TestASweepLapsingLessThanABatchReadsTheDecisionsOnce(t *testing.T) {
 		for i := range size {
 			occurrence := fmt.Sprintf("place-%d", i)
 			if _, err := f.db.DB.NewInsert().Model(&finding.Finding{
-				TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+				BuildID: in.build, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 				Visibility: access.Public, ComponentID: moved, OccurrenceIdentity: occurrence,
 				OpenedAt: now, OpenedRunID: &in.run,
 			}).Exec(ctx); err != nil {
@@ -63,7 +63,7 @@ func TestASweepLapsingLessThanABatchReadsTheDecisionsOnce(t *testing.T) {
 		}
 		reads := &lapsableReads{}
 		f.hook(reads)
-		lapsed, err := f.store.Lapse(ctx, in.target)
+		lapsed, err := f.store.Lapse(ctx, in.build)
 		if err != nil {
 			t.Fatal(err)
 		}

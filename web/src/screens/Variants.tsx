@@ -21,7 +21,7 @@ import { Wide } from "../ui/Wide";
 // restated per release. With a release in the path this lists what that
 // release was actually built as; without one, what the product declares.
 export function Variants() {
-  const { product = "", stream = "" } = useParams();
+  const { product = "", branch_or_tag: branchOrTag = "" } = useParams();
   const queries = useQueryClient();
   const who = useWho();
   const [adding, setAdding] = useState(false);
@@ -34,18 +34,18 @@ export function Variants() {
   const [editFacing, setEditFacing] = useState(true);
 
   const ofRelease = useQuery({
-    queryKey: ["variants", product, stream, "counts"],
-    enabled: !!stream,
+    queryKey: ["variants", product, branchOrTag, "counts"],
+    enabled: !!branchOrTag,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/branches-and-tags/{stream}/variants", {
-          params: { path: { product, stream }, query: { counts: true } },
+        await api.GET("/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants", {
+          params: { path: { product, branch_or_tag: branchOrTag }, query: { counts: true } },
         }),
       ),
   });
   const ofProduct = useQuery({
     queryKey: ["variants", product, "counts"],
-    enabled: !stream,
+    enabled: !branchOrTag,
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/variants", {
@@ -53,13 +53,13 @@ export function Variants() {
         }),
       ),
   });
-  const variants = stream ? ofRelease : ofProduct;
+  const variants = branchOrTag ? ofRelease : ofProduct;
 
   // Both lists, because the two answer different questions about the same
   // variant: what the product declares, and what a release was built as.
   const invalidate = () => {
     void queries.invalidateQueries({ queryKey: ["variants", product] });
-    void queries.invalidateQueries({ queryKey: ["variants", product, stream] });
+    void queries.invalidateQueries({ queryKey: ["variants", product, branchOrTag] });
   };
 
   const declare = useMutation({
@@ -119,11 +119,13 @@ export function Variants() {
   const items = variants.data?.items ?? [];
   return (
     <>
-      <Crumbs product={product} stream={stream || undefined} />
+      <Crumbs product={product} branch_or_tag={branchOrTag || undefined} />
       <div className="screen-head">
         <h2>Variants</h2>
         <p>
-          {stream ? `The ways ${product} · ${stream} is built.` : `The ways ${product} is built.`}{" "}
+          {branchOrTag
+            ? `The ways ${product} · ${branchOrTag} is built.`
+            : `The ways ${product} is built.`}{" "}
           The same code, built a different way.
         </p>
         {who.data?.admin && <AddButton label="Add variant" onClick={() => setAdding(true)} />}
@@ -139,9 +141,9 @@ export function Variants() {
 
       {items.length === 0 ? (
         <Empty
-          title={stream ? "Nothing has been scanned here." : "No variant is declared."}
+          title={branchOrTag ? "Nothing has been scanned here." : "No variant is declared."}
           detail={
-            stream
+            branchOrTag
               ? "Appears under a release once a scan is filed against it."
               : "Declare one before a build can file a scan against it."
           }
@@ -178,9 +180,13 @@ export function Variants() {
                   </td>
                   <td className="num">{(variant.open ?? 0).toLocaleString()}</td>
                   <td className="rowacts">
-                    {stream ? (
+                    {branchOrTag ? (
                       <Link
-                        to={buildFindingsAt({ product, stream, variant: variant.name ?? "" })}
+                        to={buildFindingsAt({
+                          product,
+                          branch_or_tag: branchOrTag,
+                          variant: variant.name ?? "",
+                        })}
                         className="linkish"
                       >
                         Findings →

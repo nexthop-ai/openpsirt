@@ -41,11 +41,12 @@ func Lapses(db *bun.DB, logger *slog.Logger) func(context.Context, []triage.ForP
 //
 // A link to the decisions that are theirs to re-affirm rather than to one of the
 // rows: a version bump lapses many decisions at once, and the work is re-affirming
-// all of them.
+// all of them. The count is of occurrence rows, one per place a decision
+// reached, so it is said as occurrences.
 func Lapse(one triage.ForPerson) Telling {
 	what := "A decision of yours"
 	if one.Rows > 1 {
-		what = fmt.Sprintf("%d decisions of yours", one.Rows)
+		what = fmt.Sprintf("Your decisions at %d occurrences", one.Rows)
 	}
 	why := " stopped applying: the code it was about has moved."
 	again := " The finding is open again, and re-affirming it is yours to do."
@@ -53,8 +54,8 @@ func Lapse(one triage.ForPerson) Telling {
 	case one.RatedWorse:
 		why = " stopped applying: the issue is rated worse than when it was made."
 	case one.Probable:
-		why = " stopped applying: an analyzer run matched the lead only by its function or its nearest line."
-		again = " The lead is open again, and re-affirming it is yours to do."
+		why = " stopped applying: an analyzer run matched the code finding only by its function or its nearest line."
+		again = " The code finding is open again, and re-affirming it is yours to do."
 	}
 	return Telling{
 		PersonID: one.PersonID, Kind: DecisionLapsed,

@@ -30,7 +30,7 @@ type Kind string
 
 const (
 	// Setting is a value in the settings, including the three that rewrite
-	// what the tool reports: the deadline windows, the triage floor, and how
+	// what the tool reports: the deadline windows, the minimum severity, and how
 	// roles are assigned.
 	Setting Kind = "setting"
 	// Role is a grant or a withdrawal against one product.
@@ -44,14 +44,15 @@ const (
 	Account Kind = "account"
 	// Team is a team declared or retired, or somebody put on one or taken off.
 	Team Kind = "team"
-	// Routing is a standing rule that hands unheld work to a team, added or
-	// retired. Not a Role: a role is granted to a person against one product,
-	// and a routing rule grants nobody anything — it decides who is asked.
-	Routing Kind = "routing"
-	// LeadRule is a standing rule that dismisses static analysis leads:
-	// proposed, approved or retired. Not a Routing: it decides what a lead
-	// is, which is a decision, where a routing rule decides who is asked.
-	LeadRule Kind = "lead-rule"
+	// AssignmentRule is a standing rule that hands unheld work to a team,
+	// added or retired. Not a Role: a role is granted to a person against one
+	// product, and an assignment rule grants nobody anything — it decides who
+	// is asked.
+	AssignmentRule Kind = "assignment-rule"
+	// SuppressionRule is a suppression rule that dismisses static analysis code findings:
+	// proposed, approved or retired. Not an AssignmentRule: it decides what a code finding
+	// is, which is a decision, where an assignment rule decides who is asked.
+	SuppressionRule Kind = "suppression-rule"
 	// Alias is another identifier an issue answers to. Deployment-wide and
 	// permanent: from the moment it is recorded, a scan of any product
 	// reporting that name resolves to this issue and inherits its decisions.
@@ -70,14 +71,14 @@ const (
 	// ship date and what it was cut from, which are facts about one release
 	// rather than about what the catalog holds.
 	Catalog Kind = "catalog"
-	// ExploitedHere is somebody recording that a product was exploited
+	// Incident is somebody recording that a product was exploited
 	// through an issue, or clearing that record. Not a triage decision: it is a fact
 	// about an incident rather than a decision about a finding, and what it
 	// does is decide what the triage record may say — a decision that the issue
 	// does not apply is refused while it stands, and one already agreed to
 	// has its agreement taken back. That is the same kind of act as an alias,
 	// and it belongs beside one.
-	ExploitedHere Kind = "exploited-here"
+	Incident Kind = "incident"
 	// Case is somebody brought into one undisclosed case, or taken off it
 	// . An access change like the rest of these: it is the one way
 	// somebody reaches an embargoed finding without holding private
@@ -86,7 +87,7 @@ const (
 	Case Kind = "case"
 	// Merge is a record a report's merge of two issues took out of force
 	// because another stood in its place in the same product: a rating claim
-	// withdrawn, or a record of being attacked cleared. Nobody chose which of
+	// withdrawn, or an incident cleared. Nobody chose which of
 	// the two stands, so what the product lost is asked about afterwards.
 	Merge Kind = "merge"
 	// Upstream is a product starting or stopping trusting an upstream, its
@@ -104,8 +105,8 @@ const (
 // which shows up as an empty screen rather than as a failure.
 func Kinds() []Kind {
 	return []Kind{
-		Setting, Role, Routing, LeadRule, Support, Release,
-		Credential, Account, Team, Case, Alias, Catalog, ExploitedHere, Merge, Upstream,
+		Setting, Role, AssignmentRule, SuppressionRule, Support, Release,
+		Credential, Account, Team, Case, Alias, Catalog, Incident, Merge, Upstream,
 	}
 }
 
@@ -417,7 +418,8 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 // `axb@example.com` and report somebody else's history as this person's. The
 // escape character is "#" rather than a backslash, because a backslash inside a
 // string literal is itself an escape on two of the four engines and `ESCAPE
-// '\'` does not parse there at all — the same reason the routing rules use it.
+// '\'` does not parse there at all, the same reason the assignment rules use
+// it.
 //
 // The prefix is compared exactly as well. SQLite's LIKE ignores the case of
 // ASCII letters, and identities are compared exactly, so `alice@example.com`

@@ -28,19 +28,19 @@ const (
 	OutcomeUpgradeNeeded = "upgrade-needed"
 	// OutcomePatchNeeded promises a backported patch by a date.
 	OutcomePatchNeeded = "patch-needed"
-	// OutcomeDismissed says a lead is not a real flaw, or not one to act on,
+	// OutcomeDismissed says a code finding is not a real flaw, or not one to act on,
 	// for the reason it states.
 	OutcomeDismissed = "dismissed"
-	// OutcomeNotSecurity says a lead is a real flaw that does no harm: a
+	// OutcomeNotSecurity says a code finding is a real flaw that does no harm: a
 	// crash on a path no input reaches, a leak in a tool that exits.
 	OutcomeNotSecurity = "not-security"
-	// OutcomeConfirmed says a lead is a real flaw.
+	// OutcomeConfirmed says a code finding is a real flaw.
 	OutcomeConfirmed = "confirmed"
 )
 
 // AnyVersionOutcomes are the outcomes a decision covers its occurrence with
 // whatever versions the occurrence holds: a wrong match, which is about
-// identity, and every outcome about a lead, whose occurrence is the lead
+// identity, and every outcome about a code finding, whose occurrence is the code finding
 // itself.
 func AnyVersionOutcomes() []string {
 	return []string{OutcomeMismatched, OutcomeDismissed, OutcomeNotSecurity, OutcomeConfirmed}

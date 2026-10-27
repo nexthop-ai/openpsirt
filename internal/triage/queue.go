@@ -52,7 +52,7 @@ type Waiting struct {
 	// distinct issues, distinct occurrences.
 	Rows, Issues, Occurrences int
 	// Builds names every build the decision's rows currently cover, as the
-	// stream and variant display names joined with a middle dot.
+	// branch or tag and variant display names joined with a middle dot.
 	Builds []string
 	// Outliers is what in a bulk set does not look like the rest. Only for a
 	// decision over many issues; nil otherwise.
@@ -66,13 +66,13 @@ type Waiting struct {
 // Outliers is what an approver of a bulk decision checks instead of reading every
 // row: the handful that contradict the shape of the decision.
 type Outliers struct {
-	// ExploitedHere, Exploited, Severe, Fixable and Unmatched count the
-	// distinct issues in the decision with that property. ExploitedHere is this
-	// product's own standing record of being attacked through the issue;
+	// Incident, Exploited, Severe, Fixable and Unmatched count the
+	// distinct issues in the decision with that property. Incident is this
+	// product's own standing incident through the issue;
 	// Severe is critical or high; Unmatched is an issue whose description
 	// does not contain the term the set was narrowed by, where that term is
 	// known.
-	ExploitedHere, Exploited, Severe, Fixable, Unmatched int
+	Incident, Exploited, Severe, Fixable, Unmatched int
 	// Rows are the issues that stood out, attacked here first, then
 	// exploited, then by severity. Capped, except that no issue this product
 	// was attacked through is ever left off: agreeing to the decision is refused
@@ -89,7 +89,7 @@ type Outlier struct {
 	DecisionOccurrenceIDs []int64
 	Vulnerability         string
 	Severity              string
-	ExploitedHere         bool
+	Incident              bool
 	Exploited             bool
 	FixedIn               string
 	Description           string
@@ -241,9 +241,9 @@ type QueueFilter struct {
 	Severities []string
 	// Outcomes keeps decisions of these kinds.
 	Outcomes []Outcome
-	// Release keeps decisions that currently cover an open finding in a branch
-	// or tag of this name, matched the way a build's own names are.
-	Release string
+	// BranchOrTag keeps decisions that currently cover an open finding in a
+	// branch or tag of this name, matched the way a build's own names are.
+	BranchOrTag string
 }
 
 // narrow applies the filter to a grouped query over decision_occurrence AS de.
@@ -282,9 +282,9 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 			q.NewSelect().TableExpr(`"decision" AS "qc"`).Column("qc.id").
 				Where(`"qc"."outcome" IN (?)`, bun.List(f.Outcomes)))
 	}
-	if release := typedname.Matching(f.Release); release != "" {
-		// An open finding the row covers, in a build of the named release.
-		covers := openUnder(q).Where(`"st"."name" = ?`, release)
+	if named := typedname.Matching(f.BranchOrTag); named != "" {
+		// An open finding the row covers, in a build of the named branch or tag.
+		covers := openUnder(q).Where(`"st"."name" = ?`, named)
 		q = q.Where("EXISTS (?)", readableFindings(covers, subject, "f", `"st"."product_id"`))
 	}
 	return q
@@ -298,8 +298,8 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Where(finding.DecisionOccurrenceFiledAt("de", "f")).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
@@ -434,9 +434,9 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueF
 // can match findings they may not.
 func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, decisions []int64) (map[int64][]string, error) {
 	var rows []struct {
-		DecisionID int64  `bun:"decision_id"`
-		Stream     string `bun:"stream"`
-		Variant    string `bun:"variant"`
+		DecisionID  int64  `bun:"decision_id"`
+		BranchOrTag string `bun:"branch_or_tag"`
+		Variant     string `bun:"variant"`
 	}
 	query := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
@@ -448,14 +448,14 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, decis
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		// Grouped on the names and shown in the spelling somebody declared:
 		// the list is text a person reads, and one build is one entry
 		// however it was spelled.
-		ColumnExpr(`MIN(`+catalog.ShownExpr("st")+`) AS "stream"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("st")+`) AS "branch_or_tag"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("va")+`) AS "variant"`).
 		Where(`"de"."decision_id" IN (?)`, bun.List(decisions)).
 		// Live rows only, as a decision's reach is counted.
@@ -473,7 +473,7 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, decis
 	}
 	builds := map[int64][]string{}
 	for _, row := range rows {
-		builds[row.DecisionID] = append(builds[row.DecisionID], row.Stream+" \u00b7 "+row.Variant)
+		builds[row.DecisionID] = append(builds[row.DecisionID], row.BranchOrTag+" \u00b7 "+row.Variant)
 	}
 	return builds, nil
 }
@@ -553,7 +553,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisio
 	// Which of these issues each product records being attacked through.
 	attacked := map[int64]map[int64]bool{}
 	for productID, issues := range byProduct {
-		standing, err := finding.ExploitedHere(ctx, s.db, productID, issues)
+		standing, err := finding.Incident(ctx, s.db, productID, issues)
 		if err != nil {
 			return nil, err
 		}
@@ -604,8 +604,8 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisio
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
@@ -677,11 +677,11 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 		one := Outlier{
 			DecisionOccurrenceID: occurrencesOf[issue.ID][0], DecisionOccurrenceIDs: occurrencesOf[issue.ID],
 			Vulnerability: issue.Identifier, Severity: word,
-			ExploitedHere: attacked[issue.ID], Exploited: issue.Exploited,
+			Incident: attacked[issue.ID], Exploited: issue.Exploited,
 			FixedIn: fixedIn[issue.ID], Description: clip(issue.Description, 200),
 		}
-		if one.ExploitedHere {
-			out.ExploitedHere++
+		if one.Incident {
+			out.Incident++
 			one.Why = append(one.Why, "this product was attacked through it")
 		}
 		if issue.Exploited {
@@ -708,8 +708,8 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 	// so the order is the same on every engine.
 	sort.SliceStable(candidates, func(i, j int) bool {
 		a, b := candidates[i], candidates[j]
-		if a.ExploitedHere != b.ExploitedHere {
-			return a.ExploitedHere
+		if a.Incident != b.Incident {
+			return a.Incident
 		}
 		if a.Exploited != b.Exploited {
 			return a.Exploited
@@ -721,7 +721,7 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 	})
 	// Past the cap only where the rows past it are attacked here, which sort
 	// first: those are the ones agreeing is refused over.
-	keep := max(outlierRows, out.ExploitedHere)
+	keep := max(outlierRows, out.Incident)
 	if len(candidates) > keep {
 		candidates = candidates[:keep]
 	}

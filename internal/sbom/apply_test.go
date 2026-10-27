@@ -22,7 +22,7 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 	world.Each(t, func(t *testing.T, w *world.World) {
 		db := w.DB
 		ctx := t.Context()
-		filedAgainst := w.Target
+		filedAgainst := w.Build
 
 		doc, err := sbom.Read(fixture(t, "image.cdx.json"), sbom.Limits{})
 		if err != nil {
@@ -39,7 +39,7 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 		record := func(hash string, at time.Time) int64 {
 			t.Helper()
 			rec, outcome, err := scans.Record(ctx, ingest.Arriving{
-				TargetID: filedAgainst.ID, ContentHash: hash, BuiltAt: at, ParserVersion: "test",
+				BuildID: filedAgainst.ID, ContentHash: hash, BuiltAt: at, ParserVersion: "test",
 			})
 			if err != nil || outcome != ingest.Accept {
 				t.Fatalf("record: outcome %v, err %v", outcome, err)
@@ -85,13 +85,13 @@ func TestALicenseReadFromAnElementReachesTheStoredComponent(t *testing.T) {
 	world.Each(t, func(t *testing.T, w *world.World) {
 		db := w.DB
 		ctx := t.Context()
-		target := w.Target
+		target := w.Build
 		doc, err := sbom.Read(fixture(t, "rust-app.spdx3.json"), sbom.Limits{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		rec, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "spdx3", BuiltAt: time.Now().UTC(), ParserVersion: "test",
+			BuildID: target.ID, ContentHash: "spdx3", BuiltAt: time.Now().UTC(), ParserVersion: "test",
 		})
 		if err != nil {
 			t.Fatal(err)

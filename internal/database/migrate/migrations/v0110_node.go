@@ -20,7 +20,7 @@ func graphNodeV0110(t *columnTypes) []string {
 			-- built from, without credentials. An analyzer's result in that
 			-- repository is placed on the component.
 			"repository"       `+t.free+` NULL,`)
-	return statements
+	return renamedV0110(statements)
 }
 
 // graphNodeRepositoryV0110 adds the repository a build stated to each node.

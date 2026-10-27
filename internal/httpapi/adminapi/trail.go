@@ -75,12 +75,12 @@ func registerTrail(api huma.API, in core.Deps) {
 		OperationID: "list-administrative-changes", Method: http.MethodGet,
 		Path:    "/v1/administration/changes",
 		Summary: "List administrative changes",
-		Description: "Who changed a setting, a role grant, a routing rule, a support date, a " +
+		Description: "Who changed a setting, a role grant, an assignment rule, a support date, a " +
 			"credential, an account, a team or an issue's names — with what it held " +
 			"before and what it holds now.\n\n" +
 			"This is the layer above the triage record rather than part of it. Three of the " +
 			"things listed here silently rewrite what the tool reports: the deadline windows " +
-			"recompute every open finding's deadline, the triage floor takes the deadline off " +
+			"recompute every open finding's deadline, the minimum severity takes the deadline off " +
 			"everything below it, and an end-of-life date takes it off everything past it.\n\n" +
 			"Newest first, and paged: it only grows.\n\n" +
 			"Takes a period, because the question an audit asks is what changed in the " +

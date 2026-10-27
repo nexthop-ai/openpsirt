@@ -71,7 +71,7 @@ export function Collaborators({
 }
 
 // The people brought into one grant narrower than the product: a case, or one
-// lead. What the grant reaches is said on the card.
+// code finding. What the grant reaches is said on the card.
 export function People({
   product,
   scope,
@@ -211,14 +211,14 @@ export function Assignee({
   at,
   assigned,
   undisclosed,
-  routedBy,
+  assignedByRule,
 }: {
   at: At;
   assigned: string;
   undisclosed: boolean;
-  // The standing rule that placed this, where one did. A placement nobody can
+  // The assignment rule that placed this, where one did. A placement nobody can
   // explain is one nobody can correct.
-  routedBy: string;
+  assignedByRule: string;
 }) {
   const queries = useQueryClient();
   const hand = useMutation({
@@ -227,7 +227,7 @@ export function Assignee({
     mutationFn: async (held: Held | null) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/assignment",
           {
             params: whereOf(at),
             body:
@@ -266,7 +266,7 @@ export function Assignee({
           onPick={(held) => hand.mutate(held)}
         />
       </div>
-      {routedBy && <span className="hint">by rule {routedBy}</span>}
+      {assignedByRule && <span className="hint">by rule {assignedByRule}</span>}
       {hand.isPending && <span className="hint">Saving…</span>}
       {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
     </div>
@@ -285,7 +285,7 @@ export function Resolve({
   vulnerability,
   prefill = "",
 }: {
-  at: { product: string; stream: string; variant: string };
+  at: { product: string; branch_or_tag: string; variant: string };
   vulnerability: string;
   // What the fix is first written as, where something here already says it.
   prefill?: string;
@@ -298,7 +298,7 @@ export function Resolve({
     mutationFn: async () =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/resolve",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/resolve",
           {
             params: { path: { ...at, issue: vulnerability } },
             body: { because: because.trim() },
@@ -487,12 +487,12 @@ export function Attachments({
 // to distrust the ones that work.
 export function Marks({
   at,
-  tags,
+  labels,
   mayMark,
   onChanged,
 }: {
   at: At;
-  tags: string[];
+  labels: string[];
   mayMark: boolean;
   onChanged: () => void;
 }) {
@@ -500,7 +500,7 @@ export function Marks({
   const [adding, setAdding] = useState(false);
 
   const inUse = useQuery({
-    queryKey: ["tags", at.product],
+    queryKey: ["labels", at.product],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/labels", {
@@ -511,13 +511,13 @@ export function Marks({
   });
 
   const where = whereOf(at);
-  const path = (tag: string) => ({ ...where.path, label: tag });
+  const path = (label: string) => ({ ...where.path, label });
   const mark = useMutation({
-    mutationFn: async (tag: string) =>
+    mutationFn: async (label: string) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
-          { params: { path: path(tag), query: where.query } },
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
+          { params: { path: path(label), query: where.query } },
         ),
       ),
     onSuccess: () => {
@@ -527,36 +527,36 @@ export function Marks({
     },
   });
   const unmark = useMutation({
-    mutationFn: async (tag: string) =>
+    mutationFn: async (label: string) =>
       unwrap(
         await api.DELETE(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
-          { params: { path: path(tag), query: where.query } },
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
+          { params: { path: path(label), query: where.query } },
         ),
       ),
     onSuccess: onChanged,
   });
 
   const busy = mark.isPending || unmark.isPending;
-  // A tag already on this is not offered again — the request would succeed
+  // A label already on this is not offered again — the request would succeed
   // and change nothing, which reads as the control not working.
-  const already = new Set(tags.map((each) => each.trim().toLowerCase()));
-  // silent-read: a suggestion list; a tag not offered can still be typed.
+  const already = new Set(labels.map((each) => each.trim().toLowerCase()));
+  // silent-read: a suggestion list; a label not offered can still be typed.
   const offered = (inUse.data?.items ?? []).filter((each) => !already.has(each.toLowerCase()));
 
-  if (tags.length === 0 && !mayMark) return null;
+  if (labels.length === 0 && !mayMark) return null;
   return (
     <div className="marks">
-      {tags.map((tag) => (
-        <span key={tag} className="mark">
-          {tag}
+      {labels.map((label) => (
+        <span key={label} className="mark">
+          {label}
           {mayMark && (
             <button
               type="button"
-              aria-label={`Remove tag ${tag}`}
-              title={`Remove tag ${tag}`}
+              aria-label={`Remove label ${label}`}
+              title={`Remove label ${label}`}
               disabled={busy}
-              onClick={() => unmark.mutate(tag)}
+              onClick={() => unmark.mutate(label)}
             >
               ×
             </button>
@@ -567,11 +567,11 @@ export function Marks({
         (adding ? (
           <span className="marking">
             <Suggest
-              id="tag-with"
-              label="Add a tag"
+              id="label-with"
+              label="Add a label"
               value={typed}
               onChange={setTyped}
-              onPick={(tag) => mark.mutate(tag)}
+              onPick={(label) => mark.mutate(label)}
               options={offered}
               loading={inUse.isFetching}
               from={0}
@@ -599,11 +599,11 @@ export function Marks({
           </span>
         ) : (
           <button type="button" className="mark add" onClick={() => setAdding(true)}>
-            + Tag
+            + Label
           </button>
         ))}
       {(mark.error != null || unmark.error != null) && (
-        <Failed error={mark.error ?? unmark.error} what="That tag did not change." />
+        <Failed error={mark.error ?? unmark.error} what="That label did not change." />
       )}
     </div>
   );

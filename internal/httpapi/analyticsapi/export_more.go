@@ -1,0 +1,684 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package analyticsapi
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
+)
+
+// The lists that could be read on a screen and not taken away.
+//
+// An export is not a convenience here. The audit log is what an
+// auditor is given, the review queue is what a manager reports a backlog from,
+// and the by-component view is what a release meeting argues over — none of
+// the three a screen somebody should copy out of by hand.
+//
+// The subject travels through the stream, as it does for the findings export:
+// the same query the screen reads, paged and written out as it goes, with no
+// point at which a whole unnarrowed list exists to be filtered afterwards.
+// That is the failure an export is the easiest place to make.
+//
+// The same filters as the screen, from the same struct. An export taking a
+// smaller set is a file that quietly answers a different question from the one
+// on screen, which is worse than no export: nothing about the file says it.
+
+func registerMoreExports(api huma.API, in core.Deps) {
+	registerAuditExport(api, in)
+	registerChangeExport(api, in)
+	registerTrendExport(api, in)
+	registerQueueExport(api, in)
+	registerMyDecisionsExport(api, in)
+	registerComponentExport(api, in)
+	registerDueExport(api, in)
+	registerComparisonExport(api, in)
+}
+
+// registerDueExport writes out what is running out of time.
+//
+// The deadline report is the one somebody takes to a meeting about dates.
+// Without a file the late list is retyped, and a retyped list is wrong by the
+// meeting after next.
+func registerDueExport(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-running-out", Method: http.MethodGet,
+		Path:    "/v1/running-out.{format}",
+		Summary: "Export what is running out of time",
+		Description: "Open findings whose deadline falls within `days` and which nobody has " +
+			"decided about, as a file: every row, not the page the screen shows.\n\n" +
+			"The same list the screen reads, under the same rule — a deadline that has been " +
+			"answered is not on it, because a dismissal takes a finding off the clock and a " +
+			"deferral replaces the deadline with its own date. What is left is time passing " +
+			"with nothing said.\n\n" +
+			"`days_left` is negative once something is overdue.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Format string `path:"format" enum:"csv,json"`
+		core.ScopeQuery
+		Days int `query:"days" default:"14" minimum:"0" maximum:"365" doc:"The distance ahead to look"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
+		if err != nil {
+			return nil, err
+		}
+		store := finding.NewStore(in.DB.DB)
+		now := time.Now().UTC()
+		out := core.Exporting{
+			What:  "what is running out of time",
+			About: []core.Stated{{Label: "looking ahead days", Value: strconv.Itoa(input.Days)}},
+			Header: []string{
+				"issue", "severity", "exploited", "component", "version",
+				"product", "product name", "branch_or_tag", "branch or tag name", "variant", "variant name",
+				"occurrences", "held by", "held by name", "due", "days left",
+			},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				late, _, err := store.RunningOutPage(ctx, subject, scope,
+					time.Duration(input.Days)*24*time.Hour, limit, offset)
+				if err != nil {
+					return nil, err
+				}
+				// The rows the screen states, so the file and the screen
+				// cannot round or name a holder differently.
+				bodies, err := lateBodies(ctx, in, late, now)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(bodies))
+				for _, body := range bodies {
+					rows = append(rows, []string{
+						body.Vulnerability, body.Severity,
+						strconv.FormatBool(body.Exploited),
+						body.Component, body.Version,
+						body.Product, body.ProductName,
+						body.BranchOrTag, body.BranchOrTagName,
+						body.Variant, body.VariantName,
+						strconv.Itoa(body.Occurrences), body.AssignedTo, body.AssignedName,
+						body.Due, strconv.Itoa(body.DaysLeft),
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, "running-out", out)
+		}}, nil
+	})
+}
+
+// registerComparisonExport writes out what changed between two builds.
+//
+// The comparison is what a release note is written from, and its destination
+// is usually a document somebody else edits — so it has to leave the screen.
+//
+// One file rather than three, with a column saying which of the three each row
+// belongs to: what is fixed, newly present and still present is one comparison,
+// and three files are three things to keep together by hand.
+func registerComparisonExport(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-comparison", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/comparison.{format}",
+		Summary: "Export a comparison of two builds",
+		Description: "What was fixed, what is newly present and what is still there between " +
+			"two builds, as a file.\n\n" +
+			"One file with a `change` column rather than three files: it is one comparison, " +
+			"and three of anything that has to be kept together is three chances to send " +
+			"somebody two of them.\n\n" +
+			"Each fixed row says why it went. `superseded` is the one to read carefully — the " +
+			"version moved and the issue came with it, so it was not fixed at all. A " +
+			"still-present row carrying `arrived from` is that same failure from the other " +
+			"side.\n\n" +
+			"Public findings only unless you ask otherwise, because the destination is " +
+			"usually a public document.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		Format  string `path:"format" enum:"csv,json"`
+		TwoBuilds
+		IncludePrivate bool `query:"include_undisclosed" doc:"Include findings nobody has disclosed"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		from, to, err := input.buildIDs(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
+		}
+		// Read whole rather than paged, unlike every other export here: a
+		// comparison is one answer computed from two builds at once and there
+		// is no page of it to ask for. Bounded by what two builds hold, which
+		// is what the screen already reads.
+		comparison, err := finding.NewStore(in.DB.DB).Compare(ctx, subject, from, to,
+			input.IncludePrivate)
+		if err != nil {
+			return nil, core.RefusedFinding(in, err)
+		}
+		out := core.Exporting{
+			What: "comparison of two builds",
+			// The two builds named, because a file headed "comparison" and
+			// naming neither of them is a document nobody can check against
+			// anything, and whether the undisclosed ones are in it: a file
+			// that leaves them out reads as complete about what remains.
+			About: []core.Stated{
+				{Label: "earlier build", Value: input.From + " (" + input.FromVariant + ")"},
+				{Label: "later build", Value: input.To + " (" + input.ToVariant + ")"},
+				{Label: "includes undisclosed", Value: strconv.FormatBool(input.IncludePrivate)},
+			},
+			Header: []string{
+				"change", "issue", "component", "severity", "because",
+				"from version", "moved to", "arrived from", "closed by run",
+				"state", "outcome", "justification", "due",
+			},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				if offset > 0 {
+					return nil, nil
+				}
+				rows := make([][]string, 0, len(comparison.Fixed)+len(comparison.Closed)+
+					len(comparison.Newly)+len(comparison.Still))
+				for _, group := range []struct {
+					what string
+					of   []finding.Changed
+					// stands says the rows carry what the build decided about
+					// them, which is true of what is still there and of
+					// nothing else: what was fixed needs no justification and
+					// what is newly present has not been looked at yet.
+					stands bool
+				}{
+					{what: "fixed", of: comparison.Fixed},
+					// Apart from the fixes, by the same split the screen and
+					// the release note read: a superseded bump and a closure
+					// nothing explains are not work anybody did.
+					{what: "closed, not fixed", of: comparison.Closed},
+					{what: "newly present", of: comparison.Newly},
+					{what: "still present", of: comparison.Still, stands: true},
+				} {
+					// Read through the same function the screen reads, so the
+					// file cannot come to answer less than the screen it was
+					// taken from. Read apart from it, an approved
+					// not-applicable and a row nobody has looked at are the
+					// same nine columns.
+					for _, body := range changed(group.of, true, group.stands) {
+						closedRun := ""
+						if body.ClosedRun != 0 {
+							closedRun = strconv.FormatInt(body.ClosedRun, 10)
+						}
+						rows = append(rows, []string{
+							group.what, body.Vulnerability, body.Component, body.Severity,
+							string(body.Because), body.FromVersion, body.MovedTo, body.ArrivedFrom,
+							closedRun, string(body.State), string(body.Outcome),
+							string(body.Justification), body.Due,
+						})
+					}
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, "comparison-"+core.DownloadName(input.Product), out)
+		}}, nil
+	})
+}
+
+// asDay is a bound on a period as a file states it, and nothing where the
+// period has no bound on that side.
+func asDay(at time.Time) string {
+	if at.IsZero() {
+		return ""
+	}
+	return at.UTC().Format(time.DateOnly)
+}
+
+// registerAuditExport writes out the audit log.
+func registerAuditExport(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-audit", Method: http.MethodGet, Path: "/v1/audit.{format}",
+		Summary: "Export the audit log of decisions",
+		Description: "The audit list as a file: every decision the same filters would show, " +
+			"not one page of them.\n\n" +
+			"One row per occurrence a decision covers, with the decision it belongs to, who proposed it, who has a " +
+			"standing agreement on it, and whether a second person does. Every occurrence one " +
+			"act covered shares a decision, and `GET /v1/audit/decisions` lists them grouped by it. " +
+			"Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a " +
+			"list; the JSON keeps them as one field of the same shape.\n\n" +
+			"`agreements` is the whole of the record, with dates: who agreed, when, " +
+			"whether the agreement was carried from an earlier decision, and when it was taken " +
+			"back. `approved by` stays who agrees *now*, because those are different " +
+			"questions and a column mixing them is the one answer an auditor must not be " +
+			"given.\n\n" +
+			"Read with your own visibility, as it streams. Nothing about a report is " +
+			"exempt from the rules the screens follow — a file showing more than the screen " +
+			"that summarizes it would be a way around them.\n\n" +
+			"Takes every filter the audit list takes, including the period.",
+		Tags: []string{"Analytics"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Auditing
+		Format string `path:"format" enum:"csv,json"`
+	}) (*huma.StreamResponse, error) {
+		subject, store, err := core.Triaging(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		filter, since, until, err := input.narrow(ctx, in, subject)
+		if err != nil {
+			return nil, err
+		}
+		// What was asked for, printed on the file. A sheet headed "the record
+		// of decisions" over a narrowed population is a sheet nobody can
+		// check against anything.
+		about := []core.Stated{{Label: "from", Value: asDay(since)}, {Label: "to", Value: asDay(until)}}
+		if filter.InForce {
+			about = append(about, core.Stated{Label: "applies", Value: "still standing"})
+		}
+		out := core.Exporting{
+			What:  "the audit log",
+			About: about,
+			Header: []string{
+				"id", "decision", "proposed", "product", "product name", "issue", "component", "version",
+				"consumer",
+				"outcome", "justification", "reason", "deferred until", "fixed version",
+				"state", "standing", "proposed by", "approved by", "two people", "ended",
+				"agreements", "reasoning",
+			},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				audited, _, err := store.Audit(ctx, subject, filter, since, until, limit, offset)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(audited))
+				for _, row := range audited {
+					body := auditedBody(row)
+					// Only the agreements that still stand. One taken back is
+					// in the record and is not somebody who agrees now, and a
+					// column that mixed the two would be the exact answer an
+					// auditor must not be given.
+					agreed := make([]string, 0, len(body.Approvals))
+					for _, one := range body.Approvals {
+						if one.WithdrawnAt == "" {
+							agreed = append(agreed, one.By)
+						}
+					}
+					// And the whole of the record beside it, dates and all.
+					// The column above is who agrees now, which is what an
+					// auditor reads first; an agreement somebody made and
+					// then took back is what an audit is looking for, and
+					// this column and the dates beside it are what carry it.
+					every := make([]string, 0, len(body.Approvals))
+					for _, one := range body.Approvals {
+						said := one.By + " " + one.At
+						if one.Carried {
+							said += " carried"
+						}
+						if one.WithdrawnAt != "" {
+							said += " withdrawn " + one.WithdrawnAt
+						}
+						every = append(every, said)
+					}
+					rows = append(rows, []string{
+						strconv.FormatInt(body.ID, 10), strconv.FormatInt(body.DecisionID, 10),
+						body.ProposedAt, body.Product,
+						body.ProductName, body.Issue, body.Component, body.Version, body.Consumer,
+						string(body.Outcome), string(body.Justification), string(body.Reason),
+						body.DeferredUntil, body.FixedVersion, string(body.State),
+						strconv.FormatBool(body.Standing),
+						body.ProposedBy, strings.Join(agreed, "; "),
+						strconv.FormatBool(body.TwoPeople), body.EndedAt,
+						strings.Join(every, "; "), body.Reasoning,
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, "audit", out)
+		}}, nil
+	})
+}
+
+// registerQueueExport writes out one list of the review queue.
+func registerQueueExport(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-review-queue", Method: http.MethodGet,
+		Path:    "/v1/review-queue.{format}",
+		Summary: "Export the review queue",
+		Description: "The review queue as a file: every decision, not one page of them.\n\n" +
+			"One row per decision, the way the screen counts them — one proposer's action, " +
+			"however many occurrences it reaches — with how much it covers and how old it is.\n\n" +
+			"Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, " +
+			"and holds the same decisions.",
+		Tags: []string{"Triage"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Format  string `path:"format" enum:"csv,json"`
+		Mine    bool   `query:"mine" doc:"Write out only decisions you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you"`
+		Product string `query:"product" doc:"Limit to decisions made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
+		core.QueueNarrowing
+	}) (*huma.StreamResponse, error) {
+		subject, store, err := core.Triaging(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		// Narrowed the same way the list is, so a file taken from a narrowed
+		// screen is the narrowed backlog rather than the whole one.
+		filter, err := input.Filter(ctx, in, subject, input.Mine, input.Product)
+		if err != nil {
+			return nil, err
+		}
+		out := core.Exporting{
+			What: "the review queue",
+			Header: []string{
+				"decision", "proposed", "proposed by", "proposed by name", "age days", "outcome",
+				"deferred until", "committed to", "upgrade to",
+				"issue", "product", "product name", "component", "rows", "issues",
+				"occurrences", "builds",
+				"previously approved", "deferred days", "reasoning",
+			},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				waiting, _, err := store.Queue(ctx, subject, filter, limit, offset)
+				if err != nil {
+					return nil, err
+				}
+				if len(waiting) == 0 {
+					return nil, nil
+				}
+				// The names, in one pass over the page rather than per row —
+				// the same call the screen makes, so the file and the screen
+				// say the same thing about the same decision.
+				occurrences := make([]triage.DecisionOccurrence, 0, len(waiting))
+				for _, row := range waiting {
+					occurrences = append(occurrences, row.DecisionOccurrence)
+				}
+				named, err := core.DescribeDecisionOccurrences(ctx, in, store, occurrences, nil)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(waiting))
+				for i, row := range waiting {
+					// The dates and the version as the screen's card reads them.
+					promised := core.DecisionArgument(row.Decision, "")
+					where := named[i].Finding
+					product, productName, component, version := "", "", "", ""
+					if where != nil {
+						product, productName = where.Product, where.ProductName
+						component, version = where.Component, where.Version
+					}
+					rows = append(rows, []string{
+						strconv.FormatInt(row.Decision.ID, 10),
+						core.Stamp(row.DecisionOccurrence.ProposedAt),
+						named[i].ProposedBy, named[i].ProposedByName,
+						strconv.Itoa(int(store.Age(&row.DecisionOccurrence).Hours() / 24)),
+						string(row.Decision.Outcome),
+						promised.DeferredUntil, promised.CommittedTo, promised.UpgradeTo,
+						named[i].Occurrence.Vulnerability,
+						product, productName, component + " " + version,
+						strconv.Itoa(row.Rows), strconv.Itoa(row.Issues),
+						strconv.Itoa(row.Occurrences),
+						strings.Join(row.Builds, "; "),
+						strconv.FormatBool(row.PreviouslyApproved),
+						strconv.Itoa(int(row.DeferredSoFar.Hours() / 24)),
+						row.Reasoning,
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, "review-queue", out)
+		}}, nil
+	})
+}
+
+// registerComponentExport writes out what is open, gathered by component.
+func registerComponentExport(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-finding-components", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/findings/components.{format}",
+		Summary: "Export findings by component",
+		Description: "One row per component and version, with how many distinct issues are " +
+			"open against it and how many occurrences those sit at — every row, not one page.\n\n" +
+			"This is the shape a release meeting argues over: where the weight is rather " +
+			"than what is wrong. On a switch operating-system image the kernel carried 4,943 " +
+			"of 6,822 findings rows and the next largest contributor carried 58, which is a " +
+			"one-line answer here and invisible in a list of issues.\n\n" +
+			"Takes the same filters as the by-component list, and the line this deployment " +
+			"triages at is stated in the file.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Product     string `path:"product"`
+		Format      string `path:"format" enum:"csv,json"`
+		BranchOrTag string `query:"branch_or_tag"`
+		Variant     string `query:"variant"`
+		core.AtOneBuild
+		core.Narrowing
+	}) (*huma.StreamResponse, error) {
+		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
+		}, input.AtOneBuild, input.Narrowing, "the minimum severity could not be read")
+		if err != nil {
+			return nil, err
+		}
+		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.MinimumSeverity, at.Filter, at.Store
+		line := "everything"
+		if floor.Hides() {
+			line = floor.Word
+		}
+		out := core.Exporting{
+			What:   "findings by component",
+			About:  []core.Stated{{Label: "triaged at or above", Value: line}},
+			Header: []string{"component", "version", "upstream", "ecosystem", "issues", "occurrences", "exploited"},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				groups, _, err := store.ComponentGroups(ctx, subject, scope, limit, offset, narrowed)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(groups))
+				for _, g := range groups {
+					rows = append(rows, []string{
+						g.Component, g.Version, g.Upstream, g.Ecosystem,
+						strconv.Itoa(g.Issues), strconv.Itoa(g.Occurrences),
+						strconv.FormatBool(g.Exploited),
+					})
+				}
+				return rows, nil
+			},
+		}
+		name := "components-" + strings.ToLower(input.Product)
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, name, out)
+		}}, nil
+	})
+}
+
+// registerChangeExport writes out what has been changed administratively.
+//
+// An audit asks for every grant made in the year a certificate covers. Read a
+// page at a time on a screen, capped at fifty rows, undated and reached by
+// scrolling past a hundred audit cards, that answer cannot leave the
+// application at all.
+func registerChangeExport(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-administrative-changes", Method: http.MethodGet,
+		Path:    "/v1/administration/changes.{format}",
+		Summary: "Export administrative changes",
+		Description: "Every administrative change the same filters would show, as a file, " +
+			"rather than one page of them.\n\n" +
+			"One row per change, with who made it, what it was about, and what it held " +
+			"before and after. An absent value is not an empty one: `unset` says nobody had " +
+			"set it, and `cleared` that the change removed it.\n\n" +
+			"Takes the kind and the period the list takes. Asked for no period it writes " +
+			"everything this deployment holds.",
+		Tags: []string{"Administration"},
+	}, core.DeploymentRecords, ""), func(ctx context.Context, input *struct {
+		Format string         `path:"format" enum:"csv,json"`
+		Kind   core.TrailKind `query:"kind" doc:"Keep only changes of one kind"`
+		core.Period
+	}) (*huma.StreamResponse, error) {
+		subject, err := core.Requester(ctx)
+		if err != nil {
+			return nil, err
+		}
+		since, until, err := input.Window(0, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+		store := trail.NewStore(in.DB.DB)
+		out := core.Exporting{
+			What: "what has been changed administratively",
+			About: []core.Stated{
+				{Label: "from", Value: asDay(since)}, {Label: "to", Value: asDay(until)}, {Label: "kind", Value: string(input.Kind)},
+			},
+			Header: []string{"at", "actor", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
+			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
+				changes, _, err := store.Changes(ctx, subject, trail.Kind(input.Kind),
+					trail.Over{Since: since, Until: until}, limit, offset)
+				if err != nil {
+					return nil, err
+				}
+				// The person, by the identity they sign in under and their
+				// display name beside it, read a page at a time like every
+				// other name this file carries.
+				who := make([]int64, 0, len(changes))
+				for _, change := range changes {
+					if person := change.Person(); person != 0 {
+						who = append(who, person)
+					}
+				}
+				people, err := core.WhoSigned(ctx, in.DB.DB, who)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(changes))
+				for _, change := range changes {
+					rows = append(rows, []string{
+						core.Stamp(change.At), string(change.Actor),
+						people.Identity(change.Person()), people.Label(change.Person()),
+						string(change.Kind), change.Name,
+						core.OrBlank(change.Was), core.OrBlank(change.Became),
+						strconv.FormatBool(change.Was == nil),
+						strconv.FormatBool(change.Became == nil),
+					})
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, "administrative-changes", out)
+		}}, nil
+	})
+}
+
+// registerTrendExport writes out the backlog over time.
+//
+// A growing backlog is the first thing a manager asks about. As a panel on one
+// screen at a fixed twelve weeks — no catalog entry, no window, no file — the
+// answer can be looked at and not taken to the meeting it was asked in.
+func registerTrendExport(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "export-trend", Method: http.MethodGet, Path: "/v1/trend.{format}",
+		Summary: "Export new, resolved and open over time",
+		Description: "One row per step, with what arrived, what was answered and what stood " +
+			"open at the end of it — each split by severity.\n\n" +
+			"The two flows are what the backlog is read for. Ten arriving and ten " +
+			"answered is a team keeping pace where both are low, and a team losing ground " +
+			"where what arrives is critical and what leaves is not.\n\n" +
+			"Takes the window and the narrowings the trend takes. Read with your own " +
+			"visibility, like the chart it comes from.",
+		Tags: []string{"Analytics"},
+	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
+		Format string `path:"format" enum:"csv,json"`
+		core.ScopeQuery
+		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
+		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
+		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices"`
+		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
+		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
+	}) (*huma.StreamResponse, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
+		if err != nil {
+			return nil, err
+		}
+		// Resolved before the file is begun, so a name the build does not hold
+		// is refused with a status rather than written as a file cut short.
+		beneath, err := core.BeneathIn(ctx, in, scope, input.Beneath, graph.Choice{
+			Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
+		})
+		if err != nil {
+			return nil, err
+		}
+		const week = 7 * 24 * time.Hour
+		since := time.Now().UTC().Add(-time.Duration(input.Weeks) * week)
+		// The bands the file carries, worst first, from the one place the
+		// ladder is written down — and what nothing rated, which ranks below
+		// all of them. Fixed rather than taken from whatever the first row
+		// happens to hold: a file whose columns depend on the data is one a
+		// spreadsheet cannot be built against.
+		bands := append(finding.Bands(), finding.Unrated)
+		header := []string{"week ending", "opened", "resolved", "open"}
+		for _, band := range bands {
+			header = append(header, "opened "+band)
+		}
+		for _, band := range bands {
+			header = append(header, "resolved "+band)
+		}
+		for _, band := range bands {
+			header = append(header, "open "+band)
+		}
+		out := core.Exporting{
+			What:   "the backlog over time",
+			About:  []core.Stated{{Label: "weeks", Value: strconv.Itoa(input.Weeks)}},
+			Header: header,
+			// Every step in one answer, because a trend is worked out over the
+			// whole window rather than a page at a time: there is no offset
+			// that means anything here, so the second page is empty and the
+			// walk stops.
+			Rows: func(ctx context.Context, _, offset int) ([][]string, error) {
+				if offset > 0 {
+					return nil, nil
+				}
+				points, err := finding.NewStore(in.DB.DB).Trend(ctx, subject, scope,
+					since, week, input.Weeks, finding.Within{Component: input.Component, Beneath: beneath})
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(points))
+				for _, point := range points {
+					row := []string{
+						point.At.UTC().Format(time.DateOnly), strconv.Itoa(point.Opened),
+						strconv.Itoa(point.Resolved), strconv.Itoa(point.Open),
+					}
+					for _, split := range []map[string]int{
+						point.OpenedBySeverity, point.ResolvedBySeverity, point.BySeverity,
+					} {
+						for _, band := range bands {
+							row = append(row, strconv.Itoa(split[band]))
+						}
+					}
+					rows = append(rows, row)
+				}
+				return rows, nil
+			},
+		}
+		return &huma.StreamResponse{Body: func(writer huma.Context) {
+			core.WriteExport(writer, input.Format, "trend", out)
+		}}, nil
+	})
+}

@@ -35,16 +35,16 @@ func reachBody(r finding.Reach) ReachBody {
 	}
 	for _, m := range r.Automatic {
 		body.Automatic = append(body.Automatic, MatchBody{
-			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
-			StreamName:  m.StreamName,
-			VariantName: m.VariantName,
+			BranchOrTag: m.BranchOrTag, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
+			BranchOrTagName: m.BranchOrTagName,
+			VariantName:     m.VariantName,
 		})
 	}
 	for _, m := range r.Differing {
 		body.Differing = append(body.Differing, MatchBody{
-			Stream: m.Stream, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
-			StreamName:  m.StreamName,
-			VariantName: m.VariantName,
+			BranchOrTag: m.BranchOrTag, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
+			BranchOrTagName: m.BranchOrTagName,
+			VariantName:     m.VariantName,
 		})
 	}
 	return body
@@ -52,10 +52,10 @@ func reachBody(r finding.Reach) ReachBody {
 
 // MatchBody is the same issue at the same occurrence in another build.
 type MatchBody struct {
-	Stream      string `json:"stream"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant     string `json:"variant"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	BranchOrTag     string `json:"branch_or_tag"`
+	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant         string `json:"variant"`
+	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	// Version is what that build ships, and the reason this is a separate
 	// question. With a match, the decision already reaches there and nobody is
 	// asked. It is the version the decision route resolves a name by, so a
@@ -95,7 +95,7 @@ func registerElsewhere(api huma.API, in core.Deps) {
 		// under a concurrent write — a grant withdrawn between them refuses
 		// the second differently — so the request would authorize against one
 		// answer and report against another.
-		at, here, err := decidingAbout(ctx, in, subject, input.Product, input.Stream,
+		at, here, err := decidingAbout(ctx, in, subject, input.Product, input.BranchOrTag,
 			input.Variant, input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err
@@ -112,7 +112,7 @@ func registerElsewhere(api huma.API, in core.Deps) {
 func registerReachAcross(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-finding-reach", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/findings/{issue}/components/{component}/reach",
 		Summary: "Show how far a decision about this finding would reach",
 		Description: "The same three parts the per-occurrence answer gives, for every occurrence " +
@@ -127,7 +127,7 @@ func registerReachAcross(api huma.API, in core.Deps) {
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Stream        string `path:"stream"`
+		BranchOrTag   string `path:"branch_or_tag"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue"`
 		Component     string `path:"component"`
@@ -137,19 +137,19 @@ func registerReachAcross(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		target, issue, at, err := findingAbout(ctx, in, subject, input.Product, input.Stream,
+		build, issue, at, err := findingAbout(ctx, in, subject, input.Product, input.BranchOrTag,
 			input.Variant, input.Vulnerability, input.Component, input.Choice())
 		if err != nil {
 			return nil, err
 		}
-		occurrences, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, target, issue, at)
+		occurrences, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, build, issue, at)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "those occurrences could not be looked up", core.NoSuchFinding)
 		}
 		if len(occurrences) == 0 {
 			return nil, core.NoSuchFinding()
 		}
-		reach, err := finding.NewStore(in.DB.DB).ReachingAcross(ctx, subject, occurrences, target)
+		reach, err := finding.NewStore(in.DB.DB).ReachingAcross(ctx, subject, occurrences, build)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "cannot look for the same issue elsewhere", err)
 		}

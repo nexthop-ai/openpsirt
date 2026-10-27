@@ -22,23 +22,23 @@ import (
 func TestAWayDownIsRefusedToSomebodyWhoHoldsNothingOnTheProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
-		curl, err := f.store.ComponentAs(ctx, f.targetID, "curl", graph.Choice{})
+		curl, err := f.store.ComponentAs(ctx, f.buildID, "curl", graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		product := *f.scope.ProductID
 
 		stranger := access.NewPerson(2, "stranger", false, nil, 0)
-		if chains, err := f.store.Chains(ctx, stranger, f.targetID, []int64{curl}); !errors.Is(err, access.ErrDenied) {
+		if chains, err := f.store.Chains(ctx, stranger, f.buildID, []int64{curl}); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("somebody holding nothing on the product got %v and %v, want a refusal", chains, err)
 		}
 
 		collaborator := access.NewPerson(3, "collaborator", false, nil, 0).
 			OnCases(map[int64][]int64{product: {1}})
-		chains, err := f.store.Chains(ctx, collaborator, f.targetID, []int64{curl})
+		chains, err := f.store.Chains(ctx, collaborator, f.buildID, []int64{curl})
 		if err != nil {
 			t.Fatalf("a case collaborator was refused the way down: %v", err)
 		}

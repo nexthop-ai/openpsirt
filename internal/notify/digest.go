@@ -200,7 +200,7 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	// less the things a notification already told them about — which is the
 	// whole of "carries what nothing else told you".
 	//
-	// Theirs *and their teams'*: work routed to a team arrives without a
+	// Theirs *and their teams'*: work assigned to a team arrives without a
 	// message by design — a rule is not a human action, so it is digest
 	// content rather than an interruption — which makes this the only
 	// place it is ever mentioned.
@@ -209,7 +209,7 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	// told you about", and the things it told you about are exactly what the
 	// filter removes — so a holder with a page's worth of already-told work
 	// gets an empty digest and is never told about anything behind it,
-	// however much there is. Routed work is the case that matters: it is
+	// however much there is. Work assigned by rule is the case that matters: it is
 	// deliberately silent, so the digest is the only place it is ever
 	// mentioned.
 	//
@@ -316,7 +316,7 @@ func itemOf(row finding.Owned) Item {
 	return Item{
 		Issue: row.Vulnerability, Component: row.Component, Version: row.Version,
 		Severity: row.Severity, Product: row.Product,
-		Build: row.Stream + " " + row.Variant, Exploited: row.Exploited,
+		Build: row.BranchOrTag + " " + row.Variant, Exploited: row.Exploited,
 	}
 }
 

@@ -18,39 +18,39 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
-// Evidence is what the newest run that saw a lead said about it, with each
+// Evidence is what the newest run that saw a code finding said about it, with each
 // place linked into the source it was analyzed at.
 type Evidence struct {
 	At      Located
 	Steps   []Located
 	Related []Located
-	// LastSeen is when the build the newest run that saw the lead was made,
+	// LastSeen is when the build the newest run that saw the code finding was made,
 	// and NotSeen when the build of the first run after it that did not see
 	// it was, nil while every run since has seen it.
 	LastSeen time.Time
 	NotSeen  *time.Time
-	// NotSeenRun is the first run after it that did not see the lead, zero
+	// NotSeenRun is the first run after it that did not see the code finding, zero
 	// while every run since has seen it, and FixedIn the run whose build a
 	// person stated fixed it in, nil until somebody did.
 	NotSeenRun int64
 	FixedIn    *RunAt
-	// LastCommit and NotSeenCommit are the commits the lead's own repository
+	// LastCommit and NotSeenCommit are the commits the code finding's own repository
 	// was at in those two builds, empty where the run named none.
 	LastCommit    string
 	NotSeenCommit string
-	// Compare is the address comparing the lead's repository between those
+	// Compare is the address comparing the code finding's repository between those
 	// two builds, and Unchanged whether both name the same commit for it and
 	// neither patched it.
 	Compare   string
 	Unchanged bool
 	// Rule is the analyzer's rule, as the issue it is filed under names it.
 	Rule string
-	// State is where the lead stands.
+	// State is where the code finding stands.
 	State State
-	// Kin is the other leads on the build that are the same flaw, or
+	// Kin is the other code findings on the build that are the same flaw, or
 	// possibly are.
 	Kin []Kin
-	// ThirdParty says the lead is under a path the newest run that saw it
+	// ThirdParty says the code finding is under a path the newest run that saw it
 	// declared as third-party code.
 	ThirdParty bool
 }
@@ -63,7 +63,7 @@ type RunAt struct {
 	Commit  string
 }
 
-// Located is one place a run named for a lead.
+// Located is one place a run named for a code finding.
 type Located struct {
 	Path                   string
 	StartLine, StartColumn int
@@ -76,38 +76,38 @@ type Located struct {
 	Link                   sourcelink.Link
 }
 
-// EvidenceOf is the evidence for one lead, answered where the subject may
-// read the lead and as no lead otherwise. The product's repository settings
+// EvidenceOf is the evidence for one code finding, answered where the subject may
+// read the code finding and as no code finding otherwise. The product's repository settings
 // say where each place links to.
-func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *finding.Finding, productID int64) (Evidence, error) {
-	reach := finding.LeadReach(subject, productID)
+func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, codeFinding *finding.Finding, productID int64) (Evidence, error) {
+	reach := finding.CodeFindingReach(subject, productID)
 	read, err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		Where(`"f"."id" = ?`, lead.ID).
+		Where(`"f"."id" = ?`, codeFinding.ID).
 		Where(reach.Full, reach.FullArgs...).
 		Exists(ctx)
 	switch {
 	case err != nil:
-		return Evidence{}, fmt.Errorf("read whether lead %d may be read: %w", lead.ID, err)
+		return Evidence{}, fmt.Errorf("read whether code finding %d may be read: %w", codeFinding.ID, err)
 	case !read:
 		return Evidence{}, finding.ErrNoOpenFinding
 	}
 	var said result
-	err = db.NewSelect().Model(&said).Where(`"ar"."finding_id" = ?`, lead.ID).Scan(ctx)
+	err = db.NewSelect().Model(&said).Where(`"ar"."finding_id" = ?`, codeFinding.ID).Scan(ctx)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return Evidence{}, finding.ErrNoOpenFinding
 	case err != nil:
-		return Evidence{}, fmt.Errorf("read what the run said about lead %d: %w", lead.ID, err)
+		return Evidence{}, fmt.Errorf("read what the run said about code finding %d: %w", codeFinding.ID, err)
 	}
 	var occurrences []location
-	if err := db.NewSelect().Model(&occurrences).Where(`"al"."finding_id" = ?`, lead.ID).
+	if err := db.NewSelect().Model(&occurrences).Where(`"al"."finding_id" = ?`, codeFinding.ID).
 		OrderExpr(`"al"."ordinal" ASC`).Scan(ctx); err != nil {
-		return Evidence{}, fmt.Errorf("read the places lead %d names: %w", lead.ID, err)
+		return Evidence{}, fmt.Errorf("read the places code finding %d names: %w", codeFinding.ID, err)
 	}
 	var seen series.Sighting
-	if err := db.NewSelect().Model(&seen).Where(`"si"."finding_id" = ?`, lead.ID).
+	if err := db.NewSelect().Model(&seen).Where(`"si"."finding_id" = ?`, codeFinding.ID).
 		OrderExpr(`"si"."id" DESC`).Limit(1).Scan(ctx); err != nil {
-		return Evidence{}, fmt.Errorf("read when lead %d was seen: %w", lead.ID, err)
+		return Evidence{}, fmt.Errorf("read when code finding %d was seen: %w", codeFinding.ID, err)
 	}
 	config, err := sourcelink.NewStore(db).Config(ctx, productID)
 	if err != nil {
@@ -156,10 +156,10 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
 		ColumnExpr(state+` AS "state"`, stateArgs...).
 		ColumnExpr(`"vu"."identifier" AS "rule"`).
-		Where(`"f"."id" = ?`, lead.ID).Limit(1).Scan(ctx, &out.State, &out.Rule); err != nil {
-		return Evidence{}, fmt.Errorf("read where lead %d stands: %w", lead.ID, err)
+		Where(`"f"."id" = ?`, codeFinding.ID).Limit(1).Scan(ctx, &out.State, &out.Rule); err != nil {
+		return Evidence{}, fmt.Errorf("read where code finding %d stands: %w", codeFinding.ID, err)
 	}
-	if out.Kin, err = KinOf(ctx, db, subject, productID, lead.ID); err != nil {
+	if out.Kin, err = KinOf(ctx, db, subject, productID, codeFinding.ID); err != nil {
 		return Evidence{}, err
 	}
 	if seen.AbsentRunID != nil {

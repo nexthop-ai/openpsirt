@@ -52,9 +52,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
-// Source is a supplier this deployment fetches advisories from.
-type Source struct {
-	bun.BaseModel `bun:"table:advisory_source,alias:sp"`
+// Feed is a supplier advisory feed: a supplier this deployment fetches
+// advisories from.
+type Feed struct {
+	bun.BaseModel `bun:"table:supplier_advisory_feed,alias:sp"`
 
 	ID        int64 `bun:"id,pk,autoincrement"`
 	ProductID int64 `bun:"product_id,notnull"`
@@ -159,13 +160,13 @@ func inUse(q *bun.SelectQuery) *bun.SelectQuery {
 //
 // One never tried is due whatever the moment, which is what makes a supplier
 // named this morning read this afternoon rather than tomorrow.
-func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Time) ([]Source, error) {
+func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Time) ([]Feed, error) {
 	if !subject.Unnarrowed() {
 		if err := subject.Administering("read which suppliers are fetched from"); err != nil {
 			return nil, err
 		}
 	}
-	var rows []Source
+	var rows []Feed
 	q := s.db.NewSelect().Model(&rows).
 		Where(`"sp"."retired_at" IS NULL`).
 		Where(`"sp"."fetched_at" IS NULL OR "sp"."fetched_at" < ?`,
@@ -187,8 +188,8 @@ func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Tim
 // pass takes minutes and a supplier withdrawn during one is a request leaving
 // this deployment that somebody thought they had stopped. Answers nothing where
 // the source has been withdrawn or its product taken out of use.
-func (s *Store) Standing(ctx context.Context, db bun.IDB, id int64) (*Source, error) {
-	row := new(Source)
+func (s *Store) Standing(ctx context.Context, db bun.IDB, id int64) (*Feed, error) {
+	row := new(Feed)
 	q := db.NewSelect().Model(row).Where(`"sp"."id" = ?`, id).Where(`"sp"."retired_at" IS NULL`)
 	switch err := inUse(q).Scan(ctx); {
 	case errors.Is(err, sql.ErrNoRows):
@@ -200,11 +201,11 @@ func (s *Store) Standing(ctx context.Context, db bun.IDB, id int64) (*Source, er
 }
 
 // For is every supplier configured against one product.
-func (s *Store) For(ctx context.Context, subject access.Subject, productID int64) ([]Source, error) {
+func (s *Store) For(ctx context.Context, subject access.Subject, productID int64) ([]Feed, error) {
 	if err := subject.Administering("read which suppliers are fetched from"); err != nil {
 		return nil, err
 	}
-	var rows []Source
+	var rows []Feed
 	if err := s.db.NewSelect().Model(&rows).
 		Where(`"sp"."product_id" = ?`, productID).
 		Where(`"sp"."retired_at" IS NULL`).
@@ -231,7 +232,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, productID int64
 // judgment into this deployment's evidence and points it at an address of
 // their choosing, which is a deployment decision rather than a product one.
 func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64,
-	name, address string) (*Source, error) {
+	name, address string) (*Feed, error) {
 
 	if err := subject.Administering("configure which suppliers are fetched from"); err != nil {
 		return nil, err
@@ -267,11 +268,11 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	}
 	folded := typedname.Matching(typed)
 	now := s.now().UTC().Truncate(time.Microsecond)
-	row := &Source{
+	row := &Feed{
 		ProductID: productID, Name: folded, Display: typed, URL: address,
 		CreatedBy: subject.ID, CreatedAt: now,
 	}
-	revive := s.db.NewUpdate().Model((*Source)(nil)).
+	revive := s.db.NewUpdate().Model((*Feed)(nil)).
 		// The mark is kept only where the address is the one it was read
 		// at. An address never read has nothing behind it this supplier has
 		// seen, so it starts where a new one does. Ahead of the address
@@ -320,17 +321,17 @@ func (s *Store) productInUse(ctx context.Context, productID int64) (bool, error)
 // somebody may have granted an approval on the strength of, and withdrawing the
 // address we read them from does not make them unsaid.
 func (s *Store) Retire(ctx context.Context, subject access.Subject, productID int64,
-	name string) (*Source, error) {
+	name string) (*Feed, error) {
 
 	if err := subject.Administering("configure which suppliers are fetched from"); err != nil {
 		return nil, err
 	}
 	// The row is answered so the caller names it as it is stored, whatever
 	// capitals the request carried.
-	var retired *Source
+	var retired *Feed
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		retired = nil
-		row := new(Source)
+		row := new(Feed)
 		err := tx.NewSelect().Model(row).
 			Where(`"product_id" = ?`, productID).
 			Where(`"name" = ?`, typedname.Matching(name)).
@@ -347,7 +348,7 @@ func (s *Store) Retire(ctx context.Context, subject access.Subject, productID in
 			return fmt.Errorf("stop fetching from that supplier: %w", err)
 		}
 		at := s.now().UTC().Truncate(time.Microsecond)
-		took, err := database.Retire(ctx, tx, (*Source)(nil), row.ID, at)
+		took, err := database.Retire(ctx, tx, (*Feed)(nil), row.ID, at)
 		if err != nil {
 			return fmt.Errorf("stop fetching from that supplier: %w", err)
 		}
@@ -385,7 +386,7 @@ func (s *Store) Reached(ctx context.Context, id int64, at time.Time, mark string
 	failed error) error {
 
 	now := s.now().UTC().Truncate(time.Microsecond)
-	update := s.db.NewUpdate().Model((*Source)(nil)).
+	update := s.db.NewUpdate().Model((*Feed)(nil)).
 		Set(`"fetched_at" = ?`, now).
 		Where(`"id" = ?`, id)
 	if failed != nil {
@@ -426,7 +427,7 @@ func (s *Store) Reached(ctx context.Context, id int64, at time.Time, mark string
 func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark string,
 	failed error) error {
 
-	update := s.db.NewUpdate().Model((*Source)(nil)).Where(`"id" = ?`, id)
+	update := s.db.NewUpdate().Model((*Feed)(nil)).Where(`"id" = ?`, id)
 	switch {
 	case failed != nil:
 		update = update.Set(`"failed" = ?`, bound.HeadRunes(failed.Error(), MostReason))
@@ -479,7 +480,7 @@ const ahead = `"caught_up_to" IS NULL OR "caught_up_to" < ? ` +
 // the whole of it, drained at the per-pass bound. A supplier taken up again
 // carries the mark from before it was withdrawn, so it takes what was issued
 // while it was away and nothing it already read, within the same window.
-func (s Source) From(history time.Duration) (time.Time, string) {
+func (s Feed) From(history time.Duration) (time.Time, string) {
 	floor := s.CreatedAt.Add(-history)
 	if s.CaughtUpTo != nil && !s.CaughtUpTo.Before(floor) {
 		return *s.CaughtUpTo, s.CaughtUpMark

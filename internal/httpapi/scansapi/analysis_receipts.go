@@ -30,7 +30,7 @@ type AnalysisReceiptBody struct {
 	Status     core.RunStatus `json:"status" doc:"What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, or failed"`
 	Failure    string         `json:"failure,omitempty" doc:"Why the run could not be applied, where it could not"`
 	// Comparable is absent until the run is applied.
-	Comparable    *bool          `json:"comparable,omitempty" doc:"Whether the results this run did not report count as not reproduced. Absent until it is applied"`
+	Comparable    *bool          `json:"comparable,omitempty" doc:"Whether the results this run did not report count as no longer detected. Absent until it is applied"`
 	NotComparable core.RunReason `json:"not_comparable,omitempty" doc:"Why they do not, where they do not"`
 	Tool          string         `json:"tool,omitempty" doc:"The analyzer that ran"`
 	ToolVersion   string         `json:"tool_version,omitempty" doc:"Its version"`
@@ -60,7 +60,7 @@ type AnalysisReceiptsOutput struct {
 func registerAnalysisReceipts(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-analyses", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses",
 		Summary: "List uploaded analyzer runs and their status",
 		Description: "Returns analyzer runs newest first, each with its status and, once applied, " +
 			"whether it was comparable and how many results it opened, saw again and did not see. " +
@@ -70,32 +70,32 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 			"read internal findings in the product.",
 		Tags: []string{"Ingest"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
-		Offset  int    `query:"offset" minimum:"0" doc:"The number skipped"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Limit       int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
+		Offset      int    `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*AnalysisReceiptsOutput, error) {
-		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 		// Asked before the build is looked up: a refusal that came only where
 		// something was sent would say which builds hold runs.
-		if !subject.ReadsBuild(named.ProductID, named.StreamID, named.VariantID) ||
+		if !subject.ReadsBuild(named.ProductID, named.BranchOrTagID, named.VariantID) ||
 			(subject.Kind != access.Pipeline && !subject.Reads(analysis.OpensAt, named.ProductID)) {
 			return nil, core.NothingScannedThere()
 		}
 		out := &AnalysisReceiptsOutput{}
 		out.Body.Items, out.Body.Refused = []AnalysisReceiptBody{}, []AnalysisRefusalBody{}
-		target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, named.StreamID, named.VariantID)
+		build, err := catalog.NewStore(in.DB.DB).ExistingBuild(ctx, named.BranchOrTagID, named.VariantID)
 		switch {
 		case errors.Is(err, catalog.ErrNotFound):
 			return out, nil
 		case err != nil:
 			return nil, core.WentWrong(in.Logger, "that build could not be looked up", err)
 		}
-		sent, total, err := series.NewStore(in.DB.DB).Receipts(ctx, subject, named.ProductID, target.ID,
+		sent, total, err := series.NewStore(in.DB.DB).Receipts(ctx, subject, named.ProductID, build.ID,
 			kind.Analysis, analysis.OpensAt, input.Limit, input.Offset)
 		switch {
 		case errors.Is(err, access.ErrDenied):
@@ -121,7 +121,7 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		out.Body.Total = total
-		refusals, err := series.NewStore(in.DB.DB).RefusalsOf(ctx, target.ID, kind.Analysis)
+		refusals, err := series.NewStore(in.DB.DB).RefusalsOf(ctx, build.ID, kind.Analysis)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the uploads turned away could not be read", err)
 		}

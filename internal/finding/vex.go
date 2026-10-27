@@ -29,7 +29,7 @@ import (
 // a prefill. A supplier's statement that its own product is not affected is
 // also applied, by the run, at the occurrences that product occupies (REQ-31).
 type Statement struct {
-	bun.BaseModel `bun:"table:vex_statement,alias:ss"`
+	bun.BaseModel `bun:"table:received_vex_statement,alias:ss"`
 
 	ID        int64 `bun:"id,pk,autoincrement"`
 	ProductID int64 `bun:"product_id,notnull"`
@@ -143,7 +143,7 @@ const (
 	PlacedAnybody = "anybody"
 )
 
-// packaged reports whether a target is named by the package identifier of an
+// packaged reports whether a build is named by the package identifier of an
 // ecosystem's package, which a distribution's own build and a rebuild of its
 // source share, rather than as a product.
 func packaged(purl string) bool {
@@ -521,7 +521,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 // the product and on whatever sits beneath it.
 func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID,
 	vulnerabilityID int64, names []string, component, purl string,
-	targetID, componentID int64) ([]Statement, error) {
+	buildID, componentID int64) ([]Statement, error) {
 
 	// Asked about the issue rather than about the product, because what comes
 	// back is narrowed to this issue's names and this component — it is
@@ -550,7 +550,7 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	}
 	said = namingTheSamePackage(said, purl)
 
-	above, err := graph.NewStore(s.db).Above(ctx, subject, targetID, componentID)
+	above, err := graph.NewStore(s.db).Above(ctx, subject, buildID, componentID)
 	if err != nil {
 		return nil, err
 	}
@@ -619,8 +619,8 @@ func (s *Store) shipsProducts(ctx context.Context, productID int64,
 		TableExpr(`"component" AS "pc"`).
 		ColumnExpr(`"pc"."name_folded"`).
 		Join(`JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"`).
-		Join(`JOIN "target" AS "pt" ON "pt"."id" = "pn"."target_id"`).
-		Join(`JOIN "stream" AS "ps" ON "ps"."id" = "pt"."stream_id"`).
+		Join(`JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"`).
 		Where(`"ps"."product_id" = ?`, productID).
 		Where(`"pn"."closed_scan_id" IS NULL`).
 		Where(`"pc"."name_folded" IN (?)`, bun.List(named)).

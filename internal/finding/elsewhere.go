@@ -38,12 +38,12 @@ type Reach struct {
 
 // Match is the same issue at the same occurrence in another build.
 type Match struct {
-	TargetID int64
-	Stream   string
-	Variant  string
-	// StreamName and VariantName are the names they are shown under; the
+	BuildID     int64
+	BranchOrTag string
+	Variant     string
+	// BranchOrTagName and VariantName are the names they are shown under; the
 	// two above are the names a path addresses them by.
-	StreamName, VariantName string
+	BranchOrTagName, VariantName string
 	// Version is what that build ships under the name, which is what a route
 	// naming a component resolves. For anything that is not a patched fork it
 	// is the same as the upstream version below; for a fork it is the fork's
@@ -88,9 +88,9 @@ type Match struct {
 // term — and only the many-occurrence side had any coverage, so the one a route
 // calls was the untested copy.
 func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Deciding,
-	hereTargetID int64) (Reach, error) {
+	hereBuildID int64) (Reach, error) {
 
-	return s.ReachingAcross(ctx, subject, []Deciding{at}, hereTargetID)
+	return s.ReachingAcross(ctx, subject, []Deciding{at}, hereBuildID)
 }
 
 // ReachingAcross is Reaching for every occurrence of one finding at once.
@@ -107,7 +107,7 @@ func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Decidin
 // of one finding commonly land in the same other build and it is one thing to
 // tick.
 func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
-	occurrences []Deciding, hereTargetID int64) (Reach, error) {
+	occurrences []Deciding, hereBuildID int64) (Reach, error) {
 
 	if len(occurrences) == 0 {
 		return Reach{}, nil
@@ -131,7 +131,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// does: two consumers pulling in the same version there is still one
 	// version to decide about.
 	add := func(into *[]Match, differing bool, match Match) {
-		key := fmt.Sprintf("%d", match.TargetID)
+		key := fmt.Sprintf("%d", match.BuildID)
 		if differing {
 			key += "\x00" + match.Version
 		}
@@ -166,9 +166,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 
 	var rows []struct {
 		OccurrenceIdentity string `bun:"occurrence_identity"`
-		TargetID           int64  `bun:"target_id"`
-		Stream             string `bun:"stream"`
-		StreamName         string `bun:"stream_name"`
+		BuildID            int64  `bun:"build_id"`
+		BranchOrTag        string `bun:"branch_or_tag"`
+		BranchOrTagName    string `bun:"branch_or_tag_name"`
 		Variant            string `bun:"variant"`
 		VariantName        string `bun:"variant_name"`
 		Version            string `bun:"version"`
@@ -180,15 +180,15 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Where(kinds, kindArgs...).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
-		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
 		ColumnExpr(`"c"."version" AS "version"`).
@@ -200,7 +200,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Where(`"f"."occurrence_identity" IN (?)`, bun.List(identities)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"f"."occurrence_identity", "f"."target_id", "st"."name", "st"."display_name", "va"."name", "va"."display_name", `+
+		GroupExpr(`"f"."occurrence_identity", "f"."build_id", "st"."name", "st"."display_name", "va"."name", "va"."display_name", `+
 			`"c"."version", `+
 			ComponentUpstreamExpr+", "+ConsumerUpstreamExpr).
 		OrderExpr(`"st"."name", "va"."name", "c"."version"`).
@@ -215,15 +215,15 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 			continue
 		}
 		match := Match{
-			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
-			StreamName: row.StreamName, VariantName: row.VariantName,
+			BuildID: row.BuildID, BranchOrTag: row.BranchOrTag, Variant: row.Variant,
+			BranchOrTagName: row.BranchOrTagName, VariantName: row.VariantName,
 			Version:           row.Version,
 			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
 			Occurrences: row.Occurrences,
-			// Its place, elsewhere or right here. A screen leads with
+			// Its place, elsewhere or right here. A screen code findings with
 			// the version, because that is what differs, and says where as an
 			// aside — but it still has to be able to say "here".
-			Here: row.TargetID == hereTargetID,
+			Here: row.BuildID == hereBuildID,
 		}
 		if row.ComponentUpstream == here[0] && row.ConsumerUpstream == here[1] {
 			// In this build at these versions, this *is* what is being

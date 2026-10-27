@@ -35,7 +35,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 			"first, with who wrote each and when. A note that has been edited also carries " +
 			"when it was last changed.\n\n" +
 			"A note records no decision and changes nothing: not what ranks, not a deadline, " +
-			"not a triage line. It is context for whoever decides.\n\n" +
+			"not a minimum severity. It is context for whoever decides.\n\n" +
 			"It is about the issue in this product, not about one component. A row in the " +
 			"findings list is one issue at one source package, and one issue is often several " +
 			"rows — so a note kept against a row would be written on one of them and hidden " +

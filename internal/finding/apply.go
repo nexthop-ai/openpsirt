@@ -49,7 +49,7 @@ type at struct {
 // Re-running against a database that moved slightly must write only what
 // changed, for the same reason the graph does: a nightly re-scan that found
 // the same things should cost nothing.
-func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Reported) (Applied, error) {
+func (s *Store) Apply(ctx context.Context, buildID, runID int64, reported []Reported) (Applied, error) {
 	var applied Applied
 
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
@@ -57,19 +57,19 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// attempt that rolled back counted is not what was applied.
 		applied = Applied{}
 		// Taken first, before anything is read, exactly as applying a graph
-		// does. Two runs against one target can be in flight at once — the
+		// does. Two runs against one build can be in flight at once — the
 		// queue hands different jobs to different workers by design — and
 		// without this both read the same open findings, both compute the same
 		// difference, and both write it, leaving two open rows where
 		// everything downstream assumes one. An ordinary row update is a lock
 		// every engine honors, so the second worker waits instead of racing.
-		if _, err := tx.NewUpdate().Table("target").
+		if _, err := tx.NewUpdate().Table("build").
 			Set(`"last_run_id" = ?`, runID).
-			Where(`"id" = ?`, targetID).Exec(ctx); err != nil {
-			return fmt.Errorf("take the target: %w", err)
+			Where(`"id" = ?`, buildID).Exec(ctx); err != nil {
+			return fmt.Errorf("take the build: %w", err)
 		}
 
-		run, err := s.readRun(ctx, tx, targetID, runID, reported)
+		run, err := s.readRun(ctx, tx, buildID, runID, reported)
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		held, heldAt, err := heldOpen(ctx, tx, targetID)
+		held, heldAt, err := heldOpen(ctx, tx, buildID)
 		if err != nil {
 			return err
 		}
@@ -107,14 +107,14 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// so a report raising one here leaves every open finding of it in
 		// every build nothing rescanned carrying a number worked out from a
 		// world that has moved — a known-exploited issue in a shipped tag
-		// below the triage line, answering no exploited filter, on no
+		// below the minimum severity, answering no exploited filter, on no
 		// exploited clock, at the bottom of the list, until somebody
 		// rescans a tag, which for a tag is never.
 		//
 		// After this build's own rows are written, so what the scan changed
 		// here is counted as the scan's; the rows this corrects are the ones
 		// no scan was going to touch.
-		return Reranked(ctx, tx, run.interned.Moved(), run.startedAt, targetID)
+		return Reranked(ctx, tx, run.interned.Moved(), run.startedAt, buildID)
 	})
 	return applied, err
 }
@@ -124,7 +124,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 // holds and where, the build's claims and its suppliers' statements, and the
 // clock.
 type applyRun struct {
-	targetID, runID int64
+	buildID, runID  int64
 	interned        *Vulnerabilities
 	vulnerabilities map[string]int64
 	ratings         map[int64]Rating
@@ -138,7 +138,7 @@ type applyRun struct {
 	fixing          map[int64]bool
 	windows         Windows
 	startedAt       time.Time
-	floor           Floor
+	floor           MinimumSeverity
 	onTheClock      bool
 	// claimsReaching and claimsReachingNothing say how many of the build's
 	// claims land on something it ships.
@@ -147,10 +147,10 @@ type applyRun struct {
 
 // readRun reads what applying a scan works from, inside the transaction that
 // writes.
-func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
+func (s *Store) readRun(ctx context.Context, tx bun.IDB, buildID, runID int64,
 	reported []Reported) (*applyRun, error) {
 
-	run := &applyRun{targetID: targetID, runID: runID}
+	run := &applyRun{buildID: buildID, runID: runID}
 	issues := make([]Named, 0, len(reported))
 	for _, r := range reported {
 		issues = append(issues, r.Issue)
@@ -165,7 +165,7 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	// The product this build belongs to, read before anything is ranked. A
 	// rating belongs to a product, so what ranks here is this product's
 	// rating and not a word somebody working on another one wrote.
-	productID, err := productOf(ctx, tx, targetID)
+	productID, err := productOf(ctx, tx, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -187,14 +187,14 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	// only the build system runs matters less than a medium in what people
 	// install, and that is a property of the build rather than of any finding
 	// in it.
-	if run.shipped, err = shippedToCustomers(ctx, tx, targetID); err != nil {
+	if run.shipped, err = shippedToCustomers(ctx, tx, buildID); err != nil {
 		return nil, err
 	}
 
-	if run.present, err = openComponents(ctx, tx, targetID); err != nil {
+	if run.present, err = openComponents(ctx, tx, buildID); err != nil {
 		return nil, err
 	}
-	if run.occurrences, err = openOccurrences(ctx, tx, targetID); err != nil {
+	if run.occurrences, err = openOccurrences(ctx, tx, buildID); err != nil {
 		return nil, err
 	}
 	// The build's own claims about what it ships. Applied here rather than
@@ -203,10 +203,10 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	//
 	// What a document uploaded on its own says about the build's root is the
 	// build's claim too, brought up to date first.
-	if err := publishedForBuild(ctx, tx, productID, targetID); err != nil {
+	if err := publishedForBuild(ctx, tx, productID, buildID); err != nil {
 		return nil, err
 	}
-	if run.claims, err = openClaims(ctx, tx, targetID); err != nil {
+	if run.claims, err = openClaims(ctx, tx, buildID); err != nil {
 		return nil, err
 	}
 	// What suppliers say about their own products, where it can close a
@@ -218,13 +218,13 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	}
 	// Where each product a claim or a statement names sits in this build,
 	// worked out once per product.
-	if run.placed, err = placing(ctx, tx, targetID, run.present, run.occurrences); err != nil {
+	if run.placed, err = placing(ctx, tx, buildID, run.present, run.occurrences); err != nil {
 		return nil, err
 	}
 	if run.suppliers, err = disclaimers(ctx, tx, productID, issues, issueIDs, run.placed); err != nil {
 		return nil, err
 	}
-	// Those that reached anything are worked out against what the target
+	// Those that reached anything are worked out against what the build
 	// contains, not against what was reported: a claim covering a component
 	// nothing was found in has still done its job, while one covering nothing
 	// the build ships has not.
@@ -256,26 +256,26 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 		return nil, fmt.Errorf("read when this run started: %w", err)
 	}
 
-	// The product's triage line. Below that line nothing carries a deadline:
+	// The product's minimum severity. Below that line nothing carries a deadline:
 	// a line says "this is not work" and a deadline says "this is work, and
 	// it is late", and holding both means one of them is lying — within a
 	// year the overdue figure would be thousands of things nobody ever
 	// intended to look at.
-	if run.floor, err = FloorFor(ctx, tx, productID); err != nil {
+	if run.floor, err = MinimumSeverityFor(ctx, tx, productID); err != nil {
 		return nil, err
 	}
 
 	// And whether this build is still supported. Past its end-of-life date
 	// nothing on it carries a deadline: the overdue figure and the escalation
 	// view would otherwise fill permanently with releases nobody will ever
-	// fix, and both stop being read. It is the same statement the triage line
+	// fix, and both stop being read. It is the same statement the minimum severity
 	// makes from another direction — "this is not work" — and it is applied
 	// the same way.
 	//
 	// Nothing is hidden or deleted by it. The findings are still recorded,
 	// still counted and still reportable; what ends is what is expected of
 	// us.
-	supported, err := catalog.NewStore(tx).EndOfLifeForTarget(ctx, targetID)
+	supported, err := catalog.NewStore(tx).EndOfLifeForBuild(ctx, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	// deployments accumulate tags while branches do not, so a deadline on
 	// every one of them inflates every overdue figure with work nobody could
 	// ever have done.
-	moves, err := catalog.NewStore(tx).TargetMoves(ctx, targetID)
+	moves, err := catalog.NewStore(tx).BuildMoves(ctx, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +376,7 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 				}
 			}
 			entry := Finding{
-				TargetID: run.targetID, Kind: Vulnerable,
+				BuildID: run.buildID, Kind: Vulnerable,
 				// A scanner's finding in a shipped component is public
 				// knowledge by the time it reaches us: the advisory it matched
 				// is published. What is not disclosed is a finding somebody
@@ -397,14 +397,14 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 			}
 			rated := run.ratings[vulnerabilityID]
 			ranked := Ranked{
-				ExploitedHere: rated.ExploitedHere,
-				Exploited:     rated.Exploited, Shipped: run.shipped,
+				Incident:  rated.Incident,
+				Exploited: rated.Exploited, Shipped: run.shipped,
 				LikelihoodPPM: rated.LikelihoodPPM,
 				ScoreCenti:    rated.Score(),
 			}
 			entry.Urgency = int64(ranked.Rank())
 			entry.RankExploited, entry.RankShipped = ranked.Exploited, ranked.Shipped
-			entry.RankExploitedHere = ranked.ExploitedHere
+			entry.RankIncident = ranked.Incident
 			// A finding that opens already exploited was learned about when it
 			// opened, and every later recount has to reach the same answer.
 			entry.ExploitedLearnedAt = learnedExploitation(entry, rated.ExploitedOn, run.startedAt)
@@ -418,14 +418,14 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 			// carries no deadline: every count of what is late then agrees
 			// about it without each having to ask.
 			if run.onTheClock && answeredBy == nil &&
-				run.floor.Admits(rated.Exploited || rated.ExploitedHere, severity) {
+				run.floor.Admits(rated.Exploited || rated.Incident, severity) {
 				window := run.windows.For(rated.Exploited, severity)
 				w.windowFor[k] = window
 				// From this run, which for a new finding is when it was first
 				// seen. One already open is answered against what is held,
 				// from its own opening.
 				entry.DueAt = Deadline(entry.FixState,
-					rated.Exploited || rated.ExploitedHere, run.startedAt, run.startedAt,
+					rated.Exploited || rated.Incident, run.startedAt, run.startedAt,
 					entry.ExploitedLearnedAt, entry.FixedAt, window)
 			}
 			w.findings[k] = entry
@@ -450,13 +450,13 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 // version change makes a different component and therefore a different key, so
 // the two indexes disagree exactly where a version moved — which is the case
 // worth telling apart from every other kind of closure.
-func heldOpen(ctx context.Context, tx bun.IDB, targetID int64) (map[key]heldFinding,
+func heldOpen(ctx context.Context, tx bun.IDB, buildID int64) (map[key]heldFinding,
 	map[at]heldFinding, error) {
 
 	var open []heldFinding
 	kinds, kindArgs := kind.Closure.Where(`"kind"`)
 	if err := tx.NewSelect().Model(&open).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(kinds, kindArgs...).
 		Where(`"closed_at" IS NULL`).Scan(ctx); err != nil {
 		return nil, nil, fmt.Errorf("read what is already open: %w", err)
@@ -574,7 +574,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			learned = learnedExploitation(f, run.ratings[f.VulnerabilityID].ExploitedOn, run.startedAt)
 		}
 		if window, onClock := want.windowFor[k]; onClock {
-			f.DueAt = Deadline(f.FixState, f.RankExploited || f.RankExploitedHere,
+			f.DueAt = Deadline(f.FixState, f.RankExploited || f.RankIncident,
 				already.OpenedAt, run.startedAt, learned, f.FixedAt, window)
 		}
 		// Asked of the answer rather than of what moved. A fix appearing
@@ -668,7 +668,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	for _, componentID := range plan.movedFrom {
 		movedIDs = append(movedIDs, componentID)
 	}
-	before, err := componentsByID(ctx, tx, run.targetID, movedIDs)
+	before, err := componentsByID(ctx, tx, run.buildID, movedIDs)
 	if err != nil {
 		return wrote, err
 	}
@@ -689,7 +689,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 			reading = append(reading, k.vulnerabilityID)
 		}
 	}
-	latest, latestAt, err := latestClosed(ctx, tx, run.targetID, reading)
+	latest, latestAt, err := latestClosed(ctx, tx, run.buildID, reading)
 	if err != nil {
 		return wrote, err
 	}
@@ -709,7 +709,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 			carriedIDs = append(carriedIDs, componentID)
 		}
 	}
-	carried, err := componentsByID(ctx, tx, run.targetID, carriedIDs)
+	carried, err := componentsByID(ctx, tx, run.buildID, carriedIDs)
 	if err != nil {
 		return wrote, err
 	}
@@ -791,7 +791,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	for _, d := range plan.departing {
 		gone = append(gone, d.f.ComponentID)
 	}
-	departed, err := componentsByID(ctx, tx, run.targetID, gone)
+	departed, err := componentsByID(ctx, tx, run.buildID, gone)
 	if err != nil {
 		return wrote, err
 	}
@@ -966,7 +966,7 @@ func closeIDs(ctx context.Context, tx bun.IDB, ids []int64, startedAt time.Time,
 
 // latestClosed reads the most recent closed row of these issues, at each
 // component and consumer and at each occurrence identity.
-func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
+func latestClosed(ctx context.Context, db bun.IDB, buildID int64,
 	vulnerabilities []int64) (map[key]Finding, map[at]Finding, error) {
 
 	byKey, byAt := map[key]Finding{}, map[at]Finding{}
@@ -990,7 +990,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 			return db.NewSelect().
 				TableExpr(`"finding" AS "lf"`).
 				ColumnExpr(`MAX("lf"."id")`).
-				Where(`"lf"."target_id" = ?`, targetID).
+				Where(`"lf"."build_id" = ?`, buildID).
 				Where(kinds, kindArgs...).
 				Where(`"lf"."closed_at" IS NOT NULL`).
 				Where(`"lf"."vulnerability_id" IN (?)`, bun.List(batch)).
@@ -1004,7 +1004,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 			// The range again outside the two arms: a membership test under OR
 			// is never a semi-join on PostgreSQL or MySQL, so without it the
 			// read walks every finding in the deployment.
-			Where(`"target_id" = ?`, targetID).
+			Where(`"build_id" = ?`, buildID).
 			Where(kinds, kindArgs...).
 			Where(`"closed_at" IS NOT NULL`).
 			Where(`"vulnerability_id" IN (?)`, bun.List(batch)).
@@ -1111,7 +1111,7 @@ type ratingRow struct {
 	Published     string     `bun:"published"`
 	Assessed      string     `bun:"assessed"`
 	Exploited     bool       `bun:"exploited"`
-	ExploitedHere int        `bun:"exploited_here"`
+	Incident      int        `bun:"incident"`
 	ScoreCenti    int        `bun:"score_centi"`
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ExploitedOn   *time.Time `bun:"exploited_on"`
@@ -1164,7 +1164,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 			ColumnExpr(`COALESCE("v"."severity", ?) AS "published"`, "").
 			ColumnExpr(`COALESCE("ir"."severity", ?) AS "assessed"`, "").
 			ColumnExpr(`"v"."exploited" AS "exploited"`).
-			ColumnExpr(`CASE WHEN "eh"."id" IS NULL THEN 0 ELSE 1 END AS "exploited_here"`).
+			ColumnExpr(`CASE WHEN "eh"."id" IS NULL THEN 0 ELSE 1 END AS "incident"`).
 			ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
 			ColumnExpr(`COALESCE("v"."likelihood_ppm", 0) AS "likelihood_ppm"`).
 			ColumnExpr(`"v"."exploited_on" AS "exploited_on"`).
@@ -1179,7 +1179,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 	for _, row := range rows {
 		ratings[row.ID] = Rating{
 			Published: row.Published, Assessed: row.Assessed,
-			Exploited: row.Exploited, ExploitedHere: row.ExploitedHere == 1,
+			Exploited: row.Exploited, Incident: row.Incident == 1,
 			ScoreCenti:    row.ScoreCenti,
 			LikelihoodPPM: row.LikelihoodPPM,
 			ExploitedOn:   row.ExploitedOn,
@@ -1237,13 +1237,13 @@ func sameDate(a, b *time.Time) bool {
 //
 // Read from the variant, because that is where it is recorded: what a product
 // is built as is what decides whether anybody outside runs it.
-func shippedToCustomers(ctx context.Context, tx bun.IDB, targetID int64) (bool, error) {
+func shippedToCustomers(ctx context.Context, tx bun.IDB, buildID int64) (bool, error) {
 	var shipped bool
 	err := tx.NewSelect().
-		TableExpr(`"target" AS "t"`).
+		TableExpr(`"build" AS "t"`).
 		Join(`JOIN "variant" AS "v" ON "v"."id" = "t"."variant_id"`).
 		Column("v.customer_facing").
-		Where(`"t"."id" = ?`, targetID).
+		Where(`"t"."id" = ?`, buildID).
 		Scan(ctx, &shipped)
 	if err != nil {
 		return false, fmt.Errorf("read whether this build reaches customers: %w", err)

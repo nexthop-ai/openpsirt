@@ -44,8 +44,8 @@ const depth = 64
 // build's root is every component in the build, so scanning this into a slice
 // is unbounded by construction; the two callers that pass it into a subquery
 // never hold it.
-func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
-	return WithinAny(db, targetID, []int64{componentID})
+func Within(db *bun.DB, buildID, componentID int64) *bun.RawQuery {
+	return WithinAny(db, buildID, []int64{componentID})
 }
 
 // WithinAny is the same for a set of components, in one statement.
@@ -54,29 +54,29 @@ func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 // over every build of the product — so a rule naming a pattern that matches
 // broadly issued tens of thousands of them inside one request. The engine
 // walks from every anchor at once instead.
-func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
+func WithinAny(db bun.IDB, buildID int64, componentIDs []int64) *bun.RawQuery {
 	// No depth in the rows, for the reason the count beneath carries none:
 	// 167,785 rows for 10,045 components under one real product, 0.81 s
 	// against 0.10 s, and the union ends a cycle on its own.
 	return db.NewRaw(`WITH RECURSIVE "down" AS (
 		SELECT "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
+		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
 		UNION
 		SELECT "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
+		WHERE "e"."build_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
 		  AND "e"."parent_id" <> "e"."child_id"
 	)
 	SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`,
-		targetID, bun.List(componentIDs), targetID)
+		buildID, bun.List(componentIDs), buildID)
 }
 
 // The downward walks are written as `CROSS JOIN ... WHERE` rather than
 // `JOIN ... ON`, and the difference is not cosmetic. It is standard SQL and
 // an inner join on every engine; on SQLite it is also an instruction about
 // order, and the order is the whole cost. Without it the planner put the
-// edge table on the outside of the recursive step — the target alone looked
+// edge table on the outside of the recursive step — the build alone looked
 // selective — and scanned every edge in the build once per row of the queue:
 // 6.6 s to count what sits under a build's root, 9 s for the tree's first
 // screen. With the queue on the outside each step is one index seek, and
@@ -120,7 +120,7 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // is asking. An issue has one rating, so the bands partition the distinct
 // issues; the total is summed from them by the caller, so the number and its
 // parts cannot disagree.
-func (s *Store) beneath(ctx context.Context, productID, targetID int64,
+func (s *Store) beneath(ctx context.Context, productID, buildID int64,
 	visible []access.Visibility, of []int64, adopt adoption) (map[int64]map[string]int, error) {
 
 	totals := map[int64]map[string]int{}
@@ -133,19 +133,19 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	// else being counted.
 	seeds := `SELECT "n"."id" AS "start", "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-	walkArgs := []any{targetID, bun.List(of)}
+		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
+	walkArgs := []any{buildID, bun.List(of)}
 	if len(adopt.IDs) > 0 {
 		seeds += `
 		UNION ALL
 		SELECT "bn"."id", "n"."id"
 		FROM "graph_node" AS "bn"
-		JOIN "graph_node" AS "n" ON "n"."target_id" = "bn"."target_id"
-		WHERE "bn"."target_id" = ? AND "bn"."closed_scan_id" IS NULL AND "bn"."component_id" = ?
+		JOIN "graph_node" AS "n" ON "n"."build_id" = "bn"."build_id"
+		WHERE "bn"."build_id" = ? AND "bn"."closed_scan_id" IS NULL AND "bn"."component_id" = ?
 		  AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-		walkArgs = append(walkArgs, targetID, adopt.By, bun.List(adopt.IDs))
+		walkArgs = append(walkArgs, buildID, adopt.By, bun.List(adopt.IDs))
 	}
-	walkArgs = append(walkArgs, targetID)
+	walkArgs = append(walkArgs, buildID)
 	// No depth in the rows. With one, the union keeps a node once per depth
 	// it is reached at, and a node reached along many paths is walked again
 	// from each: 1,612,405 rows for 43,904 pairs under one real product's
@@ -156,7 +156,7 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 		UNION
 		SELECT "d"."start", "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
+		WHERE "e"."build_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
 		  AND "e"."parent_id" <> "e"."child_id"
 	)
 	`
@@ -193,13 +193,13 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 		return totals, nil
 	}
 	kinds, kindArgs := kind.Inventory.Where(`"f"."kind"`)
-	args := append([]any{targetID, bun.List(visible)}, kindArgs...)
+	args := append([]any{buildID, bun.List(visible)}, kindArgs...)
 	args = append(args, bun.List(all), productID)
 	err = s.db.NewRaw(`SELECT "g"."component_id" AS "component_id", "g"."vulnerability_id" AS "vulnerability_id",
 	       `+rating.EffectiveExpr+` AS "band"
 	FROM (SELECT "f"."component_id" AS "component_id", "f"."vulnerability_id" AS "vulnerability_id"
 	      FROM "finding" AS "f"
-	      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)
+	      WHERE "f"."build_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)
 	        AND `+kinds+` AND "f"."component_id" IN (?)
 	      GROUP BY "f"."component_id", "f"."vulnerability_id") AS "g"
 	JOIN "vulnerability" AS "v" ON "v"."id" = "g"."vulnerability_id"
@@ -322,12 +322,12 @@ type region struct {
 // which a build predicate cannot help and could push a planner off. The answer
 // is the same either way — a node identifier is unique across builds, so an
 // edge of another build cannot match a node of this one.
-func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64) (region, error) {
+func (s *Store) climb(ctx context.Context, buildID int64, componentIDs []int64) (region, error) {
 	var rows []rise
 	err := s.db.NewRaw(`WITH RECURSIVE "up" AS (
 		SELECT "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
+		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
 		UNION
 		SELECT "e"."parent_id"
 		FROM "up" AS "u" CROSS JOIN "graph_edge" AS "e"
@@ -341,7 +341,7 @@ func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64)
 	JOIN "component" AS "c" ON "c"."id" = "n"."component_id"
 	LEFT JOIN "graph_edge" AS "e"
 	  ON "e"."child_id" = "u"."node" AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" <> "e"."child_id"`,
-		targetID, bun.List(componentIDs)).
+		buildID, bun.List(componentIDs)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return region{}, fmt.Errorf("walk up from what is on the page: %w", err)
@@ -408,13 +408,13 @@ func (r region) above(starts []int64) []int64 {
 // What places a supplier's statement on a finding: a statement about what sits
 // inside a product is evidence where the product is above the occurrence, and
 // nowhere else. Read through the same walk the chains are, to the same bound.
-func (s *Store) Above(ctx context.Context, subject access.Subject, targetID,
+func (s *Store) Above(ctx context.Context, subject access.Subject, buildID,
 	componentID int64) ([]Component, error) {
 
-	if err := s.knowsBuild(ctx, subject, targetID); err != nil {
+	if err := s.knowsBuild(ctx, subject, buildID); err != nil {
 		return nil, err
 	}
-	climbed, err := s.climb(ctx, targetID, []int64{componentID})
+	climbed, err := s.climb(ctx, buildID, []int64{componentID})
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +460,7 @@ func (s *Store) Above(ctx context.Context, subject access.Subject, targetID,
 // enumerate the graph, and the shortest is the one somebody can hold in mind.
 // A component the inventory placed nowhere, or one whose every way up runs
 // past the bound, has no chain, which is the honest answer.
-func (s *Store) Chains(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) Chains(ctx context.Context, subject access.Subject, buildID int64,
 	componentIDs []int64) (map[int64][]Step, error) {
 
 	chains := map[int64][]Step{}
@@ -474,10 +474,10 @@ func (s *Store) Chains(ctx context.Context, subject access.Subject, targetID int
 	// role on the product was refused the path to the component their own case
 	// sits in — so the finding their grant is for answered as though it were
 	// not there.
-	if err := s.knowsBuild(ctx, subject, targetID); err != nil {
+	if err := s.knowsBuild(ctx, subject, buildID); err != nil {
 		return nil, err
 	}
-	climbed, err := s.climb(ctx, targetID, componentIDs)
+	climbed, err := s.climb(ctx, buildID, componentIDs)
 	if err != nil {
 		return nil, err
 	}

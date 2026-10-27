@@ -87,8 +87,8 @@ func TestALaterStampFromAStaleValueIsALostRace(t *testing.T) {
 	})
 }
 
-// Every write to a decision that refuses a decision about a lead handed off changes
-// its stamp, so a hand-off resting on the decision cannot commit beside it.
+// Every write to a decision that refuses a decision about a code finding recorded as a flaw changes
+// its stamp, so a flaw record resting on the decision cannot commit beside it.
 func TestEveryWriteToADecisionChangesItsStamp(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

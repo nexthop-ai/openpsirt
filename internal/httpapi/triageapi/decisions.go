@@ -135,12 +135,12 @@ func registerDecisions(api huma.API, in core.Deps) {
 		link := weblink.DecisionOccurrence(back.DecisionOccurrence.ID)
 		if described, err := store.Describe(ctx, subject, []triage.DecisionOccurrence{back.DecisionOccurrence}); err == nil {
 			if d, ok := described[back.DecisionOccurrence.ID]; ok {
-				link = weblink.Finding(d.Product, d.Stream, d.Variant,
+				link = weblink.Finding(d.Product, d.BranchOrTag, d.Variant,
 					d.Issue.Identifier, d.Component, d.Version)
-				// A rule names no finding page; its lead is addressed by
+				// A rule names no finding page; its code finding is addressed by
 				// its occurrence.
 				if d.Issue.Kind == kind.Rule {
-					link = weblink.Lead(d.Product, d.Stream, d.Variant, back.DecisionOccurrence.OccurrenceIdentity)
+					link = weblink.CodeFinding(d.Product, d.BranchOrTag, d.Variant, back.DecisionOccurrence.OccurrenceIdentity)
 				}
 			}
 		} else if err != nil {
@@ -248,7 +248,7 @@ func registerReaffirmDecision(api huma.API, in core.Deps) {
 			"`triage.agreed-issues` where nothing goes back to an approver, and against " +
 			"`triage.review-issues` where anything does; the findings it writes count against " +
 			"`triage.write-ceiling`.\n\n" +
-			"A lead past its end of life is not re-made, and a decision with no other occurrence is " +
+			"A code finding past its end of life is not re-made, and a decision with no other occurrence is " +
 			"refused with 409.\n\n" +
 			"An occurrence that is open nowhere any more is not re-made, which is a finding that " +
 			"closed rather than a fault. `reasoning` is required.",
@@ -307,15 +307,15 @@ func decisionBody(c triage.Decision, proposedBy, proposedByName string) Decision
 
 func outliersBody(o triage.Outliers) *OutliersBody {
 	body := &OutliersBody{
-		ExploitedHere: o.ExploitedHere,
-		Exploited:     o.Exploited, Severe: o.Severe, Fixable: o.Fixable, Unmatched: o.Unmatched,
+		Incidents: o.Incident,
+		Exploited: o.Exploited, Severe: o.Severe, Fixable: o.Fixable, Unmatched: o.Unmatched,
 		Rows: make([]OutlierBody, 0, len(o.Rows)),
 	}
 	for _, row := range o.Rows {
 		body.Rows = append(body.Rows, OutlierBody{
 			DecisionOccurrenceID: row.DecisionOccurrenceID, DecisionOccurrenceIDs: row.DecisionOccurrenceIDs,
 			Vulnerability: row.Vulnerability, Severity: row.Severity,
-			ExploitedHere: row.ExploitedHere, Exploited: row.Exploited, FixedIn: row.FixedIn,
+			Incident: row.Incident, Exploited: row.Exploited, FixedIn: row.FixedIn,
 			Description: row.Description, Why: row.Why,
 		})
 	}

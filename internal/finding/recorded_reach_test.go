@@ -18,7 +18,7 @@ func TestAnUndisclosedRecordsWordsReachNoReaderOfDisclosedWorkAlone(t *testing.T
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl, "GHSA-aaaa-bbbb-cccc")}); err != nil {
 			t.Fatal(err)
 		}
@@ -57,18 +57,18 @@ func TestAnUndisclosedRecordsWordsReachNoReaderOfDisclosedWorkAlone(t *testing.T
 			if err != nil {
 				t.Fatal(err)
 			}
-			evidence, err := f.store.Detail(ctx, who, f.target, issue, component)
+			evidence, err := f.store.Detail(ctx, who, f.build, issue, component)
 			if err != nil {
 				t.Fatal(err)
 			}
-			listed, _, _, err := f.store.AtComponent(ctx, who, f.target, component, "", 50, 0)
+			listed, _, _, err := f.store.AtComponent(ctx, who, f.build, component, "", 50, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(listed) == 0 {
 				t.Fatal("the component lists nothing, so its summary was not read")
 			}
-			matched, _, _, err := f.store.AtComponent(ctx, who, f.target, component, "socket", 50, 0)
+			matched, _, _, err := f.store.AtComponent(ctx, who, f.build, component, "socket", 50, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -114,7 +114,7 @@ func TestAnUndisclosedRecordsScoreReachesNoReaderOfDisclosedWorkAlone(t *testing
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -155,7 +155,7 @@ func TestAnUndisclosedRecordsScoreReachesNoReaderOfDisclosedWorkAlone(t *testing
 			if err != nil {
 				t.Fatal(err)
 			}
-			evidence, err := f.store.Detail(ctx, who, f.target, issue, component)
+			evidence, err := f.store.Detail(ctx, who, f.build, issue, component)
 			if err != nil {
 				t.Fatal(err)
 			}

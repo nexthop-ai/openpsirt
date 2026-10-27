@@ -20,7 +20,7 @@ import (
 func TestTheListAcrossProductsAnswersOnlyForWhatIsHeld(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)
@@ -134,10 +134,10 @@ func TestTheListAcrossProductsAnswersOnlyForWhatIsHeld(t *testing.T) {
 
 // Each product's own line applies, because a line is a claim about what is
 // worth an afternoon here.
-func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
+func TestTheListAcrossProductsKeepsEachProductsMinimumSeverity(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			lowly("CVE-2026-1", libnl),
 		}); err != nil {
 			t.Fatal(err)
@@ -161,7 +161,7 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 
 		// The second product decides low findings are not worth triaging. The
 		// first says nothing, so its row stays.
-		if err := catalog.NewStore(f.db.DB).SetTriageFloor(t.Context(), other, "high"); err != nil {
+		if err := catalog.NewStore(f.db.DB).SetMinimumSeverity(t.Context(), other, "high"); err != nil {
 			t.Fatal(err)
 		}
 		after, afterTotal, err := f.store.Anywhere(t.Context(), both, 50, 0, finding.Filter{})
@@ -180,7 +180,7 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 		// A request for what is below the line brings it back, so the row is
 		// hidden rather than gone.
 		below, belowTotal, err := f.store.Anywhere(t.Context(), both, 50, 0,
-			finding.Filter{BelowFloor: true})
+			finding.Filter{BelowMinimumSeverity: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -195,26 +195,26 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 // one that states a lower line of its own. The product's line is a floor the
 // caller cannot go beneath, and the caller's raise is a second floor above it.
 // Being exploited passes both, because no line sets that aside.
-func TestASeverityAskedAcrossProductsRaisesAProductsOwnLowerLine(t *testing.T) {
+func TestASeverityAskedAcrossProductsRaisesAProductsOwnLowerMinimumSeverity(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		used := finding.Reported{
 			Issue:     finding.Named{Identifier: "CVE-2026-3", Severity: "medium", Exploited: true},
 			Component: teamd,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "medium"}, Component: libnl},
 			{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "critical"}, Component: swss},
 			used,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := catalog.NewStore(f.db.DB).SetTriageFloor(t.Context(), f.productID, "low"); err != nil {
+		if err := catalog.NewStore(f.db.DB).SetMinimumSeverity(t.Context(), f.productID, "low"); err != nil {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
 		rows, total, err := f.store.Anywhere(t.Context(), who, 50, 0,
-			finding.Filter{Floor: finding.Floor{Word: "high"}})
+			finding.Filter{MinimumSeverity: finding.MinimumSeverity{Word: "high"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -261,7 +261,7 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		said := "The parser accepts a length nobody bounded.\nA second line nothing shows."
 		reported := found("CVE-2026-9", binary)
 		reported.Issue.Description = said
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{reported}); err != nil {
 			t.Fatal(err)
 		}
@@ -300,7 +300,7 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		// sees — and the filter here already takes them, which is the half
 		// that made the other half's absence hard to notice.
 		marker := f.someoneElse(t, access.PublicTriage)
-		if err := f.store.TagIt(t.Context(), marker, f.productID,
+		if err := f.store.LabelIt(t.Context(), marker, f.productID,
 			f.issueID(t, "CVE-2026-9"), f.componentID(t, binary.Name),
 			"Waiting On Vendor"); err != nil {
 			t.Fatal(err)
@@ -309,10 +309,10 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(marked) != 1 || len(marked[0].Tags) != 1 ||
-			marked[0].Tags[0] != "Waiting On Vendor" {
+		if len(marked) != 1 || len(marked[0].Labels) != 1 ||
+			marked[0].Labels[0] != "Waiting On Vendor" {
 			t.Errorf("across products the row is marked %q, wanted the word that was put on it",
-				marked[0].Tags)
+				marked[0].Labels)
 		}
 
 		// And the rating in force, which is what reassessing an issue is for.
@@ -403,7 +403,7 @@ func TestTheListAcrossProductsSaysWhatIsExploited(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		used := found("CVE-2026-1", libnl)
 		used.Issue.Exploited = true
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			used, found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)
@@ -425,8 +425,8 @@ func TestTheListAcrossProductsSaysWhatIsExploited(t *testing.T) {
 			}
 			// Nothing here was recorded as used against this product, and the
 			// two must never answer for one another.
-			if row.ExploitedHere {
-				t.Errorf("%s reads as exploited here with no record kept",
+			if row.Incident {
+				t.Errorf("%s reads as an incident with none kept",
 					row.Vulnerability)
 			}
 		}

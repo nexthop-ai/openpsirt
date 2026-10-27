@@ -177,7 +177,7 @@ func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64
 }
 
 // open records each result new to this build as a finding, with what the run
-// said about it. A result the series holds elsewhere takes that lead's occurrence,
+// said about it. A result the series holds elsewhere takes that code finding's occurrence,
 // so a decision on it reaches this build too; any other opens at an occurrence its
 // series and key name. It returns the findings.
 func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, productID, seriesID int64, fresh []Keyed,
@@ -194,9 +194,9 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 			fresh[i].On = c.on
 		}
 	}
-	// A handed-off lead opens at the visibility its hand-off holds, so the
-	// next run's sighting is not a new internal lead.
-	handed, err := handedVisibility(ctx, db, productID, occurrences)
+	// A code finding recorded as a flaw opens at the visibility its flaw record holds, so the
+	// next run's sighting is not a new internal code finding.
+	handed, err := recordedVisibility(ctx, db, productID, occurrences)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 			visibility = v
 		}
 		rows[i] = finding.Finding{
-			TargetID: run.TargetID, Kind: kind.Analysis, VulnerabilityID: rules[k.Rule],
+			BuildID: run.BuildID, Kind: kind.Analysis, VulnerabilityID: rules[k.Rule],
 			Visibility: visibility, ComponentID: component, OccurrenceIdentity: occurrences[i],
 			OpenedAt: now,
 		}
@@ -231,7 +231,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 	return ids, nil
 }
 
-// freshOccurrences is the occurrence each result new to this build opens at: the lead's
+// freshOccurrences is the occurrence each result new to this build opens at: the code finding's
 // it was carried from, or the one its series and key name.
 func freshOccurrences(seriesID int64, fresh []Keyed, from map[int]carried) []string {
 	occurrences := make([]string, len(fresh))
@@ -323,21 +323,21 @@ func stated(n int) *int {
 	return &n
 }
 
-// handedVisibility is the visibility each handed-off lead among these occurrences
+// recordedVisibility is the visibility each code finding recorded as a flaw among these occurrences
 // holds in a product.
-func handedVisibility(ctx context.Context, db bun.IDB, productID int64, occurrences []string) (
+func recordedVisibility(ctx context.Context, db bun.IDB, productID int64, occurrences []string) (
 	map[string]access.Visibility, error) {
 
 	out := map[string]access.Visibility{}
 	for start := 0; start < len(occurrences); start += database.BatchSize {
 		batch := occurrences[start:min(start+database.BatchSize, len(occurrences))]
-		var rows []finding.Handoff
+		var rows []finding.CodeFindingFlaw
 		if err := db.NewSelect().Model(&rows).
 			Column("lh.occurrence_identity", "lh.visibility").
 			Where(`"lh"."product_id" = ?`, productID).
 			Where(`"lh"."occurrence_identity" IN (?)`, bun.List(batch)).
 			Scan(ctx); err != nil {
-			return nil, fmt.Errorf("read which of the leads were handed off: %w", err)
+			return nil, fmt.Errorf("read which of the code findings were recorded as a flaw: %w", err)
 		}
 		for _, r := range rows {
 			out[r.OccurrenceIdentity] = r.Visibility

@@ -40,9 +40,9 @@ we measure against carries 335,021 of them. Nobody can read that list, and
 nobody has to.
 
 Most findings are answered by a handful of upgrades, and OpenPSIRT shows you
-the handful. Fix bundles group findings by the upgrade that closes them. On a
+the handful. Planned upgrades group findings by the upgrade that closes them. On a
 real image, 5,047 fixable findings collapse into 271 upgrades, and a single
-kernel upgrade closes 917 of them. One decision answers a whole bundle, and the
+kernel upgrade closes 917 of them. One decision answers a whole upgrade, and the
 next scan proves it landed. Binary packages built from the same source move
 together, so curl and the libraries built beside it are one decision.
 
@@ -144,7 +144,7 @@ the interface does, your automation can do too.
 
 [Evaluation](trying.md) stands one up to look at, and [Current state](built.md)
 says what is built and what is not. To put it to work, [Build pipelines](pipeline.md)
-shows a pipeline declaring its target and posting its SBOM, and
+shows a pipeline declaring its build and posting its SBOM, and
 [A vendor's release](vendor-release.md) loads a vendor's SBOM and VEX document so
 their judgments are recorded as theirs. [Configuration](configuration.md) lists
 every setting, the [API reference](reference/api.md) every operation, and

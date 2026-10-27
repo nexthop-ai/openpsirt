@@ -18,8 +18,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
@@ -182,8 +182,8 @@ type sweep struct {
 	// reach is what each person may do with each product, from the two
 	// above.
 	reach map[int64]map[int64]acts
-	// shelved is the obligation shelf once a kind has read it.
-	shelved *[]obligation.Entry
+	// shelved is the incident shelf once a kind has read it.
+	shelved *[]incident.Entry
 }
 
 // tell makes what each person is told of one kind exactly what they are
@@ -260,9 +260,9 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		}, "what is about to disclose"},
 		// A window after an attack on a product, running and then passed,
 		// with nobody outside recorded as told.
-		{ObligationOpen, s.windowsOpen, "which windows after an attack are running"},
-		{ObligationNear, s.windowsNear, "which windows after an attack are about to end"},
-		{ObligationPassed, s.windowsPassed, "which windows after an attack have passed"},
+		{ResponseWindowOpen, s.windowsOpen, "which windows after an attack are running"},
+		{ResponseWindowNear, s.windowsNear, "which windows after an attack are about to end"},
+		{ResponseWindowPassed, s.windowsPassed, "which windows after an attack have passed"},
 		// A VEX publisher changing what they said about something a standing
 		// decision cited.
 		{StatementRevised, s.statementsRevised, "what a publisher changed"},
@@ -276,11 +276,11 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		// A critical against something already shipped.
 		{CriticalOnRelease, s.criticalOnReleases, "what is critical on a release"},
 		// An analyzer whose absences are not evidence, or that stopped.
-		{AnalysisNotComparable, s.analysesNotComparable, "which analyzer runs could not be compared"},
-		{AnalysisQuiet, s.analysesQuiet, "which analyzers have gone quiet"},
-		// A standing rule on leads covering more than was agreed to.
-		{RuleOutgrown, s.rulesOutgrown, "which standing rules on leads have outgrown their approval"},
-		{RuleWaiting, s.rulesWaiting, "which standing rules on leads are waiting on a second person"},
+		{SecurityTestingNotComparable, s.analysesNotComparable, "which analyzer runs could not be compared"},
+		{SecurityTestingStopped, s.analysesQuiet, "which analyzers have gone quiet"},
+		// A suppression rule covering more than was agreed to.
+		{SuppressionRuleOutgrown, s.rulesOutgrown, "which suppression rules have outgrown their approval"},
+		{SuppressionRuleWaiting, s.rulesWaiting, "which suppression rules are waiting on a second person"},
 	} {
 		holding, err := each.of(ctx)
 		if err != nil {
@@ -319,7 +319,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 
 	var rows []struct {
 		Product       string `bun:"product"`
-		Stream        string `bun:"stream"`
+		BranchOrTag   string `bun:"branch_or_tag"`
 		Variant       string `bun:"variant"`
 		Component     string `bun:"component"`
 		Vulnerability string `bun:"vulnerability"`
@@ -366,17 +366,17 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 
 	for _, row := range rows {
 		private := row.Undisclosed
-		where := row.Product + " " + row.Stream + " " + row.Variant
+		where := row.Product + " " + row.BranchOrTag + " " + row.Variant
 		why := "is rated critical"
 		if row.Exploited {
 			why = "is being exploited"
 		}
 		holds := Holds{
-			About: identify("critical-on-release", row.Product, row.Stream, row.Variant,
+			About: identify("critical-on-release", row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component),
 			Body: fmt.Sprintf("%s %s and is open against %s, which has been released. Nothing has been decided about it.",
 				row.Vulnerability, why, where),
-			Link: weblink.Finding(row.Product, row.Stream, row.Variant,
+			Link: weblink.Finding(row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component, ""),
 			Private:         private,
 			ProductID:       &row.ProductID,
@@ -419,7 +419,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 	// administering grants no reading of a product, so an administrator's
 	// subject would not reach every product.
 	everything := access.Everything("the watch")
-	rows, err := ingest.NewStore(w.db).Scanning(ctx, everything, finding.Scope{}, after)
+	rows, err := ingest.NewStore(w.db).LastUploads(ctx, everything, finding.Scope{}, after)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +429,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 		if !row.Quiet {
 			continue
 		}
-		where := row.Product + " " + row.Stream + " " + row.Variant
+		where := row.Product + " " + row.BranchOrTag + " " + row.Variant
 		days := int(row.Since.Hours() / 24)
 		// Put into words rather than printed, because "0 days" is what
 		// arithmetic gives for a threshold measured in hours and is not
@@ -459,9 +459,9 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			// 191 characters and the column holds 191, and a hash is a fixed
 			// width that is only ever compared for equality. The names people
 			// read are in the body.
-			About: identify("quiet", row.Product, row.Stream, row.Variant),
+			About: identify("quiet", row.Product, row.BranchOrTag, row.Variant),
 			Body:  body,
-			Link:  weblink.Uploads(row.Product, row.Stream, row.Variant),
+			Link:  weblink.Uploads(row.Product, row.BranchOrTag, row.Variant),
 		})
 	}
 	return holding, nil
@@ -485,8 +485,8 @@ func administrators(people []access.Account) []int64 {
 // were.
 //
 // Several fields are each written with their length first, because a name may
-// contain whatever separator would join them: product "a b" and stream "c"
-// joined with a space are product "a" and stream "b c". One field is hashed as
+// contain whatever separator would join them: product "a b" and branch or tag "c"
+// joined with a space are product "a" and branch or tag "b c". One field is hashed as
 // it is.
 func identify(fields ...string) string {
 	if len(fields) == 1 {

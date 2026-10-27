@@ -27,9 +27,9 @@ export const ROUTES = Object.fromEntries(
 
 // The prefix every screen of one build shares. Not an address by itself: the
 // router answers only the screens below it.
-export const BUILD = "/products/:product/streams/:stream/variants/:variant";
+export const BUILD = "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant";
 
-export type Build = { product: string; stream: string; variant: string };
+export type Build = { product: string; branch_or_tag: string; variant: string };
 
 // The kinds of upload a build's Uploads screen has a tab for, in the server's
 // own words.
@@ -71,34 +71,42 @@ const at = (
 
 // One product and what hangs off it.
 export const productAt = (product: string) => at("product", { product });
-export const streamsAt = (product: string) => at("streams", { product });
-export const streamAt = (product: string, stream: string) => at("stream", { product, stream });
+export const branchesAndTagsAt = (product: string) => at("branchesAndTags", { product });
+export const branchOrTagAt = (product: string, branchOrTag: string) =>
+  at("branchOrTag", { product, branch_or_tag: branchOrTag });
+// The place under a product's branches and tags that an address under its
+// former streams prefix names. The rest arrives escaped, as the address had it.
+export const fromStreamsAt = (product: string, rest: string) =>
+  rest ? `${branchesAndTagsAt(product)}/${rest}` : branchesAndTagsAt(product);
 export const variantsAt = (product: string) => at("variants", { product });
 export const comparisonAt = (product: string, query?: Query) =>
   at("comparison", { product }, query);
 export const inventoryComparisonAt = (product: string, query?: Query) =>
   at("inventoryComparison", { product }, query);
-// A product's inbox, or only the rulings in it waiting for a second person.
-export const inboxAt = (product: string, waiting = false) =>
-  at("inbox", { product }, { waiting: waiting ? "1" : undefined });
-export const inboxReportAt = (product: string, reference: string) =>
-  at("inboxReport", { product, reference });
-// A product's static analysis leads: the queue, or one state's leads, on
+// A product's vulnerability reports, or only the rulings waiting for a second
+// person.
+export const vulnerabilityReportsAt = (product: string, waiting = false) =>
+  at("vulnerabilityReports", { product }, { waiting: waiting ? "1" : undefined });
+export const vulnerabilityReportAt = (product: string, reference: string) =>
+  at("vulnerabilityReport", { product, reference });
+// A product's static analysis code findings: the queue, or one state's code findings, on
 // every build or one.
-export const leadsAt = (
+export const codeFindingsAt = (
   product: string,
   query?: {
     state?: string;
-    stream?: string;
+    branch_or_tag?: string;
     variant?: string;
     series?: string;
+    method?: string;
     assigned?: "nobody";
   },
-) => at("leads", { product }, query);
-// One lead's evidence on one build.
-export const leadAt = (build: Build, place: string) => at("lead", { ...build, place });
-// The standing rules dismissing a product's leads.
-export const leadRulesAt = (product: string) => at("leadRules", { product });
+) => at("codeFindings", { product }, query);
+// One code finding's evidence on one build.
+export const codeFindingAt = (build: Build, occurrence: string) =>
+  at("codeFinding", { ...build, occurrence });
+// The suppression rules dismissing a product's code findings.
+export const suppressionRulesAt = (product: string) => at("suppressionRules", { product });
 // The hosts a product's source links open on, and what it says per path.
 export const repositoriesAt = (product: string) => at("repositories", { product });
 
@@ -109,14 +117,14 @@ export function componentAt(
   product: string,
   component: string,
   version?: string | null,
-  from?: { stream?: string; variant?: string },
+  from?: { branch_or_tag?: string; variant?: string },
 ): string {
   return at(
     "productComponent",
     { product, component },
     {
       version: version || undefined,
-      stream: from?.stream || undefined,
+      branch_or_tag: from?.branch_or_tag || undefined,
       variant: from?.variant || undefined,
     },
   );
@@ -154,7 +162,7 @@ export function findingAt(
 ): string {
   return at(
     "finding",
-    { ...build, vulnerability: row.vulnerability ?? "", component: row.component ?? "" },
+    { ...build, issue: row.vulnerability ?? "", component: row.component ?? "" },
     {
       version: row.version || undefined,
       // A name at a version can be two components in one build, so the
@@ -174,7 +182,7 @@ export function findingAt(
 // queue's rows do: one record holding all of it, each part possibly absent.
 export function findingOf(row: {
   product?: string | null;
-  stream?: string | null;
+  branch_or_tag?: string | null;
   variant?: string | null;
   vulnerability?: string | null;
   component?: string | null;
@@ -183,7 +191,11 @@ export function findingOf(row: {
   namespace?: string | null;
 }): string {
   return findingAt(
-    { product: row.product ?? "", stream: row.stream ?? "", variant: row.variant ?? "" },
+    {
+      product: row.product ?? "",
+      branch_or_tag: row.branch_or_tag ?? "",
+      variant: row.variant ?? "",
+    },
     row,
   );
 }
@@ -204,10 +216,10 @@ export const bulkDecisionAt = (build: Build, component: string, which: Which = {
 export const uploadsAt = (build: Build, type?: UploadType) =>
   type && type !== "sbom" ? at("uploadsOf", { ...build, type }) : at("uploads", build);
 export const inventoryChangesAt = (build: Build, scan: number) =>
-  at("inventoryChanges", { ...build, scan });
+  at("inventoryChanges", { ...build, sbom: scan });
 export const runAt = (build: Build, run: number) => at("run", { ...build, run });
-export const upgradesAt = (build: Build) => at("upgrades", build);
-export const matchCoverageAt = (build: Build) => at("matchCoverage", build);
+export const plannedUpgradesAt = (build: Build) => at("plannedUpgrades", build);
+export const unmatchedComponentsAt = (build: Build) => at("unmatchedComponents", build);
 export const vexAt = (build: Build) => at("vex", build);
 
 // A build's screen named by what follows the build in an address, for moving
@@ -225,10 +237,10 @@ export const sameProductScreenAt = (product: string, rest: string) => productAt(
 // One thing, by what names it.
 export const decisionAt = (id: number) => at("decision", { id });
 export const decisionOccurrenceAt = (id: number) => at("decisionOccurrence", { id });
-export const issueAt = (vulnerability: string) => at("issue", { vulnerability });
+export const issueAt = (issue: string) => at("issue", { issue });
 export const personAt = (identity: string) => at("person", { identity });
 export const advisoryAt = (advisory: string | number) => at("advisory", { advisory });
-export const reportAt = (report: string) => at("report", { report });
+export const analyticsReportAt = (report: string) => at("analyticsReport", { report });
 export const settingsAt = (section: string) => at("settingsSection", { section });
 
 // The review queue, for one product, on one of its lists, or opened on the
@@ -254,15 +266,15 @@ export const reviewQueueAt = (
 
 // The form that records a flaw in a product, started from a report where one
 // prompted it, or with where it came from already answered.
-export const reportFlawAt = (product: string, from?: string, source?: "outside") =>
-  at("reportFlaw", {}, { product, from: from || undefined, source });
+export const recordFlawAt = (product: string, from?: string, source?: "outside") =>
+  at("recordFlaw", {}, { product, from: from || undefined, source });
 
-// The Exploited here shelf, narrowed to one product where one is named.
-export const exploitedAt = (product?: string) =>
-  at("exploited", {}, { product: product || undefined });
+// The Incidents screen, narrowed to one product where one is named.
+export const incidentsAt = (product?: string) =>
+  at("incidents", {}, { product: product || undefined });
 
-// The record of decisions, asked a question.
-export const recordAt = (query?: Query) => at("record", {}, query);
+// The audit log, asked a question.
+export const auditLogAt = (query?: Query) => at("auditLog", {}, query);
 
 // An address built here, with its query replaced, for a list moved to another
 // scope with the filters it carried.
@@ -286,8 +298,8 @@ export function refiled(pathname: string, from: string, to: string): string {
     const parts = Object.fromEntries(
       Object.entries(hit.params).map(([key, value]) => [key, decoded(value ?? "")]),
     );
-    if (parts.vulnerability === from) {
-      return fill(ROUTES[name], { ...parts, vulnerability: to });
+    if (parts.issue === from) {
+      return fill(ROUTES[name], { ...parts, issue: to });
     }
   }
   return pathname;

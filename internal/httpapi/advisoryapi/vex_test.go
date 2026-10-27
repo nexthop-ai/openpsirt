@@ -475,7 +475,7 @@ func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarg
 	// generates it too, so it refuses the same way.
 	//
 	// The ceiling is brought down to the fixture rather than the fixture
-	// built up to twenty thousand, which is how the routing reach is tested
+	// built up to twenty thousand, which is how the assignment rule reach is tested
 	// and for the same reason.
 	carryingOne := func(d *core.Deps) { d.VexCeiling = 1 }
 	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Two, carryingOne, func(t *testing.T, r *httpapitest.Reach) {
@@ -675,7 +675,7 @@ func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
 	carryingOne := func(d *core.Deps) { d.VexCeiling = 1 }
 	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Two, carryingOne, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		httpapitest.RecordedIssuance(t, r, "triager")
+		httpapitest.RecordedPublishedVEX(t, r, "triager")
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
 			decision, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
 			r.Agreed(t, decision)
@@ -752,13 +752,13 @@ func TestAVEXDocumentSaysNothingFixedWhileAnOccurrenceIsOpen(t *testing.T) {
 				"fold_key", "first_seen_at")
 			SELECT '`+hash+`', "purl", "name", '5.10-2', '`+hash+`', "first_seen_at"
 			FROM "component" WHERE "name" = 'linux-image'`)
-		r.PatchedRows(t, `INSERT INTO "finding" ("target_id", "kind", "vulnerability_id",
+		r.PatchedRows(t, `INSERT INTO "finding" ("build_id", "kind", "vulnerability_id",
 				"visibility", "component_id", "occurrence_identity", "urgency",
-				"urgency_exploited", "urgency_exploited_here", "urgency_shipped",
+				"urgency_exploited", "urgency_incident", "urgency_shipped",
 				"opened_at")
-			SELECT "target_id", "kind", "vulnerability_id", "visibility",
+			SELECT "build_id", "kind", "vulnerability_id", "visibility",
 				(SELECT "id" FROM "component" WHERE "identity" = '`+hash+`'),
-				"occurrence_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
+				"occurrence_identity", "urgency", "urgency_exploited", "urgency_incident",
 				"urgency_shipped", "opened_at"
 			FROM "finding" WHERE "closed_because" = 'patched'`)
 		if fixed := r.FixedIn(t); len(fixed) != 0 {

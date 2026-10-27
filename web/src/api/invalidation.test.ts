@@ -49,7 +49,7 @@ describe("what an act invalidates", () => {
   it("a change to a report reaches the reports, the rulings, the duplicates, every disclosure date and the held lists", () => {
     expect(after(useAfterReport)).toEqual(
       [
-        "disclosing",
+        "disclosure-deadlines",
         "duplicate-disclosure",
         "duplicates",
         "finding",
@@ -74,7 +74,7 @@ describe("what an act invalidates", () => {
         "held-reports",
         "holdings",
         "home",
-        "leads",
+        "code-findings",
         "reports",
         "team-assigned",
       ].sort(),

@@ -22,7 +22,7 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil {
@@ -34,12 +34,12 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 		// A reason is required, for the same reason moving a disclosure date
 		// needs one: a closure with no reason is a record saying somebody
 		// closed it and nothing else.
-		if _, err := f.store.Resolve(ctx, who, f.target, issueID, "   "); !errors.Is(err, finding.ErrNoReason) {
+		if _, err := f.store.Resolve(ctx, who, f.build, issueID, "   "); !errors.Is(err, finding.ErrNoReason) {
 			t.Errorf("a closure with no reason was accepted: %v", err)
 		}
 
 		const because = "Fixed by the authentication check added in 1.0.1."
-		done, err := f.store.Resolve(ctx, who, f.target, issueID, because)
+		done, err := f.store.Resolve(ctx, who, f.build, issueID, because)
 		if err != nil {
 			t.Fatalf("closing %s: %v", identifier, err)
 		}
@@ -84,7 +84,7 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 
 		// Closing it again finds nothing open, rather than rewriting the first
 		// closure's reason with a second one.
-		if _, err := f.store.Resolve(ctx, who, f.target, issueID, "again"); !errors.Is(err, finding.ErrNothingOpenThere) {
+		if _, err := f.store.Resolve(ctx, who, f.build, issueID, "again"); !errors.Is(err, finding.ErrNothingOpenThere) {
 			t.Errorf("closing it twice: %v", err)
 		}
 	})
@@ -99,7 +99,7 @@ func TestAScannersFindingIsNotClosedByHand(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +109,7 @@ func TestAScannersFindingIsNotClosedByHand(t *testing.T) {
 		}
 
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		_, err = f.store.Resolve(ctx, who, f.target, issueID, "We fixed it, honestly.")
+		_, err = f.store.Resolve(ctx, who, f.build, issueID, "We fixed it, honestly.")
 		if !errors.Is(err, finding.ErrNotOursToClose) {
 			t.Errorf("a scanner's finding was closed by hand: %v", err)
 		}
@@ -136,7 +136,7 @@ func TestClosingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil {
@@ -146,13 +146,13 @@ func TestClosingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 
 		// Reading it and not triaging it is refused as that.
 		reads := f.planner(t, access.PublicTriage, access.PrivateRead)
-		_, err = f.store.Resolve(ctx, reads, f.target, row.VulnerabilityID, "Fixed.")
+		_, err = f.store.Resolve(ctx, reads, f.build, row.VulnerabilityID, "Fixed.")
 		if !errors.Is(err, access.ErrDenied) {
 			t.Errorf("somebody without the private right closed an undisclosed flaw: %v", err)
 		}
 		// Not reading it at all, there is nothing open that they may see.
 		public := f.planner(t, access.PublicTriage)
-		_, err = f.store.Resolve(ctx, public, f.target, row.VulnerabilityID, "Fixed.")
+		_, err = f.store.Resolve(ctx, public, f.build, row.VulnerabilityID, "Fixed.")
 		if !errors.Is(err, finding.ErrNothingOpenThere) {
 			t.Errorf("somebody who may not read an undisclosed flaw was answered %v", err)
 		}
@@ -166,7 +166,7 @@ func TestClosingByHandSaysNothingOfWhatTheCallerMayNotRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -182,7 +182,7 @@ func TestClosingByHandSaysNothingOfWhatTheCallerMayNotRead(t *testing.T) {
 		}
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
 			Set(`"visibility" = ?`, access.Private).
-			Where(`"target_id" = ?`, other).Exec(ctx); err != nil {
+			Where(`"build_id" = ?`, other).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -210,7 +210,7 @@ func TestARecordedFlawStaysClosableWhenAScannerReportsTheSameName(t *testing.T) 
 
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil || len(rows) == 0 {
@@ -227,7 +227,7 @@ func TestARecordedFlawStaysClosableWhenAScannerReportsTheSameName(t *testing.T) 
 			},
 		)
 
-		done, err := f.store.Resolve(ctx, who, f.target, rows[0].VulnerabilityID,
+		done, err := f.store.Resolve(ctx, who, f.build, rows[0].VulnerabilityID,
 			"Fixed in the next image.")
 		if err != nil {
 			t.Fatalf("closing a recorded flaw a scanner also reported elsewhere: %v", err)
@@ -242,7 +242,7 @@ func TestARecordedFlawStaysClosableWhenAScannerReportsTheSameName(t *testing.T) 
 			t.Helper()
 			q := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
 				ColumnExpr("COUNT(*)").
-				Where(`"target_id" = ?`, f.target).
+				Where(`"build_id" = ?`, f.build).
 				Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
 				Where(`"kind" = ?`, kind)
 			if open {

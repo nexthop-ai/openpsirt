@@ -507,8 +507,8 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	if err != nil {
 		return Subject{}, err
 	}
-	// Every handed-off lead they were granted, for the same reason.
-	leads, err := s.LeadsOf(ctx, person.ID)
+	// Every code finding recorded as a flaw they were granted, for the same reason.
+	codeFindings, err := s.CodeFindingsOf(ctx, person.ID)
 	if err != nil {
 		return Subject{}, err
 	}
@@ -543,7 +543,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	// Somebody holding the audit permission alone holds access: they reach no
 	// product and read the deployment's own records, which is the whole of
 	// what it is for.
-	if !administers && !audits && len(grants) == 0 && len(cases) == 0 && len(leads) == 0 {
+	if !administers && !audits && len(grants) == 0 && len(cases) == 0 && len(codeFindings) == 0 {
 		return Subject{}, ErrDenied
 	}
 
@@ -564,7 +564,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		on = append(on, team.PartyID)
 	}
 	subject := NewPerson(person.ID, person.Identity, administers, grants,
-		person.PartyID, on...).OnCases(cases).OnLeads(leads)
+		person.PartyID, on...).OnCases(cases).OnCodeFindings(codeFindings)
 	if audits {
 		subject = subject.Auditing()
 	}

@@ -4,7 +4,7 @@
 import { Fragment } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { Severity, Exploited, Incident } from "../ui/Severity";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
@@ -79,7 +79,7 @@ function openFor(opened: string | undefined): string | null {
 // screen whose purpose is noticing what is running out, so the reason is said.
 const noDeadlineSays: Record<NonNullable<Row["no_deadline"]>, string> = {
   "not-rated": "not rated",
-  "below-the-line": "below the line",
+  "below-minimum-severity": "below minimum severity",
   "nothing-to-take": "no fix to take",
   "out-of-support": "out of support",
 };
@@ -151,7 +151,7 @@ export function FindingsTable({
   oneBuild: boolean;
   sortable: (label: keyof typeof SORTS) => React.ReactNode;
   // The build a row's actions and links are about.
-  buildOf: (row: Row) => { product: string; stream: string; variant: string };
+  buildOf: (row: Row) => { product: string; branch_or_tag: string; variant: string };
   // The other rows on this page that are the same issue at another binary of
   // one source package.
   siblings: Map<string, number>;
@@ -333,7 +333,7 @@ export function FindingsTable({
                       <Link to={at} className="id" onClick={(e) => e.stopPropagation()}>
                         {row.vulnerability}
                       </Link>{" "}
-                      <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
+                      <Incident when={row.incident} /> <Exploited when={row.exploited} />
                       {/* The secondary signal. What somebody must not
                                 miss is on the finding itself. */}
                       {row.undisclosed && (
@@ -373,20 +373,20 @@ export function FindingsTable({
                           {row.summary}
                         </div>
                       )}
-                      {(row.tags ?? []).length > 0 && (
+                      {(row.labels ?? []).length > 0 && (
                         <span className="marks">
-                          {(row.tags ?? []).map((tag) => (
+                          {(row.labels ?? []).map((label) => (
                             <button
-                              key={tag}
+                              key={label}
                               type="button"
                               className="mark"
-                              title={`Everything tagged ${tag}`}
+                              title={`Everything labeled ${label}`}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                set("tag", tag);
+                                set("label", label);
                               }}
                             >
-                              {tag}
+                              {label}
                             </button>
                           ))}
                         </span>
@@ -445,7 +445,7 @@ export function FindingsTable({
                       {/* The same issue at two binaries of one source
                                 package is two rows here and one piece of work
                                 everywhere else: it is decided once, upgraded
-                                once, and routed by one rule. Said on the row
+                                once, and assigned by one rule. Said on the row
                                 rather than folded away, because the occurrences are
                                 real and a reader counting them should get the
                                 same number the list does — what they were not
@@ -582,7 +582,7 @@ export function FindingsTable({
               key={identityOf(row)}
               // The word the badge draws with, so the card's stripe and the
               // badge on it agree, an absent rating included.
-              className={`fcard ${row.exploited || row.exploited_here ? "exploited" : bandOf(row.severity)}`}
+              className={`fcard ${row.exploited || row.incident ? "exploited" : bandOf(row.severity)}`}
               role="link"
               tabIndex={0}
               aria-label={`${row.vulnerability} in ${row.component}`}
@@ -596,7 +596,7 @@ export function FindingsTable({
             >
               <header>
                 <Severity word={row.severity} />
-                <ExploitedHere when={row.exploited_here} />
+                <Incident when={row.incident} />
                 <Exploited when={row.exploited} />
               </header>
               <div>

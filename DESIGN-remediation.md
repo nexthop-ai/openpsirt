@@ -6,7 +6,7 @@ documents generated from what was decided.
 Satisfies REQ-15, REQ-19, REQ-24, REQ-28, REQ-33, REQ-34, REQ-35, REQ-36, REQ-39.
 
 Neighboring pieces: the escalation view, per-item time remaining and the SLA
-compliance rate are in `DESIGN-reporting.md`; the assignment model is in
+compliance rate are in `DESIGN-analytics.md`; the assignment model is in
 `DESIGN-access.md`, which defines the party a thing is assigned to.
 
 ## Contents
@@ -15,7 +15,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [The unit](#the-unit)
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
-- [Pending upgrades](#pending-upgrades)
+- [Planned upgrades of a build](#planned-upgrades-of-a-build)
 - [Upstream currency](#upstream-currency)
 - [Version ordering](#version-ordering)
 - [Promise states](#promise-states)
@@ -66,7 +66,7 @@ A commitment is one build moving one fold: a source package, at the version it
 was built at, going to another version. That is the piece of work somebody
 actually does, and it is one row.
 
-A release is named by its stream and its variant together, never by one of them:
+A release is named by its branch or tag and its variant together, never by one of them:
 the same branch built two ways is two builds, and a plan naming only the branch
 would claim a fix for hardware nobody built for.
 
@@ -158,7 +158,7 @@ it opens, and there is no floor for a slow pipeline.
 | A scan with no listing day learns exploitation at its own start | The moment every issue a database held before the day was read counts from |
 | A listing day filled or moved earlier re-clocks the issue | Every open exploited finding of the issue counting from a later moment is moved onto the day, in every build, and its deadline worked out again. Once per issue: after it, nothing counts from later |
 | A severity word filled in re-clocks the issue in every product holding it | The deadline of each open finding is worked out again from when it opened, by the product's rating in force with the new word as its fallback (`DESIGN-findings.md` § Report merging) |
-| A finding with no deadline keeps none when re-clocked | A tag, a release past end of life and a missing fix are off the clock whatever the moment is. A rating moving, a word filled in, a record of being attacked and an issue becoming exploited each re-clock only what sits on a release that moves and is in support |
+| A finding with no deadline keeps none when re-clocked | A tag, a release past end of life and a missing fix are off the clock whatever the moment is. A rating moving, a word filled in, an incident and an issue becoming exploited each re-clock only what sits on a release that moves and is in support |
 | A recount reasons at the store's clock | One moment per recount, read from the clock every other write reads, so a fix date is weighed the same way by a recount and by the scan beside it |
 
 The same rule governs every writer. A scan counts it per finding, and an edited
@@ -168,18 +168,18 @@ moment it is weighed at has not arrived: a scan weighs it at the run's start
 and the rewrite at the time of the edit.
 
 The rewrite writes a deadline only where one belongs: a release that moves and
-is in support, a band the line admits or an issue this product was attacked
+is in support, a band the minimum severity admits or an issue this product was attacked
 through, and a fix to take. A rewrite stopped part way, by an error or a
 shutdown, leaves every row it reached right and every other row as it was. The
 sweeps that follow take the clock off what was written before a release went out
-of support, a line moved or upstream answered.
+of support, a minimum severity moved or upstream answered.
 
 A finding with no deadline states which reason applies:
 
 | Reason | Reported as | Precedence |
 |---|---|---|
 | A flaw recorded here that nobody has rated | `not-rated` | The narrowest: it is about what this finding lacks rather than anything around it |
-| Below the line its product triages at | `below-the-line` | The narrowest statement about how this finding is rated |
+| Below its product's minimum severity | `below-minimum-severity` | The narrowest statement about how this finding is rated |
 | **Upstream has released no fix, or has declined to on an issue nobody is exploiting** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
 | **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
 | Its release is past end-of-life (REQ-15) | `out-of-support` | |
@@ -219,7 +219,7 @@ only be met by waiting.
 | A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
 | A scan moving the listing day earlier, for every build of the issue | The one deadline rule, over findings that already carry a deadline |
 | A record of this product being attacked, set or cleared | The recount, with either signal |
-| An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the line passes over either signal |
+| An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the minimum severity passes over either signal |
 
 A scanner that did not answer is not upstream saying no. Reading silence as
 "no fix exists" is a claim about the world made out of a gap in a report, and it
@@ -239,7 +239,7 @@ compliance rate. Three of the reasons already have somewhere to be seen — the
 line is stated wherever a list hides something, a tag's findings are read at the
 release, and what upstream has done is a column of the findings list and a
 filter over it. End-of-life does not, so releases out of support are a report of
-their own; `DESIGN-reporting.md` holds it.
+their own; `DESIGN-analytics.md` holds it.
 
 A tag was built once and is what somebody received. No work will land in it
 whatever a date says, so a deadline on one is unmeetable the moment it is
@@ -248,7 +248,7 @@ one tag carry a deadline, every one of them unmeetable by construction. Real
 deployments accumulate tags while branches do not, so that side grows — and it
 inflates every overdue count, the compliance rate among them.
 
-The reason is derived rather than stored, and derived where the triage line is
+The reason is derived rather than stored, and derived where the minimum severity is
 applied, so the two cannot disagree. The deadline itself is stored, because
 deriving it costs a pass over every open finding per urgency band — and it is
 rewritten whenever the answer moves rather than only when the ranking does, so
@@ -268,9 +268,9 @@ its clock starts when it is first given a severity (REQ-33).
 | Everything else is the rule above | Exploitation learned later and a fix arriving move it the way they move a scanned finding |
 | A recorded flaw is recounted on its own | Recorded flaws are few, one row per occurrence in each build, so they are rewritten row by row rather than in the bands a scan's findings are |
 
-## Pending upgrades
+## Planned upgrades of a build
 
-The fix-bundle query inverted (REQ-35). A triager reads an upgrade and the
+The product's planned upgrades inverted (REQ-35). A triager reads an upgrade and the
 issues it closes, in the findings list's by-upgrade view; a coordinator reads a
 build and the upgrades it is waiting on, here. One query read from either end,
 and both ends are drawn.
@@ -280,7 +280,7 @@ direction.
 
 | Ordering | |
 |---|---|
-| The bundle list breaks its last tie on the fold | The fold is the last column a bundle is grouped on, so two bundles equal on every other key keep one order across pages |
+| The planned upgrades list breaks its last tie on the fold | The fold is the last column a planned upgrade is grouped on, so two equal on every other key keep one order across pages |
 | One source at two versions in one build lists the earlier version first | By the ecosystem's version ordering where the fold has one, and by text where it has none |
 
 The version in hand and the version being moved to are both stored with the
@@ -564,7 +564,7 @@ It names the issues it covers and the products each of those is covered in.
 | One covering nothing is its minter's alone | Covering nothing it satisfies every narrowing there is, and its title is prose somebody typed that goes on to be the document's. The same holds for one whose issues were all taken off |
 | What went out is read at what it named | An issuance names the flaws the advisory covered when it went out. The report of what went out, the documents a directory serves, the list of one advisory's issuances, whether it changed since, its editorial status and the revision history of a document generated now are all shown only to a reader who may see what every issuance named and every flaw the advisory covers now. A reader who may not is told the advisory does not exist, so emptying or re-pointing an advisory after it went out discloses nothing |
 | An issue taken off leaves its record | Who removed a flaw from a document is a question a deleted row does not answer. Naming it again revives that record rather than writing a second, which is also what keeps the pair unique |
-| A flaw recorded from a lead is fixed in a build where a person closed it there, and the flaw's page offers each build its lead is not reproduced on, from the first run that did not see it | The lead's absence is the evidence and the closure is the statement (`DESIGN-analysis.md` § Fixed in) |
+| A flaw recorded from a code finding is fixed in a build where a person closed it there, and the flaw's page offers each build its code finding is no longer detected on, from the first run that did not see it | The code finding's absence is the evidence and the closure is the statement (`DESIGN-analysis.md` § Fixed in) |
 | The flaws offered for a product are every one recorded there, open or fixed | An advisory is usually written after the fix lands, so a list of what is still open offers nothing for the flaw it is about. The list is the rows naming one accepts — recorded by a person, at a visibility the reader may see, in a product they triage — with how many of each are still open |
 
 An advisory is the rare, deliberate document. A vendor does not notify a
@@ -636,7 +636,7 @@ Nothing is sent anywhere.
 | Generating or recording a document with no publisher configured answers 409; any other failure is a fault | The missing publisher is the store's own refusal, matched by identity. Reading what has gone out needs no publisher, so its failures are faults wherever none is configured |
 | A document about an undisclosed flaw travels no further, whatever its editorial state | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either. The distribution label is what carries this; the tracking status says where the document is in its life |
 | The label is decided from every occurrence of each issue in its product | One undisclosed occurrence makes the issue embargoed there, whichever occurrence was recorded first or which the reader sees. A reader who may not read undisclosed work in that product is not shown the advisory at all: listing it, opening it by name and generating its document refuse together, because a listing that admits it beside a document that refuses says undisclosed work exists |
-| Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
+| Releases are named by branch or tag and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
 | A release whose every open occurrence stands under approved, live decisions with one outcome states what they say | The rule the VEX document of a build reads, through the one query both documents use. Not applicable or a wrong match, with its reason, is known not affected; already fixed is fixed; will not fix stays known affected, and says no fix is planned. A release partly covered stays known affected, because the document has no finer grain than the release |
 | Where the decisions at a release differ, the earliest speaks | The decision that has stood longest, as in the VEX document. Its reason and its mitigation are read off that one decision |
@@ -699,7 +699,7 @@ component the document is about, where it declared one.
 
 Assembled from approved `not-applicable`, `mismatched` and `already-fixed`
 decisions (REQ-39), from `wont-fix` decisions that say what a holder can do
-instead, and from the patches the build declares, for one product, stream and
+instead, and from the patches the build declares, for one product, branch or tag, and
 variant.
 
 Two documents describe a build, chosen when one is generated.
@@ -948,7 +948,7 @@ on is assembled from the flaws the advisory covers.
 
 | | |
 |---|---|
-| A bump is keyed on where it is going as well as where it comes from | Pending upgrades grouped on the first two fields and took the third from whichever row made the bucket, so two bundles at 5.9.0 and 5.9.2 rendered as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
+| A bump is keyed on where it is going as well as where it comes from | Grouped on the first two fields alone, two upgrades at 5.9.0 and 5.9.2 read as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
 | A fix declared for a product covers its builds without being written per build | A decision occurrence's live key names the occurrence and not the build, so a product shipping the same component in two builds produced two identical proposals and the second collided with the unique index, rolling back the whole declaration. The proposals are made distinct before they are written |
 | A statement about a group speaks for the group | The outbound format has no occurrence granularity, so a dismissal covering some of a group is not published as covering all of it |
 | Only a decision made where a build was in hand records one | A decision from before the builds were kept, and one made where no build was on screen, records none. The advisory says so and flags nothing, because a guess from where the occurrence sat names every variant holding the same code, which is the case the flag exists for |

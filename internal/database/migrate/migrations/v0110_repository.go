@@ -54,7 +54,7 @@ func repositoryV0110(t *columnTypes) []string {
 			-- Whether source snippets under the prefix are kept. Null takes
 			-- the setting of the nearest prefix that states one.
 			"snippets"         ` + t.boolean + ` NULL,
-			-- Whether the snippets of a lead moved into a case are disclosed
+			-- Whether the snippets of a code finding included in its flaw's disclosure are disclosed
 			-- with its flaw. Null takes the nearest prefix that states one,
 			-- and none stating one strips them.
 			"disclosed_snippets" ` + t.boolean + ` NULL,

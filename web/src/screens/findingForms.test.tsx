@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { milderThan, startingRating } from "./FindingAssess";
 import { References } from "./FindingEvidence";
-import { ExploitedHere } from "./FindingExploited";
+import { Incident } from "./FindingIncident";
 import { screen, mounted } from "../test/mount";
 import { FLOORS } from "../ui/severities";
 
@@ -57,16 +57,14 @@ describe("the references a finding cites", () => {
 describe("recording that a product was exploited", () => {
   it("closes a form opened on one issue on arriving at another", () => {
     const draw = (vulnerability: string) =>
-      mount.render(
-        screen(<ExploitedHere product="sonic" vulnerability={vulnerability} mayTriage />),
-      );
+      mount.render(screen(<Incident product="sonic" vulnerability={vulnerability} mayTriage />));
     draw("CVE-2026-1");
     const open = Array.from(mount.host().querySelectorAll("button")).find((each) =>
-      each.textContent?.includes("Record exploited here"),
+      each.textContent?.includes("Record an incident"),
     );
     act(() => open?.click());
     expect(mount.host().querySelector("textarea, input")).not.toBeNull();
     draw("CVE-2026-2");
-    expect(mount.host().textContent).toContain("Record exploited here");
+    expect(mount.host().textContent).toContain("Record an incident");
   });
 });

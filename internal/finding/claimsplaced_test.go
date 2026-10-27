@@ -38,7 +38,7 @@ func insideOf(status sbom.Status, product graph.Described, statement string) sbo
 // argues records claims the build sent with its inventory on the last scan.
 func (f *fixture) argues(t *testing.T, claims ...sbom.Suppression) {
 	t.Helper()
-	if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
+	if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, claims, everyOrigin); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -240,7 +240,7 @@ func TestAScanDoesNotWithdrawAClaimTakenFromAPublishedStatement(t *testing.T) {
 		f.vendorSays(t, rootPurl, sbom.NotAffected, "sha256:vendor-1")
 		f.reported(t, found(inside, zlib))
 		// The build's own document, stating nothing.
-		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, nil, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -291,7 +291,7 @@ func TestAFindingShowsTheBuildsClaimInItsOwnWords(t *testing.T) {
 		f.reported(t, found(inside, zlib))
 		who := f.holding(t, access.PublicTriage)
 		open := f.open(t)
-		evidence, err := f.store.Detail(t.Context(), who, f.target, open[0].VulnerabilityID,
+		evidence, err := f.store.Detail(t.Context(), who, f.build, open[0].VulnerabilityID,
 			open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
@@ -389,7 +389,7 @@ func TestARootTwoBuildsHoldNamesNeither(t *testing.T) {
 		other := f.anotherBranch(t, "release")
 		f.shippedTo(t, other, beside(acmeY))
 		if _, err := f.db.DB.NewUpdate().Table("scan").Set(`"root_identifier" = ?`, rootPurl).
-			Where(`"target_id" = ?`, other).Exec(t.Context()); err != nil {
+			Where(`"build_id" = ?`, other).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		f.vendorSays(t, rootPurl, sbom.NotAffected, "sha256:vendor-1")
@@ -482,7 +482,7 @@ func TestAFindingShowsNoClaimTheBuildHasWithdrawn(t *testing.T) {
 			t.Fatalf("the zlib inside Y is closed as %q naming %v, want disclaimed naming the "+
 				"withdrawn claim", inY.ClosedBecause, inY.ClaimedBy)
 		}
-		evidence, err := f.store.Detail(t.Context(), who, f.target, inY.VulnerabilityID, inY.ComponentID)
+		evidence, err := f.store.Detail(t.Context(), who, f.build, inY.VulnerabilityID, inY.ComponentID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -500,7 +500,7 @@ func TestCarriedPatchesNameTheProductAndLeaveOutWhatWasUploadedOnItsOwn(t *testi
 		f.vendorSays(t, rootPurl, sbom.NotAffected, "sha256:vendor-1")
 		f.reported(t, found(inside, zlib))
 		who := f.holding(t, access.PublicTriage)
-		rows, total, err := f.store.CarriedPatches(t.Context(), who, f.target, "", 50, 0)
+		rows, total, err := f.store.CarriedPatches(t.Context(), who, f.build, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

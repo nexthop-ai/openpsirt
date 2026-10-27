@@ -59,7 +59,7 @@ type Receipt struct {
 	Caution string
 	// RunID is the scan run that reflects this upload, where one has finished.
 	//
-	// A run covers a target rather than an upload, so several uploads can be
+	// A run covers a build rather than an upload, so several uploads can be
 	// answered by one run. It is attributed to the newest upload it covered
 	// and left off the rest: what a run opened and closed is one fact, and
 	// repeating it down three rows reads as three separate changes.
@@ -82,8 +82,8 @@ type Receipt struct {
 // check beside the query cannot be skipped by adding another endpoint, and
 // that covers which builds a key reaches as well as which product it sees. A
 // scan that belongs to another build answers as one that does not exist.
-func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID int64) (*Scan, error) {
-	if err := s.mayRead(ctx, subject, targetID); err != nil {
+func (s *Store) Of(ctx context.Context, subject access.Subject, buildID, scanID int64) (*Scan, error) {
+	if err := s.mayRead(ctx, subject, buildID); err != nil {
 		if errors.Is(err, access.ErrDenied) {
 			return nil, ErrNoScan
 		}
@@ -92,7 +92,7 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	held := new(Scan)
 	if err := s.db.NewSelect().Model(held).
 		Where(`"id" = ?`, scanID).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNoScan,
 			fmt.Sprintf("look up scan %d on this build", scanID))
@@ -102,16 +102,16 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 
 // mayRead refuses a subject who may not read what was filed against a build:
 // the rule catalog.ReadsBuild holds.
-func (s *Store) mayRead(ctx context.Context, subject access.Subject, targetID int64) error {
-	return catalog.ReadsBuild(ctx, s.db, subject, targetID)
+func (s *Store) mayRead(ctx context.Context, subject access.Subject, buildID int64) error {
+	return catalog.ReadsBuild(ctx, s.db, subject, buildID)
 }
 
-// Receipts reports what became of the scans filed against a target, newest
+// Receipts reports what became of the scans filed against a build, newest
 // first, with how many there are in total.
 //
 // Who may read them is decided here from the subject, and is the rule Of
 // holds.
-func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) Receipts(ctx context.Context, subject access.Subject, buildID int64,
 	limit, offset int) ([]Receipt, int, error) {
 
 	// Asked here rather than only in the handler. A check beside the query
@@ -122,7 +122,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// A typed refusal, so the handler answers it the way a build nobody
 	// declared is answered rather than as a fault: a 500 where a stranger
 	// gets a 404 says the build is there, one name at a time.
-	if err := s.mayRead(ctx, subject, targetID); err != nil {
+	if err := s.mayRead(ctx, subject, buildID); err != nil {
 		return nil, 0, err
 	}
 
@@ -131,7 +131,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	limit = database.AList.Of(limit)
 
 	sent := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where(`"target_id" = ?`, targetID)
+		return q.Where(`"build_id" = ?`, buildID)
 	}
 
 	total, err := sent(s.db.NewSelect().Model((*Scan)(nil))).Count(ctx)
@@ -170,7 +170,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		read[j.Reference] = j
 	}
 
-	// One run covers a target rather than a scan, so what matters is whether a
+	// One run covers a build rather than a scan, so what matters is whether a
 	// run finished after this upload was parsed. Every finished run rather
 	// than only the newest, because a page of receipts spans several and each
 	// upload is answered by the run that came after it rather than by the last
@@ -183,7 +183,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// identifier is the tiebreaker, so the result is deterministic.
 	var runs []finding.Run
 	if err := s.db.NewSelect().Model(&runs).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"finished_at" IS NOT NULL`).
 		Order("finished_at DESC", "id DESC").Scan(ctx); err != nil {
 		return nil, 0, err
@@ -196,7 +196,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// of us, a run claimed on page one is claimed again on page two by the
 	// first older upload it also covered, and its counts render twice. The
 	// claim is a property of the scan, not of the page it appears on.
-	claimed, err := s.claims(ctx, targetID, runs)
+	claimed, err := s.claims(ctx, buildID, runs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -223,14 +223,14 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	return receipts, int(total), nil
 }
 
-// progressOf folds a scan, the job that read it and the target's latest
+// progressOf folds a scan, the job that read it and the build's latest
 // finished run into one answer.
 func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, string, *int64) {
 	if sc.Status == Failed {
 		return Refused, sc.Failure, "", nil
 	}
 	switch job.State {
-	case queue.Dead:
+	case queue.Failed:
 		// The scan row is marked too, but a job that died before it could mark
 		// anything would otherwise read as still being worked on. Fixed words:
 		// the job's last error is whatever failed, a dropped connection's
@@ -289,13 +289,13 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 // claims says which upload each run's numbers belong to: the newest one it
 // covered, decided over the whole history rather than over one page of it.
 //
-// Two columns for every scan filed here and read, which the target index
+// Two columns for every scan filed here and read, which the build index
 // answers directly, and the state of the job that read each. Arrival stands in for the moment a document was parsed — they are
 // seconds apart, and what is being decided is only which of two uploads a run
 // came after, so the distinction cannot change the answer without the two
 // having arrived either side of the run finishing, in which case arrival is
 // the more truthful of the two anyway.
-func (s *Store) claims(ctx context.Context, targetID int64,
+func (s *Store) claims(ctx context.Context, buildID int64,
 	runs []finding.Run) (map[int64]int64, error) {
 
 	var filed []filing
@@ -305,7 +305,7 @@ func (s *Store) claims(ctx context.Context, targetID int64,
 	// receipt.
 	q := s.db.NewSelect().TableExpr(`"scan" AS "sc"`).
 		Column("sc.id", "sc.received_at").
-		Where(`"sc"."target_id" = ?`, targetID).
+		Where(`"sc"."build_id" = ?`, buildID).
 		Where(`"sc"."status" = ?`, Accepted)
 	// Newest first by when it arrived, which is what "the newest upload this
 	// run covered" asks about. By arrival rather than by identifier because

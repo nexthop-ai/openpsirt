@@ -8,7 +8,7 @@ import { BANDS } from "./severities";
 // The four bands, folded the way the server folds them.
 //
 // This is a second copy of a rule the server owns — the same CASE the severity
-// filter, the triage floor, the order and the deadline are all worked out
+// filter, the minimum severity, the order and the deadline are all worked out
 // from. "unknown" is a medium everywhere the server looks at it; counted here
 // as a low, one real deployment read 1,415 low on the front page where the
 // list agreed on 38.

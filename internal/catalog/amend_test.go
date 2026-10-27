@@ -21,8 +21,8 @@ import (
 func TestARetiredVariantLeavesTheOfferedListAndNotTheBuiltList(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
-		product, stream, variant := declared(t, ctx, s)
-		if _, err := s.TargetFor(ctx, stream.ID, variant.ID); err != nil {
+		product, branchOrTag, variant := declared(t, ctx, s)
+		if _, err := s.BuildFor(ctx, branchOrTag.ID, variant.ID); err != nil {
 			t.Fatal(err)
 		}
 		admin := access.NewPerson(1, "admin", true, nil, 0)
@@ -39,7 +39,7 @@ func TestARetiredVariantLeavesTheOfferedListAndNotTheBuiltList(t *testing.T) {
 			t.Errorf("a retired variant is still offered: %+v", offered)
 		}
 
-		built, err := s.BuiltAs(ctx, admin, stream.ID)
+		built, err := s.BuiltAs(ctx, admin, branchOrTag.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -241,13 +241,13 @@ func TestCorrectingWhatAVariantReaches(t *testing.T) {
 func TestARetiredProductAndReleaseLeaveTheOfferedLists(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
-		product, stream, _ := declared(t, ctx, s)
+		product, branchOrTag, _ := declared(t, ctx, s)
 		admin := access.NewPerson(1, "admin", true, nil, 0)
 
-		if err := s.RetireStream(ctx, stream.ID); err != nil {
+		if err := s.RetireBranchOrTag(ctx, branchOrTag.ID); err != nil {
 			t.Fatalf("retire the release: %v", err)
 		}
-		lines, err := s.Streams(ctx, admin, product.ID, false)
+		lines, err := s.BranchesAndTags(ctx, admin, product.ID, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -273,8 +273,8 @@ func TestARetiredProductAndReleaseLeaveTheOfferedLists(t *testing.T) {
 func TestARetiredProductAndReleaseStillResolveByName(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
-		product, stream, _ := declared(t, ctx, s)
-		if err := s.RetireStream(ctx, stream.ID); err != nil {
+		product, branchOrTag, _ := declared(t, ctx, s)
+		if err := s.RetireBranchOrTag(ctx, branchOrTag.ID); err != nil {
 			t.Fatal(err)
 		}
 		if err := s.RetireProduct(ctx, product.ID); err != nil {
@@ -285,7 +285,7 @@ func TestARetiredProductAndReleaseStillResolveByName(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the build no longer locates: %v", err)
 		}
-		if !named.ProductRetired || !named.StreamRetired {
+		if !named.ProductRetired || !named.BranchOrTagRetired {
 			t.Errorf("the located build does not say what is retired: %+v", named)
 		}
 		if named.VariantRetired {
@@ -316,7 +316,7 @@ func TestRetiringAProductLeavesItsReleasesAlone(t *testing.T) {
 		}
 
 		admin := access.NewPerson(1, "admin", true, nil, 0)
-		lines, err := s.Streams(ctx, admin, product.ID, false)
+		lines, err := s.BranchesAndTags(ctx, admin, product.ID, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -338,15 +338,15 @@ func TestRetiringAProductLeavesItsReleasesAlone(t *testing.T) {
 func TestDeclaringARetiredReleaseBringsItBack(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
-		product, stream, _ := declared(t, ctx, s)
-		if err := s.RetireStream(ctx, stream.ID); err != nil {
+		product, branchOrTag, _ := declared(t, ctx, s)
+		if err := s.RetireBranchOrTag(ctx, branchOrTag.ID); err != nil {
 			t.Fatal(err)
 		}
-		back, made, err := s.EnsureStream(ctx, product.ID, "master", catalog.Branch, nil)
+		back, made, err := s.EnsureBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 		if err != nil {
 			t.Fatalf("declaring a retired release: %v", err)
 		}
-		if back.ID != stream.ID || !made.Restored || back.Retired() {
+		if back.ID != branchOrTag.ID || !made.Restored || back.Retired() {
 			t.Fatalf("it did not come back as itself: %+v made=%v", back, made)
 		}
 	})

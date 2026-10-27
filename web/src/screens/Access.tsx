@@ -727,7 +727,7 @@ function Credentials({ me }: { me: Who }) {
   // The three catalog reads as one, so this form shares the picker's cache
   // rather than keeping a fourth copy of the same query keys. Asked only while
   // the form is open: nothing below is drawn until then.
-  const { products, streams, variants } = useCatalog(issuing, keyProduct);
+  const { products, branchesAndTags, variants } = useCatalog(issuing, keyProduct);
   const tokens = useQuery({
     queryKey: ["tokens"],
     queryFn: async () => unwrap(await api.GET("/v1/people/tokens", {})),
@@ -739,7 +739,7 @@ function Credentials({ me }: { me: Who }) {
   // The product is required and the release and variant are independent, so
   // either, both or neither may pin it. A key covering a whole product cannot
   // imply which release an upload is for, which is why an upload always states
-  // its full target and this only authorizes it.
+  // its full build and this only authorizes it.
   const issueKey = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -747,7 +747,7 @@ function Credentials({ me }: { me: Who }) {
           body: {
             name: keyName.trim(),
             product: keyProduct,
-            ...(keyStream.trim() ? { stream: keyStream.trim() } : {}),
+            ...(keyStream.trim() ? { branch_or_tag: keyStream.trim() } : {}),
             ...(keyVariant.trim() ? { variant: keyVariant.trim() } : {}),
           },
         }),
@@ -832,7 +832,7 @@ function Credentials({ me }: { me: Who }) {
                     <span className="id">{key.product}</span>
                     <span className="hint">
                       {" "}
-                      · {key.stream ? key.stream : "any branch"},{" "}
+                      · {key.branch_or_tag ? key.branch_or_tag : "any branch"},{" "}
                       {key.variant ? key.variant : "any variant"}
                     </span>
                   </td>
@@ -1006,14 +1006,14 @@ function Credentials({ me }: { me: Who }) {
             label="Branch or tag"
             value={keyStream}
             onChange={setKeyStream}
-            options={(streams.data?.items ?? []).map((each) => each.name ?? "")}
-            loading={streams.isFetching}
+            options={(branchesAndTags.data?.items ?? []).map((each) => each.name ?? "")}
+            loading={branchesAndTags.isFetching}
             disabled={keyProduct === ""}
             placeholder={keyProduct === "" ? "pick a product first" : "master"}
             from={0}
           />
           <span className="hint">Optional. Empty means any branch or tag.</span>
-          <Unread of={streams} what="The branches and tags could not be read." />
+          <Unread of={branchesAndTags} what="The branches and tags could not be read." />
         </div>
         <div className="field">
           <label htmlFor="key-variant">Variant</label>

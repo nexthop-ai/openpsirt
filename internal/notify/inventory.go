@@ -38,7 +38,7 @@ func Movements(db *bun.DB, logger *slog.Logger) func(context.Context, ingest.Sto
 			// carries the same numbers, so a message nobody could compose is
 			// not a reason to fail the upload that earned it.
 			logger.Error("could not say what an upload changed about a build",
-				"build", stored.TargetID, "scan", stored.ScanID, "error", err)
+				"build", stored.BuildID, "scan", stored.ScanID, "error", err)
 		}
 	}
 }
@@ -46,7 +46,7 @@ func Movements(db *bun.DB, logger *slog.Logger) func(context.Context, ingest.Sto
 // moved works out whether an upload is worth telling anybody about, and tells
 // them.
 func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
-	movement, answered, err := graph.NewStore(db).Moved(ctx, stored.TargetID, stored.ScanID)
+	movement, answered, err := graph.NewStore(db).Moved(ctx, stored.BuildID, stored.ScanID)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 		return nil
 	}
 
-	placed, err := catalog.NewStore(db).Describe(ctx, stored.TargetID)
+	placed, err := catalog.NewStore(db).Describe(ctx, stored.BuildID)
 	if err != nil {
 		return fmt.Errorf("read which build this upload was for: %w", err)
 	}
@@ -84,7 +84,7 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 	// product. Hashed for the reason a condition's key is: it lands in a
 	// fixed-width column beside keys other passes invent.
 	together := identify("inventory-moved " + strconv.FormatInt(stored.ScanID, 10))
-	where := weblink.InventoryChanges(placed.Addressed.Product, placed.Addressed.Stream,
+	where := weblink.InventoryChanges(placed.Addressed.Product, placed.Addressed.BranchOrTag,
 		placed.Addressed.Variant, stored.ScanID)
 
 	for personID, per := range reach {
@@ -150,6 +150,6 @@ func saying(placed *catalog.Placement, movement graph.Movement) string {
 	// held.
 	return fmt.Sprintf("%s %s %s: %s in one upload, against an inventory of %d. "+
 		"%d arrived, %d left, %d at different versions.",
-		placed.Product, placed.Stream, placed.Variant,
+		placed.Product, placed.BranchOrTag, placed.Variant,
 		moved, movement.Held, movement.Added, movement.Removed, movement.Changed)
 }

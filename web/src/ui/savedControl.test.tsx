@@ -60,7 +60,7 @@ describe("a saved filter", () => {
     mount.render(
       screen(
         <Picking />,
-        "/f?stream=main&severity=critical&variant=x86&opened_by_run=4&view=components",
+        "/f?branch_or_tag=main&severity=critical&variant=x86&opened_by_run=4&view=components",
       ),
     );
     await settle();
@@ -69,7 +69,7 @@ describe("a saved filter", () => {
     act(() => pick(select, "kernel"));
     await settle();
     expect(location()).toBe(
-      "/f?component=linux&stream=main&variant=x86&opened_by_run=4&view=components&rule=kernel",
+      "/f?component=linux&branch_or_tag=main&variant=x86&opened_by_run=4&view=components&rule=kernel",
     );
     // Open, because what it keeps is what the list is narrowed by.
     expect(select.value).toBe("kernel");
@@ -78,7 +78,7 @@ describe("a saved filter", () => {
   it("is kept without its scope, and saying so", async () => {
     const sent = keeping([]);
     mount.render(
-      screen(<Saved onBuild={false} onPicked={() => {}} />, "/f?stream=main&exploited=1"),
+      screen(<Saved onBuild={false} onPicked={() => {}} />, "/f?branch_or_tag=main&exploited=1"),
     );
     await settle();
     await save("exploited");

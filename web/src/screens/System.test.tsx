@@ -39,7 +39,7 @@ const READS: Record<string, Answer> = {
         {
           id: 9,
           kind: "scan",
-          reference: "target:4",
+          reference: "build:4",
           attempts: 5,
           stopped_at: "2026-01-01T00:00:00Z",
         },
@@ -84,7 +84,7 @@ describe("the deployment's own state", () => {
     const [path, init] = only(sent);
     expect(path).toBe("/v1/failed-jobs/{id}/retry");
     expect(init.params?.path).toEqual({ id: 9 });
-    expect(invalidated()).toContain("set-aside");
+    expect(invalidated()).toContain("failed-jobs");
     expect(text()).toContain("Showing 1 of 3.");
     expect(text()).toContain("nothing said");
   });

@@ -24,7 +24,7 @@ function asking() {
 function Views({ spanning, view }: { spanning: boolean; view: string }) {
   useFindingsViews({
     product: spanning ? "" : "sonic",
-    stream: "",
+    branch_or_tag: "",
     variant: "",
     spanning,
     query: withinVariant(listQuery(new URLSearchParams("page=50")), false),

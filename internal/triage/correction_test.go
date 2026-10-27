@@ -65,7 +65,7 @@ func TestACorrectionSurvivesEveryVersionTheCodeMovesThrough(t *testing.T) {
 		// The build moves both packages on.
 		f.moves(t, release, found, bumped, "place-of-libfoo")
 		f.moves(t, release, bar, f.component(t, "libbar", "1.2.4"), "place-of-libbar")
-		if _, err := f.store.Lapse(ctx, release.target); err != nil {
+		if _, err := f.store.Lapse(ctx, release.build); err != nil {
 			t.Fatal(err)
 		}
 

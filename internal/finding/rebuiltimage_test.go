@@ -51,7 +51,7 @@ func TestARebuiltImageClosesNothingBeneathItAndKeepsItsDecisions(t *testing.T) {
 		ctx := t.Context()
 		reported := []finding.Reported{found("CVE-2026-1", libnl)}
 		f.shipped(t, inImage(swssImage("master.1-aaa"), libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 		occurrence := f.occurrencesOf(t, "CVE-2026-1")["docker-swss"]
@@ -71,7 +71,7 @@ func TestARebuiltImageClosesNothingBeneathItAndKeepsItsDecisions(t *testing.T) {
 		if f.lastScan == scan {
 			t.Fatal("the rebuild was not recorded")
 		}
-		applied, err := f.store.Apply(ctx, f.target, f.run(t), reported)
+		applied, err := f.store.Apply(ctx, f.build, f.run(t), reported)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,14 +111,14 @@ func TestAPackageMovingInsideARebuiltImageSupersedesItsFinding(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, inImage(swssImage("master.1-aaa"), libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		occurrence := f.occurrencesOf(t, "CVE-2026-1")["docker-swss"]
 		f.decidedAt(t, f.somebodyElse(t), occurrence, "approved", libnl.Version, "", "beneath-the-image")
 
 		f.shipped(t, inImage(swssImage("master.2-bbb"), libnlNew))
-		applied, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{found("CVE-2026-1", libnlNew)})
+		applied, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{found("CVE-2026-1", libnlNew)})
 		if err != nil {
 			t.Fatal(err)
 		}

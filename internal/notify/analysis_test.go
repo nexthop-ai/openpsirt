@@ -40,7 +40,7 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 			t.Fatal(err)
 		}
 		notify.AnalysisDrops(w.DB.DB, slog.New(slog.NewTextHandler(io.Discard, nil)))(ctx,
-			analysis.Drop{RunID: 7, SeriesID: set.ID, TargetID: w.Target.ID, Missed: 30, Live: 40})
+			analysis.Drop{RunID: 7, SeriesID: set.ID, BuildID: w.Build.ID, Missed: 30, Live: 40})
 
 		told := func(who *access.Account, role access.Role) []notify.Notification {
 			subject := access.NewPerson(who.ID, who.Identity, false,
@@ -51,7 +51,7 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 			}
 			var mine []notify.Notification
 			for _, one := range waiting {
-				if one.Kind == notify.AnalysisDropped {
+				if one.Kind == notify.SecurityTestingDropped {
 					mine = append(mine, one)
 				}
 			}
@@ -59,7 +59,7 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 		}
 		heard := told(internal, access.InternalRead)
 		if len(heard) != 1 || !strings.Contains(heard[0].Body, "clang-tidy/default marked 30 of 40") ||
-			!strings.Contains(heard[0].Link, "state=not-reproduced") ||
+			!strings.Contains(heard[0].Link, "state=no-longer-detected") ||
 			!strings.Contains(heard[0].Link, "series=clang-tidy%2Fdefault") {
 			t.Errorf("the internal reader was told %+v; want the run, its counts and a link to what it marked", heard)
 		}
@@ -70,7 +70,7 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 		// whoever it was addressed to.
 		productID := w.Product.ID
 		if err := notify.NewStore(w.DB.DB).Tell(ctx, notify.Telling{
-			PersonID: embargo.ID, Kind: notify.AnalysisDropped, Body: "internal",
+			PersonID: embargo.ID, Kind: notify.SecurityTestingDropped, Body: "internal",
 			ProductID: &productID, Private: true, Internal: true,
 		}); err != nil {
 			t.Fatal(err)
@@ -85,7 +85,7 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 // at, and comparable or not.
 func analyzed(t *testing.T, w *fixtures.World, set *series.Series, at time.Time, comparable bool) {
 	t.Helper()
-	run := &series.Run{SeriesID: set.ID, TargetID: w.Target.ID,
+	run := &series.Run{SeriesID: set.ID, BuildID: w.Build.ID,
 		ContentHash: strconv.FormatInt(at.UnixNano(), 16), BuiltAt: at, ReceivedAt: at,
 		Status: series.Applied, Comparable: &comparable, AppliedAt: &at}
 	if !comparable {
@@ -145,17 +145,17 @@ func TestASeriesWhoseNewestRunCouldNotBeComparedIsToldUntilOneCan(t *testing.T) 
 		analyzed(t, w, set, day, true)
 		analyzed(t, w, set, day.Add(24*time.Hour), false)
 
-		heard := toldOf(t, w, analyst, access.InternalRead, notify.AnalysisNotComparable)
+		heard := toldOf(t, w, analyst, access.InternalRead, notify.SecurityTestingNotComparable)
 		if len(heard) != 1 || !strings.Contains(heard[0].Body, "analyzed less than it was meant to") {
 			t.Fatalf("the internal reader was told %+v; want the run that could not be compared, and why", heard)
 		}
-		if got := toldOf(t, w, reader, access.PrivateRead, notify.AnalysisNotComparable); len(got) != 0 {
+		if got := toldOf(t, w, reader, access.PrivateRead, notify.SecurityTestingNotComparable); len(got) != 0 {
 			t.Errorf("a reader of undisclosed work was told %+v; want nothing about internal work", got)
 		}
 
 		// A comparable run after it is the newest, and the condition clears.
 		analyzed(t, w, set, day.Add(48*time.Hour), true)
-		if got := toldOf(t, w, analyst, access.InternalRead, notify.AnalysisNotComparable); len(got) != 0 {
+		if got := toldOf(t, w, analyst, access.InternalRead, notify.SecurityTestingNotComparable); len(got) != 0 {
 			t.Errorf("after a comparable run the analyst still holds %+v; want it cleared", got)
 		}
 	})
@@ -173,24 +173,24 @@ func TestASeriesSilentForThreeOfItsUsualGapsHasGoneQuiet(t *testing.T) {
 		// Two runs a day apart are no rhythm, however long ago the last was.
 		analyzed(t, w, set, now.Add(-10*24*time.Hour), true)
 		analyzed(t, w, set, now.Add(-9*24*time.Hour), true)
-		if got := toldOf(t, w, analyst, access.InternalRead, notify.AnalysisQuiet); len(got) != 0 {
+		if got := toldOf(t, w, analyst, access.InternalRead, notify.SecurityTestingStopped); len(got) != 0 {
 			t.Fatalf("a series with two runs was quiet: %+v; want nothing", got)
 		}
 
 		// A third a day later makes a daily series, silent for eight days.
 		analyzed(t, w, set, now.Add(-8*24*time.Hour), true)
-		heard := toldOf(t, w, analyst, access.InternalRead, notify.AnalysisQuiet)
+		heard := toldOf(t, w, analyst, access.InternalRead, notify.SecurityTestingStopped)
 		if len(heard) != 1 || !strings.Contains(heard[0].Body, "no run of clang-tidy/default has been applied") {
 			t.Fatalf("the analyst was told %+v; want the series named as quiet", heard)
 		}
 
 		// An upload turned away since is named, with what its sender was told.
-		if err := series.NewStore(w.DB.DB).Refused(ctx, series.Refusal{TargetID: w.Target.ID,
+		if err := series.NewStore(w.DB.DB).Refused(ctx, series.Refusal{BuildID: w.Build.ID,
 			Series: "Clang-Tidy/default", Kind: kind.Analysis, At: now.Add(-time.Hour),
 			Reason: "the documents could not be read"}); err != nil {
 			t.Fatal(err)
 		}
-		heard = toldOf(t, w, analyst, access.InternalRead, notify.AnalysisQuiet)
+		heard = toldOf(t, w, analyst, access.InternalRead, notify.SecurityTestingStopped)
 		if len(heard) != 1 || !strings.Contains(heard[0].Body, "turned away") ||
 			!strings.Contains(heard[0].Body, "the documents could not be read") {
 			t.Fatalf("the analyst was told %+v; want the refusal named", heard)
@@ -199,7 +199,7 @@ func TestASeriesSilentForThreeOfItsUsualGapsHasGoneQuiet(t *testing.T) {
 		// Two days of silence is less than three daily gaps, so a run
 		// recently clears it.
 		analyzed(t, w, set, now.Add(-2*24*time.Hour), true)
-		if got := toldOf(t, w, analyst, access.InternalRead, notify.AnalysisQuiet); len(got) != 0 {
+		if got := toldOf(t, w, analyst, access.InternalRead, notify.SecurityTestingStopped); len(got) != 0 {
 			t.Errorf("a series silent for two of its days was quiet: %+v; want nothing", got)
 		}
 	})

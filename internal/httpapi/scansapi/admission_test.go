@@ -51,7 +51,7 @@ func TestAnUploadToAProductTheKeyDoesNotCoverIsRefusedUnread(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		branch, err := names.DeclareStream(ctx, other.ID, fixture.BranchName, catalog.Branch, nil)
+		branch, err := names.DeclareBranchOrTag(ctx, other.ID, fixture.BranchName, catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,7 +59,7 @@ func TestAnUploadToAProductTheKeyDoesNotCoverIsRefusedUnread(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := names.TargetFor(ctx, branch.ID, variant.ID); err != nil {
+		if _, err := names.BuildFor(ctx, branch.ID, variant.ID); err != nil {
 			t.Fatal(err)
 		}
 

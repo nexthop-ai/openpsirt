@@ -226,7 +226,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 //
 // The second person holds their role on the product the rating belongs to.
 // Agreeing is what puts a milder rating into force, so it moves that product's
-// deadlines and its triage line, and a role held elsewhere buys nothing here.
+// deadlines and its minimum severity, and a role held elsewhere buys nothing here.
 func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*Assessment, error) {
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return nil, refusal.New("agreeing is something a person does")
@@ -534,10 +534,10 @@ func reranking(tx bun.IDB, productID int64, rest string, args ...any) *bun.Updat
 	return tx.NewUpdate().
 		Model((*Finding)(nil)).
 		Where(kinds, kindArgs...).
-		Set(`"urgency" = (CASE WHEN "urgency_exploited_here" THEN ? ELSE 0 END)`+
+		Set(`"urgency" = (CASE WHEN "urgency_incident" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_exploited" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_shipped" THEN ? ELSE 0 END) + `+rest,
-			append([]any{int64(exploitedHereBand), int64(exploitedBand), int64(shippedBand)}, args...)...).
+			append([]any{int64(incidentBand), int64(exploitedBand), int64(shippedBand)}, args...)...).
 		Where(`"closed_at" IS NULL`).
 		// This product's findings alone. The number being written was worked
 		// out from this product's rating, and writing it over another
@@ -592,8 +592,8 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 	// rows learning it from the ones that already carried it.
 	if err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Where(kinds, kindArgs...).
 		ColumnExpr(`"f"."id" AS "id"`).
@@ -700,7 +700,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	if err != nil {
 		return err
 	}
-	floor, err := FloorFor(ctx, tx, productID)
+	floor, err := MinimumSeverityFor(ctx, tx, productID)
 	if err != nil {
 		return err
 	}
@@ -716,22 +716,22 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		// which the line admits and the window does not read: a window is how
 		// long a fix may take, and being attacked here says nothing about how
 		// long upstream will be.
-		ExploitedHere bool       `bun:"exploited_here"`
-		OpenedAt      time.Time  `bun:"opened_at"`
-		LearnedAt     *time.Time `bun:"learned_at"`
-		Severity      string     `bun:"severity"`
-		FixState      FixState   `bun:"fix_state"`
-		FixedAt       *time.Time `bun:"fixed_at"`
+		Incident  bool       `bun:"incident"`
+		OpenedAt  time.Time  `bun:"opened_at"`
+		LearnedAt *time.Time `bun:"learned_at"`
+		Severity  string     `bun:"severity"`
+		FixState  FixState   `bun:"fix_state"`
+		FixedAt   *time.Time `bun:"fixed_at"`
 	}
 	err = tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(rating.Here, productID).
 		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
-		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
 		// Grouped on the learning as well, because it is the base an
 		// exploited deadline is counted from: grouped without it, the
@@ -752,7 +752,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		Where(clocked, clockedArgs...).
 		// What a scan opened. A recorded flaw is clocked by recountOwn, below.
 		Where(`"f"."kind" = ?`, Vulnerable).
-		GroupExpr(`"f"."urgency_exploited", "f"."urgency_exploited_here", "f"."opened_at", `+
+		GroupExpr(`"f"."urgency_exploited", "f"."urgency_incident", "f"."opened_at", `+
 			`"f"."exploited_learned_at", "f"."fix_state", "f"."fixed_at", `+rating.EffectiveExpr).
 		Scan(ctx, &groups)
 	if err != nil {
@@ -766,7 +766,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 			Where(`"vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"closed_at" IS NULL`).
 			Where(`"urgency_exploited" = ?`, group.Exploited).
-			Where(`"urgency_exploited_here" = ?`, group.ExploitedHere).
+			Where(`"urgency_incident" = ?`, group.Incident).
 			Where(`"opened_at" = ?`, group.OpenedAt).
 			Where(`"kind" = ?`, Vulnerable).
 			// An occurrence a supplier answers on some routes carries no
@@ -787,11 +787,11 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		// The one rule, asked here rather than restated. A recount that worked
 		// the deadline out its own way is a second policy nobody chose, and
 		// the two agreed only until one of them moved.
-		due := Deadline(group.FixState, group.Exploited || group.ExploitedHere,
+		due := Deadline(group.FixState, group.Exploited || group.Incident,
 			group.OpenedAt, recountedAt,
 			group.LearnedAt, group.FixedAt,
 			windows.For(group.Exploited, group.Severity))
-		if due == nil || !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity) {
+		if due == nil || !floor.Admits(group.Exploited || group.Incident, group.Severity) {
 			q = q.Set(`"due_at" = NULL`)
 		} else {
 			q = q.Set(`"due_at" = ?`, *due)
@@ -872,8 +872,8 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 			readable := onlyReadable(s.db.NewSelect().
 				ColumnExpr("1").
 				TableExpr(IssueFindings("f")).
-				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 				Where(kinds, kindArgs...).
 				Where(`"si"."id" = "asm"."vulnerability_id"`).
 				Where(`"st"."product_id" = "asm"."product_id"`),
@@ -1005,14 +1005,14 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		return held, nil
 	}
 
-	floors := map[int64]Floor{}
+	floors := map[int64]MinimumSeverity{}
 	var ratedIn, filed []int64
 	for _, claim := range asked {
 		filed = append(filed, claim.VulnerabilityID)
 		if _, read := floors[claim.ProductID]; read {
 			continue
 		}
-		floor, err := FloorFor(ctx, s.db, claim.ProductID)
+		floor, err := MinimumSeverityFor(ctx, s.db, claim.ProductID)
 		if err != nil {
 			return nil, err
 		}
@@ -1024,7 +1024,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	// finding is exploited and what it is rated now, and a build carries
 	// thousands of findings of one issue. Each issue asked is read as the
 	// issue it stands for, keyed by the name the rating was filed under, and
-	// each finding is rated in its own stream's product. The two lists admit
+	// each finding is rated in its own branch or tag's product. The two lists admit
 	// an issue of one rating in the product of another, and those groups are
 	// read and left out below.
 	type group struct {
@@ -1035,9 +1035,9 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		// milder rating would take off the list has to read both. Reading one
 		// of them offered an approver a number that promised to hide findings
 		// the line would go on admitting.
-		ExploitedHere bool   `bun:"exploited_here"`
-		Severity      string `bun:"severity"`
-		Open          int    `bun:"open"`
+		Incident bool   `bun:"incident"`
+		Severity string `bun:"severity"`
+		Open     int    `bun:"open"`
 	}
 	type pair struct{ filed, product int64 }
 	rows := map[pair][]group{}
@@ -1046,21 +1046,21 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		var read []group
 		q := s.db.NewSelect().
 			TableExpr(IssueFindings("f")).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
-			Join(rating.For(rating.OnStream)).
+			Join(rating.For(rating.OnBranchOrTag)).
 			ColumnExpr(`"si"."id" AS "filed"`).
 			ColumnExpr(`"st"."product_id" AS "product_id"`).
 			ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
-			ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+			ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COUNT(*) AS "open"`).
 			Where(kinds, kindArgs...).
 			Where(`"si"."id" IN (?)`, bun.List(batch)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"st"."product_id" IN (?)`, bun.List(ratedIn)).
-			GroupExpr(`"si"."id", "st"."product_id", "f"."urgency_exploited", "f"."urgency_exploited_here", ` +
+			GroupExpr(`"si"."id", "st"."product_id", "f"."urgency_exploited", "f"."urgency_incident", ` +
 				rating.EffectiveExpr)
 		// Narrowed across every product, not only the claim's: an approver
 		// holding one product is not told how many findings this issue has in
@@ -1087,7 +1087,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 			// finding already below it is not taken off anything by this, and
 			// saying it was would inflate the number an approver is being
 			// asked to weigh.
-			exploited := row.Exploited || row.ExploitedHere
+			exploited := row.Exploited || row.Incident
 			if floor.Admits(exploited, row.Severity) &&
 				!floor.Admits(exploited, claim.Severity) {
 				would.OffTheList += row.Open

@@ -47,7 +47,7 @@ var ErrUnknownIssue = refusal.New("no issue is known by that name")
 // a name nobody holds came back differently — which is exactly what
 // authorizing before resolving a name forbids, applied to issues rather than
 // to people. Worse, the check that came second was not always a refusal: a fix
-// target answered an empty list and an assignment answered "done" while
+// build answered an empty list and an assignment answered "done" while
 // writing nothing, so two routes disclosed by succeeding.
 //
 // Narrowed to the product because these routes are already about one. An issue
@@ -130,8 +130,8 @@ func toldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 			q := db.NewSelect().
 				TableExpr(`"vulnerability" AS "tv"`).
 				Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "tv"."issue_id"`).
-				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 				ColumnExpr(`DISTINCT "tv"."id"`).
 				Where(`"tv"."id" IN (?)`, bun.List(batch)).
 				Where(`"st"."product_id" = ?`, productID).

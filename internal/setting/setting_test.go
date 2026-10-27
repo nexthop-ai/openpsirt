@@ -140,7 +140,7 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 		store := setting.NewStore(db.DB)
 
 		// Nothing held it, which is not the same as holding the empty string.
-		before, had, err := store.Change(ctx, setting.TriageFloor, "high")
+		before, had, err := store.Change(ctx, setting.MinimumSeverity, "high")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +149,7 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 		}
 
 		// And then what the previous write left.
-		before, had, err = store.Change(ctx, setting.TriageFloor, "critical")
+		before, had, err = store.Change(ctx, setting.MinimumSeverity, "critical")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -95,7 +95,7 @@ func (f *runFixture) occurrenceOf(t *testing.T, who access.Subject, issueName, c
 	if component == "libswsscommon" {
 		consumer = ""
 	}
-	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, who, f.target, issue,
+	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, who, f.build, issue,
 		finding.OccurrenceIdentity(component, consumer))
 	if err != nil {
 		t.Fatal(err)
@@ -525,12 +525,12 @@ func TestAMergeMeetingTwoRecordsOfAnAttackKeepsTheNewerAndTellsTheTriagers(t *te
 		proposer, approver := f.triagers(t)
 		records := triage.NewStore(f.db.DB)
 		known := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Second)
-		older, _, err := records.RecordExploitedHere(ctx, proposer, product, underAdvisory,
+		older, _, err := records.RecordIncident(ctx, proposer, product, underAdvisory,
 			known, "A customer's switch was taken over through the netlink parser.")
 		if err != nil {
 			t.Fatal(err)
 		}
-		newer, _, err := records.RecordExploitedHere(ctx, approver, product, underNational,
+		newer, _, err := records.RecordIncident(ctx, approver, product, underNational,
 			known.Add(24*time.Hour), "Our own lab reproduced the takeover.")
 		if err != nil {
 			t.Fatal(err)
@@ -538,11 +538,11 @@ func TestAMergeMeetingTwoRecordsOfAnAttackKeepsTheNewerAndTellsTheTriagers(t *te
 
 		f.reporting(t, named(national, libnl), named(advisory, swss, national))
 
-		var rows []triage.ExploitedHere
+		var rows []triage.Incident
 		if err := f.db.DB.NewSelect().Model(&rows).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		got := map[int64]triage.ExploitedHere{}
+		got := map[int64]triage.Incident{}
 		for _, row := range rows {
 			got[row.ID] = row
 		}
@@ -558,8 +558,8 @@ func TestAMergeMeetingTwoRecordsOfAnAttackKeepsTheNewerAndTellsTheTriagers(t *te
 			t.Errorf("the older record stands %v, held under %v, cleared by %v, because %v",
 				gone.Standing(), gone.LiveVulnerabilityID, gone.ClearedBy, deref(gone.ClearedBecause))
 		}
-		if _, _, err := records.RecordExploitedHere(ctx, proposer, product, underNational,
-			known, "A third report."); !errors.Is(err, triage.ErrAlreadyExploitedHere) {
+		if _, _, err := records.RecordIncident(ctx, proposer, product, underNational,
+			known, "A third report."); !errors.Is(err, triage.ErrIncidentStands) {
 			t.Errorf("a new record beside the one that stands answered %v", err)
 		}
 		f.trailedByMerge(t, trail.Merge, 1)
@@ -606,7 +606,7 @@ func (f *runFixture) openFindings(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, f.target).Where(`"closed_at" IS NULL`).
+		Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NULL`).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}

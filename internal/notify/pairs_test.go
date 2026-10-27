@@ -40,7 +40,7 @@ func aTeam(t *testing.T, w *fixture.World, names ...string) *team {
 	if err != nil {
 		t.Fatal(err)
 	}
-	aScannedTarget(t, w)
+	aScannedBuild(t, w)
 	product := w.Product
 	tm := &team{db: db, product: product.ID, admin: admin, people: map[string]*access.Account{}}
 	for _, name := range names {

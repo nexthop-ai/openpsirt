@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// fixed is the obligation list as one person reads it, with the window
+// fixed is the incident list as one person reads it, with the window
 // counting from the fix and the releases named on the record.
 type fixed struct {
 	Items []struct {
@@ -72,7 +72,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tag, err := cat.DeclareStream(ctx, product.ID, "v1.0.1", catalog.Tag, nil)
+		tag, err := cat.DeclareBranchOrTag(ctx, product.ID, "v1.0.1", catalog.Tag, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,7 +119,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 			fixes[0].NamedBy == "" {
 			t.Errorf("the record's fix releases read %+v", fixes)
 		}
-		open := r.Alerts(t, "private-triage", "obligation-open")
+		open := r.Alerts(t, "private-triage", "response-window-open")
 		if len(open) != 1 || !strings.Contains(open[0], "the release of the fix") {
 			t.Errorf("the running windows are %v, want the one counting from the fix", open)
 		}

@@ -46,19 +46,19 @@ func TestTheShortestWayDownIsTheOneShown(t *testing.T) {
 		snap := tree()
 		snap.Components = append(snap.Components, zlib, unplaced)
 		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: openssl, Child: zlib})
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		ids := map[string]int64{}
 		for _, name := range []string{"sonic", "curl", "openssl", "zlib", "orphan"} {
-			id, err := f.store.ComponentAs(t.Context(), f.targetID, name, graph.Choice{})
+			id, err := f.store.ComponentAs(t.Context(), f.buildID, name, graph.Choice{})
 			if err != nil {
 				t.Fatalf("%s: %v", name, err)
 			}
 			ids[name] = id
 		}
 
-		chains, err := f.store.Chains(t.Context(), everyone(f), f.targetID,
+		chains, err := f.store.Chains(t.Context(), everyone(f), f.buildID,
 			[]int64{ids["sonic"], ids["curl"], ids["openssl"], ids["zlib"], ids["orphan"]})
 		if err != nil {
 			t.Fatal(err)
@@ -99,12 +99,12 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 				{Parent: a, Child: lib}, {Parent: b, Child: lib},
 			},
 		}
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
@@ -116,13 +116,13 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
 			}
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
 			reported("CVE-2026-1", lib), reported("CVE-2026-2", lib), reported("CVE-2026-3", a),
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.targetID)
+		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +142,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 		// The list a tree number opens agrees with it: narrowed beneath a
 		// container, the findings list holds the library's two issues, and
 		// beneath the root everything.
-		aID, err := f.store.ComponentAs(t.Context(), f.targetID, a.Name, graph.Choice{})
+		aID, err := f.store.ComponentAs(t.Context(), f.buildID, a.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -154,7 +154,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 		if total != 3 {
 			t.Errorf("beneath %s the list counts %d groups, wanted 3", a.Name, total)
 		}
-		bID, err := f.store.ComponentAs(t.Context(), f.targetID, b.Name, graph.Choice{})
+		bID, err := f.store.ComponentAs(t.Context(), f.buildID, b.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -182,12 +182,12 @@ func TestAnIssueOnTwoComponentsBeneathOneCountsOnce(t *testing.T) {
 				{Parent: root, Child: box}, {Parent: box, Child: one}, {Parent: box, Child: two},
 			},
 		}
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
@@ -199,13 +199,13 @@ func TestAnIssueOnTwoComponentsBeneathOneCountsOnce(t *testing.T) {
 				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
 			}
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
 			reported("CVE-2026-1", one), reported("CVE-2026-1", two), reported("CVE-2026-2", two),
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.targetID)
+		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -215,7 +215,7 @@ func TestAnIssueOnTwoComponentsBeneathOneCountsOnce(t *testing.T) {
 		if len(kids) != 1 || kids[0].Beneath != 2 {
 			t.Fatalf("the container reads %+v, wanted 2 distinct issues beneath it", kids)
 		}
-		_, below, err := f.store.Around(t.Context(), everyone(f), f.targetID, box.Name, graph.Choice{})
+		_, below, err := f.store.Around(t.Context(), everyone(f), f.buildID, box.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -243,12 +243,12 @@ func TestAStepCountsWhatEachNeighborCarriesAndPullsIn(t *testing.T) {
 				{Parent: root, Child: box}, {Parent: box, Child: one}, {Parent: box, Child: two},
 			},
 		}
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
@@ -257,13 +257,13 @@ func TestAStepCountsWhatEachNeighborCarriesAndPullsIn(t *testing.T) {
 		reported := func(id string, component graph.Described) finding.Reported {
 			return finding.Reported{Issue: finding.Named{Identifier: id, Severity: "high"}, Component: component}
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
 			reported("CVE-2026-1", one), reported("CVE-2026-2", two), reported("CVE-2026-3", two),
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		above, below, err := f.store.Around(t.Context(), everyone(f), f.targetID, box.Name, graph.Choice{})
+		above, below, err := f.store.Around(t.Context(), everyone(f), f.buildID, box.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,20 +292,20 @@ func TestADocumentInALoopIsWalkedOnceAndStops(t *testing.T) {
 				{Parent: root, Child: a}, {Parent: a, Child: b}, {Parent: b, Child: a},
 			},
 		}
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		aID, _ := f.store.ComponentAs(t.Context(), f.targetID, "a", graph.Choice{})
-		bID, _ := f.store.ComponentAs(t.Context(), f.targetID, "b", graph.Choice{})
+		aID, _ := f.store.ComponentAs(t.Context(), f.buildID, "a", graph.Choice{})
+		bID, _ := f.store.ComponentAs(t.Context(), f.buildID, "b", graph.Choice{})
 
-		chains, err := f.store.Chains(t.Context(), everyone(f), f.targetID, []int64{aID, bID})
+		chains, err := f.store.Chains(t.Context(), everyone(f), f.buildID, []int64{aID, bID})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if got := chain(chains[bID]); got != "sonic > a > b" {
 			t.Errorf("b is reached by %q, wanted the way that does not loop", got)
 		}
-		root, kids, err := f.store.Roots(t.Context(), everyone(f), f.targetID)
+		root, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -336,12 +336,12 @@ func TestContainersAreOrderedByWhatIsInsideThem(t *testing.T) {
 				{Parent: quiet, Child: small}, {Parent: busy, Child: large},
 			},
 		}
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
@@ -353,14 +353,14 @@ func TestContainersAreOrderedByWhatIsInsideThem(t *testing.T) {
 				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
 			}
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
 			reported("CVE-2026-1", large), reported("CVE-2026-2", large),
 			reported("CVE-2026-3", small),
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		_, kids, err := f.store.Roots(t.Context(), everyone(f), f.targetID)
+		_, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -390,7 +390,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 	// rating — so the number and its parts cannot disagree.
 	each(t, func(t *testing.T, f *fixture) {
 		box, lib := at("container-a", "1"), at("libshared", "1.0")
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{box, lib},
 			Dependencies: []graph.Dependency{
@@ -401,7 +401,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
@@ -413,7 +413,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 				Component: lib,
 			}
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
 			rated("CVE-2026-1", "critical"), rated("CVE-2026-2", "low"),
 			// Nobody rated this one, which is its own band rather than a row
 			// the split quietly drops.
@@ -422,7 +422,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		root, kids, err := f.store.Roots(t.Context(), everyone(f), f.targetID)
+		root, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -470,7 +470,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 	})
 }
 
-func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testing.T) {
+func TestAProductsOwnRatingDrawsTheTreeTheUpgradeStripAndTheReleaseNote(t *testing.T) {
 	// One rule for what a finding's severity is: this product's word where it
 	// has stated one, the published word otherwise. Nine queries read the
 	// published word alone with no rating joined, so a product that re-rated
@@ -484,7 +484,7 @@ func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testin
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib := at("libshared", "1.0")
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root: root, Components: []graph.Described{lib},
 			Dependencies: []graph.Dependency{{Parent: root, Child: lib}},
 		}); err != nil {
@@ -492,13 +492,13 @@ func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testin
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(ctx, finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := findings.Apply(ctx, f.targetID, run.ID, []finding.Reported{{
+		if _, err := findings.Apply(ctx, f.buildID, run.ID, []finding.Reported{{
 			Issue:     finding.Named{Identifier: "CVE-2026-9", Severity: "low"},
 			Component: lib, FixState: finding.FixedUpstream, FixedIn: "2.0",
 		}}); err != nil {
@@ -510,7 +510,7 @@ func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testin
 		// before and after.
 		treeBand := func(t *testing.T) string {
 			t.Helper()
-			_, kids, err := f.store.Roots(ctx, who, f.targetID)
+			_, kids, err := f.store.Roots(ctx, who, f.buildID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -537,7 +537,7 @@ func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testin
 			t.Helper()
 			// A build compared against itself: every row is unchanged, which
 			// is what carries the severity the document would publish.
-			changed, err := findings.Compare(ctx, who, f.targetID, f.targetID, false)
+			changed, err := findings.Compare(ctx, who, f.buildID, f.buildID, false)
 			if err != nil {
 				t.Fatal(err)
 			}

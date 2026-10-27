@@ -5,7 +5,7 @@ package core
 
 import "github.com/nexthop-ai/openpsirt/internal/access"
 
-// HolderBody names who is dealing with a lead, embedded in the answers that
+// HolderBody names who is dealing with a code finding, embedded in the answers that
 // show one.
 type HolderBody struct {
 	AssignedTo   string `json:"assigned_to,omitempty" doc:"Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is"`

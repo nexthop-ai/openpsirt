@@ -32,7 +32,7 @@ func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
 				`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 					`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
 					holder+
-					`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+					`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		}
 
 		// Naming both is naming nobody: work is held by one party.

@@ -10,7 +10,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 )
 
 // A v0.8.0 database holding a recorded flaw's rating on the issue row is
@@ -26,7 +25,7 @@ func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v080)
-		declared, err := world.Declare(ctx, db)
+		declared, err := declareBeforeV0110(ctx, db)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,7 +64,7 @@ func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 				"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
 				"urgency_shipped", "last_changed_at", "opened_at")
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				declared.Target.ID, kind, "private", issue, component, identity, 1, false, false, true, at, at)
+				declared.Build.ID, kind, "private", issue, component, identity, 1, false, false, true, at, at)
 		}
 		place("entered", issue, "swss")
 		rated := func(identifier, severity string, score int, source string) int64 {

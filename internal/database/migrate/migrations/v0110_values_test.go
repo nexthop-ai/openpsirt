@@ -11,25 +11,26 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 )
 
 // savedV0100 is a kept filter's address as v0.10.0 wrote it, naming every
 // word v0.11.0 renames beside words it keeps, and savedV0110 the same address
 // in v0.11.0's words.
 const (
-	savedV0100 = "claim=7&claim_state=waiting&claim_state=lapsed&sort=places&asc=true&fix_state=none"
-	savedV0110 = "decision=7&decision_state=waiting&decision_state=lapsed&sort=occurrences&asc=true&fix_state=none"
+	savedV0100 = "claim=7&claim_state=waiting&claim_state=lapsed&sort=places&asc=true&fix_state=none&tag=vendor"
+	savedV0110 = "decision=7&decision_state=waiting&decision_state=lapsed&sort=occurrences&asc=true&fix_state=none&label=vendor"
 )
 
 // seedWordsV0100 writes, in a v0.10.0 database, a row holding each stored
 // word v0.11.0 renames: a bulk claim, a notification and a destination of
 // each renamed kind, a notification linking a decision's row and one linking
-// a claim, a kept filter naming the renamed words, and the bulk action limit
-// under its v0.10.0 name.
+// a claim, a job that ran out of attempts beside one that finished, a kept
+// filter naming the renamed words, a trail row and a job of each renamed
+// kind, the renamed settings under their v0.10.0 names, and a change on the
+// trail of the renamed kind beside one of a kind kept.
 func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +46,8 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 		"together", person, at, "not-applicable")
 	exec(`INSERT INTO "claim" ("kind", "proposed_by", "proposed_at", "outcome") VALUES (?, ?, ?, ?)`,
 		"finding", person, at, "not-applicable")
-	for i, kind := range []string{"claim-waiting", "claim-lapsed", "assigned"} {
+	for i, kind := range []string{"claim-waiting", "claim-lapsed", "obligation-open", "obligation-near",
+		"obligation-passed", "assigned"} {
 		exec(`INSERT INTO "notification" ("person_id", "kind", "lifetime", "about", "body", "link",
 			"private", "together", "attempts", "created_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			person, kind, "event", "about-"+kind, "Something happened.", "/", false, "", 0, at)
@@ -58,12 +60,32 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 			"private", "together", "attempts", "created_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			person, "sent-back", "event", "about-"+link, "Sent back.", link, false, "", 0, at)
 	}
+	for _, state := range []string{"dead", "done"} {
+		exec(`INSERT INTO "job" ("kind", "reference", "state", "attempts", "max_attempts", "run_after",
+			"created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			"scan", "target:"+state, state, 5, 5, at, at, at)
+	}
 	exec(`INSERT INTO "saved_filter" ("person_id", "name", "query", "created_at") VALUES (?, ?, ?, ?)`,
 		person, "waiting", savedV0100, at)
 	exec(`INSERT INTO "saved_filter" ("person_id", "name", "query", "created_at") VALUES (?, ?, ?, ?)`,
 		person, "kept", "outcome=not-applicable&exclude=placeholder-claims", at)
 	exec(`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
 		"triage.together-cap", "250", at)
+	for _, kind := range []string{"exploited-here", "setting"} {
+		exec(`INSERT INTO "admin_change" ("at", "by", "actor", "kind", "about", "was", "became")
+			VALUES (?, ?, ?, ?, ?, ?, ?)`, at, person, "person", kind, "Obligation window Early warning", nil, "24")
+	}
+	exec(`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
+		"triage.floor", "medium", at)
+	exec(`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
+		"routing.batch", "500", at)
+	exec(`INSERT INTO "admin_change" ("at", "by", "kind", "about", "actor") VALUES (?, ?, ?, ?, ?)`,
+		at, person, "routing", "mine · routing", "person")
+	for _, kind := range []string{"routing.sweep", "scan.read"} {
+		exec(`INSERT INTO "job" ("kind", "reference", "state", "attempts", "max_attempts", "run_after",
+			"created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			kind, "1", "done", 1, 5, at, at, at)
+	}
 }
 
 // wordsRenamed asserts every stored word the seed wrote reads in v0.11.0's
@@ -81,25 +103,60 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'decision-waiting'`, 1},
 		{"a notification of a decision lapsed",
 			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'decision-lapsed'`, 1},
+		{"a notification of a response window running",
+			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'response-window-open'`, 1},
+		{"a notification of a response window ending",
+			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'response-window-near'`, 1},
+		{"a notification of a response window passed",
+			`SELECT COUNT(*) FROM "notification" WHERE "kind" = 'response-window-passed'`, 1},
 		{"a notification of a kind kept", `SELECT COUNT(*) FROM "notification" WHERE "kind" = 'assigned'`, 1},
-		{"a notification of a v0.10.0 kind",
-			`SELECT COUNT(*) FROM "notification" WHERE "kind" IN ('claim-waiting', 'claim-lapsed')`, 0},
+		{"a notification of a v0.10.0 kind", `SELECT COUNT(*) FROM "notification" WHERE "kind" IN
+			('claim-waiting', 'claim-lapsed', 'obligation-open', 'obligation-near', 'obligation-passed')`, 0},
 		{"a destination of a decision waiting",
 			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'decision-waiting'`, 1},
 		{"a destination of a decision lapsed",
 			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'decision-lapsed'`, 1},
-		{"a destination of a v0.10.0 kind",
-			`SELECT COUNT(*) FROM "outbound" WHERE "kind" IN ('claim-waiting', 'claim-lapsed')`, 0},
 		{"a link to a decision's row at its new address",
 			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/decision-occurrences/34'`, 1},
 		{"a link to a decision's row at its v0.10.0 address",
 			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/decisions/34'`, 0},
 		{"a link to a decision, left for the interface to forward",
 			`SELECT COUNT(*) FROM "notification" WHERE "link" = '/claims/7'`, 1},
+		{"a destination of a response window running",
+			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'response-window-open'`, 1},
+		{"a destination of a response window ending",
+			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'response-window-near'`, 1},
+		{"a destination of a response window passed",
+			`SELECT COUNT(*) FROM "outbound" WHERE "kind" = 'response-window-passed'`, 1},
+		{"a destination of a v0.10.0 kind", `SELECT COUNT(*) FROM "outbound" WHERE "kind" IN
+			('claim-waiting', 'claim-lapsed', 'obligation-open', 'obligation-near', 'obligation-passed')`, 0},
+		{"a change to an incident", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'incident'`, 1},
+		{"a change of a kind kept", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'setting'`, 1},
+		{"a change of the v0.10.0 kind", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'exploited-here'`, 0},
+		{"what a change was about, as written", `SELECT COUNT(*) FROM "admin_change"
+			WHERE "about" = 'Obligation window Early warning'`, 2},
+		{"a job that ran out of attempts", `SELECT COUNT(*) FROM "job"
+			WHERE "state" = 'failed' AND "reference" = 'target:dead'`, 1},
+		{"the jobs that finished", `SELECT COUNT(*) FROM "job" WHERE "state" = 'done'`, 3},
+		{"a job of the v0.10.0 state", `SELECT COUNT(*) FROM "job" WHERE "state" = 'dead'`, 0},
 		{"the limit under its new name", `SELECT COUNT(*) FROM "application_setting"
 			WHERE "name" = 'triage.bulk-decision-cap' AND "value" = '250'`, 1},
 		{"the limit under its v0.10.0 name",
 			`SELECT COUNT(*) FROM "application_setting" WHERE "name" = 'triage.together-cap'`, 0},
+		{"the minimum severity under its new name", `SELECT COUNT(*) FROM "application_setting"
+			WHERE "name" = 'triage.minimum-severity' AND "value" = 'medium'`, 1},
+		{"the minimum severity under its v0.10.0 name",
+			`SELECT COUNT(*) FROM "application_setting" WHERE "name" = 'triage.floor'`, 0},
+		{"the assignment batch under its new name", `SELECT COUNT(*) FROM "application_setting"
+			WHERE "name" = 'assignment.batch' AND "value" = '500'`, 1},
+		{"the assignment batch under its v0.10.0 name",
+			`SELECT COUNT(*) FROM "application_setting" WHERE "name" = 'routing.batch'`, 0},
+		{"a trail row of an assignment rule",
+			`SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'assignment-rule'`, 1},
+		{"a trail row of a v0.10.0 kind", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'routing'`, 0},
+		{"a job of the assignment sweep", `SELECT COUNT(*) FROM "job" WHERE "kind" = 'assignment.sweep'`, 1},
+		{"a job of a kind kept", `SELECT COUNT(*) FROM "job" WHERE "kind" = 'scan.read'`, 1},
+		{"a job of a v0.10.0 kind", `SELECT COUNT(*) FROM "job" WHERE "kind" = 'routing.sweep'`, 0},
 	} {
 		var n int
 		if err := db.DB.NewRaw(c.query).Scan(ctx, &n); err != nil {
@@ -138,32 +195,31 @@ func TestAV0100DatabaseTakesTheV0110StoredWords(t *testing.T) {
 	})
 }
 
-// An upgrade stopped after any one step rewriting stored words is started
-// again, and leaves what one that did not stop leaves.
+// An upgrade stopped after each step rewriting stored words in turn, every
+// start resuming the one before it, is started again, and leaves what one that
+// did not stop leaves. One database per engine runs every stop, as
+// TestAnUpgradeStoppedPartWayThroughItsRenamesResumes says.
 func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
-	for _, step := range []string{
+	steps := []string{
 		"decision.bulk", "notification.decision-lapsed", "outbound.decision-waiting",
-		"notification.link", "saved_filter", "application_setting",
-	} {
-		t.Run(step, func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
-				ctx := t.Context()
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0100)
-				seedWordsV0100(t, ctx, db)
-				stopped, err := migrations.StopV0110RewritingAfter(ctx, db, step)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !stopped {
-					t.Fatalf("no step is named %s, so this stopped nothing", step)
-				}
-				dbtest.MigrateTo(t, db, v0110)
-				wordsRenamed(t, ctx, db)
-				leaveAtLatest(t, ctx, db)
-			})
-		})
+		"notification.link", "notification.response-window-near", "outbound.response-window-passed",
+		"admin_change.incident", "job.failed", "admin_change.assignment-rule", "job.assignment.sweep",
+		"saved_filter", "application_setting",
 	}
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		seedWordsV0100(t, ctx, db)
+		for _, step := range steps {
+			stopAt(t, step, func() (bool, error) {
+				return migrations.StopV0110RewritingAfter(ctx, db, step)
+			})
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		wordsRenamed(t, ctx, db)
+		leaveAtLatest(t, ctx, db)
+	})
 }
 
 // A kept filter's address takes v0.11.0's words for a word of the address and
@@ -177,6 +233,7 @@ func TestAKeptFilterRenamesOnlyTheWordsOfItsAddress(t *testing.T) {
 		{"claim_state&sort=urgency", "decision_state&sort=urgency"},
 		{"sort=places", "sort=occurrences"},
 		{"under=claim%5Fstate", "under=claim%5Fstate"},
+		{"tag=tag&tag=waiting", "label=tag&label=waiting"},
 	} {
 		if got := migrations.SavedQueryV0110(c.from); got != c.to {
 			t.Errorf("%q became %q, want %q", c.from, got, c.to)

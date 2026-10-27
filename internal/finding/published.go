@@ -32,17 +32,17 @@ import (
 // version the statement names. A statement naming no version is about every
 // release and is left as evidence, as a supplier's is, and so is one naming a
 // root another build of the product holds too.
-func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int64) error {
+func publishedForBuild(ctx context.Context, tx bun.IDB, productID, buildID int64) error {
 	var build struct {
 		ScanID int64  `bun:"scan_id"`
 		Root   string `bun:"root_identifier"`
 	}
 	err := tx.NewSelect().
-		TableExpr(`"target" AS "t"`).
+		TableExpr(`"build" AS "t"`).
 		Join(`JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
 		ColumnExpr(`"sc"."id" AS "scan_id"`).
 		ColumnExpr(`COALESCE("sc"."root_identifier", '') AS "root_identifier"`).
-		Where(`"t"."id" = ?`, targetID).
+		Where(`"t"."id" = ?`, buildID).
 		Scan(ctx, &build)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
@@ -60,8 +60,8 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 	var holding int64
 	if rootBase != "" {
 		if holding, err = tx.NewSelect().
-			TableExpr(`"target" AS "t"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+			TableExpr(`"build" AS "t"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 			Join(`JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
 			Where(`"st"."product_id" = ?`, productID).
 			Where(`"sc"."root_identifier" = ?`, build.Root).
@@ -90,7 +90,7 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 			}
 			id := one.ID
 			row := Claim{
-				TargetID: targetID, Vulnerability: one.Vulnerability,
+				BuildID: buildID, Vulnerability: one.Vulnerability,
 				Status: one.Status, Justification: one.Justification,
 				StatementID: one.StatementID, Statement: one.Statement, Origin: Published,
 				SubjectPurl: one.Purl, SubjectName: spelled(one),
@@ -106,7 +106,7 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 
 	var open []Claim
 	if err := tx.NewSelect().Model(&open).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"closed_scan_id" IS NULL`).
 		Where(`"origin" = ?`, Published).
 		Scan(ctx); err != nil {

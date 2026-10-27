@@ -20,19 +20,19 @@ import (
 
 // ReportBody is what somebody told us, and what became of it.
 type ReportBody struct {
-	Reference  string `json:"reference" doc:"The name this report is reached by"`
-	Product    string `json:"product" doc:"The product it was reported against, by name. The notes and correspondence of a report are read under it"`
-	Title      string `json:"title,omitempty" doc:"A line naming the claim"`
-	Summary    string `json:"summary,omitempty" doc:"What was claimed, as markdown, as it stands now"`
-	ReportedBy string `json:"reported_by,omitempty"`
-	Contact    string `json:"contact,omitempty"`
-	Credit     string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
-	Received   string `json:"received,omitempty" doc:"The day it arrived, which the embargo is counted from"`
-	FoundHere  bool   `json:"found_here" doc:"Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date, nobody is owed an answer, and it has no correspondence"`
+	Reference       string `json:"reference" doc:"The name this report is reached by"`
+	Product         string `json:"product" doc:"The product it was reported against, by name. The notes and correspondence of a report are read under it"`
+	Title           string `json:"title,omitempty" doc:"A line naming the reported problem"`
+	ReportedProblem string `json:"reported_problem,omitempty" doc:"The reported problem, as markdown, as it stands now"`
+	ReportedBy      string `json:"reported_by,omitempty"`
+	Contact         string `json:"contact,omitempty"`
+	Credit          string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
+	Received        string `json:"received,omitempty" doc:"The day it arrived, which the embargo is counted from"`
+	FoundHere       bool   `json:"found_here" doc:"Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date, nobody is owed an answer, and it has no correspondence"`
 	// Edits and Editable are how often what it says was changed, and whether
 	// it may still be.
 	Edits    int  `json:"edits,omitempty" doc:"How many times what it says was edited. The earlier versions, the original first, are read from its revisions"`
-	Editable bool `json:"editable" doc:"Whether its title, claim and reporter may still be edited: nobody has judged it and no ruling holds it"`
+	Editable bool `json:"editable" doc:"Whether its title, reported problem and reporter may still be edited: nobody has judged it and no ruling holds it"`
 	// Acknowledged is the day of the first message sent to the reporter,
 	// which is the acknowledgement. Absent is a report nothing has been sent
 	// on.
@@ -41,17 +41,17 @@ type ReportBody struct {
 	AcknowledgedByName string `json:"acknowledged_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	core.HolderBody
 	AssignedAt string `json:"assigned_at,omitempty" doc:"When it went to whoever holds it"`
-	// Issue is what the claim turned out to be, where somebody has said, with
-	// when they said it and who they were. Absent is a claim nobody has
+	// Issue is what the report turned out to be, where somebody has said, with
+	// when they said it and who they were. Absent is a report nobody has
 	// judged, which is the state every report arrives in.
-	Issue           string `json:"issue,omitempty" doc:"The issue the claim turned out to be"`
+	Issue           string `json:"issue,omitempty" doc:"The issue the report turned out to be"`
 	Evaluated       string `json:"evaluated,omitempty" doc:"When somebody said what it turned out to be"`
 	EvaluatedBy     string `json:"evaluated_by,omitempty" doc:"The person who said so, by sign-in identity"`
 	EvaluatedByName string `json:"evaluated_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	// Disposition is what the claim was judged to be, where that has taken
-	// effect. Absent is a claim nobody has answered, or one whose ruling is
+	// Disposition is what the report was judged to be, where that has taken
+	// effect. Absent is a report nobody has answered, or one whose ruling is
 	// waiting for a second person.
-	Disposition    core.Disposition        `json:"disposition,omitempty" doc:"What the claim was judged to be, once that has taken effect"`
+	Disposition    core.Disposition        `json:"disposition,omitempty" doc:"What the report was judged to be, once that has taken effect"`
 	DuplicateOf    string                  `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
 	Ruling         int64                   `json:"ruling,omitempty" doc:"The ruling that answers it, waiting or in force"`
 	Waiting        core.DispositionWaiting `json:"waiting,omitempty" doc:"A disposition proposed and waiting for a second person"`
@@ -313,7 +313,7 @@ func reportBodies(ctx context.Context, in core.Deps, rows []finding.FlawReport) 
 	for _, row := range rows {
 		body := ReportBody{
 			Reference: row.Reference, Product: called[row.ProductID],
-			Title: row.Title, Summary: row.Summary,
+			Title: row.Title, ReportedProblem: row.ReportedProblem,
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
 			FoundHere: row.FoundHere, Edits: edits[row.ID], Editable: row.Editable(),
 			RecordedBy: who.Identity(row.RecordedBy), RecordedByName: who.Label(row.RecordedBy),

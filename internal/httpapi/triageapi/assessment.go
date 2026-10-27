@@ -51,7 +51,7 @@ type AssessmentBody struct {
 	// OffTheList is the number an approver is really being asked about: these
 	// stop being work rather than becoming later work, and lose their deadline
 	// with it.
-	OffTheList int `json:"off_the_list,omitempty" doc:"The number this rating would put below the product's triage line, where they stop being work and carry no deadline"`
+	OffTheList int `json:"off_the_list,omitempty" doc:"The number this rating would put below the product's minimum severity, where they stop being work and carry no deadline"`
 	// Mine says you made this one, so you may not be the second person. The
 	// server refuses it either way; carried so a screen can say why rather
 	// than offering a button that answers 422 — which is what the embargo
@@ -135,7 +135,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 			"else: a control one person can complete alone is not a control.\n\n" +
 			"The second person holds their role on the product the rating belongs to. " +
 			"Agreeing is what puts a milder rating into force, so it moves that product's " +
-			"deadlines and its triage line; a rating in a product you hold nothing on " +
+			"deadlines and its minimum severity; a rating in a product you hold nothing on " +
 			"answers as one that is not there.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "The proposer may not approve their own. The product is the rating's own, "+
@@ -166,7 +166,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		Summary: "Withdraw an assessment, and take the published rating back",
 		Description: "The rating in force in that product returns to the published one, and " +
 			"everything that reads it — where a finding sits in the list, how long it has, " +
-			"whether it is above the line the product triages — follows it back. No other " +
+			"whether it is at or above the product's minimum severity — follows it back. No other " +
 			"product is touched.\n\n" +
 			"Asked of triage on the product the rating belongs to: taking a rating back " +
 			"is making one.",

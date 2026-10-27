@@ -2,14 +2,14 @@
 
 What a build pipeline does, end to end. An inventory is one HTTP request;
 there is no client to install and no agent to run. A static analyzer's run is
-sent with the upload client, as [Analyzer results](analysis.md) describes.
+sent with the upload client, as [Security testing](security-testing.md) describes.
 
 The short version: declare what you ship once, mint a key once, and post the
 inventory on every build.
 
 ## Prerequisites
 
-A scan is filed against a product, a stream and a variant, and an upload naming
+A scan is filed against a product, a branch or tag, and a variant, and an upload naming
 something undeclared is refused — the error says which part is missing. That is
 deliberate: a typo in a pipeline would otherwise create a fourth product nobody
 meant, and the first anybody would know is a screen with four of everything.
@@ -66,7 +66,7 @@ curl -X POST "$OPENPSIRT/v1/keys" \
 ```
 
 A key is scoped to one product, which is required rather than optional, and
-may be narrowed further to one stream and one variant. So a deployment shipping
+may be narrowed further to one branch or tag and one variant. So a deployment shipping
 three products has three keys, and a key that leaks reaches one of them.
 
 The secret comes back once in `item.secret`, begins `opk_`, and is stored hashed — a credential
@@ -139,13 +139,13 @@ send-inventory:
         -F "inventory=@sbom.cdx.json"
 ```
 
-Naming the stream from `$CI_COMMIT_BRANCH` is the shape that bites: the
-stream has to have been declared. A pipeline running on a branch nobody
+Naming the branch from `$CI_COMMIT_BRANCH` is the shape that bites: the
+branch has to have been declared. A pipeline running on a branch nobody
 declared is refused, every build, until somebody declares it — and the refusal
 says which part is missing rather than making you guess:
 
 ```
-404  product "sonic": stream "nobody-declared-this": not declared
+404  product "sonic": branch or tag "nobody-declared-this": not declared
 ```
 
 ## The result

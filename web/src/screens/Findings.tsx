@@ -106,7 +106,7 @@ const NAMED_AT_ONCE = 2000;
 // and where the component sits — and opens the finding, which is where a
 // decision is made with the evidence beside it.
 export function Findings() {
-  const { product = "", stream: named = "", variant: builtAs = "" } = useParams();
+  const { product = "", branch_or_tag: named = "", variant: builtAs = "" } = useParams();
   // No product in the path means every product the reader may see. The server
   // takes the same filters for both lists, so the screen is the one thing that
   // differs.
@@ -116,16 +116,19 @@ export function Findings() {
   // The branch and the variant come from the path on a build's own list and
   // from the picker's selection otherwise. Either may be "all": the list is
   // not one of the screens that needs a whole build.
-  const stream = named || params.get("stream") || "";
+  const branchOrTag = named || params.get("branch_or_tag") || "";
   const variant = builtAs || params.get("variant") || "";
-  const oneBuild = Boolean(stream && variant);
+  const oneBuild = Boolean(branchOrTag && variant);
   // The selection the server needs, beside the filters.
   //
   // Held rather than rebuilt each render, so the memo below it does not
   // recompute every time.
   const selection = useMemo(
-    () => ({ ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) }),
-    [stream, variant],
+    () => ({
+      ...(branchOrTag ? { branch_or_tag: branchOrTag } : {}),
+      ...(variant ? { variant } : {}),
+    }),
+    [branchOrTag, variant],
   );
   const { offset, go } = usePaging();
   const page = pageSize(params);
@@ -286,10 +289,10 @@ export function Findings() {
   // before and the row after under exactly these filters.
   const carrying = useMemo(() => {
     const now = new URLSearchParams(asked);
-    if (stream) now.set("stream", stream);
+    if (branchOrTag) now.set("branch_or_tag", branchOrTag);
     if (variant) now.set("variant", variant);
     return now.toString();
-  }, [asked, stream, variant]);
+  }, [asked, branchOrTag, variant]);
 
   // The decision a saved filter prepares, where this list is exactly one somebody
   // kept and that one prepares anything. Read off the address rather than
@@ -310,12 +313,12 @@ export function Findings() {
   }, [kept.data, params, declined]);
 
   const queries = useQueryClient();
-  // The tags people have marked findings with here, for the filter to offer.
+  // The labels people have put on findings here, for the filter to offer.
   // Read only while the panel that uses it is open: it is a per-product list
   // nobody needs unless they are narrowing by one.
   const inUse = useQuery({
     enabled: more && !spanning,
-    queryKey: ["tags", product],
+    queryKey: ["labels", product],
     queryFn: async () =>
       unwrap(await api.GET("/v1/products/{product}/labels", { params: { path: { product } } })),
     retry: false,
@@ -326,7 +329,7 @@ export function Findings() {
   // filter because another filter is on.
   const kindsHere = useQuery({
     enabled: more,
-    queryKey: ["package-kinds", product, stream, variant],
+    queryKey: ["package-kinds", product, branchOrTag, variant],
     queryFn: async () =>
       spanning
         ? unwrap(await api.GET("/v1/findings/package-kinds", {}))
@@ -342,7 +345,7 @@ export function Findings() {
   const { hand, handMatching } = useHandOver({ product, query, selection, buildOf });
   const { findings, byIssue, byComponent, byUpgrade } = useFindingsViews({
     product,
-    stream,
+    branch_or_tag: branchOrTag,
     variant,
     spanning,
     query,
@@ -355,15 +358,15 @@ export function Findings() {
   // the top of it, eighteen rows above where they were reading.
   useKeepPlace(findings.isSuccess);
 
-  // The rows below what this product triages, and the line itself.
-  // A product's own answer: across products each has its own line, so there is
+  // The rows below what this product triages, and the minimum severity itself.
+  // A product's own answer: across products each has its own, so there is
   // no single count to give and no single value to name, and the notice is not
   // drawn. The cross-product response does not carry the two fields at all,
   // which is what makes reading them through a narrowing here rather than off
   // the response the honest form.
   const line = spanning
-    ? { hidden: 0, floor: "" }
-    : ((findings.data ?? {}) as { hidden?: number; floor?: string });
+    ? { hidden: 0, minimum_severity: "" }
+    : ((findings.data ?? {}) as { hidden?: number; minimum_severity?: string });
 
   // The build a row's actions and links are about. Where the selection is
   // one build that is the selection; across several the row names one of them
@@ -372,7 +375,7 @@ export function Findings() {
   function buildOf(row: Row) {
     return {
       product: row.product || product,
-      stream: row.stream || stream,
+      branch_or_tag: row.branch_or_tag || branchOrTag,
       variant: row.variant || variant,
     };
   }
@@ -386,7 +389,12 @@ export function Findings() {
   // writes. That is the half of the rule the hold is justified under: a number
   // that is wrong in a way nothing reports.
   function reread() {
-    for (const key of [["findings"], ["findings-by-component"], ["fix-bundles"], ["holdings"]]) {
+    for (const key of [
+      ["findings"],
+      ["findings-by-component"],
+      ["planned-upgrades"],
+      ["holdings"],
+    ]) {
       void queries.invalidateQueries({ queryKey: key });
     }
   }
@@ -662,7 +670,7 @@ export function Findings() {
           across that would carry rows chosen under one question into an act
           taken under another. */}
         <Saved
-          onBuild={Boolean(stream || variant)}
+          onBuild={Boolean(branchOrTag || variant)}
           onPicked={(next) => {
             ask(next, true);
             setDeclined(null);
@@ -676,7 +684,7 @@ export function Findings() {
           meant opening a panel and looking at nine controls. */}
       <Narrowed
         params={asked}
-        scope={{ product, stream, variant }}
+        scope={{ product, branch_or_tag: branchOrTag, variant }}
         // Widening a level is a move rather than a parameter change, because
         // the selection rides on the path. The filters travel with it: what
         // was asked of one product is the same question asked of all of them,
@@ -709,7 +717,7 @@ export function Findings() {
           set={set}
           setMany={setMany}
           // silent-read: choices offered in the panel; an unread list offers fewer.
-          tags={inUse.data?.items ?? []}
+          labels={inUse.data?.items ?? []}
           // silent-read: handed whole to the panel, which says a failure beside the picker.
           kinds={kindsHere.data?.items ?? []}
           kindsRead={kindsHere}
@@ -805,12 +813,12 @@ export function Findings() {
         <div className="screen-head">
           <h2>Findings</h2>
           <p>
-            {product} · {stream || "every branch"} · {variant || "every variant"}
+            {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
           </p>
         </div>
         {controls}
         <ByBump
-          at={{ product, stream, variant }}
+          at={{ product, branch_or_tag: branchOrTag, variant }}
           query={query}
           offset={offset}
           size={page}
@@ -839,12 +847,12 @@ export function Findings() {
         <div className="screen-head">
           <h2>Findings</h2>
           <p>
-            {product} · {stream || "every branch"} · {variant || "every variant"}
+            {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
           </p>
         </div>
         {controls}
         <ByComponent
-          at={{ product, stream, variant }}
+          at={{ product, branch_or_tag: branchOrTag, variant }}
           // The same question the by-issue view asks, built in the one place
           // that builds it, so switching views keeps every filter the chips
           // above say is on.
@@ -940,7 +948,7 @@ export function Findings() {
             <>Every product you can read</>
           ) : (
             <>
-              {product} · {stream || "every branch"} · {variant || "every variant"}
+              {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
             </>
           )}
         </p>
@@ -1109,7 +1117,8 @@ export function Findings() {
           {(line.hidden ?? 0) > 0 && !below && (
             <>
               {" "}
-              · {(line.hidden ?? 0).toLocaleString()} below the {line.floor} line
+              · {(line.hidden ?? 0).toLocaleString()} below the {line.minimum_severity} minimum
+              severity
             </>
           )}
         </span>

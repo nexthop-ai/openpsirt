@@ -21,7 +21,7 @@ func Register(api huma.API, in core.Deps) {
 	registerChatChoices(api, in)
 	registerTokens(api, in)
 	registerSettings(api, in)
-	// Work the queue set aside, and putting it back.
+	// Failed jobs, and putting them back.
 	registerWork(api, in)
 	registerTrail(api, in)
 	registerSaved(api, in)

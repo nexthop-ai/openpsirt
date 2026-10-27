@@ -14,8 +14,8 @@ import {
   productFindingsAt,
   sameProductScreenAt,
   sameScreenAt,
-  streamAt,
-  streamsAt,
+  branchOrTagAt,
+  branchesAndTagsAt,
 } from "./routes";
 
 // The selection in hand.
@@ -43,9 +43,16 @@ const EVERY = ROUTES.findings;
 const UNDER = `${ROUTES.product}/*`;
 
 // The exact shapes first, then anything else under a product.
-const SHAPES = [`${BUILD}/*`, BUILD, ROUTES.stream, ROUTES.streams, ROUTES.product, UNDER];
+const SHAPES = [
+  `${BUILD}/*`,
+  BUILD,
+  ROUTES.branchOrTag,
+  ROUTES.branchesAndTags,
+  ROUTES.product,
+  UNDER,
+];
 
-export type Scoped = { product?: string; stream?: string; variant?: string };
+export type Scoped = { product?: string; branch_or_tag?: string; variant?: string };
 
 // A screen at this path that needs a whole build.
 //
@@ -105,11 +112,11 @@ export function findingsPath(
   // list being a screen of its own, reached from its own rail entry — one list
   // would have two doors, and the one in the scope group would be dead
   // whenever no product is picked.
-  let whole: { product: string; stream: string; variant: string } | undefined;
-  if (at.product && at.stream && at.variant) {
-    whole = { product: at.product, stream: at.stream, variant: at.variant };
+  let whole: { product: string; branch_or_tag: string; variant: string } | undefined;
+  if (at.product && at.branch_or_tag && at.variant) {
+    whole = { product: at.product, branch_or_tag: at.branch_or_tag, variant: at.variant };
   } else if (at.product) {
-    if (at.stream) query.set("stream", at.stream);
+    if (at.branch_or_tag) query.set("branch_or_tag", at.branch_or_tag);
     if (at.variant) query.set("variant", at.variant);
   }
   if (unnarrowed)
@@ -171,7 +178,7 @@ function remembered(): Scoped {
     if (typeof raw !== "object" || raw === null) return {};
     const at = raw as Record<string, unknown>;
     const scope: Scoped = {};
-    for (const level of ["product", "stream", "variant"] as const) {
+    for (const level of ["product", "branch_or_tag", "variant"] as const) {
       const value = at[level];
       if (typeof value === "string" && value) scope[level] = value;
     }
@@ -191,7 +198,7 @@ export function scopeQuery(at: Scoped): Record<string, string> {
   if (!at.product) return {};
   return {
     product: at.product,
-    ...(at.stream ? { stream: at.stream } : {}),
+    ...(at.branch_or_tag ? { branch_or_tag: at.branch_or_tag } : {}),
     ...(at.variant ? { variant: at.variant } : {}),
   };
 }
@@ -207,7 +214,7 @@ export function useScope(): Scoped {
 
 // The scope an address names, or null where it names none and the tab's
 // remembered one stands. An address under a product that names nothing below
-// it, such as a component or an inbox, keeps the branch and variant
+// it, such as a component or its vulnerability reports, keeps the branch and variant
 // remembered for that product, so walking into one does not widen the scope.
 export function scopeAt(pathname: string, search: string, kept: Scoped = {}): Scoped | null {
   // The wider findings list is the one address whose scope is not all in the
@@ -218,16 +225,16 @@ export function scopeAt(pathname: string, search: string, kept: Scoped = {}): Sc
     const asked = new URLSearchParams(search);
     return {
       product: list.params.product,
-      stream: asked.get("stream") || undefined,
+      branch_or_tag: asked.get("branch_or_tag") || undefined,
       variant: asked.get("variant") || undefined,
     };
   }
   for (const shape of SHAPES) {
     const hit = matchPath(shape, pathname);
     if (hit) {
-      const { product, stream, variant } = hit.params;
+      const { product, branch_or_tag: branchOrTag, variant } = hit.params;
       if (shape === UNDER && product === kept.product) return { ...kept };
-      return { product, stream, variant };
+      return { product, branch_or_tag: branchOrTag, variant };
     }
   }
   return null;
@@ -240,16 +247,18 @@ export function scopeAt(pathname: string, search: string, kept: Scoped = {}): Sc
 // picker snaps back with nothing said. Each is rewritten instead — and what
 // sits below the product in the address is dropped where it belongs to the
 // product that was there: a branch is one product's, and so is a component.
-const UNDER_PRODUCT: { shape: string; carries: "nothing" | "stream" | "tail" }[] = [
-  { shape: ROUTES.stream, carries: "stream" },
-  { shape: ROUTES.streams, carries: "tail" },
+const UNDER_PRODUCT: { shape: string; carries: "nothing" | "branch_or_tag" | "tail" }[] = [
+  { shape: ROUTES.branchOrTag, carries: "branch_or_tag" },
+  { shape: ROUTES.branchesAndTags, carries: "tail" },
   { shape: ROUTES.variants, carries: "tail" },
   { shape: ROUTES.comparison, carries: "tail" },
   { shape: ROUTES.inventoryComparison, carries: "tail" },
-  { shape: ROUTES.inbox, carries: "tail" },
-  { shape: ROUTES.inboxReport, carries: "nothing" },
-  { shape: ROUTES.leads, carries: "tail" },
-  { shape: ROUTES.leadRules, carries: "tail" },
+  { shape: ROUTES.vulnerabilityReports, carries: "tail" },
+  { shape: ROUTES.vulnerabilityReport, carries: "nothing" },
+  { shape: ROUTES.formerVulnerabilityReports, carries: "tail" },
+  { shape: ROUTES.formerVulnerabilityReport, carries: "nothing" },
+  { shape: ROUTES.codeFindings, carries: "tail" },
+  { shape: ROUTES.suppressionRules, carries: "tail" },
   { shape: ROUTES.repositories, carries: "tail" },
   { shape: ROUTES.productComponent, carries: "nothing" },
   { shape: ROUTES.product, carries: "tail" },
@@ -270,8 +279,8 @@ export function rescoped(pathname: string, to: Scoped): string | null {
     // A build-scoped screen exists for one build and no other, so a partial
     // selection has nowhere to land. The picker disables those levels while
     // somebody stands on one, so this is the belt rather than the braces.
-    if (!to.product || !to.stream || !to.variant) return null;
-    const whole = { product: to.product, stream: to.stream, variant: to.variant };
+    if (!to.product || !to.branch_or_tag || !to.variant) return null;
+    const whole = { product: to.product, branch_or_tag: to.branch_or_tag, variant: to.variant };
     // A run and an inventory are the old build's, and the new one has neither
     // under that number, so a change lands on the new build's uploads.
     if (matchPath(ROUTES.run, pathname) || matchPath(ROUTES.inventoryChanges, pathname)) {
@@ -294,8 +303,11 @@ export function rescoped(pathname: string, to: Scoped): string | null {
       const tail = shape.slice(ROUTES.product.length);
       return hit.params.product === to.product ? null : sameProductScreenAt(to.product, tail);
     }
-    if (hit.params.product === to.product && hit.params.stream === to.stream) return null;
-    return to.stream ? streamAt(to.product, to.stream) : streamsAt(to.product);
+    if (hit.params.product === to.product && hit.params.branch_or_tag === to.branch_or_tag)
+      return null;
+    return to.branch_or_tag
+      ? branchOrTagAt(to.product, to.branch_or_tag)
+      : branchesAndTagsAt(to.product);
   }
   return null;
 }

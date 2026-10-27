@@ -11,8 +11,8 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const ADDRESS = "/products/sonic/streams";
-const PATTERN = "/products/:product/streams";
+const ADDRESS = "/products/sonic/branches-and-tags";
+const PATTERN = "/products/:product/branches-and-tags";
 
 function serving(admin: boolean) {
   serve((path) => {
@@ -87,7 +87,7 @@ describe("the branches and tags of a product", () => {
     change(drawer().querySelector("#declare-name"), " 2024.11 ");
     await press(drawer(), "Save");
     await settle();
-    expect(patched().map(pathOf)).toEqual([{ product: "sonic", stream: "202411" }]);
+    expect(patched().map(pathOf)).toEqual([{ product: "sonic", branch_or_tag: "202411" }]);
     expect(patched().map(bodyOf)).toEqual([{ name: "2024.11" }]);
   });
 
@@ -98,7 +98,7 @@ describe("the branches and tags of a product", () => {
     await settle();
     await press(mount.host(), "Retire");
     await settle();
-    expect(removed().map(pathOf)).toEqual([{ product: "sonic", stream: "master" }]);
+    expect(removed().map(pathOf)).toEqual([{ product: "sonic", branch_or_tag: "master" }]);
   });
 
   it("offers nothing to change to somebody who is not an administrator", async () => {

@@ -49,21 +49,21 @@ func (f *fixture) issueOf(t *testing.T, identifier string) int64 {
 // claimed has the first person propose a decision about the flaw at one occurrence in
 // one build, made on that build, and answers the decision. Nobody has agreed to
 // it.
-func (f *fixture) claimed(t *testing.T, target int64, identifier, occurrence string,
+func (f *fixture) claimed(t *testing.T, build int64, identifier, occurrence string,
 	outcome triage.Outcome, why triage.Justification, mitigation string) int64 {
 
 	t.Helper()
-	return f.claimedOn(t, target, []int64{target}, identifier, occurrence, outcome, why, mitigation)
+	return f.claimedOn(t, build, []int64{build}, identifier, occurrence, outcome, why, mitigation)
 }
 
 // claimedOn is the same, recorded as made on the builds given: the one on
 // screen and those chosen beside it, or none.
-func (f *fixture) claimedOn(t *testing.T, target int64, madeOn []int64, identifier,
+func (f *fixture) claimedOn(t *testing.T, build int64, madeOn []int64, identifier,
 	occurrence string, outcome triage.Outcome, why triage.Justification, mitigation string) int64 {
 
 	t.Helper()
 	ctx := t.Context()
-	at, err := f.finds.OccurrenceFor(ctx, f.who, target, f.issueOf(t, identifier), occurrence)
+	at, err := f.finds.OccurrenceFor(ctx, f.who, build, f.issueOf(t, identifier), occurrence)
 	if err != nil {
 		t.Fatalf("finding the occurrence to decide about: %v", err)
 	}
@@ -93,9 +93,9 @@ func (f *fixture) agree(t *testing.T, decision int64) {
 }
 
 // dismissed is a decision that the flaw does not apply at its occurrence, agreed to.
-func (f *fixture) dismissed(t *testing.T, target int64, identifier string) int64 {
+func (f *fixture) dismissed(t *testing.T, build int64, identifier string) int64 {
 	t.Helper()
-	decision := f.claimed(t, target, identifier, onOccurrence, triage.NotApplicable,
+	decision := f.claimed(t, build, identifier, onOccurrence, triage.NotApplicable,
 		triage.MitigationsExist, stops)
 	f.agree(t, decision)
 	return decision
@@ -103,15 +103,15 @@ func (f *fixture) dismissed(t *testing.T, target int64, identifier string) int64
 
 // elsewhereIn files the same issue against a second occurrence in a build, which a
 // decision about the first occurrence does not reach.
-func (f *fixture) elsewhereIn(t *testing.T, identifier string, target int64) {
+func (f *fixture) elsewhereIn(t *testing.T, identifier string, build int64) {
 	t.Helper()
-	f.filed(t, identifier, target, finding.OccurrenceIdentity(carrier.Name, "the other consumer"),
+	f.filed(t, identifier, build, finding.OccurrenceIdentity(carrier.Name, "the other consumer"),
 		nil, "")
 }
 
 // filed writes one finding of the issue in a build at an occurrence, closed for a
 // reason where one is given.
-func (f *fixture) filed(t *testing.T, identifier string, target int64, occurrence string,
+func (f *fixture) filed(t *testing.T, identifier string, build int64, occurrence string,
 	closed *time.Time, because finding.Closure) {
 
 	t.Helper()
@@ -121,14 +121,14 @@ func (f *fixture) filed(t *testing.T, identifier string, target int64, occurrenc
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"c"."id"`).
-		Where(`"n"."target_id" = ?`, target).
+		Where(`"n"."build_id" = ?`, build).
 		Where(`"c"."name" = ?`, carrier.Name).
 		Limit(1).Scan(ctx, &componentID); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	row := &finding.Finding{
-		TargetID: target, Kind: finding.Vulnerable, Visibility: access.Private,
+		BuildID: build, Kind: finding.Vulnerable, Visibility: access.Private,
 		VulnerabilityID: f.issueOf(t, identifier), ComponentID: componentID,
 		OccurrenceIdentity: occurrence, OpenedAt: now,
 		ClosedAt: closed, ClosedBecause: because,

@@ -39,11 +39,11 @@ func TestAStatementAboutOneVersionDoesNotSuppressAnother(t *testing.T) {
 		} {
 			f.shipped(t, graph.Snapshot{Root: root, Components: []graph.Described{step.shipping},
 				Dependencies: []graph.Dependency{{Parent: root, Child: step.shipping}}})
-			if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+			if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 				[]sbom.Suppression{statement}, everyOrigin); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 				[]finding.Reported{found("CVE-2026-7", step.shipping)}); err != nil {
 				t.Fatal(err)
 			}
@@ -60,7 +60,7 @@ func TestAStatementAboutOneVersionDoesNotSuppressAnother(t *testing.T) {
 		// The version is what the carried patches read shows beside the name,
 		// and the one statement sent twice is one claim.
 		carried, _, err := f.store.CarriedPatches(t.Context(), f.holding(t, access.PublicRead),
-			f.target, "", 10, 0)
+			f.build, "", 10, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestAVersionInsideAPackageIdentifierIsNotStoredAgain(t *testing.T) {
 	// reopen on the next scan.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{{
 				Vulnerability: "CVE-2026-8", Status: sbom.NotAffected,
 				Justification: "vulnerable_code_not_present",
@@ -87,7 +87,7 @@ func TestAVersionInsideAPackageIdentifierIsNotStoredAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 		carried, _, err := f.store.CarriedPatches(t.Context(), f.holding(t, access.PublicRead),
-			f.target, "", 10, 0)
+			f.build, "", 10, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -58,7 +58,7 @@ describe("comparing two builds", () => {
       (each) => each.textContent,
     );
     expect(counts).toEqual(["1", "1", "0", "2"]);
-    expect(mount.host().textContent).toContain("the run that stopped");
+    expect(mount.host().textContent).toContain("the known vulnerability scan that stopped");
   });
 
   it("includes undisclosed findings only once asked to", async () => {

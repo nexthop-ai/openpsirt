@@ -95,7 +95,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 
 		// Recording a flaw that is already public asks for the public half.
 		if got := httpapitest.AsPerson(t, r, "embargo-triager", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"disclosed":true,`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"disclosed":true,`+
 				`"summary":"A flaw somebody announced last week.",`+
 				`"severity":"high","component":"libnl-3-200"}`); got.Code != http.StatusNotFound {
 			t.Errorf("private triage recording a disclosed flaw answered %d: %s",

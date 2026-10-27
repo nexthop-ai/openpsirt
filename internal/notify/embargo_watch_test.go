@@ -56,22 +56,22 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		if err := rights.GrantRole(ctx, outsider.ID, product.ID, access.PublicTriage); err != nil {
 			t.Fatal(err)
 		}
-		target := w.Target
+		build := w.Build
 		// New, so it is not also quiet — this test is about one condition.
-		if _, err := db.DB.NewUpdate().Table("target").
+		if _, err := db.DB.NewUpdate().Table("build").
 			Set(`"created_at" = ?`, time.Now().UTC()).
-			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
-		embargoed(t, db, target.ID, "SONIC-2026-0001", owner.PartyID,
+		embargoed(t, db, build.ID, "SONIC-2026-0001", owner.PartyID,
 			time.Now().UTC().Add(-24*time.Hour))
 
 		// A second one, held by somebody who may not read undisclosed work
 		// here. An assignment can outlive the role that allowed it, and
 		// delivering this to them would hand over the thing the role was
 		// withdrawn to stop.
-		embargoed(t, db, target.ID, "SONIC-2026-0002", outsider.PartyID,
+		embargoed(t, db, build.ID, "SONIC-2026-0002", outsider.PartyID,
 			time.Now().UTC().Add(-24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)
@@ -123,14 +123,14 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 // embargoed writes one undisclosed finding past its disclosure date, held by
 // somebody. The holder is a party, which is what an assignment names; a
 // person's own number coincides with it only by accident of insertion order.
-func embargoed(t *testing.T, db *database.DB, targetID int64, identifier string,
+func embargoed(t *testing.T, db *database.DB, buildID int64, identifier string,
 	owner int64, at time.Time) {
 	t.Helper()
-	embargoedAt(t, db, targetID, identifier, "sonic", owner, at)
+	embargoedAt(t, db, buildID, identifier, "sonic", owner, at)
 }
 
 // embargoedAt is embargoed at a component of the name given.
-func embargoedAt(t *testing.T, db *database.DB, targetID int64, identifier, component string,
+func embargoedAt(t *testing.T, db *database.DB, buildID int64, identifier, component string,
 	owner int64, at time.Time) {
 	t.Helper()
 	ctx := t.Context()
@@ -152,7 +152,7 @@ func embargoedAt(t *testing.T, db *database.DB, targetID int64, identifier, comp
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	row := &finding.Finding{
-		TargetID: targetID, Kind: finding.Entered, Visibility: access.Private,
+		BuildID: buildID, Kind: finding.Entered, Visibility: access.Private,
 		VulnerabilityID: ids[identifier], ComponentID: componentID,
 		OccurrenceIdentity: "place-of-" + identifier + "-" + component, OpenedAt: now,
 		DiscloseAt: &at, AssignedTo: &owner, AssignedAt: &now,
@@ -175,15 +175,15 @@ func TestAnEmbargoAtTwoOccurrencesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := w.Target
-		if _, err := db.DB.NewUpdate().Table("target").
+		build := w.Build
+		if _, err := db.DB.NewUpdate().Table("build").
 			Set(`"created_at" = ?`, time.Now().UTC()).
-			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		past := time.Now().UTC().Add(-24 * time.Hour)
-		embargoedAt(t, db, target.ID, "SONIC-2026-0001", "libfoo", admin.PartyID, past)
-		embargoedAt(t, db, target.ID, "SONIC-2026-0001", "libbar", admin.PartyID, past)
+		embargoedAt(t, db, build.ID, "SONIC-2026-0001", "libfoo", admin.PartyID, past)
+		embargoedAt(t, db, build.ID, "SONIC-2026-0001", "libbar", admin.PartyID, past)
 
 		watch := notify.NewWatch(db.DB, quiet)
 		if _, _, err := watch.Once(ctx); err != nil {
@@ -249,16 +249,16 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		target := w.Target
-		if _, err := db.DB.NewUpdate().Table("target").
+		build := w.Build
+		if _, err := db.DB.NewUpdate().Table("build").
 			Set(`"created_at" = ?`, time.Now().UTC()).
-			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
 		// Inside the lead time and not yet arrived, which is the coming
 		// condition and not the arrived one.
-		embargoed(t, db, target.ID, "SONIC-2026-0003", held.PartyID,
+		embargoed(t, db, build.ID, "SONIC-2026-0003", held.PartyID,
 			time.Now().UTC().Add(24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)

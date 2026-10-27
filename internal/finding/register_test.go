@@ -26,7 +26,7 @@ import (
 func TestTheRegistersPageIsTheSameWithoutItsCount(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 			found("CVE-2026-3", teamd),
 		}); err != nil {
@@ -34,11 +34,11 @@ func TestTheRegistersPageIsTheSameWithoutItsCount(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicRead)
 
-		withCount, total, err := f.store.Register(t.Context(), who, f.target, finding.Registering{}, 50, 0)
+		withCount, total, err := f.store.Register(t.Context(), who, f.build, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		without, err := f.store.RegisterPage(t.Context(), who, f.target, finding.Registering{}, 50, 0)
+		without, err := f.store.RegisterPage(t.Context(), who, f.build, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,10 +58,10 @@ func TestTheRegistersPageIsTheSameWithoutItsCount(t *testing.T) {
 		// And the same refusal. A reader who may see nothing here has to be
 		// refused by both, or the export is the way around the check.
 		nobody := f.holdingIn(t, nil, access.PublicRead)
-		if _, err := f.store.RegisterPage(t.Context(), nobody, f.target, finding.Registering{}, 50, 0); err == nil {
+		if _, err := f.store.RegisterPage(t.Context(), nobody, f.build, finding.Registering{}, 50, 0); err == nil {
 			t.Error("a page read without the count answered somebody holding nothing")
 		}
-		if err := f.store.RegisterEach(t.Context(), nobody, f.target, finding.Registering{},
+		if err := f.store.RegisterEach(t.Context(), nobody, f.build, finding.Registering{},
 			func(finding.Disposed) error { return nil }); err == nil {
 			t.Error("the walk answered somebody holding nothing")
 		}
@@ -78,7 +78,7 @@ func TestTheRegistersPageIsTheSameWithoutItsCount(t *testing.T) {
 func TestTheRegisterWalkedIsTheRegisterPaged(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 			found("CVE-2026-3", teamd), found("CVE-2026-4", libnl),
 		}); err != nil {
@@ -86,12 +86,12 @@ func TestTheRegisterWalkedIsTheRegisterPaged(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicRead)
 
-		paged, err := f.store.RegisterPage(t.Context(), who, f.target, finding.Registering{}, 500, 0)
+		paged, err := f.store.RegisterPage(t.Context(), who, f.build, finding.Registering{}, 500, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var walked []finding.Disposed
-		if err := f.store.RegisterEach(t.Context(), who, f.target, finding.Registering{},
+		if err := f.store.RegisterEach(t.Context(), who, f.build, finding.Registering{},
 			func(row finding.Disposed) error {
 				walked = append(walked, row)
 				return nil
@@ -116,7 +116,7 @@ func TestTheRegisterWalkedIsTheRegisterPaged(t *testing.T) {
 		// ends early and reads as complete.
 		stop := fmt.Errorf("enough")
 		seen := 0
-		err = f.store.RegisterEach(t.Context(), who, f.target, finding.Registering{}, func(finding.Disposed) error {
+		err = f.store.RegisterEach(t.Context(), who, f.build, finding.Registering{}, func(finding.Disposed) error {
 			seen++
 			return stop
 		})
@@ -170,7 +170,7 @@ func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
 		f.recorded(t, 2, "approver")
 
 		decided := f.decidedAndLapsed(t, open[0])
-		rows, _, err := f.store.Register(ctx, f.holding(t, access.PublicRead), f.target, finding.Registering{}, 50, 0)
+		rows, _, err := f.store.Register(ctx, f.holding(t, access.PublicRead), f.build, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -251,18 +251,18 @@ func TestTheRegisterCarriesWhyAPersonClosedSomething(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		const because = "The patch was backported in 2.4.1-3."
-		if _, err := f.store.Resolve(ctx, who, f.target, rows[0].VulnerabilityID, because); err != nil {
+		if _, err := f.store.Resolve(ctx, who, f.build, rows[0].VulnerabilityID, because); err != nil {
 			t.Fatal(err)
 		}
 
-		register, _, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
+		register, _, err := f.store.Register(ctx, who, f.build, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -295,13 +295,13 @@ func TestAStateWordTheRegisterDoesNotKnowKeepsNothing(t *testing.T) {
 	// everything.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl),
 		}); err != nil {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		whole, err := f.store.RegisterPage(t.Context(), who, f.target,
+		whole, err := f.store.RegisterPage(t.Context(), who, f.build,
 			finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -309,7 +309,7 @@ func TestAStateWordTheRegisterDoesNotKnowKeepsNothing(t *testing.T) {
 		if len(whole) == 0 {
 			t.Fatal("the fixture's register is empty, so this checks nothing")
 		}
-		nonsense, err := f.store.RegisterPage(t.Context(), who, f.target,
+		nonsense, err := f.store.RegisterPage(t.Context(), who, f.build,
 			finding.Registering{States: []finding.DecisionStanding{"whatever"}}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -335,7 +335,7 @@ func TestAnOccurrenceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing
 		f.applied(t, found("CVE-2026-1", swss), found("CVE-2026-2", teamd), found("CVE-2026-3", libnl))
 		who := f.holding(t, access.PublicRead)
 		somebody := f.somebodyElse(t)
-		_, before, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
+		_, before, err := f.store.Register(ctx, who, f.build, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -352,7 +352,7 @@ func TestAnOccurrenceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
 
-		rows, total, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
+		rows, total, err := f.store.Register(ctx, who, f.build, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -373,7 +373,7 @@ func TestAnOccurrenceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing
 		if got := states[twice]; len(got) != 1 || got[0] != "lapsed" {
 			t.Errorf("an occurrence lapsed twice with nothing live reads %v, want one row lapsed", got)
 		}
-		undecided, total, err := f.store.Register(ctx, who, f.target,
+		undecided, total, err := f.store.Register(ctx, who, f.build,
 			finding.Registering{States: []finding.DecisionStanding{"undecided"}}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -414,20 +414,20 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
 			finding.OccurrenceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
 
-		reads := func(target int64, want string) {
+		reads := func(build int64, want string) {
 			t.Helper()
-			rows, total, err := f.store.Register(ctx, who, target, finding.Registering{}, 50, 0)
+			rows, total, err := f.store.Register(ctx, who, build, finding.Registering{}, 50, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if total != 1 || len(rows) != 1 || string(rows[0].State) != want {
-				t.Fatalf("build %d's register reads %+v (total %d), want one row %q", target, rows, total, want)
+				t.Fatalf("build %d's register reads %+v (total %d), want one row %q", build, rows, total, want)
 			}
 			if want == "undecided" && (rows[0].Outcome != "" || rows[0].ProposedBy != "") {
-				t.Errorf("build %d's register names a decision that does not cover it: %+v", target, rows[0])
+				t.Errorf("build %d's register names a decision that does not cover it: %+v", build, rows[0])
 			}
 		}
-		reads(f.target, "agreed")
+		reads(f.build, "agreed")
 		reads(other, "undecided")
 	})
 }
@@ -453,7 +453,7 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 
 		reads := func(because, outcome string) {
 			t.Helper()
-			rows, total, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
+			rows, total, err := f.store.Register(ctx, who, f.build, finding.Registering{}, 50, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -486,18 +486,18 @@ func TestTheRegisterNarrowsToAnIssueTypedInAnyCase(t *testing.T) {
 	// reads as nothing known.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		filed, err := f.store.RegisterPage(t.Context(), who, f.target,
+		filed, err := f.store.RegisterPage(t.Context(), who, f.build,
 			finding.Registering{Issue: "CVE-2026-1"}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		whole, err := f.store.RegisterPage(t.Context(), who, f.target,
+		whole, err := f.store.RegisterPage(t.Context(), who, f.build,
 			finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -506,7 +506,7 @@ func TestTheRegisterNarrowsToAnIssueTypedInAnyCase(t *testing.T) {
 			t.Fatalf("the filed name keeps %d of %d rows, so this checks nothing",
 				len(filed), len(whole))
 		}
-		typed, err := f.store.RegisterPage(t.Context(), who, f.target,
+		typed, err := f.store.RegisterPage(t.Context(), who, f.build,
 			finding.Registering{Issue: " cve-2026-1"}, 50, 0)
 		if err != nil {
 			t.Fatal(err)

@@ -20,7 +20,7 @@ import (
 // changes asks for one scan's whole listing.
 func changes(t *testing.T, f *fixture, scanID int64) []graph.Change {
 	t.Helper()
-	listed, total, err := f.store.Changes(t.Context(), everyone(f), f.targetID, scanID, "", 0, 0)
+	listed, total, err := f.store.Changes(t.Context(), everyone(f), f.buildID, scanID, "", 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestOneKindAtATimeIsAskableAndTheTotalIsOfThatKind(t *testing.T) {
 		}
 		scanID := applied(t, f, next)
 
-		listed, total, err := f.store.Changes(t.Context(), everyone(f), f.targetID, scanID,
+		listed, total, err := f.store.Changes(t.Context(), everyone(f), f.buildID, scanID,
 			graph.Removed, 0, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -221,7 +221,7 @@ func TestAPageIsATakenFromTheWholeAnswer(t *testing.T) {
 		if len(whole) != 5 {
 			t.Fatalf("the upload moved %d names, want 5: %v", len(whole), spelled(whole))
 		}
-		page, total, err := f.store.Changes(t.Context(), everyone(f), f.targetID, scanID, "", 2, 1)
+		page, total, err := f.store.Changes(t.Context(), everyone(f), f.buildID, scanID, "", 2, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -232,7 +232,7 @@ func TestAPageIsATakenFromTheWholeAnswer(t *testing.T) {
 			t.Errorf("the second page is %v, want the second and third of %v",
 				spelled(page), spelled(whole))
 		}
-		past, total, err := f.store.Changes(t.Context(), everyone(f), f.targetID, scanID, "", 2, 99)
+		past, total, err := f.store.Changes(t.Context(), everyone(f), f.buildID, scanID, "", 2, 99)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -268,7 +268,7 @@ func TestWhatAnUploadChangedIsNotReadableBySomebodyWhoDoesNotReachTheProduct(t *
 		second := applied(t, f, tree())
 
 		outsider := access.NewPerson(2, "outsider", false, nil, 0)
-		_, _, err := f.store.Changes(t.Context(), outsider, f.targetID, second, "", 0, 0)
+		_, _, err := f.store.Changes(t.Context(), outsider, f.buildID, second, "", 0, 0)
 		if !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a subject with nothing on the product was answered: %v", err)
 		}
@@ -294,7 +294,7 @@ func TestWhatAnUploadMovedIsMeasuredAgainstWhatTheBuildHeld(t *testing.T) {
 		next := tree()
 		next.Components = append(next.Components, zlib)
 		next.Dependencies = append(next.Dependencies, graph.Dependency{Parent: curl, Child: zlib})
-		moved, answered, err := f.store.Moved(t.Context(), f.targetID, applied(t, f, next))
+		moved, answered, err := f.store.Moved(t.Context(), f.buildID, applied(t, f, next))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -312,7 +312,7 @@ func TestWhatAnUploadMovedIsMeasuredAgainstWhatTheBuildHeld(t *testing.T) {
 
 func TestTheFirstInventoryHasNoMovementToReport(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		moved, answered, err := f.store.Moved(t.Context(), f.targetID, applied(t, f, tree()))
+		moved, answered, err := f.store.Moved(t.Context(), f.buildID, applied(t, f, tree()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -336,7 +336,7 @@ func TestANameThisUploadRemovedIsOneTheBuildHeld(t *testing.T) {
 			Root: root, Components: []graph.Described{zlib},
 			Dependencies: []graph.Dependency{{Parent: root, Child: zlib}},
 		}
-		moved, answered, err := f.store.Moved(t.Context(), f.targetID, applied(t, f, next))
+		moved, answered, err := f.store.Moved(t.Context(), f.buildID, applied(t, f, next))
 		if err != nil || !answered {
 			t.Fatalf("the upload was not answered for: %v", err)
 		}
@@ -354,7 +354,7 @@ func TestAKindOfChangeNobodyHasIsRefused(t *testing.T) {
 		applied(t, f, tree())
 		second := applied(t, f, tree())
 
-		if _, _, err := f.store.Changes(t.Context(), everyone(f), f.targetID, second,
+		if _, _, err := f.store.Changes(t.Context(), everyone(f), f.buildID, second,
 			"upgraded", 0, 0); err == nil {
 			t.Error("a kind nobody has was answered as a listing")
 		}

@@ -31,7 +31,7 @@ func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
 		}
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			moves("CVE-2026-1", "3.9.0"),
 			moves("CVE-2026-2", "3.9.0"),
 			moves("CVE-2026-3", "3.8.0"),
@@ -80,14 +80,14 @@ func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
 }
 
 func TestAComponentIsAnsweredPerBuildBecauseTheAnswerDiffers(t *testing.T) {
-	// The whole difficulty of upgrading a shared component: one stream stays
+	// The whole difficulty of upgrading a shared component: one branch or tag stays
 	// on a maintained older line and another moves on, so the version shipped
 	// and the version to move to are both per build. A single answer for the
 	// product would be wrong for one of them.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: libnl,
 				FixState: finding.FixedUpstream, FixedIn: "3.9.0",
@@ -131,14 +131,14 @@ func TestAComponentIsAnsweredPerBuildBecauseTheAnswerDiffers(t *testing.T) {
 }
 
 func TestWhatAPromisedUpgradeCoversIsDerivedRatherThanMarked(t *testing.T) {
-	// The mark on a covered finding is a join, not a tag written across every
-	// row an upgrade touches. A tag is per product and could not say "planned
+	// The mark on a covered finding is a join, not a label written across every
+	// row an upgrade touches. A label is per product and could not say "planned
 	// on master, not on 2.4", which is the case the per-build target exists
 	// for — and it would go stale the moment the promise was withdrawn.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, through(libnl))
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			found("CVE-2026-1", libnl),
 		}); err != nil {
 			t.Fatal(err)
@@ -192,7 +192,7 @@ func TestTheBinariesOfOneSourcePackageAreOneEntryWhicheverNameIsAsked(t *testing
 				{Parent: swss, Child: gnutls},
 			},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-20", Severity: "high"}, Component: libcurl,
 				FixState: finding.FixedUpstream, FixedIn: "8.5.0-3",
@@ -250,7 +250,7 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		// Against libnl alone, so its two consumers carry nothing of their own.
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: libnl,
 				FixState: finding.FixedUpstream, FixedIn: "3.9.0",
@@ -294,7 +294,7 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 	})
 }
 
-func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
+func TestTheVersionWorthTakingCodeFindingsRatherThanTheOneThatFixedMost(t *testing.T) {
 	// Measured on the demo's kernel: of 168 open, the 6.12.100-1 release fixed
 	// 49 and the newest named, 6.12.107-1, fixed 2 — so ranked on what each
 	// release fixed, the version that closes everything sorts near the bottom
@@ -315,7 +315,7 @@ func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 		run := f.run(t)
 		// Three fixed in an earlier release, one in the newest: the shape that
 		// reads backwards when the count is what sorts.
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			fixedIn("CVE-2026-1", "3.8.0"),
 			fixedIn("CVE-2026-2", "3.8.0"),
 			fixedIn("CVE-2026-3", "3.8.0"),
@@ -338,7 +338,7 @@ func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 		}
 		// Furthest along first, though it fixed the fewest of its own.
 		if up[0].To != "3.9.0" {
-			t.Errorf("the list leads with %q, want the newest version named", up[0].To)
+			t.Errorf("the list code findings with %q, want the newest version named", up[0].To)
 		}
 		if up[0].FixedHere != 1 {
 			t.Errorf("3.9.0 fixed %d of its own, want one", up[0].FixedHere)
@@ -368,7 +368,7 @@ func TestVersionsNobodyCanOrderAreNotRanked(t *testing.T) {
 			Dependencies: []graph.Dependency{{Parent: root, Child: runtime}},
 		})
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-10", Severity: "high"}, Component: runtime,
 				FixState: finding.FixedUpstream, FixedIn: "go1.26.5",
@@ -419,7 +419,7 @@ func TestAWordAnAdvisoryWroteWhereAVersionBelongsIsNotTheUpgrade(t *testing.T) {
 		}
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			fixedIn("CVE-2026-1", "3.8.0"),
 			fixedIn("CVE-2026-2", "3.9.0"),
 			fixedIn("CVE-2026-3", "unfixed"),
@@ -481,7 +481,7 @@ func ranked(id string, component graph.Described, severity string, score float64
 func spread(t *testing.T, f *fixture) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 		ranked("CVE-2026-1", swss, "high", 7.5),
 		ranked("CVE-2026-2", swss, "high", 7.5),
 		ranked("CVE-2026-3", swss, "high", 7.5),
@@ -511,21 +511,21 @@ func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
 		// The weight, which is what this view is for and what it
 		// answers when nothing is asked.
 		if got := leader(finding.Filter{}); got != swss.Name {
-			t.Errorf("unasked, the view leads with %q rather than the package holding the most issues", got)
+			t.Errorf("unasked, the view code findings with %q rather than the package holding the most issues", got)
 		}
 		// Its reach. Three issues at one occurrence against two issues at two
 		// occurrences: a view that ignores the key answers the same as above.
 		if got := leader(finding.Filter{SortBy: finding.ByOccurrences}); got != libnl.Name {
-			t.Errorf("sort=occurrences leads with %q rather than the package sitting at the most occurrences", got)
+			t.Errorf("sort=occurrences code findings with %q rather than the package sitting at the most occurrences", got)
 		}
 		// The worst of what is open against it.
 		if got := leader(finding.Filter{SortBy: finding.BySeverity}); got != libnl.Name {
-			t.Errorf("sort=severity leads with %q rather than the package holding the critical", got)
+			t.Errorf("sort=severity code findings with %q rather than the package holding the critical", got)
 		}
 		// And the other way round, which was accepted and discarded: the
 		// caller asking for the least of something was answered with the most.
 		if got := leader(finding.Filter{SortBy: finding.ByOccurrences, Ascending: true}); got != swss.Name {
-			t.Errorf("asc=true leads with %q, which is what descending answers", got)
+			t.Errorf("asc=true code findings with %q, which is what descending answers", got)
 		}
 	})
 }
@@ -548,10 +548,10 @@ func TestEveryOrderTheGroupedListsOfferAreOrdersTheyRun(t *testing.T) {
 				}
 			}
 		}
-		for _, by := range finding.BundleSortKeys() {
+		for _, by := range finding.PlannedUpgradeSortKeys() {
 			for _, way := range []bool{false, true} {
-				filter := finding.Filter{BundleSort: by, Ascending: way}
-				if _, total, err := f.store.Bundles(t.Context(), who,
+				filter := finding.Filter{PlannedUpgradeSort: by, Ascending: way}
+				if _, total, err := f.store.PlannedUpgrades(t.Context(), who,
 					f.wholeProduct(), 50, 0, filter); err != nil || total == 0 {
 					t.Errorf("by bump, sorting by %q ascending=%v answered %d: %v",
 						by, way, total, err)
@@ -560,8 +560,8 @@ func TestEveryOrderTheGroupedListsOfferAreOrdersTheyRun(t *testing.T) {
 		}
 		// A key nobody allows is the list's own default rather than a failure
 		// or a key reaching the statement.
-		hostile := finding.Filter{BundleSort: "builds); DROP TABLE finding; --"}
-		if _, total, err := f.store.Bundles(t.Context(), who, f.wholeProduct(), 50, 0,
+		hostile := finding.Filter{PlannedUpgradeSort: "builds); DROP TABLE finding; --"}
+		if _, total, err := f.store.PlannedUpgrades(t.Context(), who, f.wholeProduct(), 50, 0,
 			hostile); err != nil || total == 0 {
 			t.Errorf("a bump order nobody allows made the list fail rather than fall back: %v", err)
 		}
@@ -574,31 +574,31 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		spread(t, f)
 		who := f.holding(t, access.PublicTriage)
-		leader := func(filter finding.Filter) finding.Bundle {
+		leader := func(filter finding.Filter) finding.PlannedUpgrade {
 			t.Helper()
-			bundles, _, err := f.store.Bundles(t.Context(), who, f.wholeProduct(), 50, 0, filter)
+			upgrades, _, err := f.store.PlannedUpgrades(t.Context(), who, f.wholeProduct(), 50, 0, filter)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(bundles) == 0 {
+			if len(upgrades) == 0 {
 				t.Fatal("nothing has a version to move to")
 			}
-			return bundles[0]
+			return upgrades[0]
 		}
 
 		// Worst first unasked: the bump carrying the critical.
 		if got := leader(finding.Filter{}); got.Upstream != libnl.Name {
-			t.Errorf("unasked, the list leads with %q rather than the bump closing the critical", got.Upstream)
+			t.Errorf("unasked, the list code findings with %q rather than the bump closing the critical", got.Upstream)
 		}
 		// Most closed first when that is what was asked.
-		if got := leader(finding.Filter{BundleSort: finding.BundlesByIssues}); got.Upstream != swss.Name {
-			t.Errorf("sort=issues leads with %q rather than the bump closing the most", got.Upstream)
+		if got := leader(finding.Filter{PlannedUpgradeSort: finding.PlannedUpgradesByIssues}); got.Upstream != swss.Name {
+			t.Errorf("sort=issues code findings with %q rather than the bump closing the most", got.Upstream)
 		}
 		// And the fewest, which is the direction half of the same question.
 		if got := leader(finding.Filter{
-			BundleSort: finding.BundlesByIssues, Ascending: true,
+			PlannedUpgradeSort: finding.PlannedUpgradesByIssues, Ascending: true,
 		}); got.Upstream != libnl.Name {
-			t.Errorf("asc=true leads with %q, which is what descending answers", got.Upstream)
+			t.Errorf("asc=true code findings with %q, which is what descending answers", got.Upstream)
 		}
 	})
 }
@@ -653,7 +653,7 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 			fixedIn []string
 			ordered bool
 		}{
-			// Ranked: every version places, so the newest leads and reaching it
+			// Ranked: every version places, so the newest code findings and reaching it
 			// reaches what the earlier one fixed.
 			{"versions that all place", ecosystem.occurrences, true},
 			// And unranked: one entry nobody can place is not a list ordered
@@ -682,7 +682,7 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 							FixState:  finding.FixedUpstream, FixedIn: fixed,
 						})
 					}
-					if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+					if _, err := f.store.Apply(t.Context(), f.build, f.run(t), reported); err != nil {
 						t.Fatal(err)
 					}
 
@@ -707,11 +707,11 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 					if !one.ordered {
 						return
 					}
-					// Ranked means the furthest along leads, and that it
+					// Ranked means the furthest along code findings, and that it
 					// reaches what the earlier release fixed as well as its
 					// own.
 					if up[0].To != ecosystem.furthest {
-						t.Errorf("the list leads with %q, want the furthest along", up[0].To)
+						t.Errorf("the list code findings with %q, want the furthest along", up[0].To)
 					}
 					if up[0].Reached != 2 {
 						t.Errorf("%q reaches %d issues, want both", up[0].To, up[0].Reached)
@@ -734,7 +734,7 @@ func TestACommitmentStandsWhenALaterInventoryStatesMore(t *testing.T) {
 		who := f.someoneElse(t, access.PublicTriage)
 		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID,
 			f.componentID(t, libnl.Name), "3.9.0", nil, nil,
-			[]int64{f.target}, map[int64]string{}); err != nil {
+			[]int64{f.build}, map[int64]string{}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -753,7 +753,7 @@ func TestACommitmentStandsWhenALaterInventoryStatesMore(t *testing.T) {
 		}
 		f.shipped(t, restated)
 
-		planned, err := f.store.PendingUpgrades(ctx, who, f.target)
+		planned, err := f.store.PlannedUpgradesFor(ctx, who, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}

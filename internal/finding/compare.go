@@ -103,7 +103,7 @@ type Comparison struct {
 // "fixed by a carried patch" are different things to a reader, and a bump that
 // did not reach the fix is not a fix — it appears as superseded rather than as
 // something resolved.
-func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget, toTarget int64,
+func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, toBuild int64,
 	includePrivate bool) (*Comparison, error) {
 
 	// Both builds, each authorized on its own. An answer for one applied to
@@ -111,11 +111,11 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// of another through the comparison. The product comes back with each,
 	// because the rating a row is reported at is that product's, and the two
 	// builds compared can be in two products.
-	toProduct, visible, err := readableIn(ctx, s.db, subject, toTarget)
+	toProduct, visible, err := readableIn(ctx, s.db, subject, toBuild)
 	if err != nil {
 		return nil, err
 	}
-	fromProduct, earlier, err := readableIn(ctx, s.db, subject, fromTarget)
+	fromProduct, earlier, err := readableIn(ctx, s.db, subject, fromBuild)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	visible = both
 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
-	at := func(productID, targetID int64) *bun.SelectQuery {
+	at := func(productID, buildID int64) *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
@@ -167,7 +167,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 			ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
 			ColumnExpr(`"v"."exploited" AS "exploited"`).
 			ColumnExpr(`COALESCE("v"."advisory", '') AS "advisory"`).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			GroupExpr(`"v"."identifier", "c"."name", ` + rating.EffectiveExpr +
 				`, "f"."closed_because", "v"."exploited", "v"."advisory"`)
@@ -175,10 +175,10 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	}
 
 	var was, now []Changed
-	if err := at(fromProduct, fromTarget).Scan(ctx, &was); err != nil {
+	if err := at(fromProduct, fromBuild).Scan(ctx, &was); err != nil {
 		return nil, fmt.Errorf("read what the earlier build had: %w", err)
 	}
-	if err := at(toProduct, toTarget).Scan(ctx, &now); err != nil {
+	if err := at(toProduct, toBuild).Scan(ctx, &now); err != nil {
 		return nil, fmt.Errorf("read what the later build has: %w", err)
 	}
 
@@ -208,7 +208,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// release a customer has been on for a year has as many fixed entries as
 	// the release note is long, and asking about each separately made the
 	// screen's cost a count of round trips.
-	gone, err := s.whyGone(ctx, toTarget, comparison.Fixed)
+	gone, err := s.whyGone(ctx, toBuild, comparison.Fixed)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// off against — what was fixed needs no justification and what is newly
 	// present has not been looked at yet.
 	if len(comparison.Still) > 0 {
-		stands, err := s.whatStands(ctx, toProduct, toTarget, visible)
+		stands, err := s.whatStands(ctx, toProduct, toBuild, visible)
 		if err != nil {
 			return nil, err
 		}
@@ -272,10 +272,10 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 // case: there is nothing being kept from somebody who was never going to see
 // it, and a count would be an oracle for whether embargoed work exists.
 func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
-	fromTarget, toTarget int64) (int, error) {
+	fromBuild, toBuild int64) (int, error) {
 
-	for _, targetID := range []int64{toTarget, fromTarget} {
-		_, visible, err := readableIn(ctx, s.db, subject, targetID)
+	for _, buildID := range []int64{toBuild, fromBuild} {
+		_, visible, err := readableIn(ctx, s.db, subject, buildID)
 		if err != nil {
 			return 0, err
 		}
@@ -285,7 +285,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	}
 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
-	at := func(targetID int64) ([]Changed, error) {
+	at := func(buildID int64) ([]Changed, error) {
 		var rows []Changed
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -294,18 +294,18 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 			ColumnExpr(`"c"."name" AS "component"`).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" = ?`, access.Private).
 			Where(`"f"."closed_at" IS NULL`).
 			GroupExpr(`"v"."identifier", "c"."name"`).
 			Scan(ctx, &rows)
 		return rows, err
 	}
-	was, err := at(fromTarget)
+	was, err := at(fromBuild)
 	if err != nil {
 		return 0, fmt.Errorf("read what the earlier build had undisclosed: %w", err)
 	}
-	now, err := at(toTarget)
+	now, err := at(toBuild)
 	if err != nil {
 		return 0, fmt.Errorf("read what the later build has undisclosed: %w", err)
 	}
@@ -335,7 +335,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	// Counted through whyGone and onlyFixes rather than by a filter of its
 	// own, because a second spelling of "what counts as a fix" is how the
 	// listed half and the counted half came to disagree in the first place.
-	why, err := s.whyGone(ctx, toTarget, gone)
+	why, err := s.whyGone(ctx, toBuild, gone)
 	if err != nil {
 		return 0, err
 	}
@@ -361,7 +361,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 // landed before that line was first scanned: saying "removed" would publish
 // "we dropped the component" into a release note about a component that is
 // still there at a newer version.
-func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (map[string]Gone, error) {
+func (s *Store) whyGone(ctx context.Context, buildID int64, fixed []Changed) (map[string]Gone, error) {
 	why := make(map[string]Gone, len(fixed))
 	if len(fixed) == 0 {
 		return why, nil
@@ -414,7 +414,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 			ColumnExpr(`COALESCE("f"."moved_to", '') AS "moved_to"`).
 			ColumnExpr(`COALESCE("f"."closed_run_id", 0) AS "closed_run"`).
 			Where(kinds, kindArgs...).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."closed_at" IS NOT NULL`).
 			Where(`"v"."identifier" IN (?)`, bun.List(issues)).
 			Where(`"cp"."name" IN (?)`, bun.List(components)).
@@ -484,7 +484,7 @@ type Stands struct {
 // comparison's still-present list is most of what the build holds, and a
 // statement narrowed by a list of hundreds of pairs is a longer statement
 // that reads the same rows.
-func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
+func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 	visible []access.Visibility) (map[string]Stands, error) {
 
 	var counted []struct {
@@ -512,7 +512,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	q = decisionCounts(q, "?", []any{productID}, decisionWaiting, decisionApproved, decisionLapsed).
 		Where(kinds, kindArgs...).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		GroupExpr(`"v"."identifier", "c"."name"`)
@@ -574,7 +574,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		// engine compares to take the minimum cannot change the answer.
 		ColumnExpr(`COALESCE(MIN("cl"."justification"), '') AS "justification"`).
 		Where(kinds, kindArgs...).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		GroupExpr(`"v"."identifier", "c"."name", "cl"."id", "cl"."outcome"`).

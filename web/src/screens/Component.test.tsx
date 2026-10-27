@@ -21,9 +21,9 @@ const PATTERN = "/products/:product/components/:component";
 
 // One build shipping libnl at a version, with what is open there and the
 // versions a scanner named as fixing it.
-function build(stream: string, variant: string, version: string, upgrades: string[]) {
+function build(branchOrTag: string, variant: string, version: string, upgrades: string[]) {
   return {
-    stream,
+    branch_or_tag: branchOrTag,
     variant,
     version,
     source: "libnl",
@@ -43,11 +43,11 @@ function serving(items: unknown[]) {
   );
 }
 
-function chip(stream: string, variant: string): HTMLButtonElement {
+function chip(branchOrTag: string, variant: string): HTMLButtonElement {
   const found = Array.from(mount.host().querySelectorAll<HTMLButtonElement>("button.vchip")).find(
-    (each) => each.textContent?.includes(stream) && each.textContent.includes(variant),
+    (each) => each.textContent?.includes(branchOrTag) && each.textContent.includes(variant),
   );
-  if (!found) throw new Error(`no release ${stream} ${variant}`);
+  if (!found) throw new Error(`no release ${branchOrTag} ${variant}`);
   return found;
 }
 
@@ -64,7 +64,7 @@ describe("scheduling an upgrade of a component", () => {
     mount.render(
       screen(
         <Component />,
-        "/products/sonic/components/libnl?stream=master&variant=broadcom&version=3.7",
+        "/products/sonic/components/libnl?branch_or_tag=master&variant=broadcom&version=3.7",
         PATTERN,
       ),
     );
@@ -86,7 +86,7 @@ describe("scheduling an upgrade of a component", () => {
         version: "3.7",
         by: "2026-12-01",
         reasoning: "The packaged fix.",
-        builds: [{ stream: "master", variant: "broadcom" }],
+        builds: [{ branch_or_tag: "master", variant: "broadcom" }],
       },
     });
     expect(mount.host().textContent).toContain("Recorded against 2 occurrences across 2 issues.");
@@ -106,7 +106,7 @@ describe("scheduling an upgrade of a component", () => {
     act(() => other?.click());
     await settle();
     expect(location()).toContain("version=3.5");
-    expect(location()).toContain("stream=202411");
+    expect(location()).toContain("branch_or_tag=202411");
   });
 
   it("offers a decision rather than an empty form when nothing fixes it", async () => {

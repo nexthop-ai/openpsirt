@@ -14,7 +14,7 @@ import { unwrap } from "./queries";
 // for these names asks through here.
 
 export type Product = Body<"ProductBody">;
-type Stream = Body<"StreamBody">;
+type BranchOrTag = Body<"BranchOrTagBody">;
 type Variant = Body<"VariantBody">;
 
 // The three, as one hook. The variants are the product's own — what it is
@@ -32,13 +32,13 @@ export function useCatalog(
   product = "",
 ): {
   products: UseQueryResult<{ items: Product[] | null }>;
-  streams: UseQueryResult<{ items: Stream[] | null }>;
+  branchesAndTags: UseQueryResult<{ items: BranchOrTag[] | null }>;
   variants: UseQueryResult<{ items: Variant[] | null }>;
 } {
   const products = useProducts(open);
-  const streams = useStreams(product, open);
+  const branchesAndTags = useBranchesAndTags(product, open);
   const variants = useProductVariants(product, open);
-  return { products, streams, variants };
+  return { products, branchesAndTags, variants };
 }
 
 // The products, by name.
@@ -52,12 +52,12 @@ export function useProducts(enabled = true): UseQueryResult<{ items: Product[] |
 
 // One product's branches and tags, by name. Nothing is asked until a product
 // is named.
-export function useStreams(
+export function useBranchesAndTags(
   product: string,
   enabled = true,
-): UseQueryResult<{ items: Stream[] | null }> {
+): UseQueryResult<{ items: BranchOrTag[] | null }> {
   return useQuery({
-    queryKey: ["streams", product],
+    queryKey: ["branches_and_tags", product],
     enabled: enabled && !!product,
     queryFn: async () =>
       unwrap(
@@ -71,9 +71,11 @@ export function useStreams(
 // One product's branches and tags, retired ones included. This resolves a
 // name somebody arrived with rather than offering a choice, so a retired line
 // is an answer here; it is keyed apart from the offered list because of it.
-export function useStreamsResolving(product: string): UseQueryResult<{ items: Stream[] | null }> {
+export function useBranchesAndTagsResolving(
+  product: string,
+): UseQueryResult<{ items: BranchOrTag[] | null }> {
   return useQuery({
-    queryKey: ["streams", product, "retired"],
+    queryKey: ["branches_and_tags", product, "retired"],
     enabled: !!product,
     queryFn: async () =>
       unwrap(
@@ -113,15 +115,15 @@ export function useProductVariants(
 export function useReleaseVariants(
   open: boolean,
   product: string,
-  stream: string,
+  branchOrTag: string,
 ): UseQueryResult<{ items: Variant[] | null }> {
   return useQuery({
-    queryKey: ["variants", product, stream],
-    enabled: open && !!product && !!stream,
+    queryKey: ["variants", product, branchOrTag],
+    enabled: open && !!product && !!branchOrTag,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/branches-and-tags/{stream}/variants", {
-          params: { path: { product, stream } },
+        await api.GET("/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants", {
+          params: { path: { product, branch_or_tag: branchOrTag } },
         }),
       ),
   });

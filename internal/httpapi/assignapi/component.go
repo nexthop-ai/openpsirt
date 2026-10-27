@@ -20,10 +20,10 @@ import (
 
 // PerBuildBody is one build's answer about a source package.
 type PerBuildBody struct {
-	Stream  string `json:"stream"`
-	Variant string `json:"variant"`
-	Source  string `json:"source" doc:"The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing"`
-	Version string `json:"version" doc:"The version the source package was built at"`
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
+	Source      string `json:"source" doc:"The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing"`
+	Version     string `json:"version" doc:"The version the source package was built at"`
 	// Ecosystem is read out of the identifiers rather than stored, and every
 	// binary of one fold shares it: the package type is part of the fold.
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the package identifiers name"`
@@ -34,19 +34,19 @@ type PerBuildBody struct {
 	// work, and a number with nothing beside it says which is which.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Everything open across the source package here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
 	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited"`
-	// ExploitedHere is the other exploitation signal, and the one that
+	// Incident is the other exploitation signal, and the one that
 	// outranks it. Separate, because a feed's word about the world and a
 	// person's word about this product are different facts.
-	ExploitedHere bool `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of what is open here"`
-	Fixable       int  `json:"fixable" doc:"The number of open issues any version fixes, counted once per issue however many binaries carry it"`
-	Issues        int  `json:"issues" doc:"Distinct vulnerabilities open across the source package here, counted once however many binaries carry each"`
+	Incident bool `json:"incident,omitempty" doc:"Whether an incident stands in this product through any of what is open here"`
+	Fixable  int  `json:"fixable" doc:"The number of open issues any version fixes, counted once per issue however many binaries carry it"`
+	Issues   int  `json:"issues" doc:"Distinct vulnerabilities open across the source package here, counted once however many binaries carry each"`
 	// Consumers is the unit somebody acts in: one decision covers the whole
 	// fold, and what varies underneath it is the set of consumers pulling the
 	// package in.
 	Consumers   int `json:"consumers" doc:"The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted"`
 	Occurrences int `json:"occurrences" doc:"The number of times those sit somewhere in this build. What the ceiling on one action is measured against"`
 	// Upgrades are the versions this build could move to.
-	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets"`
+	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and a branch or tag that has moved on have different builds"`
 	DueAt    string             `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`
 	// CommittedTo is the promise already made for this build, read off the
 	// decisions.
@@ -122,8 +122,8 @@ func registerComponent(api huma.API, in core.Deps) {
 			"`libcurl4t64` and `curl` answer alike. A binary whose inventory names no source " +
 			"package is its own source. A source shipped at two versions in one build is two " +
 			"entries: two pieces of code, decided about separately.\n\n" +
-			"Answered per build, because the answer differs by build. A stream staying " +
-			"on a maintained older line and a stream that has moved on are different work.\n\n" +
+			"Answered per build, because the answer differs by build. A branch or tag staying " +
+			"on a maintained older line and a branch or tag that has moved on are different work.\n\n" +
 			"Counts cover the source package: an issue open on three of its binaries is one " +
 			"issue. Each entry in `packages` carries its own counts.\n\n" +
 			"Where it could go carries two counts. `fixed_here` is how many of what is " +
@@ -187,11 +187,11 @@ func registerComponent(api huma.API, in core.Deps) {
 				})
 			}
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
-				Stream: build.Stream, Variant: build.Variant,
+				BranchOrTag: build.BranchOrTag, Variant: build.Variant,
 				Source: build.Source, Version: build.SourceVersion, Ecosystem: ecosystem,
 				Packages:   packages,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
-				ExploitedHere: build.ExploitedHere, Fixable: build.Fixable,
+				Incident: build.Incident, Fixable: build.Fixable,
 				Issues: build.Issues, Consumers: build.Consumers, Occurrences: build.Occurrences,
 				Upgrades: upgrades,
 				DueAt:    core.StampAt(build.DueAt), CommittedTo: core.StampAt(build.CommittedTo), UpgradeTo: build.UpgradeTo,
@@ -210,7 +210,7 @@ type PlanUpgradeBody struct {
 	// Builds is which releases this is promised for. The same component
 	// can be promised a different version in another release, which is the
 	// ordinary case.
-	Builds    []BuildName `json:"builds" minItems:"1" maxItems:"2000" doc:"The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version"`
+	Builds    []BuildName `json:"builds" minItems:"1" maxItems:"2000" doc:"The releases this is promised for. A branch or tag staying on a maintained older line takes its own promise with its own version"`
 	Reasoning string      `json:"reasoning" minLength:"1" doc:"The reason this is the answer here. Required like every other decision: what an auditor reads is the reasoning, not the outcome"`
 	// Person is who carries it. A team as readily as a person: moving a
 	// package is work a queue tracks rather than a decision one person
@@ -224,7 +224,7 @@ type PlannedUpgradeBody struct {
 	DecisionID  int64 `json:"decision_id" doc:"The one decision the whole upgrade was recorded under"`
 	Occurrences int   `json:"occurrences" doc:"Occurrences answered"`
 	Issues      int   `json:"issues" doc:"Distinct vulnerabilities it covers"`
-	Targets     int   `json:"targets" doc:"Build-level intents recorded, which is what the pending upgrades screen reads"`
+	Targets     int   `json:"targets" doc:"Build-level intents recorded, which is what the planned upgrades screen reads"`
 	Components  int   `json:"components" doc:"The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
 	// Waiting says a second person has to agree, which happens when the date
 	// is past the earliest deadline among what this covers.
@@ -238,7 +238,7 @@ type PlannedUpgradeBody struct {
 // registerPlanUpgrade records moving a component as the answer to what is
 // open.
 //
-// The act the component screen exists for. It replaces declaring a fix bundle:
+// The act the component screen exists for. It replaces declaring a planned upgrade:
 // the same thing, recorded as a decision with the version and the date as its
 // payload rather than as a record beside one, so what somebody decided and
 // what a release is waiting on cannot come to disagree.
@@ -288,15 +288,15 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		}
 		builds := make([]int64, 0, len(input.Body.Builds))
 		for _, at := range input.Body.Builds {
-			located, err := core.LocatedVisibly(ctx, in, subject, input.Product, at.Stream, at.Variant)
+			located, err := core.LocatedVisibly(ctx, in, subject, input.Product, at.BranchOrTag, at.Variant)
 			if err != nil {
 				return nil, err
 			}
-			target, err := core.TargetRow(ctx, in, located.StreamID, located.VariantID)
+			build, err := core.BuildRow(ctx, in, located.BranchOrTagID, located.VariantID)
 			if err != nil {
 				return nil, err
 			}
-			builds = append(builds, target.ID)
+			builds = append(builds, build.ID)
 		}
 
 		holder, admits, err := carrying(ctx, in, subject, product.ID, input.Body.Person,
@@ -372,11 +372,11 @@ func carrying(ctx context.Context, in core.Deps, subject access.Subject, product
 	return &party, teamAdmits(found, productID), nil
 }
 
-// mayHandOver refuses a party nobody may be given work as, and a hand-off the
+// mayHandOver refuses a party nobody may be given work as, and a flaw record the
 // subject may not make.
 //
 // One helper because the rule is one rule. Two routes stating it answer the
-// same request differently: they drift over which status a refused hand-off
+// same request differently: they drift over which status a refused flaw record
 // is, so the two paths to the same act contradict each other about what
 // happened.
 //

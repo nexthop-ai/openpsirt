@@ -125,7 +125,7 @@ func TestWhatTheDocumentSaysAFindingWithNoDeadlineCarries(t *testing.T) {
 		// The store's own words, and nothing else. Named here rather than read
 		// from internal/finding so that a word added there without being
 		// published fails this rather than passing it.
-		want := []string{"below-the-line", "not-rated", "nothing-to-take", "out-of-support"}
+		want := []string{"below-minimum-severity", "not-rated", "nothing-to-take", "out-of-support"}
 		for body, said := range declared {
 			if !slices.Equal(said, want) {
 				t.Errorf("%s declares %v, and the store emits %v", body, said, want)
@@ -161,7 +161,7 @@ func TestAShareIsRefusedAboveTheWhole(t *testing.T) {
 // the deployment's agree on what they accept.
 func TestAWordSettingIsTakenWhateverItsCapitals(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.minimum-severity",
 			`{"value":" High "}`); got.Code >= 300 {
 			t.Fatalf("a floor typed with a capital answered %d: %s", got.Code, got.Body.String())
 		}
@@ -173,7 +173,7 @@ func TestAWordSettingIsTakenWhateverItsCapitals(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "admin", "/v1/settings", &offered)
 		for _, each := range offered.Items {
-			if each.Name == "triage.floor" && each.Value != "high" {
+			if each.Name == "triage.minimum-severity" && each.Value != "high" {
 				t.Errorf("the floor reads back as %q, want %q", each.Value, "high")
 			}
 		}

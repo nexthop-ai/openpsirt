@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { remember } from "../app/scope";
 import { useQueries } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { useReleaseVariants, useStreamsResolving } from "../api/catalog";
+import { useReleaseVariants, useBranchesAndTagsResolving } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -15,8 +15,8 @@ import { Wide } from "../ui/Wide";
 import {
   buildFindingsAt,
   comparisonAt,
-  reportAt,
-  streamsAt,
+  analyticsReportAt,
+  branchesAndTagsAt,
   dependenciesAt,
   vexAt,
 } from "../app/routes";
@@ -31,14 +31,20 @@ import {
 //
 // No overdue section. A tag never changes, so nothing on it has a deadline
 // to miss.
-export function Release({ product, stream }: { product: string; stream: string }) {
+export function Release({
+  product,
+  branch_or_tag: branchOrTag,
+}: {
+  product: string;
+  branch_or_tag: string;
+}) {
   // Retired lines included: a retired tag is still the release it was, and
   // its address opens here.
-  const streams = useStreamsResolving(product);
-  const built = useReleaseVariants(true, product, stream);
+  const branchesAndTags = useBranchesAndTagsResolving(product);
+  const built = useReleaseVariants(true, product, branchOrTag);
 
-  const rows = streams.data?.items ?? [];
-  const here = rows.find((row) => row.name === stream);
+  const rows = branchesAndTags.data?.items ?? [];
+  const here = rows.find((row) => row.name === branchOrTag);
   const variants = built.data?.items ?? [];
 
   // Each variant's own counts for this release, by severity. Asked per variant
@@ -47,13 +53,15 @@ export function Release({ product, stream }: { product: string; stream: string }
   // that can go stale.
   const counts = useQueries({
     queries: variants.map((variant) => ({
-      queryKey: ["release-counts", product, stream, variant.name],
+      queryKey: ["release-counts", product, branchOrTag, variant.name],
       queryFn: async () =>
         unwrap(
           await api.GET(
-            "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness",
+            "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/readiness",
             {
-              params: { path: { product, stream, variant: variant.name ?? "" } },
+              params: {
+                path: { product, branch_or_tag: branchOrTag, variant: variant.name ?? "" },
+              },
             },
           ),
         ),
@@ -69,9 +77,9 @@ export function Release({ product, stream }: { product: string; stream: string }
     here,
   );
 
-  if (streams.isPending || built.isPending) return <Loading />;
-  if (streams.isError) {
-    return <Failed error={streams.error} what="This release could not be read." />;
+  if (branchesAndTags.isPending || built.isPending) return <Loading />;
+  if (branchesAndTags.isError) {
+    return <Failed error={branchesAndTags.error} what="This release could not be read." />;
   }
   if (!here) {
     return (
@@ -97,7 +105,7 @@ export function Release({ product, stream }: { product: string; stream: string }
   return (
     <>
       <div className="screen-head">
-        <h2>{stream}</h2>
+        <h2>{branchOrTag}</h2>
         <p>
           {product}
           {here.released_on ? (
@@ -110,7 +118,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           {here.parent && (
             <>
               {" "}
-              · cut from <Link to={streamsAt(product)}>{here.parent}</Link>
+              · cut from <Link to={branchesAndTagsAt(product)}>{here.parent}</Link>
             </>
           )}
           {here.end_of_life && <> · support ends {here.end_of_life}</>}
@@ -149,7 +157,7 @@ export function Release({ product, stream }: { product: string; stream: string }
               </thead>
               <tbody>
                 {variants.map((variant, at_) => {
-                  const at = { product, stream, variant: variant.name ?? "" };
+                  const at = { product, branch_or_tag: branchOrTag, variant: variant.name ?? "" };
                   // Off the same answer the severity split below is added
                   // from, rather than off the variant list: that endpoint
                   // lists what a release was built as and never fills the
@@ -229,8 +237,8 @@ export function Release({ product, stream }: { product: string; stream: string }
             <p className="hint" style={{ marginTop: 0 }}>
               Against <b>{previous.name}</b>, the previous release.
             </p>
-            <Link to={comparisonAt(product, { from: previous.name ?? "", to: stream })}>
-              Compare {previous.name} with {stream}
+            <Link to={comparisonAt(product, { from: previous.name ?? "", to: branchOrTag })}>
+              Compare {previous.name} with {branchOrTag}
             </Link>
           </>
         ) : (
@@ -249,7 +257,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           <li>
             <div>
               {previous ? (
-                <Link to={comparisonAt(product, { from: previous.name ?? "", to: stream })}>
+                <Link to={comparisonAt(product, { from: previous.name ?? "", to: branchOrTag })}>
                   The release note
                 </Link>
               ) : (
@@ -262,7 +270,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           </li>
           <li>
             <div>
-              <Link to="/reports/advisories-issued">Advisories issued</Link>
+              <Link to="/analytics/advisories-issued">Advisories issued</Link>
             </div>
             {/* Not narrowed to this release. An advisory is about a flaw and is
                 published once, so tying it to whichever release was cut nearby
@@ -272,8 +280,10 @@ export function Release({ product, stream }: { product: string; stream: string }
           {variants.map((variant) => (
             <li key={`vex-${variant.name}`}>
               <div>
-                <Link to={vexAt({ product, stream, variant: variant.name ?? "" })}>
-                  VEX document · {variant.name}
+                <Link
+                  to={vexAt({ product, branch_or_tag: branchOrTag, variant: variant.name ?? "" })}
+                >
+                  Published VEX · {variant.name}
                 </Link>
               </div>
               <div className="hint">
@@ -287,7 +297,7 @@ export function Release({ product, stream }: { product: string; stream: string }
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>The record</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Every vulnerability known in this release and what became of it, with no triage line
+          Every vulnerability known in this release and what became of it, with no minimum severity
           applied.
         </p>
         <ul className="files catalog">
@@ -297,8 +307,10 @@ export function Release({ product, stream }: { product: string; stream: string }
                 {/* The register answers for the build the picker holds, so
                     the link picks this one on its way there. */}
                 <Link
-                  to={reportAt("disposition-register")}
-                  onClick={() => remember({ product, stream, variant: variant.name ?? "" })}
+                  to={analyticsReportAt("disposition-register")}
+                  onClick={() =>
+                    remember({ product, branch_or_tag: branchOrTag, variant: variant.name ?? "" })
+                  }
                 >
                   Disposition register · {variant.name}
                 </Link>

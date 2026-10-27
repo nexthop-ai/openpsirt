@@ -101,8 +101,8 @@ type FindingDecisionBody struct {
 
 // AlsoBuild is another build one decision reaches, as the reach names it.
 type AlsoBuild struct {
-	Stream  string `json:"stream"`
-	Variant string `json:"variant"`
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
 	// Version is what that build ships under this component's name, and is
 	// required wherever it ships more than one — the same reason the route
 	// takes it as a query for the build in the path.
@@ -133,17 +133,17 @@ type DecidedBody struct {
 // There is no per-build outcome to report, because there is no per-build
 // outcome to have: the whole decision is written or none of it is.
 type CoveredBuild struct {
-	Stream   string `json:"stream"`
-	Variant  string `json:"variant"`
-	Version  string `json:"version,omitempty"`
-	Recorded int    `json:"recorded" doc:"The number of occurrences it covers there"`
-	Covered  int    `json:"covered" doc:"The number of findings those occurrences hold"`
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
+	Version     string `json:"version,omitempty"`
+	Recorded    int    `json:"recorded" doc:"The number of occurrences it covers there"`
+	Covered     int    `json:"covered" doc:"The number of findings those occurrences hold"`
 }
 
 func registerFindingDecision(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide-finding", Method: http.MethodPost,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/findings/{issue}/components/{component}/decision",
 		Summary: "Record one decision about a finding, covering its occurrences",
 		Description: "Records the same decision against every occurrence this issue has in this " +
@@ -173,7 +173,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Stream        string `path:"stream"`
+		BranchOrTag   string `path:"branch_or_tag"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component, as the findings list gives it"`
@@ -189,7 +189,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		// written: the one in the path, and any the caller put beside
 		// it.
 		asked := append([]AlsoBuild{{
-			Stream: input.Stream, Variant: input.Variant, Version: input.Version,
+			BranchOrTag: input.BranchOrTag, Variant: input.Variant, Version: input.Version,
 		}}, input.Body.Also...)
 		until, lands, err := promisedDates(input.Body.DeferredUntil, input.Body.CommittedTo)
 		if err != nil {
@@ -237,31 +237,31 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			// dropped, and the version and what carries the issue decide.
 			which := graph.Choice{Version: build.Version, Ecosystem: input.Ecosystem,
 				Namespace: input.Namespace}
-			occurrences, all, target, err := occurrencesToDecide(ctx, in, subject, store, input.Product,
-				build.Stream, build.Variant, input.Vulnerability, input.Component,
+			occurrences, all, buildID, err := occurrencesToDecide(ctx, in, subject, store, input.Product,
+				build.BranchOrTag, build.Variant, input.Vulnerability, input.Component,
 				which, wanted, remaining)
 			if i > 0 && which.Namespace != "" && core.Answered(err) == http.StatusNotFound {
 				which.Namespace = ""
-				occurrences, all, target, err = occurrencesToDecide(ctx, in, subject, store, input.Product,
-					build.Stream, build.Variant, input.Vulnerability, input.Component,
+				occurrences, all, buildID, err = occurrencesToDecide(ctx, in, subject, store, input.Product,
+					build.BranchOrTag, build.Variant, input.Vulnerability, input.Component,
 					which, wanted, remaining)
 			}
 			if err != nil {
 				if i == 0 {
 					return nil, err
 				}
-				return nil, aboutBuild(build.Stream, build.Variant, err)
+				return nil, aboutBuild(build.BranchOrTag, build.Variant, err)
 			}
 			// Compared as the names resolve, because a name people type is
 			// matched without regard to capitals.
-			if slices.Contains(covering, target) {
+			if slices.Contains(covering, buildID) {
 				return nil, huma.Error422UnprocessableEntity(namedTwice)
 			}
 			if i == 0 {
 				sits = all
 			}
 			reached[i] = occurrences
-			covering = append(covering, target)
+			covering = append(covering, buildID)
 
 			// Charged as each build is resolved rather than after all of
 			// them. REQ-27 bounds what is written, not what was asked for —
@@ -333,7 +333,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		out.Body.Left = sits - out.Body.Recorded
 		for i, build := range asked[1:] {
 			out.Body.Also = append(out.Body.Also, CoveredBuild{
-				Stream: build.Stream, Variant: build.Variant, Version: build.Version,
+				BranchOrTag: build.BranchOrTag, Variant: build.Variant, Version: build.Version,
 				Recorded: writes[i+1], Covered: holds[i+1],
 			})
 		}
@@ -348,15 +348,15 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 // there. The two differ whenever something was left out, and the difference
 // states how much of the finding is still open.
 func occurrencesToDecide(ctx context.Context, in core.Deps, subject access.Subject, store *triage.Store,
-	product, stream, variant, vulnerability, component string, which graph.Choice,
+	product, branchOrTag, variant, vulnerability, component string, which graph.Choice,
 	wanted []string, remaining bool) ([]finding.Deciding, int, int64, error) {
 
-	target, issue, at, err := findingAbout(ctx, in, subject,
-		product, stream, variant, vulnerability, component, which)
+	build, issue, at, err := findingAbout(ctx, in, subject,
+		product, branchOrTag, variant, vulnerability, component, which)
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	all, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, target, issue, at)
+	all, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, build, issue, at)
 	if err != nil {
 		return nil, 0, 0, core.Absent(in.Logger, err, "those occurrences could not be looked up", core.NoSuchFinding)
 	}
@@ -387,7 +387,7 @@ func occurrencesToDecide(ctx context.Context, in core.Deps, subject access.Subje
 	}
 
 	if !remaining {
-		return occurrences, len(all), target, nil
+		return occurrences, len(all), build, nil
 	}
 	ask := make([]triage.Occurrence, 0, len(occurrences))
 	for _, occurrence := range occurrences {
@@ -409,7 +409,7 @@ func occurrencesToDecide(ctx context.Context, in core.Deps, subject access.Subje
 			open = append(open, occurrence)
 		}
 	}
-	return open, len(all), target, nil
+	return open, len(all), build, nil
 }
 
 // aboutBuild says which of the builds a refusal is about.
@@ -417,10 +417,10 @@ func occurrencesToDecide(ctx context.Context, in core.Deps, subject access.Subje
 // Only for the ones named beside the path, and it says nothing a caller did
 // not already know: it named the build itself, and the refusal is the same one
 // the build in the path would have got.
-func aboutBuild(stream, variant string, err error) error {
+func aboutBuild(branchOrTag, variant string, err error) error {
 	var status huma.StatusError
 	if errors.As(err, &status) {
-		return huma.NewError(status.GetStatus(), stream+"/"+variant+": "+status.Error())
+		return huma.NewError(status.GetStatus(), branchOrTag+"/"+variant+": "+status.Error())
 	}
 	return err
 }
@@ -432,14 +432,14 @@ func aboutBuild(stream, variant string, err error) error {
 // ships three vendored versions of one library, and resolving the name on its
 // own answers about whichever was interned first.
 func findingAbout(ctx context.Context, in core.Deps, subject access.Subject,
-	product, stream, variant, vulnerability, component string,
+	product, branchOrTag, variant, vulnerability, component string,
 	which graph.Choice) (int64, int64, int64, error) {
 
-	named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+	named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+	build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -447,12 +447,12 @@ func findingAbout(ctx context.Context, in core.Deps, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	at, err := core.ComponentCarrying(ctx, in, subject, target.ID, issue, component, which,
+	at, err := core.ComponentCarrying(ctx, in, subject, build.ID, issue, component, which,
 		func(err error) error { return core.AmbiguousOrMissing(in.Logger, err) })
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	return target.ID, issue, at, nil
+	return build.ID, issue, at, nil
 }
 
 // decidingAbout resolves the names in a path to the occurrence a decision is made
@@ -462,12 +462,12 @@ func findingAbout(ctx context.Context, in core.Deps, subject access.Subject,
 // finding route gives. Naming which part of the address failed is for a
 // pipeline filing a scan; here it would tell a reader which products exist.
 func decidingAbout(ctx context.Context, in core.Deps, subject access.Subject,
-	product, stream, variant, vulnerability, occurrence string) (*finding.Deciding, int64, error) {
-	named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+	product, branchOrTag, variant, vulnerability, occurrence string) (*finding.Deciding, int64, error) {
+	named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, 0, err
 	}
-	target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+	build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -477,11 +477,11 @@ func decidingAbout(ctx context.Context, in core.Deps, subject access.Subject,
 		return nil, 0, err
 	}
 
-	at, err := finding.NewStore(in.DB.DB).OccurrenceFor(ctx, subject, target.ID, issue, occurrence)
+	at, err := finding.NewStore(in.DB.DB).OccurrenceFor(ctx, subject, build.ID, issue, occurrence)
 	if err != nil {
 		return nil, 0, core.Absent(in.Logger, err, "that occurrence could not be looked up", core.NoSuchFinding)
 	}
-	return at, target.ID, nil
+	return at, build.ID, nil
 }
 
 // occurrenceOf is the occurrence a decision is about, as the finding there

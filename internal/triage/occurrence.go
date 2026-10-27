@@ -522,7 +522,7 @@ func (s *Store) write(ctx context.Context, decision *Decision, proposals []Propo
 			proposals[i].Occurrence.VulnerabilityID = issue
 		}
 	}
-	if err := s.refuseIfExploitedHere(ctx, decision, proposals); err != nil {
+	if err := s.refuseIfIncident(ctx, decision, proposals); err != nil {
 		return nil, err
 	}
 	now := s.now().Truncate(time.Microsecond)
@@ -662,13 +662,13 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 	// about applicability.
 	switch {
 	case outcome == Dismissed:
-		// A lead's reasons are their own: the vulnerability ones describe
-		// how a known issue applies, and a lead is a guess somebody judged.
-		if !slices.Contains(LeadReasons(), LeadReason(justification)) {
-			return refusal.Errorf("%q is not a reason a lead is dismissed for: %v", justification, LeadReasons())
+		// A code finding's reasons are their own: the vulnerability ones describe
+		// how a known issue applies, and a code finding is a guess somebody judged.
+		if !slices.Contains(CodeFindingReasons(), CodeFindingReason(justification)) {
+			return refusal.Errorf("%q is not a reason a code finding is dismissed for: %v", justification, CodeFindingReasons())
 		}
 		if strings.TrimSpace(mitigation) != "" {
-			return refusal.New("a dismissed lead says what stops it in its reasoning")
+			return refusal.New("a dismissed code finding says what stops it in its reasoning")
 		}
 		return nil
 	case outcome.NeedsJustification():
@@ -720,13 +720,13 @@ func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
 		return refusal.Errorf("%q is not an outcome", p.Outcome)
 	}
-	// A lead is asked whether it is real, and a vulnerability how it
+	// A code finding is asked whether it is real, and a vulnerability how it
 	// applies. Each kind's outcomes answer its own question and no other.
 	if !slices.Contains(OutcomesFor(p.Occurrence.Kind), p.Outcome) {
 		if p.Occurrence.Kind == kind.Analysis {
-			return refusal.Errorf("%q is not something a lead is judged to be: %v", p.Outcome, LeadOutcomes())
+			return refusal.Errorf("%q is not something a code finding is judged to be: %v", p.Outcome, CodeFindingOutcomes())
 		}
-		return refusal.Errorf("%q is a decision about a lead", p.Outcome)
+		return refusal.Errorf("%q is a decision about a code finding", p.Outcome)
 	}
 	// A tag cannot be fixed. It was built once and is what somebody
 	// received, so an outcome that names a date is a statement about a thing
@@ -1029,8 +1029,8 @@ func (s *Store) disclosedSince(ctx context.Context, rows []DecisionOccurrence) e
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
@@ -1139,7 +1139,7 @@ func (s *Store) reaching(ctx context.Context, subject access.Subject, occurrence
 			return nil, ErrNotTheirs
 		}
 		if !readableOn(subject, occurrence.ProductID, occurrence.VulnerabilityID, occurrence.Visibility) {
-			// A lead included in its flaw's case is read by the flaw's
+			// A code finding included in its flaw's case is read by the flaw's
 			// readers, which only the row's occurrence says.
 			included, err := s.readsIncluded(ctx, subject, []int64{occurrence.ID})
 			if err != nil {

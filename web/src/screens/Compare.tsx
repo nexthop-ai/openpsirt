@@ -109,7 +109,7 @@ export function Compare() {
             <h3>Open findings by release</h3>
           </header>
           <Across releases={releases.data?.items ?? []} />
-          <p className="hint">Every open finding at each build, before any triage line.</p>
+          <p className="hint">Every open finding at each build, before any minimum severity.</p>
         </div>
       )}
 
@@ -164,7 +164,7 @@ export function Compare() {
               closed={comparison.data?.closed_not_fixed ?? []}
               newly={comparison.data?.newly_present ?? []}
               still={comparison.data?.still_present ?? []}
-              runsIn={{ product, stream: to, variant: toVariant }}
+              runsIn={{ product, branch_or_tag: to, variant: toVariant }}
             />
 
             {/* The same comparison in the form it is actually wanted in
@@ -384,7 +384,9 @@ function Column({
                 {runsIn && row.because === "unexplained" && row.closed_by_run && (
                   <>
                     {" — "}
-                    <Link to={runAt(runsIn, row.closed_by_run)}>the run that stopped</Link>
+                    <Link to={runAt(runsIn, row.closed_by_run)}>
+                      the known vulnerability scan that stopped
+                    </Link>
                   </>
                 )}
               </span>

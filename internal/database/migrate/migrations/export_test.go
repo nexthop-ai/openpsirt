@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 
 	"github.com/uptrace/bun"
 
@@ -87,30 +88,38 @@ func StopV090AfterDropping(ctx context.Context, db *database.DB, tables ...strin
 // StatementsV0110 is v0.11.0's declaration of each table it changes.
 func StatementsV0110(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
-	out := map[string][]string{
+	out := map[string][]string{}
+	for table := range keptV0110 {
+		out[table] = declaredV0110(t, table)
+	}
+	for _, r := range tablesRenamedV0110 {
+		out[r.to] = declaredV0110(t, r.to)
+	}
+	// The tables v0.11.0 changes after renaming them are declared as the
+	// change leaves them.
+	for table, declared := range map[string][]string{
 		"vulnerability":  vulnerabilityV0110(t),
 		"finding":        findingV0110(t),
 		"graph_node":     graphNodeV0110(t),
 		"notification":   notificationV0110(t),
 		"decision_stamp": decisionStampV0110(t),
-	}
-	for _, table := range []string{"upgrade"} {
-		out[table] = declaredV0110(t, table)
-	}
-	for _, r := range tablesRenamedV0110 {
-		out[r.to] = declaredV0110(t, r.to)
+	} {
+		out[table] = declared
 	}
 	for table, declared := range map[string][]string{
 		"series": seriesV0110(t), "series_run": seriesV0110(t), "series_document": seriesV0110(t),
 		"series_document_chunk": seriesV0110(t), "series_module": seriesV0110(t),
 		"sighting": seriesV0110(t), "series_refusal": seriesV0110(t), "analysis_result": analysisV0110(t),
 		"analysis_location": analysisV0110(t),
-		"lead_rule":         leadV0110(t), "rule_rating": leadV0110(t), "rule_family": leadV0110(t),
-		"document_upload": documentUploadV0110(t),
-		"flaw_report":     flawReportV0110(t), "flaw_report_revision": flawReportV0110(t),
+		"suppression_rule":  codeFindingV0110(t), "rule_rating": codeFindingV0110(t), "rule_family": codeFindingV0110(t),
+		"code_finding_flaw": codeFindingV0110(t), "flaw_code_finding": codeFindingV0110(t),
+		"flaw_code_finding_build": codeFindingV0110(t), "code_finding_component": codeFindingV0110(t),
+		"code_finding_collaborator": codeFindingV0110(t),
+		"document_upload":           documentUploadV0110(t),
+		"flaw_report":               flawReportV0110(t), "flaw_report_revision": flawReportV0110(t),
 		"report_note": flawReportV0110(t), "report_note_revision": flawReportV0110(t),
 		"report_message": flawReportV0110(t), "report_assignment": flawReportV0110(t),
-		"routing_rule": routingRuleV0110(t),
+		"assignment_rule": assignmentRuleV0110(t),
 	} {
 		made, indexes, err := pick(declared, table)
 		if err != nil {
@@ -126,7 +135,43 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 // it, at a later step.
 func RunV0110ReportStep(ctx context.Context, db *database.DB) error {
 	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
-	return inV020(ctx, db.DB.DB, reportCaseV0110)
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		return renamedForV0110(ctx, tx, reportCaseV0110)
+	})
+}
+
+// renamedForV0110 runs a step of the v0.11.0 upgrade against the names it is
+// written for, as a start that stopped after that step left them. MySQL and
+// MariaDB commit each rename as it runs, so such a start had made every one.
+// PostgreSQL and SQLite keep nothing a stopped start did, so the tables the
+// step names are given their new names for it and their former ones after,
+// and a later start makes every rename.
+func renamedForV0110(ctx context.Context, tx bun.Tx, step func(context.Context, bun.Tx) error) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if u.engine == database.MySQL || u.engine == database.MariaDB {
+		if err := renameV0110(ctx, tx); err != nil {
+			return err
+		}
+		return step(ctx, tx)
+	}
+	named := []tableRename{{"routing_rule", "assignment_rule"}}
+	for _, r := range named {
+		if err := u.run([]string{`ALTER TABLE "` + r.from + `" RENAME TO "` + r.to + `"`}); err != nil {
+			return err
+		}
+	}
+	if err := step(ctx, tx); err != nil {
+		return err
+	}
+	for _, r := range named {
+		if err := u.run([]string{`ALTER TABLE "` + r.to + `" RENAME TO "` + r.from + `"`}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // StopV0110AfterAcknowledgements makes the report step's tables and writes
@@ -140,14 +185,16 @@ func StopV0110AfterAcknowledgements(ctx context.Context, db *database.DB) error 
 		if err != nil {
 			return err
 		}
-		declared := flawReportV0110(u.t)
-		for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
-			"report_note_revision", "report_assignment"} {
-			if err := u.create(declared, table); err != nil {
-				return err
+		return renamedForV0110(ctx, tx, func(ctx context.Context, tx bun.Tx) error {
+			declared := flawReportV0110(u.t)
+			for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
+				"report_note_revision", "report_assignment"} {
+				if err := u.create(declared, table); err != nil {
+					return err
+				}
 			}
-		}
-		return acknowledgedAsSentV0110(ctx, tx)
+			return acknowledgedAsSentV0110(ctx, tx)
+		})
 	})
 }
 
@@ -164,6 +211,23 @@ func StopV0110RenamingAfter(ctx context.Context, db *database.DB, name string) (
 		return true, nil
 	}
 	return false, err
+}
+
+// RenameOrderV0110 is the position, in the order the v0.11.0 upgrade runs its
+// renames, of the first statement renaming the named table, column, index or
+// constraint, and -1 where nothing renames that name.
+func RenameOrderV0110(name string) int {
+	var froms []string
+	for _, t := range tablesRenamedV0110 {
+		froms = append(froms, t.from)
+	}
+	for _, c := range columnsRenamedV0110 {
+		froms = append(froms, c.from)
+	}
+	for _, n := range namesRenamedV0110 {
+		froms = append(froms, n.from)
+	}
+	return slices.Index(froms, name)
 }
 
 // StopV0110RewritingAfter runs the v0.11.0 renames and the stored words after

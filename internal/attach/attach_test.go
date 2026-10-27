@@ -38,7 +38,7 @@ type fixture struct {
 	root    string
 	product int64
 	issue   int64
-	target  int64
+	build   int64
 }
 
 const (
@@ -66,7 +66,7 @@ func setUp(t *testing.T, db *database.DB) *fixture {
 	}
 	f := &fixture{
 		db: db, store: attach.NewStore(db.DB, files), files: files, root: root,
-		product: w.Product.ID, target: w.Target.ID,
+		product: w.Product.ID, build: w.Build.ID,
 	}
 	f.issue = f.anIssue(t, identity, access.Public)
 	return f
@@ -101,7 +101,7 @@ func (f *fixture) anIssue(t *testing.T, name string, visibility access.Visibilit
 		t.Fatalf("record a component: %v", err)
 	}
 	row := &finding.Finding{
-		TargetID: f.target, Kind: finding.Vulnerable, VulnerabilityID: issue.ID,
+		BuildID: f.build, Kind: finding.Vulnerable, VulnerabilityID: issue.ID,
 		Visibility: visibility, ComponentID: component.ID,
 		OccurrenceIdentity: "place-" + name, Urgency: 1, OpenedAt: time.Now().UTC(),
 	}

@@ -26,10 +26,10 @@ func TestAPromiseNamesOnlyBuildsOfItsOwnProduct(t *testing.T) {
 		elsewhere := f.anotherBranchOf(t, other.ID, "main")
 
 		if _, err := f.store.BuildsForWithin(ctx, f.db.DB, f.productID,
-			[]int64{f.target, elsewhere}); !errors.Is(err, access.ErrDenied) {
+			[]int64{f.build, elsewhere}); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a build of another product was accepted beside this one's: %v", err)
 		}
-		here, err := f.store.BuildsForWithin(ctx, f.db.DB, f.productID, []int64{f.target, f.target})
+		here, err := f.store.BuildsForWithin(ctx, f.db.DB, f.productID, []int64{f.build, f.build})
 		if err != nil || len(here) != 1 {
 			t.Errorf("this product's build named twice answered %v, %v", here, err)
 		}

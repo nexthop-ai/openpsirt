@@ -18,31 +18,31 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// Claimed is a claim that arrived, as somebody types it in.
+// NewReport is a vulnerability report that arrived, as somebody types it in.
 //
-// The summary is what was claimed, and it is the one thing required: a report
-// that says nothing records only that a mail arrived, which nobody can
-// evaluate, answer or find again. Everything about the reporter stays
-// optional, because a claim arriving anonymously is an ordinary claim.
-type Claimed struct {
-	// Title is an optional line naming the claim.
-	Title   string
-	Summary string
-	Told    Told
+// The reported problem is the one thing required: a report that says nothing
+// records only that a mail arrived, which nobody can evaluate, answer or find
+// again. Everything about the reporter stays optional, because a report
+// arriving anonymously is an ordinary report.
+type NewReport struct {
+	// Title is an optional line naming the reported problem.
+	Title           string
+	ReportedProblem string
+	Told            Told
 }
 
 // ErrNoSuchReport is the one answer for a report that is not here, one
 // nobody may see, and a product that is neither.
 var ErrNoSuchReport = refusal.New("no report here goes by that name")
 
-// ErrAlreadyJudged, ErrIssueReported and ErrNothingClaimed are the three ways
-// recording or judging a claim is refused.
+// ErrAlreadyJudged, ErrIssueReported and ErrNoReportedProblem are the three
+// ways recording or judging a report is refused.
 var (
 	ErrAlreadyJudged = refusal.New(
 		"that report has already been judged, or a ruling on it is waiting for a second person")
-	ErrIssueReported  = refusal.New("another report is already the record of that issue")
-	ErrNothingClaimed = refusal.New(
-		"say what was claimed — a report with nothing in it records only that a mail arrived")
+	ErrIssueReported     = refusal.New("another report is already the record of that issue")
+	ErrNoReportedProblem = refusal.New(
+		"say what the reported problem is — a report with nothing in it records only that a mail arrived")
 )
 
 // mayHandle reports whether this subject may work a product's reports:
@@ -66,8 +66,8 @@ func mayHandle(subject access.Subject, productID int64) error {
 // what arrived with them, and the rulings over them.
 //
 // The right to read work nobody has announced. Somebody who reads every
-// embargoed issue in a product already reads what a stranger's claim could
-// point at, so the claim is no more than they hold. Working one is a write and
+// embargoed issue in a product already reads what a stranger's report could
+// point at, so the report is no more than they hold. Working one is a write and
 // stays with mayHandle.
 func mayReadReports(subject access.Subject, productID int64) error {
 	if subject.Kind != access.Person {
@@ -126,14 +126,14 @@ func MayWorkReports(subject access.Subject, productID int64) error {
 	return mayHandle(subject, productID)
 }
 
-// Record writes down a claim that arrived.
+// Record writes down a report that arrived.
 //
-// It mints no issue. What arrived is a claim, and whether it is a flaw is a
+// It mints no issue. What arrived is a report, and whether it is a flaw is a
 // judgment somebody makes afterwards — so the record stands on its own, and a
-// claim nobody believes is answered and filed rather than either minting a
+// report nobody believes is answered and filed rather than either minting a
 // flaw nobody believes or going unrecorded.
 func (s *Store) Record(ctx context.Context, subject access.Subject,
-	productID int64, in Claimed) (*FlawReport, error) {
+	productID int64, in NewReport) (*FlawReport, error) {
 
 	if err := mayHandle(subject, productID); err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 	// as markdown where it is read back, and it quotes somebody outside this
 	// deployment, which is the case the policy exists for: raw HTML refused,
 	// link schemes limited, and a bound on how long a rendered field may be.
-	summary, err := claimed(in.Summary)
+	problem, err := reportedProblem(in.ReportedProblem)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 		// back into the model, and a retry would re-insert a model already
 		// carrying the rolled-back attempt's key.
 		row = &FlawReport{
-			Reference: reference, Title: title, ProductID: productID, Summary: summary,
+			Reference: reference, Title: title, ProductID: productID, ReportedProblem: problem,
 			ReportedBy: strings.TrimSpace(in.Told.ReportedBy),
 			Contact:    strings.TrimSpace(in.Told.Contact),
 			Credit:     strings.TrimSpace(in.Told.Credit),
@@ -180,7 +180,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 		if _, err = tx.NewInsert().Model(row).Exec(ctx); err != nil {
 			return err
 		}
-		// Placed by the first standing rule for reports whose team may hold
+		// Placed by the first assignment rule for reports whose team may hold
 		// it, in the same transaction, so a report never sits unheld between
 		// arriving and the next sweep.
 		return routeReport(ctx, tx, row, now)
@@ -228,7 +228,7 @@ func foldReference(typed string) string {
 // ReportsIn is one product's reports, newest first, with how many there are.
 //
 // Every report, judged or not. What somebody works through is the list of
-// claims, and one already turned into an issue is the evidence that the issue
+// reports, and one already turned into an issue is the evidence that the issue
 // came from outside.
 func (s *Store) ReportsIn(ctx context.Context, subject access.Subject,
 	productID int64, limit, offset int) ([]FlawReport, int, error) {
@@ -252,12 +252,12 @@ func (s *Store) ReportsIn(ctx context.Context, subject access.Subject,
 	return rows, int(total), nil
 }
 
-// JudgeAsIssue says what a claim turned out to be, and records who said so.
+// JudgeAsIssue says what a report turned out to be, and records who said so.
 //
 // The issue is one that already exists here: a report becomes evidence for an
 // issue rather than minting one, because minting is the act of recording a
 // flaw and that carries the builds it ships in, the severity and the embargo.
-// Two acts, so that agreeing a claim is real is not the same keystroke as
+// Two acts, so that agreeing a report is real is not the same keystroke as
 // declaring where it lives.
 func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 	productID int64, reference string, vulnerabilityID int64) (*FlawReport, error) {
@@ -350,7 +350,7 @@ var ErrNoSuchIssueHere = refusal.New("no issue here goes by that name")
 // Shaped like the identifier a recorded flaw gets, with a letter between the
 // product and the year so the two namespaces cannot be read for each other.
 // The number is drawn rather than counted, for the same reason: counted from
-// one it is a running total of how many claims this product has received and
+// one it is a running total of how many reports this product has received and
 // when the last one arrived, which is a disclosure made by the name alone.
 func mintReference(ctx context.Context, tx bun.IDB, draw drawing, product string,
 	year int) (string, error) {

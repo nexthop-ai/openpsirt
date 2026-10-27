@@ -26,16 +26,16 @@ type Changed = {
 // any of it urgent. Somebody looking at a build that jumped by four thousand
 // overnight is asking which of them matter.
 export function Run() {
-  const { product = "", stream = "", variant = "", run = "" } = useParams();
-  const at = { product, stream, variant, run: Number(run) };
-  const build = { product, stream, variant };
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "", run = "" } = useParams();
+  const at = { product, branch_or_tag: branchOrTag, variant, run: Number(run) };
+  const build = { product, branch_or_tag: branchOrTag, variant };
 
   const ran = useQuery({
     queryKey: ["run", at],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/runs/{run}",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/runs/{run}",
           {
             params: { path: at },
           },
@@ -44,7 +44,7 @@ export function Run() {
   });
 
   if (ran.isPending) return <Loading />;
-  if (ran.isError) return <Failed error={ran.error} what="That run could not be read." />;
+  if (ran.isError) return <Failed error={ran.error} what="That scan could not be read." />;
   const it = ran.data;
   if (!it) return null;
 
@@ -55,11 +55,11 @@ export function Run() {
           <Link to={uploadsAt(build)} className="linkish" style={{ fontWeight: 500 }}>
             Uploads
           </Link>{" "}
-          › <b>run {it.run_id}</b>
+          › <b>known vulnerability scan {it.run_id}</b>
         </span>
-        <h2>Scan results</h2>
+        <h2>Known vulnerability scan</h2>
         <p>
-          {product} · {stream} · {variant} ·{" "}
+          {product} · {branchOrTag} · {variant} ·{" "}
           {it.finished_at ? (
             <>
               finished {on(it.finished_at)}

@@ -30,7 +30,7 @@ type split struct {
 	db          *database.DB
 	rights      *access.Store
 	product     int64
-	target      int64
+	build       int64
 	issue       int64
 	component   int64
 	occurrences int
@@ -40,7 +40,7 @@ func aSplit(t *testing.T, w *fixture.World) *split {
 	t.Helper()
 	db := w.DB
 	ctx := t.Context()
-	target := aScannedTarget(t, w)
+	build := aScannedBuild(t, w)
 	product := w.Product
 	named, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 		{Identifier: "CVE-2026-4242", Severity: "high"},
@@ -56,7 +56,7 @@ func aSplit(t *testing.T, w *fixture.World) *split {
 		t.Fatal(err)
 	}
 	return &split{
-		db: db, rights: access.NewStore(db.DB), product: product.ID, target: target,
+		db: db, rights: access.NewStore(db.DB), product: product.ID, build: build,
 		issue: named["CVE-2026-4242"], component: component.ID,
 	}
 }
@@ -113,7 +113,7 @@ func (s *split) decision(t *testing.T, by int64, public, private int,
 	}
 }
 
-// queued writes one open finding at this visibility, routed to a team long
+// queued writes one open finding at this visibility, assigned to a team long
 // enough ago to count as sitting there.
 func (s *split) queued(t *testing.T, team *access.Team, visibility access.Visibility) {
 	t.Helper()
@@ -121,7 +121,7 @@ func (s *split) queued(t *testing.T, team *access.Team, visibility access.Visibi
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	routed := now.Add(-5 * 24 * time.Hour)
 	row := &finding.Finding{
-		TargetID: s.target, Kind: finding.Vulnerable, VulnerabilityID: s.issue,
+		BuildID: s.build, Kind: finding.Vulnerable, VulnerabilityID: s.issue,
 		Visibility: visibility, ComponentID: s.component,
 		OccurrenceIdentity: fmt.Sprintf("place-%d", s.occurrences),
 		OpenedAt:           now, AssignedTo: &team.PartyID, AssignedAt: &routed,
@@ -221,7 +221,7 @@ func TestADecisionWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	})
 }
 
-func TestADecisionAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
+func TestADecisionAboutACodeFindingIsToldToItsInternalAudienceAlone(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		s := aSplit(t, w)
@@ -273,7 +273,7 @@ func TestADecisionAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
 			t.Fatal(err)
 		}
 		if marked != 2 {
-			t.Errorf("%d of the lines about the lead are marked internal; want 2", marked)
+			t.Errorf("%d of the lines about the code finding are marked internal; want 2", marked)
 		}
 	})
 }
@@ -322,7 +322,7 @@ func TestACriticalOnAReleaseIsNotToldToWhoeverTriagesOnlyUndisclosedWork(t *test
 		db := w.DB
 		rights := access.NewStore(db.DB)
 		product := w.Product
-		released := w.TargetFor(w.Tag, w.Customer)
+		released := w.BuildFor(w.Tag, w.Customer)
 		privateTriager := recordPerson(t, rights, "private@example.com", false,
 			product.ID, access.PrivateTriage)
 		publicTriager := recordPerson(t, rights, "public@example.com", false,
@@ -442,7 +442,7 @@ func TestReportsSittingInATeamQueueAreToldToTheMembersWhoReadReports(t *testing.
 		for i, judged := range []bool{false, false, true} {
 			row := &finding.FlawReport{
 				Reference: fmt.Sprintf("SONIC-R-2026-00000%d", i), ProductID: s.product,
-				Summary: "A claim.", RecordedBy: admin, RecordedAt: now,
+				ReportedProblem: "A claim.", RecordedBy: admin, RecordedAt: now,
 				AssignedTo: &queue.PartyID, AssignedAt: &routed,
 			}
 			if judged {

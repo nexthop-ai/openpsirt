@@ -21,7 +21,7 @@ func (r *Reach) StateOf(t *testing.T, variant string) string {
 		} `json:"items"`
 	}
 	Read(t, r, "triager",
-		"/v1/products/mine/findings?stream=master&variant="+variant, &out)
+		"/v1/products/mine/findings?branch_or_tag=master&variant="+variant, &out)
 	if len(out.Items) != 1 {
 		t.Fatalf("%s lists %d rows, want the one the fixture seeds", variant, len(out.Items))
 	}
@@ -76,9 +76,9 @@ func (r *Reach) AlsoIn(t *testing.T, variant string) {
 // row however many products report it, so naming the identifier is what puts
 // two products on the same row — which is the state a query joining an
 // advisory to a release through the finding table has to tell apart.
-func (r *Reach) AlsoHolds(t *testing.T, product, stream, variant, identifier string) {
+func (r *Reach) AlsoHolds(t *testing.T, product, branchOrTag, variant, identifier string) {
 	t.Helper()
-	r.Ran(t, r.TargetOf(t, Build{product, stream, variant}), []finding.Reported{{
+	r.Ran(t, r.BuildOf(t, Build{product, branchOrTag, variant}), []finding.Reported{{
 		Issue:     finding.Named{Identifier: identifier, Severity: "high"},
 		Component: SeededLib,
 		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
@@ -191,7 +191,7 @@ func (r *Reach) ScannedOneIssueAtTwoVersions(t *testing.T) {
 // the seeded library at a version of its own, with the seeded issue against it.
 func (r *Reach) ScannedTag(t *testing.T, tag, version string) {
 	t.Helper()
-	if _, err := catalog.NewStore(r.DB.DB).DeclareStream(t.Context(),
+	if _, err := catalog.NewStore(r.DB.DB).DeclareBranchOrTag(t.Context(),
 		r.productID(t), tag, catalog.Tag, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -210,9 +210,9 @@ func (r *Reach) ScannedTag(t *testing.T, tag, version string) {
 // AlsoScannedInto puts the same component and issue behind a second product,
 // so that an occurrence identity — which carries no product, deliberately — is the
 // same key in both.
-func (r *Reach) AlsoScannedInto(t *testing.T, product, stream, variant string) {
+func (r *Reach) AlsoScannedInto(t *testing.T, product, branchOrTag, variant string) {
 	t.Helper()
-	r.ScanAt(t, Build{product, stream, variant}, "elsewhere-"+product, graph.Snapshot{
+	r.ScanAt(t, Build{product, branchOrTag, variant}, "elsewhere-"+product, graph.Snapshot{
 		Root:         SeededRoot,
 		Components:   []graph.Described{SeededLib},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: SeededLib}},
@@ -240,7 +240,7 @@ var AheadOfUs = time.Now().UTC().AddDate(0, 0, 2).UTC().Format(time.DateOnly)
 // ScannedSiblings puts two packages built from one source into a build, each
 // carrying the same two issues, plus one issue nothing has released a fix for.
 //
-// The shape the fix bundle is about: curl, libcurl4t64 and libcurl3t64 are one
+// The shape the planned upgrade is about: curl, libcurl4t64 and libcurl3t64 are one
 // source package bumping once, and keying on the component would make that
 // three rows that all say the same thing.
 func (r *Reach) ScannedSiblings(t *testing.T) {
@@ -316,7 +316,7 @@ func (r *Reach) siblingsIn(t *testing.T, variant string, also ...graph.Described
 			},
 		)
 	}
-	// And one nothing has released a fix for, which is in no bundle.
+	// And one nothing has released a fix for, which is in no upgrade.
 	reported = append(reported, finding.Reported{
 		Issue:     finding.Named{Identifier: "CVE-2026-CURL3", Severity: "high"},
 		Component: four, FixState: finding.NoFix,

@@ -17,7 +17,7 @@ func madeOn(t *testing.T, r *httpapitest.Reach, decision int64) []string {
 	t.Helper()
 	var variants []string
 	if err := r.DB.DB.NewRaw(`SELECT "va"."name" FROM "decision_build" AS "cb"
-		JOIN "target" AS "t" ON "t"."id" = "cb"."target_id"
+		JOIN "build" AS "t" ON "t"."id" = "cb"."build_id"
 		JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"
 		WHERE "cb"."decision_id" = ?`, decision).Scan(t.Context(), &variants); err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ func TestADecisionRecordsTheBuildOnScreenAndTheBuildsChosenBesideIt(t *testing.T
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
-				`"also":[{"stream":"master","variant":"mellanox","version":"3.8.0"}]}`)
+				`"also":[{"branch_or_tag":"master","variant":"mellanox","version":"3.8.0"}]}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("deciding across two builds answered %d: %s", got.Code, got.Body.String())
 		}

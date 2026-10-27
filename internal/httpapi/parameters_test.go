@@ -20,12 +20,12 @@ func TestAQueryParameterNoOperationTakesIsRefusedByName(t *testing.T) {
 		r.Scanned(t)
 
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/findings?stream=master", ""); got.Code != http.StatusOK {
+			"/v1/products/mine/findings?branch_or_tag=master", ""); got.Code != http.StatusOK {
 			t.Fatalf("a declared parameter answered %d: %s", got.Code, got.Body.String())
 		}
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/findings?stream=master&stat=open", "")
+			"/v1/products/mine/findings?branch_or_tag=master&stat=open", "")
 		if got.Code != http.StatusBadRequest {
 			t.Fatalf("an undeclared parameter answered %d, want 400: %s",
 				got.Code, got.Body.String())
@@ -37,7 +37,7 @@ func TestAQueryParameterNoOperationTakesIsRefusedByName(t *testing.T) {
 		// A pair that cannot be read is refused rather than dropped. Dropped,
 		// the filter it carried is read as absent and the unfiltered list
 		// answers.
-		for _, query := range []string{"stream=master%", "stream=master;stat=open"} {
+		for _, query := range []string{"branch_or_tag=master%", "branch_or_tag=master;stat=open"} {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
 				"/v1/products/mine/findings?"+query, "")
 			if got.Code != http.StatusBadRequest {

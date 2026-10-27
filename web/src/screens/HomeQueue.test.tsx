@@ -44,7 +44,7 @@ describe("the review queue's count on Home", () => {
   });
 
   it("is asked once for the rail, the figures and the panel with a product picked", async () => {
-    remember({ product: "sonic", stream: "master", variant: "broadcom" });
+    remember({ product: "sonic", branch_or_tag: "master", variant: "broadcom" });
     expect(await wholeQueueCounts()).toBe(1);
   });
 });

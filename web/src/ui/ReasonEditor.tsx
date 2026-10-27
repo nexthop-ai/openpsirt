@@ -68,10 +68,10 @@ export function ReasonEditor({
   // The disclosure of the thing being argued about, which decides who
   // may be offered after an @. This is the same text the decision form writes.
   undisclosed?: boolean;
-  // Whether it is internal material: a lead's, until its flaw is disclosed.
+  // Whether it is internal material: a code finding's, until its flaw is disclosed.
   internal?: boolean;
   // Whether the reader may revise and withdraw it, which a reader of a moved
-  // lead's decision through its flaw may not.
+  // code finding's decision through its flaw may not.
   writes?: boolean;
 }) {
   const [editing, setEditing] = useState(false);

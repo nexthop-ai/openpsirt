@@ -13,11 +13,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
-// Set-aside work is listed with how much of each kind is still waiting, put
-// back once, and refused when it is not set aside.
-func TestSetAsideWorkIsListedAndPutBackOnce(t *testing.T) {
+// A failed job is listed with how much of each kind is still waiting, put
+// back once, and refused when it has not failed.
+func TestAFailedJobIsListedAndPutBackOnce(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		id := r.SetAside(t, queue.Scan, "target:1")
+		id := r.FailJob(t, queue.Scan, "build:1")
 		if _, err := queue.New(r.DB, queue.DefaultOptions()).Add(t.Context(), queue.Parse, "scan:1"); err != nil {
 			t.Fatal(err)
 		}
@@ -37,8 +37,8 @@ func TestSetAsideWorkIsListedAndPutBackOnce(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "admin", "/v1/failed-jobs", &listed)
 		if listed.Total != 1 || len(listed.Items) != 1 || listed.Items[0].ID != id ||
-			listed.Items[0].Kind != queue.Scan || listed.Items[0].Reference != "target:1" {
-			t.Errorf("the set-aside list reads as %+v", listed)
+			listed.Items[0].Kind != queue.Scan || listed.Items[0].Reference != "build:1" {
+			t.Errorf("the failed jobs list reads as %+v", listed)
 		}
 		if len(listed.Waiting) != len(queue.Kinds()) {
 			t.Errorf("waiting names %d kinds, want one per kind: %+v", len(listed.Waiting), listed.Waiting)
@@ -60,9 +60,9 @@ func TestSetAsideWorkIsListedAndPutBackOnce(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "admin", "/v1/failed-jobs", &listed)
 		if listed.Total != 0 {
-			t.Errorf("a job put back is still listed as set aside: %+v", listed.Items)
+			t.Errorf("a job put back is still listed as failed: %+v", listed.Items)
 		}
-		// Put back already, and never there: neither is set aside.
+		// Put back already, and never there: neither has failed.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPost, retry, ""), http.StatusNotFound)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPost,
 			"/v1/failed-jobs/999999/retry", ""), http.StatusNotFound)

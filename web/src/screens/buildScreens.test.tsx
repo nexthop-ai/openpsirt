@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DecisionOccurrence } from "./DecisionOccurrence";
 import { InventoryChanges } from "./InventoryChanges";
 import { Run } from "./Run";
-import { Upgrades } from "./Upgrades";
+import { PlannedUpgrades } from "./PlannedUpgrades";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import { press, type Init } from "../test/controls";
 
@@ -14,8 +14,8 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 const text = () => mount.host().textContent ?? "";
-const BUILD = "/products/sonic/streams/master/variants/arm";
-const BUILT = "/products/:product/streams/:stream/variants/:variant";
+const BUILD = "/products/sonic/branches-and-tags/master/variants/arm";
+const BUILT = "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant";
 
 describe("an occurrence row's address", () => {
   it("forwards to the decision the row belongs to", async () => {
@@ -93,7 +93,7 @@ describe("the upgrades a build is waiting on", () => {
         ],
       },
     }));
-    mount.render(screen(<Upgrades />, `${BUILD}/upgrades`, `${BUILT}/upgrades`));
+    mount.render(screen(<PlannedUpgrades />, `${BUILD}/upgrades`, `${BUILT}/upgrades`));
     await settle();
     const first = Array.from(mount.host().querySelectorAll("tbody tr")).map(
       (tr) => tr.querySelector("td")?.textContent,
@@ -119,7 +119,7 @@ describe("what one upload changed", () => {
         : undefined,
     );
     mount.render(
-      screen(<InventoryChanges />, `${BUILD}/scans/3/changes`, `${BUILT}/scans/:scan/changes`),
+      screen(<InventoryChanges />, `${BUILD}/scans/3/changes`, `${BUILT}/scans/:sbom/changes`),
     );
     await settle();
     await press(mount.host(), "Next");

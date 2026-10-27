@@ -348,7 +348,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	// And only a decision the list of what is yours to re-affirm holds, the rule
 	// the single form asks. A decision with a withdrawn row is one somebody took
 	// back, and re-making it carries an agreement onto what was withdrawn. A
-	// decision at leads past their end of life alone is refused below, in the
+	// decision at code findings past their end of life alone is refused below, in the
 	// words a decision there is refused in.
 	reaffirmable, err := s.lapsedOfYours(subject).Where(`"de"."decision_id" = ?`, previousDecisionID).Exists(ctx)
 	if err != nil {
@@ -390,7 +390,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 
 	proposals := make([]Proposal, 0, len(lapsed))
 	occurrences := map[string]bool{}
-	// A lead past its end of life is kept as it stands, so the decision is
+	// A code finding past its end of life is kept as it stands, so the decision is
 	// re-made at the rest of its occurrences and refused where none is left.
 	ended := map[string]bool{}
 	asked := map[string]bool{}
@@ -410,17 +410,17 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 			}
 			done[written] = true
 			if at.Kind == kind.Analysis {
-				lead := fmt.Sprintf("%d\x00%s", at.ProductID, at.OccurrenceIdentity)
-				if !asked[lead] {
-					asked[lead] = true
-					switch err := finding.LeadEnded(ctx, s.db, at.ProductID, at.OccurrenceIdentity, s.now()); {
-					case errors.Is(err, finding.ErrLeadPastEndOfLife):
-						ended[lead] = true
+				codeFinding := fmt.Sprintf("%d\x00%s", at.ProductID, at.OccurrenceIdentity)
+				if !asked[codeFinding] {
+					asked[codeFinding] = true
+					switch err := finding.CodeFindingEnded(ctx, s.db, at.ProductID, at.OccurrenceIdentity, s.now()); {
+					case errors.Is(err, finding.ErrCodeFindingPastEndOfLife):
+						ended[codeFinding] = true
 					case err != nil:
 						return reaffirmPlan{}, err
 					}
 				}
-				if ended[lead] {
+				if ended[codeFinding] {
 					pastEnd = true
 					continue
 				}
@@ -434,7 +434,7 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 		}
 	}
 	if len(proposals) == 0 && pastEnd {
-		return reaffirmPlan{}, finding.ErrLeadPastEndOfLife
+		return reaffirmPlan{}, finding.ErrCodeFindingPastEndOfLife
 	}
 	if len(proposals) == 0 {
 		return reaffirmPlan{}, fmt.Errorf(
@@ -489,7 +489,7 @@ func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirme
 // a second live decision where the later one already stands, or bring back a
 // decision somebody since took back.
 //
-// A decision made before the row stopped standing replaces nothing. Two streams
+// A decision made before the row stopped standing replaces nothing. Two builds
 // at two versions hold sibling decisions at one occurrence, keyed apart by the
 // versions, and one lapsing leaves the other its own. Rows of one decision are
 // one decision and do not replace each other.
@@ -567,8 +567,8 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 		}
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).

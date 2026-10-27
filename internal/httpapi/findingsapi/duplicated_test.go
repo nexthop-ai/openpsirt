@@ -18,21 +18,21 @@ func TestADuplicateRulingSaysTheDateItStartsAndRecordsIt(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		minted := r.Embargoed(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
-			`{"summary":"The management socket lets anybody in.","received":"2026-01-10"}`)
+			`{"reported_problem":"The management socket lets anybody in.","received":"2026-01-10"}`)
 		if got.Code != http.StatusCreated {
-			t.Fatalf("recording a claim answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("recording a report answered %d: %s", got.Code, got.Body.String())
 		}
-		var claimed struct {
+		var reported struct {
 			Reference string `json:"reference"`
 		}
-		if err := json.Unmarshal(got.Body.Bytes(), &claimed); err != nil {
+		if err := json.Unmarshal(got.Body.Bytes(), &reported); err != nil {
 			t.Fatal(err)
 		}
 		want := time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC).Add(90 * 24 * time.Hour).
 			Format(time.RFC3339)
 
 		preview := "/v1/products/mine/issues/" + minted + "/duplicate-disclosure?report=" +
-			claimed.Reference
+			reported.Reference
 		var starts struct {
 			DiscloseAt    string `json:"disclose_at"`
 			NeedsApproval bool   `json:"needs_approval"`
@@ -50,7 +50,7 @@ func TestADuplicateRulingSaysTheDateItStartsAndRecordsIt(t *testing.T) {
 
 		got = httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/report-rulings",
 			fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":%q}`,
-				claimed.Reference, minted))
+				reported.Reference, minted))
 		if got.Code != http.StatusCreated {
 			t.Fatalf("a duplicate answered %d: %s", got.Code, got.Body.String())
 		}
@@ -74,9 +74,9 @@ func TestADuplicateRulingSaysTheDateItStartsAndRecordsIt(t *testing.T) {
 		}
 		row := moved.Items[0]
 		if row.Act != "duplicate" || row.Until != want || row.Was == "" ||
-			row.Ruling != ruling.ID || row.Report != claimed.Reference {
+			row.Ruling != ruling.ID || row.Report != reported.Reference {
 			t.Errorf("the movement reads %+v, want a duplicate to %s by ruling %d from %s",
-				row, want, ruling.ID, claimed.Reference)
+				row, want, ruling.ID, reported.Reference)
 		}
 	})
 }

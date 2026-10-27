@@ -65,16 +65,16 @@ func seed(t *testing.T, db *database.DB, of []component,
 
 	t.Helper()
 	ctx := t.Context()
-	var targets []int64
-	if err := db.DB.NewSelect().TableExpr(`"target"`).Column("id").
-		OrderExpr(`"id" ASC`).Limit(1).Scan(ctx, &targets); err != nil {
+	var buildIDs []int64
+	if err := db.DB.NewSelect().TableExpr(`"build"`).Column("id").
+		OrderExpr(`"id" ASC`).Limit(1).Scan(ctx, &buildIDs); err != nil {
 		t.Fatalf("read a build to carry the components: %v", err)
 	}
-	if len(targets) == 0 {
-		targets = append(targets, fixture.New(t, db).Target.ID)
+	if len(buildIDs) == 0 {
+		buildIDs = append(buildIDs, fixture.New(t, db).Build.ID)
 	}
 	scan := &ingest.Scan{
-		TargetID: targets[0], ContentHash: fmt.Sprintf("seed-%d", time.Now().UnixNano()),
+		BuildID: buildIDs[0], ContentHash: fmt.Sprintf("seed-%d", time.Now().UnixNano()),
 		BuiltAt: time.Now().UTC(), ReceivedAt: time.Now().UTC(),
 		ParserVersion: "test", Status: ingest.Accepted,
 	}
@@ -94,7 +94,7 @@ func seed(t *testing.T, db *database.DB, of []component,
 		if _, insert := db.DB.NewInsert().Model(row).Exec(ctx); insert != nil {
 			t.Fatalf("seed component %d: %v", i, insert)
 		}
-		node := &graph.Node{TargetID: targets[0], ComponentID: row.ID, OpenedScanID: scan.ID}
+		node := &graph.Node{BuildID: buildIDs[0], ComponentID: row.ID, OpenedScanID: scan.ID}
 		if each.dropped {
 			node.ClosedScanID = &scan.ID
 		}
@@ -965,7 +965,7 @@ func carried(t *testing.T, w *fixture.World, root string, purls ...string) {
 	t.Helper()
 	ctx := t.Context()
 	scan := &ingest.Scan{
-		TargetID: w.Target.ID, ContentHash: fmt.Sprintf("hash-%d", time.Now().UnixNano()),
+		BuildID: w.Build.ID, ContentHash: fmt.Sprintf("hash-%d", time.Now().UnixNano()),
 		BuiltAt: time.Now().UTC(), ReceivedAt: time.Now().UTC(),
 		ParserVersion: "test", Status: ingest.Accepted, RootIdentifier: root,
 	}
@@ -980,7 +980,7 @@ func carried(t *testing.T, w *fixture.World, root string, purls ...string) {
 			t.Fatalf("find %s: %v", purl, err)
 		}
 		node := &graph.Node{
-			TargetID: w.Target.ID, ComponentID: id, OpenedScanID: scan.ID,
+			BuildID: w.Build.ID, ComponentID: id, OpenedScanID: scan.ID,
 		}
 		if _, err := w.DB.DB.NewInsert().Model(node).Exec(ctx); err != nil {
 			t.Fatalf("put %s in the build: %v", purl, err)

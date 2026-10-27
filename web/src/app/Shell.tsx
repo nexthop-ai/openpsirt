@@ -11,13 +11,13 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { TO_THE_TOP, useTopOnArrival } from "./arrival";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import {
-  inboxAt,
+  vulnerabilityReportsAt,
   uploadsAt,
-  leadsAt,
+  codeFindingsAt,
   issueAt,
-  streamsAt,
+  branchesAndTagsAt,
   dependenciesAt,
-  upgradesAt,
+  plannedUpgradesAt,
   variantsAt,
 } from "./routes";
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
@@ -50,7 +50,7 @@ import { useClickAway } from "../ui/away";
 // total counted without them is a number that disagrees with the list it
 // opens. Built from the entry's own address for that reason.
 const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"));
-// The Findings entry's badge, for the same reason: the list it opens writes the
+// The Dependency findings entry's badge, for the same reason: the list it opens writes the
 // same narrowings, so the count is asked with them.
 const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 
@@ -64,16 +64,16 @@ const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 // bound to one build while the queue is not: the findings list is scoped to a
 // product, and home summarizes across them.
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
-  const { product, stream, variant } = useScope();
-  const whole = !!(product && stream && variant);
+  const { product, branch_or_tag: branchOrTag, variant } = useScope();
+  const whole = !!(product && branchOrTag && variant);
   // Reading reports takes reading undisclosed work, which is what reads_private says.
   const reportsAnywhere = (who.reach ?? []).some((each) => each.reads_private);
   const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
-  // A lead is internal, so the leads entry follows reading internal material.
-  const leadsAnywhere = (who.reach ?? []).some((each) => each.reads_internal);
-  const leadsHere = !!product && !!mayOf(who, product)?.reads_internal;
-  const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
-  const build = whole ? { product, stream, variant } : undefined;
+  // A code finding is internal, so the Security testing entry follows reading internal material.
+  const codeFindingsAnywhere = (who.reach ?? []).some((each) => each.reads_internal);
+  const codeFindingsHere = !!product && !!mayOf(who, product)?.reads_internal;
+  const scope = [product ?? "all products", branchOrTag, variant].filter(Boolean).join(" · ");
+  const build = whole ? { product, branch_or_tag: branchOrTag, variant } : undefined;
   const [uploading, setUploading] = useState(false);
   // On a narrow screen the rail is a panel that opens from a menu control. The
   // tab bar carries the three places somebody reviews and responds from , and
@@ -124,7 +124,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // goes quiet the moment somebody widens the scope is one that looks broken
   // rather than one that declines.
   const open = useQuery({
-    queryKey: ["findings", "count", product, stream, variant],
+    queryKey: ["findings", "count", product, branchOrTag, variant],
     enabled: !!product,
     queryFn: async () =>
       unwrap(
@@ -134,7 +134,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             query: {
               ...OPEN_QUERY,
               limit: 1,
-              ...(stream ? { stream } : {}),
+              ...(branchOrTag ? { branch_or_tag: branchOrTag } : {}),
               ...(variant ? { variant } : {}),
             },
           },
@@ -158,7 +158,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         </button>
         <Scope />
         <span className="spacer" />
-        <Search at={{ product, stream, variant }} />
+        <Search at={{ product, branch_or_tag: branchOrTag, variant }} />
         <button
           type="button"
           className="topact"
@@ -222,14 +222,15 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               quiet
             />
             <Rail to="/assignments" icon="people" label="Assignments" />
-            {/* The record of what was decided. Across products because that is how
-              it is asked for — an auditor asks about a period, not a build. */}
-            <Rail to="/record" icon="ledger" label="The record" />
+            {/* The audit log of what was decided. Across products because that
+              is how it is asked for — an auditor asks about a period, not a
+              build. */}
+            <Rail to="/audit-log" icon="ledger" label="Audit log" />
             {/* The catalog of named reports, and the one place a report is
               built by hand. Here rather than under a build because a report
               spans whatever the picker has selected, up to every product a
               reader can see. */}
-            <Rail to="/reports" icon="chart" label="Reports" />
+            <Rail to="/analytics" icon="chart" label="Analytics" />
           </>
         )}
         <Group name="scope" label={scope} shut={shut} onToggle={toggleGroup} />
@@ -241,9 +242,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               selected, and for every product a reader can see when nothing
               is. */}
             <Rail
-              to={findingsPath({ product, stream, variant })}
+              to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}
               icon="bug"
-              label="Findings"
+              label="Dependency findings"
+              hint="SCA"
               count={open.data?.total}
               unread={open.isError}
               unit="findings — an issue at a component, counted once per build"
@@ -256,22 +258,22 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               needs={whole}
             />
             <Rail to={build ? uploadsAt(build) : ""} icon="scan" label="Uploads" needs={whole} />
-            {/* What this build is waiting on, which is the fix-bundle view read
-              from the other end. */}
+            {/* What this build is waiting on, which is the product's planned
+              upgrades read from the other end. */}
             <Rail
-              to={build ? upgradesAt(build) : ""}
+              to={build ? plannedUpgradesAt(build) : ""}
               icon="flag"
-              label="Pending upgrades"
+              label="Planned upgrades"
               needs={whole}
             />
             {/* What people outside have sent a product. Only for somebody who may
               read vulnerability reports somewhere, and it needs a product
-              picked because an inbox belongs to one. */}
+              picked because a product's reports belong to it. */}
             {reportsAnywhere && (
               <Rail
-                to={product ? inboxAt(product) : ""}
+                to={product ? vulnerabilityReportsAt(product) : ""}
                 icon="letter"
-                label="Inbox"
+                label="Vulnerability reports"
                 needs={!!product && reportsHere}
                 why={
                   product
@@ -280,15 +282,23 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 }
               />
             )}
-            {/* A product's static analysis leads, under the same rule as the
-              inbox: shown to somebody who reads internal material anywhere, and
-              opening on the branch and variant picked where both are. */}
-            {leadsAnywhere && (
+            {/* A product's code findings from security testing, under the same
+              rule as the vulnerability reports: shown to somebody who reads
+              internal material anywhere, and opening on the branch and
+              variant picked where both are. */}
+            {codeFindingsAnywhere && (
               <Rail
-                to={product ? leadsAt(product, whole ? { stream, variant } : undefined) : ""}
+                to={
+                  product
+                    ? codeFindingsAt(
+                        product,
+                        whole ? { branch_or_tag: branchOrTag, variant } : undefined,
+                      )
+                    : ""
+                }
                 icon="triage"
-                label="Leads"
-                needs={leadsHere}
+                label="Security testing"
+                needs={codeFindingsHere}
                 why={
                   product ? "You can't read internal material in this product" : "Pick a product"
                 }
@@ -298,20 +308,20 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               being recorded is precisely what is *not* in that list, and it asks
               more than a control beside a table has room for. It needs no
               product picked, because the screen asks for one. */}
-            <Rail to="/report-a-flaw" icon="record" label="Report a flaw" />
+            <Rail to="/record-a-flaw" icon="record" label="Record a flaw" />
             {/* What is running out of embargo. The list is itself a disclosure,
               so a product somebody may not read undisclosed work in contributes
               nothing to it — the server narrows it. */}
-            <Rail to="/disclosing" icon="bell" label="Disclosing" />
-            {/* Exploited here: the standing attacks and the windows counted
-              from each. Beside Disclosing because both are dates with
+            <Rail to="/disclosure-deadlines" icon="bell" label="Disclosure deadlines" />
+            {/* Incidents: the standing attacks and the response windows
+              counted from each. Beside Disclosure deadlines because both are dates with
               somebody outside waiting on them, which no remediation deadline
               has. */}
-            <Rail to="/exploited-here" icon="shield" label="Exploited here" />
+            <Rail to="/incidents" icon="shield" label="Incidents" />
             {/* What this deployment has said about its own flaws. Beside
-              Disclosing because an embargo reaching its date is one of the
-              three things an advisory gets written for. */}
-            <Rail to="/advisories" icon="advisory" label="Advisories" />
+              Disclosure deadlines because an embargo reaching its date is one
+              of the three things an advisory gets written for. */}
+            <Rail to="/advisories" icon="advisory" label="Published advisories" />
           </>
         )}
         <Group name="manage" label="Manage" shut={shut} onToggle={toggleGroup} />
@@ -325,7 +335,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               above, which is what that control is for. */}
             <Rail to="/products" end icon="box" label="Products" />
             <Rail
-              to={streamsAt(product ?? "")}
+              to={branchesAndTagsAt(product ?? "")}
               end
               icon="branch"
               label="Branches and tags"
@@ -347,7 +357,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* Who holds what, which the audit permission is largely for.
               The screen already degrades for a reader who cannot grant. */}
             {(who.admin || who.audits) && <Rail to="/access" icon="roles" label="Access" />}
-            {/* Assignment without a person doing it, by standing rule.
+            {/* Assignment without a person doing it, by an assignment rule.
               Under Manage because it is something set up once rather than worked
               at, and called what it does: the act it automates is assignment. */}
             <Rail to="/auto-assignment" icon="route" label="Auto-assignment" />
@@ -392,7 +402,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         <NavLink to="/" end>
           Home
         </NavLink>
-        <NavLink to={findingsPath({ product, stream, variant })}>Findings</NavLink>
+        <NavLink to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}>
+          Findings
+        </NavLink>
         <NavLink to="/review-queue">Queue</NavLink>
         <button type="button" aria-expanded={menu} onClick={() => setMenu(!menu)}>
           Menu
@@ -425,6 +437,7 @@ function Rail({
   mark,
   icon,
   label,
+  hint,
   count,
   unread,
   unit,
@@ -441,6 +454,8 @@ function Rail({
   mark?: string;
   icon: string;
   label: string;
+  // What the entry is, on hover, where the label alone leaves it unclear.
+  hint?: string;
   count?: number;
   // An unreadable count. A badge is gated on being above zero,
   // so a failed or refused count draws exactly like "nothing waiting" — which
@@ -505,13 +520,19 @@ function Rail({
       pathname === to.split("?")[0] &&
       [...new URLSearchParams(mark)].every(([key, value]) => asked.getAll(key).includes(value));
     return (
-      <Link to={to} state={TO_THE_TOP} className="nav" aria-current={here ? "page" : undefined}>
+      <Link
+        to={to}
+        state={TO_THE_TOP}
+        className="nav"
+        title={hint}
+        aria-current={here ? "page" : undefined}
+      >
         {body}
       </Link>
     );
   }
   return (
-    <NavLink to={to} state={TO_THE_TOP} end={end} className="nav">
+    <NavLink to={to} state={TO_THE_TOP} end={end} className="nav" title={hint}>
       {body}
     </NavLink>
   );

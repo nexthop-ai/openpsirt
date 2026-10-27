@@ -25,13 +25,13 @@ func TestAnybodyIsHandedOnlyWhatIsPublished(t *testing.T) {
 		ctx := t.Context()
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl})
-		w.decide(w.Target, "CVE-2026-1001", openssl,
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 
 		// A flaw of ours in the published product, recorded and undisclosed.
 		_, flaw, err := w.findings.Enter(ctx, w.proposer, finding.Entering{
-			TargetIDs: []int64{w.Target.ID}, Component: swss.Name,
+			BuildIDs: []int64{w.Build.ID}, Component: swss.Name,
 			Summary: "The management socket answers anybody.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -42,12 +42,12 @@ func TestAnybodyIsHandedOnlyWhatIsPublished(t *testing.T) {
 		// A second product beside it, which does not publish.
 		other := w.DeclareProduct("hidden-os", "Hidden OS")
 		w.hold(other)
-		otherBranch := w.DeclareStream(other, "main", "branch", nil)
+		otherBranch := w.DeclareBranchOrTag(other, "main", "branch", nil)
 		otherVariant := w.DeclareVariant(other, "x86", true)
-		otherTarget := w.TargetFor(otherBranch, otherVariant)
+		otherBuild := w.BuildFor(otherBranch, otherVariant)
 		otherRoot := graph.Described{Purl: "pkg:generic/hidden-os@1.0", Name: "hidden-os", Version: "1.0"}
-		w.ship(otherTarget, otherRoot, edge{otherRoot, zlib})
-		w.report(otherTarget, reported{"CVE-2026-2001", zlib})
+		w.ship(otherBuild, otherRoot, edge{otherRoot, zlib})
+		w.report(otherBuild, reported{"CVE-2026-2001", zlib})
 
 		w.publishes(w.Product, true)
 		w.write()
@@ -90,7 +90,7 @@ func TestAnUndisclosedFlawsNameIsNotPublishedAsAnotherIssuesAlias(t *testing.T) 
 		w := newWorld(t, f)
 		w.shipped()
 		_, flaw, err := w.findings.Enter(ctx, w.proposer, finding.Entering{
-			TargetIDs: []int64{w.Target.ID}, Component: swss.Name,
+			BuildIDs: []int64{w.Build.ID}, Component: swss.Name,
 			Summary: "The management socket answers anybody.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -98,17 +98,17 @@ func TestAnUndisclosedFlawsNameIsNotPublishedAsAnotherIssuesAlias(t *testing.T) 
 			t.Fatal(err)
 		}
 		// A report learns the flaw's name for a CVE it finds in openssl.
-		run, err := w.findings.Begin(ctx, finding.Run{TargetID: w.Target.ID, Scanner: "grype", RanHere: true})
+		run, err := w.findings.Begin(ctx, finding.Run{BuildID: w.Build.ID, Scanner: "grype", RanHere: true})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := w.findings.Apply(ctx, w.Target.ID, run.ID, []finding.Reported{{
+		if _, err := w.findings.Apply(ctx, w.Build.ID, run.ID, []finding.Reported{{
 			Issue:     finding.Named{Identifier: "CVE-2026-3001", Aliases: []string{flaw}, Severity: "high"},
 			Component: openssl,
 		}}); err != nil {
 			t.Fatal(err)
 		}
-		w.decide(w.Target, "CVE-2026-3001", openssl,
+		w.decide(w.Build, "CVE-2026-3001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()
@@ -132,8 +132,8 @@ func TestThePublishedDocumentsAreReadOnlyAsAnybody(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
 		w.shipped()
-		w.report(w.Target, reported{"CVE-2026-1001", openssl})
-		w.decide(w.Target, "CVE-2026-1001", openssl,
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()

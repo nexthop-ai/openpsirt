@@ -80,8 +80,8 @@ func (a audienceWorld) report(t *testing.T, held *int64) *finding.FlawReport {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	report := &finding.FlawReport{
 		Reference: "SONIC-R-2026-515151", ProductID: a.w.Product.ID,
-		Summary:    "The management socket accepts a request nobody authenticated.",
-		ReportedBy: "A Researcher", RecordedBy: a.worker.ID, RecordedAt: now,
+		ReportedProblem: "The management socket accepts a request nobody authenticated.",
+		ReportedBy:      "A Researcher", RecordedBy: a.worker.ID, RecordedAt: now,
 		AssignedTo: held,
 	}
 	if held != nil {

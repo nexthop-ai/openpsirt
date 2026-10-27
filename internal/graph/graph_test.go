@@ -25,8 +25,8 @@ type fixture struct {
 	scans *ingest.Store
 	// db is the same database the store reads, for the tests that need a
 	// second store over it.
-	db       *database.DB
-	targetID int64
+	db      *database.DB
+	buildID int64
 	// world is what the build was declared in, for the tests that need a
 	// second build of the same product.
 	world *fixtures.World
@@ -41,16 +41,16 @@ type fixture struct {
 // identifier.
 func (f *fixture) scan(t *testing.T) int64 {
 	t.Helper()
-	return f.scanOf(t, f.targetID)
+	return f.scanOf(t, f.buildID)
 }
 
 // scanOf records a new scan of any build, each newer than the last.
-func (f *fixture) scanOf(t *testing.T, targetID int64) int64 {
+func (f *fixture) scanOf(t *testing.T, buildID int64) int64 {
 	t.Helper()
 	f.seq++
 	f.built = f.built.Add(time.Hour)
 	rec, outcome, err := f.scans.Record(t.Context(), ingest.Arriving{
-		TargetID: targetID, ContentHash: fmt.Sprintf("hash-%d", f.seq),
+		BuildID: buildID, ContentHash: fmt.Sprintf("hash-%d", f.seq),
 		BuiltAt: f.built, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -64,9 +64,9 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		fn(t, &fixture{
 			store: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB), db: w.DB,
-			targetID: w.Target.ID, world: w,
+			buildID: w.Build.ID, world: w,
 			scope: finding.Scope{
-				ProductID: &w.Product.ID, StreamID: &w.Branch.ID, VariantID: &w.Customer.ID,
+				ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID,
 			},
 			built: time.Now().UTC().Add(-48 * time.Hour),
 		})
@@ -116,7 +116,7 @@ func tree() graph.Snapshot {
 
 func TestFirstSnapshotIsStored(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree())
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), tree())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,7 +127,7 @@ func TestFirstSnapshotIsStored(t *testing.T) {
 			t.Errorf("closed something on a first snapshot: %+v", applied)
 		}
 
-		nodes, err := f.store.CurrentNodes(t.Context(), f.targetID)
+		nodes, err := f.store.CurrentNodes(t.Context(), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -153,10 +153,10 @@ func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 	// it along. On a real image that is thousands of rows for a build in which
 	// nothing happened.
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t),
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t),
 			rebuilt(tree(), "2.4.0-20260829.010101"))
 		if err != nil {
 			t.Fatal(err)
@@ -173,12 +173,12 @@ func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 // tracked for a year costs the same whether or not anything happened to it.
 func TestAnUnchangedRebuildWritesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		before := rowCounts(t, f)
 
-		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree())
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), tree())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestAnUnchangedRebuildWritesNothing(t *testing.T) {
 
 func TestOnlyTheChangeIsWritten(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -202,7 +202,7 @@ func TestOnlyTheChangeIsWritten(t *testing.T) {
 		next.Components = append(next.Components, zlib)
 		next.Dependencies = append(next.Dependencies, graph.Dependency{Parent: curl, Child: zlib})
 
-		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), next)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), next)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -219,7 +219,7 @@ func TestOnlyTheChangeIsWritten(t *testing.T) {
 func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		first := f.scan(t)
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, first, tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, first, tree()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -234,7 +234,7 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 			},
 		}
 		second := f.scan(t)
-		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, second, next)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, second, next)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -243,7 +243,7 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 			t.Errorf("applied %+v, want %+v", applied, want)
 		}
 
-		nodes, err := f.store.CurrentNodes(t.Context(), f.targetID)
+		nodes, err := f.store.CurrentNodes(t.Context(), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +253,7 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 		// The closed row is still there, stamped with the scan that ended it.
 		var closed []graph.Node
 		if err := f.db.DB.NewSelect().Model(&closed).
-			Where(`"target_id" = ?`, f.targetID).
+			Where(`"build_id" = ?`, f.buildID).
 			Where(`"closed_scan_id" IS NOT NULL`).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -267,11 +267,11 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 // component table sized by the portfolio rather than by scans times variants.
 func TestAComponentIsSharedAcrossVariants(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		before := rowCounts(t, f)["component"]
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		if after := rowCounts(t, f)["component"]; after != before {
@@ -287,7 +287,7 @@ func TestADependencyOnAnUnlistedComponentIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		bad := tree()
 		bad.Dependencies = append(bad.Dependencies, graph.Dependency{Parent: curl, Child: zlib})
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), bad); err == nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), bad); err == nil {
 			t.Fatal("an edge to an undescribed component was accepted")
 		}
 	})
@@ -302,7 +302,7 @@ func TestAComponentWithoutAVersionIsStillTracked(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		snap := tree()
 		snap.Components = append(snap.Components, graph.Described{Name: "mystery"})
-		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap)
 		if err != nil {
 			t.Fatalf("a component with no version was refused: %v", err)
 		}
@@ -317,7 +317,7 @@ func TestAComponentWithoutANameIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		bad := tree()
 		bad.Components = append(bad.Components, graph.Described{Version: "1.0"})
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), bad); err == nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), bad); err == nil {
 			t.Fatal("a component with no name was accepted")
 		}
 	})
@@ -356,7 +356,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: c})
 		}
 
-		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap)
 		if err != nil {
 			t.Fatalf("applying a graph larger than one statement: %v", err)
 		}
@@ -369,7 +369,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 		// the first scan carries it on the insert.
 		second := snap
 		second.Components = append([]graph.Described{}, snap.Components...)
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), second); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), second); err != nil {
 			t.Fatalf("applying a graph whose suppliers are filled in: %v", err)
 		}
 		// Counted rather than read: the point is the statement that wrote
@@ -386,7 +386,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 
 		// And closing them again, which names as many identifiers as opening
 		// wrote rows.
-		applied, err = fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), graph.Snapshot{Root: root})
+		applied, err = fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), graph.Snapshot{Root: root})
 		if err != nil {
 			t.Fatalf("closing a graph larger than one statement: %v", err)
 		}
@@ -407,7 +407,7 @@ func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
 		// is stored under — so the same row can be a child in one document
 		// and the root of the next.
 		base := graph.Described{Name: "base"}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:         root,
 			Components:   []graph.Described{base},
 			Dependencies: []graph.Dependency{{Parent: root, Child: base}},
@@ -416,7 +416,7 @@ func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
 		}
 
 		// The next document is rooted at it instead.
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:         base,
 			Components:   []graph.Described{openssl},
 			Dependencies: []graph.Dependency{{Parent: base, Child: openssl}},
@@ -424,7 +424,7 @@ func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		top, _, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		top, _, err := f.store.Roots(ctx, everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -438,14 +438,14 @@ func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
 
 		// And the other way: rooted back at the product, the promoted
 		// component reads as a component again.
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:         root,
 			Components:   []graph.Described{base},
 			Dependencies: []graph.Dependency{{Parent: root, Child: base}},
 		}); err != nil {
 			t.Fatal(err)
 		}
-		back, _, err := f.store.Roots(ctx, everyone(f), f.targetID)
+		back, _, err := f.store.Roots(ctx, everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -467,7 +467,7 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 	// one higher than the rows below it on every build.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -479,7 +479,7 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 			f.opens(t, issue, componentID, occurrence)
 		}
 
-		found, err := f.store.Search(ctx, everyone(f), f.targetID, "ssl", 10)
+		found, err := f.store.Search(ctx, everyone(f), f.buildID, "ssl", 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -493,12 +493,12 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 
 		// The count in the header and the list beside it answer about the
 		// same thing.
-		tally, err := f.store.Counts(ctx, everyone(f), f.targetID)
+		tally, err := f.store.Counts(ctx, everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		components := tally.Components
-		listed, err := f.store.CurrentComponents(ctx, f.targetID)
+		listed, err := f.store.CurrentComponents(ctx, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -522,7 +522,7 @@ func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: root, Child: zlib},
 			graph.Dependency{Parent: openssl, Child: libssl})
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 
@@ -545,7 +545,7 @@ func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
 			return strings.Join(out, " ")
 		}
 
-		found, err := f.store.Search(ctx, everyone(f), f.targetID, "L", 10)
+		found, err := f.store.Search(ctx, everyone(f), f.buildID, "L", 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -555,7 +555,7 @@ func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
 
 		disclosed := access.NewPerson(2, "disclosed", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead}}, 0)
-		found, err = f.store.Search(ctx, disclosed, f.targetID, "l", 10)
+		found, err = f.store.Search(ctx, disclosed, f.buildID, "l", 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -563,7 +563,7 @@ func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
 			t.Errorf("searching as somebody reading disclosed work answered %q, want %q", got, want)
 		}
 
-		found, err = f.store.Search(ctx, everyone(f), f.targetID, "l", 2)
+		found, err = f.store.Search(ctx, everyone(f), f.buildID, "l", 2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -579,12 +579,12 @@ func TestASearchHitCarriesWhatIsBeneathItAsTheTreeDoes(t *testing.T) {
 	// by the same bands, that browsing to it shows.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		f.opens(t, f.anIssue(t, "CVE-2026-UNDER"), f.componentNamed(t, openssl.Name), "under-curl")
 
-		found, err := f.store.Search(ctx, everyone(f), f.targetID, "curl", 10)
+		found, err := f.store.Search(ctx, everyone(f), f.buildID, "curl", 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -611,10 +611,10 @@ func TestASearchDoesNotFindTheBuildItself(t *testing.T) {
 	// every other read of a build's contents says.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
-		found, err := f.store.Search(ctx, everyone(f), f.targetID, root.Name, 10)
+		found, err := f.store.Search(ctx, everyone(f), f.buildID, root.Name, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -659,7 +659,7 @@ func (f *fixture) opensAs(t *testing.T, issue, componentID int64, occurrence str
 	visibility access.Visibility) {
 	t.Helper()
 	row := &finding.Finding{
-		TargetID: f.targetID, Kind: finding.Vulnerable, VulnerabilityID: issue,
+		BuildID: f.buildID, Kind: finding.Vulnerable, VulnerabilityID: issue,
 		Visibility: visibility, ComponentID: componentID, OccurrenceIdentity: occurrence,
 		OpenedAt: time.Now().UTC().Truncate(time.Microsecond),
 	}
@@ -678,7 +678,7 @@ func TestARefusalAroundAComponentDoesNotSayWhetherTheBuildHoldsIt(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// One name at two versions, which is what makes the answers differ.
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, at(curl.Name, "8.5.0"), zlib},
 			Dependencies: []graph.Dependency{
@@ -697,7 +697,7 @@ func TestARefusalAroundAComponentDoesNotSayWhetherTheBuildHoldsIt(t *testing.T) 
 
 		var said []string
 		for _, name := range []string{zlib.Name, curl.Name, "nothing-is-called-this"} {
-			_, _, err := f.store.Around(ctx, outside, f.targetID, name, graph.Choice{})
+			_, _, err := f.store.Around(ctx, outside, f.buildID, name, graph.Choice{})
 			if err == nil {
 				t.Fatalf("%q was answered for somebody who may read nothing here", name)
 			}
@@ -729,7 +729,7 @@ func TestTwoNamesThatDifferInsideTheColumnAreTwoComponents(t *testing.T) {
 			t.Fatal("two names differing before the column's width share a fold key")
 		}
 
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{one, two},
 			Dependencies: []graph.Dependency{
@@ -738,7 +738,7 @@ func TestTwoNamesThatDifferInsideTheColumnAreTwoComponents(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		listed, err := f.store.CurrentComponents(t.Context(), f.targetID)
+		listed, err := f.store.CurrentComponents(t.Context(), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -759,7 +759,7 @@ func TestWhatAProducerCalledADependencyIsStoredWithTheEdge(t *testing.T) {
 		scoped := tree()
 		scoped.Dependencies[0].Kind = "build"
 
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), scoped); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), scoped); err != nil {
 			t.Fatal(err)
 		}
 		kinds := openEdgeKinds(t, f)
@@ -775,7 +775,7 @@ func TestWhatAProducerCalledADependencyIsStoredWithTheEdge(t *testing.T) {
 		// document says another is a record of what nobody sent.
 		relabelled := tree()
 		relabelled.Dependencies[0].Kind = "excluded"
-		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), relabelled)
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), relabelled)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -788,7 +788,7 @@ func TestWhatAProducerCalledADependencyIsStoredWithTheEdge(t *testing.T) {
 
 		// And an unchanged rebuild is still unchanged, which is what keeps the
 		// stored volume tracking real change rather than the calendar.
-		again, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), relabelled)
+		again, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), relabelled)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -812,7 +812,7 @@ func openEdgeKinds(t *testing.T, f *fixture) map[string]string {
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"c"."name" AS "name"`).
 		ColumnExpr(`"e"."kind" AS "kind"`).
-		Where(`"e"."target_id" = ?`, f.targetID).
+		Where(`"e"."build_id" = ?`, f.buildID).
 		Where(`"e"."closed_scan_id" IS NULL`).
 		Scan(t.Context(), &rows)
 	if err != nil {
@@ -841,7 +841,7 @@ func TestTheListCanAskWhatAProducerCalledSomethingAndNothingElseReadsIt(t *testi
 				scoped.Dependencies[i].Kind = "build"
 			}
 		}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), scoped); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), scoped); err != nil {
 			t.Fatal(err)
 		}
 
@@ -883,7 +883,7 @@ func TestTheListCanAskWhatAProducerCalledSomethingAndNothingElseReadsIt(t *testi
 		// And the finding's own screen says it, which is the other half of
 		// what recording it is for: a filter finds the population and the
 		// evidence block is where somebody decides about one of them.
-		detail, err := findings.Detail(ctx, everyone(f), f.targetID, issue,
+		detail, err := findings.Detail(ctx, everyone(f), f.buildID, issue,
 			f.componentNamed(t, curl.Name))
 		if err != nil {
 			t.Fatal(err)

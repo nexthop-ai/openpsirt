@@ -42,7 +42,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		Summary: "Assign a vulnerability report to somebody",
 		Description: "Records who is working this report.\n\n" +
 			"Send `person` as an empty string to hand it back to nobody. Send `team` instead to " +
-			"route it to a team, which is a queue rather than a holding: it stays unheld until " +
+			"assign it to a team, which is a queue rather than a holding: it stays unheld until " +
 			"somebody takes it.\n\n" +
 			"A report is undisclosed, so a person is given one only where they read " +
 			"undisclosed work in the product, and a team only where one member does. A judged " +
@@ -56,7 +56,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593"`
 		Body      struct {
 			Person string `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
-			Team   string `json:"team,omitempty" doc:"A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
+			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
 	}) (*struct{}, error) {
 		subject, err := core.Reading(ctx)
@@ -114,7 +114,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 				core.Tell(ctx, in, "could not say that a report was assigned", notify.Telling{
 					PersonID: them.ID, Kind: notify.Assigned,
 					Body:    "Report " + row.Reference + ", in " + product.Name,
-					Link:    weblink.InboxReport(product.Name, row.Reference),
+					Link:    weblink.VulnerabilityReport(product.Name, row.Reference),
 					Private: true, ProductID: &productID,
 				}, "person", them.ID)
 			}
@@ -190,7 +190,7 @@ func registerReportAssignment(api huma.API, in core.Deps) {
 		OperationID: "list-team-assigned-reports", Method: http.MethodGet,
 		Path:    "/v1/teams/{team}/assignments/reports",
 		Summary: "List the vulnerability reports in one team's queue",
-		Description: "The open vulnerability reports routed to a team, oldest first.\n\n" +
+		Description: "The open vulnerability reports assigned to a team, oldest first.\n\n" +
 			"A team nobody declared answers an empty list, which is also what a team whose " +
 			"reports are not yours to see answers.",
 		Tags: []string{"Findings"},

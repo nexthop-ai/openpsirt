@@ -7,7 +7,7 @@ REQ-29, REQ-30, REQ-31, REQ-32, REQ-33, REQ-35, REQ-40, REQ-43, REQ-53,
 REQ-57, REQ-65, REQ-66.
 
 The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
-`DESIGN-reporting.md`.
+`DESIGN-analytics.md`.
 
 ## Contents
 
@@ -31,14 +31,14 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Sending back](#sending-back)
 - [The deferral threshold](#the-deferral-threshold)
 - [One live decision per key](#one-live-decision-per-key)
-- [Decisions against a recorded attack](#decisions-against-a-recorded-attack)
-- [The triage line](#the-triage-line)
+- [Decisions against an incident](#decisions-against-an-incident)
+- [Minimum severity](#minimum-severity)
 - [Issue assessments](#issue-assessments)
 - [Coverage count](#coverage-count)
 - [Reach across builds](#reach-across-builds)
 - [Reach across builds](#reach-across-builds)
 - [Bulk decisions](#bulk-decisions)
-- [Fix bundles](#fix-bundles)
+- [Planned upgrades](#planned-upgrades)
 - [Promised work](#promised-work)
 - [Deadlines](#deadlines)
 - [Lapse marking](#lapse-marking)
@@ -50,7 +50,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
 - [Mitigations](#mitigations)
 - [Outcomes on a tag](#outcomes-on-a-tag)
-- [Tags](#tags)
+- [Labels](#labels)
 - [Rule-prepared decisions](#rule-prepared-decisions)
 - [Decisions on a new branch](#decisions-on-a-new-branch)
 - [Statement scope](#statement-scope)
@@ -101,8 +101,8 @@ decision made about a leaf.
 
 ## Outcomes
 
-These are the outcomes about a vulnerability. A lead takes its own, which
-`DESIGN-analysis.md` § Lead triage holds.
+These are the outcomes about a vulnerability. A code finding takes its own, which
+`DESIGN-analysis.md` § Code finding triage holds.
 
 | Outcome | Means |
 |---|---|
@@ -170,9 +170,9 @@ recurs at every point release.
 
 ### The standing set
 
-Corrections in force are read from the record with its filters set: the
-outcome, and what applies now. `DESIGN-reporting.md` holds the record and the
-one other question it is asked this way.
+Corrections in force are read from the audit log with its filters set: the
+outcome, and what applies now. `DESIGN-analytics.md` holds the audit log and
+the one other question it is asked this way.
 
 Asking for what applies now is not asking for what was approved. A decision is
 approved and lapses later when the code moves out from under it, so a list of
@@ -216,7 +216,7 @@ Arguing, agreeing and reading are separate questions.
 
 | Rule | |
 |---|---|
-| A triager may approve somebody else's decision about disclosed or undisclosed work | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative. A decision about a lead takes the approver capability (`DESIGN-analysis.md` § Lead triage) |
+| A triager may approve somebody else's decision about disclosed or undisclosed work | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative. A decision about a code finding takes the approver capability (`DESIGN-analysis.md` § Code finding triage) |
 | Reading is the finding's own visibility and nothing else (REQ-43) | Asking whether the reader could decide or approve was narrower: a reader saw "deferred" with no way to see why, and on a real deployment somebody holding private reading opened a finding and was told none of its 91 decision rows existed |
 | Writing is named apart from reading in the code | They are separate rules. Adding a comment had leaned on the reading rule, so widening one would let a reader comment on a decision they may not argue about |
 | Every check reads the product and visibility from the row | Never from what a caller stated |
@@ -261,8 +261,8 @@ holds the ones nobody has agreed to yet.
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
 | Undoing a bulk approval takes back only the agreements the person undoing gave | A batch is named by whoever gives it, so two reviewers may each hold one of the same name. Undoing one is not a way to withdraw another reviewer's agreement |
 | A decision it reaches only part of is left alone whole | The agreement is one row keyed on the decision, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
-| A decision about a lead handed off as a flaw is left alone whole | Its flaw is judged instead, and nothing else changes the decision (`DESIGN-analysis.md` § Hand-off) |
-| A lead handed off as a flaw is in no list of held work | Its flaw is held and listed as itself, so the lead is closed work for its holder (`DESIGN-analysis.md` § Lead assignment) |
+| A decision about a code finding recorded as a flaw is left alone whole | Its flaw is judged instead, and nothing else changes the decision (`DESIGN-analysis.md` § Flaw records) |
+| A code finding recorded as a flaw is in no list of held work | Its flaw is held and listed as itself, so the code finding is closed work for its holder (`DESIGN-analysis.md` § Code finding assignment) |
 | What an undo reports is what returned to waiting | A decision another agreement still stands on, and one that has ended, is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
@@ -294,9 +294,9 @@ what became of it, what it wrote, and what it covers now.
 | The state on it is the decision's, never a representative row's | A row's state standing in for the decision's is how one row approved beside forty-three sent back read as approved |
 | What it covers is worked out when it is asked for | A decision reaches by matching, so a build appearing afterwards is covered with nobody acting. What somebody consented to covering is stored with their approval, and is the different question |
 | Refused whole or answered whole | Shown half, a reader would be told about words whose other half is about a finding they may not see |
-| A list showing the rows a reader may read leaves off the reasoning of a decision they may read only part of | The record of decisions, the list of decision occurrences, one occurrence read alone, and the earlier, similar and elsewhere decisions beside a finding each show a row its reader may read. The reasoning on it is about every occurrence of the decision, so it is shown only where they may read them all |
+| A list showing the rows a reader may read leaves off the reasoning of a decision they may read only part of | The audit log, the list of decision occurrences, one occurrence read alone, and the earlier, similar and elsewhere decisions beside a finding each show a row its reader may read. The reasoning on it is about every occurrence of the decision, so it is shown only where they may read them all |
 | A case grant reaches it | Somebody brought into one issue is offered its decisions by every list they can reach, and a decision offered and then refused reads as a fault rather than as a rule |
-| The flaw's readers reach a decision at a moved lead's occurrence while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the lead, and the same narrowing adds its decisions (`DESIGN-analysis.md` § Keep or move) |
+| The flaw's readers reach a decision at an included code finding's occurrence while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the code finding, and the same narrowing adds its decisions (`DESIGN-analysis.md` § Disclosure inclusion) |
 | The counts are narrowed to findings the reader may see | A decision somebody may read can match findings they may not, and a count is the leak even where no row is shown |
 
 ## Decisions
@@ -346,7 +346,7 @@ underneath carry where it lands and when it stops applying.
 This was on the row. A decision reaching forty-four occurrences was forty-four copies
 of one sentence, each revisable on its own — so revising one returned that row
 to the queue and left the other forty-three saying the old thing under a decision
-that read as agreed. Measured on the demo before the move: 11 decisions, 155
+that read as agreed. Measured on the demo before the inclusion: 11 decisions, 155
 rows, 155 revisions, and five distinct pieces of reasoning; one decision
 carried forty-four identical copies of its own words. Every payload field was
 constant across every row of every decision.
@@ -712,15 +712,15 @@ unmarked as contradictory: what applies is chosen by agreed-beats-waiting and
 then newest-wins, so approving both leaves one silently governing while the
 other stands on the record as agreed.
 
-## Decisions against a recorded attack
+## Decisions against an incident
 
-A product may record that it was exploited through an issue.
-`DESIGN-obligations.md` holds the record; what it does to decisions is here.
+A product may record an incident: that it was exploited through an issue.
+`DESIGN-incidents.md` holds the incident; what it does to decisions is here.
 
 | Rule | |
 |---|---|
-| A decision that the issue does not apply is refused while a record stands | The two say opposite things about one product, and the one that arrived from a person who watched it happen is not the one to give way |
-| A bulk act that sets the issue aside or puts it off is refused while a record stands | A standing record is an obligation somebody may be answering to, and one sentence over a selection is not how that leaves anybody's list. Every outcome that hides a finding without promising work counts: not applicable, a wrong match, a deferral, a decision not to fix, already fixed |
+| A decision that the issue does not apply is refused while an incident stands | The two say opposite things about one product, and the one that arrived from a person who watched it happen is not the one to give way |
+| A bulk act that sets the issue aside or puts it off is refused while an incident stands | A standing incident is a deadline somebody may be answering to, and one sentence over a selection is not how that leaves anybody's list. Every outcome that hides a finding without promising work counts: not applicable, a wrong match, a deferral, a decision not to fix, already fixed |
 | A bulk act saying the issues apply, or promising work, is not refused | Neither sets anything aside, and the next scan checks every row a promise names |
 | Rows set aside from a bulk act are still a bulk act | Setting rows aside makes a decision of its own, followed back to where it began. Otherwise the rule ends one step from where it started |
 | An approver may set the attacked issue aside and agree to the rest | The refusal is asked of the rows being agreed to. One attacked issue does not make a selection of hundreds unanswerable, and what is set aside meets the rule again with its author |
@@ -731,31 +731,31 @@ A product may record that it was exploited through an issue.
 | At the finding, only the decision that the issue does not apply | A decision that the scanner matched the wrong thing is about identity, and the outcomes that promise work or put it off are not contradicted by an attack. Made one finding at a time, each is a decision somebody made about that finding |
 | Clearing the record puts nothing back | Whether the decision was right is for whoever answers the finding, not for the clearing to decide on their behalf |
 
-## The triage line
+## Minimum severity
 
-A deployment says what it considers worth triaging. Below that line a finding
-is still recorded, still counted and still reportable — out of the working
-list, not out of the system. Five thousand findings is a list nobody reads, and
+A deployment states its **minimum severity**: the least severity it considers
+worth triaging. Below it a finding is still recorded, still counted and still
+reportable — out of the working list, not out of the system. Five thousand findings is a list nobody reads, and
 the ones that drown it are the ones nobody was ever going to act on.
 
 | Rule | |
 |---|---|
 | Nothing is hidden until somebody decides to hide it | A tool that kept findings out of the list on the day it was installed would be deciding something nobody asked it to |
-| The line is compared against our rating where one stands | Being able to say a published rating is wrong is pointless if everything that ranks and filters then ignores us |
+| The minimum severity is compared against our rating where one stands | Being able to say a published rating is wrong is pointless if everything that ranks and filters then ignores us |
 | An unrated issue is judged as a medium | The same folding the deadline uses, spelled once. Briefly two rules read one fact and disagreed: on a real image 91,040 findings rated "unknown" dropped out of the working list *and* off any clock |
-| Exploitation is never below the line | A line states how bad something has to be before it is worth an afternoon, and exploitation is a fact. Either signal admits it: a feed's word about the world, and this product's own record of being attacked |
-| Below the line nothing is on a clock | A line says "this is not work" and a deadline says "this is work, and it is late". Within a year the overdue figure would be thousands of things nobody intended to look at |
-| Nothing on a release out of support is on a clock either (REQ-15) | Applied separately rather than folded in: it reaches further, because a line never sets aside something known to be exploited while end-of-life says nothing here will be fixed at all |
+| Exploitation is never below the minimum severity | A minimum severity states how bad something has to be before it is worth an afternoon, and exploitation is a fact. Either signal admits it: a feed's word about the world, and this product's own incident |
+| Below the minimum severity nothing is on a clock | A minimum severity says "this is not work" and a deadline says "this is work, and it is late". Within a year the overdue figure would be thousands of things nobody intended to look at |
+| Nothing on a release out of support is on a clock either (REQ-15) | Applied separately rather than folded in: it reaches further, because a minimum severity never sets aside something known to be exploited while end-of-life says nothing here will be fixed at all |
 
-A product may state its own line. Products differ in what they can afford to
+A product may state its own minimum severity. Products differ in what they can afford to
 ignore, and a single number for an estate is either too strict somewhere or too
 loose somewhere else.
 
 | | |
 |---|---|
-| A product with no opinion **inherits rather than copies** | A product that stated the deployment's current line would stop following the next time the deployment changed its mind, and nobody would see that happen. Clearing a product's line is its own act |
+| A product with no opinion **inherits rather than copies** | A product that stated the deployment's current minimum severity would stop following the next time the deployment changed its mind, and nobody would see that happen. Clearing a product's minimum severity is its own act |
 | Stating one is administration | The same authority that sets the deployment's. It hides findings, which is the act every other part of this gates |
-| Moving either line rewrites what is stored | Away from the request and one replica at a time — see `DESIGN-queue.md` |
+| Moving either minimum severity rewrites what is stored | Away from the request and one replica at a time — see `DESIGN-queue.md` |
 
 ## Issue assessments
 
@@ -773,15 +773,15 @@ statement for the whole deployment.
 | A rating belongs to one product and reaches every build of it (REQ-29) | A rating is an assessment of how a component is used, and two products do not use one the same way: one may ship the vulnerable configuration and another may not |
 | Two products may hold different live ratings of one issue | Neither reaches the other. A single rating refused the second team any rating at all |
 | Nothing inherits | A product nobody has rated the issue in reads the published rating until somebody on that team looks. A rating arriving from a product a team cannot see is what this shape removes, so it is not reintroduced as a default |
-| Making one, agreeing to one and taking one back ask for the role **on that product** (REQ-29, REQ-42) | A rating sets the deadline and can push a finding below the line the product triages at. Asked anywhere, somebody holding one product moved both in a product they cannot see |
+| Making one, agreeing to one and taking one back ask for the role **on that product** (REQ-29, REQ-42) | A rating sets the deadline and can push a finding below the product's minimum severity. Asked anywhere, somebody holding one product moved both in a product they cannot see |
 | Every act on an assessment asks whether the person may read a finding of this issue **in that product**, at its visibility (REQ-43) | The assessment carries the severity recorded against the issue and the argument somebody wrote about it, so a row about an embargoed flaw is that flaw's disclosure. A refusal answers exactly as a name nobody has ever used, and an assessment that fails it is absent from the list rather than refused |
 | The list asks it from the issue's own row | The findings are reached through the issue the assessment is filed under and the findings held under the issue it is read as. Asked from the product's findings, each assessment reads all of them first: 5.4 s against under 5 ms for 306 assessments on PostgreSQL |
 | An issue that sits at no build anywhere may still be rated | It is nobody's secret: there is no finding for a rating to disclose. It is what lets a product get ahead of an issue it knows is coming |
 | The counts beside a waiting assessment stop at what the reader may see, inside the rating's own product | Narrowing on visibility alone admits every disclosed finding in the deployment, so an approver holding one product was told how many findings the issue has elsewhere — a count of what somebody else ships |
 | Rating something worse takes effect at once | Nobody needs protecting from being told something is worse than the world says |
-| Rating it milder waits for a second person, on that product | Severity sets the deadline, and where the product has said what is worth triaging, a downgrade below that line takes the finding off the working list and off any clock |
+| Rating it milder waits for a second person, on that product | Severity sets the deadline, and where the product has said what is worth triaging, a downgrade below that minimum severity takes the finding off the working list and off any clock |
 | Milder is judged against the **published** rating | What needs a second person is hiding something the world called bad. Judged against whatever the product holds now, the next step down would go through unwatched |
-| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; the product's is what ranks, what its triage line compares and what sets its deadline |
+| The published rating is never overwritten | A rating of ours shown where the world's goes reads as the world's. Both are on screen; the product's is what ranks, what its minimum severity compares and what sets its deadline |
 | An assessment in force is written as the rating in force for that product | Everything that ranks, filters or clocks reads that one row with the published rating as its fallback, rather than each reader joining the assessment and folding it its own way. The product's open findings are reordered and re-clocked when it lands, and no other product's are |
 | A finding opened later picks the product's rating up | The applying path reads the rating for the build's product at the moment it opens findings. A copy written onto each finding would carry it only where something remembered to fetch it |
 
@@ -804,10 +804,10 @@ would take off a working list.
 | | |
 |---|---|
 | Counted in the rating's own product | That is everywhere the rating reaches. A count spanning products would describe work this assessment does not touch |
-| What is already below the line is not counted | Agreeing takes it off nothing |
+| What is already below the minimum severity is not counted | Agreeing takes it off nothing |
 | Narrowed to what the reader may see | That understates the effect for them, which is the right way for it to be wrong: the alternative discloses a count of undisclosed work |
 | Worked out only for the assessments that are waiting | A count for a historical assessment answers a question nobody is being asked |
-| Worked out for a page at once | The ratings, which of their issues the reader may be told of, and each named product's line, then one grouped read of the findings for every rating on the page. Each rating is still counted over its own issue in its own product. A rating at a time, a page of fifty is 263 statements and 0.32 s, of which 20 ms is the database |
+| Worked out for a page at once | The ratings, which of their issues the reader may be told of, and each named product's minimum severity, then one grouped read of the findings for every rating on the page. Each rating is still counted over its own issue in its own product. A rating at a time, a page of fifty is 263 statements and 0.32 s, of which 20 ms is the database |
 
 ## Coverage count
 
@@ -837,14 +837,14 @@ code, where a tick is a decision about a version nobody has looked at.
 
 | Rule | |
 |---|---|
-| One action writes a separate record per target, each keyed to its own versions | What makes carrying acceptable at all. A dismissal carried onto an older branch lapses by itself the moment that branch moves |
+| One action writes a separate record per build, each keyed to its own versions | What makes carrying acceptable at all. A dismissal carried onto an older branch lapses by itself the moment that branch moves |
 | Nothing is withheld for sitting past the named fix | It would be the right rule and is not enforced: deciding whether one version sits past another needs an ordering for the ecosystem in hand, and there is one for some of them and not for the rest — a rule that applied to some ecosystems and not others would be worse than none. What is recorded instead is the case that needs no ordering — a version moved and the issue came with it |
 | An approval names the reach, not only the words | The three parts are shown to the approver before they act, and how much the decision covered is counted at that moment and kept, because the number moves on its own: a branch cut next month shipping the same versions is covered too, with nobody having acted. Asking afterwards what a decision covers is a *different* question from what somebody consented to. One number is kept, not three — the split is presentation |
 | One decision covers every occurrence it sits at by default (REQ-26) | The occurrences are listed and ticked; unticking one leaves that occurrence open, and nothing is asked about the occurrences left out. Silence about an occurrence is not a decision about it |
 | Covering many occurrences does not by itself require a second person | The alternative teaches people to make narrow decisions, which produces more records saying less |
 | Grouping is presentation only (REQ-17) | One grouped action writes an individual record per occurrence, and the group is derived when it is read. A stored group would describe a build that no longer exists within a scan or two |
 | A list that is hiding something says so, with the count (REQ-30) | |
-| Exceptions are grouped by the layer they come from (REQ-25) | A suppression a build supplied, a decision made here, and a finding below the line are three kinds of "not shown", and one flat list invites reading a build's own claim as a decision this deployment made. Every kind of variant follows the same model — the machinery does not learn what kind of thing a variant is |
+| Exceptions are grouped by the layer they come from (REQ-25) | A suppression a build supplied, a decision made here, and a finding below the minimum severity are three kinds of "not shown", and one flat list invites reading a build's own claim as a decision this deployment made. Every kind of variant follows the same model — the machinery does not learn what kind of thing a variant is |
 
 ## Reach across builds
 
@@ -932,12 +932,12 @@ instead for those occurrences to be left out.
 | Every occurrence decided refuses the request | Nothing is recorded. A decision with no rows is not something a second person can agree to |
 | The approver sees the rows the decision wrote | What was skipped is not recorded on the decision. The narrowing's two counts still compare the issues named with the issues the narrowing reaches |
 
-## Fix bundles
+## Planned upgrades
 
 One row per bump with what it would close, and one act that answers the whole of
 it.
 
-A fix bundle is keyed on the upstream name, the version in hand, and the version
+A planned upgrade is keyed on the upstream name, the version in hand, and the version
 that fixes it (REQ-35), falling back to the component name where no upstream is
 recorded. The version in hand is the upstream version where one is recorded. It
 is presentation, like every other grouping here.
@@ -951,21 +951,21 @@ feature.
 
 | Rule | |
 |---|---|
-| No build appears in the key | A component shipped at the same version by two builds is one thing to decide about and two findings. The bundle proposes once per key rather than once per row it closes |
+| No build appears in the key | A component shipped at the same version by two builds is one thing to decide about and two findings. The upgrade proposes once per key rather than once per row it closes |
 | Where the same occurrence is undisclosed in one build and public in another, the one row there carries the stricter | |
 | Everything it decides from is read inside the transaction | The builds the request names, which are past end-of-life, and the occurrences the bump reaches are all reads, and a retry re-runs the closure against a database that has moved |
-| One request, one transaction, one decision | Half of it written would be a pending upgrade that says a bump is declared for a release it is not, so the decision and the fix targets are written together |
+| One request, one transaction, one decision | Half of it written would be a planned upgrade that says a bump is declared for a release it is not, so the decision and the fix targets are written together |
 | A release past end-of-life named in the request refuses the whole of it as 422, "release X is retired" | The caller may triage there and asked for something that cannot be done; naming the release says which one to drop |
 
 Proposing per row instead writes the same key twice, and the second collides
 with the index that keeps one decision standing per occurrence, taking the whole
 transaction with it: every product with more than one build then refuses every
-bundle it is asked to declare, with a message naming a decision it has just
+upgrade it is asked to declare, with a message naming a decision it has just
 written itself.
 
 It is safe at that size because of what it carries. The outcome hides nothing and
-needs no second person, and a fix target is intent the next scan answers, so a
-bundle that never lands is reported rather than quietly wrong.
+needs no second person, and a fix target is intent the next scan answers, so an
+upgrade that never lands is reported rather than quietly wrong.
 
 ## Promised work
 
@@ -1020,11 +1020,11 @@ on the server before the run and `ALTER SYSTEM RESET autovacuum` after it. The
 
 What it covers is derived, never marked. A covered finding is one a standing
 promise reaches, which the decision already records, so the mark is a join
-rather than a tag across every row.
+rather than a label across every row.
 
 | | |
 |---|---|
-| The argument is grain, not cost | A tag here is per product, and could not say "planned on master, not on the 2.4 branch", which is the case the per-build target exists for. Derived, the answer is per build |
+| The argument is grain, not cost | A label is per product, and could not say "planned on master, not on the 2.4 branch", which is the case the per-build target exists for. Derived, the answer is per build |
 | Withdrawing a promise puts what it covered back | Nothing to clean up: there was never a second record to keep in step |
 | It is offered as a filter and its negation | Asking for what is *not* covered is the working list once planned work is out of view, and a flag could not ask it |
 | It is what the by-issue list asks unless told otherwise | Deciding covered work again one finding at a time is what the promise was made instead of. The by-component view is untouched, because that is where the upgrade is managed |
@@ -1044,14 +1044,14 @@ is one act at the grain the decision was made at.
 | The proposer's, and nobody else's | An approver doing it becomes proposer of the new decision while their own earlier agreement is carried onto it, which is one person on both sides of the control |
 | Any row escalating sends the whole act back | An approver works at the unit the proposer acted at (REQ-28). Asked per row, an act covering 45 occurrences could write 44 standing rows and one waiting, which is agreeing to part of an argument somebody was shown whole |
 | The carried agreement is one row, taking effect on all of them together | An agreement is an agreement to a decision's words. Recorded per row, one person agreeing once would appear in the record 45 times; taking effect per row, half the act could stand while half waited |
-| A row that a row of another decision, made at its occurrence after it stopped standing, replaced is not re-made | The later one is what the occurrence last said: the decision that re-made it, a fresh decision, or one somebody made and withdrew. Re-making the earlier row writes a second live decision where the later one stands, or brings back a decision somebody took back. A decision made before the row stopped standing replaces nothing: two streams at two versions hold sibling decisions at one occurrence, keyed apart by the versions. Rows of one decision do not replace each other |
+| A row that a row of another decision, made at its occurrence after it stopped standing, replaced is not re-made | The later one is what the occurrence last said: the decision that re-made it, a fresh decision, or one somebody made and withdrew. Re-making the earlier row writes a second live decision where the later one stands, or brings back a decision somebody took back. A decision made before the row stopped standing replaces nothing: two branches at two versions hold sibling decisions at one occurrence, keyed apart by the versions. Rows of one decision do not replace each other |
 | A row whose versions are still open is re-made at them alone | It lapsed for a rating and its code did not move. Re-made at every version the occurrence is open at, it would take on builds it never covered, and collide with a sibling decision at another version |
 
 The lapsed population is reached by the findings list's `lapsed` state, and by
 the review queue's To reaffirm tab, which lists the reader's own lapsed decisions.
 A decision with a withdrawn row is neither listed there nor offered on its page:
 its author took it back, and a withdrawal leaves a row that had already lapsed
-as it was. A row at a lead past its end of life is not re-made, and a decision
+as it was. A row at a code finding past its end of life is not re-made, and a decision
 with no other row is neither listed nor offered (`DESIGN-analysis.md` § End of
 life). The act sits on the decision, or on several decisions from that tab
 (§ Re-affirmation across decisions).
@@ -1067,7 +1067,7 @@ deferrals is **where the gate sits**.
 | **At or before the earliest deadline among what the act covers** | No approval. Nothing is hidden for longer than the policy already allowed, and gating every planned upgrade would put the most routine act of all through the review queue |
 | **Past it** | A second person agrees. The promise now defers the worst thing the act covers |
 | **Measured over the whole set, not per finding** | One act covering a critical and a medium is gated by the critical. Gating each row separately would let the same act stand for the mediums and wait for the critical |
-| **Nothing the act covers has a deadline** | There is no date to be past, so the exemption has nothing to measure against and a second person agrees. A product below its own triage line is the ordinary case, and it was the one place a promise could hide a finding for years on one signature |
+| **Nothing the act covers has a deadline** | There is no date to be past, so the exemption has nothing to measure against and a second person agrees. A product below its own minimum severity is the ordinary case, and it was the one place a promise could hide a finding for years on one signature |
 | **A commitment with no date at all** | Not a commitment |
 
 The deadline is resolved with the occurrences, never supplied. It is a fact about
@@ -1132,7 +1132,7 @@ moved out from under, and those land in the review queue as work.
 | Marked a bounded batch at a time, ending at a batch that came back short | The read asks about every live row in the product. A short batch named everything lapsable at that moment, and reading again finds only what changed since, which the next sweep finds: 1.2 s a read over 133,549 live rows on PostgreSQL |
 | A rebuild that moved nothing marks nothing | Rebuilds are nightly, so a sweep marking too much would unpick decisions nobody had revisited, every night |
 | A decision covering nothing in the product is not marked | A component that is gone closed its findings. A component still present at a different version is exactly the question somebody has to answer again |
-| Covering is asked of the product, not of the build that was scanned | One release stream moving while another still ships the version decided about leaves the decision covering the other. So a sweep marks only when this build holds the occurrence at other versions **and** no open finding anywhere in the product still matches the decision's versions |
+| Covering is asked of the product, not of the build that was scanned | One branch moving while another still ships the version decided about leaves the decision covering the other. So a sweep marks only when this build holds the occurrence at other versions **and** no open finding anywhere in the product still matches the decision's versions |
 | Only the scanned build's product is swept | An occurrence is a pair of names, the same pair sits in other products, and their decisions are theirs |
 | The comparison uses the same expression that wrote the version | Shared rather than spelled twice. Two spellings is how a decision starts lapsing on one path and standing on the other |
 | Failing to mark is reported and not fatal | What the scan found is recorded and correct; the marking is a prompt, and losing a scan over a prompt is the wrong trade |
@@ -1206,7 +1206,7 @@ way a deadline reads one.
 
 The band is read from the rating in force as the baseline was: this product's
 word where it has one, and otherwise the published score, falling back to the
-published word where no score was given. Deadlines, filters and the triage line
+published word where no score was given. Deadlines, filters and the minimum severity
 band on the word instead.
 
 | | |
@@ -1516,15 +1516,15 @@ fact about the occurrence. Every route that decides at an occurrence, re-affirma
 included, builds the occurrence from the finding in one spelling, so the refusal
 holds on each of them.
 
-## Tags
+## Labels
 
-A finding takes free-text tags (REQ-57), filterable, with no fixed vocabulary.
+A finding takes free-text labels (REQ-57), filterable, with no fixed vocabulary.
 At a dozen products and thousands of findings people mark work regardless —
 customer-escalated, release-blocker, waiting on a vendor — and with nowhere to
 put it they put it in the reasoning, where nothing can filter on it and where an
 approver reads it as part of the argument for the decision.
 
-No vocabulary is fixed, because none has been earned. A tag that becomes
+No vocabulary is fixed, because none has been earned. A label that becomes
 universal is a signal rather than a success: "waiting on vendor" has a subject,
 an expected reply and a staleness of its own, and leaving it as a string is how
 it stays unreasonable-about forever. What is in use in a product is offered back,
@@ -1533,14 +1533,14 @@ promoting one.
 
 | Rule | |
 |---|---|
-| What is in use is narrowed to findings the asker may read | A tag carries no visibility of its own, and free text typed while triaging an embargo says what the embargo is about: "waiting on the reporter" beside an undisclosed issue is the disclosure |
-| At the grain somebody looks at | One issue, in one fold, in one product: the unit a decision covers and the finding screen shows. Not per occurrence — a kernel flaw at sixty occurrences is one thing somebody is tagging — and not per build, because a tag is about the work rather than a release |
+| What is in use is narrowed to findings the asker may read | A label carries no visibility of its own, and free text typed while triaging an embargo says what the embargo is about: "waiting on the reporter" beside an undisclosed issue is the disclosure |
+| At the grain somebody looks at | One issue, in one fold, in one product: the unit a decision covers and the finding screen shows. Not per occurrence — a kernel flaw at sixty occurrences is one thing somebody is labeling — and not per build, because a label is about the work rather than a release |
 | Put on, read and taken off across the fold | Putting one on writes it on every package of the fold the product holds the issue at. The finding screen, a list row and the filter read the words on any package of the fold, once each, so a package that joins the fold later carries them. Taking one off through any package takes it off them all |
 | Each package's word at that package's visibility | Putting one on and taking one off reach the packages whose findings of the issue the caller may triage. A word is read where its own package carries a finding of the issue in the product that the reader may see; the filter asks for one at the row's visibility. A word typed on an undisclosed package is not shown through a disclosed one |
-| Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Tagging what already carries the tag succeeds and keeps the first spelling |
-| Tagging is triage | A tag changes what a filtered list answers. Somebody who may only read sees the tags and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
-| On the row, not only on the finding | The tags come back with each group, read for the whole page in one statement, and each is itself a filter |
-| Called a tag everywhere, in every register | The screens, the filter, the API descriptions and this document. It was a tag in the filter and on the route while the finding screen, the API summaries and the rows above this one said "mark" — one thing under two names, which makes neither searchable |
+| Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Labeling what already carries the label succeeds and keeps the first spelling |
+| Labeling is triage | A label changes what a filtered list answers. Somebody who may only read sees the labels and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
+| On the row, not only on the finding | The labels come back with each group, read for the whole page in one statement, and each is itself a filter |
+| Called a label everywhere, in every register | The screens, the filter, the API descriptions and this document. One thing under two names makes neither searchable |
 
 ## Rule-prepared decisions
 
@@ -1590,7 +1590,7 @@ reasoning at all.
 | Both versions come from one finding | Where the new line holds two open findings at the occurrence, one finding's pair of component and consumer versions is taken whole, the first in the order both sort as text, in the preview and in the act. A pair drawn half from each is a key no finding holds |
 | A dated decision carries what it said | A deferral keeps its date, and a patch promise keeps its date. Quietly moving a date forward would be the tool making the decision it is asking for, and a promise without its date is refused on every write path. The total a deferral has already run for is shown beside it, because that is what agreeing to it again agrees to |
 | **A decision whose date has gone by is not offered** | It carries its date rather than having it moved forward, so carrying one that has run out writes a decision finished the moment it lands. Offering it is offering something the act behind the button turns down |
-| **A promised upgrade is not carried** | An upgrade covers a component in the releases it names and records what each release is waiting on. A decision carried onto one occurrence writes neither, so the new line would hold a promise its own list of pending upgrades never shows. Planned from the component, naming the new line, it writes both |
+| **A promised upgrade is not carried** | An upgrade covers a component in the releases it names and records what each release is waiting on. A decision carried onto one occurrence writes neither, so the new line would hold a promise its own list of planned upgrades never shows. Planned from the component, naming the new line, it writes both |
 | What is carried is checked like anything else written | The occurrence it builds records whether the new line is a tag, so a dated decision carried onto a release built once is refused as it is when proposed there. Who may write it is asked at the visibility the occurrence has on the new line |
 | An occurrence the carrier may not argue about on the new line is neither offered nor counted | The new line's visibility there may be undisclosed where the old line's was not. A decision carried onto it would be written on work its carrier may not argue about, and a count of such occurrences says what the new line holds |
 | Bounded, and written in one transaction | Carrying six decisions is one act, and half of it landing is a line nobody can tell from one somebody chose that way |

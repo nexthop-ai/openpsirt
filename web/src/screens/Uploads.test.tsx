@@ -16,7 +16,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const SCANS = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms";
+const SCANS = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms";
 
 function receipt(state: string) {
   return { scan_id: 1, received_at: "2026-10-01T00:00:00Z", state };
@@ -32,8 +32,8 @@ async function askedOverAMinute(state: string): Promise<number> {
   mount.render(
     screen(
       <Uploads />,
-      "/products/sonic/streams/master/variants/x/uploads",
-      "/products/:product/streams/:stream/variants/:variant/uploads",
+      "/products/sonic/branches-and-tags/master/variants/x/uploads",
+      "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads",
     ),
   );
   for (let second = 0; second < 60; second++) {
@@ -59,8 +59,10 @@ describe("the page of receipts", () => {
   });
 });
 
-const UPLOADS = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads";
-const PATTERN = "/products/:product/streams/:stream/variants/:variant/uploads/:type?";
+const UPLOADS =
+  "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/uploads";
+const PATTERN =
+  "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads/:type?";
 
 // The screen at an address, with the kinds of upload the server lists.
 async function opened(at: string, kinds: unknown[]) {
@@ -69,7 +71,11 @@ async function opened(at: string, kinds: unknown[]) {
     return { data: { items: [], total: 0, quiet: 0, refused: [] } };
   });
   mount.render(
-    screen(<Uploads />, `/products/sonic/streams/master/variants/x/uploads${at}`, PATTERN),
+    screen(
+      <Uploads />,
+      `/products/sonic/branches-and-tags/master/variants/x/uploads${at}`,
+      PATTERN,
+    ),
   );
   await settle();
   const tabs = Array.from(mount.host().querySelectorAll("nav .tab2"));
@@ -144,7 +150,11 @@ describe("the tabs", () => {
       return { data: { items: [doc], total: 60 } };
     });
     mount.render(
-      screen(<Uploads />, "/products/sonic/streams/master/variants/x/uploads/vex", PATTERN),
+      screen(
+        <Uploads />,
+        "/products/sonic/branches-and-tags/master/variants/x/uploads/vex",
+        PATTERN,
+      ),
     );
     await settle();
     const next = Array.from(mount.host().querySelectorAll("button")).find(
@@ -169,7 +179,7 @@ describe("the tabs", () => {
     const { asked } = await opened("/sarif", [{ type: "sbom", total: 0 }]);
     expect(asked).toContain(SCANS);
     expect(asked).not.toContain(
-      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
+      "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses",
     );
   });
 });

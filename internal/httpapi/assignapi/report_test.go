@@ -12,15 +12,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
-// recordReport records a claim in the product "mine" and answers the path it
+// recordReport records a vulnerability report in the product "mine" and answers the path it
 // is reached by.
 func recordReport(t *testing.T, r *httpapitest.Reach) string {
 	t.Helper()
 	got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
-		`{"summary":"The management socket answers before anyone has authenticated.",`+
+		`{"reported_problem":"The management socket answers before anyone has authenticated.",`+
 			`"reported_by":"A. Researcher"}`)
 	if got.Code != http.StatusCreated {
-		t.Fatalf("recording a claim answered %d: %s", got.Code, got.Body.String())
+		t.Fatalf("recording a report answered %d: %s", got.Code, got.Body.String())
 	}
 	var recorded httpapitest.ReportRead
 	if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {

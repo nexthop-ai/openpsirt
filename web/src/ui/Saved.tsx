@@ -60,7 +60,7 @@ export function useKept(when = true) {
 // words from what it keeps, and a web test holds this list to the one it
 // reads, in testdata/scope-words.json.
 export const SCOPE = [
-  "stream",
+  "branch_or_tag",
   "variant",
   "beneath",
   "beneath_version",

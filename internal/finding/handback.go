@@ -34,7 +34,7 @@ func HandBack(ctx context.Context, db bun.IDB, narrowed access.Narrowed) error {
 // The people named are asked about, and so is every team they are on, because
 // a team holds work only while a member reads it.
 //
-// Work goes back to nobody, exactly as when somebody leaves. No routing sweep
+// Work goes back to nobody, exactly as when somebody leaves. No assignment sweep
 // is queued, because a full queue would then refuse the write that took the
 // reading away; a rule places the work when one is next recorded.
 func (s *Store) HandBackUnread(ctx context.Context, narrowed access.Narrowed) (int64, error) {
@@ -190,7 +190,7 @@ func holdersNarrowed(ctx context.Context, db bun.IDB, narrowed access.Narrowed) 
 	return out, nil
 }
 
-// heldIn is what one party holds open in one product: findings and leads at
+// heldIn is what one party holds open in one product: findings and code findings at
 // these visibilities, and whether any report.
 type heldIn struct {
 	party        int64
@@ -209,8 +209,8 @@ func heldByParty(ctx context.Context, db bun.IDB, parties []int64) ([]heldIn, er
 	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
 	if err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`DISTINCT "f"."assigned_to" AS "party", "st"."product_id" AS "product", `+
 			`"f"."visibility" AS "visibility"`).
 		Where(`"f"."assigned_to" IN (?)`, bun.List(parties)).
@@ -253,7 +253,7 @@ func heldByParty(ctx context.Context, db bun.IDB, parties []int64) ([]heldIn, er
 	return out, nil
 }
 
-// releaseUnread hands back one party's open findings and leads in one product
+// releaseUnread hands back one party's open findings and code findings in one product
 // at every visibility outside kept, and all of them where kept is empty.
 func releaseUnread(ctx context.Context, db bun.IDB, party, productID int64,
 	kept []access.Visibility) (int64, error) {

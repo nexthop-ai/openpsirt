@@ -26,15 +26,15 @@ func TestAFailedRunDoesNotPoisonTheUploadsBeforeIt(t *testing.T) {
 	// wrong the longer a deployment runs.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
 		// An upload, then a run that fails, then a run that succeeds.
-		file(t, s, target, "first", now.Add(-3*time.Hour))
-		finishRun(t, s, target, now.Add(-2*time.Hour), "the scanner fell over")
-		finishRun(t, s, target, now.Add(-time.Hour), "")
+		file(t, s, build, "first", now.Add(-3*time.Hour))
+		finishRun(t, s, build, now.Add(-2*time.Hour), "the scanner fell over")
+		finishRun(t, s, build, now.Add(-time.Hour), "")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,13 +57,13 @@ func TestAnUploadReadsAsFailedWhileEveryRunSinceHasFailed(t *testing.T) {
 	// made irrelevant must not turn into never reporting one at all.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
-		file(t, s, target, "only", now.Add(-3*time.Hour))
-		finishRun(t, s, target, now.Add(-2*time.Hour), "the scanner fell over")
+		file(t, s, build, "only", now.Add(-3*time.Hour))
+		finishRun(t, s, build, now.Add(-2*time.Hour), "the scanner fell over")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,18 +82,18 @@ func TestARunIsAttributedToOneUploadHoweverThePageFalls(t *testing.T) {
 	// again, and the same opened-and-closed numbers would render twice.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
 		// Three uploads, then one run covering all of them.
 		for i, hash := range []string{"one", "two", "three"} {
-			file(t, s, target, hash, now.Add(-time.Duration(9-i)*time.Hour))
+			file(t, s, build, hash, now.Add(-time.Duration(9-i)*time.Hour))
 		}
-		finishRun(t, s, target, now.Add(-time.Hour), "")
+		finishRun(t, s, build, now.Add(-time.Hour), "")
 
 		claimed := 0
 		for offset := range 3 {
-			page, _, err := s.Receipts(ctx, reader, target, 1, offset)
+			page, _, err := s.Receipts(ctx, reader, build, 1, offset)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -111,17 +111,17 @@ func TestARunIsAttributedToOneUploadHoweverThePageFalls(t *testing.T) {
 	})
 }
 
-// quietTarget is the fixture's build whose only scan is a month old, so an
+// quietBuild is the fixture's build whose only scan is a month old, so an
 // upload filed now is newer than what it holds.
 //
 // The build the fixture scanned an hour ago cannot be used: a scan older than
 // the one a variant already holds is refused, which is the monotonicity rule
 // doing its job rather than something to work around.
-func quietTarget(t *testing.T, s *ingest.Store, productID int64) int64 {
+func quietBuild(t *testing.T, s *ingest.Store, productID int64) int64 {
 	t.Helper()
 	var id int64
-	if err := s.DB().NewSelect().TableExpr("\"target\" AS \"tg\"").
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+	if err := s.DB().NewSelect().TableExpr("\"build\" AS \"tg\"").
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "v" ON "v"."id" = "tg"."variant_id"`).
 		Column("tg.id").
 		Where(`"st"."product_id" = ?`, productID).
@@ -139,11 +139,11 @@ func quietTarget(t *testing.T, s *ingest.Store, productID int64) int64 {
 // an upload still sitting in the queue reads as "reading" whatever the runs
 // around it did, so leaving it pending would make every assertion below pass
 // for the wrong reason.
-func file(t *testing.T, s *ingest.Store, target int64, hash string, at time.Time) {
+func file(t *testing.T, s *ingest.Store, build int64, hash string, at time.Time) {
 	t.Helper()
 	ctx := t.Context()
 	scan, _, err := s.Record(ctx, ingest.Arriving{
-		TargetID: target, ContentHash: hash, BuiltAt: at, ParserVersion: "test",
+		BuildID: build, ContentHash: hash, BuiltAt: at, ParserVersion: "test",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -167,17 +167,17 @@ func file(t *testing.T, s *ingest.Store, target int64, hash string, at time.Time
 
 // finishRun records a scan run that has already ended, failing where a cause
 // is given.
-func finishRun(t *testing.T, s *ingest.Store, target int64, at time.Time, failure string) {
+func finishRun(t *testing.T, s *ingest.Store, build int64, at time.Time, failure string) {
 	t.Helper()
-	finishRunWith(t, s, target, at, failure, "", "")
+	finishRunWith(t, s, build, at, failure, "", "")
 }
 
 // finishRunWith is the same, saying what the run was measured with.
-func finishRunWith(t *testing.T, s *ingest.Store, target int64, at time.Time,
+func finishRunWith(t *testing.T, s *ingest.Store, build int64, at time.Time,
 	failure, scannerVersion, databaseVersion string) {
 	t.Helper()
 	row := map[string]any{
-		"target_id": target, "scanner": "test", "ran_here": true,
+		"build_id": build, "scanner": "test", "ran_here": true,
 		"scanner_version": scannerVersion, "database_version": databaseVersion,
 		"started_at": at.Add(-time.Minute), "finished_at": at, "failure": failure,
 	}
@@ -195,17 +195,17 @@ func finishRunWith(t *testing.T, s *ingest.Store, target int64, at time.Time,
 func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
 		// Two uploads, each answered by its own run, against databases four
 		// months apart.
-		file(t, s, target, "march", now.Add(-6*time.Hour))
-		finishRunWith(t, s, target, now.Add(-5*time.Hour), "", "0.100.0", "2026-03-01")
-		file(t, s, target, "september", now.Add(-4*time.Hour))
-		finishRunWith(t, s, target, now.Add(-3*time.Hour), "", "0.101.0", "2026-09-01")
+		file(t, s, build, "march", now.Add(-6*time.Hour))
+		finishRunWith(t, s, build, now.Add(-5*time.Hour), "", "0.100.0", "2026-03-01")
+		file(t, s, build, "september", now.Add(-4*time.Hour))
+		finishRunWith(t, s, build, now.Add(-3*time.Hour), "", "0.101.0", "2026-09-01")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -227,10 +227,10 @@ func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 		// them — repeating what a run opened down three rows reads as three
 		// separate changes — but what it was measured with belongs to both,
 		// because that is a property of the run rather than a change it made.
-		file(t, s, target, "one", now.Add(-2*time.Hour))
-		file(t, s, target, "two", now.Add(-90*time.Minute))
-		finishRunWith(t, s, target, now.Add(-time.Hour), "", "0.102.0", "2026-09-06")
-		receipts, _, err = s.Receipts(ctx, reader, target, 50, 0)
+		file(t, s, build, "one", now.Add(-2*time.Hour))
+		file(t, s, build, "two", now.Add(-90*time.Minute))
+		finishRunWith(t, s, build, now.Add(-time.Hour), "", "0.102.0", "2026-09-06")
+		receipts, _, err = s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -273,15 +273,15 @@ func TestARunIsAttributedToTheUploadThatArrivedLastBeforeIt(t *testing.T) {
 	// two, and the receipt for the upload the run actually read said nothing.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
 		// Filed in the order a build produces them, then set to have arrived
 		// the other way round: the lower identifier arrived second. A scan
 		// built before one already held is refused, so the two are recorded in
 		// order and their arrival is written afterwards.
-		file(t, s, target, "arrived-second", now.Add(-3*time.Hour))
-		file(t, s, target, "arrived-first", now.Add(-2*time.Hour))
+		file(t, s, build, "arrived-second", now.Add(-3*time.Hour))
+		file(t, s, build, "arrived-first", now.Add(-2*time.Hour))
 		for hash, at := range map[string]time.Time{
 			"arrived-second": now.Add(-2 * time.Hour),
 			"arrived-first":  now.Add(-3 * time.Hour),
@@ -292,9 +292,9 @@ func TestARunIsAttributedToTheUploadThatArrivedLastBeforeIt(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		finishRun(t, s, target, now.Add(-time.Hour), "")
+		finishRun(t, s, build, now.Add(-time.Hour), "")
 
-		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -322,17 +322,17 @@ func TestEveryRunKeepsItsOwnUploadAcrossALongHistory(t *testing.T) {
 	// way. A night at a time, over enough nights for that to show.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
 		const nights = 12
 		for i := range nights {
 			at := now.Add(-time.Duration(nights-i) * 2 * time.Hour)
-			file(t, s, target, "night-"+strconv.Itoa(i), at)
-			finishRun(t, s, target, at.Add(time.Hour), "")
+			file(t, s, build, "night-"+strconv.Itoa(i), at)
+			finishRun(t, s, build, at.Add(time.Hour), "")
 		}
 
-		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -361,10 +361,10 @@ func TestAKeyReadsEveryReceiptOnABuildItMayUploadTo(t *testing.T) {
 	// each one, and a key pinned to another build of the product reads none.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		var variant int64
-		if err := s.DB().NewSelect().TableExpr(`"target"`).Column("variant_id").
-			Where(`"id" = ?`, target).Scan(ctx, &variant); err != nil {
+		if err := s.DB().NewSelect().TableExpr(`"build"`).Column("variant_id").
+			Where(`"id" = ?`, build).Scan(ctx, &variant); err != nil {
 			t.Fatal(err)
 		}
 		now := time.Now().UTC()
@@ -378,7 +378,7 @@ func TestAKeyReadsEveryReceiptOnABuildItMayUploadTo(t *testing.T) {
 		sent := map[string]int64{}
 		for i, by := range []access.Subject{person, key} {
 			scan, _, err := s.Record(ctx, ingest.Arriving{
-				TargetID: target, ContentHash: string(by.Kind), BuiltAt: now.Add(time.Duration(i-3) * time.Hour),
+				BuildID: build, ContentHash: string(by.Kind), BuiltAt: now.Add(time.Duration(i-3) * time.Hour),
 				ParserVersion: "test", Credential: access.Sender(by),
 			})
 			if err != nil {
@@ -387,11 +387,11 @@ func TestAKeyReadsEveryReceiptOnABuildItMayUploadTo(t *testing.T) {
 			sent[string(by.Kind)] = scan.ID
 		}
 
-		_, every, err := s.Receipts(ctx, reader, target, 50, 0)
+		_, every, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		receipts, total, err := s.Receipts(ctx, key, target, 50, 0)
+		receipts, total, err := s.Receipts(ctx, key, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -399,14 +399,14 @@ func TestAKeyReadsEveryReceiptOnABuildItMayUploadTo(t *testing.T) {
 			t.Errorf("the key reads back %d of %d receipts, want all %d filed on the build",
 				len(receipts), total, every)
 		}
-		if _, err := s.Of(ctx, key, target, sent[string(access.Person)]); err != nil {
+		if _, err := s.Of(ctx, key, build, sent[string(access.Person)]); err != nil {
 			t.Errorf("the key cannot read a scan another sender filed on its build: %v", err)
 		}
 
-		if _, _, err := s.Receipts(ctx, pinned, target, 50, 0); !errors.Is(err, access.ErrDenied) {
+		if _, _, err := s.Receipts(ctx, pinned, build, 50, 0); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a key pinned to another build read its receipts: %v", err)
 		}
-		if _, err := s.Of(ctx, pinned, target, sent[string(access.Pipeline)]); !errors.Is(err, ingest.ErrNoScan) {
+		if _, err := s.Of(ctx, pinned, build, sent[string(access.Pipeline)]); !errors.Is(err, ingest.ErrNoScan) {
 			t.Errorf("a key pinned to another build read a scan of this one: %v", err)
 		}
 	})
@@ -419,14 +419,14 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 	// error is whatever failed, and a dropped connection names its address.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
 		for i, each := range []struct{ hash, lastError string }{
 			{"with-cause", "dial tcp 10.0.4.7:5432: connect: connection refused"},
 			{"without-cause", ""},
 		} {
-			file(t, s, target, each.hash, now.Add(time.Duration(i-2)*time.Hour))
+			file(t, s, build, each.hash, now.Add(time.Duration(i-2)*time.Hour))
 			var lastError any
 			if each.lastError != "" {
 				lastError = each.lastError
@@ -437,7 +437,7 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 				t.Fatal(err)
 			}
 			if _, err := s.DB().NewUpdate().Model((*queue.Job)(nil)).
-				Set(`"state" = ?`, queue.Dead).
+				Set(`"state" = ?`, queue.Failed).
 				Set(`"last_error" = ?`, lastError).
 				Where(`"reference" = ?`, strconv.FormatInt(scanID, 10)).
 				Exec(ctx); err != nil {
@@ -445,7 +445,7 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 			}
 		}
 
-		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -480,13 +480,13 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 func TestARunIsNotAttributedToAnUploadThatFailedOrIsUnread(t *testing.T) {
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
-		target := quietTarget(t, s, ours)
+		build := quietBuild(t, s, ours)
 		now := time.Now().UTC()
 
-		file(t, s, target, "read", now.Add(-4*time.Hour))
-		file(t, s, target, "failed", now.Add(-3*time.Hour))
-		file(t, s, target, "reading", now.Add(-150*time.Minute))
-		finishRun(t, s, target, now.Add(-2*time.Hour), "")
+		file(t, s, build, "read", now.Add(-4*time.Hour))
+		file(t, s, build, "failed", now.Add(-3*time.Hour))
+		file(t, s, build, "reading", now.Add(-150*time.Minute))
+		finishRun(t, s, build, now.Add(-2*time.Hour), "")
 
 		var failed, reading int64
 		for hash, id := range map[string]*int64{"failed": &failed, "reading": &reading} {
@@ -503,7 +503,7 @@ func TestARunIsNotAttributedToAnUploadThatFailedOrIsUnread(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		receipts, _, err := s.Receipts(ctx, reader, build, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

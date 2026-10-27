@@ -41,24 +41,24 @@ func openRows(t *testing.T, r *httpapitest.Reach, identifier string) int {
 }
 
 // A scan's sweep closes the vulnerability findings it no longer reports, and
-// leaves a lead at the same component open: absence in an inventory scan says
+// leaves a code finding at the same component open: absence in an inventory scan says
 // nothing about an analyzer's result.
-func TestAScansSweepClosesNoLead(t *testing.T) {
+func TestAScansSweepClosesNoCodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		asKind(t, r, "CVE-2026-1000", "analysis", "internal")
-		r.Ran(t, r.TargetOf(t, httpapitest.SeededBuild), nil)
+		r.Ran(t, r.BuildOf(t, httpapitest.SeededBuild), nil)
 		if got := openRows(t, r, "CVE-2026-9999"); got != 0 {
 			t.Fatalf("the sweep left %d vulnerability findings open, so this checks nothing", got)
 		}
 		if got := openRows(t, r, "CVE-2026-1000"); got != 1 {
-			t.Errorf("the sweep left %d of the lead open; want it untouched", got)
+			t.Errorf("the sweep left %d of the code finding open; want it untouched", got)
 		}
 	})
 }
 
 // A decision lapses when the versions it was made about move, and a decision
-// standing over leads alone lapses nowhere: a lead is carried by matching, and
+// standing over code findings alone lapses nowhere: a code finding is carried by matching, and
 // a version moving under it is not a reason to ask again.
 func TestAVersionMovingLapsesNoDecisionAboutALead(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -96,15 +96,15 @@ func TestAVersionMovingLapsesNoDecisionAboutALead(t *testing.T) {
 			t.Fatal("the decision over vulnerability findings did not lapse, so this checks nothing")
 		}
 		if got := lapsed(decisions["CVE-2026-CURL1"]); got != 0 {
-			t.Errorf("%d rows of the decision over leads lapsed; want none", got)
+			t.Errorf("%d rows of the decision over code findings lapsed; want none", got)
 		}
 	})
 }
 
 // The pass rewriting deadlines writes a vulnerability's and takes one away
-// where there is no fix to take, and leaves a lead's as it was: a lead carries
+// where there is no fix to take, and leaves a code finding's as it was: a code finding carries
 // no deadline the policy sets or clears.
-func TestTheDeadlinePassRewritesNoLead(t *testing.T) {
+func TestTheDeadlinePassRewritesNoCodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		sentinel := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
@@ -139,14 +139,14 @@ func TestTheDeadlinePassRewritesNoLead(t *testing.T) {
 		asKind(t, r, "CVE-2026-9999", "analysis", "public")
 		asKind(t, r, "CVE-2026-1000", "analysis", "public")
 		if got := moved(); got["CVE-2026-9999"] || got["CVE-2026-1000"] {
-			t.Errorf("the pass moved the deadlines of leads: %v", got)
+			t.Errorf("the pass moved the deadlines of code findings: %v", got)
 		}
 	})
 }
 
 // The screens about what a build contains count the vulnerability findings at
-// a component and no lead there.
-func TestTheInventoryScreensCountNoLead(t *testing.T) {
+// a component and no code finding there.
+func TestTheInventoryScreensCountNoCodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		counted := func() int {
@@ -169,14 +169,14 @@ func TestTheInventoryScreensCountNoLead(t *testing.T) {
 		}
 		asKind(t, r, "CVE-2026-9999", "analysis", "public")
 		if got := counted(); got != 0 {
-			t.Errorf("the tree counts %d findings where the one finding is a lead", got)
+			t.Errorf("the tree counts %d findings where the one finding is a code finding", got)
 		}
 	})
 }
 
 // The figures about findings — the trend and a product's overview — count
-// the vulnerability and no lead.
-func TestTheFiguresCountNoLead(t *testing.T) {
+// the vulnerability and no code finding.
+func TestTheFiguresCountNoCodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		figures := func() (trend, overview int) {
@@ -201,20 +201,20 @@ func TestTheFiguresCountNoLead(t *testing.T) {
 		}
 		asKind(t, r, "CVE-2026-9999", "analysis", "public")
 		if trend, overview := figures(); trend != 0 || overview != 0 {
-			t.Errorf("the trend counts %d open and the overview %d where the one finding is a lead", trend, overview)
+			t.Errorf("the trend counts %d open and the overview %d where the one finding is a code finding", trend, overview)
 		}
 	})
 }
 
 // An advisory names every release of a flaw recorded here, and no release
-// where the flaw's finding is a lead: a lead nobody judged is not a statement
+// where the flaw's finding is a code finding: a code finding nobody judged is not a statement
 // about what a release ships.
 func TestAnAdvisoryNamesNoReleaseOfALead(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		r.ScannedAlso(t, "mellanox", "3.7.0")
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"},{"stream":"master","variant":"mellanox"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"},{"branch_or_tag":"master","variant":"mellanox"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200"}`)
 		if made.Code != http.StatusCreated {
@@ -257,25 +257,25 @@ func TestAnAdvisoryNamesNoReleaseOfALead(t *testing.T) {
 		// The flaw's finding on one build only, so the advisory is still read
 		// through the other.
 		r.PatchedRows(t, `UPDATE "finding" SET "kind" = 'analysis'
-			WHERE "kind" = 'entered' AND "target_id" = `+httpapitest.Itoa(r.TargetOf(t, httpapitest.SeededBuild)))
+			WHERE "kind" = 'entered' AND "build_id" = `+httpapitest.Itoa(r.BuildOf(t, httpapitest.SeededBuild)))
 		if got := releases(); got["mine:master:broadcom"] || !got["mine:master:mellanox"] {
 			t.Errorf("the advisory names %v; want the release whose finding is the flaw's alone", got)
 		}
 	})
 }
 
-// The lead reads take the analysis kind alone. A finding holding everything a
-// lead holds — its analyzer's result, its sighting, its occurrence and its
+// The code finding reads take the analysis kind alone. A finding holding everything a
+// code finding holds — its analyzer's result, its sighting, its occurrence and its
 // visibility — and filed as another kind answers the evidence, the fixed
-// closure and the lead queue as though nothing were there.
-func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
+// closure and the code finding queue as though nothing were there.
+func TestTheCodeFindingReadsRefuseEveryOtherKind(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		occurrence := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededCodeFinding(t, r)
 		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 		queued := func() int {
 			t.Helper()
 			total := 0
-			for _, state := range []string{"", "not-reproduced", "fixed"} {
+			for _, state := range []string{"", "no-longer-detected", "fixed"} {
 				var queue struct {
 					Total int `json:"total"`
 				}
@@ -285,21 +285,21 @@ func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
 			return total
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
-			t.Fatalf("the lead's evidence answered %d, so this checks nothing: %s", got.Code, got.Body)
+			t.Fatalf("the code finding's evidence answered %d, so this checks nothing: %s", got.Code, got.Body)
 		}
 		if got := queued(); got != 1 {
-			t.Fatalf("the queue holds %d with one lead seeded, so this checks nothing", got)
+			t.Fatalf("the queue holds %d with one code finding seeded, so this checks nothing", got)
 		}
 		for _, other := range []string{"vulnerability", "entered"} {
 			r.PatchedRows(t, `UPDATE "finding" SET "kind" = '`+other+`' WHERE "occurrence_identity" = '`+occurrence+`'`)
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
 				t.Errorf("the evidence of a finding of kind %s answered %d: %s", other, got.Code, got.Body)
 			}
-			// Not reproduced, so the closure would otherwise be taken.
+			// No longer detected, so the closure would otherwise be taken.
 			r.PatchedRows(t, `UPDATE "sighting" SET "absent_run_id" = "last_run_id"`)
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at+"/fixed",
 				`{"because":"the parser was rewritten","fixed_in":1}`); got.Code != http.StatusNotFound {
-				t.Errorf("closing a finding of kind %s as a fixed lead answered %d: %s", other, got.Code, got.Body)
+				t.Errorf("closing a finding of kind %s as a fixed code finding answered %d: %s", other, got.Code, got.Body)
 			}
 			if got := queued(); got != 0 {
 				t.Errorf("the queue holds %d rows where the one finding is of kind %s", got, other)

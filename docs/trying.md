@@ -106,7 +106,7 @@ make demo DEMO_CAST="8091:ana:public-read,public-triage,approver \
 | `make dev` | This machine's binary plus the interface's own dev server, for editing the interface and watching it reload |
 
 - A demo where every figure reads zero demonstrates nothing. Without
-  `demo-triage` the review queue, the record of decisions, how long triage is
+  `demo-triage` the review queue, the audit log, how long triage is
   taking and what is planned are all empty, and the screens answering those
   questions look broken rather than idle. It records through the cast's own
   doors, because one person proposing and a second agreeing is the control the

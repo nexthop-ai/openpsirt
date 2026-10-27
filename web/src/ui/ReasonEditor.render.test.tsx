@@ -77,7 +77,7 @@ describe("revising and withdrawing a decision's reasoning", () => {
 });
 
 describe("naming somebody in a decision's reasoning", () => {
-  it("offers readers of internal work on a decision about a lead", async () => {
+  it("offers readers of internal work on a decision about a code finding", async () => {
     const reads = serve((path) =>
       path === "/v1/products/{product}/mentionable" ? { data: { items: [] } } : { data: {} },
     );

@@ -12,7 +12,7 @@ import {
 } from "./FindingDecision";
 import { Assess } from "./FindingAssess";
 import { Disclose } from "./FindingDisclose";
-import { ExploitedHere } from "./FindingExploited";
+import { Incident } from "./FindingIncident";
 import { Notes } from "./FindingNotes";
 import {
   Duplicates,
@@ -23,7 +23,7 @@ import {
   Reporter,
 } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
-import { FlawLeadCard, fixedFromLead, useFlawLead } from "./FlawLead";
+import { FlawCodeFindingCard, fixedFromCodeFinding, useFlawCodeFinding } from "./FlawCodeFinding";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
@@ -34,7 +34,7 @@ import { own } from "../ui/own";
 import { at as choicesAt, unwrap, whichOf } from "../api/queries";
 import { mayOf, useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
-import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
+import { Severity, Exploited, Incident as IncidentBadge } from "../ui/Severity";
 import { Weaknesses } from "../ui/Weakness";
 import { AffectedBuilds } from "./FindingBuilds";
 import { Markdown } from "../ui/Markdown";
@@ -94,11 +94,12 @@ const SAMPLE = 8;
 // The reason a finding carries no deadline, in words a reader can act on.
 //
 // Each says what to do with the row rather than naming the rule: somebody
-// reading this is deciding whether to look further, and "below the line" on
-// its own is a term they would have to go and learn.
+// reading this is deciding whether to look further, and a bare reason code is
+// a term they would have to go and learn.
 const NO_DEADLINE: Record<NonNullable<Body<"FindingBody">["no_deadline"]>, string> = {
   "not-rated": "nobody has rated it yet. The clock starts when somebody does.",
-  "below-the-line": "below what this product triages at. Recorded and counted; nothing is late.",
+  "below-minimum-severity":
+    "below what this product triages at. Recorded and counted; nothing is late.",
   "nothing-to-take":
     "upstream has released no fix, or has declined to, so there is no version that would close it.",
   "out-of-support": "the release is past its end of life, so nothing here will be fixed.",
@@ -111,9 +112,9 @@ function whyNone(reason: string | undefined): string {
 export function Finding() {
   const {
     product = "",
-    stream = "",
+    branch_or_tag: branchOrTag = "",
     variant = "",
-    vulnerability = "",
+    issue: vulnerability = "",
     component = "",
   } = useParams();
   const [params] = useSearchParams();
@@ -128,7 +129,7 @@ export function Finding() {
   const walking = params.has("from");
   const from = params.get("from") ?? "";
   const who = useWho();
-  const at = { product, stream, variant, vulnerability, component };
+  const at = { product, branch_or_tag: branchOrTag, variant, vulnerability, component };
   // The same finding with what picks its component, as the panes acting on it
   // take it.
   const located: At = { ...at, version, ecosystem, namespace };
@@ -156,7 +157,7 @@ export function Finding() {
   // The rest of what belongs to one finding, put back on walking to the next:
   // the confirmation of what was recorded, the decision being extended, and
   // the rating form and what it recorded.
-  useReseed(`${product}|${stream}|${variant}|${oneFinding}`, () => {
+  useReseed(`${product}|${branchOrTag}|${variant}|${oneFinding}`, () => {
     setRecorded(null);
     setExtending(null);
     setReclassifying(false);
@@ -174,10 +175,16 @@ export function Finding() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}",
           {
             params: {
-              path: { product, stream, variant, issue: vulnerability, component },
+              path: {
+                product,
+                branch_or_tag: branchOrTag,
+                variant,
+                issue: vulnerability,
+                component,
+              },
               query: whichOf({ version, ecosystem, namespace }),
             },
           },
@@ -188,16 +195,15 @@ export function Finding() {
   const it = finding.data;
   // Whether this reader may argue about this finding, which is what the
   // controls about the finding turn on: triage at the finding's own
-  // visibility, since each is its own role. A record of being exploited here
-  // is about the product and takes triage at any visibility. Read once:
-  // asked at each control, the copies drift and one of them ends up offering a
-  // button that answers 403.
+  // visibility, since each is its own role. An incident is about the product
+  // and takes triage at any visibility. Read once: asked at each control, the
+  // copies drift and one of them ends up offering a button that answers 403.
   const here = mayOf(who.data, product);
   const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
   const occurrences = useMemo(() => it?.occurrences ?? [], [it]);
-  // The lead a recorded flaw came from, read once for its card and the fix it
+  // The code finding a recorded flaw came from, read once for its card and the fix it
   // offers on this build.
-  const flawLead = useFlawLead(product, vulnerability, !!it?.recorded);
+  const flawCodeFinding = useFlawCodeFinding(product, vulnerability, !!it?.recorded);
   // An occurrence is the component and what pulls it in; two chains reaching the
   // same pair are one occurrence, and the head counts what a decision covers.
   const distinct = new Set(occurrences.map((occurrence) => occurrence.occurrence)).size;
@@ -244,12 +250,12 @@ export function Finding() {
         queryFn: async () =>
           unwrap(
             await api.GET(
-              "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision",
+              "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision",
               {
                 params: {
                   path: {
                     product,
-                    stream,
+                    branch_or_tag: branchOrTag,
                     variant,
                     issue: vulnerability,
                     occurrence: occurrence.occurrence ?? "",
@@ -354,7 +360,7 @@ export function Finding() {
   // the list may have been across several.
   const back = walking
     ? productFindingsAt(product, from)
-    : buildFindingsAt({ product, stream, variant });
+    : buildFindingsAt({ product, branch_or_tag: branchOrTag, variant });
   const mine = (proposedBy: string) => !!who.data && proposedBy === who.data.identity;
 
   return (
@@ -402,12 +408,12 @@ export function Finding() {
           </Link>{" "}
           in <span className="id">{it.component}</span>{" "}
           <Severity word={it.assessed || it.severity} />{" "}
-          <ExploitedHereBadge when={(it.exploited_here ?? []).some((each) => each.standing)} />{" "}
+          <IncidentBadge when={(it.incidents ?? []).some((each) => each.standing)} />{" "}
           {it.exploited && <Exploited when />}{" "}
           <span className={`state ${state.cls}`}>{state.label}</span>
         </h2>
         <p>
-          {product} · {stream} · {variant} · {distinct}{" "}
+          {product} · {branchOrTag} · {variant} · {distinct}{" "}
           {distinct === 1 ? "occurrence" : "occurrences"} ·{" "}
           <b style={{ color: "var(--ink)" }}>
             {decided} of {distinct} decided
@@ -460,7 +466,7 @@ export function Finding() {
             in is the person who put the mark here. */}
         <Marks
           at={located}
-          tags={it.tags ?? []}
+          labels={it.labels ?? []}
           mayMark={mayTriage}
           onChanged={() => void finding.refetch()}
         />
@@ -675,10 +681,10 @@ export function Finding() {
           {/* Beside the rating, because the two are the pair a reader is
               weighing: what the world says this is worth, and whether it has
               already happened to us. */}
-          <ExploitedHere
+          <Incident
             product={product}
             vulnerability={vulnerability}
-            records={it.exploited_here ?? undefined}
+            records={it.incidents ?? undefined}
             mayTriage={!!here?.may_triage}
           />
         </div>
@@ -700,7 +706,10 @@ export function Finding() {
             <Link
               className="linkish id"
               title={`Open ${it.component}`}
-              to={componentAt(product, it.component ?? "", it.version, { stream, variant })}
+              to={componentAt(product, it.component ?? "", it.version, {
+                branch_or_tag: branchOrTag,
+                variant,
+              })}
             >
               {it.component} {it.version}
             </Link>
@@ -790,7 +799,7 @@ export function Finding() {
 
       <div className="acting">
         {/* Directly above the decision card it produced. Submitting hides the
-            form and the publisher statements, so the page shortens under
+            form and the received VEX, so the page shortens under
             whoever pressed the button, and a confirmation at the head of the
             screen lands out of view. */}
         {recorded && (
@@ -899,22 +908,22 @@ export function Finding() {
             {/* Said when there is nothing, because the difference matters:
                 an empty panel reads as "nobody has an opinion about this",
                 and what it actually means is that no document saying so has
-                been uploaded here. The layer is fed only by uploads
- — nothing derives it, and a distribution's
+                been received here. The layer is fed only by uploads and
+                supplier advisory feeds — nothing derives it, and a distribution's
                 will-not-fix arrives through the scanner as an upstream fix
                 status instead. */}
             {publishers.length === 0 && (
               <div className="card">
-                <h3>Publisher statements</h3>
-                <p className="reading" title="Uploaded by an administrator, never fetched">
-                  Nothing uploaded
+                <h3 title="What suppliers and other publishers state about this">Received VEX</h3>
+                <p className="reading" title="Uploaded, or fetched from a supplier advisory feed">
+                  Nothing received
                 </p>
               </div>
             )}
 
             {publishers.length > 0 && (
               <div className="card">
-                <h3>Publisher statements</h3>
+                <h3 title="What suppliers and other publishers state about this">Received VEX</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
                   Evidence. Only what is marked as applying here closes anything.
                 </p>
@@ -1129,7 +1138,7 @@ export function Finding() {
                       at={located}
                       assigned={it.assigned_to ?? ""}
                       undisclosed={!!it.undisclosed}
-                      routedBy={it.routed_by ?? ""}
+                      assignedByRule={it.assigned_by_rule ?? ""}
                     />
                   }
                   onDone={(r) => {
@@ -1145,7 +1154,7 @@ export function Finding() {
                   // stayed mounted and kept the previous build's answers in its
                   // fields — an outcome and a justification about one variant,
                   // offered against another.
-                  key={`${prefill.opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
+                  key={`${prefill.opened}:${product}:${branchOrTag}:${variant}:${vulnerability}:${component}:${version}`}
                 />
               </div>
             )}
@@ -1200,7 +1209,7 @@ export function Finding() {
             at={located}
             assigned={it.assigned_to ?? ""}
             undisclosed={!!it.undisclosed}
-            routedBy={it.routed_by ?? ""}
+            assignedByRule={it.assigned_by_rule ?? ""}
           />
         )}
 
@@ -1211,7 +1220,7 @@ export function Finding() {
         <div className="card">
           <Occurrences
             occurrences={occurrences}
-            build={{ product, stream, variant }}
+            build={{ product, branch_or_tag: branchOrTag, variant }}
             version={it.version}
           />
         </div>
@@ -1239,10 +1248,10 @@ export function Finding() {
         {it.recorded && <AffectedBuilds product={product} vulnerability={vulnerability} />}
 
         {it.recorded && (
-          <FlawLeadCard
+          <FlawCodeFindingCard
             product={product}
             vulnerability={vulnerability}
-            stream={stream}
+            branch_or_tag={branchOrTag}
             variant={variant}
           />
         )}
@@ -1251,7 +1260,7 @@ export function Finding() {
           <Resolve
             at={at}
             vulnerability={vulnerability}
-            prefill={fixedFromLead(flawLead.data, stream, variant)}
+            prefill={fixedFromCodeFinding(flawCodeFinding.data, branchOrTag, variant)}
           />
         )}
 

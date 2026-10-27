@@ -15,18 +15,18 @@ import (
 
 // builtAs is one variant's build of one branch, for a pair the fixture's own
 // helpers do not make: they each hold one of the two fixed.
-func (f *fixture) builtAs(t *testing.T, streamID int64, variant string) int64 {
+func (f *fixture) builtAs(t *testing.T, branchOrTagID int64, variant string) int64 {
 	t.Helper()
 	cat := catalog.NewStore(f.db.DB)
 	declared, err := cat.VariantByName(t.Context(), f.productID, variant)
 	if err != nil {
 		t.Fatalf("variant %s: %v", variant, err)
 	}
-	target, err := cat.TargetFor(t.Context(), streamID, declared.ID)
+	build, err := cat.BuildFor(t.Context(), branchOrTagID, declared.ID)
 	if err != nil {
 		t.Fatalf("build of %s: %v", variant, err)
 	}
-	return target.ID
+	return build.ID
 }
 
 // variantID is what a variant's name resolves to, for a selection naming one.
@@ -49,19 +49,19 @@ func TestWhatIsSpecificToAVariantIsComparedOnItsOwnBranch(t *testing.T) {
 
 		// Two branches, both built as both variants.
 		older := f.anotherBranch(t, "202411")
-		olderStream := f.scopeOf(t, older).StreamID
+		olderBranchOrTag := f.scopeOf(t, older).BranchOrTagID
 		builds := map[string]int64{
-			"broadcom/master": f.target,
+			"broadcom/master": f.build,
 			"mellanox/master": f.anotherVariant(t, "mellanox"),
 			"broadcom/202411": older,
-			"mellanox/202411": f.builtAs(t, *olderStream, "mellanox"),
+			"mellanox/202411": f.builtAs(t, *olderBranchOrTag, "mellanox"),
 		}
-		for name, target := range builds {
-			if target == f.target {
+		for name, build := range builds {
+			if build == f.build {
 				f.shipped(t, through(libnl))
 				continue
 			}
-			f.shippedTo(t, target, through(libnl))
+			f.shippedTo(t, build, through(libnl))
 			_ = name
 		}
 
@@ -76,12 +76,12 @@ func TestWhatIsSpecificToAVariantIsComparedOnItsOwnBranch(t *testing.T) {
 			"broadcom/202411": {"CVE-2026-1", "CVE-2026-2"},
 			"mellanox/202411": {"CVE-2026-1"},
 		}
-		for name, target := range builds {
+		for name, build := range builds {
 			reported := make([]finding.Reported, 0, len(open[name]))
 			for _, issue := range open[name] {
 				reported = append(reported, found(issue, libnl))
 			}
-			if _, err := f.store.Apply(ctx, target, f.runOn(t, target), reported); err != nil {
+			if _, err := f.store.Apply(ctx, build, f.runOn(t, build), reported); err != nil {
 				t.Fatalf("scan %s: %v", name, err)
 			}
 		}
@@ -117,7 +117,7 @@ func TestWhatIsSpecificToAVariantIsComparedOnItsOwnBranch(t *testing.T) {
 		everywhere := func(variant int64) finding.Scope {
 			return finding.Scope{ProductID: &f.productID, VariantID: &variant}
 		}
-		newer := finding.Scope{ProductID: &f.productID, StreamID: f.scope.StreamID}
+		newer := finding.Scope{ProductID: &f.productID, BranchOrTagID: f.scope.BranchOrTagID}
 
 		// On the newer branch alone, broadcom does not hold CVE-2026-2.
 		same(t, "specific to mellanox on the newer branch",

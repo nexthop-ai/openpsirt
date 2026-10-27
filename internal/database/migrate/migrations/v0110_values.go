@@ -18,32 +18,49 @@ type valueRewrite struct{ table, column, from, to string }
 
 // valuesRewrittenV0110 is every stored word v0.11.0 renames, by the tables as
 // v0.11.0 names them. A notification destination names a kind as a
-// notification does, so both are rewritten.
+// notification does, so both are rewritten. The trail's kind of change is
+// one of a fixed list the API filters on and returns, so it is rewritten
+// too; what a change was about is kept as written.
 var valuesRewrittenV0110 = []valueRewrite{
 	{"decision", "kind", "together", "bulk"},
 	{"notification", "kind", "claim-waiting", "decision-waiting"},
 	{"notification", "kind", "claim-lapsed", "decision-lapsed"},
 	{"outbound", "kind", "claim-waiting", "decision-waiting"},
 	{"outbound", "kind", "claim-lapsed", "decision-lapsed"},
+	{"notification", "kind", "obligation-open", "response-window-open"},
+	{"notification", "kind", "obligation-near", "response-window-near"},
+	{"notification", "kind", "obligation-passed", "response-window-passed"},
+	{"outbound", "kind", "obligation-open", "response-window-open"},
+	{"outbound", "kind", "obligation-near", "response-window-near"},
+	{"outbound", "kind", "obligation-passed", "response-window-passed"},
+	{"admin_change", "kind", "exploited-here", "incident"},
+	{"job", "state", "dead", "failed"},
+	{"admin_change", "kind", "routing", "assignment-rule"},
+	{"job", "kind", "routing.sweep", "assignment.sweep"},
 }
 
-// settingRenamedV0110 is the setting v0.11.0 renames, from its v0.10.0 name.
-var settingRenamedV0110 = struct{ from, to string }{"triage.together-cap", "triage.bulk-decision-cap"}
+// settingsRenamedV0110 is each setting v0.11.0 renames, from its v0.10.0 name.
+var settingsRenamedV0110 = []struct{ from, to string }{
+	{"triage.together-cap", "triage.bulk-decision-cap"},
+	{"triage.floor", "triage.minimum-severity"},
+	{"routing.batch", "assignment.batch"},
+}
 
 // savedWordsV0110 is each word of the findings list's address v0.11.0
 // renames, and savedSortsV0110 each order it renames.
 var (
-	savedWordsV0110 = map[string]string{"claim": "decision", "claim_state": "decision_state"}
+	savedWordsV0110 = map[string]string{"claim": "decision", "claim_state": "decision_state", "tag": "label"}
 	savedSortsV0110 = map[string]string{"places": "occurrences"}
 )
 
 // errValuesStopped is what a rewrite stopped on purpose returns.
 var errValuesStopped = errors.New("the stored words were stopped part way")
 
-// valuesV0110 gives every stored word the triage renames reach its v0.11.0
+// valuesV0110 gives every stored word the renames reach its v0.11.0
 // spelling: a decision's kind, the kinds of notification and destination,
-// the link a notification holds to a decision's row, the address a kept
-// filter opens and a setting's name. It runs after the
+// the link a notification holds to a decision's row, a job's state, the
+// administrative trail's and the job queue's kinds, the
+// address a kept filter opens and the settings' names. It runs after the
 // renames, against the tables as v0.11.0 names them.
 //
 // Every step changes only rows still holding a v0.10.0 word, so a start that
@@ -125,7 +142,8 @@ func savedFiltersV0110(ctx context.Context, tx bun.Tx) error {
 		Query string `bun:"query"`
 	}
 	if err := tx.NewRaw(`SELECT "id", "query" FROM "saved_filter"
-		WHERE "query" LIKE '%claim%' OR "query" LIKE '%places%' ORDER BY "id"`).Scan(ctx, &rows); err != nil {
+		WHERE "query" LIKE '%claim%' OR "query" LIKE '%places%' OR "query" LIKE '%tag%'
+		ORDER BY "id"`).Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read the kept filters: %w", err)
 	}
 	for _, row := range rows {
@@ -166,20 +184,22 @@ func savedQueryV0110(query string) string {
 	return strings.Join(pairs, "&")
 }
 
-// settingV0110 moves the renamed setting's row to its new name. A row already
+// settingV0110 moves each renamed setting's row to its new name. A row already
 // under the new name is left beside the old one, which the new one outranks.
 func settingV0110(ctx context.Context, tx bun.Tx) error {
-	var held int
-	if err := tx.NewRaw(`SELECT COUNT(*) FROM "application_setting" WHERE "name" = ?`,
-		settingRenamedV0110.to).Scan(ctx, &held); err != nil {
-		return fmt.Errorf("read the %q setting: %w", settingRenamedV0110.to, err)
-	}
-	if held > 0 {
-		return nil
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE "application_setting" SET "name" = ? WHERE "name" = ?`,
-		settingRenamedV0110.to, settingRenamedV0110.from); err != nil {
-		return fmt.Errorf("rename the %q setting: %w", settingRenamedV0110.from, err)
+	for _, renamed := range settingsRenamedV0110 {
+		var held int
+		if err := tx.NewRaw(`SELECT COUNT(*) FROM "application_setting" WHERE "name" = ?`,
+			renamed.to).Scan(ctx, &held); err != nil {
+			return fmt.Errorf("read the %q setting: %w", renamed.to, err)
+		}
+		if held > 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE "application_setting" SET "name" = ? WHERE "name" = ?`,
+			renamed.to, renamed.from); err != nil {
+			return fmt.Errorf("rename the %q setting: %w", renamed.from, err)
+		}
 	}
 	return nil
 }

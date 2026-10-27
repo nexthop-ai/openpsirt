@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useParams } from "react-router-dom";
-import { useStreamsResolving } from "../api/catalog";
+import { useBranchesAndTagsResolving } from "../api/catalog";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Variants } from "./Variants";
 import { Release } from "./Release";
 
-// One stream, at the address a branch and a tag share.
+// One branch or tag, at the address a branch and a tag share.
 //
 // A branch and a tag are the same kind of thing to the catalog and very
 // different things to a reader: a branch is rebuilt nightly and what matters is
@@ -20,25 +20,30 @@ import { Release } from "./Release";
 // Resolved rather than guessed from the name. A tag is a tag because the
 // catalog says so, and a naming convention is a rule nobody agreed to.
 export function Branch() {
-  const { product = "", stream = "" } = useParams();
+  const { product = "", branch_or_tag: branchOrTag = "" } = useParams();
   // Retired releases included. A retired tag missing from the answer falls
   // through to the branch view, which is the one thing this screen exists to
   // prevent.
-  const streams = useStreamsResolving(product);
+  const branchesAndTags = useBranchesAndTagsResolving(product);
 
-  if (streams.isPending) return <Loading />;
+  if (branchesAndTags.isPending) return <Loading />;
   // Nothing is dispatched on a read that failed. This screen exists to stop a
   // tag being drawn as a branch with the interesting parts missing, and the
   // fallback is the branch view — so falling through on a failure does the one
   // thing the screen is for preventing. That the variants list reports its own
   // failure is true and is not the question: the choice has already been made
   // wrongly by then.
-  if (streams.isError) {
-    return <Failed error={streams.error} what="This could not be resolved to a branch or a tag." />;
+  if (branchesAndTags.isError) {
+    return (
+      <Failed
+        error={branchesAndTags.error}
+        what="This could not be resolved to a branch or a tag."
+      />
+    );
   }
   // A name matching no row is a 404 the variants screen reports for itself,
   // so the fallback stays for that.
-  const here = streams.data?.items?.find((row) => row.name === stream);
-  if (here?.kind === "tag") return <Release product={product} stream={stream} />;
+  const here = branchesAndTags.data?.items?.find((row) => row.name === branchOrTag);
+  if (here?.kind === "tag") return <Release product={product} branch_or_tag={branchOrTag} />;
   return <Variants />;
 }

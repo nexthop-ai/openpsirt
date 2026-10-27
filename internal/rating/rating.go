@@ -31,9 +31,9 @@ import "sort"
 type On string
 
 const (
-	// OnStream is the product the row's stream belongs to, for a query that
+	// OnBranchOrTag is the product the row's branch or tag belongs to, for a query that
 	// spans products and reads each row's own.
-	OnStream On = `"st"."product_id"`
+	OnBranchOrTag On = `"st"."product_id"`
 	// OnDecisionOccurrence is the product a decision occurrence was recorded in.
 	OnDecisionOccurrence On = `"de"."product_id"`
 	// OnGrouped is the product column of a derived table aliased grouped,

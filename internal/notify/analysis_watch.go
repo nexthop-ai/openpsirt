@@ -41,19 +41,19 @@ const (
 // analysisBuild is one series on one build in use, with the names a message
 // needs.
 type analysisBuild struct {
-	ProductID int64  `bun:"product_id"`
-	StreamID  int64  `bun:"stream_id"`
-	SeriesID  int64  `bun:"series_id"`
-	TargetID  int64  `bun:"target_id"`
-	Product   string `bun:"product"`
-	Stream    string `bun:"stream"`
-	Variant   string `bun:"variant"`
+	ProductID     int64  `bun:"product_id"`
+	BranchOrTagID int64  `bun:"branch_or_tag_id"`
+	SeriesID      int64  `bun:"series_id"`
+	BuildID       int64  `bun:"build_id"`
+	Product       string `bun:"product"`
+	BranchOrTag   string `bun:"branch_or_tag"`
+	Variant       string `bun:"variant"`
 	// The same three as an address names them.
-	ProductName string `bun:"product_name"`
-	StreamName  string `bun:"stream_name"`
-	VariantName string `bun:"variant_name"`
-	Series      string `bun:"series"`
-	Folded      string `bun:"series_folded"`
+	ProductName     string `bun:"product_name"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	VariantName     string `bun:"variant_name"`
+	Series          string `bun:"series"`
+	Folded          string `bun:"series_folded"`
 }
 
 // analysisRuns is the applied runs of analyzer series against builds still in
@@ -62,19 +62,19 @@ func analysisRuns(db bun.IDB) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr(`"series_run" AS "sr"`).
 		Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "sr"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "sr"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"sr"."series_id" AS "series_id"`).
-		ColumnExpr(`"sr"."target_id" AS "target_id"`).
+		ColumnExpr(`"sr"."build_id" AS "build_id"`).
 		ColumnExpr(`"p"."display_name" AS "product"`).
-		ColumnExpr(`"st"."display_name" AS "stream"`).
+		ColumnExpr(`"st"."display_name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."display_name" AS "variant"`).
 		ColumnExpr(`"p"."name" AS "product_name"`).
-		ColumnExpr(`"st"."name" AS "stream_name"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant_name"`).
 		ColumnExpr(`"se"."name" AS "series"`).
 		ColumnExpr(`"se"."name_folded" AS "series_folded"`).
@@ -89,7 +89,7 @@ func analysisRuns(db bun.IDB) *bun.SelectQuery {
 // pastEndOfLife is the releases past their end of life, whose builds are
 // left alone on purpose for the reason a retired one is.
 func (w *sweep) pastEndOfLife(ctx context.Context) (map[int64]bool, error) {
-	ended, err := catalog.NewStore(w.db).StreamsPastEndOfLife(ctx, time.Now().UTC())
+	ended, err := catalog.NewStore(w.db).BranchesAndTagsPastEndOfLife(ctx, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (w *sweep) tellInternal(out map[int64][]Holds, productID int64, holds Holds
 // be compared, against the product's internal readers.
 //
 // While it holds, nothing that series stops reporting on that build is marked
-// not reproduced, so a fix and a broken pipeline look the same. It clears on
+// no longer detected, so a fix and a broken pipeline look the same. It clears on
 // the next comparable run.
 func (w *sweep) analysesNotComparable(ctx context.Context) (map[int64][]Holds, error) {
 	var rows []struct {
@@ -129,7 +129,7 @@ func (w *sweep) analysesNotComparable(ctx context.Context) (map[int64][]Holds, e
 		Where(`"sr"."comparable" = ?`, false).
 		// The newest applied run, in the order the applier reads them.
 		Where(`NOT EXISTS (SELECT 1 FROM "series_run" AS "nw" `+
-			`WHERE "nw"."series_id" = "sr"."series_id" AND "nw"."target_id" = "sr"."target_id" `+
+			`WHERE "nw"."series_id" = "sr"."series_id" AND "nw"."build_id" = "sr"."build_id" `+
 			`AND "nw"."status" = ? AND ("nw"."built_at" > "sr"."built_at" `+
 			`OR ("nw"."built_at" = "sr"."built_at" AND "nw"."id" > "sr"."id")))`, series.Applied).
 		Scan(ctx, &rows)
@@ -141,21 +141,21 @@ func (w *sweep) analysesNotComparable(ctx context.Context) (map[int64][]Holds, e
 		return nil, err
 	}
 
-	out, err := w.everybody(ctx, AnalysisNotComparable)
+	out, err := w.everybody(ctx, SecurityTestingNotComparable)
 	if err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
-		if past[row.StreamID] {
+		if past[row.BranchOrTagID] {
 			continue
 		}
 		w.tellInternal(out, row.ProductID, Holds{
-			About: identify("analysis-not-comparable", strconv.FormatInt(row.SeriesID, 10),
-				strconv.FormatInt(row.TargetID, 10)),
+			About: identify("security-testing-not-comparable", strconv.FormatInt(row.SeriesID, 10),
+				strconv.FormatInt(row.BuildID, 10)),
 			Body: fmt.Sprintf("%s %s %s: the last run of %s could not be compared, because %s. "+
-				"Nothing it stops reporting is marked not reproduced until a run can be.",
-				row.Product, row.Stream, row.Variant, row.Series, uncomparable(row.Reason)),
-			Link: weblink.Leads(row.ProductName, row.StreamName, row.VariantName, "", ""),
+				"Nothing it stops reporting is marked no longer detected until a run can be.",
+				row.Product, row.BranchOrTag, row.Variant, row.Series, uncomparable(row.Reason)),
+			Link: weblink.CodeFindings(row.ProductName, row.BranchOrTagName, row.VariantName, "", ""),
 		})
 	}
 	return out, nil
@@ -200,22 +200,22 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 	err := w.db.NewSelect().
 		TableExpr(`(?) AS "ranked"`, analysisRuns(w.db).
 			ColumnExpr(`"sr"."received_at" AS "received_at"`).
-			ColumnExpr(`ROW_NUMBER() OVER (PARTITION BY "sr"."series_id", "sr"."target_id" `+
+			ColumnExpr(`ROW_NUMBER() OVER (PARTITION BY "sr"."series_id", "sr"."build_id" `+
 				`ORDER BY "sr"."received_at" DESC, "sr"."id" DESC) AS "newest"`)).
 		ColumnExpr(`"ranked".*`).
 		Where(`"ranked"."newest" <= ?`, quietGaps+1).
-		OrderExpr(`"ranked"."series_id", "ranked"."target_id", "ranked"."received_at" DESC`).
+		OrderExpr(`"ranked"."series_id", "ranked"."build_id", "ranked"."received_at" DESC`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read when each analyzer series last arrived: %w", err)
 	}
 
-	type pair struct{ series, target int64 }
+	type pair struct{ series, build int64 }
 	var order []pair
 	runs := make(map[pair][]time.Time)
 	named := make(map[pair]analysisBuild)
 	for _, row := range rows {
-		at := pair{row.SeriesID, row.TargetID}
+		at := pair{row.SeriesID, row.BuildID}
 		if _, seen := named[at]; !seen {
 			order = append(order, at)
 			named[at] = row.analysisBuild
@@ -227,14 +227,14 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 		return nil, err
 	}
 
-	out, err := w.everybody(ctx, AnalysisQuiet)
+	out, err := w.everybody(ctx, SecurityTestingStopped)
 	if err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC()
 	for _, at := range order {
 		build := named[at]
-		if past[build.StreamID] {
+		if past[build.BranchOrTagID] {
 			continue
 		}
 		silent, quiet := quietFor(runs[at], now)
@@ -242,21 +242,21 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 			continue
 		}
 		body := fmt.Sprintf("%s %s %s: no run of %s has been applied for %s.",
-			build.Product, build.Stream, build.Variant, build.Series, plainly(int(silent.Hours()/24)))
+			build.Product, build.BranchOrTag, build.Variant, build.Series, plainly(int(silent.Hours()/24)))
 		turned, err := w.lastRefused(ctx, build, runs[at][0])
 		if err != nil {
 			return nil, err
 		}
 		if turned != nil {
 			body = fmt.Sprintf("%s %s %s: no run of %s has been applied for %s, and an upload "+
-				"of it was turned away on %s: %s", build.Product, build.Stream, build.Variant,
+				"of it was turned away on %s: %s", build.Product, build.BranchOrTag, build.Variant,
 				build.Series, plainly(int(silent.Hours()/24)), day(turned.At), turned.Reason)
 		}
 		w.tellInternal(out, build.ProductID, Holds{
-			About: identify("analysis-quiet", strconv.FormatInt(at.series, 10),
-				strconv.FormatInt(at.target, 10)),
+			About: identify("security-testing-stopped", strconv.FormatInt(at.series, 10),
+				strconv.FormatInt(at.build, 10)),
 			Body: body,
-			Link: weblink.Leads(build.ProductName, build.StreamName, build.VariantName, "", ""),
+			Link: weblink.CodeFindings(build.ProductName, build.BranchOrTagName, build.VariantName, "", ""),
 		})
 	}
 	return out, nil
@@ -290,7 +290,7 @@ func (w *sweep) lastRefused(ctx context.Context, build analysisBuild,
 	since time.Time) (*series.Refusal, error) {
 	var turned []series.Refusal
 	err := w.db.NewSelect().Model(&turned).
-		Where(`"sx"."target_id" = ?`, build.TargetID).
+		Where(`"sx"."build_id" = ?`, build.BuildID).
 		Where(`"sx"."kind" = ?`, kind.Analysis).
 		Where(`"sx"."series_folded" = ?`, build.Folded).
 		Where(`"sx"."at" > ?`, since).
@@ -305,7 +305,7 @@ func (w *sweep) lastRefused(ctx context.Context, build analysisBuild,
 	return &turned[0], nil
 }
 
-// rulesOutgrown is every approved standing rule on leads that covers more
+// rulesOutgrown is every approved suppression rule that covers more
 // than its approver saw by the deployment's factor, against whoever may
 // approve it again.
 //
@@ -322,12 +322,12 @@ func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
 		TableExpr(`"product" AS "p"`).
 		ColumnExpr(`"p"."id", "p"."name", "p"."display_name"`).
 		Where(`"p"."retired_at" IS NULL`).
-		Where(`EXISTS (SELECT 1 FROM "lead_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
+		Where(`EXISTS (SELECT 1 FROM "suppression_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
 			`AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL)`).
 		Scan(ctx, &products); err != nil {
-		return nil, fmt.Errorf("read which products hold standing rules on leads: %w", err)
+		return nil, fmt.Errorf("read which products hold suppression rules: %w", err)
 	}
-	out, err := w.everybody(ctx, RuleOutgrown)
+	out, err := w.everybody(ctx, SuppressionRuleOutgrown)
 	if err != nil {
 		return nil, err
 	}
@@ -335,12 +335,12 @@ func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
 	// the rule's size, and who hears it is decided below by who may approve.
 	everything := access.Everything("the watch")
 	for _, product := range products {
-		rules, err := analysis.StandingRules(ctx, w.db, everything, product.ID)
+		rules, err := analysis.SuppressionRules(ctx, w.db, everything, product.ID)
 		if err != nil {
 			return nil, err
 		}
 		for _, rule := range rules {
-			if rule.State != analysis.RuleOutgrown || rule.ApprovedCovering == nil {
+			if rule.State != analysis.SuppressionRuleOutgrown || rule.ApprovedCovering == nil {
 				continue
 			}
 			named := rule.Rule
@@ -349,11 +349,11 @@ func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
 			}
 			productID := product.ID
 			holds := Holds{
-				About: identify("rule-outgrown", strconv.FormatInt(rule.ID, 10)),
-				Body: fmt.Sprintf("A standing rule in %s dismissing %s covers %d leads, and was approved "+
+				About: identify("suppression-rule-outgrown", strconv.FormatInt(rule.ID, 10)),
+				Body: fmt.Sprintf("A suppression rule in %s dismissing %s covers %d code findings, and was approved "+
 					"over %d. It keeps dismissing them until somebody approves it again.",
 					product.Shown, named, rule.Covering, *rule.ApprovedCovering),
-				Link:      weblink.LeadRules(product.Name),
+				Link:      weblink.SuppressionRules(product.Name),
 				Private:   true,
 				Internal:  true,
 				ProductID: &productID,
@@ -370,17 +370,17 @@ func (w *sweep) rulesOutgrown(ctx context.Context) (map[int64][]Holds, error) {
 	return out, nil
 }
 
-// rulesWaiting is every standing rule on leads that nobody has approved, past
+// rulesWaiting is every suppression rule that nobody has approved, past
 // the period a decision may wait on a second person, against whoever may approve
 // it.
 //
-// A proposed rule dismisses nothing, so every lead it names stays in the
+// A proposed rule dismisses nothing, so every code finding it names stays in the
 // queue while it waits. It clears when the rule is approved or retired.
 func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 	after, err := setting.NewStore(w.db).Duration(ctx,
 		setting.WaitingAfter, setting.DefaultWaitingAfter)
 	if err != nil {
-		return nil, fmt.Errorf("read how long a standing rule may wait: %w", err)
+		return nil, fmt.Errorf("read how long a suppression rule may wait: %w", err)
 	}
 	since := time.Now().UTC().Add(-after)
 	var products []struct {
@@ -392,12 +392,12 @@ func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 		TableExpr(`"product" AS "p"`).
 		ColumnExpr(`"p"."id", "p"."name", "p"."display_name"`).
 		Where(`"p"."retired_at" IS NULL`).
-		Where(`EXISTS (SELECT 1 FROM "lead_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
+		Where(`EXISTS (SELECT 1 FROM "suppression_rule" AS "lr" WHERE "lr"."product_id" = "p"."id" `+
 			`AND "lr"."approved_at" IS NULL AND "lr"."retired_at" IS NULL AND "lr"."proposed_at" <= ?)`, since).
 		Scan(ctx, &products); err != nil {
-		return nil, fmt.Errorf("read which products hold standing rules waiting on a second person: %w", err)
+		return nil, fmt.Errorf("read which products hold suppression rules waiting on a second person: %w", err)
 	}
-	out, err := w.everybody(ctx, RuleWaiting)
+	out, err := w.everybody(ctx, SuppressionRuleWaiting)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +405,7 @@ func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 	// decided below by who may approve.
 	everything := access.Everything("the watch")
 	for _, product := range products {
-		rules, err := analysis.StandingRules(ctx, w.db, everything, product.ID)
+		rules, err := analysis.SuppressionRules(ctx, w.db, everything, product.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -416,16 +416,16 @@ func (w *sweep) rulesWaiting(ctx context.Context) (map[int64][]Holds, error) {
 			named := rule.Rule
 			switch {
 			case named == "":
-				named = "every lead under " + rule.Prefix
+				named = "every code finding under " + rule.Prefix
 			case rule.Prefix != "":
 				named += " under " + rule.Prefix
 			}
 			productID := product.ID
 			holds := Holds{
-				About: identify("rule-waiting", strconv.FormatInt(rule.ID, 10)),
-				Body: fmt.Sprintf("A standing rule in %s dismissing %s is waiting for a second person. "+
+				About: identify("suppression-rule-waiting", strconv.FormatInt(rule.ID, 10)),
+				Body: fmt.Sprintf("A suppression rule in %s dismissing %s is waiting for a second person. "+
 					"It dismisses nothing until somebody approves it.", product.Shown, named),
-				Link:      weblink.LeadRules(product.Name),
+				Link:      weblink.SuppressionRules(product.Name),
 				Private:   true,
 				Internal:  true,
 				ProductID: &productID,

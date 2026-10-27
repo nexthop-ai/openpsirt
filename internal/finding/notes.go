@@ -15,7 +15,7 @@ import (
 // Note is what a release note says about itself: which two builds it compares,
 // when it was produced, and what it was produced against.
 //
-// The names are what the releases are called rather than the stream and
+// The names are what the releases are called rather than the branch or tag and
 // variant this deployment files them under. A customer reading "main
 // container" does not know what that is, and a heading naming our internals is
 // the first line of a document going to them.
@@ -92,7 +92,7 @@ func Notes(about Note, c *Comparison) string {
 //
 // Every one of these is somebody else's text: the release names were given at
 // upload and the scanner and database versions are what the scanner reported.
-// Each is escaped once here, so the heading, the lead and the sentence a
+// Each is escaped once here, so the heading, the code finding and the sentence a
 // release that fixed nothing is carry them as text.
 func written(about Note) Note {
 	about.From = markdown.Literal(strings.TrimSpace(about.From))

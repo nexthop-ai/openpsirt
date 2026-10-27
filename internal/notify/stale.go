@@ -182,7 +182,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 				"second person. It takes effect only once somebody agrees to it.",
 				row.Product, reports, strings.ReplaceAll(row.Disposition, "-", " "),
 				plainly(days)),
-			Link: weblink.InboxWaiting(row.Product),
+			Link: weblink.VulnerabilityReportsWaiting(row.Product),
 			// A claim nobody has agreed to set aside is one nobody has
 			// decided is safe to repeat.
 			Private:   true,
@@ -277,8 +277,8 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 // public, so a message about them carries no detail. Each sweep adds the
 // conditions and the columns of its own.
 //
-// A row is about an issue of the kinds decisions are made about, leads'
-// rules included. A decision on a lead is internal work, counted apart so that
+// A row is about an issue of the kinds decisions are made about, code findings'
+// rules included. A decision on a code finding is internal work, counted apart so that
 // its audience is the product's internal readers.
 //
 // The withheld rows are counted rather than taken from an aggregate over
@@ -379,7 +379,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 //
 // One condition per team and product rather than per finding, which is the
 // one place these four differ in shape. The others are somebody's action —
-// a decision is one thing a person did — and this is a population: a routing rule
+// a decision is one thing a person did — and this is a population: an assignment rule
 // places thousands of findings in a single sweep, so a notification
 // each would be the estate arriving in a notification area. What somebody has
 // to know is that their team's queue has stopped being emptied, and a count
@@ -420,8 +420,8 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
@@ -550,17 +550,17 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			out[personID] = append(out[personID], holds)
 		}
 	}
-	return out, w.leadQueuesUntaken(ctx, since, out)
+	return out, w.codeFindingQueuesUntaken(ctx, since, out)
 }
 
-// leadQueuesUntaken adds to what queuesUntaken tells the leads sitting in a
+// codeFindingQueuesUntaken adds to what queuesUntaken tells the code findings sitting in a
 // team's queue that nobody has taken, one condition per team and product.
 //
-// A lead is one piece of work at its occurrence, however many builds it is open
-// on. One handed off as a flaw is closed work for its holder, and one a decision
-// stands on is being judged. Every lead it counts is internal, so it reaches
+// A code finding is one piece of work at its occurrence, however many builds it is open
+// on. One recorded as a flaw is closed work for its holder, and one a decision
+// stands on is being judged. Every code finding it counts is internal, so it reaches
 // the members who read the product's internal work and nobody else.
-func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[int64][]Holds) error {
+func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, out map[int64][]Holds) error {
 	var rows []struct {
 		TeamID    int64  `bun:"team_id"`
 		Team      string `bun:"team"`
@@ -569,11 +569,11 @@ func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[
 		Product   string `bun:"product"`
 		Waiting   int    `bun:"waiting"`
 	}
-	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
+	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`"tm"."id" AS "team_id"`).
 		ColumnExpr(`"tm"."display_name" AS "team_display"`).
@@ -585,7 +585,7 @@ func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[
 		Where(`"f"."assigned_at" IS NOT NULL`).
 		Where(`"f"."assigned_at" <= ?`, since).
 		Where(`"tm"."retired_at" IS NULL`).
-		Where(`NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+		Where(`NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
 			WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."product_id" = "st"."product_id" AND "dc"."live_key" IS NOT NULL
@@ -603,7 +603,7 @@ func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[
 		Join(`JOIN "product" AS "p" ON "p"."id" = "q"."product_id"`).
 		GroupExpr(`"q"."team_id", "q"."product_id"`).
 		Scan(ctx, &rows); err != nil {
-		return fmt.Errorf("read which leads are sitting in a queue: %w", err)
+		return fmt.Errorf("read which code findings are sitting in a queue: %w", err)
 	}
 
 	rights := access.NewStore(w.db)
@@ -614,10 +614,10 @@ func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[
 		}
 		productID, teamID := row.ProductID, row.TeamID
 		holds := Holds{
-			About: identify(fmt.Sprintf("lead-queue-untaken %d %d", row.TeamID, row.ProductID)),
+			About: identify(fmt.Sprintf("code-finding-queue-untaken %d %d", row.TeamID, row.ProductID)),
 			Body: fmt.Sprintf("%s has %s waiting in %s that nobody has taken. "+
 				"Work in a queue is held by nobody until somebody picks it up.",
-				row.Team, leadsWaiting(row.Waiting), row.Product),
+				row.Team, codeFindingsWaiting(row.Waiting), row.Product),
 			Link:    weblink.AssignmentsTeam(row.TeamName),
 			Private: true, Internal: true,
 			ProductID: &productID,
@@ -633,12 +633,12 @@ func (w *sweep) leadQueuesUntaken(ctx context.Context, since time.Time, out map[
 	return nil
 }
 
-// leadsWaiting says how many leads wait, in the unit the lead queue counts.
-func leadsWaiting(n int) string {
+// codeFindingsWaiting says how many code findings wait, in the unit the code finding queue counts.
+func codeFindingsWaiting(n int) string {
 	if n == 1 {
-		return "1 static analysis lead"
+		return "1 static analysis code finding"
 	}
-	return fmt.Sprintf("%d static analysis leads", n)
+	return fmt.Sprintf("%d static analysis code findings", n)
 }
 
 // plainly is a number of days as somebody would say it.
@@ -745,7 +745,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Reference, row.Product, when)
-			holds.Link = weblink.InboxReport(row.Product, row.Reference)
+			holds.Link = weblink.VulnerabilityReport(row.Product, row.Reference)
 			holds.VulnerabilityID = nil
 		}
 		told, err := audience.of(ctx, row.ProductID, row.AssignedTo)

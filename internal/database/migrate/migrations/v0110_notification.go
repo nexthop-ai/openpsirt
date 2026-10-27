@@ -17,7 +17,7 @@ func notificationV0110(t *columnTypes) []string {
 	statements := notificationV080(t)
 	statements[0] = withColumn(statements[0], `"private"   `+t.boolean+` NOT NULL,`,
 		`-- Whether a withheld notification is about internal work, an
-			-- analyzer's leads, which a reader of internal findings reads and
+			-- analyzer's code findings, which a reader of internal findings reads and
 			-- a reader of undisclosed work does not.
 			"internal"  `+t.boolean+` DEFAULT FALSE NOT NULL,`)
 	return statements

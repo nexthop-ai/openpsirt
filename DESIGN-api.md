@@ -102,7 +102,7 @@ description, which is the one thing a reader of these asks for first.
 | 202 | Accepted, not yet done. Only an upload, which answers before it has been read |
 | 204 | Done, with nothing worth saying |
 | 400 | A query parameter the operation does not take, or a NUL character in typed input. The refusal names the input |
-| 403 | An act the caller may not do, on a product they can see: an issue act or a routing rule without the role it asks for |
+| 403 | An act the caller may not do, on a product they can see: an issue act or an assignment rule without the role it asks for |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
 | 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the decision, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was being generated, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written: a promise naming a release past end-of-life, for one |
@@ -121,7 +121,8 @@ the wrong thing.
 A store's refusal that no handler has an arm for is an oracle too. It falls
 through to the fault answer, so the route says 500 where a stranger is told
 404, and the pair says the build is there — one name at a time, with the
-fault's own text naming which of product, stream and variant is undeclared.
+fault's own text naming which of product, branch or tag, and variant is
+undeclared.
 Every store refusal is typed and every handler that can meet one answers it the
 way a name that reaches nothing is answered.
 
@@ -307,7 +308,7 @@ per issue at a source package and version.
 | Rule | |
 |---|---|
 | Counted over what the reader may see (REQ-43) | Narrowed in the data-access layer like every other aggregate. A kind present only on an undisclosed finding is absent for somebody who reads disclosed ones |
-| Over the whole scope | The list's other filters, its release and support defaults and the triage line do not narrow it. It answers what the filter can offer, and a kind that vanished whenever another filter was on would be a choice nobody can see |
+| Over the whole scope | The list's other filters, its release and support defaults and the minimum severity do not narrow it. It answers what the filter can offer, and a kind that vanished whenever another filter was on would be a choice nobody can see |
 | A row is counted once per product | However many builds and binaries of the selection hold it, as the list holds it as one row. Across products it counts in each, as it is a row in each |
 | Every binary of one source package is one kind | So a row's lowest package identifier speaks for it |
 | A kind is read as the filter reads it | The identifier as stored, without regard to capitals, beginning `pkg:`, the kind and a slash. An identifier the filter finds under no kind, and a component with no identifier, is not counted, because ticking it would empty the list |
@@ -334,7 +335,7 @@ part of the statement.
 | Rule | |
 |---|---|
 | Six keys, each selecting an expression stored beside it | The key a caller sends is a lookup and never the value |
-| The fix-bundle list has six of its own | A bundle is one upstream bump rather than a finding: it has an issue count and a build count a finding has not, and no age of its own. One allowlist covering both would offer each list keys that mean nothing there, so it has a second — read the same way, with the same direction word, and offered by the same generated enum |
+| The planned upgrades list has six of its own | A planned upgrade is one upstream bump rather than a finding: it has an issue count and a build count a finding has not, and no age of its own. One allowlist covering both would offer each list keys that mean nothing there, so it has a second — read the same way, with the same direction word, and offered by the same generated enum |
 | Nothing else reaches the statement | No derivation from the parameter, no mapping that falls through, no default that is the parameter |
 | The direction is one of two words written here | Not a word that arrived |
 | A key that misses answers in the list's own order | An unknown sort is a mistake about a list, not a reason not to show it |
@@ -365,12 +366,13 @@ The findings list spans products too, at `/v1/findings` with no product in the
 path: one row per product, issue and component, with the same filters, sort
 allowlist and paging.
 
-Every product's own triage line applies per row from that product's own column
-rather than from one number chosen for the page. `severity` raises the line for
-the whole page and never lowers it below what a product decided: a row passes
-its product's line and the raised one, so the higher of the two applies,
-whether the product states its own line or inherits the deployment's. An
-exploited row passes both. `below_floor` turns every line off.
+Every product's own minimum severity applies per row from that product's own column
+rather than from one number chosen for the page. `severity` raises it for the
+whole page and never lowers it below what a product decided: a row passes its
+product's minimum severity and the raised one, so the higher of the two
+applies, whether the product states its own or inherits the deployment's. An
+exploited row passes both. `below_minimum_severity` turns every minimum
+severity off.
 
 The filters belonging to one product's builds are not offered across products
 rather than answered from whichever build sorted first: `beneath` walks one
@@ -506,7 +508,7 @@ product declared `acme-router` and displayed `Acme Router`, listed as the
 label, is sent back by the withdraw beside it and matches nothing.
 
 Every listing carries both fields: the collaborators, the roles, the
-credentials, the bindings, the tokens and the routing rules.
+credentials, the bindings, the tokens and the assignment rules.
 
 The pipeline-key and personal-token lists leave a product's label off where it
 repeats the product's name.
@@ -518,7 +520,7 @@ or team a row is about, are named the same way.
 |---|---|
 | A field naming a person carries the sign-in identity | A caller matches the record against a person, and a screen matches it against the viewer's own identity to decide what is theirs |
 | A field naming a product, a branch or tag, a variant or a team carries its name | A caller filters a list and builds a path from what it was handed, and a label resolves to nothing |
-| A label, where a response carries one, is the field's name suffixed `_name` | `proposed_by` and `proposed_by_name`, `product` and `product_name`, `stream` and `stream_name`, `team` and `team_name`. One suffix, so a caller finds the label without reading each field's description |
+| A label, where a response carries one, is the field's name suffixed `_name` | `proposed_by` and `proposed_by_name`, `product` and `product_name`, `branch_or_tag` and `branch_or_tag_name`, `team` and `team_name`. One suffix, so a caller finds the label without reading each field's description |
 | A label beside a person or a team is absent where it would repeat the name; a label beside a product, branch or tag, or variant falls back to the name | Absent beside a person reads as "the same". A build is named on every list alike |
 | Not every field carries a label | The lists a person reads by name carry one. Adding a label beside a name is additive, so the rest gain one as a screen needs it |
 | The holder of work is a person's identity or a team's name, beside `person_name` | The holder's own list resolves it, and a team's label matches no team |
@@ -532,13 +534,13 @@ route, sign-in and the served interface, and registers each area in turn.
 
 | Area | Operations |
 |---|---|
-| Inventories arriving | Uploads, their receipts, the documents a build sent, one scanner run |
+| Uploads arriving | Uploads, their receipts, the documents a build sent, one scanner run |
 | Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
-| Handing work out | Assignment, routing rules, teams, tags, bulk acts, fix bundles, planned upgrades, one component |
-| Decisions | The review queue, proposing, approving, re-affirmation, comments, exploitation here, obligation windows, assessments, scrutiny, readiness |
-| Reports | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
+| Handing work out | Assignment, assignment rules, teams, labels, bulk acts, planned upgrades, one component |
+| Decisions | The review queue, proposing, approving, re-affirmation, comments, incidents, response windows, assessments, scrutiny, readiness |
+| Analytics | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
 | Advisories | Advisories, VEX, supplier imports, the suppliers read on a schedule, outbound destinations |
-| Administration | The catalog, people and their roles, role bindings, keys, tokens, settings, the trail, work set aside, saved filters, notifications, the caller's own session |
+| Administration | The catalog, people and their roles, role bindings, keys, tokens, settings, the trail, failed jobs, saved filters, notifications, the caller's own session |
 
 | Rule | Why |
 |---|---|
@@ -578,8 +580,8 @@ Recorded because the conclusion is the deliverable.
 | A note states something the scope does not, or is omitted | A note saying the opposite of the value beside it is worse than none: an operation answered without a credential can declare that it requires one |
 | Paging is `limit` and `offset`, with a total | A cursor is better under concurrent writes and worse for jumping to a page. The total is separate from the page because somebody deciding whether to start work needs to know how much there is |
 | A list answers with an object, not an array | An array at the top level has nowhere to put the total |
-| Names in paths, identifiers in bodies | A product, stream and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
-| A removal takes something out of use rather than out of the database | A team, a routing rule, an outbound destination and a variant are each reached by `DELETE` and each keep their row. What they hold is named by findings, decisions and documents that went to customers, so removing the row would take those with it |
+| Names in paths, identifiers in bodies | A product, branch or tag, and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
+| A removal takes something out of use rather than out of the database | A team, an assignment rule, an outbound destination and a variant are each reached by `DELETE` and each keep their row. What they hold is named by findings, decisions and documents that went to customers, so removing the row would take those with it |
 | An amendment leaves out what it does not change, and naming nothing is refused | Absent and cleared are different requests wherever a field has a default, and a request that asks for nothing answered as done would say something happened |
 | An occurrence in a path is the identity the findings list gave out | A caller free to compose one would be choosing which decisions apply where |
 | Comment density in this layer is low by design | It is a registration and a mapping: the operation is declared, a store is called, its answer becomes a body. What is worth explaining about a rule belongs where the rule is enforced |

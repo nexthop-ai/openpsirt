@@ -11,12 +11,12 @@ import { mayOf, useWho } from "../app/session";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { Severity, Exploited, Incident } from "../ui/Severity";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
-import { findingOf, inboxReportAt, leadAt, leadsAt } from "../app/routes";
+import { findingOf, vulnerabilityReportAt, codeFindingAt, codeFindingsAt } from "../app/routes";
 import { useHandBack, useHeldReports } from "../api/intake";
 import { on } from "../ui/when";
 
@@ -56,8 +56,8 @@ export function Assignments() {
   // Whose work is being looked at on the second tab. Empty is the roll-up of
   // everybody; a name is that holder's list.
   //
-  // The kind of holder, because a team is not a person. Work goes to a team by
-  // standing rule and by an assignment naming one, and the person's route
+  // The kind of holder, because a team is not a person. Work goes to a team by an
+  // assignment rule and by an assignment naming one, and the person's route
   // resolves an identity, so a team's list is read from the team's own route.
   const person = params.get("person") ?? "";
   const team = params.get("team") ?? "";
@@ -114,9 +114,9 @@ export function Assignments() {
     !row.team && row.person === who.data?.identity;
   const others = peopleRows.filter((row) => !own(row));
   const myCount = peopleRows.find(own)?.open ?? 0;
-  // Leads are left out of the findings list, so the unheld ones of the
+  // Code findings are left out of the findings list, so the unheld ones of the
   // product in scope are linked where this screen points at unheld work.
-  const leadsIn =
+  const codeFindingsIn =
     scope.product && mayOf(who.data, scope.product)?.reads_internal ? scope.product : undefined;
 
   return (
@@ -125,7 +125,7 @@ export function Assignments() {
         <h2>Assignments</h2>
         <p>
           {scope.product
-            ? [scope.product, scope.stream, scope.variant].filter(Boolean).join(" · ")
+            ? [scope.product, scope.branch_or_tag, scope.variant].filter(Boolean).join(" · ")
             : "Across every product you can see"}
         </p>
       </div>
@@ -152,7 +152,7 @@ export function Assignments() {
       {/* Said rather than discovered. Who holds what is answered per product,
           so a branch or a variant in the picker narrows the other two tabs and
           not this one. */}
-      {tab === "people" && (scope.stream || scope.variant) && (
+      {tab === "people" && (scope.branch_or_tag || scope.variant) && (
         <p className="hint">
           Across every build of {scope.product}. The branch and the variant do not narrow who holds
           what.
@@ -207,7 +207,7 @@ export function Assignments() {
         <ByPerson
           rows={others}
           query={holdings}
-          leadsIn={leadsIn}
+          codeFindingsIn={codeFindingsIn}
           onPick={(name, isTeam) => {
             const now = new URLSearchParams(params);
             now.delete("person");
@@ -263,7 +263,7 @@ function Reports({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const to = inboxReportAt(row.product, row.reference);
+              const to = vulnerabilityReportAt(row.product, row.reference);
               return (
                 <tr
                   key={`${row.product} ${row.reference}`}
@@ -306,12 +306,12 @@ type Query = { isPending: boolean; isError: boolean; error: unknown };
 function ByPerson({
   rows,
   query,
-  leadsIn,
+  codeFindingsIn,
   onPick,
 }: {
   rows: Body<"HoldingBody">[];
   query: Query;
-  leadsIn?: string;
+  codeFindingsIn?: string;
   onPick: (name: string, team: boolean) => void;
 }) {
   const release = useHandBack();
@@ -326,8 +326,10 @@ function ByPerson({
         title="Nobody else is holding anything."
         detail="What is waiting for nobody is the findings list under Unassigned; this one is about work somebody has taken on."
       >
-        {leadsIn && (
-          <Link to={leadsAt(leadsIn, { assigned: "nobody" })}>Unassigned leads in {leadsIn}</Link>
+        {codeFindingsIn && (
+          <Link to={codeFindingsAt(codeFindingsIn, { assigned: "nobody" })}>
+            Unassigned code findings in {codeFindingsIn}
+          </Link>
         )}
       </Empty>
     );
@@ -363,7 +365,7 @@ function ByPerson({
                     <span className="who2">
                       {/* A team is a queue rather than a person, and drawing
                           it with somebody's initials says the opposite: work
-                          routed to a team is unheld until somebody takes it. */}
+                          assigned to a team is unheld until somebody takes it. */}
                       <span className="avatar">
                         {row.team ? "◇" : initials(row.person_name || row.person || "")}
                       </span>
@@ -422,7 +424,7 @@ function ByPerson({
 // One person's own work, in the same units as what nobody is dealing with: one
 // row per issue in a component in a product, not one per build. The same code
 // built several ways is one piece of work and was taken on as one. A static
-// analysis lead is a row of its own, named by its rule, and opens its page.
+// analysis code finding is a row of its own, named by its rule, and opens its page.
 function Held({
   rows,
   total,
@@ -474,8 +476,12 @@ function Held({
           <tbody>
             {rows.map((row) => {
               const to = row.occurrence
-                ? leadAt(
-                    { product: row.product, stream: row.stream, variant: row.variant },
+                ? codeFindingAt(
+                    {
+                      product: row.product,
+                      branch_or_tag: row.branch_or_tag,
+                      variant: row.variant,
+                    },
                     row.occurrence,
                   )
                 : findingOf(row);
@@ -492,8 +498,8 @@ function Held({
                     <Link to={to} className="id">
                       {row.vulnerability}
                     </Link>{" "}
-                    {row.occurrence && <span className="hint">lead</span>}{" "}
-                    <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
+                    {row.occurrence && <span className="hint">code finding</span>}{" "}
+                    <Incident when={row.incident} /> <Exploited when={row.exploited} />
                   </td>
                   <td>
                     <span className="id">{row.component}</span>{" "}
@@ -508,7 +514,8 @@ function Held({
                     ) : (
                       <>
                         {" "}
-                        · {row.stream_name || row.stream} · {row.variant_name || row.variant}
+                        · {row.branch_or_tag_name || row.branch_or_tag} ·{" "}
+                        {row.variant_name || row.variant}
                       </>
                     )}
                   </td>

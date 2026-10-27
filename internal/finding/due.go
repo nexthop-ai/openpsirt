@@ -128,7 +128,7 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // decision, which is the one act the deadline exists to ask for and cannot be
 // the answer to. It is the statement three other rules here already make from
 // other directions — a tag that cannot change, a build past its end of life,
-// and an issue below the triage line all carry no deadline for the same reason.
+// and an issue below the minimum severity all carry no deadline for the same reason.
 //
 // A scanner that did not answer is not upstream saying no. Reading silence
 // as "no fix exists" is a claim about the world made out of a gap in a report,
@@ -215,17 +215,17 @@ type Late struct {
 	// Version is which one, because a build ships a name at more than one
 	// version often enough that a link without it cannot be resolved — and a
 	// screen offering a link that dead-ends is worse than one offering none.
-	Version     string `bun:"version"`
-	Purl        string `bun:"purl"`
-	Severity    string `bun:"severity"`
-	Exploited   bool   `bun:"exploited"`
-	Product     string `bun:"product"`
-	ProductName string `bun:"product_name"`
-	Stream      string `bun:"stream"`
-	StreamName  string `bun:"stream_name"`
-	Variant     string `bun:"variant"`
-	VariantName string `bun:"variant_name"`
-	AssignedTo  *int64 `bun:"assigned_to"`
+	Version         string `bun:"version"`
+	Purl            string `bun:"purl"`
+	Severity        string `bun:"severity"`
+	Exploited       bool   `bun:"exploited"`
+	Product         string `bun:"product"`
+	ProductName     string `bun:"product_name"`
+	BranchOrTag     string `bun:"branch_or_tag"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	Variant         string `bun:"variant"`
+	VariantName     string `bun:"variant_name"`
+	AssignedTo      *int64 `bun:"assigned_to"`
 	// Due is the earliest deadline among the occurrences this row covers — the
 	// one that makes the whole group late.
 	Due time.Time `bun:"due"`
@@ -260,7 +260,7 @@ type Late struct {
 //
 // The finding is `f`, its component `c` and its consumer `uc`, all joined by
 // the caller; product is the SQL naming the finding's product, which a list
-// across products reads from the stream and a list within one binds.
+// across products reads from the branch or tag and a list within one binds.
 func OffTheClock(product string, now time.Time) (string, []any) {
 	return offTheClock(product, now, "")
 }
@@ -368,15 +368,15 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			// Each row's own product rates its own findings. The list spans
-			// products, so the join reads the stream's product per row rather
+			// products, so the join reads the branch or tag's product per row rather
 			// than binding one.
-			Join(rating.For(rating.OnStream)).
+			Join(rating.For(rating.OnBranchOrTag)).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			// The consumer, for the versions a decision is keyed on.
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
@@ -399,7 +399,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	// The grouping, which decides what one row is: an issue at a component in
 	// one build, however many occurrences it has there.
 	const grouping = `"v"."identifier", "c"."name", "c"."version", "c"."purl", "f"."urgency_exploited", "p"."name", "p"."display_name", ` +
-		`"st"."name", "st"."display_name", "va"."name", "va"."display_name", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`
+		`"st"."name", "st"."display_name", "va"."name", "va"."display_name", "f"."build_id", "f"."vulnerability_id", "f"."component_id"`
 
 	query := narrow(s.db.NewSelect()).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
@@ -431,7 +431,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// plan. Then the exploited flag, exploited first, because it is in the
 		// grouping: a merge refiles the gone issue's findings with their flag
 		// as it was, so one component in one build can hold a group of each.
-		OrderExpr(`due, "v"."identifier", "c"."name", "f"."target_id", "c"."version", "f"."component_id", "f"."urgency_exploited" DESC`).
+		OrderExpr(`due, "v"."identifier", "c"."name", "f"."build_id", "c"."version", "f"."component_id", "f"."urgency_exploited" DESC`).
 		Limit(int64(limit)).Offset(int64(offset))
 
 	var late []Late
@@ -603,7 +603,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		// A band the product's line does not admit is written only where the
 		// product was attacked through the issue, which no line sets aside, so
 		// the pass never writes a deadline the line would take away.
-		floor, err := FloorFor(ctx, s.db, productID)
+		floor, err := MinimumSeverityFor(ctx, s.db, productID)
 		if err != nil {
 			return changed, err
 		}
@@ -612,7 +612,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				return where
 			}
 			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return where(q).Where(`"urgency_exploited_here" = ?`, true)
+				return where(q).Where(`"urgency_incident" = ?`, true)
 			}
 		}
 		bands := []band{
@@ -640,8 +640,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			var moments []time.Time
 			err = s.db.NewSelect().
 				TableExpr(`"finding" AS "f"`).
-				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 				ColumnExpr(string(database.Column(s.db, "f."+start.column))).
 				Where(kinds, kindArgs...).
 				Where(`"f"."closed_at" IS NULL`).
@@ -684,7 +684,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							Where(onClock, onClockArgs...).
 							Where(`"fix_state" <> ?`, NoFix).
 							Where(`NOT ("fix_state" = ? AND "urgency_exploited" = ? AND `+
-								`"urgency_exploited_here" = ?)`, WontFix, false, false)
+								`"urgency_incident" = ?)`, WontFix, false, false)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {
 							return changed, fmt.Errorf("rewrite deadlines: %w", err)
@@ -714,7 +714,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	// The passes sweep what was written before a release went out of support,
 	// a line moved, or upstream answered, and each reports what it took off
 	// under its own rule.
-	cleared, err := s.clearBelowFloor(ctx)
+	cleared, err := s.clearBelowMinimumSeverity(ctx)
 	if err != nil {
 		return changed, err
 	}
@@ -763,7 +763,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 // clockedIn is the condition on a finding's build under which it is in this
 // product and, as asked, on the clock or off it at a moment (catalog.OnTheClock).
 //
-// Written as a condition on the target rather than as a join, because the
+// Written as a condition on the build rather than as a join, because the
 // statements that need it are updates and no engine here spells a joined update
 // the same way.
 func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
@@ -771,8 +771,8 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 	if !on {
 		clocked = "NOT " + clocked
 	}
-	return `"target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
-		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+	return `"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
+		JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
 		JOIN "product" AS "p" ON "p"."id" = "st"."product_id"
 		WHERE "st"."product_id" = ? AND ` + clocked + `)`, append([]any{productID}, args...)
 }
@@ -799,7 +799,7 @@ func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 				WhereGroup(" OR ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
 					return q.Where(`"fix_state" = ?`, WontFix).
 						Where(`"urgency_exploited" = ?`, false).
-						Where(`"urgency_exploited_here" = ?`, false)
+						Where(`"urgency_incident" = ?`, false)
 				})
 		}).
 		Exec(ctx)
@@ -822,7 +822,7 @@ func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 // moving is not an opinion about the finding at all. The finding is still
 // recorded, still counted and still reportable — what ends is the clock.
 func (s *Store) clearOnTags(ctx context.Context) (int, error) {
-	tags, err := catalog.NewStore(s.db).TagStreams(ctx)
+	tags, err := catalog.NewStore(s.db).TagBranchesAndTags(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -839,7 +839,7 @@ func (s *Store) clearOnTags(ctx context.Context) (int, error) {
 // property of a finding argues with. The finding is still recorded, still
 // counted and still reportable — what ends is the clock.
 func (s *Store) clearPastEndOfLife(ctx context.Context) (int, error) {
-	past, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, s.now().UTC())
+	past, err := catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, s.now().UTC())
 	if err != nil {
 		return 0, err
 	}
@@ -857,21 +857,21 @@ func (s *Store) clearPastEndOfLife(ctx context.Context) (int, error) {
 // The count is what the database says it matched, and a failure to read it is
 // a failure: a number quietly short is a receipt saying less work was done
 // than was done, which is the shape somebody investigates for an afternoon.
-func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (int, error) {
-	if len(streams) == 0 {
+func (s *Store) clearClockOn(ctx context.Context, branchesAndTags []int64, why string) (int, error) {
+	if len(branchesAndTags) == 0 {
 		return 0, nil
 	}
 	cleared := 0
 	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
-	err := database.IDsInBatches(ctx, streams, func(ctx context.Context, batch []int64) error {
+	err := database.IDsInBatches(ctx, branchesAndTags, func(ctx context.Context, batch []int64) error {
 		result, err := s.db.NewUpdate().
 			Model((*Finding)(nil)).
 			Set(`"due_at" = NULL`).
 			Where(kinds, kindArgs...).
 			Where(`"closed_at" IS NULL`).
 			Where(`"due_at" IS NOT NULL`).
-			Where(`"target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
-				WHERE "tg"."stream_id" IN (?))`, bun.List(batch)).
+			Where(`"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
+				WHERE "tg"."branch_or_tag_id" IN (?))`, bun.List(batch)).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("take the deadline off %s: %w", why, err)
@@ -886,9 +886,9 @@ func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (
 	return cleared, err
 }
 
-// clearBelowFloor removes the deadline from open findings their product does
+// clearBelowMinimumSeverity removes the deadline from open findings their product does
 // not consider worth triaging.
-func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
+func (s *Store) clearBelowMinimumSeverity(ctx context.Context) (int, error) {
 	products, err := s.everyProduct(ctx)
 	if err != nil {
 		return 0, err
@@ -897,7 +897,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 	cleared := 0
 	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	for _, productID := range products {
-		floor, err := FloorFor(ctx, s.db, productID)
+		floor, err := MinimumSeverityFor(ctx, s.db, productID)
 		if err != nil {
 			return cleared, err
 		}
@@ -916,7 +916,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 			Where(`"closed_at" IS NULL`).
 			Where(`"due_at" IS NOT NULL`).
 			Where(`"urgency_exploited" = ?`, false).
-			Where(`"urgency_exploited_here" = ?`, false).
+			Where(`"urgency_incident" = ?`, false).
 			Where(inThisProduct, productID).
 			Where(`"vulnerability_id" NOT IN (SELECT "v"."id" FROM "vulnerability" AS "v" `+
 				rating.Here+` WHERE `+rating.BandExpr+` IN (?))`, productID, bun.List(words)).

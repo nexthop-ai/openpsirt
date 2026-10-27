@@ -61,7 +61,7 @@ type Group struct {
 	// Source is the package this binary was built from, where the two differ.
 	// The same issue at two binaries of one source is two rows here and one
 	// piece of work everywhere else — it is decided once, upgraded once and
-	// routed by one rule — and a reader with no way to see that is reading a
+	// assigned by one rule — and a reader with no way to see that is reading a
 	// list a third of which is the same work said again.
 	Source string
 	// Ecosystem is the kind of package this is, as its identifier spells it.
@@ -110,8 +110,8 @@ type Group struct {
 	// recorded flaw rendered identically to any other row.
 	Undisclosed bool
 	DiscloseAt  *time.Time
-	// Tags are the words somebody put on this, as they were typed.
-	Tags []string
+	// Labels are the words somebody put on this, as they were typed.
+	Labels []string
 	// OpenedAt is when the earliest of these occurrences opened here, which is
 	// the age a deadline relates to. Not the year in the identifier: an
 	// issue assigned in 2019 that first appeared in this product last week
@@ -124,16 +124,16 @@ type Group struct {
 	NoDeadline NoDeadline
 	// Urgency is how far up the list this belongs, and the two flags say
 	// whether it is there because somebody is using it. Exploited is a feed's
-	// word about the world; ExploitedHere is somebody here recording that this
+	// word about the world; Incident is somebody here recording that this
 	// product was attacked through it, which is the signal that outranks
 	// everything.
 	//
 	// Both are carried rather than left to be inferred from the number: a
 	// position nobody can explain is one people stop trusting and then work
 	// around, and the number cannot tell the two apart in any case.
-	Urgency       int64
-	Exploited     bool
-	ExploitedHere bool
+	Urgency   int64
+	Exploited bool
+	Incident  bool
 	// LikelihoodPPM is the published estimate that this will be exploited, in
 	// parts per million. Carried because it ranks *above* severity: without it
 	// on the row, a medium sitting above a high looks like the list is
@@ -175,18 +175,18 @@ type Group struct {
 	Parent string
 	Middle int
 	Chains int
-	// Builds is how many builds in the selection hold this group, and Stream
+	// Builds is how many builds in the selection hold this group, and Branch or tag
 	// and Variant name one of them — not the only one. A screen needs
 	// somewhere to link to and an action needs a build to name; what says
 	// there are others is the count, so a screen can show that instead of
 	// reading the named one as the whole answer. Both are empty where the
 	// selection is a single build, since the row would only be repeating it.
-	Builds  int
-	Stream  string
-	Variant string
-	// StreamName and VariantName are the spellings shown, beside the names
+	Builds      int
+	BranchOrTag string
+	Variant     string
+	// BranchOrTagName and VariantName are the spellings shown, beside the names
 	// above that a path addresses them by.
-	StreamName, VariantName string
+	BranchOrTagName, VariantName string
 	// Matched says how the scanner reached this. One answer for the whole
 	// group: every occurrence of it comes from the same line of a report. Empty
 	// where the scanner said nothing.
@@ -280,7 +280,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	if err != nil {
 		return 0, nil, nil, err
 	}
-	targets, err := s.buildsWorking(ctx, scope, filter.Workable)
+	buildIDs, err := s.buildsWorking(ctx, scope, filter.Workable)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -290,7 +290,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// word a line states and the rating it compares against are both this
 	// product's decisions, and a caller free to state either would be choosing
 	// whose rating its findings are judged by.
-	filter.Floor.ProductID = productID
+	filter.MinimumSeverity.ProductID = productID
 	// The person "mine" means, from the subject rather than from the request,
 	// and their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
@@ -303,8 +303,8 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// builds" is measured against. The filter cannot see it. The builds
 	// themselves, the variant named and what the reader may see, for the
 	// comparison across variants, which reaches builds outside the selection.
-	filter.Builds = len(targets)
-	filter.Targets = targets
+	filter.Builds = len(buildIDs)
+	filter.BuildIDs = buildIDs
 	filter.VariantID = scope.VariantID
 	filter.Visible = visible
 	// A subtree is a walk over one build's edges, so it is answerable only
@@ -312,13 +312,13 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// rather than answered from whichever build sorted first — which is what
 	// leaving the identifier at zero would have done, silently and emptily.
 	switch {
-	case len(targets) == 1:
-		filter.TargetID = targets[0]
+	case len(buildIDs) == 1:
+		filter.BuildID = buildIDs[0]
 	case filter.Beneath != nil:
 		return 0, nil, nil, refusal.Errorf("read findings beneath a component: a subtree is a walk"+
-			" over one build's edges, and %d builds are in scope", len(targets))
+			" over one build's edges, and %d builds are in scope", len(buildIDs))
 	}
-	return productID, visible, targets, nil
+	return productID, visible, buildIDs, nil
 }
 
 // Groups returns what is open in a selection, as the things somebody decides
@@ -334,11 +334,11 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 // the thing being avoided.
 func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope, limit, offset int,
 	filter Filter) ([]Group, int, error) {
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
+	productID, visible, buildIDs, err := s.inScope(ctx, subject, scope, &filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return nil, 0, nil
 	}
 	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
@@ -359,12 +359,12 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	// groups on the page. The first version asked all of it in one statement,
 	// and the five correlated decision lookups per row ran against every one
 	// of a build's 240,945 open rows to produce fifty answers.
-	heads, total, err := s.heads(ctx, targets, visible, limit, offset, filter)
+	heads, total, err := s.heads(ctx, buildIDs, visible, limit, offset, filter)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	known, err := s.decorate(ctx, targets, productID, visible, heads, filter)
+	known, err := s.decorate(ctx, buildIDs, productID, visible, heads, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -414,7 +414,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	// than a walk per row. A row whose occurrences are pulled in directly by the
 	// build is asked about by the component itself, which lands on the same
 	// answer with one step in it.
-	oneBuild := len(targets) == 1
+	oneBuild := len(buildIDs) == 1
 	var chains map[int64][]graph.Step
 	var where map[int64]build
 	if oneBuild {
@@ -426,7 +426,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 				wanted = append(wanted, row.ComponentID)
 			}
 		}
-		if chains, err = graph.NewStore(s.db).Chains(ctx, subject, targets[0], wanted); err != nil {
+		if chains, err = graph.NewStore(s.db).Chains(ctx, subject, buildIDs[0], wanted); err != nil {
 			return nil, 0, err
 		}
 	} else {
@@ -435,7 +435,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 		// page's builds in one statement rather than per row.
 		at := make([]int64, 0, len(rows))
 		for _, row := range rows {
-			at = append(at, row.TargetID)
+			at = append(at, row.BuildID)
 		}
 		if where, err = buildsNamed(ctx, s.db, at); err != nil {
 			return nil, 0, err
@@ -443,17 +443,17 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	}
 
 	// The words somebody put on the page's rows, read in one statement
-	// rather than per row: a tag is worth showing where the filter that
+	// rather than per row: a label is worth showing where the filter that
 	// finds it lives, and a query per row is fifty queries for a page.
-	marks, err := s.tagsFor(ctx, filter.ProductID, rows, visible)
+	marks, err := s.labelsFor(ctx, filter.ProductID, rows, visible)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	groups := make([]Group, 0, len(rows))
 	for _, row := range rows {
-		group := groupFrom(row, named, rated, shipped, filter.Floor)
-		group.Tags = marks[markKey{row.VulnerabilityID, row.Fold}]
+		group := groupFrom(row, named, rated, shipped, filter.MinimumSeverity)
+		group.Labels = marks[markKey{row.VulnerabilityID, row.Fold}]
 		if oneBuild {
 			// The number of distinct ways down: the consumers this
 			// component has here, plus one for the build pulling it in
@@ -482,13 +482,13 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 					group.Parent = consumer.Name
 				}
 			}
-		} else if at, held := where[row.TargetID]; held {
+		} else if at, held := where[row.BuildID]; held {
 			group.Builds = row.Builds
 			// The way down is left empty rather than filled from this one
 			// build: the group sits in every build the count names, and each
 			// of them reaches it its own way.
-			group.Stream, group.Variant = at.Stream, at.Variant
-			group.StreamName, group.VariantName = at.StreamName, at.VariantName
+			group.BranchOrTag, group.Variant = at.BranchOrTag, at.Variant
+			group.BranchOrTagName, group.VariantName = at.BranchOrTagName, at.VariantName
 		}
 		groups = append(groups, group)
 	}
@@ -509,13 +509,13 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 // are one product's: the word the line states and the word it is compared
 // against are both decisions that team made.
 func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]string,
-	shipped map[int64]graph.Component, floor Floor) Group {
+	shipped map[int64]graph.Component, floor MinimumSeverity) Group {
 
 	group := Group{
 		Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
 		Occurrences: row.Occurrences, Answered: row.Answered,
 		Urgency: row.Urgency, Exploited: row.Exploited == 1,
-		ExploitedHere: row.ExploitedHere == 1,
+		Incident:      row.Incident == 1,
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
 		Scored:       row.Scored == 1,
 		ScoreVersion: row.ScoreVersion,
@@ -562,15 +562,15 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		switch {
 		case row.Recorded > 0 && group.Severity == "":
 			group.NoDeadline = NotRated
-		case !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity):
-			group.NoDeadline = BelowTheLine
+		case !floor.Admits(group.Exploited || group.Incident, group.Severity):
+			group.NoDeadline = BelowMinimumSeverity
 		// Asked of both ends rather than of the word they agree on. A group
 		// whose occurrences disagree reports "mixed", which is not a state
 		// upstream is ever in — and reading it as one tells a reader that a
 		// supported release is past its end of life, on the ordinary shape
 		// where a scanner says one thing in one build and another in the next.
-		case !Clocked(FixState(row.FixStateLeast), group.Exploited || group.ExploitedHere) &&
-			!Clocked(FixState(row.FixStateMost), group.Exploited || group.ExploitedHere):
+		case !Clocked(FixState(row.FixStateLeast), group.Exploited || group.Incident) &&
+			!Clocked(FixState(row.FixStateMost), group.Exploited || group.Incident):
 			group.NoDeadline = NothingToTake
 		default:
 			group.NoDeadline = OutOfSupport
@@ -581,11 +581,11 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 
 // build names one of the builds a group sits in, for a row that spans several.
 type build struct {
-	ID          int64  `bun:"id"`
-	Stream      string `bun:"stream"`
-	StreamName  string `bun:"stream_name"`
-	Variant     string `bun:"variant"`
-	VariantName string `bun:"variant_name"`
+	ID              int64  `bun:"id"`
+	BranchOrTag     string `bun:"branch_or_tag"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	Variant         string `bun:"variant"`
+	VariantName     string `bun:"variant_name"`
 }
 
 // buildsNamed names the builds a page's rows point at.
@@ -599,12 +599,12 @@ func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build,
 	}
 	var rows []build
 	if err := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(`"tg"."id" AS "id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
-		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
 		Where(`"tg"."id" IN (?)`, bun.List(ids)).
@@ -642,8 +642,8 @@ type groupHead struct {
 	// cannot tell them apart — both lift it into a band above everything
 	// else — and a list that showed one where the other holds would be the
 	// confusion the two columns exist to prevent.
-	Exploited     int `bun:"exploited"`
-	ExploitedHere int `bun:"exploited_here"`
+	Exploited int `bun:"exploited"`
+	Incident  int `bun:"incident"`
 	// Total is how many groups the filter admits, the same on every row.
 	Total int `bun:"total"`
 }
@@ -661,9 +661,9 @@ type groupHead struct {
 type NoDeadline string
 
 const (
-	// BelowTheLine is a finding its product does not consider worth
+	// BelowMinimumSeverity is a finding its product does not consider worth
 	// triaging . Still recorded, still counted, and off the clock.
-	BelowTheLine NoDeadline = "below-the-line"
+	BelowMinimumSeverity NoDeadline = "below-minimum-severity"
 	// NothingToTake is a finding upstream has released no fix for, or has
 	// declined to fix on an issue nobody is using. There is no version that
 	// would close it, so a deadline on it is unmeetable by construction — the
@@ -682,7 +682,7 @@ const (
 
 // NoDeadlines is every reason a finding carries no deadline, narrowest first.
 func NoDeadlines() []NoDeadline {
-	return []NoDeadline{NotRated, BelowTheLine, NothingToTake, OutOfSupport}
+	return []NoDeadline{NotRated, BelowMinimumSeverity, NothingToTake, OutOfSupport}
 }
 
 // groupKey names one group of the list.
@@ -728,7 +728,7 @@ type decorated struct {
 	Packages            int   `bun:"packages"`
 	ConsumerOccurrences int   `bun:"consumer_places"`
 	Builds              int   `bun:"builds"`
-	TargetID            int64 `bun:"target_id"`
+	BuildID             int64 `bun:"build_id"`
 	Waiting             int   `bun:"waiting_here"`
 	Approved            int   `bun:"approved_here"`
 	Lapsed              int   `bun:"lapsed_here"`
@@ -745,12 +745,12 @@ type decorated struct {
 // whose window count is the number of groups the HAVING clauses admit, before
 // the limit. Where the page comes back empty — an offset past the end — there
 // is no row to carry it and it is counted separately.
-func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Visibility,
+func (s *Store) heads(ctx context.Context, buildIDs []int64, visible []access.Visibility,
 	limit, offset int, filter Filter) ([]groupHead, int, error) {
 
 	var heads []groupHead
 	key, sorted := pagedOrder(filter, "vulnerability_id", "fold")
-	grouped := s.foldGroups(targets, visible, filter).
+	grouped := s.foldGroups(buildIDs, visible, filter).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
@@ -760,7 +760,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// decision appears is the worst of what it covers.
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`)
+		ColumnExpr(overParts.incident() + ` AS "incident"`)
 	if key != "" {
 		grouped = grouped.ColumnExpr(key + ` AS "sort_key"`)
 	}
@@ -771,7 +771,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		grouped = grouped.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
 	}
 	page := paged(s.db, grouped, "vulnerability_id", "fold", "component_id", "places",
-		"urgency", "exploited", "exploited_here").
+		"urgency", "exploited", "incident").
 		// Ordered by urgency unless somebody asked otherwise. Urgency
 		// rather than how widespread something is: sorting by occurrence
 		// count puts whatever ships in the most occurrences at the top,
@@ -791,7 +791,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 	// counting them as two here changes the figure above the list depending
 	// on which page is being looked at — and this is the one somebody quotes,
 	// because it is what a deep link or the last page shows.
-	total, err := s.countGroups(ctx, s.foldGroups(targets, visible, filter))
+	total, err := s.countGroups(ctx, s.foldGroups(buildIDs, visible, filter))
 	if err != nil {
 		return nil, 0, fmt.Errorf("count what is open: %w", err)
 	}
@@ -806,9 +806,9 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 //
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
-// decision and routing them is one rule.
-func (s *Store) foldGroups(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	return filter.folded(s.db, openRows(s.db, targets, visible), issueAndComponent).
+// decision and assigning them is one rule.
+func (s *Store) foldGroups(buildIDs []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
+	return filter.folded(s.db, openRows(s.db, buildIDs, visible), issueAndComponent).
 		GroupExpr(GroupedOn)
 }
 
@@ -843,11 +843,11 @@ func paged(db bun.IDB, grouped *bun.SelectQuery, columns ...string) *bun.SelectQ
 
 // openRows is open findings in these builds that the reader may see, read as
 // "f" and not yet grouped.
-func openRows(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
+func openRows(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.SelectQuery {
 	kinds, args := kind.Triage.Where(`"f"."kind"`)
 	return db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, args...)
@@ -860,9 +860,9 @@ func openRows(db bun.IDB, targets []int64, visible []access.Visibility) *bun.Sel
 //
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
-// decision and routing them is one rule.
-func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
-	return openRows(db, targets, visible).
+// decision and assigning them is one rule.
+func openGroups(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.SelectQuery {
+	return openRows(db, buildIDs, visible).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		GroupExpr(GroupedOn)
 }
@@ -875,7 +875,7 @@ func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.S
 // group was counted over: a list narrowed to what sits inside one container
 // reports how many of *those* occurrences are answered, not how many
 // occurrences there are anywhere.
-func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
+func (s *Store) decorate(ctx context.Context, buildIDs []int64, productID int64,
 	visible []access.Visibility, heads []groupHead, filter Filter) (map[groupKey]decorated, error) {
 
 	known := make(map[groupKey]decorated, len(heads))
@@ -967,14 +967,14 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// The number of builds in the selection holding this group, and one of
 		// them to name. Both are one where the selection is a single build,
 		// which is why the row says nothing about either there.
-		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
-		ColumnExpr(`MIN("f"."target_id") AS "target_id"`)
+		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
+		ColumnExpr(`MIN("f"."build_id") AS "build_id"`)
 	// The decision state of each group, counted the way the state filter
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.
 	q = decisionCounts(q, "?", []any{productID},
 		decisionWaiting, decisionApproved, decisionLapsed, decisionSentBack).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).

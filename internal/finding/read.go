@@ -5,7 +5,7 @@ package finding
 
 // Reading findings back, and the naming layer every other read here shares.
 //
-// The whole-target read, which product a target belongs to and what a subject
+// The whole-target read, which product a build belongs to and what a subject
 // may read of it, and the lookups that turn identifiers into names. The
 // narrowing is in narrow.go, the page in groups.go, and what is open at one
 // component in component.go.
@@ -22,8 +22,8 @@ import (
 )
 
 // productOf reads which product a build belongs to.
-func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
-	return catalog.NewStore(db).ProductOf(ctx, targetID)
+func productOf(ctx context.Context, db bun.IDB, buildID int64) (int64, error) {
+	return catalog.NewStore(db).ProductOf(ctx, buildID)
 }
 
 // readableIn is the product a build belongs to and which visibilities this
@@ -34,9 +34,9 @@ func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
 // empty by some. Where the read is about one issue a collaborator may have
 // been brought into, the caller asks access.ReadableOn instead.
 func readableIn(ctx context.Context, db bun.IDB, subject access.Subject,
-	targetID int64) (int64, []access.Visibility, error) {
+	buildID int64) (int64, []access.Visibility, error) {
 
-	productID, err := productOf(ctx, db, targetID)
+	productID, err := productOf(ctx, db, buildID)
 	if err != nil {
 		return 0, nil, err
 	}

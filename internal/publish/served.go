@@ -140,7 +140,7 @@ func AnyPublishedForProduct(ctx context.Context, db bun.IDB, productID int64) (b
 		Where(`"pub"."product_id" = ?`, productID))
 }
 
-// AnyPublishedForStream reports whether a document that may name this branch
+// AnyPublishedForBranchOrTag reports whether a document that may name this branch
 // or tag has been served, withdrawn or not.
 //
 // Its own OpenVEX document names it. A CSAF document about an issue in its
@@ -149,13 +149,13 @@ func AnyPublishedForProduct(ctx context.Context, db bun.IDB, productID int64) (b
 // scanned build every CSAF document of its product counts. That refuses a
 // rename that might have been safe rather than allowing one that breaks a
 // reader's address. A release with no scanned build is in no document.
-func AnyPublishedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
+func AnyPublishedForBranchOrTag(ctx context.Context, db bun.IDB, branchOrTagID int64) (bool, error) {
 	return anyPublished(ctx, db.NewSelect().Model((*Document)(nil)).
-		Join(`JOIN "stream" AS "st" ON "st"."product_id" = "pub"."product_id"`).
-		Where(`"st"."id" = ?`, streamID).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."product_id" = "pub"."product_id"`).
+		Where(`"st"."id" = ?`, branchOrTagID).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where(`"pub"."kind" = ? AND "pub"."subject" = "st"."name"`, OpenVEX).
-				WhereOr(`"pub"."kind" = ? AND EXISTS (?)`, CSAFVEX, scanned(db, "stream_id", "st"))
+				WhereOr(`"pub"."kind" = ? AND EXISTS (?)`, CSAFVEX, scanned(db, "branch_or_tag_id", "st"))
 		}))
 }
 
@@ -174,7 +174,7 @@ func AnyPublishedForVariant(ctx context.Context, db bun.IDB, variantID int64) (b
 // joins under alias. A build is named by a document only once a scan has
 // been filed against it, and the scan it names is never taken away.
 func scanned(db bun.IDB, column, alias string) *bun.SelectQuery {
-	return db.NewSelect().TableExpr(`"target" AS "tg"`).ColumnExpr("1").
+	return db.NewSelect().TableExpr(`"build" AS "tg"`).ColumnExpr("1").
 		Where(`"tg".? = ?.?`, bun.Ident(column), bun.Ident(alias), bun.Ident("id")).
 		Where(`"tg"."last_scan_id" IS NOT NULL`)
 }

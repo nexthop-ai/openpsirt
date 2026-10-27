@@ -46,7 +46,7 @@ type CarriedDecisionBody struct {
 func registerCarried(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-carried-patches", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/carried-patches",
 		Summary: "List what a build says it deals with itself",
 		Description: "Everything this build has argued about in its own inventories: carried " +
@@ -67,17 +67,17 @@ func registerCarried(api huma.API, in core.Deps) {
 			"working is looking for.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product   string `path:"product"`
-		Stream    string `path:"stream"`
-		Variant   string `path:"variant"`
-		Component string `query:"component" doc:"Narrow to what one package was claimed about"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Component   string `query:"component" doc:"Narrow to what one package was claimed about"`
 		core.Paging
 	}) (*core.CountedListOutput[CarriedDecisionBody], error) {
-		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).CarriedPatches(ctx, subject, targetID,
+		rows, total, err := finding.NewStore(in.DB.DB).CarriedPatches(ctx, subject, buildID,
 			input.Component, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)

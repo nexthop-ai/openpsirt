@@ -24,7 +24,7 @@ func TestOneReportStandsForAnIssueAcrossTheNamesMergedIntoIt(t *testing.T) {
 		keptName, absorbedName := f.issues[0].Issue.Identifier, f.issues[1].Issue.Identifier
 
 		first, err := f.store.Record(ctx, who, f.productID,
-			finding.Claimed{Summary: "The management socket lets anybody in."})
+			finding.NewReport{ReportedProblem: "The management socket lets anybody in."})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -38,7 +38,7 @@ func TestOneReportStandsForAnIssueAcrossTheNamesMergedIntoIt(t *testing.T) {
 		}
 
 		second, err := f.store.Record(ctx, who, f.productID,
-			finding.Claimed{Summary: "Somebody else says the same thing."})
+			finding.NewReport{ReportedProblem: "Somebody else says the same thing."})
 		if err != nil {
 			t.Fatal(err)
 		}

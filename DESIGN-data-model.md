@@ -8,10 +8,10 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 ## Contents
 
 - [Vocabulary](#vocabulary)
-- [Streams](#streams)
+- [Branches and tags](#branches-and-tags)
 - [Release dates](#release-dates)
 - [End of support](#end-of-support)
-- [Variants and targets](#variants-and-targets)
+- [Variants and builds](#variants-and-builds)
 - [Declaration before use](#declaration-before-use)
 - [Names](#names)
 - [Engine differences](#engine-differences)
@@ -28,19 +28,19 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 
 ## Vocabulary
 
-A scan is filed against **(product, stream, variant)**. All three are declared
-before anything may target them.
+A scan is filed against **(product, branch or tag, variant)**. All three are
+declared before anything may name them.
 
 | Word | Means |
 |---|---|
 | Product | A thing that ships |
-| Stream | A branch or a tag of that product |
+| Branch or tag | A branch or a tag of that product |
 | Variant | One of the ways the product is built |
-| Build | One stream built as one variant, and the pair a scan is filed against |
+| Build | One branch or tag built as one variant, and the pair a scan is filed against |
 | Occurrence | A component and what directly pulled it in |
 | Finding | One component at one occurrence in one build. Twelve occurrences is twelve findings (REQ-17) |
 | Group | One issue at one component across every occurrence it sits at. The row the findings list returns, and the thing somebody decides about |
-| Report | A claim somebody sent us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`DESIGN-findings.md` § Reports) |
+| Report | A problem somebody reported to us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`DESIGN-findings.md` § Reports) |
 
 Each word names one thing, and the unit a scan is filed against is called a
 build wherever it is named. The finding-versus-group distinction is the
@@ -50,7 +50,7 @@ other.
 
 | Term | Usage |
 |---|---|
-| Build | The word in prose, in responses and on screens. The table is called `target`, and the name stops there |
+| Build | The word in prose, in responses, on screens and in the schema |
 | Release | Not a level of the hierarchy. It is the act of shipping and the version a fix arrives in |
 | Occurrence | Spelled `occurrences` everywhere, never "locations" |
 
@@ -61,7 +61,7 @@ other.
 | Withdraw | Taking back something recorded: a decision, an approval, a role | Revoke, retract, remove, cancel. Retiring a team or a rule is the exception, being not a taking-back |
 | Hand back | Returning work to nobody | Release, which would make that word mean a third thing |
 
-## Streams
+## Branches and tags
 
 Branches and tags share one table. They differ in one respect — a branch moves
 and a tag does not — and share a product, variants, findings, an end-of-life date
@@ -76,7 +76,7 @@ decisions from.
 | The parent can be filled in afterwards (REQ-15) | A pipeline that does not know declares the tag without it, and release readiness then reports that nothing has ever been released from the branch — indistinguishable from a branch that shipped nothing. Declaring the tag again with the branch named records it |
 | Naming a different branch is refused | A tag is one frozen point |
 | Only a tag has a parent, and it is a branch of the same product | A tag under a tag, a release under itself, and a branch in another product are lines that do not exist. Declaring and filling in ask the same check |
-| A listed tag names its parent even when the parent is retired | The parent is a fact about the tag. A list leaving retired streams out still names the branch a listed tag was cut from |
+| A listed tag names its parent even when the parent is retired | The parent is a fact about the tag. A list leaving retired branches and tags out still names the branch a listed tag was cut from |
 
 ## Release dates
 
@@ -118,12 +118,12 @@ deployment, in two places:
 The comparison is spelled once, in the catalog, because the same fact decides
 both effects and what a screen says.
 
-## Variants and targets
+## Variants and builds
 
 | | Definition |
 |---|---|
 | Variant | Declared once per product, name unique within it. What a product is built as — a chip, an architecture, an operating system — is a property of the product and does not change because a new release came out |
-| Target | One release built as one variant. Recorded on first use, because nothing new is named: a scan saying this release was built as that variant reports a fact |
+| Build | One release built as one variant. Recorded on first use, because nothing new is named: a scan saying this release was built as that variant reports a fact |
 
 That pair is what a scan is filed against and what everything downstream points
 at, so one identifier runs from a scan through its graph to a finding.
@@ -133,7 +133,7 @@ eventually retype it differently, and `win`, `windows` and `win32` across three
 releases are three variants as far as everything downstream is concerned.
 
 A variant introduced later does not appear in earlier releases: those have no
-target for it.
+build of it.
 
 Each variant records whether it is customer-facing, which feeds ranking. It
 defaults to customer-facing, so an unclassified artifact ranks as though it
@@ -180,7 +180,7 @@ Retiring says the thing is not tracked here.
 | Retiring a product writes nothing onto its releases and variants | They are reached through the product, so they leave every list with it. A date written onto each of them would be a bulk write whose only effect is to make bringing the product back a second bulk write that has to remember exactly what it changed |
 | A retired variant is still named by the releases built as it, and a retired product or release is named by nothing | Only the variant has a second list that answers a different question — what a release was actually built as, where the findings filed against it sit. A retired product is reached by a link somebody kept, and the page for it says it is retired |
 | Retiring one already retired is refused | Answered as done, two administrators retiring it at once would both record having done it |
-| One write retires every kind of row kept after retirement | A catalog part, a team, a destination, a supplier, a routing rule and an obligation window are retired by one conditional write that matches only a row still in use, so the refusal above is one rule for all of them |
+| One write retires every kind of row kept after retirement | A catalog part, a team, a destination, a supplier, an assignment rule and a response window are retired by one conditional write that matches only a row still in use, so the refusal above is one rule for all of them |
 
 Renaming, correcting what a variant reaches and retiring anything are
 administrative acts, and each leaves a record of who did it and what it held
@@ -189,11 +189,11 @@ before.
 ## Declaration before use
 
 A scan naming something undeclared is refused, and the refusal names which part
-is missing — product, stream or variant.
+is missing — product, branch or tag, or variant.
 
 Creating whatever a scan names is the alternative. A pipeline with a typo in a
-stream name then produces a stream that looks genuine, with its own findings,
-counts and place in every report, while the real stream appears to have stopped
+branch name then produces a branch that looks genuine, with its own findings,
+counts and place in every report, while the real branch appears to have stopped
 being scanned.
 
 Declaring is idempotent, including against another writer. Declaring what
@@ -218,7 +218,7 @@ would be two histories for one thing somebody ships.
 Bounded: no leading or trailing spaces, nothing empty, and a length keeping a
 unique index inside every engine's key-length limit. The length is counted in
 characters, which is what the column holds. Uniqueness is within the
-parent — a product name globally, a stream and a variant within their product.
+parent — a product name globally, a branch or tag and a variant within their product.
 
 Capitals do not distinguish two names. These are typed by hand into build
 scripts, so a pipeline saying `sonic` against a product declared `SONiC` is the
@@ -242,7 +242,7 @@ filter — it is matched on the fold stored beside the name.
 
 | Rule | |
 |---|---|
-| A typed component name is matched without regard to capitals | Through the stored fold, the same one the routing rules and the search match on |
+| A typed component name is matched without regard to capitals | Through the stored fold, the same one the assignment rules and the search match on |
 | Two components whose names differ only in capitals are both what the name means | A lookup naming one component answers with the "which did you mean?" choices; a filter keeps both |
 | The producer's own spelling names the one spelled that way | Every link is built from the stored name, so a link reaches its component rather than the choices |
 | A clash in capitals alone, at one version, ecosystem and namespace, is reached only by its own spelling | The choices tell components apart by those three, and two components differing in nothing else cannot be told apart by them |
@@ -258,10 +258,10 @@ Only column declarations differ. Everything queried is portable.
 | Booleans | One engine has no boolean type |
 | Text lengths | A unique index needs a bounded width on some engines |
 
-One behavioral difference beyond the declarations: a stream points at its parent
+One behavioral difference beyond the declarations: a tag points at its parent
 branch, and MySQL and MariaDB enforce that self-reference during a bulk delete
-where PostgreSQL and SQLite do not. Code clearing streams detaches the parent
-first.
+where PostgreSQL and SQLite do not. Code clearing branches and tags detaches the
+parent first.
 
 ## The dependency graph
 
@@ -363,7 +363,7 @@ a commit or a content digest.
 | A build states one image name at one version, or it is no image by name | One component is one node in a build, so two images of one name side by side cannot both be the name. Each keeps its version in its identity, as a package does, and records no image version. apko describes every layer of an image as an image named `image`, and a build can ship a base image beside an image built on it |
 | A build stating the name once again moves it to the name | Once, the way a version moving would: the version-identified node closes and the image's node opens |
 | Every other component keeps its version in its identity | An upgrade inside an image still closes the old node and supersedes its findings |
-| The scanner is given an image as stored | Its name and its identifier with no version. A report is matched back to a component by identity, and no vulnerability data is published against an image's build stamp: the scanner was measured matching nothing for the `oci` type (`DESIGN-reporting.md` § Match coverage) |
+| The scanner is given an image as stored | Its name and its identifier with no version. A report is matched back to a component by identity, and no vulnerability data is published against an image's build stamp: the scanner was measured matching nothing for the `oci` type (`DESIGN-analytics.md` § Unmatched components) |
 | A VEX statement names an image as the build stamped it | The product a statement names inside the build, and a component a statement is about, is read with the build's open image version. A product named with no version is one a reader cannot match |
 | A claim or a statement naming an image at a version is placed against the version the build states | The component row carries no version to compare it with, so the version the build states now is read from its image versions |
 
@@ -408,7 +408,7 @@ name is not enough.
 | A name matching none is not found, and is looked up only once the request is authorized | A refusal that differs between a held name and a missing one, for a build the caller may not read, says what the build holds |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
 | Findings rows, tree nodes, the rows of the tree of one's own work, the steps of a way down, component packages, and the unassigned, late, disposed, blocking and decision lists carry the ecosystem and namespace | A screen can send back only what it was given |
-| The finding and its reach, decision, assignment and tags, a component's neighbors, trend, open issues and decision about them, and a list narrowed beneath one, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
+| The finding and its reach, decision, assignment and labels, a component's neighbors, trend, open issues and decision about them, and a list narrowed beneath one, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
 
 ## Upstream name and version
 
@@ -696,7 +696,7 @@ root, against 0.018 s.
 | Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a decision is keyed on the versions in hand and asked again when they move |
 | A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |
 | Two artifacts distinguished only by a package qualifier are one component | A component is tracked for which vulnerabilities apply to it, and a qualifier does not change that |
-| A component's row, and its fold, are what the first report of it stated | A source package or a distribution a later report states reaches that product's scanner, the build's claims and a closing finding's explanation from the node, and not the fold, a decision's expiry, a routing rule or a search by name, which read the row. A package first described without its source package folds on its own name in every product |
+| A component's row, and its fold, are what the first report of it stated | A source package or a distribution a later report states reaches that product's scanner, the build's claims and a closing finding's explanation from the node, and not the fold, a decision's expiry, an assignment rule or a search by name, which read the row. A package first described without its source package folds on its own name in every product |
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
 | A group's state is read from what its occurrences say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn decision in no bucket at all: in none of the four states, and in the total |
 | An occurrence identity carries no build and no product | That is what lets a decision travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named. A decision occurrence is related to a finding by one spelling of the product, the issue and the occurrence, with a form for each way a statement reads the two rows: the finding under any alias code gives it, the product left to a statement that holds it through the finding's build, the issue asked through the merge where the statement has not joined the issue a decision is filed under, and a derived table carrying a decision occurrence's issue and occurrence. Every query correlating a decision occurrence to a finding composes one of them. A test fails a comparison of a decision occurrence's issue or occurrence with a finding's written out in either order and under any alias, and lists by name the few occurrence comparisons between two rows that are not a decision occurrence and a finding. Each query adds its own condition on liveness, versions and state beside the correlation |

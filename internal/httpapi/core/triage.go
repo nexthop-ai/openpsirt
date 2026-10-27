@@ -32,8 +32,8 @@ type DecisionOccurrenceBody struct {
 	// Justification is required for not-applicable and meaningless elsewhere:
 	// the decision that something does not affect us names one of the recognized
 	// reasons.
-	Justification Justification `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
-	Reason        LeadReason    `json:"reason,omitempty" doc:"Why a lead was dismissed. Ignored in a request"`
+	Justification Justification     `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
+	Reason        CodeFindingReason `json:"reason,omitempty" doc:"Why a code finding was dismissed. Ignored in a request"`
 	// Mitigation is the one reason here that rests on configuration rather
 	// than on code, so it is the one thing nothing will notice going away.
 	// Naming it does not fix that; it makes the decision checkable.
@@ -84,28 +84,28 @@ type DecisionOccurrenceBody struct {
 // FindingRefBody is the subject of a decision occurrence, as the findings list
 // shows it: the build to link to, the issue, the component and where it sits.
 type FindingRefBody struct {
-	Product       string   `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
-	ProductName   string   `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	Stream        string   `json:"stream"`
-	StreamName    string   `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant       string   `json:"variant"`
-	VariantName   string   `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
-	Vulnerability string   `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
-	Component     string   `json:"component"`
-	Version       string   `json:"version" doc:"The version that ships"`
-	Ecosystem     string   `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace     string   `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Severity      string   `json:"severity,omitempty" doc:"Our rating where one stands, else as published"`
-	Score         float64  `json:"score,omitempty"`
-	ScoreVersion  string   `json:"score_version,omitempty" doc:"The scoring system the number is on"`
-	Exploited     bool     `json:"exploited,omitempty"`
-	FixState      FixState `json:"fix_state,omitempty"`
-	FixedIn       string   `json:"fixed_in,omitempty"`
-	Description   string   `json:"description,omitempty" doc:"The first four hundred characters of what the report says, as plain text"`
-	Owner         string   `json:"owner,omitempty" doc:"The part of the product this belongs to"`
-	Parent        string   `json:"parent,omitempty" doc:"The component that directly pulls it in, which is what the decision is about"`
-	Occurrences   int      `json:"occurrences" doc:"The number of occurrences of the issue in that component in that build"`
-	Decided       int      `json:"decided" doc:"The number of those this decision covers"`
+	Product         string   `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
+	ProductName     string   `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	BranchOrTag     string   `json:"branch_or_tag"`
+	BranchOrTagName string   `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant         string   `json:"variant"`
+	VariantName     string   `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	Vulnerability   string   `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
+	Component       string   `json:"component"`
+	Version         string   `json:"version" doc:"The version that ships"`
+	Ecosystem       string   `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace       string   `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
+	Severity        string   `json:"severity,omitempty" doc:"Our rating where one stands, else as published"`
+	Score           float64  `json:"score,omitempty"`
+	ScoreVersion    string   `json:"score_version,omitempty" doc:"The scoring system the number is on"`
+	Exploited       bool     `json:"exploited,omitempty"`
+	FixState        FixState `json:"fix_state,omitempty"`
+	FixedIn         string   `json:"fixed_in,omitempty"`
+	Description     string   `json:"description,omitempty" doc:"The first four hundred characters of what the report says, as plain text"`
+	Owner           string   `json:"owner,omitempty" doc:"The part of the product this belongs to"`
+	Parent          string   `json:"parent,omitempty" doc:"The component that directly pulls it in, which is what the decision is about"`
+	Occurrences     int      `json:"occurrences" doc:"The number of occurrences of the issue in that component in that build"`
+	Decided         int      `json:"decided" doc:"The number of those this decision covers"`
 }
 
 // OccurrenceBody names what a decision occurrence is about.
@@ -122,12 +122,12 @@ type OccurrenceBody struct {
 
 // QueueNarrowing is the filters the review queue and its export both take.
 type QueueNarrowing struct {
-	Reason     QueueReason `query:"reason" default:"approval" doc:"Which list: decisions waiting for your approval, deferrals whose date has passed, or promised upgrades and patches whose date has passed with the finding still open"`
-	ProposedBy string      `query:"proposed_by" maxLength:"191" doc:"Keep only decisions this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty"`
-	OlderThan  int         `query:"older_than" minimum:"1" doc:"Keep only decisions at least this many days old"`
-	Severity   Rating      `query:"severity" doc:"Keep only decisions covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
-	Outcome    []Outcome   `query:"outcome,explode" uniqueItems:"true" doc:"Keep only decisions of these outcomes. Any of them, not all"`
-	Release    string      `query:"release" maxLength:"191" doc:"Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals"`
+	Reason      QueueReason `query:"reason" default:"approval" doc:"Which list: decisions waiting for your approval, deferrals whose date has passed, or promised upgrades and patches whose date has passed with the finding still open"`
+	ProposedBy  string      `query:"proposed_by" maxLength:"191" doc:"Keep only decisions this person made, by sign-in identity. Somebody who made none, or who is not known here, leaves the queue empty"`
+	OlderThan   int         `query:"older_than" minimum:"1" doc:"Keep only decisions at least this many days old"`
+	Severity    Rating      `query:"severity" doc:"Keep only decisions covering an issue rated this badly or worse in its product. 'low' excludes nothing"`
+	Outcome     []Outcome   `query:"outcome,explode" uniqueItems:"true" doc:"Keep only decisions of these outcomes. Any of them, not all"`
+	BranchOrTag string      `query:"branch_or_tag" maxLength:"191" doc:"Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals"`
 }
 
 // Filter turns the queue's parameters into the store's narrowing.
@@ -145,8 +145,8 @@ func (n QueueNarrowing) Filter(ctx context.Context, in Deps, subject access.Subj
 	}
 	filter := triage.QueueFilter{
 		Reason: triage.QueueReason(n.Reason), Mine: mine, ProductID: within,
-		Severities: finding.AtLeast(string(n.Severity)),
-		Release:    n.Release,
+		Severities:  finding.AtLeast(string(n.Severity)),
+		BranchOrTag: n.BranchOrTag,
 	}
 	for _, each := range n.Outcome {
 		filter.Outcomes = append(filter.Outcomes, triage.Outcome(each))
@@ -188,10 +188,10 @@ func RefusedDecision(logger *slog.Logger, err error) error {
 		return noSuchDecisionOccurrence()
 	case errors.Is(err, triage.ErrSamePerson):
 		return huma.Error409Conflict("somebody who proposed any of a decision or wrote any of its reasoning may not agree to it")
-	case errors.Is(err, triage.ErrLeadHandedOff):
-		return huma.Error409Conflict(triage.ErrLeadHandedOff.Error())
-	case errors.Is(err, finding.ErrLeadPastEndOfLife):
-		return huma.Error409Conflict(finding.ErrLeadPastEndOfLife.Error())
+	case errors.Is(err, triage.ErrCodeFindingRecordedAsFlaw):
+		return huma.Error409Conflict(triage.ErrCodeFindingRecordedAsFlaw.Error())
+	case errors.Is(err, finding.ErrCodeFindingPastEndOfLife):
+		return huma.Error409Conflict(finding.ErrCodeFindingPastEndOfLife.Error())
 	}
 	// An authorization refusal is not somebody having asked for the
 	// impossible. Without this arm it falls through to the default below and
@@ -296,11 +296,11 @@ type DecisionOccurrenceDetail struct {
 // that carried either would be offering an act at the wrong grain.
 func DecisionArgument(c triage.Decision, reasoning string) DecisionOccurrenceBody {
 	body := DecisionOccurrenceBody{DecisionID: c.ID, Outcome: Outcome(c.Outcome), Reasoning: reasoning}
-	// A decision about a lead publishes nothing, so it has a reason and no
+	// A decision about a code finding publishes nothing, so it has a reason and no
 	// scope.
 	if c.Outcome.AboutALead() {
 		if c.Justification != nil {
-			body.Reason = LeadReason(*c.Justification)
+			body.Reason = CodeFindingReason(*c.Justification)
 		}
 		return body
 	}
@@ -405,10 +405,10 @@ func findingRef(described map[int64]triage.Described, occurrenceID int64) *Findi
 	}
 	body := &FindingRefBody{
 		Product: d.Product, ProductName: d.ProductName,
-		Stream: d.Stream, Variant: d.Variant,
-		StreamName:    d.StreamName,
-		VariantName:   d.VariantName,
-		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
+		BranchOrTag: d.BranchOrTag, Variant: d.Variant,
+		BranchOrTagName: d.BranchOrTagName,
+		VariantName:     d.VariantName,
+		Vulnerability:   d.Issue.Identifier, Component: d.Component, Version: d.Version,
 		Ecosystem: graph.EcosystemOf(d.Purl), Namespace: graph.NamespaceOf(d.Purl),
 		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,
 		FixState: FixState(d.FixState), FixedIn: d.FixedIn,

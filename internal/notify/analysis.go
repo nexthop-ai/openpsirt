@@ -19,7 +19,7 @@ import (
 )
 
 // AnalysisDrops tells the internal readers of a product about an analyzer run
-// that marked much of a build's leads not reproduced at once.
+// that marked much of a build's code findings no longer detected at once.
 //
 // Returned as a function for the applier to call, on the terms Movements is:
 // what a run does and how anybody hears about it are separate concerns.
@@ -30,14 +30,14 @@ func AnalysisDrops(db *bun.DB, logger *slog.Logger) func(context.Context, analys
 			// the same, so a message nobody could compose is not a reason to
 			// fail the run.
 			logger.Error("could not say an analyzer run dropped sharply",
-				"run", drop.RunID, "build", drop.TargetID, "error", err)
+				"run", drop.RunID, "build", drop.BuildID, "error", err)
 		}
 	}
 }
 
 // dropped tells everybody who reads internal findings in the product.
 func dropped(ctx context.Context, db *bun.DB, drop analysis.Drop) error {
-	placed, err := catalog.NewStore(db).Describe(ctx, drop.TargetID)
+	placed, err := catalog.NewStore(db).Describe(ctx, drop.BuildID)
 	if err != nil {
 		return fmt.Errorf("read which build the run was for: %w", err)
 	}
@@ -50,21 +50,21 @@ func dropped(ctx context.Context, db *bun.DB, drop analysis.Drop) error {
 	if err != nil {
 		return err
 	}
-	body := fmt.Sprintf("%s %s %s: one run of %s marked %d of %d open leads not reproduced. "+
-		"It was applied.", placed.Product, placed.Stream, placed.Variant, name, drop.Missed, drop.Live)
-	where := weblink.Leads(placed.Addressed.Product, placed.Addressed.Stream, placed.Addressed.Variant,
-		string(analysis.NotReproduced), name)
-	together := identify("analysis-dropped " + strconv.FormatInt(drop.RunID, 10))
+	body := fmt.Sprintf("%s %s %s: one run of %s marked %d of %d open code findings no longer detected. "+
+		"It was applied.", placed.Product, placed.BranchOrTag, placed.Variant, name, drop.Missed, drop.Live)
+	where := weblink.CodeFindings(placed.Addressed.Product, placed.Addressed.BranchOrTag, placed.Addressed.Variant,
+		string(analysis.NoLongerDetected), name)
+	together := identify("security-testing-dropped " + strconv.FormatInt(drop.RunID, 10))
 	productID := placed.ProductID
 	var failed error
 	for personID, per := range reach {
-		// The leads named are internal, so reading internal findings is the
+		// The code findings named are internal, so reading internal findings is the
 		// question, and the link answers for exactly that.
 		if !per[productID].readsInternal {
 			continue
 		}
 		if err := NewStore(db).Tell(ctx, Telling{
-			PersonID: personID, Kind: AnalysisDropped,
+			PersonID: personID, Kind: SecurityTestingDropped,
 			Body: body, Link: where, ProductID: &productID,
 			Together: together, Private: true, Internal: true,
 		}); err != nil {

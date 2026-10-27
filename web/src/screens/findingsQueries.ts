@@ -15,7 +15,7 @@ import { acrossProducts, findingsPageKey, type withinVariant } from "./list";
 // the list is narrowed to, beside the filters in `query`.
 export function useFindingsViews({
   product,
-  stream,
+  branch_or_tag: branchOrTag,
   variant,
   spanning,
   query,
@@ -23,15 +23,15 @@ export function useFindingsViews({
   view,
 }: {
   product: string;
-  stream: string;
+  branch_or_tag: string;
   variant: string;
   spanning: boolean;
   query: ReturnType<typeof withinVariant>;
-  selection: { stream?: string; variant?: string };
+  selection: { branch_or_tag?: string; variant?: string };
   view: string;
 }) {
   const findings = useQuery({
-    queryKey: findingsPageKey(product, stream, variant, query),
+    queryKey: findingsPageKey(product, branchOrTag, variant, query),
     queryFn: async () =>
       unwrap(
         spanning
@@ -60,7 +60,7 @@ export function useFindingsViews({
   // is what is drawn, so it is asked only from the other two, with a page of
   // one: the findings list has no count-only answer.
   const byIssue = useQuery({
-    queryKey: ["findings", "count", product, stream, variant, query],
+    queryKey: ["findings", "count", product, branchOrTag, variant, query],
     enabled: view !== "issues",
     queryFn: async () =>
       unwrap(
@@ -95,7 +95,7 @@ export function useFindingsViews({
       ),
   });
   const byUpgrade = useQuery({
-    queryKey: ["fix-bundles", "count", product, selection, query],
+    queryKey: ["planned-upgrades", "count", product, selection, query],
     enabled: !spanning,
     queryFn: async () =>
       unwrap(

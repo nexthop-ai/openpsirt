@@ -38,7 +38,7 @@ import (
 )
 
 // The sizes a real image produces. One kernel bump reaches 4,485 findings
-// across 44,016 occurrences; a cumulative bundle reaches 243,945, which is the
+// across 44,016 occurrences; a cumulative upgrade reaches 243,945, which is the
 // largest single act the data can ask for.
 var promiseSizes = []int{2_000, 44_016, 243_945}
 
@@ -50,7 +50,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		ctx := t.Context()
 		db := w.DB
-		product, target := w.Product, w.Target
+		product, build := w.Product, w.Build
 		// A real person row, because a decision names who made it and the schema
 		// holds it to that.
 		rights := access.NewStore(db.DB)
@@ -96,25 +96,25 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 
 		scans := ingest.NewStore(db.DB)
 		scan, _, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "promise", BuiltAt: time.Now().UTC(),
+			BuildID: build.ID, ContentHash: "promise", BuiltAt: time.Now().UTC(),
 			ParserVersion: "measure",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := fixtures.ApplyGraph(ctx, db.DB, target.ID, scan.ID, snap); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, db.DB, build.ID, scan.ID, snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(db.DB)
 		run, err := findings.Begin(ctx, finding.Run{
-			TargetID: target.ID, Scanner: "measure",
+			BuildID: build.ID, Scanner: "measure",
 			ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		seeding := time.Now()
-		applied, err := findings.Apply(ctx, target.ID, run.ID, reported)
+		applied, err := findings.Apply(ctx, build.ID, run.ID, reported)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +134,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 					ProductID: product.ID,
 					Component: fmt.Sprintf("bumped-%d", n),
 					To:        "2.0", By: by,
-					Builds:    []int64{target.ID},
+					Builds:    []int64{build.ID},
 					Reasoning: "Measuring what one promise of this size costs to commit.",
 				})
 				took := time.Since(started)

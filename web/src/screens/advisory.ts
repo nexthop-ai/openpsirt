@@ -120,8 +120,8 @@ export function markable(row: { covered?: unknown; decided?: string }): boolean 
 // The builds a decision was made on, as a release is named. Nothing recorded
 // is said as that rather than left blank, which would read as nowhere.
 export function madeOnLabel(
-  made: readonly { stream?: string; variant?: string }[] | null | undefined,
+  made: readonly { branch_or_tag?: string; variant?: string }[] | null | undefined,
 ): string {
   if (!made || made.length === 0) return "not recorded";
-  return made.map((one) => `${one.stream ?? ""} (${one.variant ?? ""})`).join(", ");
+  return made.map((one) => `${one.branch_or_tag ?? ""} (${one.variant ?? ""})`).join(", ");
 }

@@ -28,19 +28,19 @@ import (
 // Everything else is the one rule a scanned finding goes through (Deadline),
 // so exploitation and a fix arriving move it the same way.
 func ownDeadline(own Windows, severity string, ratedAt *time.Time, state FixState,
-	exploited, exploitedHere bool, observedAt time.Time, learnedAt, fixedAt *time.Time,
-	floor Floor) *time.Time {
+	exploited, incident bool, observedAt time.Time, learnedAt, fixedAt *time.Time,
+	floor MinimumSeverity) *time.Time {
 
 	if severity == "" || ratedAt == nil {
 		return nil
 	}
-	if !floor.Admits(exploited || exploitedHere, severity) {
+	if !floor.Admits(exploited || incident, severity) {
 		return nil
 	}
 	// Being attacked here admits the finding to the line and moves no window,
 	// for the reason Enter gives: how long a fix may take is a question about
 	// the work rather than about the attack.
-	return Deadline(state, exploited || exploitedHere, *ratedAt, observedAt,
+	return Deadline(state, exploited || incident, *ratedAt, observedAt,
 		learnedAt, fixedAt, own.For(exploited, severity))
 }
 
@@ -66,20 +66,20 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	if err != nil {
 		return 0, err
 	}
-	floor, err := FloorFor(ctx, db, productID)
+	floor, err := MinimumSeverityFor(ctx, db, productID)
 	if err != nil {
 		return 0, err
 	}
 
 	var rows []struct {
-		ID            int64      `bun:"id"`
-		Severity      string     `bun:"severity"`
-		RatedAt       *time.Time `bun:"rated_at"`
-		FixState      FixState   `bun:"fix_state"`
-		FixedAt       *time.Time `bun:"fixed_at"`
-		Exploited     bool       `bun:"exploited"`
-		ExploitedHere bool       `bun:"exploited_here"`
-		LearnedAt     *time.Time `bun:"learned_at"`
+		ID        int64      `bun:"id"`
+		Severity  string     `bun:"severity"`
+		RatedAt   *time.Time `bun:"rated_at"`
+		FixState  FixState   `bun:"fix_state"`
+		FixedAt   *time.Time `bun:"fixed_at"`
+		Exploited bool       `bun:"exploited"`
+		Incident  bool       `bun:"incident"`
+		LearnedAt *time.Time `bun:"learned_at"`
 		// OnTheClock is whether the release carries deadlines at all: a tag
 		// and a release past end of life do not.
 		OnTheClock int `bun:"on_the_clock"`
@@ -87,8 +87,8 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, productID).
@@ -98,7 +98,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
 		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).
 		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
-		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 		ColumnExpr(`"f"."exploited_learned_at" AS "learned_at"`).
 		ColumnExpr(`CASE WHEN `+clocked+` THEN 1 ELSE 0 END AS "on_the_clock"`, clockedArgs...).
 		Where(`"f"."kind" = ?`, Entered).
@@ -121,7 +121,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 			row.RatedAt = &at
 		}
 		at := ownDeadline(own, row.Severity, row.RatedAt, row.FixState,
-			row.Exploited, row.ExploitedHere, now, row.LearnedAt, row.FixedAt, floor)
+			row.Exploited, row.Incident, now, row.LearnedAt, row.FixedAt, floor)
 		if at == nil || row.OnTheClock == 0 {
 			none = append(none, row.ID)
 			continue

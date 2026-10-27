@@ -1,0 +1,104 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package incident_test
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
+)
+
+// A window declared to count from another while that one is being retired
+// leaves one of the two acts refused, never a window counting from a retired
+// one, which would wait on a notice nobody can record.
+func TestAWindowIsNotDeclaredFromOneRetiredAtTheSameTime(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		notification := f.window(t, "Notification", 72)
+		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
+			return f.store.RetireWindow(context.Background(), f.admin, notification.ID)
+		})
+		_, declared := racing.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{
+			Name: "Final report", Hours: 720, From: &notification.ID,
+		})
+		retired := rival()
+		if declared == nil && retired == nil {
+			t.Fatal("a window was declared counting from one retired at the same time")
+		}
+		if declared == nil && !errors.Is(retired, incident.ErrCountedFrom) {
+			t.Errorf("retiring a window another came to count from answered %v", retired)
+		}
+	})
+}
+
+// Two changes at once that would close a loop between them leave one refused.
+func TestTwoChangesAtOnceCloseNoLoop(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		a := f.window(t, "A", 24)
+		b := f.window(t, "B", 24)
+		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
+			_, err := f.store.ChangeWindow(context.Background(), f.admin, b.ID, incident.WindowSaid{
+				Name: "B", Hours: 24, From: &a.ID,
+			})
+			return err
+		})
+		_, first := racing.ChangeWindow(t.Context(), f.admin, a.ID, incident.WindowSaid{
+			Name: "A", Hours: 24, From: &b.ID,
+		})
+		second := rival()
+		if first == nil && second == nil {
+			t.Fatal("two windows came to count from each other")
+		}
+	})
+}
+
+// A fix release named while the record is being cleared lands before the
+// clearing or not at all: the clearing waits for the naming, so no naming
+// arrives on a record already cleared.
+//
+// The order is read from the trail, which each act writes inside its own
+// transaction. The clearing writes its entry after it has waited for the
+// naming, so where both are recorded the naming's entry comes first.
+func TestAFixIsNotNamedOnARecordClearedAtTheSameTime(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		record := f.attacked(t)
+		racing, rival := rivalAfterRead(t, f, "incident", "incident_fix", func() error {
+			return triage.NewStore(f.db.DB).ClearIncident(context.Background(), f.triager,
+				record.ID, "It was a test harness.")
+		})
+		_, named := racing.NameFix(t.Context(), f.triager, record.ID, world.TagName)
+		if err := rival(); err != nil {
+			t.Fatalf("the rival clearing: %v", err)
+		}
+		if named != nil {
+			return
+		}
+		var acts []trail.Change
+		if err := f.db.DB.NewSelect().Model(&acts).
+			Where(`"ac"."kind" = ?`, trail.Incident).
+			OrderExpr(`"ac"."id"`).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		naming, clearing := -1, -1
+		for i, act := range acts {
+			switch {
+			case strings.HasSuffix(act.Name, ", fix release"):
+				naming = i
+			case act.Became == nil:
+				clearing = i
+			}
+		}
+		if naming < 0 || clearing < 0 {
+			t.Fatalf("the trail does not hold both acts: %+v", acts)
+		}
+		if clearing < naming {
+			t.Error("a fix release was named on a record cleared before the naming committed")
+		}
+	})
+}

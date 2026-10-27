@@ -42,7 +42,7 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 		if err := rights.GrantRole(ctx, holder.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}
-		target := w.Target
+		build := w.Build
 		named, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-8001", Severity: "medium"},
 			{Identifier: "SONIC-2026-8002", Severity: "critical"},
@@ -69,7 +69,7 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 				t.Fatal(err)
 			}
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: finding.Vulnerable,
+				BuildID: build.ID, Kind: finding.Vulnerable,
 				VulnerabilityID: named[each.identifier],
 				Visibility:      each.visibility, ComponentID: component.ID,
 				OccurrenceIdentity: "place-" + each.component, Urgency: int64(i + 1),
@@ -149,7 +149,7 @@ func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(
 			Where(`"id" = ?`, reader.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		target := w.Target
+		build := w.Build
 		for i, each := range []struct {
 			identifier, component string
 			visibility            access.Visibility
@@ -170,7 +170,7 @@ func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(
 				t.Fatal(err)
 			}
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: named[each.identifier],
+				BuildID: build.ID, Kind: finding.Vulnerable, VulnerabilityID: named[each.identifier],
 				Visibility: each.visibility, ComponentID: component.ID,
 				OccurrenceIdentity: "place-" + each.component, Urgency: int64(i + 1),
 				OpenedAt: time.Now().UTC(),
@@ -229,7 +229,7 @@ func TestADigestLeavesOutEverythingItsReaderWasToldAbout(t *testing.T) {
 		if err := rights.GrantRole(ctx, holder.ID, product.ID, access.PublicTriage); err != nil {
 			t.Fatal(err)
 		}
-		target := w.Target
+		build := w.Build
 
 		// More than one page of the told, and one thing nobody said.
 		const held = 60
@@ -249,7 +249,7 @@ func TestADigestLeavesOutEverythingItsReaderWasToldAbout(t *testing.T) {
 				t.Fatal(err)
 			}
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: finding.Vulnerable,
+				BuildID: build.ID, Kind: finding.Vulnerable,
 				VulnerabilityID: named[identifier], Visibility: access.Public,
 				ComponentID: component.ID, OccurrenceIdentity: "place-" + identifier,
 				Urgency: int64(i + 1), OpenedAt: time.Now().UTC(), AssignedTo: &holder.PartyID,
@@ -312,7 +312,7 @@ func TestADigestCountsTheReportsInTheReadersTeamsQueues(t *testing.T) {
 			"SONIC-R-2026-777777": theirs, "SONIC-R-2026-888888": other,
 		} {
 			row := &finding.FlawReport{
-				Reference: reference, ProductID: w.Product.ID, Summary: "A claim.",
+				Reference: reference, ProductID: w.Product.ID, ReportedProblem: "A report.",
 				RecordedBy: holder.ID, RecordedAt: now, AssignedTo: &team.PartyID, AssignedAt: &now,
 			}
 			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {

@@ -36,7 +36,7 @@ func (f *runFixture) queued(t *testing.T) int {
 	t.Helper()
 	n, err := f.db.NewSelect().Model((*queue.Job)(nil)).
 		Where(`"kind" = ?`, queue.Scan).
-		Where(`"reference" = ?`, strconv.FormatInt(f.target, 10)).
+		Where(`"reference" = ?`, strconv.FormatInt(f.build, 10)).
 		// Wrapped, because two arguments to one placeholder binds the first
 		// and drops the second: this counted pending work alone, and every
 		// assertion built on it read a running job as an absent one.
@@ -53,7 +53,7 @@ func (f *runFixture) queued(t *testing.T) int {
 func (f *runFixture) ranJustNow(t *testing.T) {
 	t.Helper()
 	run, err := finding.NewStore(f.db.DB).Begin(t.Context(), finding.Run{
-		TargetID: f.target, Scanner: "stub",
+		BuildID: f.build, Scanner: "stub",
 		ScannerVersion: "9.9.9", DatabaseVersion: "2026-08-28", RanHere: true,
 	})
 	if err != nil {
@@ -65,26 +65,26 @@ func (f *runFixture) ranJustNow(t *testing.T) {
 }
 
 // anotherBuild declares a second build of the same product and returns its
-// target. Nothing is filed against it.
-func (f *runFixture) anotherBuild(t *testing.T, stream string) int64 {
+// build. Nothing is filed against it.
+func (f *runFixture) anotherBuild(t *testing.T, branchOrTag string) int64 {
 	t.Helper()
-	declared := f.world.DeclareStream(f.world.Product, stream, catalog.Tag, nil)
-	return f.world.TargetFor(declared, f.world.Customer).ID
+	declared := f.world.DeclareBranchOrTag(f.world.Product, branchOrTag, catalog.Tag, nil)
+	return f.world.BuildFor(declared, f.world.Customer).ID
 }
 
 // withInventory files an inventory against a build, which is what makes it a
 // build the schedule considers at all.
-func (f *runFixture) withInventory(t *testing.T, target int64, hash string) {
+func (f *runFixture) withInventory(t *testing.T, build int64, hash string) {
 	t.Helper()
 	ctx := t.Context()
 	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: target, ContentHash: hash,
+		BuildID: build, ContentHash: hash,
 		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixture.ApplyGraph(ctx, f.db.DB, target, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, f.db.DB, build, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{swss, libnl},
 		Dependencies: []graph.Dependency{
 			{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
@@ -180,11 +180,11 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 		if _, err := f.scheduling(t, "one").Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		queuedFor := func(target int64) int {
+		queuedFor := func(build int64) int {
 			t.Helper()
 			n, err := f.db.NewSelect().Model((*queue.Job)(nil)).
 				Where(`"kind" = ?`, queue.Scan).
-				Where(`"reference" = ?`, strconv.FormatInt(target, 10)).
+				Where(`"reference" = ?`, strconv.FormatInt(build, 10)).
 				Count(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -197,7 +197,7 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 		// The fixture's own build has never been scanned and nothing was
 		// queued for it, so it is asked for — which is what says the check
 		// above is about the one build rather than about asking for nothing.
-		if n := queuedFor(f.target); n != 1 {
+		if n := queuedFor(f.build); n != 1 {
 			t.Errorf("%d scans are queued for the build that was due one, want 1", n)
 		}
 	})
@@ -314,7 +314,7 @@ func TestAReplicaThatStopsDoesNotHoldTheReScansForADay(t *testing.T) {
 func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 	// The cap exists so a runaway producer cannot push everyone else's work
 	// behind its own. Counted across every kind it did the opposite: a bulk
-	// change to the routing rules filled the queue and then refused every
+	// change to the assignment rules filled the queue and then refused every
 	// scan and every upload in the deployment.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
@@ -322,7 +322,7 @@ func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 			MaxAttempts: 5, MaxBacklog: 1, ClaimTimeout: 30 * time.Minute,
 			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
 		})
-		if _, err := full.Add(ctx, queue.Route, "a-bulk-rule-change"); err != nil {
+		if _, err := full.Add(ctx, queue.AssignmentSweep, "a-bulk-rule-change"); err != nil {
 			t.Fatal(err)
 		}
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))

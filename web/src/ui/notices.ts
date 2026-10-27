@@ -64,20 +64,20 @@ const WORDS: Record<Kind, string> = {
   // was rather than as what it might mean: nothing here knows whether the
   // base image moved or the pipeline broke.
   "inventory-moved": "a build's contents changed sharply",
-  "analysis-dropped": "an analyzer run dropped sharply",
-  "analysis-not-comparable": "an analyzer run could not be compared",
-  "analysis-quiet": "an analyzer has gone quiet",
-  "lead-handed-off": "a lead was handed off as a flaw",
-  "lead-moved": "a lead moved into or out of a case",
-  "lead-reopened": "a lead's dismissal withdrawn",
-  "rule-outgrown": "a standing rule outgrew its approval",
-  "rule-waiting": "a standing rule waiting for a second person",
+  "security-testing-dropped": "many findings no longer detected",
+  "security-testing-not-comparable": "latest run can't be compared",
+  "security-testing-stopped": "security testing stopped reporting",
+  "code-finding-recorded-as-flaw": "a code finding was recorded as a flaw",
+  "code-finding-included-in-disclosure": "a code finding included in or taken out of disclosure",
+  "code-finding-reopened": "a code finding's dismissal withdrawn",
+  "suppression-rule-outgrown": "a suppression rule outgrew its approval",
+  "suppression-rule-waiting": "a suppression rule waiting for a second person",
   // A window after an attack, counted from when it became known, with
   // nobody outside recorded as told. Said as the fact; whether anybody owed
   // anything is not the tool's answer to give.
-  "obligation-open": "window after an attack running",
-  "obligation-near": "window after an attack ending soon",
-  "obligation-passed": "window after an attack passed",
+  "response-window-open": "window after an attack running",
+  "response-window-near": "window after an attack ending soon",
+  "response-window-passed": "window after an attack passed",
 };
 
 // A kind this does not know is shown as it arrived: a server deployed ahead

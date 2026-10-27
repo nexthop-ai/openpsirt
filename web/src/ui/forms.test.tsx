@@ -211,7 +211,9 @@ describe("carrying decisions from another line", () => {
         },
       };
     });
-    mount.render(screen(<Carried at={{ product: "sonic", stream: "master", variant: "x" }} />));
+    mount.render(
+      screen(<Carried at={{ product: "sonic", branch_or_tag: "master", variant: "x" }} />),
+    );
     await settle();
     const from = () => mount.host().querySelector<HTMLSelectElement>("#carry-from");
     const pick = (line: string) =>

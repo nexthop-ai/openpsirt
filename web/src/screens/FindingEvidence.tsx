@@ -20,10 +20,10 @@ import { linkable } from "../ui/addressable";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
-import { Correspondence, ReportNotes } from "./InboxReport";
+import { Correspondence, ReportNotes } from "./VulnerabilityReport";
 import {
   decisionOccurrenceAt,
-  inboxReportAt,
+  vulnerabilityReportAt,
   refiled,
   dependenciesAt,
   type Build,
@@ -434,7 +434,7 @@ export function Reporter({
             {report.credit && <> · credited as {report.credit}</>}
           </p>
           <p className="hint">
-            <Link className="id" to={inboxReportAt(report.product, report.reference)}>
+            <Link className="id" to={vulnerabilityReportAt(report.product, report.reference)}>
               {report.reference}
             </Link>
             {report.title && <> · {report.title}</>}
@@ -536,7 +536,7 @@ export function Duplicates({
       <ul className="files">
         {rows.map((row) => (
           <li key={row.reference}>
-            <Link className="id" to={inboxReportAt(product, row.reference)}>
+            <Link className="id" to={vulnerabilityReportAt(product, row.reference)}>
               {row.reference}
             </Link>
             <span className="hint">

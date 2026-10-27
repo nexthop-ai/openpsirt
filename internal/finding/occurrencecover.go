@@ -78,18 +78,18 @@ type statedGroup struct {
 //
 // Where several occurrences beneath one consumer were decided in separate
 // sittings, the earliest decision speaks, as it does for a whole component.
-func CoveredAtOccurrences(ctx context.Context, db bun.IDB, productID, targetID int64,
+func CoveredAtOccurrences(ctx context.Context, db bun.IDB, productID, buildID int64,
 	visible []access.Visibility, most int) ([]OccurrenceCovered, error) {
 
-	decided, err := decidedOccurrences(ctx, db, productID, targetID, visible)
+	decided, err := decidedOccurrences(ctx, db, productID, buildID, visible)
 	if err != nil || len(decided) == 0 {
 		return nil, err
 	}
-	every, err := everyOccurrenceOf(ctx, db, targetID, visible, decided)
+	every, err := everyOccurrenceOf(ctx, db, buildID, visible, decided)
 	if err != nil {
 		return nil, err
 	}
-	occurrences, err := occurrenceEdges(ctx, db, targetID, 0)
+	occurrences, err := occurrenceEdges(ctx, db, buildID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -193,12 +193,12 @@ func statedOccurrenceColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Join(`LEFT JOIN "graph_node" AS "gn" ON "gn"."target_id" = "f"."target_id"
+		Join(`LEFT JOIN "graph_node" AS "gn" ON "gn"."build_id" = "f"."build_id"
 			AND "gn"."component_id" = "f"."component_id" AND "gn"."closed_scan_id" IS NULL`).
 		Join(`LEFT JOIN "image_version" AS "giv" ON "giv"."node_id" = "gn"."id"
 			AND "giv"."closed_scan_id" IS NULL`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`LEFT JOIN "graph_node" AS "cn" ON "cn"."target_id" = "f"."target_id"
+		Join(`LEFT JOIN "graph_node" AS "cn" ON "cn"."build_id" = "f"."build_id"
 			AND "cn"."component_id" = "f"."consumer_id" AND "cn"."closed_scan_id" IS NULL`).
 		Join(`LEFT JOIN "image_version" AS "civ" ON "civ"."node_id" = "cn"."id"
 			AND "civ"."closed_scan_id" IS NULL`).
@@ -241,7 +241,7 @@ func (r statedOccurrence) occurrence() coveredOccurrence {
 // Only occurrences somebody decided are read here. A build holds hundreds of
 // thousands of open occurrences, and a statement occurrence by occurrence is
 // only ever about a component somebody decided at least one occurrence of.
-func decidedOccurrences(ctx context.Context, db bun.IDB, productID, targetID int64,
+func decidedOccurrences(ctx context.Context, db bun.IDB, productID, buildID int64,
 	visible []access.Visibility) (map[int64]coveredOccurrence, error) {
 
 	var rows []struct {
@@ -256,7 +256,7 @@ func decidedOccurrences(ctx context.Context, db bun.IDB, productID, targetID int
 		ColumnExpr(`COUNT(*) AS "joined"`).
 		ColumnExpr(`COUNT("cl"."id") AS "decided"`).
 		ColumnExpr(`COUNT(DISTINCT "cl"."outcome") AS "outcomes"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."id", "v"."id", "v"."identifier", "c"."id", "c"."name", "giv"."purl", "gn"."purl", "c"."purl", "f"."consumer_id",
@@ -278,7 +278,7 @@ func decidedOccurrences(ctx context.Context, db bun.IDB, productID, targetID int
 // everyOccurrenceOf is every open occurrence of the components the decided
 // occurrences are in, grouped by what one statement is about, with whether each
 // is covered.
-func everyOccurrenceOf(ctx context.Context, db bun.IDB, targetID int64,
+func everyOccurrenceOf(ctx context.Context, db bun.IDB, buildID int64,
 	visible []access.Visibility, decided map[int64]coveredOccurrence) (map[statedGroup][]coveredOccurrence, error) {
 
 	wanted := map[statedGroup]bool{}
@@ -293,7 +293,7 @@ func everyOccurrenceOf(ctx context.Context, db bun.IDB, targetID int64,
 	byComponent, componentArgs := database.InAnyOf(`"f"."component_id"`, keysOf(components))
 	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
 	if err := statedOccurrenceColumns(db.NewSelect()).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(byIssue, issueArgs...).

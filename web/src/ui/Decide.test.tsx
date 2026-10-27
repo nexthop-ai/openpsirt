@@ -14,7 +14,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const at: At = {
   product: "sonic",
-  stream: "master",
+  branch_or_tag: "master",
   variant: "broadcom",
   vulnerability: "CVE-2026-1",
   component: "openssl",
@@ -110,7 +110,7 @@ describe("proposing a deferral past the threshold", () => {
     expect(sent()).toHaveLength(1);
     const [path, init] = sent()[0] ?? ["", {}];
     expect(path).toBe(
-      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/decision",
+      "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/decision",
     );
     expect((init as { body: unknown }).body).toEqual({
       outcome: "deferred",

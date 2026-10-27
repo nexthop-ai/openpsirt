@@ -15,10 +15,10 @@ describe("the outcomes that close a question", () => {
     );
   });
 
-  // The exception report asks for every one of these. A lead's dismissal
+  // The exception report asks for every one of these. A code finding's dismissal
   // needs a second person as surely as a vulnerability's does, and a
   // confirmation hides nothing.
-  it("that always need a second person hold a lead's dismissals beside a vulnerability's", () => {
+  it("that always need a second person hold a code finding's dismissals beside a vulnerability's", () => {
     expect([...classesOf(PUBLISHED).gated].sort()).toEqual(
       [
         "already-fixed",
@@ -31,7 +31,7 @@ describe("the outcomes that close a question", () => {
     );
   });
 
-  it("leave out what is said about a lead", () => {
+  it("leave out what is said about a code finding", () => {
     const { dismisses } = classesOf(PUBLISHED);
     for (const each of ["dismissed", "not-security", "confirmed"]) {
       expect(dismisses(each)).toBe(false);
@@ -55,7 +55,7 @@ describe("the outcomes that close a question", () => {
 });
 
 describe("the outcomes that always need a second person", () => {
-  it("are the dismissals of a vulnerability and of a lead", () => {
+  it("are the dismissals of a vulnerability and of a code finding", () => {
     const { alwaysGated } = classesOf(PUBLISHED);
     for (const each of [
       "already-fixed",

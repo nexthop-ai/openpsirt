@@ -466,7 +466,7 @@ type fixture struct {
 	store   *advisory.Store
 	finds   *finding.Store
 	scans   *ingest.Store
-	target  int64
+	build   int64
 	product int64
 	who     access.Subject
 	agrees  access.Subject
@@ -494,7 +494,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		f := &fixture{
 			db: w.DB.DB, store: advisory.NewStore(w.DB.DB),
 			finds: finding.NewStore(w.DB.DB),
-			scans: ingest.NewStore(w.DB.DB), target: w.Target.ID, product: w.Product.ID,
+			scans: ingest.NewStore(w.DB.DB), build: w.Build.ID, product: w.Product.ID,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, roles, 0),
 			agrees: access.NewPerson(second.ID, second.Identity, false,
 				map[int64][]access.Role{
@@ -648,7 +648,7 @@ func (f *fixture) recorded(t *testing.T) string {
 func (f *fixture) recordedAs(t *testing.T, disclosed bool) string {
 	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
-		TargetIDs: []int64{f.target}, Component: carrier.Name, Severity: "high",
+		BuildIDs: []int64{f.build}, Component: carrier.Name, Severity: "high",
 		Summary:   "The management socket answers before anyone authenticated.",
 		Disclosed: disclosed,
 	})
@@ -665,13 +665,13 @@ func (f *fixture) shipped(t *testing.T) {
 	ctx := t.Context()
 	f.seq++
 	scan, outcome, err := f.scans.Record(ctx, ingest.Arriving{
-		TargetID: f.target, ContentHash: "hash-1", BuiltAt: time.Now().UTC().Add(-time.Hour),
+		BuildID: f.build, ContentHash: "hash-1", BuiltAt: time.Now().UTC().Add(-time.Hour),
 		ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixtures.ApplyGraph(ctx, f.db, f.target, scan.ID, graph.Snapshot{
+	if _, err := fixtures.ApplyGraph(ctx, f.db, f.build, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{carrier},
 		Dependencies: []graph.Dependency{{Parent: root, Child: carrier}},
 	}); err != nil {

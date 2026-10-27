@@ -37,7 +37,7 @@ func (f *fixture) curlTwice(t *testing.T) (lib, gnutls graph.Described) {
 		}
 		return one
 	}
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 		rated("CVE-2026-71", "critical", lib, "8.5.0-3"),
 		rated("CVE-2026-71", "critical", gnutls, "8.5.0-3"),
 		rated("CVE-2026-72", "low", gnutls, ""),
@@ -60,7 +60,7 @@ func TestASourcePackageCountsEachIssueOnceAndEveryOccurrenceAcrossItsBinaries(t 
 		later := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
 		sooner := time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-			Set(`"due_at" = ?`, later).Where(`"target_id" = ?`, f.target).Exec(ctx); err != nil {
+			Set(`"due_at" = ?`, later).Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// The soonest deadline sits on one band and the one exploited occurrence
@@ -71,7 +71,7 @@ func TestASourcePackageCountsEachIssueOnceAndEveryOccurrenceAcrossItsBinaries(t 
 			t.Helper()
 			if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
 				Set(column+" = ?", value).
-				Where(`"target_id" = ?`, f.target).
+				Where(`"build_id" = ?`, f.build).
 				Where(`"vulnerability_id" = ?`, f.issueID(t, issue)).
 				Where(`"component_id" = ?`, rowOf(t, f, gnutls)).Exec(ctx); err != nil {
 				t.Fatal(err)
@@ -174,7 +174,7 @@ func TestAnIssueWhoseBinariesNameDifferentFixesCountsOnceUnderEach(t *testing.T)
 		}
 		var got, there finding.PerBuild
 		for _, one := range builds {
-			if one.TargetID == other {
+			if one.BuildID == other {
 				there = one
 			} else {
 				got = one
@@ -311,7 +311,7 @@ func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testi
 				})
 			}
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 		seen := &returned{}
@@ -375,7 +375,7 @@ func TestEachBinarysCountIsTheSameReadInThePassOrOnItsOwn(t *testing.T) {
 				{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: gnutls},
 			},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-71", lib), found("CVE-2026-73", lib), found("CVE-2026-71", gnutls),
 		}); err != nil {
 			t.Fatal(err)

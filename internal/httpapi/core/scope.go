@@ -21,9 +21,9 @@ import (
 // unselected level means. Embedded rather than repeated so the three screens
 // that take it cannot drift into describing it differently.
 type ScopeQuery struct {
-	Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
-	Stream  string `query:"stream" doc:"Limit to one branch or tag. Only meaningful with a product"`
-	Variant string `query:"variant" doc:"Limit to one variant. Only meaningful with a product, and independent of the branch"`
+	Product     string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
+	BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Only meaningful with a product"`
+	Variant     string `query:"variant" doc:"Limit to one variant. Only meaningful with a product, and independent of the branch"`
 }
 
 // Scoped resolves a selection into identifiers.
@@ -95,7 +95,7 @@ func resolveScope(ctx context.Context, in Deps, subject access.Subject,
 
 	var scope finding.Scope
 	if q.Product == "" {
-		if q.Stream != "" || q.Variant != "" {
+		if q.BranchOrTag != "" || q.Variant != "" {
 			return scope, false, huma.Error422UnprocessableEntity(
 				"a branch or a variant needs a product to belong to — name one, or leave all three empty")
 		}
@@ -114,13 +114,13 @@ func resolveScope(ctx context.Context, in Deps, subject access.Subject,
 	sees := subject.Sees(product.ID)
 	scope.ProductID = &product.ID
 
-	if q.Stream != "" {
-		stream, err := names.StreamByName(ctx, product.ID, q.Stream)
+	if q.BranchOrTag != "" {
+		branchOrTag, err := names.BranchOrTagByName(ctx, product.ID, q.BranchOrTag)
 		if err != nil {
 			return finding.Scope{}, false, levelAbsent(in.Logger, err, sees,
 				"that branch could not be looked up", "that product has no branch or tag by that name")
 		}
-		scope.StreamID = &stream.ID
+		scope.BranchOrTagID = &branchOrTag.ID
 	}
 	if q.Variant != "" {
 		variant, err := names.VariantByName(ctx, product.ID, q.Variant)

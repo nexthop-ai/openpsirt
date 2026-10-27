@@ -76,7 +76,7 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		const findings = "/v1/products/mine/findings"
 
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, findings,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
 				`"severity":"critical"}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
@@ -145,14 +145,14 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 			t.Error("the document says nothing about what the issue is called")
 		}
 
-		// The release it is in is named, and named by its stream and variant
+		// The release it is in is named, and named by its branch or tag and variant
 		// together: the same branch built two ways is two builds.
 		if len(doc.Vulnerabilities[0].Status.KnownAffected) != 1 {
 			t.Fatalf("affected releases: %v", doc.Vulnerabilities[0].Status.KnownAffected)
 		}
 		affected := doc.Vulnerabilities[0].Status.KnownAffected[0]
 		if affected != "mine:master:broadcom" {
-			t.Errorf("the affected release is %q, want it named by stream and variant", affected)
+			t.Errorf("the affected release is %q, want it named by branch or tag and variant", affected)
 		}
 		// Everything a status refers to has to be named in the tree, or the
 		// document refers to something it never introduced.
@@ -219,7 +219,7 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotGeneratedForSomebodyWhoMayNotSeeIt
 		r.ScannedWithEvidence(t)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The recovery console does not clear the previous session.",`+
 				`"severity":"high"}`)
 		if made.Code != http.StatusCreated {
@@ -255,7 +255,7 @@ func TestAProductYouCannotSeeAnswersLikeOneNobodyDeclared(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The console does not clear the previous session.",`+
 				`"severity":"high"}`)
 		if made.Code != http.StatusCreated {

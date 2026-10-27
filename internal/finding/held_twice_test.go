@@ -38,13 +38,13 @@ func TestAMergeCarriesTheAssignmentOfAnOccurrenceHeldTwice(t *testing.T) {
 				assigner := f.holding(t, access.PublicTriage, access.Assigner)
 				component := f.open(t)[0].ComponentID
 				if c.keeps != nil {
-					if _, _, err := f.store.Assign(ctx, assigner, f.target, f.issueID(t, other),
+					if _, _, err := f.store.Assign(ctx, assigner, f.build, f.issueID(t, other),
 						component, c.keeps, nil); err != nil {
 						t.Fatal(err)
 					}
 				}
 				closing := f.issueID(t, "CVE-2026-7001")
-				if moved, _, err := f.store.Assign(ctx, assigner, f.target, closing,
+				if moved, _, err := f.store.Assign(ctx, assigner, f.build, closing,
 					component, ptr(int64(7)), nil); err != nil || moved != 2 {
 					t.Fatalf("assigning the occurrence that closes moved %d: %v", moved, err)
 				}

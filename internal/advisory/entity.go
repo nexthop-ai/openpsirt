@@ -737,8 +737,8 @@ func (s *Store) Nameable(ctx context.Context, subject access.Subject,
 	}
 	grouped := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`SUM(CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END) AS "still_open"`).
 		Where(`"st"."product_id" = ?`, named.ID).

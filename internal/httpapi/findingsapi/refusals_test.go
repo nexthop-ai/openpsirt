@@ -17,12 +17,12 @@ func mappers(err error) map[string]error {
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	in := core.Deps{Logger: quiet}
 	return map[string]error{
-		"refusedNote":     refusedNote(quiet, err),
-		"refusedReport":   refusedReport(in, err, "that could not be read"),
-		"refusedMovement": refusedMovement(in, err),
-		"refusedRuling":   refusedRuling(in, err, "that could not be read"),
-		"refusedFlaw":     refusedFlaw(in, err),
-		"refusedHandoff":  refusedHandoff(in, err),
+		"refusedNote":       refusedNote(quiet, err),
+		"refusedReport":     refusedReport(in, err, "that could not be read"),
+		"refusedMovement":   refusedMovement(in, err),
+		"refusedRuling":     refusedRuling(in, err, "that could not be read"),
+		"refusedFlaw":       refusedFlaw(in, err),
+		"refusedFlawRecord": refusedFlawRecord(in, err),
 	}
 }
 

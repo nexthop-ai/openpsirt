@@ -28,16 +28,16 @@ func TestWhatABuildCarriesIsReachableAndNarrowedLikeEverythingElse(t *testing.T)
 		if err != nil {
 			t.Fatal(err)
 		}
-		target, err := names.TargetFor(t.Context(), located.StreamID, located.VariantID)
+		build, err := names.BuildFor(t.Context(), located.BranchOrTagID, located.VariantID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var scanID int64
 		if err := r.DB.DB.NewSelect().TableExpr("\"scan\"").ColumnExpr(`MAX("id")`).
-			Where(`"target_id" = ?`, target.ID).Scan(t.Context(), &scanID); err != nil {
+			Where(`"build_id" = ?`, build.ID).Scan(t.Context(), &scanID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := fixture.RecordClaims(t.Context(), r.DB.DB, target.ID, scanID,
+		if _, err := fixture.RecordClaims(t.Context(), r.DB.DB, build.ID, scanID,
 			[]sbom.Suppression{{
 				Vulnerability: "CVE-2026-9999", Status: sbom.AlreadyFixed,
 				Origin: sbom.FromPedigree, Statement: "Backported as a distro patch.",

@@ -480,8 +480,8 @@ func (s *Store) approveDecision(ctx context.Context, subject access.Subject, dec
 		return nil, ErrNothingToApprove
 	}
 	// Refused before anybody agrees to it. A decision that the issue does not
-	// apply, written before a record of this product being exploited through
-	// it arrived, is a decision the record contradicts — and agreeing to it is
+	// apply, written before an incident in this product through it arrived,
+	// is a decision the incident contradicts — and agreeing to it is
 	// what would put the finding out of sight.
 	//
 	// Asked of the rows being agreed to rather than all of them, so an
@@ -493,7 +493,7 @@ func (s *Store) approveDecision(ctx context.Context, subject access.Subject, dec
 			agreeing = append(agreeing, row)
 		}
 	}
-	if err := s.refuseIfExploitedHereOn(ctx, decision, agreeing); err != nil {
+	if err := s.refuseIfIncidentOn(ctx, decision, agreeing); err != nil {
 		return nil, err
 	}
 	// Compared against whoever wrote the words being agreed to, not only
@@ -977,13 +977,13 @@ func (s *Store) decisionRowsAs(ctx context.Context, subject access.Subject, deci
 }
 
 // readableDecisionRows is decisionRows for a read: a row the subject reads only as
-// one of the flaw's readers of a lead included in its case is read as well.
+// one of the flaw's readers of a code finding included in its case is read as well.
 func (s *Store) readableDecisionRows(ctx context.Context, subject access.Subject, decisionID int64) (*Decision, []DecisionOccurrence, error) {
 	return s.decisionRowsAs(ctx, subject, decisionID, readableOn, true)
 }
 
 // readsIncluded is which of these rows the subject reads as one of the
-// flaw's readers of a lead included in its case (orIncluded).
+// flaw's readers of a code finding included in its case (orIncluded).
 func (s *Store) readsIncluded(ctx context.Context, subject access.Subject, occurrenceIDs []int64) (map[int64]bool, error) {
 	out := map[int64]bool{}
 	where, args := orIncluded(subject, "1 = 0", nil, `"de"."product_id"`, `"de"."visibility"`, `"de"."occurrence_identity"`)
@@ -995,7 +995,7 @@ func (s *Store) readsIncluded(ctx context.Context, subject access.Subject, occur
 		Where(`"de"."id" IN (?)`, bun.List(occurrenceIDs)).
 		Where(where, args...).
 		Scan(ctx, &ids); err != nil {
-		return nil, fmt.Errorf("read which decision occurrences are at an included lead: %w", err)
+		return nil, fmt.Errorf("read which decision occurrences are at an included code finding: %w", err)
 	}
 	for _, id := range ids {
 		out[id] = true
@@ -1003,32 +1003,32 @@ func (s *Store) readsIncluded(ctx context.Context, subject access.Subject, occur
 	return out, nil
 }
 
-// ErrLeadHandedOff refuses a decision about a lead handed off as a flaw, and a
+// ErrCodeFindingRecordedAsFlaw refuses a decision about a code finding recorded as a flaw, and a
 // change to one already made: the flaw is judged instead.
-var ErrLeadHandedOff = refusal.New("that lead was handed off as a flaw, which is judged instead")
+var ErrCodeFindingRecordedAsFlaw = refusal.New("that code finding was recorded as a flaw, which is judged instead")
 
-// notHandedOff refuses a write to a decision about a lead handed off as a flaw.
+// notRecordedAsFlaw refuses a write to a decision about a code finding recorded as a flaw.
 // Asked inside the transaction writing it, of every row the decision covers.
-func (s *Store) notHandedOff(ctx context.Context, decisionID int64) error {
-	handed, err := s.handedOff(ctx, []int64{decisionID})
+func (s *Store) notRecordedAsFlaw(ctx context.Context, decisionID int64) error {
+	handed, err := s.recordedAsFlaw(ctx, []int64{decisionID})
 	if err != nil {
 		return err
 	}
 	if handed[decisionID] {
-		return ErrLeadHandedOff
+		return ErrCodeFindingRecordedAsFlaw
 	}
 	return nil
 }
 
-// handedOff is which of these decisions are about a lead handed off as a flaw:
-// a row of the decision filed under an analyzer's rule at an occurrence handed off.
-func (s *Store) handedOff(ctx context.Context, decisionIDs []int64) (map[int64]bool, error) {
+// recordedAsFlaw is which of these decisions are about a code finding recorded as a flaw:
+// a row of the decision filed under an analyzer's rule at an occurrence recorded as a flaw.
+func (s *Store) recordedAsFlaw(ctx context.Context, decisionIDs []int64) (map[int64]bool, error) {
 	out := map[int64]bool{}
 	if err := database.IDsInBatches(ctx, decisionIDs, func(ctx context.Context, batch []int64) error {
 		var some []int64
 		if err := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 			Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "de"."vulnerability_id"`).
-			Join(`JOIN "lead_handoff" AS "lh" ON "lh"."product_id" = "de"."product_id"
+			Join(`JOIN "code_finding_flaw" AS "lh" ON "lh"."product_id" = "de"."product_id"
 				AND "lh"."occurrence_identity" = "de"."occurrence_identity"`).
 			ColumnExpr(`DISTINCT "de"."decision_id"`).
 			Where(`"de"."decision_id" IN (?)`, bun.List(batch)).
@@ -1041,19 +1041,19 @@ func (s *Store) handedOff(ctx context.Context, decisionIDs []int64) (map[int64]b
 		}
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("read which decisions are about a lead handed off: %w", err)
+		return nil, fmt.Errorf("read which decisions are about a code finding recorded as a flaw: %w", err)
 	}
 	return out, nil
 }
 
-// writableRows is decisionRows for a write, which a decision about a lead handed off
+// writableRows is decisionRows for a write, which a decision about a code finding recorded as a flaw
 // as a flaw is refused.
 //
-// The decision is restamped from the stamp it was read with, after the hand-off
-// is asked about. A hand-off restamps the decision it rests on the same way, so
-// of a write and a hand-off committing at once one matches nothing, and is
-// taken again to find the other: the read of the hand-off alone is a plain
-// read, and answers from before a hand-off that has not committed.
+// The decision is restamped from the stamp it was read with, after the flaw record
+// is asked about. A flaw record restamps the decision it rests on the same way, so
+// of a write and a flaw record committing at once one matches nothing, and is
+// taken again to find the other: the read of the flaw record alone is a plain
+// read, and answers from before a flaw record that has not committed.
 func (s *Store) writableRows(ctx context.Context, subject access.Subject, decisionID int64,
 	allowed func(access.Subject, int64, int64, access.Visibility) bool) (*Decision, []DecisionOccurrence, error) {
 
@@ -1065,7 +1065,7 @@ func (s *Store) writableRows(ctx context.Context, subject access.Subject, decisi
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := s.notHandedOff(ctx, decisionID); err != nil {
+	if err := s.notRecordedAsFlaw(ctx, decisionID); err != nil {
 		return nil, nil, err
 	}
 	if err := s.restamp(ctx, decisionID, stamps[decisionID]); err != nil {

@@ -19,8 +19,8 @@ import (
 //
 // A decision that the scanner matched something that is not here covers the
 // occurrence whatever it now holds, because the versions are not what it is
-// about. A decision about a lead does too, because a lead's occurrence is the
-// lead. Their own version columns record what each was made against and are not
+// about. A decision about a code finding does too, because a code finding's occurrence is the
+// code finding. Their own version columns record what each was made against and are not
 // compared.
 //
 // The four aliases are the caller's to join: a finding's own row carries only
@@ -83,7 +83,7 @@ const (
 // component under the same consumer would match.
 //
 // product is how the query names the finding's product: a bound number, the
-// stream it has joined, or the decision's own product where the query is
+// branch or tag it has joined, or the decision's own product where the query is
 // already narrowed to it. Anything else is a programming error, because it is
 // placed in the statement as written.
 func DecisionOccurrenceAt(product string) string {
@@ -274,7 +274,7 @@ func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 		// the decision that currently stands, like "approved" above: a promise
 		// that was withdrawn is not one, and a finding it covered is unplanned
 		// again with nothing to clean up. That is the whole argument for
-		// deriving this rather than writing a tag.
+		// deriving this rather than writing a label.
 		ColumnExpr(`MAX(CASE WHEN "de"."live_key" IS NOT NULL AND `+standingHere+
 			` AND "cl"."outcome" = ? THEN 1 ELSE 0 END) AS "planned"`,
 			append(append([]any{}, inForce...), OutcomeUpgradeNeeded)...).

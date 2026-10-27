@@ -26,7 +26,7 @@ type Refusal struct {
 	bun.BaseModel `bun:"table:series_refusal,alias:sx"`
 
 	ID           int64     `bun:"id,pk,autoincrement"`
-	TargetID     int64     `bun:"target_id,notnull"`
+	BuildID      int64     `bun:"build_id,notnull"`
 	Series       string    `bun:"series,notnull"`
 	SeriesFolded string    `bun:"series_folded,notnull"`
 	Kind         kind.Kind `bun:"kind,notnull"`
@@ -63,7 +63,7 @@ func (s *Store) Refused(ctx context.Context, r Refusal) error {
 		Set(`"at" = ?`, r.At).
 		Set(`"reason" = ?`, r.Reason).
 		Set(`"credential" = ?`, r.Credential).
-		Where(`"target_id" = ?`, r.TargetID).
+		Where(`"build_id" = ?`, r.BuildID).
 		Where(`"kind" = ?`, r.Kind).
 		Where(`"series_folded" = ?`, r.SeriesFolded).
 		Exec(ctx)
@@ -90,10 +90,10 @@ func (s *Store) Refused(ctx context.Context, r Refusal) error {
 
 // RefusalsOf is the refusals of a kind recorded against a build, newest
 // first. The caller has already decided the subject reads the build's runs.
-func (s *Store) RefusalsOf(ctx context.Context, targetID int64, k kind.Kind) ([]Refusal, error) {
+func (s *Store) RefusalsOf(ctx context.Context, buildID int64, k kind.Kind) ([]Refusal, error) {
 	var out []Refusal
 	if err := s.db.NewSelect().Model(&out).
-		Where(`"sx"."target_id" = ?`, targetID).
+		Where(`"sx"."build_id" = ?`, buildID).
 		Where(`"sx"."kind" = ?`, k).
 		OrderExpr(`"sx"."at" DESC, "sx"."id" DESC`).
 		Scan(ctx); err != nil {

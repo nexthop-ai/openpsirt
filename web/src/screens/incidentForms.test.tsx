@@ -1,0 +1,145 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { Incident } from "./FindingIncident";
+import { Incidents, placesTyped } from "./Incidents";
+import { accept, mounted, screen, serve, settle } from "../test/mount";
+
+const mount = mounted();
+
+// A zone well away from UTC, so a form reading a typed minute as the
+// browser's local time sends a different moment from one reading it as UTC.
+beforeEach(() => {
+  vi.stubEnv("TZ", "America/New_York");
+  // Under UTC both readings agree and nothing here could fail.
+  expect(new Date("2026-10-03T22:00").getTimezoneOffset()).not.toBe(0);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
+
+function type(field: HTMLInputElement | HTMLTextAreaElement | null, value: string) {
+  if (!field) throw new Error("no such field");
+  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+  act(() => {
+    Object.getOwnPropertyDescriptor(proto.prototype, "value")?.set?.call(field, value);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+function press(label: string) {
+  const button = Array.from(mount.host().querySelectorAll("button")).find((each) =>
+    each.textContent?.includes(label),
+  );
+  if (!button) throw new Error(`no button ${label}`);
+  return act(async () => button.click());
+}
+
+describe("the places a notice named", () => {
+  it("takes one place per line, so a name holding a comma is one place", () => {
+    expect(placesTyped("Korea, Republic of\nIreland")).toEqual(["Korea, Republic of", "Ireland"]);
+  });
+  it("drops only a trailing empty line", () => {
+    expect(placesTyped("Ireland\n")).toEqual(["Ireland"]);
+    expect(placesTyped("Ireland\n\nFrance")).toEqual(["Ireland", "", "France"]);
+  });
+  it("names none where nothing is typed", () => {
+    expect(placesTyped("")).toEqual([]);
+    expect(placesTyped("  \n")).toEqual([]);
+  });
+});
+
+describe("moments typed on the incident forms", () => {
+  it("sends the minute typed as Known since as that minute in UTC", async () => {
+    const sent = accept(() => ({ data: {}, status: 201 }));
+    mount.render(screen(<Incident product="sonic" vulnerability="CVE-2026-1" mayTriage />));
+    await press("Record an incident");
+    type(mount.host().querySelector<HTMLInputElement>("#knownat"), "2026-09-20T14:00");
+    type(mount.host().querySelector<HTMLTextAreaElement>("#grounds"), "A customer saw it.");
+    await press("Record");
+    const body = (sent()[0]?.[1] as { body: { known_at: string } }).body;
+    expect(body.known_at).toBe("2026-09-20T14:00:00.000Z");
+  });
+
+  it("sends the minute typed as Told at as that minute in UTC", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: { admin: false } };
+      if (path === "/v1/response-windows") return { data: { items: [] } };
+      if (path === "/v1/incidents") {
+        return {
+          data: {
+            items: [
+              {
+                id: 7,
+                vulnerability: "CVE-2026-1",
+                product: "sonic",
+                known_at: "2026-09-20T10:00:00Z",
+                grounds: "A customer saw it.",
+                standing: true,
+                undisclosed: false,
+                may_tell: true,
+                windows: [],
+              },
+            ],
+          },
+        };
+      }
+      return undefined;
+    });
+    const sent = accept(() => ({ data: { id: 1 }, status: 201 }));
+    mount.render(screen(<Incidents />));
+    await settle();
+    await press("Record who was told");
+    type(mount.host().querySelector<HTMLInputElement>("#recipient-7"), "A regulator");
+    type(mount.host().querySelector<HTMLInputElement>("#toldat-7"), "2026-09-20T14:00");
+    type(mount.host().querySelector<HTMLTextAreaElement>("#said-7"), "Told.");
+    type(mount.host().querySelector<HTMLTextAreaElement>("#places-7"), "Korea, Republic of\n");
+    await press("Record");
+    const body = (sent()[0]?.[1] as { body: { told_at: string; places: string[] } }).body;
+    expect(body.told_at).toBe("2026-09-20T14:00:00.000Z");
+    expect(body.places).toEqual(["Korea, Republic of"]);
+  });
+});
+
+describe("who was told about an attack", () => {
+  it("offers the windows counted for this record and no other product's", async () => {
+    const counted = { id: 1, name: "Regulator, 24 hours" };
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: { admin: false } };
+      if (path === "/v1/response-windows") {
+        return { data: { items: [counted, { id: 2, name: "Elsewhere only" }] } };
+      }
+      if (path === "/v1/incidents") {
+        return {
+          data: {
+            items: [
+              {
+                id: 7,
+                vulnerability: "CVE-2026-1",
+                product: "sonic",
+                known_at: "2026-09-20T10:00:00Z",
+                grounds: "A customer saw it.",
+                standing: true,
+                undisclosed: false,
+                may_tell: true,
+                windows: [{ window: counted, started: false, answered: false, passed: false }],
+              },
+            ],
+          },
+        };
+      }
+      return undefined;
+    });
+    mount.render(screen(<Incidents />));
+    await settle();
+    await press("Record who was told");
+    const offered = Array.from(
+      mount.host().querySelectorAll<HTMLOptionElement>("#answers-7 option"),
+    ).map((each) => each.textContent);
+    expect(offered).toEqual(["No window", "Regulator, 24 hours"]);
+  });
+});

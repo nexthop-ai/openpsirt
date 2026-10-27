@@ -128,7 +128,7 @@ type ReceiptsOutput struct {
 func registerReceipts(api huma.API, in core.Deps) {
 	core.RegisterWithFormer(api, core.Requiring(huma.Operation{
 		OperationID: "list-scans", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms",
 		Summary: "List uploaded SBOMs and their status",
 		Description: "Returns uploads newest first, each with its state: `reading` (accepted, not " +
 			"yet parsed), `scanning` (parsed, vulnerability scan pending), `scanned` (complete), " +
@@ -138,18 +138,18 @@ func registerReceipts(api huma.API, in core.Deps) {
 			"whichever key sent it.",
 		Tags: []string{"Ingest"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
-		Offset  int    `query:"offset" minimum:"0" doc:"The number skipped"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Limit       int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
+		Offset      int    `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ReceiptsOutput, error) {
-		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 
-		target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, named.StreamID, named.VariantID)
+		build, err := catalog.NewStore(in.DB.DB).ExistingBuild(ctx, named.BranchOrTagID, named.VariantID)
 		out := &ReceiptsOutput{}
 		out.Body.Items = []ReceiptBody{}
 		switch {
@@ -163,7 +163,7 @@ func registerReceipts(api huma.API, in core.Deps) {
 		// A key reads the receipts of a build it may upload to, which the
 		// store decides from the subject.
 		scans := ingest.NewStore(in.DB.DB)
-		receipts, total, err := scans.Receipts(ctx, subject, target.ID, input.Limit, input.Offset)
+		receipts, total, err := scans.Receipts(ctx, subject, build.ID, input.Limit, input.Offset)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			// The answer a build nobody declared gets. A 500 here against a
@@ -181,7 +181,7 @@ func registerReceipts(api huma.API, in core.Deps) {
 				runs = append(runs, *r.RunID)
 			}
 		}
-		changed, err := finding.NewStore(in.DB.DB).Changes(ctx, subject, target.ID, runs)
+		changed, err := finding.NewStore(in.DB.DB).Changes(ctx, subject, build.ID, runs)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			// The receipts above were this caller's to read, so a refusal here
@@ -209,7 +209,7 @@ func registerReceipts(api huma.API, in core.Deps) {
 		// once. Worked out from the intervals the scan already wrote rather
 		// than stored beside them: the rows that answer it are the rows
 		// applying the scan produced.
-		deltas, err := graph.NewStore(in.DB.DB).Deltas(ctx, subject, target.ID, ids)
+		deltas, err := graph.NewStore(in.DB.DB).Deltas(ctx, subject, build.ID, ids)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			return nil, core.NothingScannedThere()
@@ -280,7 +280,7 @@ func registerReceipts(api huma.API, in core.Deps) {
 		if subject.Kind == access.Pipeline {
 			return out, nil
 		}
-		last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, target.ID)
+		last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, build.ID)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the last run could not be read", err)
 		}

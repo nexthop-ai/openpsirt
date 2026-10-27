@@ -83,12 +83,12 @@ func TestARebuiltSwitchImageMovesOnlyWhatItsImagesAreStampedWith(t *testing.T) {
 				t.Fatal(err)
 			}
 			rec, outcome, err := scans.Record(ctx, ingest.Arriving{
-				TargetID: w.Target.ID, ContentHash: hash, BuiltAt: at, ParserVersion: "test",
+				BuildID: w.Build.ID, ContentHash: hash, BuiltAt: at, ParserVersion: "test",
 			})
 			if err != nil || outcome != ingest.Accept {
 				t.Fatalf("record: outcome %v, err %v", outcome, err)
 			}
-			applied, err := world.ApplyGraph(ctx, w.DB.DB, w.Target.ID, rec.ID, doc.Snapshot(graph.Described{Name: "sonic"}))
+			applied, err := world.ApplyGraph(ctx, w.DB.DB, w.Build.ID, rec.ID, doc.Snapshot(graph.Described{Name: "sonic"}))
 			if err != nil {
 				t.Fatal(err)
 			}

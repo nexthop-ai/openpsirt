@@ -56,7 +56,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		var named []string
 		for range 2 {
 			row, err := store.Record(ctx, proposing, product.ID,
-				finding.Claimed{Summary: "Generated text about a function this does not have."})
+				finding.NewReport{ReportedProblem: "Generated text about a function this does not have."})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -103,7 +103,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		if !strings.Contains(told[0].Body, "calling 2 vulnerability reports rejected") {
 			t.Errorf("the alert reads %q", told[0].Body)
 		}
-		if told[0].Link != "/products/sonic/inbox?waiting=1" {
+		if told[0].Link != "/products/sonic/vulnerability-reports?waiting=1" {
 			t.Errorf("the alert points at %q", told[0].Link)
 		}
 		for _, who := range []*access.Account{proposer, approver, announced, reads} {
@@ -116,7 +116,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		// A second ruling, withdrawn while it waits, is not raised at all: nobody
 		// can approve it.
 		other, err := store.Record(ctx, proposing, product.ID,
-			finding.Claimed{Summary: "Taken back before anybody agreed."})
+			finding.NewReport{ReportedProblem: "Taken back before anybody agreed."})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -162,7 +162,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 		return Result{}, err
 	}
 	// Its own words while succeeding, bounded the same way the failure is. A
-	// scanner writes progress to this stream as well, which it suppresses when
+	// scanner writes progress to this branch or tag as well, which it suppresses when
 	// nothing is watching — as nothing is here.
 	result.Caution = tail(strings.TrimSpace(errs.String()))
 	return result, nil

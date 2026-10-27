@@ -25,7 +25,9 @@ describe("where a finding sits", () => {
   };
 
   it("names the build where a row folds several", () => {
-    expect(sits({ builds: 3, stream: "master", variant: "arm" })).toContain("one of 3 builds");
+    expect(sits({ builds: 3, branch_or_tag: "master", variant: "arm" })).toContain(
+      "one of 3 builds",
+    );
   });
 
   it("says when nothing records what pulls it in", () => {
@@ -78,7 +80,7 @@ describe("the open findings by component", () => {
     mount.render(
       screen(
         <ByComponent
-          at={{ product: "sonic", stream: "master" }}
+          at={{ product: "sonic", branch_or_tag: "master" }}
           query={query}
           offset={0}
           size={50}
@@ -96,7 +98,7 @@ describe("the open findings by component", () => {
     expect(csv).toContain("components.csv");
     expect(csv).toContain("severity=high");
     expect(csv).toContain("ecosystem=deb&ecosystem=npm");
-    expect(csv).toContain("stream=master");
+    expect(csv).toContain("branch_or_tag=master");
     expect(csv).not.toContain("limit=");
     expect(csv).not.toContain("offset=");
   });
@@ -148,7 +150,7 @@ describe("the open findings by upgrade", () => {
                   components: ["libssl3", "openssl"],
                   severity: "high",
                   issues: 5,
-                  in: [{ stream: "master", variant: "arm" }],
+                  in: [{ branch_or_tag: "master", variant: "arm" }],
                 },
               ],
             },
@@ -212,7 +214,7 @@ describe("a finding peeked at from the list", () => {
     mount.render(
       screen(
         <Peek
-          at={{ product: "sonic", stream: "master", variant: "arm" }}
+          at={{ product: "sonic", branch_or_tag: "master", variant: "arm" }}
           vulnerability="CVE-2026-1"
           component="zlib"
           version="1.2"

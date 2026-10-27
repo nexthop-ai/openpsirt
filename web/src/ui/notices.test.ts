@@ -16,9 +16,9 @@ describe("what a notification is called", () => {
     expect(label("sent-back")).toBe("rejected");
     expect(label("build-quiet")).toBe("not being scanned");
     expect(label("inventory-moved")).toBe("a build's contents changed sharply");
-    expect(label("obligation-open")).toBe("window after an attack running");
-    expect(label("obligation-near")).toBe("window after an attack ending soon");
-    expect(label("obligation-passed")).toBe("window after an attack passed");
+    expect(label("response-window-open")).toBe("window after an attack running");
+    expect(label("response-window-near")).toBe("window after an attack ending soon");
+    expect(label("response-window-passed")).toBe("window after an attack passed");
     expect(label("critical-on-release")).toBe("critical on a release");
     // Each staleness condition says what has stopped rather than what took
     // place; "decision-waiting" is the word a machine matches on.

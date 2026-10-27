@@ -77,11 +77,11 @@ type ProductBody struct {
 	// LastScanAt is absent where nothing has ever been filed against any of
 	// this product's builds.
 	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived for any of its builds"`
-	// TriageFloor is the least severity this product triages, where it has
+	// MinimumSeverity is the least severity this product triages, where it has
 	// said something of its own. Absent means it follows the deployment, which
 	// is a different statement from stating the same word — a product that
 	// stated it would stop following when the deployment changed its mind.
-	TriageFloor Line `json:"triage_floor,omitempty" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
+	MinimumSeverity MinimumSeverityWord `json:"minimum_severity,omitempty" doc:"The product's own minimum severity, where it says something other than the deployment. Absent means it follows the deployment"`
 	// PairShare and PairApprovers are this product's own thresholds for one
 	// pair agreeing to each other's work, where it states them. Absent follows
 	// the deployment.
@@ -125,15 +125,15 @@ type PublicationBody struct {
 	Publishes bool `json:"publishes" doc:"Whether this product's security documents are served to anybody who asks, without signing in"`
 }
 
-// TriageFloorBody is what a product considers worth triaging.
-type TriageFloorBody struct {
-	// Floor is the least severity worth triaging here, "everything" for a
+// MinimumSeverityBody is what a product considers worth triaging.
+type MinimumSeverityBody struct {
+	// MinimumSeverity is the least severity worth triaging here, "everything" for a
 	// product that hides nothing, or empty to follow the deployment.
-	Floor lineOrClear `json:"floor" doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
+	MinimumSeverity minimumSeverityOrClear `json:"minimum_severity" doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
 }
 
-// StreamBody is a branch or a tag.
-type StreamBody struct {
+// BranchOrTagBody is a branch or a tag.
+type BranchOrTagBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this branch or tag"`
 	// DisplayName is the same name as it was typed. It is stored beside the
 	// matched one at every level, and absent here a correction that moved only
@@ -165,10 +165,10 @@ type StreamBody struct {
 	EndOfLifeInherited bool `json:"end_of_life_inherited,omitempty" doc:"The date shown is the product's, not this release's own"`
 }
 
-// VariantBody is one of the ways a stream is built.
+// VariantBody is one of the ways a branch or tag is built.
 type VariantBody struct {
-	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this build of the stream"`
-	// DisplayName is the same name as it was typed, for the reason the stream
+	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this build of the branch or tag"`
+	// DisplayName is the same name as it was typed, for the reason the branch or tag
 	// body carries one.
 	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
 	// CustomerFacing is a pointer so that leaving it out is not the same as
@@ -282,16 +282,16 @@ func ProductIn(ctx context.Context, d Declaring, db bun.IDB,
 	return store, found, nil
 }
 
-// StreamIn is ProductIn, then one of the product's releases by name. A fault
+// BranchOrTagIn is ProductIn, then one of the product's releases by name. A fault
 // on the second read is logged as the release's.
-func StreamIn(ctx context.Context, d Declaring, db bun.IDB,
-	product, stream string) (*catalog.Store, *catalog.Product, *catalog.Stream, error) {
+func BranchOrTagIn(ctx context.Context, d Declaring, db bun.IDB,
+	product, branchOrTag string) (*catalog.Store, *catalog.Product, *catalog.BranchOrTag, error) {
 
 	store, found, err := ProductIn(ctx, d, db, product)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	release, err := store.StreamByName(ctx, found.ID, stream)
+	release, err := store.BranchOrTagByName(ctx, found.ID, branchOrTag)
 	if err != nil {
 		return nil, nil, nil, Undeclared(d.Logger, err, "that release could not be looked up")
 	}
@@ -358,7 +358,7 @@ func DeclineDeclaration(logger *slog.Logger, err error) error {
 // nobody checks.
 func LastScans(ctx context.Context, scans *ingest.Store, subject access.Subject) (map[string]string, error) {
 	return lastScansBy(ctx, scans, subject, finding.Scope{},
-		func(row ingest.Coverage) string { return row.Product })
+		func(row ingest.LastUpload) string { return row.Product })
 }
 
 // LastScansIn is the same within one product, keyed by whichever level the
@@ -367,7 +367,7 @@ func LastScans(ctx context.Context, scans *ingest.Store, subject access.Subject)
 // Narrowed in the query rather than filtered afterwards, so a deployment with
 // many products does not read every build to answer about one.
 func LastScansIn(ctx context.Context, scans *ingest.Store, subject access.Subject, productID int64,
-	key func(ingest.Coverage) string) (map[string]string, error) {
+	key func(ingest.LastUpload) string) (map[string]string, error) {
 
 	return lastScansBy(ctx, scans, subject, finding.Scope{ProductID: &productID}, key)
 }
@@ -376,9 +376,9 @@ func LastScansIn(ctx context.Context, scans *ingest.Store, subject access.Subjec
 // whatever order the rows arrive in. Every stamp is UTC and the same width,
 // so they compare as strings.
 func lastScansBy(ctx context.Context, scans *ingest.Store, subject access.Subject, scope finding.Scope,
-	key func(ingest.Coverage) string) (map[string]string, error) {
+	key func(ingest.LastUpload) string) (map[string]string, error) {
 
-	rows, err := scans.Scanning(ctx, subject, scope, 0)
+	rows, err := scans.LastUploads(ctx, subject, scope, 0)
 	if err != nil {
 		return nil, err
 	}

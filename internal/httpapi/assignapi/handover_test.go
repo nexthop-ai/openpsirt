@@ -30,7 +30,7 @@ func TestAnUpgradeIsNotHandedToSomebodyWhoMayNotReadWhatItCovers(t *testing.T) {
 				`{"to":"3.9.0","by":"`+httpapitest.AheadOfUs+`",`+
 					`"reasoning":"Taking the 3.9.0 bump in the next build.",`+
 					holder+
-					`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+					`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		}
 		var waiting struct {
 			Items []struct {

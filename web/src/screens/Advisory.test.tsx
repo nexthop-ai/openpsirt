@@ -98,7 +98,7 @@ describe("one advisory", () => {
       {
         product: "sonic",
         vulnerability: "CVE-2026-1",
-        stream: "master",
+        branch_or_tag: "master",
         variant: "broadcom",
         status: "known_not_affected",
         decided: "known_not_affected",
@@ -116,7 +116,7 @@ describe("one advisory", () => {
     expect(bodyOf(put()[0] as Sent)).toEqual({
       product: "sonic",
       vulnerability: "CVE-2026-1",
-      stream: "master",
+      branch_or_tag: "master",
       variant: "broadcom",
       affected: true,
     });

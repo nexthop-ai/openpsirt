@@ -101,7 +101,7 @@ var settable = []struct {
 	//
 	// On the row rather than in a second table keyed on the name: keyed that
 	// way, the next word setting anybody adds is offered nothing and then
-	// checked against the triage floor's list.
+	// checked against the minimum severity's list.
 	words []string
 	// shipped is the value in force where nobody has set one, read from the
 	// package that reads it rather than respelled here: a shipped number
@@ -180,10 +180,10 @@ var settable = []struct {
 		"Issues one answer may cover where a second person must agree",
 		"Counted in issues because issues are what the approver reads.",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultReviewIssues) }, false},
-	{setting.LeadRuleGrowth, "Standing rule growth", setting.Triage,
-		"How many times its approved size a standing rule may grow before it is approved again",
-		"Measured in open leads, for rules naming an analyzer rule. An outgrown rule still dismisses what it names.",
-		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultLeadRuleGrowth) }, false},
+	{setting.SuppressionRuleGrowth, "Suppression rule growth", setting.Triage,
+		"How many times its approved size a suppression rule may grow before it is approved again",
+		"Measured in open code findings, for rules naming an analyzer rule. An outgrown rule still dismisses what it names.",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultSuppressionRuleGrowth) }, false},
 	{setting.AgreedIssues, "Issues per re-confirmation", setting.Triage,
 		"Issues one re-confirmation may cover where nobody must agree again",
 		"",
@@ -192,10 +192,10 @@ var settable = []struct {
 		"How many findings one answer about many issues, or one flaw recorded here, may write",
 		"",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultWriteCeiling) }, false},
-	{setting.TriageFloor, "Minimum severity", setting.Triage,
+	{setting.MinimumSeverity, "Minimum severity", setting.Triage,
 		"The severity below which findings stay out of the working list",
 		"Below it, findings are still recorded and counted. A product may state its own.",
-		setting.Word, theFloor, func(core.Deps) string { return theFloor[0] }, true},
+		setting.Word, minimumSeverities, func(core.Deps) string { return minimumSeverities[0] }, true},
 	{setting.QuietAfter, "Quiet build threshold", setting.Scanning,
 		"How long a build may go without a scan before it is reported as quiet",
 		"Measured from the last arrival, or from when the build was declared if nothing has arrived.",
@@ -221,11 +221,11 @@ var settable = []struct {
 		"",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultDeltaFloor) }, false},
 	{setting.AnalysisDropShare, "Analyzer drop share", setting.Scanning,
-		"The share of a build's analyzer results one run marks not reproduced to raise an alert",
+		"The share of a build's analyzer results one run no longer detects, to raise an alert",
 		"Both this and the analyzer drop floor have to be passed. The run is applied either way.",
 		setting.Percent, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAnalysisDropShare) }, false},
 	{setting.AnalysisDropFloor, "Analyzer drop floor", setting.Scanning,
-		"The fewest results one analyzer run marks not reproduced to raise an alert",
+		"The fewest results one analyzer run no longer detects, to raise an alert",
 		"",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAnalysisDropFloor) }, false},
 	{setting.ScanEvery, "Rescan interval", setting.Scanning,
@@ -268,10 +268,10 @@ var settable = []struct {
 		"How many uploads one server reads at the same time",
 		"Each is written to scratch space as it arrives, so that space has to hold this many of the largest uploads. Past it, a sender is told to try again shortly.",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultUploadsAtOnce) }, false},
-	{setting.RoutingBatch, "Findings placed per pass", setting.Limits,
-		"How many findings one pass of the routing sweep places, at most",
+	{setting.AssignmentBatch, "Findings placed per pass", setting.Limits,
+		"How many findings one pass of the assignment sweep places, at most",
 		"On a large estate a pass can be too big to hold a connection through, or too small to drain the backlog.",
-		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAssignmentBatch) }, false},
 	{setting.SavedPerPerson, "Saved filters per person", setting.Limits,
 		"How many saved filters one person may keep",
 		"The panel that lists them reads every one on every open.",
@@ -330,12 +330,12 @@ var atMost = map[string]int{
 // theSwitch is the two values an on-or-off setting may take.
 var theSwitch = []string{setting.On, setting.Off}
 
-// theFloor is the words the triage line may be set to, from the package that
-// owns the ordering they are drawn from.
+// minimumSeverities is the words the minimum severity may be set to, from the
+// package that owns the ordering they are drawn from.
 //
-// "everything" is not a severity: it is the line that keeps nothing out, and a
+// "everything" is not a severity: it is the minimum that keeps nothing out, and a
 // word an operator sets rather than a rating anything is compared against.
-var theFloor = finding.TriageFloors()
+var minimumSeverities = finding.MinimumSeverities()
 
 func registerSettings(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -407,7 +407,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			// offers. Two tables keyed on the name is how an offered word and
 			// an accepted word come to differ. A word is typed, so it is
 			// matched and stored without regard to capitals or the spaces
-			// around it, as the product's own floor is.
+			// around it, as the product's own minimum severity is.
 			value = strings.ToLower(strings.TrimSpace(value))
 			if !slices.Contains(settable[row].words, value) {
 				return nil, huma.Error422UnprocessableEntity(
@@ -466,7 +466,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			}
 		}
 		// The prior value, answered by the write that replaced it: it is not
-		// derivable afterwards, and the person who raised the floor to
+		// derivable afterwards, and the person who raised the minimum severity to
 		// critical is half of what somebody asks. Read in a statement of its
 		// own it is the value at some earlier moment — two administrators
 		// moving the same setting at once both read the original, and the

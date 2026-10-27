@@ -21,13 +21,13 @@ import (
 // build of the same product with nothing read for it yet.
 func taggedBuild(t *testing.T, f *fixture) int64 {
 	t.Helper()
-	return f.world.TargetFor(f.world.Tag, f.world.Customer).ID
+	return f.world.BuildFor(f.world.Tag, f.world.Customer).ID
 }
 
 // appliedTo reads one inventory for any build.
-func appliedTo(t *testing.T, f *fixture, targetID int64, snap graph.Snapshot) {
+func appliedTo(t *testing.T, f *fixture, buildID int64, snap graph.Snapshot) {
 	t.Helper()
-	if _, err := fixtures.ApplyGraph(t.Context(), f.db, targetID, f.scanOf(t, targetID), snap); err != nil {
+	if _, err := fixtures.ApplyGraph(t.Context(), f.db, buildID, f.scanOf(t, buildID), snap); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -72,7 +72,7 @@ func TestTwoBuildsDifferByWhatArrivedWentAndMoved(t *testing.T) {
 		appliedTo(t, f, tag, under(at("sonic-broadcom", "2.4.1"), openssl, vendored, curl))
 		applied(t, f, holding(at("openssl", "3.0.12"), vendored, zlib))
 
-		got := spelled(between(t, f, tag, f.targetID))
+		got := spelled(between(t, f, tag, f.buildID))
 		want := []string{
 			"removed curl [8.4.0] -> []",
 			"added zlib [] -> [1.3]",
@@ -84,7 +84,7 @@ func TestTwoBuildsDifferByWhatArrivedWentAndMoved(t *testing.T) {
 
 		// The other way round is the same difference read from the other
 		// side: what one build gained the other lost.
-		got = spelled(between(t, f, f.targetID, tag))
+		got = spelled(between(t, f, f.buildID, tag))
 		want = []string{
 			"removed zlib [1.3] -> []",
 			"added curl [] -> [8.4.0]",
@@ -105,7 +105,7 @@ func TestABuildIsComparedAsItStandsNow(t *testing.T) {
 		applied(t, f, holding(openssl, curl))
 		applied(t, f, holding(openssl))
 
-		if got := between(t, f, tag, f.targetID); len(got) != 0 {
+		if got := between(t, f, tag, f.buildID); len(got) != 0 {
 			t.Errorf("two builds holding the same thing now differ by %v", spelled(got))
 		}
 	})
@@ -114,7 +114,7 @@ func TestABuildIsComparedAsItStandsNow(t *testing.T) {
 func TestOneBuildComparedWithItselfDiffersInNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		applied(t, f, tree())
-		if got := between(t, f, f.targetID, f.targetID); len(got) != 0 {
+		if got := between(t, f, f.buildID, f.buildID); len(got) != 0 {
 			t.Errorf("a build compared with itself differs by %v", spelled(got))
 		}
 	})
@@ -131,7 +131,7 @@ func TestANameSpelledTwoWaysIsOneName(t *testing.T) {
 		}))
 		applied(t, f, holding(openssl))
 
-		if got := between(t, f, tag, f.targetID); len(got) != 0 {
+		if got := between(t, f, tag, f.buildID); len(got) != 0 {
 			t.Errorf("one name in two spellings differs by %v", spelled(got))
 		}
 	})
@@ -143,7 +143,7 @@ func TestABuildWithNoInventoryIsNotCompared(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		applied(t, f, tree())
 		tag := taggedBuild(t, f)
-		for _, pair := range [][2]int64{{tag, f.targetID}, {f.targetID, tag}} {
+		for _, pair := range [][2]int64{{tag, f.buildID}, {f.buildID, tag}} {
 			_, _, err := f.store.Between(t.Context(), everyone(f), pair[0], pair[1], "", 0, 0)
 			if !errors.Is(err, graph.ErrNoInventory) {
 				t.Errorf("comparing %d with %d answered %v, want no inventory", pair[0], pair[1], err)
@@ -158,7 +158,7 @@ func TestADifferenceIsNarrowedAndPagedAfterItIsWorkedOut(t *testing.T) {
 		appliedTo(t, f, tag, holding(openssl))
 		applied(t, f, holding(openssl, curl, zlib))
 
-		listed, total, err := f.store.Between(t.Context(), everyone(f), tag, f.targetID,
+		listed, total, err := f.store.Between(t.Context(), everyone(f), tag, f.buildID,
 			graph.Added, 1, 1)
 		if err != nil {
 			t.Fatal(err)
@@ -177,7 +177,7 @@ func TestTwoBuildsAreComparedOnlyForSomebodyWhoSeesThem(t *testing.T) {
 		applied(t, f, holding(curl))
 
 		outsider := access.NewPerson(2, "outsider", false, nil, 0)
-		if _, _, err := f.store.Between(t.Context(), outsider, tag, f.targetID, "", 0, 0); !errors.Is(err, access.ErrDenied) {
+		if _, _, err := f.store.Between(t.Context(), outsider, tag, f.buildID, "", 0, 0); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("somebody outside the product was answered with %v, want a refusal", err)
 		}
 	})
@@ -188,19 +188,19 @@ func TestAKeyReadsWhatOnlyTheBuildsItMaySendToShipped(t *testing.T) {
 	// rule its receipts are read under. A key pinned to one variant compares
 	// no build of another.
 	each(t, func(t *testing.T, f *fixture) {
-		appliedTo(t, f, f.targetID, holding(openssl))
+		appliedTo(t, f, f.buildID, holding(openssl))
 		tagged := taggedBuild(t, f)
 		appliedTo(t, f, tagged, holding(openssl))
 
 		product := *f.scope.ProductID
 		branch := f.world.Branch.ID
 		sendsHere := access.NewPipeline(7, "nightly", access.Scope{
-			ProductID: product, StreamID: &branch, VariantID: f.scope.VariantID,
+			ProductID: product, BranchOrTagID: &branch, VariantID: f.scope.VariantID,
 		})
-		if _, _, err := f.store.Between(t.Context(), sendsHere, f.targetID, f.targetID, "", 0, 0); err != nil {
+		if _, _, err := f.store.Between(t.Context(), sendsHere, f.buildID, f.buildID, "", 0, 0); err != nil {
 			t.Errorf("a key compared the build it sends to with itself and was refused: %v", err)
 		}
-		if _, _, err := f.store.Between(t.Context(), sendsHere, f.targetID, tagged, "", 0, 0); !errors.Is(err, access.ErrDenied) {
+		if _, _, err := f.store.Between(t.Context(), sendsHere, f.buildID, tagged, "", 0, 0); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a key pinned to one build compared another: %v", err)
 		}
 		if _, err := f.store.Deltas(t.Context(), sendsHere, tagged, []int64{1}); !errors.Is(err, access.ErrDenied) {

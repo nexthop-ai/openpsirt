@@ -15,7 +15,7 @@ import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Crumbs } from "../ui/Crumbs";
-import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { Severity, Exploited, Incident } from "../ui/Severity";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
@@ -40,7 +40,7 @@ const PAGE = 500;
 // from the generated client rather than restated, so a field the server
 // requires cannot be left out of the call and noticed by nobody.
 type Asked = NonNullable<
-  paths["/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision"]["post"]["requestBody"]
+  paths["/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/bulk-decision"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 // The outcomes one bulk decision may record, in the order the form offers them.
@@ -74,7 +74,12 @@ export function skippedNotice(n: number): string {
 // It is defensible because it writes a separate record per issue and
 // per occurrence, each keyed and expiring on its own, rather than one blanket decision.
 export function BulkDecision() {
-  const { product = "", stream = "", variant = "", component = "" } = useParams();
+  const {
+    product = "",
+    branch_or_tag: branchOrTag = "",
+    variant = "",
+    component = "",
+  } = useParams();
   const [params, setParams] = useSearchParams();
   const contains = params.get("contains") ?? "";
   // Which component the name means, where a build holds it as more than one.
@@ -90,19 +95,19 @@ export function BulkDecision() {
   const after = useAfterDecision();
   const opener = useRowOpener();
 
-  const at = { product, stream, variant, component };
+  const at = { product, branch_or_tag: branchOrTag, variant, component };
   // The whole build, not the product and the component, so the same component
   // under two variants keeps two drafts — and what is kept here is the
   // reasoning a second person is asked to agree to.
   const kind = Object.values(which).join("/");
-  const draftKey = `bulk-decision:${product}:${stream}:${variant}:${component}${kind ? `:${kind}` : ""}`;
+  const draftKey = `bulk-decision:${product}:${branchOrTag}:${variant}:${component}${kind ? `:${kind}` : ""}`;
 
   const issues = useQuery({
     queryKey: ["at-component", at, which, contains, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues",
           {
             params: {
               path: at,
@@ -121,7 +126,7 @@ export function BulkDecision() {
     mutationFn: async (body: Asked) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/bulk-decision",
           { params: { path: at, query: which }, body },
         ),
       ),
@@ -185,7 +190,7 @@ export function BulkDecision() {
       for (let from = 0; from < everything; from += 500) {
         const page = unwrap(
           await api.GET(
-            "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues",
+            "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues",
             {
               params: {
                 path: at,
@@ -208,13 +213,13 @@ export function BulkDecision() {
 
   return (
     <>
-      <Crumbs product={product} stream={stream} variant={variant} />
+      <Crumbs product={product} branch_or_tag={branchOrTag} variant={variant} />
       <div className="screen-head">
         <h2>Bulk decision</h2>
         <p>
-          <span className="id">{component}</span> · {product} · {stream} · {variant} — one outcome,
-          one reasoning, a separate record per issue and per occurrence. Nothing here selects for
-          you.
+          <span className="id">{component}</span> · {product} · {branchOrTag} · {variant} — one
+          outcome, one reasoning, a separate record per issue and per occurrence. Nothing here
+          selects for you.
         </p>
       </div>
 
@@ -368,8 +373,7 @@ export function BulkDecision() {
                           <Link to={issueAt(name)} className="id">
                             {name}
                           </Link>{" "}
-                          <ExploitedHere when={issue.exploited_here} />{" "}
-                          <Exploited when={issue.exploited} />
+                          <Incident when={issue.incident} /> <Exploited when={issue.exploited} />
                           {/* What the issue says about itself. The screen
                               narrows on this text and showed none of it, so a
                               term matched rows nobody could check. */}

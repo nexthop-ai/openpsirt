@@ -90,9 +90,9 @@ The owner has chosen to wait on each of these.
 
 | | |
 |---|---|
-| Today | Remediation deadline windows are deployment-wide settings on the Settings screen: one set for scanned findings (3, 7, 30, 90 and 180 days by default, for exploited down to low) and one for flaws in our own product. A product can already override its triage floor, and not these windows |
+| Today | Remediation deadline windows are deployment-wide settings on the Settings screen: one set for scanned findings (3, 7, 30, 90 and 180 days by default, for exploited down to low) and one for flaws in our own product. A product can already override its minimum severity, and not these windows |
 | Problem | A customer-facing appliance and an internal lab tool must both fix a critical issue within the same seven days |
-| Work | Let a product set its own windows, falling back to the deployment's when cleared, the way the triage floor override works. Rewrite the deadlines of the product's open findings when its windows change (REQ-33) |
+| Work | Let a product set its own windows, falling back to the deployment's when cleared, the way the minimum severity override works. Rewrite the deadlines of the product's open findings when its windows change (REQ-33) |
 | Waits on | The owner's go-ahead only |
 
 ### TODO-09 Microsoft Teams and Google Chat
@@ -233,7 +233,7 @@ Missing or wrong. Where fixing one needs the owner, the item says which question
 
 | | |
 |---|---|
-| Today | A promise to upgrade names several releases, a version and a date. Each build's Pending upgrades page shows that build's state (planned, landed or lapsed). The Claim screen shows the promise and its reach |
+| Today | A promise to upgrade names several releases, a version and a date. Each build's Planned upgrades page shows that build's state (planned, landed or lapsed). The Claim screen shows the promise and its reach |
 | Problem | Nothing shows one promise's state in every release it names. To see that "move openssl to 3.0.15 by 1 October in 4.2, 4.3 and main" landed in two releases and lapsed in one, somebody opens three builds |
 | Work | List on the Claim screen each release the promise names, with its state, what is still open there and the date. It reads nothing new (REQ-35) |
 | Waits on | Nothing |
@@ -308,7 +308,7 @@ Each test passes today, and would keep passing if the code it covers broke.
 
 | | |
 |---|---|
-| Today | A test asks the list of pending upgrades for each sort order it offers, both directions, and checks only that an answer comes back |
+| Today | A test asks the planned upgrades list for each sort order it offers, both directions, and checks only that an answer comes back |
 | Problem | An offered order with no matching column silently sorts by the default and still answers, and an order mapped to the wrong column passes too. The findings list has a test tying every offered order to a column. The upgrade list has none |
 | Work | Add the same two-way test between offered orders and columns, and data in which each order puts a different upgrade first |
 

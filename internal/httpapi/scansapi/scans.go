@@ -50,10 +50,10 @@ type uploadParts struct {
 
 // UploadInput is an arriving scan.
 type UploadInput struct {
-	Product string `path:"product" doc:"The declared product this build is of"`
-	Stream  string `path:"stream" doc:"The declared branch or tag"`
-	Variant string `path:"variant" doc:"The declared way that stream is built"`
-	RawBody huma.MultipartFormFiles[uploadParts]
+	Product     string `path:"product" doc:"The declared product this build is of"`
+	BranchOrTag string `path:"branch_or_tag" doc:"The declared branch or tag"`
+	Variant     string `path:"variant" doc:"The declared way that branch or tag is built"`
+	RawBody     huma.MultipartFormFiles[uploadParts]
 }
 
 // UploadOutput is the record of what became of it.
@@ -82,7 +82,7 @@ func registerScans(api huma.API, in core.Deps) {
 	core.RegisterWithFormer(api, core.Requiring(huma.Operation{
 		OperationID: "upload-scan",
 		Method:      http.MethodPost,
-		Path:        "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
+		Path:        "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms",
 		Summary:     "Upload an SBOM and its VEX documents",
 		Description: "Accepts a CycloneDX 1.x, SPDX 2.x or SPDX 3.x SBOM and any number of " +
 			"OpenVEX documents as multipart form fields named `inventory` and " +
@@ -101,7 +101,7 @@ func registerScans(api huma.API, in core.Deps) {
 		MaxBodyBytes: core.MaxUpload(in.Limits),
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
-				_, _, err := admitted(hc.Context(), in, hc.Param("product"), hc.Param("stream"), hc.Param("variant"))
+				_, _, err := admitted(hc.Context(), in, hc.Param("product"), hc.Param("branch_or_tag"), hc.Param("variant"))
 				return err
 			},
 			Limit:   core.Fixed(core.MaxUpload(in.Limits)),
@@ -119,7 +119,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 
 	// Asked again, though the form was only read once it was asked: what a
 	// handler refuses is the second statement of what admission refused.
-	subject, named, err := admitted(ctx, in, input.Product, input.Stream, input.Variant)
+	subject, named, err := admitted(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 	if err != nil {
 		return nil, err
 	}
@@ -131,13 +131,13 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 	// nobody wired up, and tells the wrong person about the failure this
 	// record exists for. Recorded only past authorization, so a sender who
 	// may not file here writes nothing.
-	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
+	build, err := catalog.NewStore(in.DB.DB).BuildFor(ctx, named.BranchOrTagID, named.VariantID)
 	if err != nil {
-		return nil, core.WentWrong(in.Logger, "the target could not be recorded", err)
+		return nil, core.WentWrong(in.Logger, "the build could not be recorded", err)
 	}
 	note := func(reason string, builtAt *time.Time, hash *string) {
 		refusedAt(ctx, in, subject, ingest.Refusal{
-			TargetID: target.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
+			BuildID: build.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
 		}, input.Product)
 	}
 	refuse := func(refused huma.StatusError) error {
@@ -179,8 +179,8 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 	switch {
 	case named.ProductRetired:
 		retired = fmt.Sprintf("product %q", input.Product)
-	case named.StreamRetired:
-		retired = fmt.Sprintf("release %q of %q", input.Stream, input.Product)
+	case named.BranchOrTagRetired:
+		retired = fmt.Sprintf("release %q of %q", input.BranchOrTag, input.Product)
 	case named.VariantRetired:
 		retired = fmt.Sprintf("variant %q of %q", input.Variant, input.Product)
 	}
@@ -232,7 +232,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 	}
 
 	arriving := ingest.Arriving{
-		TargetID:      target.ID,
+		BuildID:       build.ID,
 		ContentHash:   contentHash,
 		InventoryHash: inventoryHash,
 		Serial:        header.Serial,
@@ -355,18 +355,18 @@ func refusedAt(ctx context.Context, in core.Deps, subject access.Subject, refusa
 func refusedBeforeReading(in core.Deps) func(huma.Context, int, string) {
 	return func(hctx huma.Context, _ int, reason string) {
 		ctx := hctx.Context()
-		subject, named, err := admitted(ctx, in, hctx.Param("product"), hctx.Param("stream"),
+		subject, named, err := admitted(ctx, in, hctx.Param("product"), hctx.Param("branch_or_tag"),
 			hctx.Param("variant"))
 		if err != nil {
 			return
 		}
-		target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
+		build, err := catalog.NewStore(in.DB.DB).BuildFor(ctx, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			in.Log().ErrorContext(ctx, "could not record that an upload was refused",
 				"error", err, "product", hctx.Param("product"))
 			return
 		}
-		refusedAt(ctx, in, subject, ingest.Refusal{TargetID: target.ID, Reason: reason},
+		refusedAt(ctx, in, subject, ingest.Refusal{BuildID: build.ID, Reason: reason},
 			hctx.Param("product"))
 	}
 }
@@ -476,7 +476,7 @@ func store(ctx context.Context, documents *ingest.Documents, scanID int64, kind 
 //
 // Asked before the form is read as well as by the handler, so a sender with no
 // right to the build spools nothing.
-func admitted(ctx context.Context, in core.Deps, product, stream, variant string) (
+func admitted(ctx context.Context, in core.Deps, product, branchOrTag, variant string) (
 	access.Subject, *catalog.Named, error) {
 
 	// The sender, before anything is read or written.
@@ -488,10 +488,10 @@ func admitted(ctx context.Context, in core.Deps, product, stream, variant string
 	// The names are resolved to things before the pair is recorded, so that
 	// whether this sender may file against them is decided first. Recording
 	// and then refusing would leave a row created by a request that failed.
-	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, stream, variant)
+	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		// The message names which part is missing, which is what whoever sees
-		// the failed upload needs in order to declare it — and a target this
+		// the failed upload needs in order to declare it — and a build this
 		// sender may not file against is reported as not declared, so that a
 		// stolen key cannot be used to read the shipping catalog one guess at
 		// a time.
@@ -516,7 +516,7 @@ func admitted(ctx context.Context, in core.Deps, product, stream, variant string
 	// administration.
 	switch {
 	case subject.Kind == access.Pipeline:
-		if !subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
+		if !subject.MaySend(named.ProductID, named.BranchOrTagID, named.VariantID) {
 			return access.Subject{}, nil, huma.Error403Forbidden("not authorized")
 		}
 	case !subject.TriagesIn(named.ProductID):

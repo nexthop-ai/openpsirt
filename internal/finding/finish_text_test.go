@@ -25,7 +25,7 @@ func TestARunEndedInBytesThatAreNotTextIsRecordedOnEveryEngine(t *testing.T) {
 		ctx := t.Context()
 		w := world.New(t, db)
 		findings := finding.NewStore(db.DB)
-		run, err := findings.Begin(ctx, finding.Run{TargetID: w.Target.ID, Scanner: "grype", RanHere: true})
+		run, err := findings.Begin(ctx, finding.Run{BuildID: w.Build.ID, Scanner: "grype", RanHere: true})
 		if err != nil {
 			t.Fatal(err)
 		}

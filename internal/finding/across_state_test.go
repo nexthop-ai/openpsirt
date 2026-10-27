@@ -51,7 +51,7 @@ func (f *fixture) acrossProducts(t *testing.T) acrossProducts {
 	// product's disclosed findings alone is answered without it.
 	if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
 		Set(`"visibility" = ?`, access.Private).
-		Where(`"target_id" = ?`, elsewhere).
+		Where(`"build_id" = ?`, elsewhere).
 		Where(`"vulnerability_id" = ?`, f.issueID(t, "CVE-2026-2")).
 		Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -207,10 +207,10 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 		}
 		f := &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-			target: w.Target.ID, productID: w.Product.ID, tag: w.Tag.ID, variant: w.Customer.ID,
+			build: w.Build.ID, productID: w.Product.ID, tag: w.Tag.ID, variant: w.Customer.ID,
 			scans: ingest.NewStore(db.DB),
 			scope: finding.Scope{
-				ProductID: &w.Product.ID, StreamID: &w.Branch.ID, VariantID: &w.Customer.ID,
+				ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID,
 			},
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		}

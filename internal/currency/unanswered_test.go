@@ -131,11 +131,11 @@ func inAnotherProduct(t *testing.T, w *fixture.World, purl string) {
 	t.Helper()
 	ctx := t.Context()
 	other := w.DeclareProduct("other", "Another Product Entirely")
-	stream := w.DeclareStream(other, "main", catalog.Branch, nil)
+	branchOrTag := w.DeclareBranchOrTag(other, "main", catalog.Branch, nil)
 	variant := w.DeclareVariant(other, "only", true)
-	target := w.TargetFor(stream, variant)
+	build := w.BuildFor(branchOrTag, variant)
 	scan := &ingest.Scan{
-		TargetID: target.ID, ContentHash: "hash-elsewhere",
+		BuildID: build.ID, ContentHash: "hash-elsewhere",
 		BuiltAt: time.Now().UTC(), ReceivedAt: time.Now().UTC(),
 		ParserVersion: "test", Status: ingest.Accepted,
 	}
@@ -148,7 +148,7 @@ func inAnotherProduct(t *testing.T, w *fixture.World, purl string) {
 	if err != nil {
 		t.Fatalf("find %s: %v", purl, err)
 	}
-	node := &graph.Node{TargetID: target.ID, ComponentID: id, OpenedScanID: scan.ID}
+	node := &graph.Node{BuildID: build.ID, ComponentID: id, OpenedScanID: scan.ID}
 	if _, err := w.DB.DB.NewInsert().Model(node).Exec(ctx); err != nil {
 		t.Fatalf("put %s in another product: %v", purl, err)
 	}

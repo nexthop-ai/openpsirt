@@ -80,10 +80,10 @@ const (
 	// it has to be the same across replicas and survive a restart, and this
 	// is where deployment state already is. Minted on first use.
 	SignInKey = "signin.key"
-	// TriageFloor is what this deployment considers worth triaging: a
+	// MinimumSeverity is what this deployment considers worth triaging: a
 	// severity word, below which a finding is recorded and counted but
 	// kept out of the working list. A product may state its own instead.
-	TriageFloor = "triage.floor"
+	MinimumSeverity = "triage.minimum-severity"
 
 	// DisclosureLead is how long before an embargo's date somebody is told
 	// it is coming. The date arriving is the last moment to act rather
@@ -128,11 +128,11 @@ const (
 	// one carried or re-confirmed that goes back to an approver. It counts
 	// issues rather than occurrences, because issues are what a reviewer reads.
 	ReviewIssues = "triage.review-issues"
-	// LeadRuleGrowth is how many times the leads its approver was shown a
-	// standing rule naming an analyzer rule may cover before it asks to be
+	// SuppressionRuleGrowth is how many times the code findings its approver was shown a
+	// suppression rule naming an analyzer rule may cover before it asks to be
 	// approved again. A rule
 	// covering far more than it did is no longer what somebody agreed to.
-	LeadRuleGrowth = "triage.lead-rule-growth"
+	SuppressionRuleGrowth = "triage.suppression-rule-growth"
 	// AgreedIssues is how many issues one re-confirmation may answer where
 	// nothing in it goes back to an approver: every row carries an agreement
 	// already given, so nobody is asked to read anything new.
@@ -179,7 +179,7 @@ const (
 	DeltaShare = "scanning.delta-share"
 	DeltaFloor = "scanning.delta-floor"
 	// AnalysisDropShare and AnalysisDropFloor are when an analyzer's run
-	// marks so much of a build's results not reproduced at once that the
+	// marks so much of a build's results no longer detected at once that the
 	// product's internal readers are told.
 	//
 	// Both have to be passed, for the reason the inventory pair does. A run
@@ -281,11 +281,11 @@ const (
 	// question about that deployment. A request past it is answered 503 and
 	// asked to send again.
 	UploadsAtOnce = "upload.max-concurrent"
-	// RoutingBatch is how many findings one pass of the routing sweep may
-	// place. A bulk decision is bounded, and the bound is a setting: an
+	// AssignmentBatch is how many findings one pass of the assignment sweep
+	// may place. A bulk decision is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
-	RoutingBatch = "routing.batch"
+	AssignmentBatch = "assignment.batch"
 	// SavedPerPerson is how many filters one person may keep.
 	//
 	// A ceiling on rows one person writes one at a time, which is the
@@ -383,14 +383,14 @@ const (
 	DefaultQueuedAfter    = 3 * 24 * time.Hour
 )
 
-// DefaultRoutingBatch is how many findings one routing pass places where
+// DefaultAssignmentBatch is how many findings one assignment pass places where
 // nobody has said.
 //
 // Generous, because the case it exists for is an estate where a rule matches
 // tens of thousands of rows at once; the bound is there because an unbounded
 // write is something somebody triggers by accident, not because two thousand
 // is a suspicious number.
-const DefaultRoutingBatch = 2000
+const DefaultAssignmentBatch = 2000
 
 // DefaultSavedPerPerson is how many filters one person may keep where
 // nobody has said.
@@ -414,9 +414,9 @@ const DefaultBulkDecisionCap = 2000
 // at this.
 const DefaultReviewIssues = 200
 
-// DefaultLeadRuleGrowth is how far a standing rule may grow past what its
+// DefaultSuppressionRuleGrowth is how far a suppression rule may grow past what its
 // approver was shown, where nobody has said: twice.
-const DefaultLeadRuleGrowth = 2
+const DefaultSuppressionRuleGrowth = 2
 
 // DefaultAgreedIssues is how many issues one re-confirmation of answers
 // already agreed to may cover where nobody has said.
@@ -532,7 +532,7 @@ const DefaultDeltaShare = 25
 const DefaultDeltaFloor = 10
 
 // DefaultAnalysisDropShare is how much of a build's open analyzer results
-// one run may mark not reproduced before anybody is told, as a percentage,
+// one run may mark no longer detected before anybody is told, as a percentage,
 // where nobody has said.
 //
 // Half: a fix sweep clears a rule's worth of results, and a run that clears
@@ -688,6 +688,8 @@ func (s *Store) read(ctx context.Context, name string) (string, bool, error) {
 // binary of the earlier release wrote afterwards.
 var formerNames = map[string]string{
 	BulkDecisionCap: "triage.together-cap",
+	MinimumSeverity: "triage.floor",
+	AssignmentBatch: formerAssignmentBatch,
 }
 
 // clearFormer removes the row under a setting's former name, inside the
@@ -709,6 +711,11 @@ func clearFormer(ctx context.Context, tx bun.IDB, name string) (string, bool, er
 	}
 	return row.Value, true, nil
 }
+
+// formerAssignmentBatch is the name the assignment batch had. A constant,
+// because a field's value spelled as a word, a dot and a column reads to the
+// reserved-word check as a column written bare.
+const formerAssignmentBatch = "routing.batch"
 
 // FormerName is a row held under a setting's former name.
 type FormerName struct {

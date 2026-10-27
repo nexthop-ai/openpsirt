@@ -22,27 +22,27 @@ import (
 func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
-	if !filter.Floor.Hides() || filter.BelowFloor {
+	if !filter.MinimumSeverity.Hides() || filter.BelowMinimumSeverity {
 		return 0, nil
 	}
 	// The same query, with the line inverted rather than removed.
 	below := filter
-	below.Floor = Floor{}
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &below)
+	below.MinimumSeverity = MinimumSeverity{}
+	productID, visible, buildIDs, err := s.inScope(ctx, subject, scope, &below)
 	if err != nil {
 		return 0, err
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return 0, nil
 	}
 	if err := s.decidedIssuesFor(ctx, &below, []int64{productID}, false); err != nil {
 		return 0, err
 	}
-	rows := openRows(s.db, targets, visible)
-	if words := filter.Floor.admits(); len(words) > 0 {
+	rows := openRows(s.db, buildIDs, visible)
+	if words := filter.MinimumSeverity.admits(); len(words) > 0 {
 		// The line's own condition, negated: no exploitation signal at
 		// all, and rated beneath the line. Both read the way
-		// Floor.narrow reads them, including the threshold that covers
+		// MinimumSeverity.narrow reads them, including the threshold that covers
 		// both bands.
 		rows = rows.Where(`"f"."urgency" < ?`, int64(exploiting)).
 			Where(`"f"."vulnerability_id" IN (?)`,

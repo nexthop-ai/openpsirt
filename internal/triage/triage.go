@@ -80,22 +80,22 @@ const (
 	// version moving, which no version comparison could have seen.
 	PatchNeeded Outcome = finding.OutcomePatchNeeded
 
-	// Dismissed means a lead is not a flaw to act on, for the reason stated:
+	// Dismissed means a code finding is not a flaw to act on, for the reason stated:
 	// a false positive, a flaw that will not be fixed, code used only in
 	// tests, or one already mitigated.
 	Dismissed Outcome = finding.OutcomeDismissed
-	// NotSecurity means a lead is real and harmless: a crash on a path no
+	// NotSecurity means a code finding is real and harmless: a crash on a path no
 	// input reaches, a leak in a tool that exits.
 	NotSecurity Outcome = finding.OutcomeNotSecurity
-	// Confirmed means a lead is a real flaw. It takes nothing out of anybody's
+	// Confirmed means a code finding is a real flaw. It takes nothing out of anybody's
 	// work, so it waits on nobody.
 	Confirmed Outcome = finding.OutcomeConfirmed
 )
 
 // Outcomes are all of them, in the order a person meets them: the ones about
-// a vulnerability, then the ones about a lead.
+// a vulnerability, then the ones about a code finding.
 func Outcomes() []Outcome {
-	return append(VulnerabilityOutcomes(), LeadOutcomes()...)
+	return append(VulnerabilityOutcomes(), CodeFindingOutcomes()...)
 }
 
 // VulnerabilityOutcomes are the outcomes a decision about a finding of the
@@ -105,15 +105,15 @@ func VulnerabilityOutcomes() []Outcome {
 		AlreadyFixed, UpgradeNeeded, PatchNeeded}
 }
 
-// LeadOutcomes are the outcomes a decision about a lead records. A lead is an
+// CodeFindingOutcomes are the outcomes a decision about a code finding records. A code finding is an
 // analyzer's guess, so what is asked of it is whether it is real, and none of
 // the vulnerability outcomes, which are about how a known issue applies, fits.
-func LeadOutcomes() []Outcome { return []Outcome{Dismissed, NotSecurity, Confirmed} }
+func CodeFindingOutcomes() []Outcome { return []Outcome{Dismissed, NotSecurity, Confirmed} }
 
 // OutcomesFor are the outcomes a decision about a finding of this kind records.
 func OutcomesFor(k kind.Kind) []Outcome {
 	if k == kind.Analysis {
-		return LeadOutcomes()
+		return CodeFindingOutcomes()
 	}
 	return VulnerabilityOutcomes()
 }
@@ -175,7 +175,7 @@ func OutcomesThatHideRisk() []Outcome {
 // control held.
 //
 // The vulnerability outcomes alone: the reports counting dismissals read the
-// vulnerability kinds. Approval quality reads lead decisions too, and asks what
+// vulnerability kinds. Approval quality reads code finding decisions too, and asks what
 // always needs a second person rather than this.
 func OutcomesDismissing() []Outcome {
 	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
@@ -189,9 +189,9 @@ func OutcomesDismissing() []Outcome {
 
 // Dismisses reports whether this outcome says no further work is needed
 // about a vulnerability: it hides risk and carries no date that something
-// later checks. A lead's outcomes dismiss nothing the dismissal counts read,
+// later checks. A code finding's outcomes dismiss nothing the dismissal counts read,
 // because those read the vulnerability kinds alone. Approval quality reads
-// lead decisions and files a lead's dismissal standing alone with these.
+// code finding decisions and files a code finding's dismissal standing alone with these.
 func (o Outcome) Dismisses() bool { return !o.AboutALead() && o.HidesRisk() && !o.Dated() }
 
 // Valid reports whether o is one we recognize.
@@ -218,7 +218,7 @@ func (o Outcome) Valid() bool {
 // already set for the work is ordinary triage, and one past it is deferring
 // the worst thing it covers. See NeedsApproval.
 //
-// Confirming a lead hides nothing either: it says the flaw is real, and the
+// Confirming a code finding hides nothing either: it says the flaw is real, and the
 // work it leads to is recording it.
 func (o Outcome) HidesRisk() bool { return o != Affected && o != Confirmed }
 
@@ -248,15 +248,15 @@ func (o Outcome) Dated() bool { return o.Commits() || o == Deferred }
 // decision about risk that outlived them would be the bump at the top of a
 // build failing to re-open a question somebody has to answer again.
 //
-// Every outcome about a lead does too. A lead's occurrence is the lead, carried by
+// Every outcome about a code finding does too. A code finding's occurrence is the code finding, carried by
 // matching rather than by versions, and what weakens a decision about one is a
-// pairing that is only probable (`DESIGN-analysis.md` § Lead triage).
+// pairing that is only probable (`DESIGN-analysis.md` § Code finding triage).
 func (o Outcome) StandsAtAnyVersion() bool {
 	return slices.Contains(finding.AnyVersionOutcomes(), string(o))
 }
 
-// AboutALead reports whether this is an outcome a decision about a lead records.
-func (o Outcome) AboutALead() bool { return slices.Contains(LeadOutcomes(), o) }
+// AboutALead reports whether this is an outcome a decision about a code finding records.
+func (o Outcome) AboutALead() bool { return slices.Contains(CodeFindingOutcomes(), o) }
 
 // NeedsJustification reports whether this outcome says which recognized reason
 // applies, which is a decision two of them make.
@@ -266,7 +266,7 @@ func (o Outcome) AboutALead() bool { return slices.Contains(LeadOutcomes(), o) }
 // or about work, and a reason on one of those states something the decision does
 // not make.
 //
-// A dismissed lead states its reason too, from the vocabulary LeadReasons
+// A dismissed code finding states its reason too, from the vocabulary CodeFindingReasons
 // holds: a dismissal nobody can review is the one a second person cannot
 // agree to.
 func (o Outcome) NeedsJustification() bool {
@@ -330,25 +330,25 @@ func JustificationsCorrecting() []Justification {
 	return kept
 }
 
-// LeadReason is why a lead is dismissed. The words start from the ones code
+// CodeFindingReason is why a code finding is dismissed. The words start from the ones code
 // scanning services offer, and a decision stores one where a vulnerability decision
 // stores its justification.
-type LeadReason string
+type CodeFindingReason string
 
 const (
 	// FalsePositive means the analyzer is wrong: the flaw is not there.
-	FalsePositive LeadReason = "false_positive"
+	FalsePositive CodeFindingReason = "false_positive"
 	// WillNotFix means the flaw is there and will not be fixed.
-	WillNotFix LeadReason = "wont_fix"
+	WillNotFix CodeFindingReason = "wont_fix"
 	// UsedInTests means the code is only used in tests and does not ship.
-	UsedInTests LeadReason = "used_in_tests"
+	UsedInTests CodeFindingReason = "used_in_tests"
 	// Mitigated means something already in place stops it.
-	Mitigated LeadReason = "mitigated"
+	Mitigated CodeFindingReason = "mitigated"
 )
 
-// LeadReasons are the reasons a dismissed lead may state.
-func LeadReasons() []LeadReason {
-	return []LeadReason{FalsePositive, WillNotFix, UsedInTests, Mitigated}
+// CodeFindingReasons are the reasons a dismissed code finding may state.
+func CodeFindingReasons() []CodeFindingReason {
+	return []CodeFindingReason{FalsePositive, WillNotFix, UsedInTests, Mitigated}
 }
 
 // Justifications are the recognized categories.

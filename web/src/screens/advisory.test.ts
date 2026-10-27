@@ -178,8 +178,8 @@ describe("the builds a decision was made on", () => {
   it("are named the way a release is", () => {
     expect(
       madeOnLabel([
-        { stream: "master", variant: "broadcom" },
-        { stream: "master", variant: "mellanox" },
+        { branch_or_tag: "master", variant: "broadcom" },
+        { branch_or_tag: "master", variant: "mellanox" },
       ]),
     ).toBe("master (broadcom), master (mellanox)");
   });

@@ -218,9 +218,9 @@ func (u unreadable) Unwrap() error { return u.err }
 // those the publisher listed past the mark. What comes back is evidence and a
 // prefill and closes nothing; applying it where it speaks for an occurrence is not
 // built (REQ-31).
-func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (Taken, error) {
+func (f *Fetcher) From(ctx context.Context, by access.Subject, feed Feed) (Taken, error) {
 	var took Taken
-	if err := Reachable(source.URL); err != nil {
+	if err := Reachable(feed.URL); err != nil {
 		return took, err
 	}
 	// The description may name its directory on another host, and a feed
@@ -231,7 +231,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 	// excluded, at the moment of connecting (REQ-69).
 	client := f.Client
 
-	listed, err := f.listings(ctx, client, source.URL)
+	listed, err := f.listings(ctx, client, feed.URL)
 	if err != nil {
 		return took, err
 	}
@@ -240,7 +240,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			"describes neither a feed of advisories nor a directory of them")
 	}
 
-	at2, mark := source.From(f.History)
+	at2, mark := feed.From(f.History)
 	due, filled, err := f.due(ctx, client, listed, at2, mark, &took)
 	if err != nil {
 		return took, err
@@ -253,7 +253,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 	// Read once for the pass rather than once per document. What a product
 	// ships does not move during a pass in any way that matters: a component
 	// that arrives during it is matched by the next one.
-	ships, err := f.shipped(ctx, source.ProductID)
+	ships, err := f.shipped(ctx, feed.ProductID)
 	if err != nil {
 		return took, err
 	}
@@ -275,7 +275,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Filled = true
 			return took, nil
 		}
-		recorded, checked, read, err := f.document(ctx, client, by, source, one, ships, sums)
+		recorded, checked, read, err := f.document(ctx, client, by, feed, one, ships, sums)
 		var refused unreadable
 		switch {
 		case errors.Is(err, errWithdrawn):
@@ -292,7 +292,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Skipped++
 		case errors.Is(err, errMismatched):
 			took.Mismatched++
-			if noted := f.turnedAway(ctx, by, source, one, read, err); noted != nil {
+			if noted := f.turnedAway(ctx, by, feed, one, read, err); noted != nil {
 				return took, noted
 			}
 		case errors.As(err, &refused), steppedOver(err):
@@ -306,7 +306,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			if refused.barred {
 				took.bar(one.address, err)
 			}
-			if noted := f.turnedAway(ctx, by, source, one, read, err); noted != nil {
+			if noted := f.turnedAway(ctx, by, feed, one, read, err); noted != nil {
 				return took, noted
 			}
 		case ctx.Err() != nil:
@@ -699,7 +699,7 @@ type read struct {
 // advisories is set aside whatever its digest says, and a distribution lists
 // tens of thousands of them.
 func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.Subject,
-	source Source, one entry, ships map[string]bool, sums *digests) (int, bool, read, error) {
+	feed Feed, one entry, ships map[string]bool, sums *digests) (int, bool, read, error) {
 
 	var got read
 	body, err := f.fetch(ctx, client, one.address, f.limits.OrDefault().MaxBytes)
@@ -726,13 +726,13 @@ func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.S
 	if err != nil {
 		return 0, false, got, err
 	}
-	recorded, err := f.record(ctx, by, source, one, body, got, advisory, ships)
+	recorded, err := f.record(ctx, by, feed, one, body, got, advisory, ships)
 	return recorded, checked, got, err
 }
 
 // record writes what one fetched advisory says about a component this product
 // ships.
-func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, one entry,
+func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one entry,
 	body []byte, got read, advisory sbom.Advisory, ships map[string]bool) (int, error) {
 
 	sum := sha256.Sum256(body)
@@ -743,7 +743,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 		// pass takes minutes, and a supplier withdrawn during one goes on
 		// fetching and recording — which is the request leaving this
 		// deployment that withdrawing it was meant to stop.
-		standing, err := NewStore(tx).Standing(ctx, tx, source.ID)
+		standing, err := NewStore(tx).Standing(ctx, tx, feed.ID)
 		if err != nil {
 			return err
 		}
@@ -754,7 +754,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 		// that sets aside what an earlier revision of this same advisory said,
 		// so a publisher who corrects one by dropping the component we ship
 		// would otherwise leave the old claim standing as evidence.
-		recorded, _, err = finding.NewStore(tx).RecordStatements(ctx, by, source.ProductID,
+		recorded, _, err = finding.NewStore(tx).RecordStatements(ctx, by, feed.ProductID,
 			finding.Supplied{
 				Source:     finding.FromAdvisory,
 				Identifier: advisory.Identifier,
@@ -765,7 +765,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 				// can be checked.
 				Document: one.address,
 				Digest:   recording(sum[:], statements),
-				Arrived:  &finding.Arrival{FeedID: source.ID, Digest: got.digest},
+				Arrived:  &finding.Arrival{FeedID: feed.ID, Digest: got.digest},
 			}, statements)
 		return err
 	})
@@ -781,16 +781,16 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 // — is not recorded: nothing arrived, and the supplier's own record says what
 // stopped it. A failure to record it is a failure of the pass, so the mark
 // stays before the document and the next pass reads it again.
-func (f *Fetcher) turnedAway(ctx context.Context, by access.Subject, source Source, one entry,
+func (f *Fetcher) turnedAway(ctx context.Context, by access.Subject, feed Feed, one entry,
 	got read, refused error) error {
 
 	if !got.whole {
 		return nil
 	}
-	return finding.NewStore(f.db).TurnedAway(ctx, by, source.ProductID, finding.Supplied{
+	return finding.NewStore(f.db).TurnedAway(ctx, by, feed.ProductID, finding.Supplied{
 		Source: finding.FromAdvisory, Publisher: got.publisher, Identifier: got.identifier,
 		Document: one.address,
-		Arrived:  &finding.Arrival{FeedID: source.ID, Digest: got.digest},
+		Arrived:  &finding.Arrival{FeedID: feed.ID, Digest: got.digest},
 	}, refused.Error())
 }
 
@@ -1008,8 +1008,8 @@ func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`"c"."name_folded"`).
 		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "n"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "n"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).

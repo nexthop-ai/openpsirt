@@ -390,7 +390,7 @@ func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
 		}{
 			{http.MethodGet, "/v1/products/mine/issues/" + embargoed + "/collaborators", ""},
 			{http.MethodPut, "/v1/products/mine/issues/" + embargoed + "/builds",
-				`{"builds":[{"stream":"master","variant":"broadcom"}]}`},
+				`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`},
 		} {
 			got := httpapitest.AsPerson(t, r, "outsider", c.method, c.path, c.body)
 			httpapitest.RefusedWith(t, got, http.StatusNotFound)
@@ -416,7 +416,7 @@ func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing
 	// A store refusal with no arm for it in the handler falls through to the
 	// fault answer, so a route answered 500 where a stranger got 404. The
 	// pair says the build is there, one name at a time — and the error text
-	// names which of product, stream and variant was undeclared, which is the
+	// names which of product, branch or tag and variant was undeclared, which is the
 	// list REQ-42 makes secret.
 	//
 	// A case collaborator is the reach that meets it: they hold nothing on
@@ -570,7 +570,7 @@ func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		theirs := r.Embargoed(t)
 		other := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The recovery console takes a password nobody set.",`+
 				`"severity":"high","component":"libnl-3-200"}`)
 		if other.Code != http.StatusCreated {

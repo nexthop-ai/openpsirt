@@ -34,7 +34,13 @@ describe("a tag's release date", () => {
       return { data: { items: [] } };
     });
     const put = answer("PUT", () => ({ status: 204 }));
-    mount.render(screen(<Branches />, "/products/sonic/streams", "/products/:product/streams"));
+    mount.render(
+      screen(
+        <Branches />,
+        "/products/sonic/branches-and-tags",
+        "/products/:product/branches-and-tags",
+      ),
+    );
     await settle();
     const box = mount.host().querySelector<HTMLInputElement>('input[aria-label="Released"]');
     type(box, "0002-01-01");

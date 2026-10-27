@@ -12,7 +12,7 @@ import (
 )
 
 // TestABuildWithNoDisplayNamesIsShownByItsNames pins the fallback a list
-// reads a build's labels with: a product, stream or variant with no display
+// reads a build's labels with: a product, branch or tag or variant with no display
 // name is labeled by its name.
 func TestABuildWithNoDisplayNamesIsShownByItsNames(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
@@ -21,11 +21,11 @@ func TestABuildWithNoDisplayNamesIsShownByItsNames(t *testing.T) {
 		f.seenAt(t, run, time.Now().UTC().Add(-100*24*time.Hour))
 		mild := found("CVE-2026-1", libnl)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
-		for _, table := range []string{"product", "stream", "variant"} {
+		for _, table := range []string{"product", "branch_or_tag", "variant"} {
 			if _, err := f.db.DB.NewUpdate().Table(table).
 				Set(`"display_name" = ?`, "").Where("1 = 1").Exec(t.Context()); err != nil {
 				t.Fatal(err)
@@ -43,10 +43,10 @@ func TestABuildWithNoDisplayNamesIsShownByItsNames(t *testing.T) {
 		}
 		for _, row := range late {
 			if row.Product == "" || row.ProductName != row.Product ||
-				row.Stream == "" || row.StreamName != row.Stream ||
+				row.BranchOrTag == "" || row.BranchOrTagName != row.BranchOrTag ||
 				row.Variant == "" || row.VariantName != row.Variant {
 				t.Errorf("the row labels its build %q/%q, %q/%q, %q/%q; want each label to be its name",
-					row.Product, row.ProductName, row.Stream, row.StreamName,
+					row.Product, row.ProductName, row.BranchOrTag, row.BranchOrTagName,
 					row.Variant, row.VariantName)
 			}
 		}

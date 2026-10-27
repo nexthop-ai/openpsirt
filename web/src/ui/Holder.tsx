@@ -41,7 +41,7 @@ export function Holder({
   // The kind of work being handed over, so the people offered are the
   // ones who could open it.
   undisclosed?: boolean;
-  // Internal work, such as a lead, which only readers of internal work open.
+  // Internal work, such as a code finding, which only readers of internal work open.
   internal?: boolean;
   // The present holder, shown when the field is not being typed in.
   value?: { identity: string; name?: string } | null;

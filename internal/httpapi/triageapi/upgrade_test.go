@@ -25,7 +25,7 @@ func TestPlanningAnUpgradeAnswersEverythingOpenOnTheComponent(t *testing.T) {
 
 		soon := time.Now().UTC().Add(365 * 24 * time.Hour).Format("2006-01-02")
 		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
-			"builds":[{"stream":"master","variant":"broadcom"}],
+			"builds":[{"branch_or_tag":"master","variant":"broadcom"}],
 			"reasoning":"Moving the package rather than answering each of these."}`, soon)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade", body)
@@ -67,7 +67,7 @@ func TestAPromiseInsideTheDeadlineStandsOnItsOwn(t *testing.T) {
 		// days out, so tomorrow is inside them.
 		tomorrow := time.Now().UTC().Add(24 * time.Hour).Format("2006-01-02")
 		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
-			"builds":[{"stream":"master","variant":"broadcom"}],
+			"builds":[{"branch_or_tag":"master","variant":"broadcom"}],
 			"reasoning":"Landing in the next build."}`, tomorrow)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade", body)
@@ -91,7 +91,7 @@ func TestPlanningAnUpgradeNeedsTheTriageRight(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		soon := time.Now().UTC().Add(24 * time.Hour).Format("2006-01-02")
 		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
-			"builds":[{"stream":"master","variant":"broadcom"}],"reasoning":"No."}`, soon)
+			"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"reasoning":"No."}`, soon)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade", body),
 			http.StatusForbidden)
@@ -109,7 +109,7 @@ func TestMovingAPromisePastTheDeadlineGatesItAgain(t *testing.T) {
 
 		tomorrow := time.Now().UTC().Add(24 * time.Hour).Format(time.DateOnly)
 		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
-			"builds":[{"stream":"master","variant":"broadcom"}],
+			"builds":[{"branch_or_tag":"master","variant":"broadcom"}],
 			"reasoning":"Landing in the next build."}`, tomorrow)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade", body)
@@ -157,7 +157,7 @@ func TestAPromiseCannotBeMovedOntoADateAlreadyPast(t *testing.T) {
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade",
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,
-				"builds":[{"stream":"master","variant":"broadcom"}],
+				"builds":[{"branch_or_tag":"master","variant":"broadcom"}],
 				"reasoning":"Landing in the next build."}`, tomorrow))
 		if made.Code != http.StatusCreated {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
@@ -187,7 +187,7 @@ func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade",
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,
-				"builds":[{"stream":"master","variant":"broadcom"}],
+				"builds":[{"branch_or_tag":"master","variant":"broadcom"}],
 				"reasoning":"Landing in the next build."}`, tomorrow))
 		if made.Code != http.StatusCreated {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
@@ -231,7 +231,7 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade",
 			fmt.Sprintf(`{"to":"9.9.9","by":%q,
-				"builds":[{"stream":"master","variant":"broadcom"}],
+				"builds":[{"branch_or_tag":"master","variant":"broadcom"}],
 				"reasoning":"Moving the package rather than answering each of these."}`, year))
 		if made.Code != http.StatusCreated {
 			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
@@ -286,7 +286,7 @@ func TestAPromiseStoresADecisionAtEveryOccurrenceItReports(t *testing.T) {
 
 		soon := time.Now().UTC().Add(365 * 24 * time.Hour).Format("2006-01-02")
 		body := fmt.Sprintf(`{"to":"9.9.9","by":%q,
-			"builds":[{"stream":"master","variant":"broadcom"}],
+			"builds":[{"branch_or_tag":"master","variant":"broadcom"}],
 			"reasoning":"Moving the package rather than answering each of these."}`, soon)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/linux-image/upgrade", body)

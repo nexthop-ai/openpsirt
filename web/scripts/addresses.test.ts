@@ -30,16 +30,16 @@ describe("an address written out whole", () => {
 
 describe("an address put together from parts", () => {
   it("is reported as a template outside routes.ts", () => {
-    expect(found("const to = `/products/${encodeURIComponent(p)}/inbox`;")).toEqual([
-      "/products/${}/inbox",
-    ]);
+    expect(found("const to = `/products/${encodeURIComponent(p)}/vulnerability-reports`;")).toEqual(
+      ["/products/${}/vulnerability-reports"],
+    );
   });
 
   it("is reported where a prefix held in a name has a segment joined on", () => {
     expect(found(`const to = buildAt + "/tree?at=" + encodeURIComponent(c);`)).toEqual([
       "/tree?at=",
     ]);
-    expect(found("const to = `${inbox}/${encodeURIComponent(reference)}`;")).toEqual(["${}/${}"]);
+    expect(found("const to = `${reports}/${encodeURIComponent(reference)}`;")).toEqual(["${}/${}"]);
   });
 
   it("is reported where a query is glued onto an address built elsewhere", () => {

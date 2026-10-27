@@ -28,12 +28,12 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 		snap.Components = append(snap.Components, zlib)
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: openssl, Child: zlib})
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
@@ -45,7 +45,7 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 				Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
 			}
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
 			reported("CVE-2026-1", zlib), reported("CVE-2026-2", zlib),
 			reported("CVE-2026-3", curl), reported("CVE-2026-4", openssl),
 		}); err != nil {
@@ -66,17 +66,17 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 			component graph.Described
 		}{{"CVE-2026-1", zlib}, {"CVE-2026-2", zlib}, {"CVE-2026-3", curl}} {
 			issue := issueID(t, f, each.issue)
-			component, err := f.store.ComponentAs(t.Context(), f.targetID, each.component.Name, graph.Choice{})
+			component, err := f.store.ComponentAs(t.Context(), f.buildID, each.component.Name, graph.Choice{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, _, err := findings.Assign(t.Context(), boss, f.targetID,
+			if _, _, err := findings.Assign(t.Context(), boss, f.buildID,
 				issue, component, &to, nil); err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		rows, complete, err := f.store.Ours(t.Context(), holder, f.targetID)
+		rows, complete, err := f.store.Ours(t.Context(), holder, f.buildID)
 		if err != nil {
 			t.Fatalf("somebody who holds work but reads nothing was refused the tree: %v", err)
 		}
@@ -119,7 +119,7 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 		// Somebody who holds nothing here gets nothing, which is not a
 		// refusal: there is no work of theirs to hang a tree from.
 		nobody := access.NewPerson(3, "nobody", false, nil, 78)
-		empty, _, err := f.store.Ours(t.Context(), nobody, f.targetID)
+		empty, _, err := f.store.Ours(t.Context(), nobody, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,18 +141,18 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		snap.Components = append(snap.Components, zlib)
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: openssl, Child: zlib})
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, []finding.Reported{
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, []finding.Reported{
 			{Issue: finding.Named{Identifier: "CVE-2026-9", Severity: "high"}, Component: zlib},
 		}); err != nil {
 			t.Fatal(err)
@@ -161,12 +161,12 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		boss := access.NewPerson(1, "boss", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicTriage, access.PrivateTriage, access.Assigner}}, 1)
 		issue := issueID(t, f, "CVE-2026-9")
-		component, err := f.store.ComponentAs(t.Context(), f.targetID, zlib.Name, graph.Choice{})
+		component, err := f.store.ComponentAs(t.Context(), f.buildID, zlib.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		to := int64(party)
-		if _, _, err := findings.Assign(t.Context(), boss, f.targetID,
+		if _, _, err := findings.Assign(t.Context(), boss, f.buildID,
 			issue, component, &to, nil); err != nil {
 			t.Fatal(err)
 		}
@@ -177,7 +177,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		if _, err := f.db.DB.NewUpdate().
 			Table("finding").
 			Set(`"visibility" = ?`, access.Private).
-			Where(`"target_id" = ?`, f.targetID).
+			Where(`"build_id" = ?`, f.buildID).
 			Where(`"vulnerability_id" = ?`, issue).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -186,7 +186,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		// They hold it, and they may not read undisclosed work here.
 		holder := access.NewPerson(2, "holder", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead}}, party)
-		rows, _, err := f.store.Ours(t.Context(), holder, f.targetID)
+		rows, _, err := f.store.Ours(t.Context(), holder, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -198,7 +198,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		// visibility clause rather than the tree being broken.
 		reader := access.NewPerson(3, "reader", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead, access.PrivateRead}}, party)
-		rows, _, err = f.store.Ours(t.Context(), reader, f.targetID)
+		rows, _, err = f.store.Ours(t.Context(), reader, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}

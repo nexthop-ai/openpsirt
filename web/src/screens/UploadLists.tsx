@@ -45,16 +45,19 @@ const RUN_STATES: Record<RunStatus, { cls: string; label: string; means: string 
 // The static analysis runs one build was sent, newest first, and the last
 // upload of each series that was turned away.
 export function AnalysisRuns({ build }: { build: Build }) {
-  const { product, stream, variant } = build;
+  const { product, branch_or_tag: branchOrTag, variant } = build;
   const [offset, setOffset] = useState(0);
   const runs = useQuery({
-    queryKey: ["analyses", product, stream, variant, offset],
+    queryKey: ["analyses", product, branchOrTag, variant, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses",
           {
-            params: { path: { product, stream, variant }, query: { limit: PAGE, offset } },
+            params: {
+              path: { product, branch_or_tag: branchOrTag, variant },
+              query: { limit: PAGE, offset },
+            },
           },
         ),
       ),
@@ -86,7 +89,7 @@ export function AnalysisRuns({ build }: { build: Build }) {
       {items.length === 0 ? (
         <Empty
           title="No static analysis runs."
-          detail="A build pipeline sends them with openpsirt-analysis."
+          detail="A build pipeline sends them with openpsirt-upload."
         />
       ) : (
         <Wide>
@@ -108,7 +111,7 @@ export function AnalysisRuns({ build }: { build: Build }) {
                   className="num"
                   title="Open results this comparable run did not report. Blank where it isn't comparable"
                 >
-                  Not reproduced
+                  No longer detected
                 </th>
               </tr>
             </thead>
@@ -136,7 +139,9 @@ export function AnalysisRuns({ build }: { build: Build }) {
                     <td className="num">{run.counts?.opened.toLocaleString() ?? ""}</td>
                     <td className="num">{run.counts?.seen.toLocaleString() ?? ""}</td>
                     <td className="num" title={run.not_comparable || undefined}>
-                      {run.comparable ? (run.counts?.not_reproduced.toLocaleString() ?? "") : ""}
+                      {run.comparable
+                        ? (run.counts?.no_longer_detected.toLocaleString() ?? "")
+                        : ""}
                     </td>
                   </tr>
                 );

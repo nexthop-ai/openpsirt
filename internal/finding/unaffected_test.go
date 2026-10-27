@@ -30,7 +30,7 @@ func unaffectedBy(component graph.Described, lines string) finding.Reported {
 func (f *fixture) reported(t *testing.T, reports ...finding.Reported) (finding.Applied, int64) {
 	t.Helper()
 	runID := f.run(t)
-	applied, err := f.store.Apply(t.Context(), f.target, runID, reports)
+	applied, err := f.store.Apply(t.Context(), f.build, runID, reports)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestTheRegisterListsWhatTheRecordsClosedWithTheirLines(t *testing.T) {
 		f.reported(t, unaffectedBy(libnl, recordSays), found("CVE-2026-2", libnl))
 
 		who := f.holding(t, access.PublicRead)
-		rows, err := f.store.RegisterPage(t.Context(), who, f.target,
+		rows, err := f.store.RegisterPage(t.Context(), who, f.build,
 			finding.Registering{Because: []finding.Closure{finding.Unaffected}}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -228,7 +228,7 @@ func TestAFindingTheRecordClosedMetAndMissedNoDeadline(t *testing.T) {
 		f.reported(t, found("CVE-2026-1", libnl))
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"due_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where(`"target_id" = ?`, f.target).Exec(t.Context()); err != nil {
+			Where(`"build_id" = ?`, f.build).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		f.reported(t, unaffectedBy(libnl, recordSays))

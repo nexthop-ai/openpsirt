@@ -62,7 +62,7 @@ export function Thread({
   mine: (writtenBy: string) => boolean;
   about: Attaching;
   undisclosed?: boolean;
-  // Whether the thing discussed is internal material: a lead's, until its flaw is disclosed.
+  // Whether the thing discussed is internal material: a code finding's, until its flaw is disclosed.
   internal?: boolean;
   // The name for one piece, and what adding one does not do. The two words
   // that are genuinely a caller's, so the wording stays deliberate rather than

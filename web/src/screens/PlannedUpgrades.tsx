@@ -1,0 +1,182 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { Link, useParams } from "react-router-dom";
+import { Loading } from "../ui/Loading";
+import { on } from "../ui/when";
+import { useQuery } from "@tanstack/react-query";
+import { api, type Body } from "../api/client";
+import { unwrap } from "../api/queries";
+import { Empty } from "../ui/Empty";
+import { Failed } from "../ui/Failed";
+import { Wide } from "../ui/Wide";
+import { fileAt as linkedFile } from "../api/links";
+import { own } from "../ui/own";
+import { decisionAt } from "../app/routes";
+
+// A promise's state, said in words rather than left to a color.
+const STANDING: Record<Body<"PlannedBody">["state"], string> = {
+  planned: "promised, with work outstanding and the date still ahead",
+  landed: "every piece of it gone, which the scans say",
+  lapsed: "the date has passed and work is outstanding",
+};
+
+// Lapsed first, then what is still promised, then what has landed.
+function rank(state?: string): number {
+  return state === "lapsed" ? 0 : state === "landed" ? 2 : 1;
+}
+
+// The work one build is waiting on, by the upgrade that would deliver it.
+//
+// Dependency hygiene rather than a plan for the product's own release: which
+// packages this build is waiting to move, and how much of each has landed.
+//
+// The product's planned upgrades read from the other end: a triager reads a bump and the
+// issues it closes, a coordinator reads a build and the upgrades it is waiting
+// on. One query, so the two cannot come to disagree.
+export function PlannedUpgrades() {
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "" } = useParams();
+  const plan = useQuery({
+    queryKey: ["build-planned-upgrades", product, branchOrTag, variant],
+    queryFn: async () =>
+      unwrap(
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades",
+          {
+            params: { path: { product, branch_or_tag: branchOrTag, variant } },
+          },
+        ),
+      ),
+  });
+
+  if (plan.isPending) return <Loading />;
+  if (plan.isError) {
+    return <Failed error={plan.error} what="The planned upgrades could not be read." />;
+  }
+  // Lapsed first: it is the row somebody has to do something about, and the
+  // rest of the screen is a status board.
+  const rows = [...(plan.data?.items ?? [])].sort((a, b) => rank(a.state) - rank(b.state));
+  const late = rows.filter((row) => row.state === "lapsed").length;
+
+  return (
+    <>
+      <div className="screen-head">
+        <h2>
+          Planned upgrades{" "}
+          <span className="n">{rows.filter((row) => row.state !== "landed").length}</span>
+        </h2>
+        <p>
+          Upgrades {branchOrTag} · {variant} is waiting on. Marked landed when a scan no longer
+          finds the old version.
+        </p>
+        {late > 0 && (
+          <div className="alert warn">
+            <strong>
+              {late} {late === 1 ? "upgrade is" : "upgrades are"} past the date promised
+            </strong>
+            <span>Findings stay covered. The upgrade goes back to whoever is carrying it.</span>
+          </div>
+        )}
+      </div>
+
+      {rows.length > 0 && (
+        <p className="hint">
+          {/* A link somebody follows rather than a request this page makes, so
+              the browser fetches it with the session it already has. */}
+          Download <a href={fileAt(product, branchOrTag, variant, "csv")}>CSV</a> ·{" "}
+          <a href={fileAt(product, branchOrTag, variant, "json")}>JSON</a>.
+        </p>
+      )}
+
+      {rows.length === 0 ? (
+        <Empty
+          title="Nothing is planned for this build."
+          detail="Plan one from a component's screen."
+        />
+      ) : (
+        <Wide>
+          <table>
+            <thead>
+              <tr>
+                <th>Upgrade</th>
+                <th>Moving to</th>
+                <th>Packages</th>
+                <th className="num">Would close</th>
+                <th>Promised by</th>
+                <th>Held by</th>
+                <th>Waiting since</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const done = row.state === "landed";
+                return (
+                  <tr key={row.fold} className="row">
+                    <td>
+                      {/* The decision it was argued under, which is where the
+                          reasoning, the approval and the conversation about
+                          the upgrade are. Not one row it wrote: a row is about
+                          one issue at one occurrence, so clicking one would
+                          answer about a single CVE. */}
+                      {row.decision_id ? (
+                        <Link to={decisionAt(row.decision_id)} className="linkish id">
+                          {row.upstream}
+                        </Link>
+                      ) : (
+                        <span className="id">{row.upstream}</span>
+                      )}{" "}
+                      <span className="hint">{row.from}</span>
+                    </td>
+                    {/* A column rather than gray hint text beside the name:
+                        the version a release is moving to is the thing
+                        somebody is waiting on. */}
+                    <td>
+                      <span className="id">{row.to}</span>
+                    </td>
+                    <td className="hint">{(row.components ?? []).join(", ")}</td>
+                    <td className="num">
+                      <span
+                        className={
+                          done
+                            ? "state agreed"
+                            : row.state === "lapsed"
+                              ? "state lapsed"
+                              : "state waiting"
+                        }
+                        title={own(STANDING, row.state) ?? ""}
+                      >
+                        {done ? "landed" : `${row.issues} ${row.issues === 1 ? "issue" : "issues"}`}
+                      </span>
+                    </td>
+                    <td className="hint">
+                      {row.by ? on(row.by) : "—"}
+                      {row.state === "lapsed" && <span className="state lapsed"> past</span>}
+                    </td>
+                    <td className="hint">{row.held_by_name || row.held_by || "no one"}</td>
+                    <td className="hint">{on(row.declared_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Wide>
+      )}
+    </>
+  );
+}
+
+// The address the file comes from.
+function fileAt(
+  product: string,
+  branchOrTag: string,
+  variant: string,
+  format: "csv" | "json",
+): string {
+  return linkedFile(
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades.{format}",
+    format,
+    {
+      path: { product, branch_or_tag: branchOrTag, variant },
+    },
+  );
+}

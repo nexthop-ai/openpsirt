@@ -38,7 +38,7 @@ var ErrNotOffered = refusal.New("is not one this line was offered")
 // a caller that got the set wrong should hear so.
 //
 // Bounded, like every other act answering many issues at once.
-func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, toTarget int64,
+func (s *Store) Carry(ctx context.Context, subject access.Subject, fromBuild, toBuild int64,
 	chosen []int64, bounds Bounds) (int, error) {
 
 	if len(chosen) == 0 {
@@ -64,7 +64,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 		// since been revised. The offer and the writing have to see
 		// the same database or the rule "only what was offered" is
 		// about a world that has moved.
-		offered, err := within.WouldCarry(ctx, subject, fromTarget, toTarget)
+		offered, err := within.WouldCarry(ctx, subject, fromBuild, toBuild)
 		if err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			// copied from the old decision: the versions are what a row is
 			// keyed on and they are the thing that moved, so copying them
 			// would write a decision keyed to a build it is not about.
-			occurrence, err := within.occurrenceOnLine(ctx, toTarget, one.DecisionOccurrenceID)
+			occurrence, err := within.occurrenceOnLine(ctx, toBuild, one.DecisionOccurrenceID)
 			if err != nil {
 				return err
 			}
@@ -128,7 +128,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 				NeedsApproval: true,
 				SelectedBy:    "carried from another line",
 				// The line it is carried to is the build somebody chose.
-				MadeOn: []int64{toTarget},
+				MadeOn: []int64{toBuild},
 			}
 			if old.Justification != nil {
 				proposal.Justification = Justification(*old.Justification)
@@ -187,7 +187,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 
 // occurrenceOnLine is where a carried decision lands: the same issue at the same
 // occurrence, at whatever versions the new line holds.
-func (s *Store) occurrenceOnLine(ctx context.Context, toTarget, occurrenceID int64) (*Occurrence, error) {
+func (s *Store) occurrenceOnLine(ctx context.Context, toBuild, occurrenceID int64) (*Occurrence, error) {
 	var row struct {
 		ProductID          int64  `bun:"product_id"`
 		VulnerabilityID    int64  `bun:"vulnerability_id"`
@@ -215,17 +215,17 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toTarget, occurrenceID int
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
-			AS "visibility"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
+			AS "visibility"`, append([]any{private, string(access.Private), string(access.Public), toBuild},
 			kindArgs...)...).
-		Apply(versionsOnLine(toTarget, "component_now", "consumer_now")).
+		Apply(versionsOnLine(toBuild, "component_now", "consumer_now")).
 		// A line carried onto that was built once. It is a fact about the
-		// target rather than about the decision, and the rule that refuses a
+		// build rather than about the decision, and the rule that refuses a
 		// dated decision on a tag reads it.
 		ColumnExpr(`(SELECT CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END
-			FROM "target" AS "tg" JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
-			WHERE "tg"."id" = ?) AS "on_tag"`, catalog.Tag, toTarget).
+			FROM "build" AS "tg" JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
+			WHERE "tg"."id" = ?) AS "on_tag"`, catalog.Tag, toBuild).
 		Where(`"de"."id" = ?`, occurrenceID).
 		Scan(ctx, &row)
 	if err != nil {
@@ -249,19 +249,19 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toTarget, occurrenceID int
 // two findings — one library vendored twice — so a minimum taken of each
 // version alone can pair versions no finding holds together. Ordered on both
 // and taken once, both columns read the same row.
-func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.SelectQuery) *bun.SelectQuery {
+func versionsOnLine(toBuild int64, componentAs, consumerAs string) func(*bun.SelectQuery) *bun.SelectQuery {
 	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	first := func(expr string) string {
 		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"
-			WHERE "f"."target_id" = ? AND ` + finding.DecisionOccurrenceOf("f") + ` AND "f"."closed_at" IS NULL
+			WHERE "f"."build_id" = ? AND ` + finding.DecisionOccurrenceOf("f") + ` AND "f"."closed_at" IS NULL
 				AND ` + kinds + `
 			ORDER BY ` + finding.ComponentUpstreamExpr + `, ` + finding.ConsumerUpstreamExpr + `
 			LIMIT 1), '')`
 	}
 	as := func(name string) []any {
-		args := append([]any{toTarget}, kindArgs...)
+		args := append([]any{toBuild}, kindArgs...)
 		return append(args, bun.Ident(name))
 	}
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -338,7 +338,7 @@ type Inherited struct {
 // Asked before a line is created, because the answer is what somebody is
 // agreeing to — and a carry that happened silently is the one nobody reviews.
 func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
-	fromTarget, toTarget int64) (*Carried, error) {
+	fromBuild, toBuild int64) (*Carried, error) {
 
 	if subject.Kind != access.Person {
 		return nil, ErrNotTheirs
@@ -351,10 +351,10 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	// the reasoning of undisclosed decisions elsewhere would come back.
 	var productID int64
 	if err := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id"`).
-		Where(`"tg"."id" = ?`, toTarget).
+		Where(`"tg"."id" = ?`, toBuild).
 		Scan(ctx, &productID); err != nil {
 		return nil, fmt.Errorf("look up which product this line belongs to: %w", err)
 	}
@@ -410,25 +410,25 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// The new line's contents at that occurrence, if anything.
 		ColumnExpr(`COALESCE((SELECT MIN("c"."name") FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
-			AS "component"`, append([]any{toTarget}, kindArgs...)...).
+			AS "component"`, append([]any{toBuild}, kindArgs...)...).
 		// Both versions, because a row is keyed on both: a build whose
 		// consumer alone has moved is one the decision does not reach, and the
 		// finding surfaces unanswered.
-		Apply(versionsOnLine(toTarget, "now_at", "consumer_now")).
+		Apply(versionsOnLine(toBuild, "now_at", "consumer_now")).
 		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer_was"`).
 		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`)
-			AS "still_there"`, append([]any{toTarget}, kindArgs...)...).
+			AS "still_there"`, append([]any{toBuild}, kindArgs...)...).
 		// The visibility the occurrence lands at, read as occurrenceOnLine reads it.
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."build_id" = ? AND `+finding.DecisionOccurrenceOf("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
-			AS "landing"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
+			AS "landing"`, append([]any{private, string(access.Private), string(access.Public), toBuild},
 			kindArgs...)...).
 		// A date it carries that has already gone by, either of them.
 		ColumnExpr(`(COALESCE("cl"."deferred_until", "cl"."committed_to") IS NOT NULL
@@ -437,8 +437,8 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."visibility" IN (?)`, bun.List(readable)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
-			WHERE "g"."target_id" = ? AND `+finding.DecisionOccurrenceOf("g")+` AND `+gKinds+`)`,
-			append([]any{fromTarget}, gKindArgs...)...).
+			WHERE "g"."build_id" = ? AND `+finding.DecisionOccurrenceOf("g")+` AND `+gKinds+`)`,
+			append([]any{fromBuild}, gKindArgs...)...).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what a new line would inherit: %w", err)

@@ -59,7 +59,7 @@ type Upload struct {
 	// Credential is who uploaded it, as a scan's sender is spelled, and
 	// FeedID the supplier whose feed fetched it. One of the two is set.
 	Credential *string   `bun:"credential"`
-	FeedID     *int64    `bun:"advisory_source_id"`
+	FeedID     *int64    `bun:"supplier_advisory_feed_id"`
 	ReceivedAt time.Time `bun:"received_at,notnull"`
 	Status     string    `bun:"status,notnull"`
 	Reason     *string   `bun:"reason"`
@@ -189,7 +189,7 @@ func (s *Store) Uploads(ctx context.Context, subject access.Subject, productID i
 				AND ("newer"."received_at" > "du"."received_at"
 					OR ("newer"."received_at" = "du"."received_at" AND "newer"."id" > "du"."id"))
 			) THEN 1 ELSE 0 END AS "newest"`, UploadTaken, UploadTaken).
-		Join(`LEFT JOIN "advisory_source" AS "sp" ON "sp"."id" = "du"."advisory_source_id"`).
+		Join(`LEFT JOIN "supplier_advisory_feed" AS "sp" ON "sp"."id" = "du"."supplier_advisory_feed_id"`).
 		Where(`"du"."product_id" = ?`, productID).
 		Where(`"du"."source" = ?`, source).
 		OrderExpr(`"du"."received_at" DESC, "du"."id" DESC`).

@@ -65,8 +65,9 @@ func Products() string { return "/products" }
 // System is the deployment's own health.
 func System() string { return "/system" }
 
-// ExploitedHere is the list of what the deployment owes somebody by a date.
-func ExploitedHere() string { return "/exploited-here" }
+// Incidents is every standing incident, with the response windows counted for
+// each.
+func Incidents() string { return "/incidents" }
 
 // Decision is one decision, whole.
 func Decision(id int64) string { return "/decisions/" + strconv.FormatInt(id, 10) }
@@ -91,31 +92,31 @@ func ProductFindings(product, search string) string {
 	return "/products/" + url.PathEscape(product) + "/findings?q=" + url.QueryEscape(search)
 }
 
-// InboxWaiting is a product's inbox opened on the rulings waiting for a second
-// person.
-func InboxWaiting(product string) string {
+// VulnerabilityReportsWaiting is a product's vulnerability reports opened on
+// the rulings waiting for a second person.
+func VulnerabilityReportsWaiting(product string) string {
 	if climbs(product) {
 		return Home()
 	}
-	return "/products/" + url.PathEscape(product) + "/inbox?waiting=1"
+	return "/products/" + url.PathEscape(product) + "/vulnerability-reports?waiting=1"
 }
 
-// InboxReport is one report in a product's inbox.
-func InboxReport(product, reference string) string {
+// VulnerabilityReport is one of a product's vulnerability reports.
+func VulnerabilityReport(product, reference string) string {
 	if climbs(product, reference) {
 		return Home()
 	}
-	return "/products/" + url.PathEscape(product) + "/inbox/" + url.PathEscape(reference)
+	return "/products/" + url.PathEscape(product) + "/vulnerability-reports/" + url.PathEscape(reference)
 }
 
 // Finding is one finding: an issue at one component of one build. A version,
 // where one is given, picks the component among several of that name in the
 // build; empty, the address carries none.
-func Finding(product, stream, variant, vulnerability, component, version string) string {
-	if climbs(product, stream, variant, vulnerability, component) {
+func Finding(product, branchOrTag, variant, vulnerability, component, version string) string {
+	if climbs(product, branchOrTag, variant, vulnerability, component) {
 		return Home()
 	}
-	address := build(product, stream, variant) +
+	address := build(product, branchOrTag, variant) +
 		"/findings/" + url.PathEscape(vulnerability) +
 		"/components/" + url.PathEscape(component)
 	if version != "" {
@@ -124,64 +125,64 @@ func Finding(product, stream, variant, vulnerability, component, version string)
 	return address
 }
 
-// Lead is one static analysis lead's evidence on one build.
-func Lead(product, stream, variant, occurrence string) string {
-	if climbs(product, stream, variant, occurrence) {
+// CodeFinding is one static analysis code finding's evidence on one build.
+func CodeFinding(product, branchOrTag, variant, occurrence string) string {
+	if climbs(product, branchOrTag, variant, occurrence) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/leads/" + url.PathEscape(occurrence)
+	return build(product, branchOrTag, variant) + "/code-findings/" + url.PathEscape(occurrence)
 }
 
-// Leads is a product's leads in one state on one build, and of one series
+// CodeFindings is a product's code findings in one state on one build, and of one series
 // where one is named.
-func Leads(product, stream, variant, state, series string) string {
+func CodeFindings(product, branchOrTag, variant, state, series string) string {
 	if climbs(product) {
 		return Home()
 	}
-	query := url.Values{"state": {state}, "stream": {stream}, "variant": {variant}}
+	query := url.Values{"state": {state}, "branch_or_tag": {branchOrTag}, "variant": {variant}}
 	if series != "" {
 		query.Set("series", series)
 	}
-	return "/products/" + url.PathEscape(product) + "/leads?" + query.Encode()
+	return "/products/" + url.PathEscape(product) + "/code-findings?" + query.Encode()
 }
 
-// LeadRules is a product's standing rules on leads.
-func LeadRules(product string) string {
+// SuppressionRules is a product's suppression rules.
+func SuppressionRules(product string) string {
 	if climbs(product) {
 		return Home()
 	}
-	return "/products/" + url.PathEscape(product) + "/lead-rules"
+	return "/products/" + url.PathEscape(product) + "/suppression-rules"
 }
 
 // Uploads is the list of what one build was sent.
-func Uploads(product, stream, variant string) string {
-	if climbs(product, stream, variant) {
+func Uploads(product, branchOrTag, variant string) string {
+	if climbs(product, branchOrTag, variant) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/uploads"
+	return build(product, branchOrTag, variant) + "/uploads"
 }
 
 // InventoryChanges is what one upload moved in a build's inventory.
-func InventoryChanges(product, stream, variant string, scan int64) string {
-	if climbs(product, stream, variant) {
+func InventoryChanges(product, branchOrTag, variant string, scan int64) string {
+	if climbs(product, branchOrTag, variant) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/uploads/" + strconv.FormatInt(scan, 10) + "/changes"
+	return build(product, branchOrTag, variant) + "/uploads/" + strconv.FormatInt(scan, 10) + "/changes"
 }
 
-// Report is one report sheet, opened on a window of days.
-func Report(slug, days string) string {
+// AnalyticsReport is one report under Analytics, opened on a window of days.
+func AnalyticsReport(slug, days string) string {
 	if climbs(slug) {
 		return Home()
 	}
-	return "/reports/" + url.PathEscape(slug) + "?days=" + url.QueryEscape(days)
+	return "/analytics/" + url.PathEscape(slug) + "?days=" + url.QueryEscape(days)
 }
 
 // build is the prefix every address under one build shares. It is not an
 // address by itself: the web application answers only the screens below it.
-func build(product, stream, variant string) string {
+func build(product, branchOrTag, variant string) string {
 	return "/products/" + url.PathEscape(product) +
-		"/streams/" + url.PathEscape(stream) +
+		"/branches-and-tags/" + url.PathEscape(branchOrTag) +
 		"/variants/" + url.PathEscape(variant)
 }
 

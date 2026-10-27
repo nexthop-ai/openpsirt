@@ -24,11 +24,11 @@ var errNoProduct = errors.New("no product in scope")
 // before it asks its question: the subject, the builds that means, the line
 // the product triages at, the filter, and the store to ask.
 type Listing struct {
-	Subject access.Subject
-	Scope   finding.Scope
-	Floor   finding.Floor
-	Filter  finding.Filter
-	Store   *finding.Store
+	Subject         access.Subject
+	Scope           finding.Scope
+	MinimumSeverity finding.MinimumSeverity
+	Filter          finding.Filter
+	Store           *finding.Store
 }
 
 // ListNarrowed does the eight steps every such handler does, in the order they
@@ -48,17 +48,17 @@ type Listing struct {
 // declared and never scanned — comes back empty from the store rather than as
 // a refusal: nothing is open because nothing has run.
 //
-// `whyFloor` is the sentence a failure reading the line answers with, because
+// `whyMinimumSeverity` is the sentence a failure reading the line answers with, because
 // two of these answer a list and three answer a file and the wording differs.
 func ListNarrowed(ctx context.Context, in Deps, q ScopeQuery,
-	at AtOneBuild, by Narrowing, whyFloor string) (Listing, error) {
+	at AtOneBuild, by Narrowing, whyMinimumSeverity string) (Listing, error) {
 
 	var out Listing
-	subject, scope, floor, err := ScopedFloor(ctx, in, q, whyFloor)
+	subject, scope, floor, err := ScopedMinimumSeverity(ctx, in, q, whyMinimumSeverity)
 	if err != nil {
 		return out, err
 	}
-	out.Subject, out.Scope, out.Floor = subject, scope, floor
+	out.Subject, out.Scope, out.MinimumSeverity = subject, scope, floor
 
 	// The list's own mapping, not a second one written beside it.
 	filter, err := by.Filter(floor)
@@ -84,34 +84,34 @@ func ListNarrowed(ctx context.Context, in Deps, q ScopeQuery,
 	return out, nil
 }
 
-// ScopedFloor is the first half of that, for a handler that builds its own
+// ScopedMinimumSeverity is the first half of that, for a handler that builds its own
 // filter out of parameters of its own rather than taking the list's.
 //
 // The subject, the builds that means, and the line the product triages at, in
 // the order they have to happen in: the scope is what says the product
 // exists and may be reached, and the line is read against the product the
 // scope resolved to.
-func ScopedFloor(ctx context.Context, in Deps, q ScopeQuery,
-	whyFloor string) (access.Subject, finding.Scope, finding.Floor, error) {
+func ScopedMinimumSeverity(ctx context.Context, in Deps, q ScopeQuery,
+	whyMinimumSeverity string) (access.Subject, finding.Scope, finding.MinimumSeverity, error) {
 
 	var none finding.Scope
 	subject, err := Reading(ctx)
 	if err != nil {
-		return access.Subject{}, none, finding.Floor{}, err
+		return access.Subject{}, none, finding.MinimumSeverity{}, err
 	}
 	scope, err := Scoped(ctx, in, subject, q)
 	if err != nil {
-		return subject, none, finding.Floor{}, err
+		return subject, none, finding.MinimumSeverity{}, err
 	}
 	// One dereference rather than one per site. Every caller reaches this
 	// with a product named in the path, which is what makes the pointer safe
 	// — and naming that once is better than assuming it at each.
 	if scope.ProductID == nil {
-		return subject, scope, finding.Floor{}, WentWrong(in.Logger, whyFloor, errNoProduct)
+		return subject, scope, finding.MinimumSeverity{}, WentWrong(in.Logger, whyMinimumSeverity, errNoProduct)
 	}
-	floor, err := finding.FloorFor(ctx, in.DB.DB, *scope.ProductID)
+	floor, err := finding.MinimumSeverityFor(ctx, in.DB.DB, *scope.ProductID)
 	if err != nil {
-		return subject, scope, finding.Floor{}, WentWrong(in.Logger, whyFloor, err)
+		return subject, scope, finding.MinimumSeverity{}, WentWrong(in.Logger, whyMinimumSeverity, err)
 	}
 	return subject, scope, floor, nil
 }

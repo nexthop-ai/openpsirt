@@ -95,14 +95,14 @@ type Keyed struct {
 	Chain  string
 	Key    string
 	// UnprintedKey is the whole key without the fingerprint or the line,
-	// which a fingerprint change compares where one result and one lead hold it.
+	// which a fingerprint change compares where one result and one code finding hold it.
 	UnprintedKey string
 	// FunctionKey and LineKey are the probable keys: the rule, the path and
 	// the message without its digits, with the function, and with neither.
 	// FunctionKey is empty where the output names no function.
 	FunctionKey string
 	LineKey     string
-	// On is how the result was paired with the lead it is recorded on, and
+	// On is how the result was paired with the code finding it is recorded on, and
 	// empty where it opened one nothing else matched.
 	On string
 	// Remote is the repository the result's file is in, normalized; empty
@@ -145,7 +145,7 @@ func digest(parts ...string) string {
 // carries it to every later sighting, so a decision keyed on it reaches each
 // build the result is seen in.
 func identity(seriesID int64, k string) string {
-	sum := sha256.Sum256([]byte("lead\x00" + strconv.FormatInt(seriesID, 10) + "\x00" + k))
+	sum := sha256.Sum256([]byte("code finding\x00" + strconv.FormatInt(seriesID, 10) + "\x00" + k))
 	return hex.EncodeToString(sum[:])
 }
 

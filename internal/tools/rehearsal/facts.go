@@ -64,6 +64,28 @@ func Moved(fromLast int64, images Images) map[string]Movement {
 	return moved
 }
 
+// renamesV0110 is the migration that gives tables the names the interface
+// uses.
+const renamesV0110 = 45
+
+// AsRenamed is the counts a release held, each under the name the upgrade
+// from a release whose last migration is given leaves its table with. renamed
+// maps a table's name before the upgrade to its name after; a table it does
+// not name keeps its name, and no name is renamed twice.
+func AsRenamed(fromLast int64, held Counts, renamed map[string]string) Counts {
+	if fromLast >= renamesV0110 {
+		return held
+	}
+	out := make(Counts, len(held))
+	for name, n := range held {
+		if to, ok := renamed[name]; ok {
+			name = to
+		}
+		out[name] = n
+	}
+	return out
+}
+
 // Compare reports every table whose count moved across an upgrade. before is
 // what the release held, after is what the upgrade left. A table both sides
 // hold keeps its count, and a table only the upgrade holds starts empty,

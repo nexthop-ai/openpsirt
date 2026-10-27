@@ -127,9 +127,9 @@ func TestAnAttachmentToAReportNobodyMayWorkIsRefusedUnread(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
-			`{"summary":"They say the management socket lets anybody in."}`)
+			`{"reported_problem":"They say the management socket lets anybody in."}`)
 		if got.Code != http.StatusCreated {
-			t.Fatalf("recording a claim answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("recording a report answered %d: %s", got.Code, got.Body.String())
 		}
 		var recorded httpapitest.ReportRead
 		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {

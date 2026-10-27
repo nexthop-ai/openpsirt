@@ -22,17 +22,17 @@ import (
 // counting rows would make a build look twenty times worse than the list
 // somebody opens next.
 type Standing struct {
-	// TargetID is the build these are about.
-	TargetID int64 `bun:"target_id"`
-	// Stream and Variant name it, and Kind says whether the release is a
+	// BuildID is the build these are about.
+	BuildID int64 `bun:"build_id"`
+	// Branch or tag and Variant name it, and Kind says whether the release is a
 	// branch or a tag. A screen asks because the comparison only means
 	// something for a branch: a tag is one frozen point and was not cut into
 	// anything.
-	Stream      string `bun:"stream"`
-	StreamName  string `bun:"stream_name"`
-	Variant     string `bun:"variant"`
-	VariantName string `bun:"variant_name"`
-	Kind        string `bun:"kind"`
+	BranchOrTag     string `bun:"branch_or_tag"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	Variant         string `bun:"variant"`
+	VariantName     string `bun:"variant_name"`
+	Kind            string `bun:"kind"`
 	// ByBand is critical, high, medium and low, folded the way the line folds
 	// them, with nothing for a band holding nothing.
 	ByBand map[string]int `bun:"-"`
@@ -61,9 +61,9 @@ type Readiness struct {
 	// Why is the missing part where Shipped is nil, in words a
 	// screen can print. Empty where there is something to compare against.
 	Why string
-	// Floor is the line these counts are at or above, so a screen can say
+	// MinimumSeverity is the line these counts are at or above, so a screen can say
 	// whose number it is showing.
-	Floor Floor
+	MinimumSeverity MinimumSeverity
 }
 
 // NothingScannedYet is what readiness says of a build declared and never
@@ -81,22 +81,22 @@ const NothingScannedYet = "nothing has been scanned here yet"
 // A build nothing has scanned has no counts, and answering with zeroes would
 // report a clean release that does not exist.
 func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
-	productID, streamID, variantID int64) (*Readiness, error) {
+	productID, branchOrTagID, variantID int64) (*Readiness, error) {
 
 	if _, err := access.Readable(subject, productID); err != nil {
 		return nil, err
 	}
-	floor, err := FloorFor(ctx, s.db, productID)
+	floor, err := MinimumSeverityFor(ctx, s.db, productID)
 	if err != nil {
 		return nil, err
 	}
 
-	here, err := s.standing(ctx, subject, productID, streamID, variantID, floor)
+	here, err := s.standing(ctx, subject, productID, branchOrTagID, variantID, floor)
 	if err != nil {
 		return nil, err
 	}
-	out := &Readiness{Now: *here, Floor: floor}
-	if here.TargetID == 0 || here.LastScanned == nil {
+	out := &Readiness{Now: *here, MinimumSeverity: floor}
+	if here.BuildID == 0 || here.LastScanned == nil {
 		// Declared and not scanned: never built, or built and every upload
 		// refused. An answer rather than a refusal, and not zeroes alone,
 		// which read as a build that was scanned and is clean.
@@ -116,28 +116,28 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	// cut at a moment and never moves again, so the newest declaration is the
 	// last thing shipped.
 	var release struct {
-		StreamID int64 `bun:"stream_id"`
+		BranchOrTagID int64 `bun:"branch_or_tag_id"`
 	}
 	err = s.db.NewSelect().
-		TableExpr(`"stream" AS "st"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."stream_id" = "st"."id"`).
-		ColumnExpr(`"st"."id" AS "stream_id"`).
-		Where(`"st"."parent_id" = ?`, streamID).
+		TableExpr(`"branch_or_tag" AS "st"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."branch_or_tag_id" = "st"."id"`).
+		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
+		Where(`"st"."parent_id" = ?`, branchOrTagID).
 		Where(`"tg"."variant_id" = ?`, variantID).
 		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
-			WHERE "sr"."target_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
+			WHERE "sr"."build_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
 		OrderExpr(`"st"."created_at" DESC, "st"."id" DESC`).
 		Limit(1).
 		Scan(ctx, &release)
 	if err != nil && !database.IsNoRows(err) {
 		return nil, fmt.Errorf("read the last release cut from this branch: %w", err)
 	}
-	if release.StreamID == 0 {
+	if release.BranchOrTagID == 0 {
 		out.Why = "no scanned release from this branch"
 		return out, nil
 	}
 
-	shipped, err := s.standing(ctx, subject, productID, release.StreamID, variantID, floor)
+	shipped, err := s.standing(ctx, subject, productID, release.BranchOrTagID, variantID, floor)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 
 // standing counts what one build holds now, by band.
 func (s *Store) standing(ctx context.Context, subject access.Subject,
-	productID, streamID, variantID int64, floor Floor) (*Standing, error) {
+	productID, branchOrTagID, variantID int64, floor MinimumSeverity) (*Standing, error) {
 
 	_, all := subject.Products()
 
@@ -163,13 +163,13 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	kinds, args := kind.Statistics.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(`"tg"."stream_id" = ?`, streamID).
+		Where(`"tg"."branch_or_tag_id" = ?`, branchOrTagID).
 		Where(`"tg"."variant_id" = ?`, variantID).
 		Where(kinds, args...).
 		GroupExpr(`"f"."vulnerability_id", "f"."component_id"`)
@@ -204,21 +204,21 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	// no build, which is the ordinary state of a tag between being cut and its
 	// pipeline running.
 	if err := s.db.NewSelect().
-		TableExpr(`"stream" AS "st"`).
+		TableExpr(`"branch_or_tag" AS "st"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = ?`, variantID).
-		Join(`LEFT JOIN "target" AS "tg" ON "tg"."stream_id" = "st"."id" AND "tg"."variant_id" = "va"."id"`).
-		ColumnExpr(`COALESCE("tg"."id", 0) AS "target_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
-		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
+		Join(`LEFT JOIN "build" AS "tg" ON "tg"."branch_or_tag_id" = "st"."id" AND "tg"."variant_id" = "va"."id"`).
+		ColumnExpr(`COALESCE("tg"."id", 0) AS "build_id"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"st"."kind" AS "kind"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
-		Where(`"st"."id" = ?`, streamID).
+		Where(`"st"."id" = ?`, branchOrTagID).
 		Limit(1).
 		Scan(ctx, standing); err != nil {
 		return nil, database.FromRead(err, catalog.ErrNotFound, "read what this build is called")
 	}
-	if standing.TargetID == 0 {
+	if standing.BuildID == 0 {
 		return standing, nil
 	}
 
@@ -229,7 +229,7 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	if err := s.db.NewSelect().
 		TableExpr(`"scan_run" AS "sr"`).
 		ColumnExpr(`"sr"."finished_at"`).
-		Where(`"sr"."target_id" = ?`, standing.TargetID).
+		Where(`"sr"."build_id" = ?`, standing.BuildID).
 		Where(`"sr"."finished_at" IS NOT NULL`).
 		OrderExpr(`"sr"."finished_at" DESC`).
 		Limit(1).

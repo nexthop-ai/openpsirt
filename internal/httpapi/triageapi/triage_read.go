@@ -38,7 +38,7 @@ type DecisionDetail struct {
 	When         string        `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
 	By           string        `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
 	ByName       string        `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and an occurrence of it is not a lead past its end of life"`
+	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and an occurrence of it is not a code finding past its end of life"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
@@ -53,7 +53,7 @@ type DecisionDetail struct {
 	Packages  int      `json:"packages" doc:"The number of binaries those fold together"`
 	Consumers int      `json:"consumers" doc:"The number of things pulling them in"`
 	Findings  int      `json:"findings" doc:"The number of findings underneath, which is what the disposition register expands to"`
-	Builds    []string `json:"builds" doc:"Every build the decision currently covers, as stream and variant"`
+	Builds    []string `json:"builds" doc:"Every build the decision currently covers, as branch or tag and variant"`
 	// Ended is what the rows that stopped applying reached when they stopped,
 	// apart from the present reach above, which counts live rows alone.
 	Ended []EndedReachBody `json:"ended" doc:"The occurrences of the decision that were withdrawn or lapsed, each with what they reached when they stopped. Empty while it is live at every occurrence"`
@@ -66,7 +66,7 @@ type DecisionDetail struct {
 	Undisclosed bool `json:"undisclosed,omitempty" doc:"At least one occurrence it covers is about a finding nobody has announced"`
 	// Internal says at least one row is about internal material, which
 	// decides who may agree to it.
-	Internal bool `json:"internal,omitempty" doc:"At least one occurrence it covers is about internal material, a static analysis lead. Agreeing to it takes the approver capability"`
+	Internal bool `json:"internal,omitempty" doc:"At least one occurrence it covers is about internal material, a static analysis code finding. Agreeing to it takes the approver capability"`
 }
 
 // EndedReachBody is the rows of a decision that stopped applying one way, and
@@ -76,7 +76,7 @@ type EndedReachBody struct {
 	At          string                  `json:"at,omitempty" doc:"The latest moment one of them stopped. Absent where none of them says when"`
 	Rows        int                     `json:"rows" doc:"The number of occurrences that stopped this way, counted once for each issue"`
 	Occurrences int                     `json:"occurrences" doc:"The number of distinct occurrences they sat at. The findings list takes decision and decision_state to list what sits there now"`
-	Builds      []string                `json:"builds" doc:"Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as stream and variant"`
+	Builds      []string                `json:"builds" doc:"Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as branch or tag and variant"`
 }
 
 // endedReach renders the parts of a decision that stopped applying.
@@ -434,7 +434,7 @@ func registerOccurrenceDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant,
 			input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err
@@ -511,7 +511,7 @@ func registerOccurrenceDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant,
 			input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err

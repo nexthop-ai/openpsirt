@@ -23,7 +23,7 @@ func Register(api huma.API, in core.Deps) {
 	registerDocuments(api, in)
 	// The suppliers whose published advisories are read on a schedule, which
 	// is the same evidence arriving without anybody choosing each document.
-	registerAdvisorySources(api, in)
+	registerSupplierAdvisoryFeeds(api, in)
 	// The upstream a product trusts, and what it offers for review.
 	registerUpstream(api, in)
 	// Standing decisions about the third-party components a build ships.

@@ -22,7 +22,7 @@ func TestATypedComponentNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 		ctx := t.Context()
 		shouted := graph.Described{Purl: "pkg:generic/OpenSSL@3.0", Name: "OpenSSL", Version: "3.0"}
 		quiet := graph.Described{Purl: "pkg:generic/openssl@1.1", Name: "openssl", Version: "1.1"}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{zlib, shouted, quiet},
 			Dependencies: []graph.Dependency{
@@ -34,34 +34,34 @@ func TestATypedComponentNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 		}
 
 		// One component, typed with other capitals.
-		want, err := f.store.ComponentAs(ctx, f.targetID, zlib.Name, graph.Choice{})
+		want, err := f.store.ComponentAs(ctx, f.buildID, zlib.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got, err := f.store.ComponentAs(ctx, f.targetID, "ZLib", graph.Choice{}); err != nil || got != want {
+		if got, err := f.store.ComponentAs(ctx, f.buildID, "ZLib", graph.Choice{}); err != nil || got != want {
 			t.Errorf("zlib typed as ZLib resolved %d (%v), want %d", got, err, want)
 		}
 
 		// Two that differ only in capitals, typed in neither spelling.
-		_, err = f.store.ComponentAs(ctx, f.targetID, "OPENSSL", graph.Choice{})
+		_, err = f.store.ComponentAs(ctx, f.buildID, "OPENSSL", graph.Choice{})
 		var several *graph.Ambiguous
 		if !errors.As(err, &several) || len(several.Choices) != 2 {
 			t.Fatalf("a name two components answer to answered %v, want the two choices", err)
 		}
 		for _, choice := range several.Choices {
-			if _, err := f.store.ComponentAs(ctx, f.targetID, "OPENSSL", choice); err != nil {
+			if _, err := f.store.ComponentAs(ctx, f.buildID, "OPENSSL", choice); err != nil {
 				t.Errorf("the choice %+v did not resolve: %v", choice, err)
 			}
 		}
 
 		// The producer's own spelling reaches the one spelled that way.
 		for _, each := range []graph.Described{shouted, quiet} {
-			id, err := f.store.ComponentAs(ctx, f.targetID, each.Name, graph.Choice{})
+			id, err := f.store.ComponentAs(ctx, f.buildID, each.Name, graph.Choice{})
 			if err != nil {
 				t.Errorf("%s in its own spelling answered %v", each.Name, err)
 				continue
 			}
-			version, err := f.store.ComponentAs(ctx, f.targetID, "OPENSSL",
+			version, err := f.store.ComponentAs(ctx, f.buildID, "OPENSSL",
 				graph.Choice{Version: each.Version})
 			if err != nil || version != id {
 				t.Errorf("%s resolved %d, and its version resolves %d (%v)", each.Name, id, version, err)
@@ -77,14 +77,14 @@ func TestAComponentIsReachedByItsEcosystemWhateverCapitalsItsSchemeHas(t *testin
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		shouted := graph.Described{Purl: "PKG:deb/debian/foo@1.0", Name: "foo", Version: "1.0"}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:         root,
 			Components:   []graph.Described{shouted},
 			Dependencies: []graph.Dependency{{Parent: root, Child: shouted}},
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.ComponentAs(ctx, f.targetID, "foo",
+		if _, err := f.store.ComponentAs(ctx, f.buildID, "foo",
 			graph.Choice{Ecosystem: "deb"}); err != nil {
 			t.Errorf("foo in the deb ecosystem answered %v", err)
 		}
@@ -97,7 +97,7 @@ func TestAComponentIsReachedByItsEcosystemWhateverCapitalsItsSchemeHas(t *testin
 func TestAPairDeclaredUnderTwoScopesShowsTheSameWordEveryRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{zlib},
 			Dependencies: []graph.Dependency{
@@ -108,12 +108,12 @@ func TestAPairDeclaredUnderTwoScopesShowsTheSameWordEveryRead(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		id, err := f.store.ComponentAs(ctx, f.targetID, zlib.Name, graph.Choice{})
+		id, err := f.store.ComponentAs(ctx, f.buildID, zlib.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		for range 5 {
-			scopes, err := f.store.DeclaredScopes(ctx, f.targetID, []int64{id})
+			scopes, err := f.store.DeclaredScopes(ctx, f.buildID, []int64{id})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -35,10 +35,10 @@ func ReadsReceipts(subject access.Subject, productID int64, opensAt access.Visib
 // A key reads them for a build it may send to. A person reads them where they
 // read the kind's findings at the visibility it opens at, because a receipt
 // counts them.
-func (s *Store) Receipts(ctx context.Context, subject access.Subject, productID, targetID int64,
+func (s *Store) Receipts(ctx context.Context, subject access.Subject, productID, buildID int64,
 	k kind.Kind, opensAt access.Visibility, limit, offset int) ([]Sent, int, error) {
 
-	if err := catalog.ReadsBuild(ctx, s.db, subject, targetID); err != nil {
+	if err := catalog.ReadsBuild(ctx, s.db, subject, buildID); err != nil {
 		return nil, 0, err
 	}
 	if !ReadsReceipts(subject, productID, opensAt) {
@@ -47,7 +47,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, productID,
 	limit = database.AList.Of(limit)
 	total, err := s.db.NewSelect().Model((*Run)(nil)).
 		Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
-		Where(`"sr"."target_id" = ?`, targetID).
+		Where(`"sr"."build_id" = ?`, buildID).
 		Where(`"se"."kind" = ?`, k).Count(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count the runs sent: %w", err)
@@ -55,7 +55,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, productID,
 	var runs []Run
 	if err := s.db.NewSelect().Model(&runs).
 		Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
-		Where(`"sr"."target_id" = ?`, targetID).
+		Where(`"sr"."build_id" = ?`, buildID).
 		Where(`"se"."kind" = ?`, k).
 		OrderExpr(`"sr"."received_at" DESC, "sr"."id" DESC`).
 		Limit(int64(limit)).Offset(int64(offset)).

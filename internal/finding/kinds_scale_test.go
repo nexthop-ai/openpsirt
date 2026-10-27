@@ -79,14 +79,14 @@ func TestMeasurePackageKindsOnARealImage(t *testing.T) {
 		ctx := t.Context()
 		w := world.New(t, db)
 		scan, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-			TargetID: w.Target.ID, ContentHash: "full-size", BuiltAt: time.Now().UTC(),
+			BuildID: w.Build.ID, ContentHash: "full-size", BuiltAt: time.Now().UTC(),
 			ParserVersion: "measure",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		snap := doc.Snapshot(graph.Described{Name: "sonic", Version: "1.0"})
-		if _, err := world.ApplyGraph(ctx, db.DB, w.Target.ID, scan.ID, snap); err != nil {
+		if _, err := world.ApplyGraph(ctx, db.DB, w.Build.ID, scan.ID, snap); err != nil {
 			t.Fatal(err)
 		}
 
@@ -117,14 +117,14 @@ func TestMeasurePackageKindsOnARealImage(t *testing.T) {
 		}
 		store := finding.NewStore(db.DB)
 		run, err := store.Begin(ctx, finding.Run{
-			TargetID: w.Target.ID, Scanner: "measure", ScannerVersion: "0",
+			BuildID: w.Build.ID, Scanner: "measure", ScannerVersion: "0",
 			DatabaseVersion: "0", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		start := time.Now()
-		applied, err := store.Apply(ctx, w.Target.ID, run.ID, reported)
+		applied, err := store.Apply(ctx, w.Build.ID, run.ID, reported)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -204,7 +204,7 @@ func TestAssigningByFilterAnswersNothingAboutAProductNobodyShowedYou(t *testing.
 }
 
 func TestAssigningByFilterToATeamNobodyOnWhichMayReadItIsRefused(t *testing.T) {
-	// Routing to a team asks that one member may read the strictest row.
+	// Assigning to a team asks that one member may read the strictest row.
 	// A team of public readers is handed disclosed work and refused
 	// undisclosed work, whole.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -228,7 +228,7 @@ func TestAssigningByFilterToATeamNobodyOnWhichMayReadItIsRefused(t *testing.T) {
 		refused := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
 			matchingAt+"?planned=either", `{"team":"readers"}`)
 		if refused.Code != http.StatusUnprocessableEntity {
-			t.Errorf("routing undisclosed work to a team nobody on which may read it "+
+			t.Errorf("assigning undisclosed work to a team nobody on which may read it "+
 				"answered %d: %s", refused.Code, refused.Body.String())
 		}
 	})

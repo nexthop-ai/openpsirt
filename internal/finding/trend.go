@@ -128,8 +128,8 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	moments := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		// The product, because the rating is this product's where it has
 		// stated one, and one issue in two products can be rated twice.
@@ -174,18 +174,18 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 			componentsWhere(moments, `"c"."name_folded" = ?`, graph.Folded(name)))
 	}
 	if within.Beneath != nil {
-		targets, err := s.Builds(ctx, scope)
+		buildIDs, err := s.Builds(ctx, scope)
 		if err != nil {
 			return nil, err
 		}
 		// Refused rather than answered from whichever build sorted first,
 		// which is a chart of somewhere else and silent about it.
-		if len(targets) != 1 {
+		if len(buildIDs) != 1 {
 			return nil, refusal.Errorf("trend beneath a component: a subtree is a walk over one"+
-				" build's edges, and %d builds are in scope", len(targets))
+				" build's edges, and %d builds are in scope", len(buildIDs))
 		}
 		moments = moments.Where(`"f"."component_id" IN (?)`,
-			graph.Within(moments.DB(), targets[0], *within.Beneath))
+			graph.Within(moments.DB(), buildIDs[0], *within.Beneath))
 	}
 
 	query := s.db.NewSelect().

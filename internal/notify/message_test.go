@@ -25,7 +25,7 @@ func TestAMessageAboutSomethingUndisclosedSaysOnlyThatThereIsSomething(t *testin
 		Private: true,
 		Body: "SONIC-2026-0001 in sonic reached its disclosure date on 2026-09-04 " +
 			"and nothing has been decided.",
-		Link: "/products/sonic/streams/master/variants/broadcom/findings/SONIC-2026-0001/components/swss",
+		Link: "/products/sonic/branches-and-tags/master/variants/broadcom/findings/SONIC-2026-0001/components/swss",
 	}
 	got := Compose(n, "https://psirt.example")
 
@@ -66,7 +66,7 @@ func TestAMessageAboutSomethingPublicCarriesWhatItIsAbout(t *testing.T) {
 	n := Notification{
 		Kind: Assigned,
 		Body: "CVE-2025-60876 in busybox-binsh, in openpsirt main container",
-		Link: "/products/openpsirt/streams/main/variants/container/findings/CVE-2025-60876",
+		Link: "/products/openpsirt/branches-and-tags/main/variants/container/findings/CVE-2025-60876",
 	}
 	got := Compose(n, "https://psirt.example")
 

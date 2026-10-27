@@ -79,12 +79,12 @@ type Evidence struct {
 	// from the thousands that can wait.
 	Exploited     bool
 	LikelihoodPPM int
-	// ExploitedHere says somebody recorded this product being attacked through
+	// Incident says somebody recorded this product being attacked through
 	// the issue. A different fact from the one above: that is a feed's word
 	// about the world, and this is an incident here. It admits the finding to
 	// the line whatever the rating says, which is why it is read beside the
 	// occurrences rather than left to the screen.
-	ExploitedHere bool
+	Incident bool
 	// LikelihoodPercentilePPM is where that estimate stands among all of
 	// them, and the day it is about. The number alone is unreadable —
 	// 0.00042 is not something anybody acts on — and the day is what says
@@ -138,12 +138,12 @@ type Evidence struct {
 	// has to be unable to miss before saying anything about it.
 	Undisclosed bool
 	DiscloseAt  *time.Time
-	// RoutedBy names the standing rule that placed this, where a rule did
+	// AssignedByRule names the assignment rule that placed this, where a rule did
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
-	RoutedBy string
-	// Tags are the words somebody put on this, as they were typed.
-	Tags []string
+	AssignedByRule string
+	// Labels are the words somebody put on this, as they were typed.
+	Labels []string
 	// DueAt is the earliest deadline among these occurrences, which is the one
 	// that makes the whole finding late — and NoDeadline says why there is
 	// none where there is none. Blank, the screen would read as missing
@@ -306,8 +306,8 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		Vector:   issue.Vector, Exploited: issue.Exploited,
 		// Off the occurrences rather than off the issue: the record belongs to
 		// one product, and the issue is shared by every product that holds it.
-		ExploitedHere: rows[0].ExploitedHere,
-		Description:   issue.Description, Advisory: issue.Advisory,
+		Incident:    rows[0].Incident,
+		Description: issue.Description, Advisory: issue.Advisory,
 		References: references,
 		Component:  component.Name, Version: component.Version,
 		FixedAt:     rows[0].FixedAt,
@@ -334,7 +334,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	// wherever the occurrences disagree — which is not a state upstream is ever
 	// in, and reading it as one says a supported release is past its end of
 	// life.
-	exploited := evidence.Exploited || evidence.ExploitedHere
+	exploited := evidence.Exploited || evidence.Incident
 	evidence.nothingToTake = !Clocked(FixState(least), exploited) &&
 		!Clocked(FixState(most), exploited)
 	evidence.unrated = Kind(rows[0].Kind) == Entered && issue.InForce() == ""
@@ -506,7 +506,7 @@ type evidenceRow struct {
 	AnsweredBy         string     `bun:"answered_by"`
 	AnsweredIn         string     `bun:"answered_in"`
 	Urgency            int64      `bun:"urgency"`
-	ExploitedHere      bool       `bun:"exploited_here"`
+	Incident           bool       `bun:"incident"`
 	FixState           string     `bun:"fix_state"`
 	FixedIn            string     `bun:"fixed_in"`
 	FixedAt            *time.Time `bun:"fixed_at"`
@@ -549,10 +549,10 @@ var standingHere = `FROM ` + DecisionOccurrences + `
 	LIMIT 1`
 
 // Detail reads everything held about one issue in one component of a build.
-func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
+func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vulnerabilityID,
 	componentID int64) (*Evidence, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +572,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// The supplier's statement answering this occurrence on some routes, and
 		// the product it answers through.
-		Join(`LEFT JOIN "vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
+		Join(`LEFT JOIN "received_vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
@@ -615,7 +615,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`COALESCE("sb"."publisher", '') AS "answered_by"`).
 		ColumnExpr(`COALESCE("sb"."within", "sb"."component", '') AS "answered_in"`).
 		ColumnExpr(`"f"."urgency" AS "urgency"`).
-		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."urgency_incident" AS "incident"`).
 		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
 		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).
@@ -634,7 +634,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// The occurrences one decision covers, so the screen a decision is made
 		// from shows the whole of what it would answer: a form that recorded
 		// twelve occurrences having shown six is a form nobody can trust.
-		Apply(inFoldOf(targetID, vulnerabilityID, componentID, visible)).
+		Apply(inFoldOf(buildID, vulnerabilityID, componentID, visible)).
 		OrderExpr(`"f"."urgency" DESC, "component", consumer`).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -751,15 +751,15 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	// narrower, because a reader told the release is retired learns nothing
 	// they could act on if the rating is what actually put it off the clock.
 	if evidence.DueAt == nil {
-		line, err := FloorFor(ctx, s.db, productID)
+		line, err := MinimumSeverityFor(ctx, s.db, productID)
 		if err != nil {
 			return nil, err
 		}
 		switch {
 		case evidence.unrated:
 			evidence.NoDeadline = NotRated
-		case !line.Admits(evidence.Exploited || evidence.ExploitedHere, issue.InForce()):
-			evidence.NoDeadline = BelowTheLine
+		case !line.Admits(evidence.Exploited || evidence.Incident, issue.InForce()):
+			evidence.NoDeadline = BelowMinimumSeverity
 		case evidence.nothingToTake:
 			evidence.NoDeadline = NothingToTake
 		default:
@@ -781,7 +781,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 			wanted = append(wanted, *row.ConsumerID)
 		}
 	}
-	chains, err := graph.NewStore(s.db).Chains(ctx, subject, targetID, wanted)
+	chains, err := graph.NewStore(s.db).Chains(ctx, subject, buildID, wanted)
 	if err != nil {
 		return nil, err
 	}
@@ -801,7 +801,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	for _, row := range rows {
 		components = append(components, row.ComponentID)
 	}
-	scopes, err := graph.NewStore(s.db).DeclaredScopes(ctx, targetID, components)
+	scopes, err := graph.NewStore(s.db).DeclaredScopes(ctx, buildID, components)
 	if err != nil {
 		return nil, err
 	}
@@ -816,25 +816,25 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	// One name for the whole finding, and empty where the occurrences disagree:
 	// the assignment is set for a group at once, so a disagreement is a state
 	// nobody chose and naming one of them would hide it.
-	held, err := s.heldBy(ctx, targetID, vulnerabilityID, componentID, visible)
+	held, err := s.heldBy(ctx, buildID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}
 	evidence.AssignedTo = held
-	// And which standing rule put it there, where one did. Read here rather
+	// And which assignment rule put it there, where one did. Read here rather
 	// than left to a caller for the same reason the holder is: the screen
 	// somebody reads a finding on is where "why is this mine" gets asked.
-	placed, err := s.routedBy(ctx, targetID, vulnerabilityID, componentID, visible)
+	placed, err := s.assignedByRule(ctx, buildID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}
-	evidence.RoutedBy = placed
+	evidence.AssignedByRule = placed
 	// The words somebody put on it.
-	marks, err := s.TagsOn(ctx, productID, vulnerabilityID, componentID, visible)
+	marks, err := s.LabelsOn(ctx, productID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}
-	evidence.Tags = marks
+	evidence.Labels = marks
 	return evidence, nil
 }
 
@@ -848,7 +848,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 // Over the occurrences the reader may read, which are the rows beside it: a
 // holder read off an occurrence they may not read names who is working
 // undisclosed work.
-func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, componentID int64,
+func (s *Store) heldBy(ctx context.Context, buildID, vulnerabilityID, componentID int64,
 	visible []access.Visibility) (string, error) {
 	var holders []struct {
 		Identity *string `bun:"identity"`
@@ -862,7 +862,7 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 		// and answers empty here, which is what a queue is.
 		Join(`LEFT JOIN "person" AS "p" ON "p"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`"p"."identity" AS "identity"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -877,18 +877,18 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 	return *holders[0].Identity, nil
 }
 
-// routedBy is the name of the rule that placed this finding, or empty where a
+// assignedByRule is the name of the rule that placed this finding, or empty where a
 // person did or nobody has.
 //
 // One name for the whole group, and empty where its occurrences disagree: the
 // same rule the holder follows, because a group placed two ways is a state
 // nobody chose and naming one of them would hide it. The group is the fold, and
-// routing places findings one at a time — so asked about one component this
+// assignment by rule places findings one at a time — so asked about one component this
 // reported no rule where a rule had placed part of the fold, and the whole
 // thing where the name given happened to be the part it placed.
 //
 // Over the occurrences the reader may read, for the reason the holder is.
-func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
+func (s *Store) assignedByRule(ctx context.Context, buildID, vulnerabilityID,
 	componentID int64, visible []access.Visibility) (string, error) {
 
 	var named []struct {
@@ -898,9 +898,9 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 	err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Where(kinds, kindArgs...).
-		Join(`LEFT JOIN "routing_rule" AS "rr" ON "rr"."id" = "f"."routed_by"`).
+		Join(`LEFT JOIN "assignment_rule" AS "rr" ON "rr"."id" = "f"."assigned_by_rule"`).
 		ColumnExpr(`"rr"."name" AS "name"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).

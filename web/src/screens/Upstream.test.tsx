@@ -142,7 +142,7 @@ describe("what upstreams offer for review", () => {
                   statement: 3,
                   finding: 9,
                   product: "fork-os",
-                  stream: "main",
+                  branch_or_tag: "main",
                   variant: "x86",
                   publisher: "sonic project",
                   issue: "CVE-2026-1002",

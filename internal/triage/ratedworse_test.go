@@ -237,7 +237,7 @@ func TestAScanOfOneProductLapsesADecisionInAnother(t *testing.T) {
 		here := f.build(t, f.product, "ours-1")
 		f.finds(t, here, f.component(t, "lib-ours", "1.2.3"), "place-ours", access.Public)
 		f.rateIssue(t, 980)
-		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: here.target}); err != nil {
+		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: here.build}); err != nil {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, theirs.ID); state != triage.LapsedState {
@@ -247,7 +247,7 @@ func TestAScanOfOneProductLapsesADecisionInAnother(t *testing.T) {
 }
 
 func TestASiblingDecisionAtAnotherVersionReplacesNothing(t *testing.T) {
-	// Two streams at two versions hold sibling decisions at one occurrence, keyed
+	// Two builds at two versions hold sibling decisions at one occurrence, keyed
 	// apart by the versions. One lapsing leaves it the proposer's to
 	// re-affirm, whichever was made later.
 	each(t, func(t *testing.T, f *fixture) {
@@ -330,7 +330,7 @@ func TestARiseLapsesADecisionUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t
 		f.holdUnder(t, held["moved-away"], unrelated["CVE-2026-3"])
 
 		f.rateIssue(t, 980)
-		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: in.target}); err != nil {
+		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: in.build}); err != nil {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, decisions["merged"]); state != triage.LapsedState {

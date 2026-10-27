@@ -75,7 +75,7 @@ func measureReceipts(t *testing.T, doc *sbom.Document, churn float64) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
-		target := w.Target.ID
+		build := w.Build.ID
 		store := finding.NewStore(db.DB)
 		scans := ingest.NewStore(db.DB)
 		graphs := graph.NewStore(db.DB)
@@ -172,13 +172,13 @@ func measureReceipts(t *testing.T, doc *sbom.Document, churn float64) {
 			start := time.Now()
 			built = built.Add(24 * time.Hour)
 			scan, _, err := scans.Record(ctx, ingest.Arriving{
-				TargetID: target, ContentHash: fmt.Sprintf("night-%d", night),
+				BuildID: build, ContentHash: fmt.Sprintf("night-%d", night),
 				BuiltAt: built, ParserVersion: "measure",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := world.ApplyGraph(ctx, db.DB, target, scan.ID, tonight()); err != nil {
+			if _, err := world.ApplyGraph(ctx, db.DB, build, scan.ID, tonight()); err != nil {
 				t.Fatal(err)
 			}
 			// The read the upload endpoint enqueues, finished, so the run
@@ -193,13 +193,13 @@ func measureReceipts(t *testing.T, doc *sbom.Document, churn float64) {
 				t.Fatal(err)
 			}
 			run, err := store.Begin(ctx, finding.Run{
-				TargetID: target, Scanner: "measure", ScannerVersion: "0",
+				BuildID: build, Scanner: "measure", ScannerVersion: "0",
 				DatabaseVersion: "0", RanHere: true,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := store.Apply(ctx, target, run.ID, reported(night)); err != nil {
+			if _, err := store.Apply(ctx, build, run.ID, reported(night)); err != nil {
 				t.Fatal(err)
 			}
 			if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
@@ -237,7 +237,7 @@ func measureReceipts(t *testing.T, doc *sbom.Document, churn float64) {
 			for i := range reads + 1 {
 				whole := time.Now()
 				start := time.Now()
-				page, _, err := scans.Receipts(ctx, who, target, 50, 0)
+				page, _, err := scans.Receipts(ctx, who, build, 50, 0)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -250,7 +250,7 @@ func measureReceipts(t *testing.T, doc *sbom.Document, churn float64) {
 					}
 				}
 				start = time.Now()
-				changed, err := store.Changes(ctx, who, target, runs)
+				changed, err := store.Changes(ctx, who, build, runs)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -261,12 +261,12 @@ func measureReceipts(t *testing.T, doc *sbom.Document, churn float64) {
 				}
 				sent := time.Since(start)
 				start = time.Now()
-				if _, err := graphs.Deltas(ctx, who, target, ids); err != nil {
+				if _, err := graphs.Deltas(ctx, who, build, ids); err != nil {
 					t.Fatal(err)
 				}
 				deltas := time.Since(start)
 				start = time.Now()
-				if _, err := store.LatestRun(ctx, who, target); err != nil {
+				if _, err := store.LatestRun(ctx, who, build); err != nil {
 					t.Fatal(err)
 				}
 				latest := time.Since(start)

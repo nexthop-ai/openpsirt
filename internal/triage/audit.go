@@ -107,7 +107,7 @@ func bySomebodyElse(approvals []Agreed, proposer string) bool {
 // releases that share the code. A decision about something since removed
 // still names what it was about, which is what an audit asks for.
 //
-// Written once because the record's page and its file both narrow this way,
+// Written once because the audit log's page and its file both narrow this way,
 // and a filter applied by one of them and not the other is a list somebody
 // reads as narrowed.
 func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filter) *bun.SelectQuery {
@@ -135,14 +135,14 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 	// Narrowed by what this reader may see, like the rows themselves: an
 	// undisclosed finding is what puts an occurrence in a build, and a decision
 	// matching through one is a decision matched by something not shown.
-	if f.TargetID != 0 {
+	if f.BuildID != 0 {
 		mayRead, readArgs := readableFindingsOn(subject, "bf", `"de"."product_id"`)
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
-			JOIN "target" AS "bt" ON "bt"."id" = "bf"."target_id"
-			JOIN "stream" AS "bs" ON "bs"."id" = "bt"."stream_id"
+			JOIN "build" AS "bt" ON "bt"."id" = "bf"."build_id"
+			JOIN "branch_or_tag" AS "bs" ON "bs"."id" = "bt"."branch_or_tag_id"
 			WHERE ` + finding.DecisionOccurrenceFiledAt("de", "bf") + `
-			  AND "bf"."target_id" = ? AND "bs"."product_id" = "de"."product_id"`
-		args := []any{f.TargetID}
+			  AND "bf"."build_id" = ? AND "bs"."product_id" = "de"."product_id"`
+		args := []any{f.BuildID}
 		kinds, kindArgs := kindsOf(kind.Decisions, "bf")
 		clause += " AND " + kinds
 		args = append(args, kindArgs...)
@@ -155,7 +155,7 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 	return q
 }
 
-// auditedBy is the narrowing the record takes, written once for the page of
+// auditedBy is the narrowing the audit log takes, written once for the page of
 // decision occurrences, the page of decisions and the file, so none of them answers a
 // question the others do not.
 func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.SelectQuery) *bun.SelectQuery {
@@ -438,8 +438,8 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(finding.DecisionOccurrenceIssue).
 		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionOccurrenceOf("f2")).
-		Join(`JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"`).
-		Join(`JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"`).
+		Join(`JOIN "build" AS "tg2" ON "tg2"."id" = "f2"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "tg2"."branch_or_tag_id"`).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`MIN("f2"."id") AS "finding_id"`).
 		Where(`"st2"."product_id" = "de"."product_id"`).
@@ -449,8 +449,8 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 	err := s.db.NewSelect().
 		TableExpr(`(?) AS "earliest"`, earliest).
 		Join(`JOIN "finding" AS "f" ON "f"."id" = "earliest"."finding_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).

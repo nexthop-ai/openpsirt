@@ -74,14 +74,14 @@ const ours = 2000
 // Complete is false where they hold work on more components than this will
 // assemble. The tree is then a part of the answer and the counts under-report,
 // so it is said rather than left to be noticed.
-func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64) (
+func (s *Store) Ours(ctx context.Context, subject access.Subject, buildID int64) (
 	[]Upward, bool, error) {
 
 	mine := subject.Mine()
 	if subject.Kind != access.Person || len(mine) == 0 {
 		return nil, true, nil
 	}
-	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, buildID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -102,7 +102,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		ColumnExpr(`MIN("c"."version") AS "version"`).
 		ColumnExpr(`MIN("c"."purl") AS "purl"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."assigned_to" IN (?)`, bun.List(mine)).
 		Where(kinds, kindArgs...).
@@ -134,7 +134,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 	for _, row := range rows {
 		ids = append(ids, row.ComponentID)
 	}
-	climbed, err := s.climb(ctx, targetID, ids)
+	climbed, err := s.climb(ctx, buildID, ids)
 	if err != nil {
 		return nil, false, err
 	}

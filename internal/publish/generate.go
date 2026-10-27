@@ -40,8 +40,8 @@ func NewGenerator(db *bun.DB, who publisher.Named, base string) *Generator {
 // built is one build of a product, as the documents name it, and what is
 // stated about it.
 type built struct {
-	stream, streamShown   string
-	variant, variantShown string
+	branchOrTag, branchOrTagShown string
+	variant, variantShown         string
 	// root is the package identifier the build's inventory gave itself,
 	// where it gave one that states a version.
 	root  string
@@ -51,7 +51,7 @@ type built struct {
 // id is what a CSAF document calls the build, and what an OpenVEX statement
 // names it by where the inventory gave it no package identifier.
 func (b *built) id(product string) string {
-	return product + ":" + b.stream + ":" + b.variant
+	return product + ":" + b.branchOrTag + ":" + b.variant
 }
 
 // Generated is one document as what stands now would write it, before it is
@@ -100,23 +100,23 @@ func (g *Generator) builds(ctx context.Context, subject access.Subject, product 
 	statuses string) ([]*built, error) {
 
 	var rows []struct {
-		TargetID     int64  `bun:"target_id"`
-		StreamID     int64  `bun:"stream_id"`
-		VariantID    int64  `bun:"variant_id"`
-		Stream       string `bun:"stream"`
-		StreamShown  string `bun:"stream_shown"`
-		Variant      string `bun:"variant"`
-		VariantShown string `bun:"variant_shown"`
+		BuildID          int64  `bun:"build_id"`
+		BranchOrTagID    int64  `bun:"branch_or_tag_id"`
+		VariantID        int64  `bun:"variant_id"`
+		BranchOrTag      string `bun:"branch_or_tag"`
+		BranchOrTagShown string `bun:"branch_or_tag_shown"`
+		Variant          string `bun:"variant"`
+		VariantShown     string `bun:"variant_shown"`
 	}
 	if err := g.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"tg"."id" AS "target_id"`).
-		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"tg"."id" AS "build_id"`).
+		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"va"."id" AS "variant_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
-		ColumnExpr(`"st"."display_name" AS "stream_shown"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
+		ColumnExpr(`"st"."display_name" AS "branch_or_tag_shown"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(`"va"."display_name" AS "variant_shown"`).
 		Where(`"st"."product_id" = ?`, product.ID).
@@ -130,15 +130,15 @@ func (g *Generator) builds(ctx context.Context, subject access.Subject, product 
 	out := make([]*built, 0, len(rows))
 	for _, row := range rows {
 		named := &catalog.Named{
-			ProductID: product.ID, StreamID: row.StreamID, VariantID: row.VariantID,
-			Product: product.Name, Stream: row.Stream, Variant: row.Variant,
+			ProductID: product.ID, BranchOrTagID: row.BranchOrTagID, VariantID: row.VariantID,
+			Product: product.Name, BranchOrTag: row.BranchOrTag, Variant: row.Variant,
 		}
-		stated, err := g.vex.Public(ctx, subject, named, row.TargetID)
+		stated, err := g.vex.Public(ctx, subject, named, row.BuildID)
 		if err != nil {
 			return nil, err
 		}
 		one := &built{
-			stream: row.Stream, streamShown: row.StreamShown,
+			branchOrTag: row.BranchOrTag, branchOrTagShown: row.BranchOrTagShown,
 			variant: row.Variant, variantShown: row.VariantShown, root: stated.Root,
 		}
 		for _, fact := range stated.Facts {

@@ -10,16 +10,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// builds is the targets a decision records it was made on, read from the table.
+// builds is the builds a decision records it was made on, read from the table.
 func (f *fixture) builds(t *testing.T, decision int64) []int64 {
 	t.Helper()
-	var targets []int64
-	if err := f.db.DB.NewRaw(`SELECT "target_id" FROM "decision_build" WHERE "decision_id" = ?`,
-		decision).Scan(t.Context(), &targets); err != nil {
+	var buildIDs []int64
+	if err := f.db.DB.NewRaw(`SELECT "build_id" FROM "decision_build" WHERE "decision_id" = ?`,
+		decision).Scan(t.Context(), &buildIDs); err != nil {
 		t.Fatal(err)
 	}
-	slices.Sort(targets)
-	return targets
+	slices.Sort(buildIDs)
+	return buildIDs
 }
 
 func TestTheRowsHeldBackFromADecisionKeepTheBuildsItWasMadeOn(t *testing.T) {
@@ -30,8 +30,8 @@ func TestTheRowsHeldBackFromADecisionKeepTheBuildsItWasMadeOn(t *testing.T) {
 	// On every engine, because what this pins is rows a write leaves.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		var target int64
-		if err := f.db.DB.NewRaw(`SELECT MIN("id") FROM "target"`).Scan(ctx, &target); err != nil {
+		var build int64
+		if err := f.db.DB.NewRaw(`SELECT MIN("id") FROM "build"`).Scan(ctx, &build); err != nil {
 			t.Fatal(err)
 		}
 		occurrences := f.occurrences("under-a", "under-b")
@@ -42,14 +42,14 @@ func TestTheRowsHeldBackFromADecisionKeepTheBuildsItWasMadeOn(t *testing.T) {
 				Justification: triage.CodeNotInExecutePath,
 				Reasoning:     "The parser is never reached: we only call the encoder.",
 				By:            f.proposer, NeedsApproval: true,
-				MadeOn: []int64{target, target},
+				MadeOn: []int64{build, build},
 			})
 		}
 		recorded, err := f.store.ProposeMany(ctx, f.triager, proposals)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := f.builds(t, recorded[0].DecisionID); !slices.Equal(got, []int64{target}) {
+		if got := f.builds(t, recorded[0].DecisionID); !slices.Equal(got, []int64{build}) {
 			t.Fatalf("the decision records %v, want the one build once", got)
 		}
 
@@ -58,7 +58,7 @@ func TestTheRowsHeldBackFromADecisionKeepTheBuildsItWasMadeOn(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := f.builds(t, held.ID); !slices.Equal(got, []int64{target}) {
+		if got := f.builds(t, held.ID); !slices.Equal(got, []int64{build}) {
 			t.Errorf("the rows held back record %v, want the build the decision was made on", got)
 		}
 	})

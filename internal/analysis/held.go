@@ -22,7 +22,7 @@ import (
 type Placed struct {
 	// Shape is the form the results are held in, which the release applying
 	// them has to read. Any other JSON decodes as a run with no results, and
-	// a comparable run with no results marks the whole build not reproduced.
+	// a comparable run with no results marks the whole build no longer detected.
 	Shape   int            `json:"shape"`
 	Results []sarif.Placed `json:"results,omitempty"`
 	// RunOf is, per result, the run in Runs that reported it. What a run

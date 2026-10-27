@@ -230,7 +230,7 @@ function anchor(node: Element) {
     // Nothing linked from here is ours. No referrer, and no handle back to
     // this window from whatever opens.
     node.setAttribute("rel", "noreferrer noopener nofollow");
-    node.setAttribute("target", "_blank");
+    node.setAttribute("build", "_blank");
   }
 }
 
@@ -319,7 +319,7 @@ function autolink(root: Element | DocumentFragment) {
       const link = document.createElement("a");
       link.setAttribute("href", hit.href);
       link.setAttribute("rel", "noreferrer noopener nofollow");
-      link.setAttribute("target", "_blank");
+      link.setAttribute("build", "_blank");
       link.textContent = hit.id;
       pieces.append(link);
       cursor = hit.end;
@@ -357,7 +357,7 @@ export function render(source: string): string {
     // no author-written attribute reaches the sanitizer at all — and that is
     // the control to keep, not this list. These are here so the hook's own
     // additions survive attribute sanitizing.
-    ADD_ATTR: ["rel", "target", "loading", "referrerpolicy"],
+    ADD_ATTR: ["rel", "build", "loading", "referrerpolicy"],
     ALLOW_DATA_ATTR: false,
     ALLOW_ARIA_ATTR: false,
     // Returned as nodes rather than as a string, so that the identifiers below

@@ -132,7 +132,7 @@ func TestTheQueueNarrowsByHowOldADecisionIs(t *testing.T) {
 	})
 }
 
-func TestTheQueueNarrowsByTheReleaseADecisionCovers(t *testing.T) {
+func TestTheQueueNarrowsByTheBranchOrTagADecisionCovers(t *testing.T) {
 	// A decision names no release; it covers the builds whose findings it
 	// matches. So a decision with nothing open under it in a release is not
 	// about that release, however it was made.
@@ -145,19 +145,19 @@ func TestTheQueueNarrowsByTheReleaseADecisionCovers(t *testing.T) {
 		}
 		f.decisionsAbout(t, f.secondIssue(t), f.proposer, triage.NotApplicable)
 
-		if got := f.queued(t, triage.QueueFilter{Release: "2026.03"}); got != 1 {
+		if got := f.queued(t, triage.QueueFilter{BranchOrTag: "2026.03"}); got != 1 {
 			t.Errorf("%d decisions cover the release, want the one made on it", got)
 		}
-		if got := f.queued(t, triage.QueueFilter{Release: " 2026.03 "}); got != 1 {
+		if got := f.queued(t, triage.QueueFilter{BranchOrTag: " 2026.03 "}); got != 1 {
 			t.Errorf("a release name typed with spaces matched %d decisions, want 1", got)
 		}
-		if got := f.queued(t, triage.QueueFilter{Release: "2026.04"}); got != 0 {
+		if got := f.queued(t, triage.QueueFilter{BranchOrTag: "2026.04"}); got != 0 {
 			t.Errorf("%d decisions cover a release that holds nothing", got)
 		}
 	})
 }
 
-func TestTheReleaseFilterReadsOnlyFindingsTheApproverMaySee(t *testing.T) {
+func TestTheBranchOrTagFilterReadsOnlyFindingsTheApproverMaySee(t *testing.T) {
 	// A decision that covers an undisclosed finding in a release says nothing
 	// about that release to an approver who reads disclosed work alone: the
 	// filter would otherwise tell them the release holds something.
@@ -176,7 +176,7 @@ func TestTheReleaseFilterReadsOnlyFindingsTheApproverMaySee(t *testing.T) {
 		both := f.privateTriager(t, "both-approver", "Both")
 		asked := func(who access.Subject, release string) int {
 			_, total, err := f.store.Queue(ctx, who,
-				triage.QueueFilter{Release: release}, 50, 0)
+				triage.QueueFilter{BranchOrTag: release}, 50, 0)
 			if err != nil {
 				t.Fatal(err)
 			}

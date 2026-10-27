@@ -44,7 +44,9 @@ describe("the filter a list is narrowed by", () => {
   });
 
   it("is the same one in any scope, which a saved filter does not keep", () => {
-    const at = new URLSearchParams("stream=main&component=firmware&variant=x86&beneath=zlib");
+    const at = new URLSearchParams(
+      "branch_or_tag=main&component=firmware&variant=x86&beneath=zlib",
+    );
     expect(ruleIn(kept, at)?.name).toBe("put off drivers");
     expect(here(at)).toBe("component=firmware");
   });
@@ -62,7 +64,7 @@ describe("the filter a list is narrowed by", () => {
         prepares: { outcome: "wont-fix", reasoning: "Everything." },
       },
     ];
-    expect(ruleIn(emptied, new URLSearchParams("stream=main"))).toBeUndefined();
+    expect(ruleIn(emptied, new URLSearchParams("branch_or_tag=main"))).toBeUndefined();
     expect(ruleIn(emptied, new URLSearchParams())).toBeUndefined();
   });
 

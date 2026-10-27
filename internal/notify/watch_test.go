@@ -52,14 +52,14 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		target := w.Target
+		build := w.Build
 
 		// Declared a month ago. A build declared a moment ago is not quiet —
 		// it is new — and the threshold is measured from when it was declared
 		// precisely so that the two are told apart.
-		if _, err := db.DB.NewUpdate().Table("target").
+		if _, err := db.DB.NewUpdate().Table("build").
 			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
-			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -93,7 +93,7 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 
 		// A scan arrives, so it is no longer quiet and the alert clears itself.
 		if _, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "fresh",
+			BuildID: build.ID, ContentHash: "fresh",
 			BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
 		}); err != nil {
 			t.Fatal(err)
@@ -128,10 +128,10 @@ func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := w.Target
-		if _, err := db.DB.NewUpdate().Table("target").
+		build := w.Build
+		if _, err := db.DB.NewUpdate().Table("build").
 			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
-			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -186,8 +186,8 @@ func TestACriticalOnAReleaseTellsWhoeverMayActOnIt(t *testing.T) {
 
 		rights := access.NewStore(db.DB)
 		product := w.Product
-		released := w.TargetFor(w.Tag, w.Customer)
-		inProgress := w.Target
+		released := w.BuildFor(w.Tag, w.Customer)
+		inProgress := w.Build
 
 		// Somebody who triages this product, an administrator holding nothing,
 		// and somebody who only reads.
@@ -245,7 +245,7 @@ func TestACriticalOnAReleaseTellsWhoeverMayActOnIt(t *testing.T) {
 		// Answering it clears the alert, with nobody dismissing anything.
 		if _, err := db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"closed_at" = ?`, time.Now().UTC()).
-			Where(`"target_id" = ?`, released.ID).Exec(ctx); err != nil {
+			Where(`"build_id" = ?`, released.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, _, err := watch.Once(ctx); err != nil {
@@ -274,7 +274,7 @@ func recordPerson(t *testing.T, rights *access.Store, identity string, admin boo
 }
 
 // critical writes an open finding of this severity against a build.
-func critical(t *testing.T, db *database.DB, targetID int64, identifier, severity string) {
+func critical(t *testing.T, db *database.DB, buildID int64, identifier, severity string) {
 	t.Helper()
 	ctx := t.Context()
 	ids, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
@@ -294,7 +294,7 @@ func critical(t *testing.T, db *database.DB, targetID int64, identifier, severit
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	row := &finding.Finding{
-		TargetID: targetID, Kind: finding.Vulnerable, Visibility: access.Public,
+		BuildID: buildID, Kind: finding.Vulnerable, Visibility: access.Public,
 		VulnerabilityID: ids[identifier], ComponentID: componentID,
 		OccurrenceIdentity: "place-of-" + identifier, OpenedAt: now,
 	}
@@ -374,7 +374,7 @@ func TestTheWatchTellsAdministratorsWhenSomethingIsHiddenWithNobodyAgreeing(t *t
 		if err != nil {
 			t.Fatal(err)
 		}
-		aScannedTarget(t, w)
+		aScannedBuild(t, w)
 		product := w.Product
 		watch := notify.NewWatch(db.DB, quiet)
 		hearing := func(who *access.Account) string {
@@ -473,14 +473,14 @@ func TestAQuietBuildBeingRefusedSaysWhyItIsRefused(t *testing.T) {
 		rights := access.NewStore(db.DB)
 		product := w.Product
 		admin := recordPerson(t, rights, "admin@example.com", true, product.ID, "")
-		target := w.Target
-		if _, err := db.DB.NewUpdate().Table("target").
+		build := w.Build
+		if _, err := db.DB.NewUpdate().Table("build").
 			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
-			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := ingest.NewStore(db.DB).Refused(ctx, access.Everything("the pipeline"),
-			ingest.Refusal{TargetID: target.ID, Reason: "the inventory could not be read"}); err != nil {
+			ingest.Refusal{BuildID: build.ID, Reason: "the inventory could not be read"}); err != nil {
 			t.Fatal(err)
 		}
 		sweep(t, db)
@@ -500,13 +500,13 @@ func TestAnExploitedIssueOnAReleaseIsToldWhateverItsRating(t *testing.T) {
 		ctx := t.Context()
 		rights := access.NewStore(db.DB)
 		product := w.Product
-		released := w.TargetFor(w.Tag, w.Customer)
+		released := w.BuildFor(w.Tag, w.Customer)
 		triager := recordPerson(t, rights, "triager@example.com", false, product.ID, access.PublicTriage)
 
 		critical(t, db, released.ID, "CVE-2026-EXPLOITED", "high")
 		if _, err := db.DB.NewUpdate().Table("finding").
 			Set(`"urgency_exploited" = ?`, true).
-			Where(`"target_id" = ?`, released.ID).Exec(ctx); err != nil {
+			Where(`"build_id" = ?`, released.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		sweep(t, db)
@@ -525,13 +525,13 @@ func TestACriticalASupplierAnswersIsNotTold(t *testing.T) {
 		ctx := t.Context()
 		rights := access.NewStore(db.DB)
 		product := w.Product
-		released := w.TargetFor(w.Tag, w.Customer)
+		released := w.BuildFor(w.Tag, w.Customer)
 		triager := recordPerson(t, rights, "triager@example.com", false, product.ID, access.PublicTriage)
 
 		critical(t, db, released.ID, "CVE-2026-ANSWERED", "critical")
 		if _, err := db.DB.NewUpdate().Table("finding").
 			Set(`"stated_by" = ?`, 1).
-			Where(`"target_id" = ?`, released.ID).Exec(ctx); err != nil {
+			Where(`"build_id" = ?`, released.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		sweep(t, db)

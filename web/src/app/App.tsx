@@ -9,16 +9,23 @@ import { useWho } from "./session";
 import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
 import { Boundary } from "./Boundary";
-import { Moved, built } from "./moved";
+import { Moved, MovedUnder, built } from "./moved";
 import { retrying } from "./retrying";
 import {
   ROUTES,
+  analyticsReportAt,
   bulkDecisionAt,
   decisionAt,
+  fromStreamsAt,
   dependenciesAt,
   uploadsAt,
   inventoryChangesAt,
   personAt,
+  incidentsAt,
+  vulnerabilityReportAt,
+  vulnerabilityReportsAt,
+  plannedUpgradesAt,
+  unmatchedComponentsAt,
 } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
@@ -41,11 +48,17 @@ const Home = retrying(() => import("../screens/Home").then((m) => m.Home));
 const Finding = retrying(() => import("../screens/Finding").then((m) => m.Finding));
 const Dependencies = retrying(() => import("../screens/Dependencies").then((m) => m.Dependencies));
 const Compare = retrying(() => import("../screens/Compare").then((m) => m.Compare));
-const Inbox = retrying(() => import("../screens/Inbox").then((m) => m.Inbox));
-const InboxReport = retrying(() => import("../screens/InboxReport").then((m) => m.InboxReport));
-const Leads = retrying(() => import("../screens/Leads").then((m) => m.Leads));
-const Lead = retrying(() => import("../screens/Lead").then((m) => m.Lead));
-const LeadRules = retrying(() => import("../screens/LeadRules").then((m) => m.LeadRules));
+const VulnerabilityReports = retrying(() =>
+  import("../screens/VulnerabilityReports").then((m) => m.VulnerabilityReports),
+);
+const VulnerabilityReport = retrying(() =>
+  import("../screens/VulnerabilityReport").then((m) => m.VulnerabilityReport),
+);
+const CodeFindings = retrying(() => import("../screens/CodeFindings").then((m) => m.CodeFindings));
+const CodeFinding = retrying(() => import("../screens/CodeFinding").then((m) => m.CodeFinding));
+const SuppressionRules = retrying(() =>
+  import("../screens/SuppressionRules").then((m) => m.SuppressionRules),
+);
 const Repositories = retrying(() => import("../screens/Repositories").then((m) => m.Repositories));
 const InventoryCompare = retrying(() =>
   import("../screens/InventoryCompare").then((m) => m.InventoryCompare),
@@ -67,24 +80,28 @@ const Teams = retrying(() => import("../screens/Teams").then((m) => m.Teams));
 const AutoAssignment = retrying(() =>
   import("../screens/AutoAssignment").then((m) => m.AutoAssignment),
 );
-const Disclosing = retrying(() => import("../screens/Disclosing").then((m) => m.Disclosing));
-const Exploited = retrying(() => import("../screens/Exploited").then((m) => m.Exploited));
-const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgrades));
-const MatchCoverage = retrying(() =>
-  import("../screens/MatchCoverage").then((m) => m.MatchCoverage),
+const DisclosureDeadlines = retrying(() =>
+  import("../screens/DisclosureDeadlines").then((m) => m.DisclosureDeadlines),
+);
+const Incidents = retrying(() => import("../screens/Incidents").then((m) => m.Incidents));
+const PlannedUpgrades = retrying(() =>
+  import("../screens/PlannedUpgrades").then((m) => m.PlannedUpgrades),
+);
+const UnmatchedComponents = retrying(() =>
+  import("../screens/UnmatchedComponents").then((m) => m.UnmatchedComponents),
 );
 const Uploads = retrying(() => import("../screens/Uploads").then((m) => m.Uploads));
 const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
 const System = retrying(() => import("../screens/System").then((m) => m.System));
-const TheRecord = retrying(() => import("../screens/TheRecord").then((m) => m.TheRecord));
-const Reports = retrying(() => import("../screens/reports/Catalog").then((m) => m.Catalog));
-const Report = retrying(() => import("../screens/reports/Report").then((m) => m.Report));
-const ReportFlaw = retrying(() => import("../screens/ReportFlaw").then((m) => m.ReportFlaw));
+const AuditLog = retrying(() => import("../screens/AuditLog").then((m) => m.AuditLog));
+const Analytics = retrying(() => import("../screens/analytics/Catalog").then((m) => m.Catalog));
+const AnalyticsReport = retrying(() => import("../screens/analytics/Report").then((m) => m.Report));
+const RecordFlaw = retrying(() => import("../screens/RecordFlaw").then((m) => m.RecordFlaw));
 const Person = retrying(() => import("../screens/Person").then((m) => m.Person));
 const Branch = retrying(() => import("../screens/Branch").then((m) => m.Branch));
 const Advisories = retrying(() => import("../screens/Advisories").then((m) => m.Advisories));
 const Advisory = retrying(() => import("../screens/Advisory").then((m) => m.Advisory));
-const VEX = retrying(() => import("../screens/VEX").then((m) => m.VEX));
+const PublishedVEX = retrying(() => import("../screens/PublishedVEX").then((m) => m.PublishedVEX));
 
 export function App() {
   const who = useWho();
@@ -171,11 +188,11 @@ export function App() {
               <Route path={ROUTES.issue} element={<Issue />} />
               <Route path={ROUTES.products} element={<Products who={who.data} />} />
               <Route path={ROUTES.product} element={<Product />} />
-              <Route path={ROUTES.streams} element={<Branches />} />
+              <Route path={ROUTES.branchesAndTags} element={<Branches />} />
               {/* A branch and a tag share this address and are different
                 questions, so it resolves to whichever screen answers the one
                 that line poses. */}
-              <Route path={ROUTES.stream} element={<Branch />} />
+              <Route path={ROUTES.branchOrTag} element={<Branch />} />
               <Route path={ROUTES.variants} element={<Variants />} />
               {/* The list at whatever the picker selects, and the same screen at the
             address a build's other screens share. */}
@@ -189,16 +206,16 @@ export function App() {
               <Route path={ROUTES.uploadsOf} element={<Uploads />} />
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
               <Route path={ROUTES.run} element={<Run />} />
-              <Route path={ROUTES.upgrades} element={<Upgrades />} />
-              <Route path={ROUTES.matchCoverage} element={<MatchCoverage />} />
-              <Route path={ROUTES.vex} element={<VEX />} />
+              <Route path={ROUTES.plannedUpgrades} element={<PlannedUpgrades />} />
+              <Route path={ROUTES.unmatchedComponents} element={<UnmatchedComponents />} />
+              <Route path={ROUTES.vex} element={<PublishedVEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
               <Route path={ROUTES.inventoryComparison} element={<InventoryCompare />} />
-              <Route path={ROUTES.inbox} element={<Inbox />} />
-              <Route path={ROUTES.inboxReport} element={<InboxReport />} />
-              <Route path={ROUTES.leads} element={<Leads />} />
-              <Route path={ROUTES.lead} element={<Lead />} />
-              <Route path={ROUTES.leadRules} element={<LeadRules />} />
+              <Route path={ROUTES.vulnerabilityReports} element={<VulnerabilityReports />} />
+              <Route path={ROUTES.vulnerabilityReport} element={<VulnerabilityReport />} />
+              <Route path={ROUTES.codeFindings} element={<CodeFindings />} />
+              <Route path={ROUTES.codeFinding} element={<CodeFinding />} />
+              <Route path={ROUTES.suppressionRules} element={<SuppressionRules />} />
               <Route path={ROUTES.repositories} element={<Repositories />} />
               {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}
@@ -209,12 +226,12 @@ export function App() {
               <Route path={ROUTES.person} element={<Person />} />
               <Route path={ROUTES.teams} element={<Teams />} />
               <Route path={ROUTES.assignments} element={<Assignments />} />
-              <Route path={ROUTES.record} element={<TheRecord />} />
-              <Route path={ROUTES.reports} element={<Reports />} />
-              <Route path={ROUTES.report} element={<Report />} />
-              <Route path={ROUTES.reportFlaw} element={<ReportFlaw />} />
-              <Route path={ROUTES.disclosing} element={<Disclosing />} />
-              <Route path={ROUTES.exploited} element={<Exploited />} />
+              <Route path={ROUTES.auditLog} element={<AuditLog />} />
+              <Route path={ROUTES.analytics} element={<Analytics />} />
+              <Route path={ROUTES.analyticsReport} element={<AnalyticsReport />} />
+              <Route path={ROUTES.recordFlaw} element={<RecordFlaw />} />
+              <Route path={ROUTES.disclosureDeadlines} element={<DisclosureDeadlines />} />
+              <Route path={ROUTES.incidents} element={<Incidents />} />
               <Route path={ROUTES.advisories} element={<Advisories />} />
               <Route path={ROUTES.advisory} element={<Advisory />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
@@ -224,8 +241,7 @@ export function App() {
               {/* The addresses these screens had before each was named after
                 its rail entry. A notice in somebody's bell keeps the link it
                 was sent with, so the old address forwards rather than opening
-                the catch-all. The old address of The record is not here: the
-                record now lives there. */}
+                the catch-all. */}
               <Route path={ROUTES.formerAccess} element={<Moved to={() => "/access"} />} />
               <Route
                 path={ROUTES.formerPerson}
@@ -236,10 +252,35 @@ export function App() {
                 element={<Moved to={() => "/assignments"} />}
               />
               <Route
-                path={ROUTES.formerExploited}
-                element={<Moved to={() => "/exploited-here"} />}
+                path={ROUTES.formerExploitedHere}
+                element={<Moved to={() => incidentsAt()} />}
               />
-              <Route path={ROUTES.formerRecord} element={<Moved to={() => "/record"} />} />
+              <Route path={ROUTES.formerObligations} element={<Moved to={() => incidentsAt()} />} />
+              <Route path={ROUTES.formerAudit} element={<Moved to={() => "/audit-log"} />} />
+              <Route path={ROUTES.formerRecord} element={<Moved to={() => "/audit-log"} />} />
+              <Route
+                path={ROUTES.formerDisclosureDeadlines}
+                element={<Moved to={() => "/disclosure-deadlines"} />}
+              />
+              <Route
+                path={ROUTES.formerRecordFlaw}
+                element={<Moved to={() => "/record-a-flaw"} />}
+              />
+              <Route path={ROUTES.formerAnalytics} element={<Moved to={() => "/analytics"} />} />
+              <Route
+                path={ROUTES.formerAnalyticsReport}
+                element={<Moved to={(at) => analyticsReportAt(at.report ?? "")} />}
+              />
+              <Route
+                path={ROUTES.formerVulnerabilityReports}
+                element={<Moved to={(at) => vulnerabilityReportsAt(at.product ?? "")} />}
+              />
+              <Route
+                path={ROUTES.formerVulnerabilityReport}
+                element={
+                  <Moved to={(at) => vulnerabilityReportAt(at.product ?? "", at.reference ?? "")} />
+                }
+              />
               <Route
                 path={ROUTES.formerDependencies}
                 element={<Moved to={(at) => dependenciesAt(built(at))} />}
@@ -250,7 +291,7 @@ export function App() {
               />
               <Route
                 path={ROUTES.formerInventoryChanges}
-                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
+                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.sbom))} />}
               />
               <Route
                 path={ROUTES.formerUploads}
@@ -258,7 +299,11 @@ export function App() {
               />
               <Route
                 path={ROUTES.formerUploadChanges}
-                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
+                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.sbom))} />}
+              />
+              <Route
+                path={ROUTES.formerStreams}
+                element={<MovedUnder to={(at, rest) => fromStreamsAt(at.product ?? "", rest)} />}
               />
               <Route
                 path={ROUTES.formerDecision}
@@ -267,6 +312,14 @@ export function App() {
               <Route
                 path={ROUTES.formerBulkDecision}
                 element={<Moved to={(at) => bulkDecisionAt(built(at), at.component ?? "")} />}
+              />
+              <Route
+                path={ROUTES.formerMatchCoverage}
+                element={<Moved to={(at) => unmatchedComponentsAt(built(at))} />}
+              />
+              <Route
+                path={ROUTES.formerPendingUpgrades}
+                element={<Moved to={(at) => plannedUpgradesAt(built(at))} />}
               />
               {/* An address this application does not answer. It says so, and
                 keeps the address in the bar: redirecting home threw away the

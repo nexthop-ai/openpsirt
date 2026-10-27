@@ -25,7 +25,7 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 		// clock rule exists for.
 		arrived := time.Now().UTC().AddDate(0, 0, -14).Format(time.DateOnly)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200",`+
 				`"reported_by":"A. Researcher","contact":"a@example.org",`+
@@ -42,20 +42,20 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 
 		at := "/v1/products/mine/issues/" + recorded.Identifier + "/report"
 		var told struct {
-			ReportedBy   string `json:"reported_by"`
-			Contact      string `json:"contact"`
-			Credit       string `json:"credit"`
-			Received     string `json:"received"`
-			Acknowledged string `json:"acknowledged"`
-			Product      string `json:"product"`
-			Reference    string `json:"reference"`
-			Summary      string `json:"summary"`
+			ReportedBy      string `json:"reported_by"`
+			Contact         string `json:"contact"`
+			Credit          string `json:"credit"`
+			Received        string `json:"received"`
+			Acknowledged    string `json:"acknowledged"`
+			Product         string `json:"product"`
+			Reference       string `json:"reference"`
+			ReportedProblem string `json:"reported_problem"`
 		}
 		httpapitest.Read(t, r, "private-triage", at, &told)
-		// A flaw recorded by hand carries its summary as the claim, so no
-		// report says nothing.
-		if told.Summary == "" {
-			t.Error("a flaw recorded by hand wrote a report with nothing claimed")
+		// A flaw recorded by hand carries its summary as the reported
+		// problem, so no report says nothing.
+		if told.ReportedProblem == "" {
+			t.Error("a flaw recorded by hand wrote a report with no reported problem")
 		}
 		if told.ReportedBy != "A. Researcher" || told.Contact != "a@example.org" {
 			t.Errorf("who told us reads as %+v", told)
@@ -172,7 +172,7 @@ func TestWhoToldUsNeedsTheRightItSaysItNeeds(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200",`+
 				`"reported_by":"A. Researcher","contact":"a@example.org"}`)

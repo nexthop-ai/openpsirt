@@ -79,7 +79,7 @@ func PerFold(expression string) string { return "MIN(" + expression + ")" }
 //
 // The unit a decision covers, and the unit the finding screen's rows already
 // use. Three things reported beside those rows — who holds it, which rule
-// placed it, what it is tagged with — asked about one component instead, so a
+// placed it, what it is labeled with — asked about one component instead, so a
 // guarantee written as "one name for the whole group, and empty where its
 // occurrences disagree" was a guarantee about a group the query could not see: a
 // rule that placed a third of a fold reported as no rule at all under one

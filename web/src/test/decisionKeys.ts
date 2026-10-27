@@ -14,8 +14,8 @@ export const EVERY_DECISION_KEY = [
   "finding",
   "findings",
   "home",
-  "lead",
-  "leads",
+  "code-finding",
+  "code-findings",
   "my-decisions",
   "queue",
 ].sort();

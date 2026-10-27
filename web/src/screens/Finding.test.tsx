@@ -16,9 +16,9 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 const ADDRESS =
-  "/products/sonic/streams/master/variants/broadcom/findings/CVE-2026-1/components/libnl";
+  "/products/sonic/branches-and-tags/master/variants/broadcom/findings/CVE-2026-1/components/libnl";
 const PATTERN =
-  "/products/:product/streams/:stream/variants/:variant/findings/:vulnerability/components/:component";
+  "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/findings/:issue/components/:component";
 
 // Two decisions standing on one finding, each with a summary of its own.
 const finding = {

@@ -227,7 +227,7 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 // of its own where a receiver reads it without opening the text.
 //
 // A link rebuilt from the row beside the body announces the identifier, the
-// product, the stream, the variant and the component to every server the
+// product, the branch or tag, the variant and the component to every server the
 // request crosses.
 func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
@@ -245,7 +245,7 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 
 		// The shape a disclosure notice takes: every part of what it is about
 		// is in the path.
-		const where = "/products/sonic/streams/master/variants/broadcom" +
+		const where = "/products/sonic/branches-and-tags/master/variants/broadcom" +
 			"/findings/SONIC-2026-7002/components/swss"
 		if err := hook.store.Tell(ctx, notify.Telling{
 			PersonID: hook.admin.ID, Kind: notify.DisclosureDue,
@@ -626,7 +626,7 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 		store, signal, admin := hook.store, hook.signal, hook.admin
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A decision stands with nobody agreeing.",
-			Link: "/reports/approval-quality",
+			Link: "/analytics/approval-quality",
 		}}
 
 		for _, step := range []struct {
@@ -672,7 +672,7 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 		}
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A decision stands with nobody agreeing.",
-			Link: "/reports/approval-quality",
+			Link: "/analytics/approval-quality",
 		}}
 
 		// Ana's row opens first, so the delivery is claimed for it.
@@ -785,7 +785,7 @@ func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
 			if err := store.Tell(ctx, notify.Telling{
 				PersonID: who.ID, Kind: notify.InventoryMoved,
 				Body:     "sonic master broadcom: 21 names moved in one upload.",
-				Link:     "/products/sonic/streams/master/variants/broadcom/scans/4/changes",
+				Link:     "/products/sonic/branches-and-tags/master/variants/broadcom/scans/4/changes",
 				Together: "one-upload",
 			}); err != nil {
 				t.Fatal(err)

@@ -46,7 +46,7 @@ type RulingProposedBody struct {
 	DuplicateOf string                  `json:"duplicate_of,omitempty" maxLength:"191" doc:"The open issue a duplicate points at, under any identifier it goes by. Only on a duplicate"`
 }
 
-// registerRulings is saying what claims are when the answer is not an issue
+// registerRulings is saying what reports are when the answer is not an issue
 // here, and the second person some of those answers take.
 func registerRulings(api huma.API, in core.Deps) {
 	const list = "/v1/products/{product}/report-rulings"
@@ -91,12 +91,12 @@ func registerRulings(api huma.API, in core.Deps) {
 		if err := finding.MayWorkReports(subject, product.ID); err != nil {
 			return nil, core.Asked(in.Logger, err)
 		}
-		var target int64
+		var build int64
 		if input.Body.DuplicateOf != "" {
 			// Resolved here and asked again inside the write. An issue this
 			// person may not be told of answers exactly as one that is not
 			// here.
-			target, err = core.IssueHere(ctx, in, subject, product.ID, input.Body.DuplicateOf)
+			build, err = core.IssueHere(ctx, in, subject, product.ID, input.Body.DuplicateOf)
 			if err != nil {
 				return nil, err
 			}
@@ -105,7 +105,7 @@ func registerRulings(api huma.API, in core.Deps) {
 			References:  input.Body.Reports,
 			Disposition: finding.Disposition(input.Body.Disposition),
 			Reasoning:   input.Body.Reasoning,
-			DuplicateOf: target,
+			DuplicateOf: build,
 		})
 		if err != nil {
 			return nil, refusedRuling(in, err, "that ruling could not be recorded")
@@ -242,8 +242,8 @@ func registerRulings(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "withdraw-report-ruling", Method: http.MethodPost, Path: one + "/withdrawal",
 		Summary: "Withdraw a ruling on vulnerability reports",
-		Description: "Takes a ruling back, waiting or in force, and returns every report it " +
-			"covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in " +
+		Description: "Takes a ruling back, waiting or in force, and opens every report it " +
+			"covered again, judged as nothing. Sending a waiting ruling back and undoing one in " +
 			"force are this one act.\n\n" +
 			"Needs nobody else, and the proposer may withdraw their own. The ruling stays on " +
 			"record as withdrawn.",

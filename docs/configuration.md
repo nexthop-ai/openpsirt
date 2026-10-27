@@ -451,7 +451,7 @@ products = ["router-os", "switch-os"]
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
 | `OPENPSIRT_SCANNER_PATH` | `scanner.path` | Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in | unset |
-| `OPENPSIRT_SCANNER_TIMEOUT` | `scanner.timeout` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
+| `OPENPSIRT_SCANNER_TIMEOUT` | `scanner.timeout` | How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job fails once its attempts run out. It has to stay below `OPENPSIRT_QUEUE_MAX_HOLD`, the span a worker may hold one job for, and the process refuses to start where it does not | `30m` |
 | `GRYPE_DB_CACHE_DIR` | — | Where the scanner keeps its vulnerability data. The image sets it, and the chart sets it from `scanner.cacheDir`, where it mounts the volume; outside the chart, a deployment that moves it moves the volume with it, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
 | `GRYPE_DB_AUTO_UPDATE` | — | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
 | `GRYPE_CHECK_FOR_APP_UPDATE` | — | Whether the scanner asks its publisher for a newer release of itself on every run. Off unless set: it is a request to a host nobody configured | `false` |
@@ -1067,8 +1067,9 @@ one applies to the branch you ship.
 
 Off unless the deployment turns it on. It fetches a copy of each repository a
 patch link names, from the host the link names, and asks the copy which
-branches hold each commit. Progress, failures and the size of each copy are on
-the System screen and at `/v1/patch-branch-lookups`.
+branches hold each commit. Progress, failures and the size of each copy are in
+the Patch branch lookups panel of the System screen and at
+`/v1/patch-branch-lookups`.
 
 Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.
@@ -1136,7 +1137,7 @@ build server and waiting for a restart is not a remedy.
 
 | Variable | File key | What it does | Default |
 |---|---|---|---|
-| `OPENPSIRT_QUEUE_MAX_ATTEMPTS` | `queue.max_attempts` | How many times a job is tried before it is set aside with its last error | `5` |
+| `OPENPSIRT_QUEUE_MAX_ATTEMPTS` | `queue.max_attempts` | How many times a job is tried before it fails with its last error | `5` |
 | `OPENPSIRT_QUEUE_CLAIM_TIMEOUT` | `queue.claim_timeout` | How long a claim is honored with nothing heard from the worker holding it, after which another worker may take the job. It bounds a worker going silent, not how long a job may take | `30m` |
 | `OPENPSIRT_QUEUE_HEARTBEAT` | `queue.heartbeat` | How often a running job renews its claim. Well under the claim timeout, so several renewals may fail before the claim is at risk — a value that is not below it is refused at startup | `5m` |
 | `OPENPSIRT_QUEUE_MAX_HOLD` | `queue.max_hold` | How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and `OPENPSIRT_SCANNER_TIMEOUT`, which the process checks at startup | `2h` |
@@ -1273,7 +1274,7 @@ the signal in the message:
 run /usr/local/bin/grype: signal: killed
 ```
 
-The job is retried with backoff and set aside after `OPENPSIRT_QUEUE_MAX_ATTEMPTS`
+The job is retried with backoff and fails after `OPENPSIRT_QUEUE_MAX_ATTEMPTS`
 attempts, so the symptom is scans that will not complete rather than a pod that
 will not stay up. Where the pod itself is killed instead, a deployment without a
 kept database restarts into the import that exhausted it.
@@ -1415,8 +1416,8 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 |---|---|
 | `POST /v1/products/{product}/reports/{reference}/acknowledgement` and `POST /v1/products/{product}/issues/{vulnerability}/report/acknowledgement` are removed, and a request to either is refused. v0.10.2 recorded with them that somebody answered the reporter | Record a message sent to the reporter instead, with `POST /v1/products/{product}/reports/{reference}/messages` and `direction` set to `sent`. The first message recorded as sent is the acknowledgement |
 | A report's `acknowledged` is the day of the first message recorded as sent, as `YYYY-MM-DD`, and `acknowledged_by` is whoever recorded it. v0.10.2 answered the moment somebody pressed acknowledge | Nothing. The upgrade writes each acknowledgement v0.10.2 recorded as the first message sent, dated the day it was recorded in UTC, by whoever recorded it, with no text. A client parsing `acknowledged` as a moment parses a day |
-| A report's claim is required when it is recorded and when it is edited. v0.10.2 accepted an empty one | Nothing. A report v0.10.2 left with no claim on a flaw recorded here takes the flaw's summary as its claim. Any other report v0.10.2 recorded with no claim keeps none, and an edit to it while it is open fills one in |
-| A routing rule takes `reports`, which places the product's vulnerability reports instead of findings | Nothing. A rule without it places findings, as before |
+| A report's reported problem, which v0.10.2 named `summary`, is required when it is recorded and when it is edited. v0.10.2 accepted an empty one | Send `reported_problem`. A report v0.10.2 left with none on a flaw recorded here takes the flaw's summary as its reported problem. Any other report v0.10.2 recorded with none keeps none, and an edit to it while it is open fills one in |
+| An assignment rule takes `reports`, which places the product's vulnerability reports instead of findings | Nothing. A rule without it places findings, as before |
 | The unanswered notice and a reporter writing back go to whoever holds the report, the members of the team whose queue it is in, or everybody who works reports in the product where nobody holds it | Nothing. Every report the upgrade carries is held by nobody, so its notices reach whom they reached in v0.10.2 |
 | Withdrawing a role that is not somebody's last, a group-bound sign-in that derives fewer roles, the first sign-in after the switch into group-bound mode, a switch out of it, taking somebody off a team and retiring a team hand back the work they leave with a holder who may no longer read it. v0.10.2 handed work back only when somebody's last role on a product went, or they were deactivated | Nothing. Work v0.10.2 already left with somebody who cannot read it stays with them until a write names its holder |
 | A role held across every product counts in every notice's audience as a role on each product. v0.10.2 read per-product roles alone, so somebody reading a product only through such a role was told nothing about it | Nothing |
@@ -1426,13 +1427,30 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | The findings lists take `label`, `below_minimum_severity`, `decision` and `decision_state` in place of `tag`, `below_floor`, `claim` and `claim_state`. `GET /v1/advisories` takes `issue` in place of `vulnerability` | Rename them in the request. A former name is refused with 400, naming it |
 | Response and request fields use the words the interface uses: a claim is a decision, a decision's row at one occurrence is a decision occurrence, and a place is an occurrence | Rename the fields a client reads or sends, as [Renamed API fields](#renamed-api-fields) lists. A request carrying a former field name is refused with 422, naming it |
 | The CSV and JSON downloads name their columns the same way: `claim` is `decision`, `place` is `occurrence`, `places` is `occurrences`, and a count of a decision's rows beside a count of occurrences is `rows`. The file of somebody's own decisions downloads as `my-decisions` | Rename the columns a script reads |
+| What a build holds that the scanner cannot match downloads as `unmatched-components-…`, and the last upload per build as `last-uploads`, which v0.10.2 named `match-coverage-…` and `scanning`. The report is at `/analytics/last-upload-per-build`, and `/reports/scan-coverage` forwards there | Look for the new name where a script picks the file up by its name |
+| A product's planned upgrades and one build's download as `planned-upgrades-…`, which v0.10.2 named `fix-bundles-…` and `pending-upgrades-…` | Look for the new name where a script picks the file up by its name |
 | The findings lists and the planned upgrades sort by `occurrences` in place of `places` | Ask for `sort=occurrences`. The upgrade rewrites a saved filter's `sort=places`, `claim` and `claim_state` to `sort=occurrences`, `decision` and `decision_state` |
+| A finding's labels are `labels` in its response, which v0.10.2 named `tags`. The findings screen's address narrows by `label`, and a kept link narrowing by `tag` opens the list without that narrowing | Read `labels`. The upgrade rewrites a saved filter's `tag` to `label` |
 | The interface's addresses for a decision are `/decisions/{id}`, for a decision occurrence `/decision-occurrences/{id}`, and for a bulk decision `…/components/{component}/bulk-decision`. `/claims/{id}` and `…/components/{component}/decide` forward to them, with the query and fragment they arrived with | Nothing |
 | A bulk decision's `kind` is `bulk`, which v0.10.2 answered as `together` | A client matching on the kind matches `bulk`. The upgrade rewrites every stored one |
 | The notification kinds `claim-waiting` and `claim-lapsed` are `decision-waiting` and `decision-lapsed`, in the notifications, a webhook's body and a chat message | A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for either kind |
 | A notification v0.10.2 stored linking a decision's row at `/decisions/{id}` links `/decision-occurrences/{id}`, because `/decisions/{id}` is the decision itself | Nothing for a notification read in the application: the upgrade rewrites the link. A `/decisions/{id}` link already sent by mail or chat opens the decision with that identifier, which is a different record. Open the notification in the application instead |
-| The setting `triage.bulk-decision-cap` is the bulk action limit, which v0.10.2 named `triage.together-cap` | Nothing. The upgrade moves the value to the new name, and `/v1/settings/triage.together-cap` answers 404. A value written under the former name afterwards, by a v0.10.2 still running, is read while the new name is unset, and each start logs `a setting is held under its former name and is read from there: set it under its new name`. With both set, the new one is read, and the start logs `a setting is held under its former name and its new one: the new one is read`. Changing the setting under its new name removes the former one and ends the warning |
-| The upgrade renames the triage tables and columns, then rewrites the stored values above. Each rename waits up to three seconds for a table another session holds, then waits again, logging `a rename is waiting for a table something else holds` with what holds it | Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end |
+| The setting `triage.bulk-decision-cap` is the bulk action limit, which v0.10.2 named `triage.together-cap`, and `triage.minimum-severity` is the minimum severity, which v0.10.2 named `triage.floor` | Nothing. The upgrade moves the value to the new name, and `/v1/settings/triage.together-cap` and `/v1/settings/triage.floor` answer 404. A value written under the former name afterwards, by a v0.10.2 still running, is read while the new name is unset, and each start logs `a setting is held under its former name and is read from there: set it under its new name`. With both set, the new one is read, and the start logs `a setting is held under its former name and its new one: the new one is read` |
+| Response fields name an incident: `exploited_here` is `incident` where it says whether one stands, and `incidents` on a finding's evidence and on a bulk decision's outliers | Rename the fields a client reads, as [Renamed API fields](#renamed-api-fields) lists |
+| The notification kinds `obligation-open`, `obligation-near` and `obligation-passed` are `response-window-open`, `response-window-near` and `response-window-passed`, in the notifications, a webhook's body and a chat message | A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for any of them |
+| A change on the administrative trail recording or clearing an incident, or naming its fix, has the kind `incident`, which v0.10.2 answered as `exploited-here`. The trail's `kind` filter takes `incident` | Ask for `kind=incident`. The upgrade rewrites every stored change. A change to a window v0.10.2 recorded keeps saying `Obligation window` in what it was about; one recorded after says `Response window` |
+| The planned upgrades download names its `exploited here` column `incident` | Rename the column a script reads |
+| The interface's address for incidents and response windows is `/incidents`. `/exploited-here` and `/obligations` forward to it | Nothing |
+| Screens are renamed: Reports is Analytics, at `/analytics`, Inbox is Vulnerability reports, at `/products/{product}/vulnerability-reports`, Disclosing is Disclosure deadlines, at `/disclosure-deadlines`, Report a flaw is Record a flaw, at `/record-a-flaw`, and The record is Audit log, at `/audit-log`. Advisories is Published advisories and Scan results is Known vulnerability scan, at the addresses they had | Nothing. An address v0.10.2 served forwards to the screen's new one, with its query |
+| A finding with no deadline because it is below its product's minimum severity says `below-minimum-severity` as its `no_deadline`, which v0.10.2 answered as `below-the-line` | A client matching on the reason matches the new word |
+| The administrative trail's kind for an assignment rule is `assignment-rule`, which v0.10.2 named `routing`, in each change and in `GET /v1/administration/changes` | Ask for `kind=assignment-rule`. The upgrade rewrites every stored change |
+| The setting `assignment.batch` is how many findings one pass of the assignment rules places, which v0.10.2 named `routing.batch` | Nothing. The upgrade moves the value to the new name, and a value under the former name is read as one under `triage.together-cap` is |
+| The background job applying the assignment rules is `assignment.sweep`, which v0.10.2 named `routing.sweep` | A monitor matching on the job's kind matches the new one. The upgrade rewrites every stored job |
+| Every read narrowing by a branch or tag, the findings lists and the code findings among them, takes `branch_or_tag` in place of `stream`. The review queue takes `branch_or_tag` in place of `release` | Rename the parameter in the request. A former name is refused with 400, naming it |
+| A branch or tag is `branch_or_tag` in every response and request, its label `branch_or_tag_name` and its kind `branch_or_tag_kind`, which v0.10.2 named `stream`, `stream_name` and `stream_kind` | Rename the fields a client reads or sends, as [Renamed API fields](#renamed-api-fields) lists |
+| The downloads name the column `branch_or_tag` and its label `branch or tag name`, which v0.10.2 named `stream` and `stream name` | Rename the columns a script reads |
+| The interface's addresses under `/products/{product}/streams` are under `/products/{product}/branches-and-tags`, and the former ones forward there. The findings screen and the review queue narrow by `branch_or_tag`, and a kept link narrowing by `stream` or `release` opens the list without that narrowing | Nothing |
+| The upgrade renames tables and columns, then rewrites the stored values above. On a database holding a million rows a table it takes 2.6 s on PostgreSQL, 6.4 s on MySQL, 6.2 s on MariaDB and 8.4 s on SQLite. Each rename waits up to three seconds for a table another session holds, then waits again, logging `a rename is waiting for a table something else holds` with what holds it | Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end |
 
 #### Renamed API fields
 
@@ -1451,6 +1469,16 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | `place` | `occurrence` |
 | `places` | `occurrences` |
 | `place_limit` | `occurrence_limit` |
+| `exploited_here`, whether an incident stands | `incident` |
+| `exploited_here`, a finding's incidents or a count of issues with one | `incidents` |
+| `summary`, on a vulnerability report | `reported_problem` |
+| `triage_floor`, a product's own | `minimum_severity` |
+| `floor`, setting a product's minimum severity, on the findings list and on a build's readiness | `minimum_severity` |
+| `routed_by`, the rule that placed a finding | `assigned_by_rule` |
+| `tags`, the labels on a finding | `labels` |
+| `stream` | `branch_or_tag` |
+| `stream_name` | `branch_or_tag_name` |
+| `stream_kind` | `branch_or_tag_kind` |
 
 A notice's `places`, the places it named, keeps its name.
 
@@ -1458,7 +1486,7 @@ A notice's `places`, the places it named, keeps its name.
 
 Every path below `/v1/products/{product}/streams` moves below
 `/v1/products/{product}/branches-and-tags`, and `…` below is a build's address,
-`/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}`. A path
+`/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}`. A path
 under it absent from the table keeps the rest of its address.
 
 | Former path | Path |
@@ -1468,15 +1496,6 @@ under it absent from the table keeps the rest of its address.
 | `…/findings/{vulnerability}/places/{place}/decision` | `…/findings/{issue}/occurrences/{occurrence}/decision` |
 | `…/findings/{vulnerability}/places/{place}/decision/reaffirmation` | `…/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation` |
 | `…/findings/{vulnerability}/places/{place}/reach` | `…/findings/{issue}/occurrences/{occurrence}/reach` |
-| `…/leads/{place}` | `…/code-findings/{occurrence}` |
-| `…/leads/{place}/assignment` | `…/code-findings/{occurrence}/assignment` |
-| `…/leads/{place}/collaborators` | `…/code-findings/{occurrence}/collaborators` |
-| `…/leads/{place}/collaborators/{identity}` | `…/code-findings/{occurrence}/collaborators/{identity}` |
-| `…/leads/{place}/decision` | `…/code-findings/{occurrence}/decision` |
-| `…/leads/{place}/fixed` | `…/code-findings/{occurrence}/fixed` |
-| `…/leads/{place}/hand-off` | `…/code-findings/{occurrence}/flaw` |
-| `…/leads/{place}/hand-off/withdrawal` | `…/code-findings/{occurrence}/flaw/withdrawal` |
-| `…/leads/{place}/move` | `…/code-findings/{occurrence}/flaw/disclosure` |
 | `…/match-coverage` | `…/unmatched-components` |
 | `…/match-coverage.{format}` | `…/unmatched-components.{format}` |
 | `…/pending-upgrades` | `…/planned-upgrades` |
@@ -1514,13 +1533,6 @@ under it absent from the table keeps the rest of its address.
 | `/v1/products/{product}/fix-bundles` | `/v1/products/{product}/planned-upgrades` |
 | `/v1/products/{product}/fix-bundles.{format}` | `/v1/products/{product}/planned-upgrades.{format}` |
 | `/v1/products/{product}/issues/{vulnerability}/exploited-here` | `/v1/products/{product}/issues/{issue}/incidents` |
-| `/v1/products/{product}/issues/{vulnerability}/lead` | `/v1/products/{product}/issues/{issue}/code-finding` |
-| `/v1/products/{product}/lead-rules` | `/v1/products/{product}/suppression-rules` |
-| `/v1/products/{product}/lead-rules/{id}` | `/v1/products/{product}/suppression-rules/{id}` |
-| `/v1/products/{product}/lead-rules/{id}/approval` | `/v1/products/{product}/suppression-rules/{id}/approval` |
-| `/v1/products/{product}/lead-series` | `/v1/products/{product}/code-finding-series` |
-| `/v1/products/{product}/leads` | `/v1/products/{product}/code-findings` |
-| `/v1/products/{product}/leads.{format}` | `/v1/products/{product}/code-findings.{format}` |
 | `/v1/products/{product}/routing-rules` | `/v1/products/{product}/assignment-rules` |
 | `/v1/products/{product}/routing-rules/preview` | `/v1/products/{product}/assignment-rules/preview` |
 | `/v1/products/{product}/routing-rules/{id}` | `/v1/products/{product}/assignment-rules/{id}` |
@@ -1532,3 +1544,70 @@ under it absent from the table keeps the rest of its address.
 | `/v1/scanning.{format}` | `/v1/last-uploads.{format}` |
 | `/v1/work/set-aside` | `/v1/failed-jobs` |
 | `/v1/work/set-aside/{id}/retry` | `/v1/failed-jobs/{id}/retry` |
+
+#### Renamed operations
+
+A client generated from the API document names its functions by operation, so
+these functions are renamed. Two former identifiers now name another
+operation: `get-decision` reads a decision, which v0.10.2 named `get-claim`,
+and `reaffirm-decision` reaffirms everything one decision covers, which
+v0.10.2 named `reaffirm-claim`.
+
+| Former operation | Operation |
+|---|---|
+| `add-advisory-source` | `add-supplier-advisory-feed` |
+| `add-routing-rule` | `add-assignment-rule` |
+| `amend-stream` | `amend-branch-or-tag` |
+| `approve-claim` | `approve-decision` |
+| `change-obligation-window` | `change-response-window` |
+| `clear-exploited-here` | `clear-incident` |
+| `comment-on-claim` | `comment-on-decision` |
+| `decide-together` | `decide-in-bulk` |
+| `declare-obligation-window` | `declare-response-window` |
+| `declare-stream` | `declare-branch-or-tag` |
+| `export-fix-bundles` | `export-planned-upgrades` |
+| `export-match-coverage` | `export-unmatched-components` |
+| `export-my-claims` | `export-my-decisions` |
+| `export-pending-upgrades` | `export-build-planned-upgrades` |
+| `export-scanning` | `export-last-uploads` |
+| `get-claim` | `get-decision` |
+| `get-decision` | `get-decision-occurrence` |
+| `get-match-coverage` | `list-unmatched-components` |
+| `get-pending-upgrades` | `list-build-planned-upgrades` |
+| `get-vex-issued` | `get-published-vex` |
+| `list-advisory-sources` | `list-supplier-advisory-feeds` |
+| `list-audit-claims` | `list-audit-decisions` |
+| `list-claim-approvals` | `list-decision-approvals` |
+| `list-claim-comments` | `list-decision-comments` |
+| `list-claim-revisions` | `list-decision-revisions` |
+| `list-decisions` | `list-decision-occurrences` |
+| `list-fix-bundles` | `list-planned-upgrades` |
+| `list-my-claims` | `list-my-decisions` |
+| `list-obligation-windows` | `list-response-windows` |
+| `list-obligations` | `list-incidents` |
+| `list-patch-branch-progress` | `list-patch-branch-lookups` |
+| `list-routing-rules` | `list-assignment-rules` |
+| `list-scanning` | `list-last-uploads` |
+| `list-set-aside-work` | `list-failed-jobs` |
+| `list-streams` | `list-branches-and-tags` |
+| `list-tags` | `list-labels` |
+| `list-vex-issuances` | `list-published-vex` |
+| `point-claim-elsewhere` | `point-decision-elsewhere` |
+| `preview-routing-rule` | `preview-assignment-rule` |
+| `reaffirm-claim` | `reaffirm-decision` |
+| `reaffirm-decision` | `reaffirm-finding-decision` |
+| `record-exploited-here` | `record-incident` |
+| `record-vex-issued` | `record-published-vex` |
+| `retire-obligation-window` | `retire-response-window` |
+| `retire-routing-rule` | `retire-assignment-rule` |
+| `retire-stream` | `retire-branch-or-tag` |
+| `retry-set-aside-work` | `retry-failed-job` |
+| `revise-claim` | `revise-decision` |
+| `send-claim-back` | `send-decision-back` |
+| `set-product-triage-floor` | `set-product-minimum-severity` |
+| `set-stream-end-of-life` | `set-branch-or-tag-end-of-life` |
+| `split-claim` | `split-decision` |
+| `tag-finding` | `label-finding` |
+| `untag-finding` | `unlabel-finding` |
+| `withdraw-advisory-source` | `withdraw-supplier-advisory-feed` |
+| `withdraw-claim` | `withdraw-decision` |

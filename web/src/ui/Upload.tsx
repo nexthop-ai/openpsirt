@@ -17,7 +17,7 @@ import { Required } from "./Required";
 import { uploadsAt } from "../app/routes";
 
 // The build an upload is sent to.
-type Target = { product: string; stream: string; variant: string };
+type Build = { product: string; branch_or_tag: string; variant: string };
 
 // Uploading an inventory by hand: the same endpoint a pipeline uses, for a
 // build with no automation yet, or for trying the tool on any SBOM to hand.
@@ -28,7 +28,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const navigate = useNavigate();
   const queries = useQueryClient();
   const [product, setProduct] = useState(at.product ?? "");
-  const [stream, setStream] = useState(at.stream ?? "");
+  const [branchOrTag, setBranchOrTag] = useState(at.branch_or_tag ?? "");
   const [variant, setVariant] = useState(at.variant ?? "");
   const [inventory, setInventory] = useState<File | null>(null);
   const [suppressions, setSuppressions] = useState<File[]>([]);
@@ -36,11 +36,11 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
   // rather than answered with the receipts screen, because nothing new is
   // waiting there and arriving on it reads as the upload having been taken.
   // Held with the build it was uploaded to, so the way to it names that build
-  // whatever the target has been changed to since.
+  // whatever the build has been changed to since.
   const [held, setHeld] = useState<{
     scan: number;
     product: string;
-    stream: string;
+    branch_or_tag: string;
     variant: string;
   } | null>(null);
   // Whether this opening of the drawer has tried an upload. A failure belongs
@@ -54,7 +54,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
   useReseed(String(open), () => {
     if (!open) return;
     setProduct(at.product ?? "");
-    setStream(at.stream ?? "");
+    setBranchOrTag(at.branch_or_tag ?? "");
     setVariant(at.variant ?? "");
     setInventory(null);
     setSuppressions([]);
@@ -62,20 +62,20 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
     setTried(false);
   });
 
-  const { products, streams, variants } = useCatalog(open, product);
+  const { products, branchesAndTags, variants } = useCatalog(open, product);
 
   // The build is the mutation's variables rather than read from the form, so
   // what happens after the upload answers is about the build it was sent to.
   // A pending mutation is handed the latest render's options, and the pickers
   // can move while the file is on its way.
   const upload = useMutation({
-    mutationFn: async (to: Target) => {
+    mutationFn: async (to: Build) => {
       const form = new FormData();
       if (inventory) form.append("inventory", inventory);
       for (const each of suppressions) form.append("suppressions", each);
       return unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms",
           {
             params: { path: to },
             // The client would otherwise serialize this as JSON; a multipart
@@ -101,7 +101,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
     },
   });
 
-  const ready = !!product && !!stream && !!variant && !!inventory && !upload.isPending;
+  const ready = !!product && !!branchOrTag && !!variant && !!inventory && !upload.isPending;
 
   return (
     <Drawer
@@ -117,7 +117,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
             onClick={() => {
               setTried(true);
               setHeld(null);
-              upload.mutate({ product, stream, variant });
+              upload.mutate({ product, branch_or_tag: branchOrTag, variant });
             }}
           >
             {upload.isPending ? "Uploading…" : "Upload"}
@@ -140,8 +140,8 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         <div className="alert info">
           <strong>Already held</strong>
           <span>
-            {held.product} · {held.stream} · {held.variant} already holds this inventory, as scan{" "}
-            {held.scan}. Nothing was queued.{" "}
+            {held.product} · {held.branch_or_tag} · {held.variant} already holds this inventory, as
+            scan {held.scan}. Nothing was queued.{" "}
             <Link to={uploadsAt(held)} onClick={onClose} className="linkish">
               View uploads →
             </Link>
@@ -150,7 +150,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       )}
 
       <div className="field">
-        <label htmlFor="up-product">Target</label>
+        <label htmlFor="up-product">Build</label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <select
             id="up-product"
@@ -159,7 +159,7 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
             value={product}
             onChange={(event) => {
               setProduct(event.target.value);
-              setStream("");
+              setBranchOrTag("");
               setVariant("");
             }}
           >
@@ -173,12 +173,12 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <select
             aria-label="Branch or tag"
             style={{ flex: 1, minWidth: 110 }}
-            value={stream}
+            value={branchOrTag}
             disabled={!product}
-            onChange={(event) => setStream(event.target.value)}
+            onChange={(event) => setBranchOrTag(event.target.value)}
           >
             <option value="">Select a branch or tag</option>
-            {(streams.data?.items ?? []).map((each) => (
+            {(branchesAndTags.data?.items ?? []).map((each) => (
               <option key={each.name} value={each.name}>
                 {each.name}
               </option>
@@ -200,9 +200,9 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
           </select>
         </div>
         <Unread of={products} what="The products could not be read." />
-        <Unread of={streams} what="The branches and tags could not be read." />
+        <Unread of={branchesAndTags} what="The branches and tags could not be read." />
         <Unread of={variants} what="The variants could not be read." />
-        <span className="hint">Must already be declared. Undeclared targets are refused.</span>
+        <span className="hint">Must already be declared. Undeclared builds are refused.</span>
       </div>
 
       <div className="field">

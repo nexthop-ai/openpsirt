@@ -14,7 +14,7 @@ import (
 // names of the operation it stands for, because the handler reads them by
 // name; a caller never sees a parameter's name.
 const (
-	FormerUpload        = "/v1/products/{product}/streams/{stream}/variants/{variant}/scans"
+	FormerUpload        = "/v1/products/{product}/streams/{branch_or_tag}/variants/{variant}/scans"
 	FormerUploadChanges = FormerUpload + "/{sbom}/changes"
 )
 
