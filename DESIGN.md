@@ -33,7 +33,14 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | Document | Covers | Terms |
 |---|---|---|
 | [triage](design-docs/triage.md) | What people decide about findings, and when a decision stops applying | decision identity, expiry, outcomes, approval, rights, bulk decisions, review queue, extensions, minimum severity, issue assessments, reach across builds, re-affirmation, lapse |
-| [remediation](design-docs/remediation.md) | Declared fix intent and whether it arrived | planned upgrades, resolution, deadlines, version ordering, promise states, advisory, CSAF document, VEX document, issuance, provider directory |
+| [remediation](design-docs/remediation.md) | Declared fix intent and whether the next scan says it arrived | commitment, fold, coverage, commitment changes, promise states, landed, lapsed, planned upgrades of a build, build-declared suppressions, external links, tracker hand-off |
+| [remediation-deadlines](design-docs/remediation-deadlines.md) | How long a finding has, when its clock starts, and why one has none | deadline, clock start, exploitation date, known-exploited listing, no-deadline reasons, upstream refusal, tag, end-of-life, recount, recorded flaw windows |
+| [remediation-currency](design-docs/remediation-currency.md) | Asking public package indexes for the newest version | upstream currency, package index, lease, answer classes, names held back, namespace, unanswered components |
+| [remediation-versions](design-docs/remediation-versions.md) | Which of two versions is further along, per ecosystem | version ordering, candidate counts, Debian, RPM, Alpine, PEP 440, Maven, NuGet, published suites, unranked, version refusals |
+| [remediation-advisories](design-docs/remediation-advisories.md) | Advisories as records, their agreement and their issuances | publication adapters, advisory identifier, editorial state, editions, agreement, issuance, settled digest, delivered checksum, publisher identity |
+| [remediation-csaf](design-docs/remediation-csaf.md) | The CSAF document generated for one advisory | CSAF 2.0, profile, distribution label, release status, marked affected, remediations, scores, weakness names, product identification |
+| [remediation-vex](design-docs/remediation-vex.md) | The OpenVEX document of one build | document kinds, with suppliers, statements, patches, supplier statements, earliest decision, statements about one occurrence, VEX revisions |
+| [remediation-directory](design-docs/remediation-directory.md) | Issued advisories written as a static CSAF provider directory | provider directory, travel, year folder, provider-metadata.json, index.txt, changes.csv, ROLIE feed, hash files |
 | [incidents](design-docs/incidents.md) | A regulator's questions after an incident | stored facts, response windows, notices, fix releases, the shelf |
 
 ## Access and the API
@@ -49,15 +56,16 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 |---|---|---|
 | [analytics](design-docs/analytics.md) | Figures and what each counts | counting unit, trends, build comparison, release note, deadline compliance, release readiness, disposition register, exports |
 | [notifications](design-docs/notifications.md) | What a person is told, through which channel, and when | events, conditions, mentions, report audience, digest, mail, outbound HTTP, chat, embargo notices |
-| [publishing](design-docs/publishing.md) | Security documents served without signing in | advisories served, statements, CSAF VEX, OpenVEX, revisions, digests and signatures, publishing pass |
+| [publishing](design-docs/publishing.md) | Security documents served without signing in | switches, served surface, rate limit, advisories served, statements, statement scope, CSAF VEX, OpenVEX, revisions, digests and signatures, publishing pass |
+| [publishing-measurements](design-docs/publishing-measurements.md) | The benchmark run behind the published documents | document sizes, feed timing, pass duration |
 
 ## Interface and text
 
 | Document | Covers | Terms |
 |---|---|---|
 | [interface](design-docs/interface.md) | The web interface and how it reaches the server | routing, generated client, the shell, findings list, filters, saved filters, finding screen, decision form, review queue, editor, keyboard, screen copy |
-| [text](design-docs/text.md) | Text people write, and where it is checked and rendered | markdown policy, raw markup, link schemes, issue references, refusals, code block language tags, bounds |
-| [attachments](design-docs/attachments.md) | Files on an issue or a report | references in text, fetch authorization, storage, delivery, quota and removal |
+| [text](design-docs/text.md) | Text people write, and where it is checked and rendered | markdown policy, sanitizing, raw markup, link schemes, issue references, images, escaping third-party text, refusals, code block language tags, bounds |
+| [attachments](design-docs/attachments.md) | Files on an issue or a report | references in text, attachment subjects, fetch authorization, object store, store credentials, plaintext store, delivery, response headers, quota and removal, reaper, redaction |
 
 ## Platform
 
