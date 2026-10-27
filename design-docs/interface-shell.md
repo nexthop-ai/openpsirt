@@ -81,7 +81,7 @@ moves to the other.
 | A narrowed screen and every panel in it say what they count | A narrowed chart labeled "all products" is believed by its label |
 | A branch or variant with no product above it is dropped on the way out | The server refuses it |
 | Picking a branch keeps the product's variants in the column until the release's arrive | A superset; a blank column reads as lost choices |
-| The picker asks for no counts; the two screens whose subject they are pass a parameter for them | Counts are the expensive half of a catalog read (`design-docs/interface-catalog.md` § Catalog and uploads) |
+| The picker asks for no counts; the products, branches and variants screens, whose subject they are, pass a parameter for them | Counts are the expensive half of a catalog read (`design-docs/interface-catalog.md` § Catalog and uploads) |
 | Variants are unselectable on a build screen until a branch is picked | A variant over no branch changes nothing |
 | A run or an inventory's changes, rescoped, lands on the new build's Uploads | Both are numbered within the old build |
 | A screen saying what it needs picked opens this picker and brings the bar into view | One picker; the bar does not follow the page down |
@@ -98,19 +98,18 @@ are the slowest read.
 |---|---|
 | Open is the trend's latest point at every scope, counting distinct issues | A tile switching unit as the picker moves quotes two figures for one word |
 | What became of decisions is counted from a page read, and the tile says where the page was cut | It is derived, with no count to ask for |
-| Every figure opens the list it counts, narrowed as counted: the aging buckets and both deadline tiles included | |
+| Every figure opens the list it counts, narrowed as counted, the aging buckets included (`design-docs/interface-administration.md` § Analytics) | |
 | A figure counting anything closed opens nothing | The findings list holds what is open (`design-docs/analytics.md`) |
 
 | Panel | Rule |
 |---|---|
 | Release readiness | The picked branch against the last release cut from it, band by band, the move shown as a direction colored by meaning (fewer is better). Drawn only for a whole build on a branch |
 | Quiet builds | A build no longer scanned, named one at a time. Also on the scans screen. It reports nothing new and fails nothing, so looks healthy |
-| Overdue and due soon | One read of the deadline list. Overdue is what happened; due soon is the week left. Each opens the deadline list it counts |
-| Incidents | Standing incidents, one per issue and product, from the shelf, narrowed to the picked product, opening the shelf narrowed so. Its own tile beside known exploited. Drawn only where there is one. A branch or variant scope counts the whole product and says so, since an incident is against a product |
-| Deadline floors | The read is capped and ordered soonest first, so a cut page holding a row still due holds every overdue row. Overdue is a floor only where the whole cut page is overdue; due soon wherever the page is cut. The all-products figure follows the same rule over its own read |
+| Incidents | Standing incidents, one per issue and product, from the shelf, narrowed to the picked product, opening the shelf narrowed so. Its own tile beside known exploited, because the feed's count says nothing about this product. Drawn only where there is one. A branch or variant scope counts the whole product and says so, since an incident is against a product |
+| Overdue and due soon | One read of the deadline list, each tile opening the list it counts. The read is capped and ordered soonest first, so a cut page holding a row still due holds every overdue row. Overdue is a floor only where the whole cut page is overdue; due soon wherever the page is cut. The all-products figure follows the same rule over its own read |
 | Review queue count | One count per product: the rail's badge, the pending figure and the across-products figure are one request under one key, polled once a minute by the rail |
 | Assigned to you | What the reader and their teams hold, in the list's unit, with the reports they hold beside it, never among them: a report is against a product and no build |
-| In progress | How much each person and team holds, open findings and reports together, the reader's own row first |
+| In progress | How much each person and team holds, open findings and reports together, three rows, the reader's own first |
 
 ## The search box
 
@@ -119,7 +118,7 @@ chosen (REQ-64).
 
 | Rule | Reason |
 |---|---|
-| It matches issue names, aliases included, and component names | "Where is this in what we ship" is asked by the name the reporter used |
+| It is labeled "Find a component or an issue" and matches issue names, aliases included, and component names | "Where is this in what we ship" is asked by the name the reporter used |
 | One box, never two fields | Somebody typing a name does not classify it |
 | It asks at the picker's selection, including none, which is every product the reader sees | Returning without navigating swallows what was typed |
 | A term resolving to an issue goes to the issue, decided by asking | A second copy of name resolution is wrong about minted identifiers |

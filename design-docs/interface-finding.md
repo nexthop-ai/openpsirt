@@ -34,7 +34,6 @@ The finding is the working screen before a decision and after it.
 | What the build says is a card above the received VEX, shown whatever is decided | A mark the build put on an occurrence stays |
 | What is neither evidence nor action (the timeline, revisions, comments, holder, assessment) stays below | |
 | Triage is one pane: who is dealing with it and what was decided. With nothing left to decide the form is not drawn and the assignee stands alone | Reassigning a decided finding is ordinary |
-| Where a fix will land is not on this screen | The promising decision names its releases; the release and the build's waiting list say what became of it |
 | The identifier in the heading opens the issue screen | Everywhere this issue sits |
 
 ### Screen parts
@@ -44,16 +43,16 @@ The finding is the working screen before a decision and after it.
 | It says when it runs out and who holds it | |
 | It says how many of its occurrences are decided (REQ-57); the count the build argued away in its own VEX does not stand in | That reasoning is not ours |
 | It states how the match was made and where it came from (REQ-13), and nothing where the scanner said nothing | Unknown is not unconfirmed |
-| Where to read about it is derived from the identifiers on the server (REQ-18): the issue's record, each alias's, the packaging distribution's answer, the package's page; apart from the scanner's links, empty where a name resolves to no known scheme, fetched from nowhere | A machine client gets the same list |
+| Where to read about it is derived from the identifiers on the server at read time (REQ-18): the issue's record, each alias's, the packaging distribution's answer, the package's page; apart from the scanner's links, empty where a name resolves to no known scheme, fetched from nowhere | A machine client gets the same list |
 | Where it sits shows the chain | One parent is reached by several routes |
 | Where upstream currency is on (REQ-69), it says what upstream released and when; where an issue was named a full year after the last release and is unfixed, that is why there is no fix, never a claim the project is abandoned. Off, the panel is absent | Two year-numbers make five weeks look like five years |
-| The references are cut at twelve, patches first, then advisories and reports, with how many more | |
+| The references are cut at twelve, patches first, then advisories and reports; the rest are a control away, with how many | |
 | A shortened description is cut at a whole character with a mark after it | |
 | A patch link carries the branches its commit is on once its repository was asked: three by name in version order, the rest counted, all on hover; a commit the repository lacks says so; not yet asked carries nothing (`design-docs/findings-patch-branches.md` § Display) | "Not yet" is no fact about the patch |
 | A publisher's claim carries the version it was made about, is shown at every version, and offers to fill the form only at that version | An advisory names the fixed version, not the shipped one |
 | An upstream's statement says what it is here (applying by itself, offered for review, or declined), links the upstream's document where the address may be sent to a reader, and offers a triager decline or take back (`design-docs/upstream.md` § Declined statements) | |
 | An occurrence a supplier's statement answers on some routes says so at the end of its way down, naming the supplier's product, the supplier on hover | Open and not work; the routes outside are what is left to judge |
-| The rating form offers the four bands; a published "negligible" or "none" opens it on medium | |
+| The rating form offers the four bands; a published "negligible" or "none" opens it on medium | Nothing it offers is milder than either |
 | A recorded flaw is closed from its own finding screen, the only kind offered the control; the panel says nothing else closes it and nothing reopens it | A scanner's finding is resolved by scans |
 | Starting an advisory mints one name, kept once it exists, and names the flaw once; a failed later step retries from where it stopped | A retry spends no second number |
 | What belongs to one finding is reset on walking to the next: the confirmation, the decision being extended, the rating form, the incident forms | The screen is not remounted on an address change |
@@ -72,7 +71,7 @@ these, and its "affected" gathers the workarounds.
 
 | Rule | Reason |
 |---|---|
-| The first six ways down are shown; the rest unfold from a secondary button naming what it adds, "Show 24 more", then "Show fewer" | |
+| The first six ways down are shown; the rest unfold from a secondary button naming what it adds, "Show 24 more", then "Show fewer" | Somebody deciding whether to click wants how many they have not seen |
 | The link into the tree sits apart at the row's far end; the row wraps at a phone's width | Two inline controls read as one run of text |
 | One row per occurrence (`design-docs/findings.md` § Work across builds) | |
 
@@ -85,8 +84,9 @@ these, and its "affected" gathers the workarounds.
 
 ### Notes and comments
 
-The notes and the decision's comments are two threads (REQ-29), drawn by one
-thread component with each caller's own words.
+The notes and the decision's comments are two threads (REQ-29) in two cards, drawn
+by one thread component with each caller's own words; two editors in one card
+read as one form.
 
 | Thread | Shown | Says |
 |---|---|---|
@@ -123,7 +123,7 @@ claim too.
 | One vocabulary carries the labels; both choosing forms read it and every display goes through one renderer; a test asserts every allowed value is listed with a label that is not its token | |
 | Whom the statement holds for is offered unchosen: the reason decides, or anyone shipping this version, or this build only; the select's title says which reasons decide which. Not offered on a deferral. Kept with the draft | |
 | The form is rebuilt when what it decides changes, a scope change included | Otherwise it offers one build's answers against another |
-| The second-person hint reads the outcome's published class (`design-docs/interface-look.md` § Interface-wide rules) | |
+| The second-person hint reads the outcome's published class (`design-docs/interface-look.md` § Interface-wide rules): an outcome hiding no risk needs nobody, and one hiding risk with no date always waits for a second person. Of the dated ones it tells a deferral from a promise by name | Their dates are measured against different things |
 
 Which locations a decision covers is a summary with an exception (REQ-26): "all
 62 locations"; "exclude locations" opens the list grouped by consumer, the axis
@@ -137,7 +137,7 @@ filter box past a dozen. It reads back "59 of 62, three left open under X".
 
 ## The reach sheet
 
-A guided review on submit (REQ-25). It opens on a summary: this build, builds
+A guided review on submit (REQ-25), never a list of checkboxes. It opens on a summary: this build, builds
 covered automatically, builds at other versions, any not offered. Builds at
 other versions are one list, unticked to start and ticked where the reasoning
 holds there, because a tick is the decision. Two steps (where it applies, then
@@ -149,7 +149,7 @@ what will be written, and only then is anything sent.
 | A build is one entry, however many occurrences reach it; a build at another version is one entry per version | Each version is a separate decision |
 | The decision here is recorded first, then each build applied in turn, narrowed where occurrences were excluded; a refusal on one does not decide the rest | |
 | The reach is answered whole, never sampled | What is offered is what is written |
-| The review step is skipped where no build holds this issue at another version; builds already matching are named in the confirmation | About 300 keystrokes a day otherwise |
+| The review step is skipped where no build holds this issue at another version; builds already matching are named in the confirmation | At about 150 decisions a day, some 300 keystrokes confirm nothing |
 | This build is counted in consumers, the scope control's unit; what is written in occurrences. A build at another version is counted in occurrences | Its consumers are not read |
 | An unread reach is not an empty one: the sheet is skipped only when every read succeeded | |
 | Every build at another version is offered | The reach read does not order versions |
@@ -164,7 +164,7 @@ confirmation is never a toast, and nothing navigates away.
 | Deciding on the finding screen | Directly above the card it produced, brought into view once drawn | The next finding, and the decision's page where it waits |
 | Deciding from a row's preview | Under the row while listed, in its place once a re-read drops it, at the page's end or over the empty list where neither it nor the next row is listed; the cursor moves to the following row | The decision's page where it waits |
 | A bulk decision | Above the submit button | The decision's page |
-| Promising an upgrade on the component screen | In place of the form | The decision's page where it waits; each build's planned upgrades for three or fewer, else the release they share, or the product's releases |
+| Promising an upgrade on the component screen | In place of the form | The decision's page where it waits; each build's planned upgrades for three or fewer, else the release they share, or the product's releases where they span several |
 | Moving a disclosure date or disclosing | On the row or notice acted from, above the list where the row left it | The queue's disclosure dates where it waits |
 | Rating an issue | On the rating line the form opened from | The queue's ratings where it waits |
 | Reaffirming | On the card or tab acted from | The re-made decision's page where it waits; from the tab, each waiting page for three or fewer, else Mine, recent |
@@ -173,12 +173,11 @@ confirmation is never a toast, and nothing navigates away.
 | Rule | Reason |
 |---|---|
 | Waiting for a second person is said only where one is needed | |
-| A decision occurrence's address opens the decision page | |
+| A decision in force at once offers nothing past the next finding | |
 | The finding screen's confirmation follows the card | Submitting hides the form and the received VEX, about 900 pixels |
 
 ## Limits
 
 | Limit | Detail |
 |---|---|
-| A decision scoped to a consumer subtree is not built | Rejected by the owner |
-| What a publisher writes is evidence, never presentation | Shown unrendered (`design-docs/interface-flaws.md` § Flaw entry) |
+| Where a fix will land is not on this screen | The promising decision names its releases; the release and the build's waiting list say what became of it |

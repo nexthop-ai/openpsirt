@@ -4,7 +4,7 @@ The findings list: what a row is and carries, the list across products, sorting,
 paging and selection, the two other views, walking from one finding to the next,
 and the restored scroll position.
 
-Satisfies REQ-13, REQ-27, REQ-32, REQ-33, REQ-57, REQ-60, REQ-64, REQ-66.
+Satisfies REQ-13, REQ-27, REQ-32, REQ-33, REQ-55, REQ-57, REQ-60, REQ-64, REQ-66.
 
 ## Contents
 
@@ -28,15 +28,16 @@ on the component they are 7,648.
 |---|---|
 | A row says how many packages and consumers it covers | The units somebody acts in |
 | The occurrence count is stored, sorted on, and shown as the row's title | It is what the ceiling on one action is measured against and what the disposition register expands to |
-| The row previews in place: its plus opens the description and where the component sits under the row | Deciding is a click further on |
+| The row previews in place: its plus opens, under the row, the description, where the component sits, and the finding screen's decision form, with one link to the finding | What a decision requires and writes is unchanged |
 
 ### Row content
 
 | Rule | Reason |
 |---|---|
 | The row carries the first line of what the issue says about itself, cut on the server | Every reader and the export get one summary, and a page carries no paragraphs |
-| The summary is clamped to one line; the whole is on the finding and the row's title | Row height sets a page's height |
+| The summary is clamped to one line; the whole is on the finding and the row's title | Row height sets page height: fifty rows are five thousand pixels |
 | The version sits beside the component | Every line a row spends is fifty on a page |
+| Narrow screens get cards, never a table that scrolls sideways (REQ-55) | |
 | A row names both ends of the way down: the part of the product it belongs to, and what directly pulls it in, with the steps between counted | The ends are what differ between sibling rows |
 | Where its occurrences are reached different ways, the row says the pair shown is one of several | |
 | Where the inventory placed the component nowhere, it says so, never naming the product itself | |
@@ -51,9 +52,8 @@ Both ends of the way down cost one recursive statement for the page: the databas
 climbs from every consumer on the page and returns each node above them once,
 with the edges among them. Routes are drawn in memory, the shortest from a root
 to each consumer; a route over sixty-four steps is not drawn. The climb is
-bounded by the graph above the page however edges loop: thirty mutually
-dependent components read 33 nodes and 874 edges, where carrying each route's
-start and length in the statement read 1,651,800 rows.
+bounded by the graph above the page however edges loop
+(`design-docs/interface-measurements.md` § Ways down on the list).
 
 ## The cross-product list
 
@@ -62,7 +62,7 @@ the server the same filters from one definition.
 
 | Rule | Reason |
 |---|---|
-| Without a product, no subtree, "differs between builds" or spread across variants is offered or sent, and each is dropped from the query | A subtree is one build's edges; the others are statements about a selection. A filter nobody can see narrows silently |
+| Without a product, no subtree, "differs between builds" or spread across variants is offered or sent, and each is dropped from the query | A subtree is one build's edges; the others describe a selection; a hidden filter narrows silently |
 | "Only this variant" is offered and sent only where the selection names a variant | |
 | Deciding from the list and the export return once a product is picked | They are a product's own |
 | Saved filters are offered | A saved filter keeps no scope |
@@ -88,11 +88,9 @@ that is not a key leaves the list in its own order.
 | The columns deciding the next action come first: severity, deadline and decision state; the component, path, estimate, fix and reach may run off the edge | The table is 1,583 px in 1,088 at a 1,366 laptop |
 | An empty list names how many filters are in force and offers removing them all, or says nothing is open here where none was | |
 | A filter change keeps and dims the rows while the next answer is read, with `aria-busy` | Unmounting blanks the search box and takes the cursor |
-| A waiting screen shows a moving mark with no text beside the word; reduced motion stills it | A still page reads as stopped |
+| A waiting screen shows a moving mark beside the word; reduced motion stills it | A still page reads as stopped; the mark carries no text, so a screen reader hears the word once |
 | The views are tabs above the filters, each carrying its figure, the by-component and by-upgrade figures asked with a limit of zero | One narrowing at three grains: 7,455 rows by issue, 341 by component, 284 by upgrade |
 | The list opens by issue at any size; another view is a tab and an address chip that removes itself | A size threshold answers different questions on two products |
-| New today writes the date a day back into the address | A sent list means the same thing when opened |
-| A row is decided where it sits: opening it carries the finding screen's decision form over the list, with one link to the rest | Requirements and approval are unchanged |
 | Searching is submitted, never per keystroke, matching anywhere in a component name regardless of capitals | Each is a query over every open finding in the build |
 | A component's name opens the component, here and on the finding; narrowing and hiding are small acts beside it | One word, one meaning |
 
@@ -142,16 +140,16 @@ close: a build's planned upgrades read from the triager's end.
 
 ## List navigation
 
-The next finding is reachable without going back (REQ-60).
+The next finding is reachable without going back (REQ-60); the form sat at about
+1,550 pixels on a page of 2,800.
 
 | Rule | Reason |
 |---|---|
 | The list travels with the finding as one value in the address | A filter added to the list collides with nothing on the finding |
-| The page the list holds answers first: a neighbor on either side, or an end of the whole list, asks nothing; a finding at a page edge with more beyond asks for a window | |
+| The page the list holds answers first: a neighbor on either side, or an end of the whole list, asks nothing; a finding at a page edge with more beyond asks for the window below, where that window is wider than the page | |
 | The window is the list's page widened by one row at each end, and a neighbor is handed the list at its own page; at the largest page the window is the page and the walk ends at its edge | Widening backward alone leaves the page's last row outside its own window |
 | The row is found by what it is; where it cannot be, there is no walk | Under a state filter it may have moved |
 | A list that asked for everything is a list: present-and-empty differs from absent | |
-| After submitting, the next finding is offered first, and a waiting decision's own page second; a decision in force at once offers nothing more | |
 | What a saved filter prepares travels with the walk (`design-docs/interface-filters.md` § Saved filters) | |
 
 ## Restored position
@@ -173,5 +171,4 @@ makes.
 
 | Limit | Detail |
 |---|---|
-| The tree's way down is not drawn across builds | A chain belongs to one build's graph |
-| A route over sixty-four steps is not drawn | |
+| A row's way down is drawn within one build | A chain belongs to one build's graph; across builds the Path column names a build and a count (`design-docs/interface-shell.md` § The scope picker) |

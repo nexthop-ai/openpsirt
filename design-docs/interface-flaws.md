@@ -22,11 +22,11 @@ recorded. Not from the findings list: what is recorded is what the list lacks.
 
 | Rule | Reason |
 |---|---|
-| Where it came from is asked, with no default, as cards (REQ-37): found here asks for the finder and credit; sent in asks for the reporter, how to reach them, the credit, and the day it arrived | It decides the disclosure date and whether an answer is owed |
+| Where it came from is asked, with no default (REQ-37): found here asks for the finder and credit; sent in asks for the reporter, how to reach them, the credit, and the day it arrived | It decides the disclosure date and whether an answer is owed |
 | A link naming the source opens the form with it answered and changeable; Disclosure deadlines' "Record a reported flaw" is the one | Following it is choosing |
 | Filing and recording are one choice. Filed, it waits in Vulnerability reports; recorded, it asks for builds, component and severity, and its report is written in the same act. Somebody who may not work reports is offered recording alone | Filing is working reports |
 | Opened from a report, it records that report, reading the source from it, and recording accepts it | |
-| A recorded flaw opens on its issue page; a filed report on its own page | |
+| A recorded flaw opens on its issue page, with every build it landed in and the advisory panel; a filed report on its own page | |
 | The control appears only for somebody who may record: undisclosed needs private triage, already public the ordinary right; holding only the ordinary right offers the second, the first saying why not | |
 | It is undisclosed unless somebody says otherwise, as two stated options | The dangerous mistake is not the quiet one |
 | The disclosure date an outside undisclosed report gets is stated as this deployment's embargo, the `disclosure.after` length `session/me` publishes; before that answer arrives, the option names no length | |
@@ -34,10 +34,10 @@ recorded. Not from the findings list: what is recorded is what the list lacks.
 | Builds are sets of lines and variants ticked under one product, prefilled from the scope without constraint, the count of builds stated | One flaw is one issue in every build shipping the code |
 | The component is searched against what the build holds; a name held at two versions is asked | A typed name the server refuses |
 | The score is composed as a vector in words and computed on the server, settling the severity | One formula |
-| The scheme is picked and the metrics follow: version 4 asks eleven, version 3 eight; switching keeps shared answers | |
+| The scheme is picked and the metrics follow: version 4 asks eleven, version 3 eight, the two they share in different words; switching keeps shared answers | |
 | A new assessment is composed under 3.1; choosing version 4 says it publishes no score | A published advisory has no field for a version 4 score |
 | A score shows its scheme: beside the number where it leads, on the number where the band leads | The schemes are not comparable |
-| Weaknesses are suggested from the server's search over both name lists, most common first, and checked for shape only: CWE- and a number, at most sixteen; a bare number reads as that CWE | A picker refusing unknown identifiers refuses next year's |
+| Weaknesses are suggested from the server's search over both name lists, by number or by words, most common first, and checked for shape only: CWE- and a number, at most sixteen; a bare number reads as that CWE | A picker refusing unknown identifiers refuses next year's |
 | Names typed for a recorded flaw are on its reporter card, each removable; a scan-reported name is not. Removing the filed name moves the screen to the name it is refiled under | A removed name stops later scans landing on the flaw |
 | Proving files are attached on the same screen, stored against the report when filed and the issue when recorded; a file that fails is named and does not undo the record | The words are the finding |
 | Recorded here is a findings list filter, linked from this screen with the release line off | "Is this already filed" asks what exists |
@@ -59,7 +59,7 @@ is and § Dispositions what a ruling does.
 |---|---|
 | The link appears only for a reader of undisclosed work in the product, and the product page's link says how many rulings wait | |
 | The rail carries it under the scope for a reader of reports anywhere, declining where no product is picked or the reader may not read reports there | |
-| A reader who does not work reports sees no writing control; notes and correspondence are drawn without a composer. Approve is offered where the capability answer's ruling field says so | |
+| A reader who does not work reports sees no writing control (recording, editing, recording a message, writing a note, assigning, accepting, attaching, proposing, withdrawing); notes and correspondence are drawn without a composer. Approve is offered where the capability answer's ruling field says so | |
 | A problem somebody sent is called a vulnerability report wherever a person reads it | Analytics' named reports sit on the rail |
 | The reported problem, a message and a ruling's reason offer no mentions | Nothing reads a mention there |
 | A note offers mentions of readers of undisclosed work in the product; a name reaching nobody says so without why | |
@@ -70,8 +70,8 @@ is and § Dispositions what a ruling does.
 | A selection past the bulk action limit holds the button back and says why | |
 | The button is "Propose" where somebody else must agree, "Submit" where not, counting reports where more than one | |
 | A duplicate asks for the issue and says a closed one is rejected instead | |
-| A duplicate starting a disclosure date says "This starts a disclosure date of *date* on *flaw*.", adding "once somebody else agrees" past the threshold; asked of the server once typing pauses, and nothing shown where none would start | |
-| Approve is not offered to the ruling's proposer. Withdrawing, offered to whoever works reports, reads Withdraw to the proposer, Send back to others while waiting, Undo once in force | One act, three moments |
+| A duplicate starting a disclosure date says "This starts a disclosure date of *date* on *flaw*.", adding "once somebody else agrees" past the threshold; asked of the server once typing pauses; nothing is shown where none would start, which is also what an issue not found reads as | |
+| Approve is not offered to the ruling's proposer, whom the server tells apart, saying so on the ruling. Withdrawing, offered to whoever works reports, reads Withdraw to the proposer, Send back to others while waiting, Undo once in force | One act, three moments |
 | A report's page holds, in order: the reported problem, the holder, correspondence, notes, files, the judgment, history; the heading the reference and title | |
 | While unanswered, the judgment offers recording as a new flaw first, as a button, then accepting as a scanned issue, then a ruling; afterwards it shows the judgment | A real report is usually a new flaw |
 | A report found here reads "found here" in From, is never shown unanswered, and has no correspondence card | |
@@ -79,7 +79,7 @@ is and § Dispositions what a ruling does.
 | An edited problem shows the original beneath it with who replaced it and when; the versions between behind a toggle naming how many | |
 | The holder card is the finding's holder picker, asked for readers of undisclosed work, offered to whoever works reports while open; a team queue says so; once judged it names the last holder | |
 | Correspondence says "Not answered." with the line that the first sent message is the acknowledgement, then "Acknowledged" with its day and recorder; each message reads Sent or Received with its day and logger | |
-| Recording a message says it sends nothing: direction, day (today where empty), text, with files attached into it held on the report | |
+| Recording a message takes direction, day (today where empty) and text, with files attached into it held on the report, and says it sends nothing | |
 | History lists every act oldest first, one line each with moment and actor; a rule's placement says so | |
 | Rows carry the title beside the reference and the holder, a team marked team | |
 | The list's new-report control opens flaw entry with the product picked | One form for every report |
@@ -93,7 +93,7 @@ is and § Dispositions what a ruling does.
 |---|---|
 | A finding says whether it is disclosed, wherever shown (REQ-40) | A private reader must know what not to repeat |
 | A group is undisclosed when any occurrence is, and its date is the earliest, both read as aggregates by count | A maximum of the visibility word answers "public" for a mixed group |
-| The standing notice sits above everything on the finding page, naming where disclosure happens: a ticket, a commit message, a chat; the row's chip is secondary | |
+| The standing notice sits above everything on the finding page (REQ-40), naming where disclosure happens: a ticket, a commit message, a chat; the row's chip is secondary | |
 | A screen lists what is approaching disclosure (REQ-38): soonest first, past due at the top, a date moved from it; a product the reader may not read undisclosed work in contributes nothing, not even a count (`design-docs/access.md`) | The list is a disclosure |
 | A row is one issue in one product: Where names the product, components and every build in scope carrying it, the variant once where shared; Occurrences totals across those builds; the issue links its page. The row, its form and an act's answer are keyed on product and issue | The unit an embargo moves in |
 | The screen answers for the scope picked, sent with the request and named in the subtitle, or every product | |
@@ -114,7 +114,7 @@ is and § Editorial state who may agree.
 
 | Rule | Reason |
 |---|---|
-| No filters, selection or bulk acts; the review step is a person reading text | Low double digits a year, each the company speaking |
+| No filters, selection or bulk acts; the review step is a person reading text | Single or low double digits a year, each the company speaking |
 | Panels are compose, review, approve, publish, in that order | The order acts happen |
 | What is left before it can go out is said once at the top: naming no flaw first, then nobody agreeing | An advisory covering nothing generates no document |
 | A control is disabled only on a fact the server answered: taking back an agreement and recording an issuance where nobody agrees. Agreeing is offered to whoever reaches the screen | Who may agree depends on who wrote the standing edition, which the screen is not told |
@@ -138,7 +138,7 @@ is and § Editorial state who may agree.
 
 One build's published VEX has its own screen, reached from the release's customer
 documents. `design-docs/remediation.md` § The VEX document holds what it says
-and § Issuance what recording keeps.
+and § Issuance records what recording keeps.
 
 | Rule | Reason |
 |---|---|
@@ -181,4 +181,4 @@ One card per standing incident; `design-docs/incidents.md` holds the parts.
 
 | Limit | Detail |
 |---|---|
-| A publisher's or scanner's words are never rendered | Raw markup is refused and scripts blocked, but layout is still presentation |
+| Correspondence is recorded, never sent | The reporter is written to outside the deployment |

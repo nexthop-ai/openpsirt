@@ -67,7 +67,8 @@ lists, not the two tabs about the reader's own decisions.
 The rail's queue count and home's pending figure count To approve plus the report
 rulings the reader may agree to: waiting, proposed by somebody else, in a
 product where they may approve a ruling. Waiting ratings and date movements are
-their own sections and uncounted there.
+their own sections, uncounted there, sharing neither the card, the selection nor
+the batch with decisions.
 
 ## The decision page
 
@@ -83,10 +84,10 @@ agree, send back, hold rows back, and say where the work is happening.
 | What it covers is what it covers now; what was agreed to is on the approval in the revision history | It grows by matching |
 | "Reach when withdrawn" and "Reach when it lapsed" sit beside the present reach, as occurrences and builds on the date they stopped; a partly lapsed decision shows both parts | A stopped row is keyed on its occurrence |
 | Each stopped part opens the findings list narrowed to those occurrences and that state, across every release and planned or not, as one self-removing chip | The list's defaults would hide a tag or an ended branch |
-| A decision occurrence's address resolves here, replacing rather than pushing history | Notices, reports and the evidence list name occurrences |
+| A decision occurrence's address resolves here, replacing rather than pushing history | Notices, reports and the evidence list name occurrences, and the audit log names the decision |
 | Reaffirming is on the finding | It is one occurrence in one build |
 | It says whom a published statement holds for, marked as from the reason where none is stated | |
-| Acts offered follow `design-docs/triage.md`'s act-and-needs table and the session's capabilities, never roles | A second copy disagrees; a triager must be able to revise a colleague's stale decision here |
+| Acts offered follow `design-docs/triage.md`'s act-and-needs table and the session's capabilities, never roles | A second copy disagrees |
 | Holding rows back is offered only on a bulk decision with outliers | It is the author's side of the approver's choice |
 | The capability is a gate only while it means what the operation accepts: one the operation grants a triager is reported to a triager | A two-person team without the approver capability is otherwise shown a decision it cannot answer |
 
