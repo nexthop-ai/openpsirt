@@ -2,7 +2,7 @@
   "home": { "path": "/" },
   "reviewQueue": {
     "path": "/review-queue",
-    "query": ["mine", "own", "product", "reaffirm", "reason"]
+    "query": ["decision", "mine", "own", "product", "reaffirm", "reason"]
   },
   "unassigned": { "path": "/unassigned" },
   "findings": {
