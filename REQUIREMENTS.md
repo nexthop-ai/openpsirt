@@ -175,7 +175,7 @@ inputs.
 | # | Requirement | Why |
 |---|---|---|
 | REQ-50 | Any list that can be read can be exported as a file, through the same visibility rules the list was read with | An export that skips the check is the leak |
-| REQ-51 | Any two releases can be compared — fixed, newly present, still present — in a form that goes into release notes | This is the question a release manager asks, and it is not only about adjacent releases |
+| REQ-51 | Any two branches or tags can be compared — fixed, newly present, still present — in a form that goes into release notes | This is the question a release manager asks, and it is not only about adjacent releases |
 | REQ-52 | Scan coverage is reportable: what is being scanned, when each artifact was last seen, and what has gone stale | A pipeline that quietly stopped uploading looks exactly like a product with no findings |
 | REQ-53 | Dismissals, deadlines, approvals and how long triage is taking are reportable in their own right, including the exception report that should come back empty | An auditor's first question is which dismissals nobody agreed to |
 | REQ-54 | Trends are plotted on the axis the subject has: calendar time for a branch, release over release for tags | Tagged releases are frozen points, not a time series |
