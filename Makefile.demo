@@ -46,16 +46,16 @@ DEMO_PORT ?= 8080
 DEMO_USER ?= dev
 # The rest of the cast, one per line as port:identity:roles.
 #
-# One person cannot demonstrate this tool. Approving your own claim is refused,
+# One person cannot demonstrate this tool. Approving your own decision is refused,
 # because a control one person completes alone is not one —
-# so a demo with a single identity can propose a judgment and can never show it
+# so a demo with a single identity can propose a decision and can never show it
 # agreed to, and the record an auditor reads says "same person" against every
 # row. Somebody has to be somebody else.
 #
 # A port each rather than a switcher: the trusted-header path is a proxy
 # stating who you are, and the smallest honest version of two people is two
 # doors. Open two browser windows and you are two people, which is also what
-# lets one of them watch the other's claim arrive.
+# lets one of them watch the other's decision arrive.
 #
 # Roles are granted per product, so the seed grants each of these on every
 # product it declares. Nobody is an administrator but the first: an approver
@@ -576,13 +576,13 @@ demo-vex:
 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" \
 	  "$(DEMO_URL)/v1/products/$$product/vex-documents?publisher=debian"
 
-# A few judgments, so the screens that report on triage have something to
+# A few decisions, so the screens that report on triage have something to
 # report.
 #
 # A demo where every figure reads zero demonstrates nothing. The seed gives
 # a deployment two products, six builds and a quarter of a million findings and
 # nobody who has ever decided anything — so the review queue, the record of
-# judgments, how long triage is taking, what is planned and what is being
+# decisions, how long triage is taking, what is planned and what is being
 # backported are all empty, and the screens that exist to answer those
 # questions look broken rather than idle.
 #
@@ -603,8 +603,8 @@ demo-vex:
 # and one from Debian — which the upgrade, resolving against the whole build,
 # refuses as ambiguous.
 # The upgrade goes on a different package from the ones decided above, because
-# it answers *everything* open on its component: planning one where a judgment
-# already stands at some of those places is refused, and rightly — one act
+# it answers *everything* open on its component: planning one where a decision
+# already stands at some of those occurrences is refused, and rightly — one act
 # cannot answer what another has already answered.
 demo-triage:
 	@command -v curl >/dev/null || { echo "curl is needed"; exit 1; }
@@ -642,12 +642,12 @@ demo-triage:
 	    -X POST -H "Origin: $$at" -H 'Content-Type: application/json' -d "$$body" \
 	    "$$at/v1/products/$$product/branches-and-tags/$$stream/variants/$$variant/findings/$$cve/components/$$component/decision"; \
 	done <<< "$$rows"; \
-	claim=$$(curl -sS --noproxy '*' "$$agrees/v1/review-queue?limit=1" \
-	  | grep -o '"claim":{"id":[0-9]*' | head -1 | tr -dc '0-9' || true); \
-	if [ -n "$$claim" ]; then \
-	  curl -sS --noproxy '*' -o /dev/null -w "  claim $$claim agreed %{http_code}\n" \
+	decision=$$(curl -sS --noproxy '*' "$$agrees/v1/review-queue?limit=1" \
+	  | grep -o '"decision":{"id":[0-9]*' | head -1 | tr -dc '0-9' || true); \
+	if [ -n "$$decision" ]; then \
+	  curl -sS --noproxy '*' -o /dev/null -w "  decision $$decision agreed %{http_code}\n" \
 	    -X POST -H "Origin: $$agrees" -H 'Content-Type: application/json' -d '{}' \
-	    "$$agrees/v1/decisions/$$claim/approval"; \
+	    "$$agrees/v1/decisions/$$decision/approval"; \
 	else \
 	  echo "  nothing was waiting for a second person"; \
 	fi; \
@@ -738,8 +738,8 @@ demo-status:
 	@$(call seed-status,$(DEMO_URL),,openpsirt:main:binary openpsirt:main:container openpsirt:v1.0:binary openpsirt:v1.0:container)
 	@echo "  open $(DEMO_URL) — you arrive as $(DEMO_USER), no sign-in"
 	@# The rest of the cast, one door each. Two windows is two people, which is
-	@# what it takes to show a claim being agreed to: approving your own is
-	@# refused, so a single identity can propose a judgment and never finish
+	@# what it takes to show a decision being agreed to: approving your own is
+	@# refused, so a single identity can propose a decision and never finish
 	@# one.
 	@#
 	@# Named without the provider, unlike the line above: the administrator is
