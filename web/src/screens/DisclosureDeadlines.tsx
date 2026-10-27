@@ -62,7 +62,7 @@ export function buildsWords(
     .join(", ");
 }
 
-export function Disclosing() {
+export function DisclosureDeadlines() {
   const queries = useQueryClient();
   const who = useWho().data;
   const scope = scopeQuery(useScope());
@@ -86,7 +86,7 @@ export function Disclosing() {
   useReseed(JSON.stringify(scope), () => setOffset(0));
 
   const rows = useQuery({
-    queryKey: ["disclosing", scope, days, offset],
+    queryKey: ["disclosure-deadlines", scope, days, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/disclosure-deadlines", {
@@ -134,7 +134,7 @@ export function Disclosing() {
       setAsking(null);
       setUntil("");
       setBecause("");
-      void queries.invalidateQueries({ queryKey: ["disclosing"] });
+      void queries.invalidateQueries({ queryKey: ["disclosure-deadlines"] });
     },
   });
 
@@ -157,7 +157,7 @@ export function Disclosing() {
     <>
       <div className="screen-head">
         <h2>
-          Disclosing <span className="n">{(total ?? items.length).toLocaleString()}</span>
+          Disclosure deadlines <span className="n">{(total ?? items.length).toLocaleString()}</span>
         </h2>
         <p>
           {scope.product

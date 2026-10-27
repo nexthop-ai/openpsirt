@@ -58,8 +58,9 @@ type EmbargoedBuild struct {
 // Passed says the date has arrived and nothing has been decided about it.
 func (e Embargoed) Passed(now time.Time) bool { return !e.DiscloseAt.After(now) }
 
-// DisclosingPage reports what is approaching disclosure, and what is past it,
-// soonest first, from a position in the list, with how many there are in all.
+// DisclosureDeadlinesPage reports what is approaching disclosure, and what is
+// past it, soonest first, from a position in the list, with how many there are
+// in all.
 //
 // Before the date, not on it. The date arriving is the last
 // moment to act on it rather than the first useful warning, and a list that
@@ -85,7 +86,7 @@ func (e Embargoed) Passed(now time.Time) bool { return !e.DiscloseAt.After(now) 
 // through the API at all — not slowly, not at all — and the total because a
 // caller holding a full page cannot otherwise tell a clipped page from the
 // whole list.
-func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scope Scope,
+func (s *Store) DisclosureDeadlinesPage(ctx context.Context, subject access.Subject, scope Scope,
 	within time.Duration, limit, offset int) ([]Embargoed, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are

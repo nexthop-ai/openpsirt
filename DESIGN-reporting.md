@@ -722,7 +722,7 @@ holds the files that are reachable nowhere else.
 | The register is a page of the catalog's own | It is about one build, and had no screen — only a file, which an auditor had to download to read. So the catalog owns it rather than a build screen listing it, and it asks for a whole build the way the build-scoped entries do |
 | An entry may point at a screen rather than owning a page | Release comparison, release readiness, match coverage, carried patches, the exception report, standing corrections and administrative changes do. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
 | The catalog is grouped by the question each report answers | The groups are below. A report is looked for by its question, and a flat list of names hides which of them answer the same one |
-| A rail screen that answers a named question is listed apart, under "Also on screens" | Assignments answers holder workload, Disclosing answers what is running out of embargo, and pending upgrades answers what a build is waiting on. Each is a screen somebody already works in, under the name the rail gives it, and listed among the reports it reads as reporting that does not exist |
+| A rail screen that answers a named question is listed apart, under "Also on screens" | Assignments answers holder workload, Disclosure deadlines answers what is running out of embargo, and pending upgrades answers what a build is waiting on. Each is a screen somebody already works in, under the name the rail gives it, and listed among the reports it reads as reporting that does not exist |
 | One address is one entry | Two names over one screen read as two reports, and the reader opens both to find the same page. Known issues at release is the comparison's third column, so it is part of the release comparison entry |
 | An entry that points at a build's screen asks for a whole build | Those screens exist for one build and no other. An entry into one on a partial selection would open on a scope that means nothing |
 | An entry that needs a scope says so beside its name, and its name opens the scope picker | "Needs a product" or "Needs a build". Appended to the description it reads as part of it, and a name drawn as plain text reads as a broken link |
@@ -739,7 +739,7 @@ holds the files that are reachable nowhere else.
 | Coverage | Scan coverage, leads by analyzer, match coverage, carried patches |
 | Releases | Release comparison, release readiness, releases out of support |
 | Records | Disposition register, advisories issued |
-| Also on screens | Assignments, Disclosing, pending upgrades |
+| Also on screens | Assignments, Disclosure deadlines, pending upgrades |
 
 ### Pages of the catalog's own
 

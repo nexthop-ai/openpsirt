@@ -230,7 +230,7 @@ export function ReportFlaw() {
     },
     onSuccess: ({ made, failed }) => {
       void queries.invalidateQueries({ queryKey: ["findings"] });
-      void queries.invalidateQueries({ queryKey: ["disclosing"] });
+      void queries.invalidateQueries({ queryKey: ["disclosure-deadlines"] });
       // The report is judged now, and a page that still offers to judge it
       // fails when somebody tries.
       if (fromReport) afterReport();

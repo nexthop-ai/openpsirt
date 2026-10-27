@@ -38,7 +38,7 @@ export function useAfterReport() {
     void queries.invalidateQueries({ queryKey: ["finding"] });
     void queries.invalidateQueries({ queryKey: ["findings"] });
     void queries.invalidateQueries({ queryKey: ["issue"] });
-    void queries.invalidateQueries({ queryKey: ["disclosing"] });
+    void queries.invalidateQueries({ queryKey: ["disclosure-deadlines"] });
     void queries.invalidateQueries({ queryKey: ["home"] });
   };
 }

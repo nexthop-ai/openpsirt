@@ -25,7 +25,7 @@ afterEach(() => vi.restoreAllMocks());
 
 // Everything a change to a report or a ruling moves.
 const EVERY_REPORT_KEY = [
-  "disclosing",
+  "disclosure-deadlines",
   "duplicate-disclosure",
   "duplicates",
   "finding",

@@ -156,7 +156,7 @@
   "reports": { "path": "/reports" },
   "report": { "path": "/reports/:report", "query": ["days"] },
   "reportFlaw": { "path": "/report-a-flaw", "query": ["from", "product", "source"] },
-  "disclosing": { "path": "/disclosing" },
+  "disclosureDeadlines": { "path": "/disclosure-deadlines" },
   "incidents": { "path": "/incidents", "query": ["product"] },
   "advisories": { "path": "/advisories" },
   "advisory": { "path": "/advisories/:advisory" },
@@ -170,6 +170,7 @@
   "formerExploitedHere": { "path": "/exploited-here" },
   "formerObligations": { "path": "/obligations" },
   "formerRecord": { "path": "/audit" },
+  "formerDisclosureDeadlines": { "path": "/disclosing" },
   "formerDependencies": {
     "path": "/products/:product/streams/:stream/variants/:variant/components"
   },

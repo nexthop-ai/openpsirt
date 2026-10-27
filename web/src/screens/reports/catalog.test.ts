@@ -85,8 +85,8 @@ describe("where a catalog row leads", () => {
   });
 
   it("leads somewhere that needs nothing picked", () => {
-    const disclosing = CATALOG.find((report) => report.name === "Disclosing")!;
-    expect(leadsTo(disclosing, {}, GATED).to).toBe("/disclosing");
+    const deadlines = CATALOG.find((report) => report.name === "Disclosure deadlines")!;
+    expect(leadsTo(deadlines, {}, GATED).to).toBe("/disclosure-deadlines");
   });
 });
 

@@ -236,9 +236,9 @@ export const ON_SCREENS: Report[] = [
     to: () => "/assignments",
   },
   {
-    name: "Disclosing",
+    name: "Disclosure deadlines",
     answers: "Embargoes running out, and what has to be said before they do.",
-    to: () => "/disclosing",
+    to: () => "/disclosure-deadlines",
   },
   {
     name: "Pending upgrades",

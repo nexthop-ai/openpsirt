@@ -365,7 +365,7 @@ func registerDisclosure(api huma.API, in core.Deps) {
 		}
 
 		store := finding.NewStore(in.DB.DB)
-		rows, total, err := store.DisclosingPage(ctx, subject, scope,
+		rows, total, err := store.DisclosureDeadlinesPage(ctx, subject, scope,
 			within, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what is approaching disclosure could not be read", err)

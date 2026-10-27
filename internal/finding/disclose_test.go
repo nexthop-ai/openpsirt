@@ -42,7 +42,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 
 		// A month out it is not on a thirty-day list yet, because ninety days
 		// is further away than that.
-		soon, _, err := f.store.DisclosingPage(t.Context(), who, finding.Scope{},
+		soon, _, err := f.store.DisclosureDeadlinesPage(t.Context(), who, finding.Scope{},
 			30*24*time.Hour, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -53,7 +53,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 
 		// Wider than the embargo, and it is there — before the date, with what
 		// somebody needs to act on it.
-		ahead, _, err := f.store.DisclosingPage(t.Context(), who, finding.Scope{},
+		ahead, _, err := f.store.DisclosureDeadlinesPage(t.Context(), who, finding.Scope{},
 			120*24*time.Hour, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -105,7 +105,7 @@ func TestWhatIsApproachingDisclosureIsItselfUndisclosed(t *testing.T) {
 		}
 
 		for _, role := range []access.Role{access.PublicRead, access.PublicTriage} {
-			rows, _, err := f.store.DisclosingPage(t.Context(), f.planner(t, role),
+			rows, _, err := f.store.DisclosureDeadlinesPage(t.Context(), f.planner(t, role),
 				finding.Scope{}, 365*24*time.Hour, 50, 0)
 			if err != nil {
 				t.Fatal(err)
@@ -115,7 +115,7 @@ func TestWhatIsApproachingDisclosureIsItselfUndisclosed(t *testing.T) {
 			}
 		}
 
-		rows, _, err := f.store.DisclosingPage(t.Context(), f.planner(t, access.PrivateRead),
+		rows, _, err := f.store.DisclosureDeadlinesPage(t.Context(), f.planner(t, access.PrivateRead),
 			finding.Scope{}, 365*24*time.Hour, 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -146,7 +146,7 @@ func TestAnEmbargoIsOneRowPerIssueAndProductAndPagesCountEmbargoes(t *testing.T)
 		}
 
 		year := 365 * 24 * time.Hour
-		rows, total, err := f.store.DisclosingPage(ctx, who, finding.Scope{}, year, 50, 0)
+		rows, total, err := f.store.DisclosureDeadlinesPage(ctx, who, finding.Scope{}, year, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -164,11 +164,11 @@ func TestAnEmbargoIsOneRowPerIssueAndProductAndPagesCountEmbargoes(t *testing.T)
 		}
 
 		// One row a page: the second page holds the other flaw, whole.
-		first, total, err := f.store.DisclosingPage(ctx, who, finding.Scope{}, year, 1, 0)
+		first, total, err := f.store.DisclosureDeadlinesPage(ctx, who, finding.Scope{}, year, 1, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		second, _, err := f.store.DisclosingPage(ctx, who, finding.Scope{}, year, 1, 1)
+		second, _, err := f.store.DisclosureDeadlinesPage(ctx, who, finding.Scope{}, year, 1, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +184,7 @@ func TestAnEmbargoIsOneRowPerIssueAndProductAndPagesCountEmbargoes(t *testing.T)
 	})
 }
 
-func TestTheDisclosingListIsNarrowedToTheScopeAskedFor(t *testing.T) {
+func TestTheDisclosureDeadlinesAreNarrowedToTheScopeAskedFor(t *testing.T) {
 	// The list answers for the scope picked like every other list. A row
 	// narrowed to one build names that build alone and counts its findings
 	// alone, and a scope that carries none of it holds no row.
@@ -201,7 +201,7 @@ func TestTheDisclosingListIsNarrowedToTheScopeAskedFor(t *testing.T) {
 		}
 
 		year := 365 * 24 * time.Hour
-		rows, total, err := f.store.DisclosingPage(ctx, who, f.scopeOf(t, older), year, 50, 0)
+		rows, total, err := f.store.DisclosureDeadlinesPage(ctx, who, f.scopeOf(t, older), year, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -218,7 +218,7 @@ func TestTheDisclosingListIsNarrowedToTheScopeAskedFor(t *testing.T) {
 
 		elsewhere := f.inAnotherProduct(t, "hedgehog")
 		other := f.productOf(t, elsewhere)
-		none, total, err := f.store.DisclosingPage(ctx, who, finding.Scope{ProductID: &other},
+		none, total, err := f.store.DisclosureDeadlinesPage(ctx, who, finding.Scope{ProductID: &other},
 			year, 50, 0)
 		if err != nil {
 			t.Fatal(err)

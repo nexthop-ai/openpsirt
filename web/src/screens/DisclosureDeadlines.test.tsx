@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildsWords, Disclosing, embargoKey } from "./Disclosing";
+import { buildsWords, DisclosureDeadlines, embargoKey } from "./DisclosureDeadlines";
 import { remember } from "../app/scope";
 import { screen, serve, settle, mounted } from "../test/mount";
 
@@ -39,7 +39,7 @@ const row = (product: string) => ({
   occurrences: 2,
 });
 
-describe("the disclosing screen", () => {
+describe("the disclosure deadlines screen", () => {
   it("opens the form on the one embargo whose row was pressed", async () => {
     serve((path) => {
       if (path === "/v1/session/me") return { data: me };
@@ -48,7 +48,7 @@ describe("the disclosing screen", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Disclosing />, "/disclosing"));
+    mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
     await settle();
     const moves = Array.from(mount.host().querySelectorAll("button")).filter(
       (each) => each.textContent === "Move or disclose",
@@ -71,7 +71,7 @@ describe("the disclosing screen", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Disclosing />, "/disclosing"));
+    mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
     await settle();
     expect(asked.at(-1)).toMatchObject({ product: "sonic", stream: "main" });
     expect(mount.host().querySelector(".screen-head p")?.textContent).toContain("sonic · main");

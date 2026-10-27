@@ -40,7 +40,7 @@ export function Disclose({ product, vulnerability }: { product: string; vulnerab
       setOpen(false);
       setBecause("");
       void queries.invalidateQueries({ queryKey: ["finding"] });
-      void queries.invalidateQueries({ queryKey: ["disclosing"] });
+      void queries.invalidateQueries({ queryKey: ["disclosure-deadlines"] });
     },
   });
 

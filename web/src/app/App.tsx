@@ -68,7 +68,9 @@ const Teams = retrying(() => import("../screens/Teams").then((m) => m.Teams));
 const AutoAssignment = retrying(() =>
   import("../screens/AutoAssignment").then((m) => m.AutoAssignment),
 );
-const Disclosing = retrying(() => import("../screens/Disclosing").then((m) => m.Disclosing));
+const DisclosureDeadlines = retrying(() =>
+  import("../screens/DisclosureDeadlines").then((m) => m.DisclosureDeadlines),
+);
 const Incidents = retrying(() => import("../screens/Incidents").then((m) => m.Incidents));
 const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgrades));
 const MatchCoverage = retrying(() =>
@@ -214,7 +216,7 @@ export function App() {
               <Route path={ROUTES.reports} element={<Reports />} />
               <Route path={ROUTES.report} element={<Report />} />
               <Route path={ROUTES.reportFlaw} element={<ReportFlaw />} />
-              <Route path={ROUTES.disclosing} element={<Disclosing />} />
+              <Route path={ROUTES.disclosureDeadlines} element={<DisclosureDeadlines />} />
               <Route path={ROUTES.incidents} element={<Incidents />} />
               <Route path={ROUTES.advisories} element={<Advisories />} />
               <Route path={ROUTES.advisory} element={<Advisory />} />
@@ -242,6 +244,10 @@ export function App() {
               />
               <Route path={ROUTES.formerObligations} element={<Moved to={() => incidentsAt()} />} />
               <Route path={ROUTES.formerRecord} element={<Moved to={() => "/record"} />} />
+              <Route
+                path={ROUTES.formerDisclosureDeadlines}
+                element={<Moved to={() => "/disclosure-deadlines"} />}
+              />
               <Route
                 path={ROUTES.formerDependencies}
                 element={<Moved to={(at) => dependenciesAt(built(at))} />}
