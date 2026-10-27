@@ -9,13 +9,14 @@ import { useWho } from "./session";
 import { belongTo } from "./drafts";
 import { snapshot, subscribe } from "./ended";
 import { Boundary } from "./Boundary";
-import { Moved, built } from "./moved";
+import { Moved, MovedUnder, built } from "./moved";
 import { retrying } from "./retrying";
 import {
   ROUTES,
   analyticsReportAt,
   bulkDecisionAt,
   decisionAt,
+  fromStreamsAt,
   dependenciesAt,
   uploadsAt,
   inventoryChangesAt,
@@ -187,11 +188,11 @@ export function App() {
               <Route path={ROUTES.issue} element={<Issue />} />
               <Route path={ROUTES.products} element={<Products who={who.data} />} />
               <Route path={ROUTES.product} element={<Product />} />
-              <Route path={ROUTES.streams} element={<Branches />} />
+              <Route path={ROUTES.branchesAndTags} element={<Branches />} />
               {/* A branch and a tag share this address and are different
                 questions, so it resolves to whichever screen answers the one
                 that line poses. */}
-              <Route path={ROUTES.stream} element={<Branch />} />
+              <Route path={ROUTES.branchOrTag} element={<Branch />} />
               <Route path={ROUTES.variants} element={<Variants />} />
               {/* The list at whatever the picker selects, and the same screen at the
             address a build's other screens share. */}
@@ -290,7 +291,7 @@ export function App() {
               />
               <Route
                 path={ROUTES.formerInventoryChanges}
-                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
+                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.sbom))} />}
               />
               <Route
                 path={ROUTES.formerUploads}
@@ -298,7 +299,11 @@ export function App() {
               />
               <Route
                 path={ROUTES.formerUploadChanges}
-                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
+                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.sbom))} />}
+              />
+              <Route
+                path={ROUTES.formerStreams}
+                element={<MovedUnder to={(at, rest) => fromStreamsAt(at.product ?? "", rest)} />}
               />
               <Route
                 path={ROUTES.formerDecision}

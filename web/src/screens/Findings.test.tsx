@@ -91,7 +91,7 @@ describe("the filters narrowing the findings list", () => {
 describe("the findings list's keys", () => {
   const row = {
     product: "sonic",
-    stream: "master",
+    branch_or_tag: "master",
     variant: "broadcom",
     vulnerability: "CVE-2026-1",
     component: "openssl",

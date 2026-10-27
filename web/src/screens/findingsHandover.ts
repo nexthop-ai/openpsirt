@@ -26,14 +26,14 @@ export function useHandOver({
 }: {
   product: string;
   query: ReturnType<typeof withinVariant>;
-  selection: { stream?: string; variant?: string };
-  buildOf: (row: Row) => { product: string; stream: string; variant: string };
+  selection: { branch_or_tag?: string; variant?: string };
+  buildOf: (row: Row) => { product: string; branch_or_tag: string; variant: string };
 }) {
   const hand = useMutation({
     mutationFn: async (to: { row: Row; who: string; team: boolean }) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/assignment",
           {
             params: {
               path: {

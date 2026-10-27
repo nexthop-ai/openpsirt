@@ -20,7 +20,7 @@ import (
 type SightingBody struct {
 	Product     string        `json:"product" doc:"The product's name, as an address takes it"`
 	ProductName string        `json:"product_name" doc:"Its spelling on screen"`
-	Stream      string        `json:"stream"`
+	BranchOrTag string        `json:"branch_or_tag"`
 	Variant     string        `json:"variant"`
 	Component   string        `json:"component"`
 	Version     string        `json:"version"`
@@ -171,7 +171,7 @@ func registerIssue(api huma.API, in core.Deps) {
 		for _, row := range rows {
 			body := SightingBody{
 				Product: row.Product, ProductName: row.ProductName,
-				Stream: row.Stream, Variant: row.Variant,
+				BranchOrTag: row.BranchOrTag, Variant: row.Variant,
 				Component: row.Component, Version: row.Version,
 				Occurrences: row.Occurrences, State: core.Standing(row.State),
 				Undisclosed: row.Undisclosed, Recorded: row.Recorded, FixedIn: row.FixedIn,

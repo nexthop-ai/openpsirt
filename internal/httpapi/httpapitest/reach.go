@@ -196,7 +196,7 @@ func (r *Reach) SentByTheKey(t *testing.T) int64 {
 		t.Fatal(err)
 	}
 	made, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: r.TargetOf(t, SeededBuild), ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
+		BuildID: r.BuildOf(t, SeededBuild), ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
 		ParserVersion: "test", Credential: access.Sender(key),
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -269,10 +269,10 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
-	// The streams and variants are declared with a capital, so each is spelled
+	// The branches and tags and variants are declared with a capital, so each is spelled
 	// differently from the name a path addresses it by and a test can tell
 	// which of the two a field carries.
-	if _, err := cat.DeclareStream(ctx, mine.ID, "Master", catalog.Branch, nil); err != nil {
+	if _, err := cat.DeclareBranchOrTag(ctx, mine.ID, "Master", catalog.Branch, nil); err != nil {
 		return cast{}, err
 	}
 	if _, err := cat.DeclareVariant(ctx, mine.ID, "Broadcom", true); err != nil {
@@ -282,7 +282,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
-	theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "Master", catalog.Branch, nil)
+	theirBranch, err := cat.DeclareBranchOrTag(ctx, theirs.ID, "Master", catalog.Branch, nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -306,7 +306,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// products and no builds, and every test of what a reader may see is
 	// satisfied by an empty list — which is also what a missing visibility
 	// filter looks like.
-	mineBranch, err := cat.StreamByName(ctx, mine.ID, "master")
+	mineBranch, err := cat.BranchOrTagByName(ctx, mine.ID, "master")
 	if err != nil {
 		return cast{}, err
 	}
@@ -314,11 +314,11 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
-	if _, err := cat.TargetFor(ctx, mineBranch.ID, mineVariant.ID); err != nil {
+	if _, err := cat.BuildFor(ctx, mineBranch.ID, mineVariant.ID); err != nil {
 		return cast{}, err
 	}
 	for _, variant := range []*catalog.Variant{theirVariant, theirBroadcom} {
-		if _, err := cat.TargetFor(ctx, theirBranch.ID, variant.ID); err != nil {
+		if _, err := cat.BuildFor(ctx, theirBranch.ID, variant.ID); err != nil {
 			return cast{}, err
 		}
 	}
@@ -389,7 +389,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		// somebody else, for the tests about what a recipient is told.
 		"private-dispatcher": {access.PublicTriage, access.PrivateTriage, access.Assigner},
 		// The undisclosed half alone: somebody working private reports
-		// who is not handed the disclosed stream.
+		// who is not handed the disclosed branch or tag.
 		"embargo-reader":  {access.PrivateRead},
 		"embargo-triager": {access.PrivateTriage},
 		// Reading the disclosed half and triaging the undisclosed one:

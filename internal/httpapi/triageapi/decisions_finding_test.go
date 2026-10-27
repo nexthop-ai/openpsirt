@@ -159,7 +159,7 @@ func TestAFindingsRowSaysHowFarItIsDecidedAndWhetherItCameBack(t *testing.T) {
 	// definition, and says when a decision is back with its author.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		const list = "/v1/products/mine/findings?stream=master&variant=broadcom"
+		const list = "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"
 		row := func() (state string, sentBack bool) {
 			t.Helper()
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, list, "")

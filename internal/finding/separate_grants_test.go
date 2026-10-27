@@ -26,15 +26,15 @@ import (
 // Narrowed to the build, because a component row is shared by every build
 // shipping that name at that version, and the checks across products need one
 // product's row hidden and the other's left disclosed.
-func (f *fixture) undisclose(t *testing.T, target int64, identifier, component string) {
+func (f *fixture) undisclose(t *testing.T, build int64, identifier, component string) {
 	t.Helper()
-	at, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), target, component, graph.Choice{})
+	at, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), build, component, graph.Choice{})
 	if err != nil {
 		t.Fatalf("resolve %s: %v", component, err)
 	}
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 		Set(`"visibility" = ?`, access.Private).
-		Where(`"target_id" = ?`, target).
+		Where(`"build_id" = ?`, build).
 		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
 		Where(`"component_id" = ?`, at).
 		Exec(t.Context()); err != nil {
@@ -44,15 +44,15 @@ func (f *fixture) undisclose(t *testing.T, target int64, identifier, component s
 
 // handTo puts one issue at one component of one build on a party directly, so
 // the holder's own grants play no part in how it got there.
-func (f *fixture) handTo(t *testing.T, target int64, identifier, component string, party int64) {
+func (f *fixture) handTo(t *testing.T, build int64, identifier, component string, party int64) {
 	t.Helper()
-	at, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), target, component, graph.Choice{})
+	at, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), build, component, graph.Choice{})
 	if err != nil {
 		t.Fatalf("resolve %s: %v", component, err)
 	}
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 		Set(`"assigned_to" = ?`, party).
-		Where(`"target_id" = ?`, target).
+		Where(`"build_id" = ?`, build).
 		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
 		Where(`"component_id" = ?`, at).
 		Exec(t.Context()); err != nil {
@@ -65,12 +65,12 @@ func (f *fixture) handTo(t *testing.T, target int64, identifier, component strin
 func (f *fixture) oneDisclosedOneNot(t *testing.T) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 		found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	f.undisclose(t, f.target, "CVE-2026-2", swss.Name)
+	f.undisclose(t, f.build, "CVE-2026-2", swss.Name)
 }
 
 func TestACarriedDisclosedFindingIsInTheHoldersWorkAndNotInTheProductsAnswers(t *testing.T) {
@@ -82,7 +82,7 @@ func TestACarriedDisclosedFindingIsInTheHoldersWorkAndNotInTheProductsAnswers(t 
 		ctx := t.Context()
 		f.oneDisclosedOneNot(t)
 		who := f.holding(t, access.PrivateRead)
-		f.handTo(t, f.target, "CVE-2026-1", libnl.Name, who.Party())
+		f.handTo(t, f.build, "CVE-2026-1", libnl.Name, who.Party())
 
 		mine, total, err := f.store.AssignedTo(ctx, kind.Assignment, who, who.Mine(), finding.Scope{}, 50, 0)
 		if err != nil {
@@ -170,9 +170,9 @@ func TestAPrivateOnlyTriagerHandsBackDisclosedWorkTheyHold(t *testing.T) {
 		ctx := t.Context()
 		f.oneDisclosedOneNot(t)
 		who := f.holding(t, access.PrivateTriage)
-		f.handTo(t, f.target, "CVE-2026-1", libnl.Name, who.Party())
+		f.handTo(t, f.build, "CVE-2026-1", libnl.Name, who.Party())
 
-		moved, _, err := f.store.Assign(ctx, who, f.target, f.issueID(t, "CVE-2026-1"),
+		moved, _, err := f.store.Assign(ctx, who, f.build, f.issueID(t, "CVE-2026-1"),
 			f.componentID(t, libnl.Name), nil, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -196,7 +196,7 @@ func TestDispatchReachesOnlyTheVisibilitiesTheCallerTriages(t *testing.T) {
 		who := f.holding(t, access.PublicRead, access.PrivateTriage, access.Assigner)
 		other := int64(2)
 
-		moved, _, err := f.store.Assign(ctx, who, f.target, f.issueID(t, "CVE-2026-1"),
+		moved, _, err := f.store.Assign(ctx, who, f.build, f.issueID(t, "CVE-2026-1"),
 			f.componentID(t, libnl.Name), &other, nil)
 		if err != nil && !errors.Is(err, access.ErrDenied) {
 			t.Fatal(err)
@@ -208,7 +208,7 @@ func TestDispatchReachesOnlyTheVisibilitiesTheCallerTriages(t *testing.T) {
 			t.Errorf("%d findings were dispatched, want none yet", len(held))
 		}
 
-		moved, _, err = f.store.Assign(ctx, who, f.target, f.issueID(t, "CVE-2026-2"),
+		moved, _, err = f.store.Assign(ctx, who, f.build, f.issueID(t, "CVE-2026-2"),
 			f.componentID(t, swss.Name), &other, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -227,7 +227,7 @@ func TestMarkingIsAskedAtTheFindingsOwnVisibility(t *testing.T) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-1", swss))
-		f.undisclose(t, f.target, "CVE-2026-1", swss.Name)
+		f.undisclose(t, f.build, "CVE-2026-1", swss.Name)
 		issue := f.issueID(t, "CVE-2026-1")
 		disclosed, undisclosed := f.componentID(t, libnl.Name), f.componentID(t, swss.Name)
 
@@ -266,7 +266,7 @@ func TestAReleaseNoteIsRefusedToSomebodyReadingOnlyUndisclosedWork(t *testing.T)
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.oneDisclosedOneNot(t)
-		earlier := f.target
+		earlier := f.build
 		later := f.anotherBuild(t, "v2")
 		f.shippedTo(t, later, twoConsumers())
 		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), nil); err != nil {

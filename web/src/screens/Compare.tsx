@@ -164,7 +164,7 @@ export function Compare() {
               closed={comparison.data?.closed_not_fixed ?? []}
               newly={comparison.data?.newly_present ?? []}
               still={comparison.data?.still_present ?? []}
-              runsIn={{ product, stream: to, variant: toVariant }}
+              runsIn={{ product, branch_or_tag: to, variant: toVariant }}
             />
 
             {/* The same comparison in the form it is actually wanted in

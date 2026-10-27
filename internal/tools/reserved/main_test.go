@@ -133,7 +133,7 @@ func q() {
 	where := "SELECT 1 FROM finding AS f"
 	where += " AND EXISTS (SELECT 1 FROM component)"
 	parts := []string{}
-	parts = append(parts, "JOIN target AS tg")
+	parts = append(parts, "JOIN build AS tg")
 	db.Where(where)
 	db.Having(strings.Join(parts, " OR "))
 }
@@ -152,7 +152,7 @@ func q() {
 		!strings.Contains(got, "FROM component") {
 		t.Errorf("a variable built in two statements read as %q", got)
 	}
-	if got := pieces["parts"]; !strings.Contains(got, "JOIN target") {
+	if got := pieces["parts"]; !strings.Contains(got, "JOIN build") {
 		t.Errorf("a slice appended to read as %q", got)
 	}
 
@@ -364,7 +364,7 @@ const keyMatches = "(cl.outcome = 'mismatched' OR de.live_key IS NULL)"
 
 type On string
 
-const OnStream On = "st.product_id"
+const OnBranchOrTag On = "st.product_id"
 
 const RoutingBatch = "routing.batch"
 
@@ -372,9 +372,9 @@ var allowed = map[string]bool{"q.visibility": true}
 
 type key struct{ expr string }
 
-var keys = []key{{expr: "f.target_id"}}
+var keys = []key{{expr: "f.build_id"}}
 
-func product() string { return "tg.stream_id" }
+func product() string { return "tg.branch_or_tag_id" }
 
 func q() {
 	db.Where(HeldAs("f.vulnerability_id"))
@@ -391,7 +391,7 @@ func q() {
 	}
 	columns := map[string]bool{
 		"outcome": true, "live_key": true, "product_id": true, "batch": true, "visibility": true,
-		"target_id": true, "stream_id": true, "vulnerability_id": true, "id": true, "told_id": true,
+		"build_id": true, "branch_or_tag_id": true, "vulnerability_id": true, "id": true, "told_id": true,
 		"kind": true, "name": true, "namespace": true,
 	}
 	bad, _, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{}, columns, nil, nil)
@@ -399,7 +399,7 @@ func q() {
 	for _, one := range ordered(bad) {
 		got = append(got, one.column)
 	}
-	want := `"de"."live_key" "cl"."outcome" "st"."product_id" "f"."target_id" "tg"."stream_id" "f"."vulnerability_id"`
+	want := `"de"."live_key" "cl"."outcome" "st"."product_id" "f"."build_id" "tg"."branch_or_tag_id" "f"."vulnerability_id"`
 	if strings.Join(got, " ") != want {
 		t.Errorf("reported %v, want %s", got, want)
 	}

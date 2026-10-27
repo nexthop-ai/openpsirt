@@ -349,7 +349,7 @@ func TestARecordAsFlawLinksEveryCodeFindingItsConfirmationCovers(t *testing.T) {
 			t.Errorf("the flaw record offers %+v; want the overflow with it, and both files disclosed", offer)
 		}
 		got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, at+occurrence+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks","include_in_disclosure":true}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks","include_in_disclosure":true}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
@@ -360,7 +360,7 @@ func TestARecordAsFlawLinksEveryCodeFindingItsConfirmationCovers(t *testing.T) {
 		}
 		// One flaw is recorded once.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, at+kin[0]+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows"}`), http.StatusConflict)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"n overflows"}`), http.StatusConflict)
 		// The code findings of one flaw move together.
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodDelete, at+kin[0]+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the overflow out of the case answered %d: %s", got.Code, got.Body)
@@ -380,7 +380,7 @@ func TestAnUndoneRecordAsFlawIsTrailedUnderEachCodeFindingsOwnName(t *testing.T)
 		decideCodeFinding(t, r, occurrence, `{"outcome":"confirmed","reasoning":"p leaks and n overflows, one flaw"}`)
 		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, at+occurrence+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut, at+kin[0]+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {

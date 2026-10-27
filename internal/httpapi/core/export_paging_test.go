@@ -76,7 +76,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 	const rows = 250
 	out := Exporting{
 		Header: []string{"n"},
-		Stream: func(_ context.Context, each func([]string) error) error {
+		BranchOrTag: func(_ context.Context, each func([]string) error) error {
 			for i := 0; i < rows; i++ {
 				if err := each([]string{fmt.Sprint(i)}); err != nil {
 					return err
@@ -111,7 +111,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 	// hear about it: that is what puts the "incomplete" marker in.
 	broken := Exporting{
 		Header: []string{"n"},
-		Stream: func(_ context.Context, each func([]string) error) error {
+		BranchOrTag: func(_ context.Context, each func([]string) error) error {
 			if err := each([]string{"0"}); err != nil {
 				return err
 			}
@@ -223,7 +223,7 @@ func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
 		unblock := make(chan struct{})
 		out := Exporting{
 			Header: []string{"n"},
-			Stream: func(ctx context.Context, each func([]string) error) error {
+			BranchOrTag: func(ctx context.Context, each func([]string) error) error {
 				rows, err := db.DB.DB.QueryContext(ctx, "WITH RECURSIVE n(i) AS "+
 					"(SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000) SELECT i FROM n")
 				if err != nil {

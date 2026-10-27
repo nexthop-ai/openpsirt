@@ -81,7 +81,7 @@ type written struct {
 }
 
 // writtenIn is every open finding of one build, by issue and occurrence.
-func (f *fixture) writtenIn(t *testing.T, target int64) map[[2]string]written {
+func (f *fixture) writtenIn(t *testing.T, build int64) map[[2]string]written {
 	t.Helper()
 	var rows []written
 	if err := f.db.DB.NewSelect().
@@ -92,7 +92,7 @@ func (f *fixture) writtenIn(t *testing.T, target int64) map[[2]string]written {
 		ColumnExpr(`"f"."fix_state", "f"."fixed_in", "f"."fixed_at", "f"."matched", "f"."matched_from"`).
 		ColumnExpr(`"f"."matched_in", "f"."matched_range", "f"."suppressed_by", "f"."stated_by", "f"."claimed_by"`).
 		ColumnExpr(`"f"."exploited_learned_at"`).
-		Where(`"f"."target_id" = ?`, target).
+		Where(`"f"."build_id" = ?`, build).
 		Where(`"f"."closed_at" IS NULL`).
 		Scan(t.Context(), &rows); err != nil {
 		t.Fatal(err)
@@ -129,7 +129,7 @@ func TestARescanWritesEachMovedFindingWhatAFirstScanOfTheReportWould(t *testing.
 			likely("CVE-2026-FIXED-LATER", 0.01),
 			found("CVE-2026-STILL", swss),
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), yesterday); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), yesterday); err != nil {
 			t.Fatal(err)
 		}
 
@@ -141,7 +141,7 @@ func TestARescanWritesEachMovedFindingWhatAFirstScanOfTheReportWould(t *testing.
 			likely("CVE-2026-RISES", 0.9), likely("CVE-2026-RISES-LESS", 0.3),
 			fixed, later, found("CVE-2026-STILL", swss),
 		}
-		applied, err := f.store.Apply(ctx, f.target, f.run(t), today)
+		applied, err := f.store.Apply(ctx, f.build, f.run(t), today)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestARescanWritesEachMovedFindingWhatAFirstScanOfTheReportWould(t *testing.
 			t.Fatal(err)
 		}
 
-		rescanned, first := f.writtenIn(t, f.target), f.writtenIn(t, fresh)
+		rescanned, first := f.writtenIn(t, f.build), f.writtenIn(t, fresh)
 		if len(rescanned) != 9 || len(first) != 9 {
 			t.Fatalf("hold %d and %d open findings, want 9 each", len(rescanned), len(first))
 		}
@@ -200,7 +200,7 @@ func TestReRankingAfterAScanLeavesTheScannedBuildAsTheScanRankedIt(t *testing.T)
 			return []finding.Reported{rated, published}
 		}
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), report(0.01)); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), report(0.01)); err != nil {
 			t.Fatal(err)
 		}
 		f.shippedTo(t, tag, twoConsumers())
@@ -215,12 +215,12 @@ func TestReRankingAfterAScanLeavesTheScannedBuildAsTheScanRankedIt(t *testing.T)
 		}
 
 		// Tonight's scan moves both likelihoods. The tag is not rescanned.
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), report(0.8)); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), report(0.8)); err != nil {
 			t.Fatal(err)
 		}
-		scanned := f.writtenIn(t, f.target)
+		scanned := f.writtenIn(t, f.build)
 		for _, issue := range []string{"CVE-2026-RATED", "CVE-2026-PUBLISHED"} {
-			if got, want := f.urgencyIn(t, tag, issue), f.urgencyIn(t, f.target, issue); got != want {
+			if got, want := f.urgencyIn(t, tag, issue), f.urgencyIn(t, f.build, issue); got != want {
 				t.Errorf("%s sits at %d on the tag and %d on the scanned build", issue, got, want)
 			}
 		}
@@ -229,7 +229,7 @@ func TestReRankingAfterAScanLeavesTheScannedBuildAsTheScanRankedIt(t *testing.T)
 		if err := finding.Reranked(ctx, f.db.DB, issues, time.Now().UTC(), 0); err != nil {
 			t.Fatal(err)
 		}
-		for at, got := range f.writtenIn(t, f.target) {
+		for at, got := range f.writtenIn(t, f.build) {
 			if want := scanned[at]; got.Urgency != want.Urgency {
 				t.Errorf("%v: re-ranking moved it from %d to %d", at, want.Urgency, got.Urgency)
 			}
@@ -247,7 +247,7 @@ func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		asked := &matchedStatements{}
 		f.hook(asked)
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-CLOSED", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -265,7 +265,7 @@ func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
 				t.Fatalf("the read has no outer condition ahead of its arms: %s", each.query)
 			}
 			outer := each.query[where:inner]
-			for _, part := range []string{`"target_id" = `, `"kind" = `, `"closed_at" IS NOT NULL`, `"vulnerability_id" IN (`} {
+			for _, part := range []string{`"build_id" = `, `"kind" = `, `"closed_at" IS NOT NULL`, `"vulnerability_id" IN (`} {
 				if !strings.Contains(outer, part) {
 					t.Errorf("the outer read does not ask %q: %s", part, each.query)
 				}
@@ -324,7 +324,7 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 		}
 		tag := f.anotherBuild(t, "24.06")
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), report(false)); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), report(false)); err != nil {
 			t.Fatal(err)
 		}
 		f.shippedTo(t, tag, twoConsumers())
@@ -334,7 +334,7 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 
 		asked := &matchedStatements{}
 		f.hook(asked)
-		applied, err := f.store.Apply(ctx, f.target, f.run(t), report(true))
+		applied, err := f.store.Apply(ctx, f.build, f.run(t), report(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -398,7 +398,7 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 		// before it, and the tag ordering each as the scanned build does.
 		var above int64
 		for i, id := range all {
-			scanned, onTag := f.urgencyIn(t, f.target, id), f.urgencyIn(t, tag, id)
+			scanned, onTag := f.urgencyIn(t, f.build, id), f.urgencyIn(t, tag, id)
 			if scanned != onTag {
 				t.Errorf("%s sits at %d on the scanned build and %d on the tag", id, scanned, onTag)
 			}

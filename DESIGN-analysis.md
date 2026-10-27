@@ -41,7 +41,7 @@ shares is in `DESIGN-ingest.md`.
 One request carries one run of one analysis against one build:
 
 ```
-POST /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses
+POST /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses
   sarif=@…        one or more SARIF 2.1.0 documents, gzip accepted
   series, commit, built, tool-version, rules, units-expected, units-analyzed,
   exit-status, source-root, third-party
@@ -283,7 +283,7 @@ occurrence, so a decision keyed on the occurrence reaches it (REQ-25).
 
 | Order | Where | How |
 |---|---|---|
-| 1 | The code findings open on the build of the same variant in the stream this one was cut from, on the series' first run on the build | Every layer, and the unprinted key where the run is a fingerprint change against that build. A new branch inherits what the line it was cut from has decided |
+| 1 | The code findings open on the build of the same variant in the branch this one was cut from, on the series' first run on the build | Every layer, and the unprinted key where the run is a fingerprint change against that build. A new branch inherits what the line it was cut from has decided |
 | 2 | A closed code finding on this build | The whole key. The result is the same flaw found again, and opens a new code finding at the closed one's occurrence |
 | 3 | Any code finding of the series on another build, open or closed | The whole key, the oldest code finding first. A probable pairing with a code finding this build never saw is a guess |
 
@@ -295,7 +295,7 @@ the same result first seen on two builds at once is one occurrence.
 A run records the fingerprint schemes its results' keys were built from, and
 the mark of the salt the client took its own with. A run whose record differs
 from the newest one applied to the build that reported anything is a
-fingerprint change. The series' first run on a build cut from another stream
+fingerprint change. The series' first run on a build cut from another branch
 is compared with the newest such run on the parent build, whose code findings it
 inherits.
 
@@ -397,7 +397,7 @@ is sent.
 
 ### Evidence
 
-`GET …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}` answers one code finding's
+`GET …/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}` answers one code finding's
 evidence on one build: its rule, where it is, the path the analyzer took to
 it, the related places, each with its link and source, when it was last seen,
 and, for a code finding no longer open, when it was first not seen, by which run, with
@@ -421,10 +421,10 @@ A decision about a code finding is a decision as `DESIGN-triage.md` describes on
 argument, its rows, its reasoning and every revision of it, and a second
 person's approval of one revision (REQ-24, REQ-28). It is keyed on the
 product, the rule the code finding is filed under, and the code finding's occurrence, with no
-versions, so one decision covers the code finding on every stream and variant it is
+versions, so one decision covers the code finding on every branch or tag and variant it is
 seen on (REQ-25).
 
-`POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision` records one.
+`POST …/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision` records one.
 
 | Outcome | Means | Second person |
 |---|---|---|
@@ -452,7 +452,7 @@ seen on (REQ-25).
 
 ### Fixed code findings
 
-`POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed` closes a code finding
+`POST …/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/fixed` closes a code finding
 on one build, with what fixed it and the build that fixed it.
 
 | Rule | |
@@ -589,14 +589,14 @@ series, by state. The analytics catalog draws it as Code findings by analyzer
 |---|---|
 | Every state is counted, zero included, beside how many open code findings a waiting decision leaves out of the queue and how many dismissed code findings a suppression rule covers | The states are worked out for the queue already, so each costs nothing more |
 | Each count is the total the list answers for that series and state | A figure and the list it opens count one population, under the same visibility |
-| Counted over every build of the product | A series is the product's. A stream or variant would list a series that never ran there with every count zero, which reads as an analyzer that found nothing |
+| Counted over every build of the product | A series is the product's. A branch or tag or a variant would list a series that never ran there with every count zero, which reads as an analyzer that found nothing |
 | A series holding no code finding is listed with every count zero | An analyzer that runs and finds nothing is a fact about the product |
 | Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of code findings is internal however it is narrowed. A reader of an included code finding through its flaw reads the code finding and not the product's figures |
 | Ordered by the series' name | The series are few, and a reader looks one up by its name |
 
 ## Code finding assignment
 
-`PUT …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment` gives a
+`PUT …/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment` gives a
 code finding to a person or a team, or hands it back to nobody, as a finding is
 assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 
@@ -697,7 +697,7 @@ every recorded flaw takes (`DESIGN-findings.md` § Recorded flaws), and linked
 to it. The code finding is then recorded as a flaw: its flaw is what is judged, fixed and
 disclosed.
 
-`GET …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw` is what a
+`GET …/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw` is what a
 flaw record is offered, and `POST` on the same address records it.
 
 | Rule | |
@@ -896,7 +896,7 @@ what the deployment cannot learn from the output alone, and sends each as
 § The upload describes.
 
 ```
-openpsirt-upload upload --product P --stream S --variant V --series [TOOL=]NAME... \
+openpsirt-upload upload --product P --branch-or-tag B --variant V --series [TOOL=]NAME... \
   [--commit SHA] [--built TIME] [--snippets] [--salt-file FILE] \
   [--third-party PATH]... OUTPUT...
 openpsirt-upload write --series [TOOL=]NAME... --output FILE OUTPUT...
@@ -1013,7 +1013,7 @@ it is about.
 | Limit | Detail |
 |---|---|
 | A moved result with no fingerprint and no function is matched on its line alone | clang-tidy, and clang before 22, give rule, path, line and message. A line moved above such a result pairs it with the nearest code finding of the same rule and message in the file, which is probable, and two such results moving past each other can swap |
-| A new variant inherits on the whole key alone | Carrying by every layer is from the stream a branch was cut from. A variant's first run of a series takes a sibling variant's occurrences where the whole keys are equal |
+| A new variant inherits on the whole key alone | Carrying by every layer is from the branch a tag was cut from. A variant's first run of a series takes a sibling variant's occurrences where the whole keys are equal |
 | A result whose whole key equals the one a moved code finding was first seen with opens at that code finding's occurrence | Occurrences are minted from the first key a series saw. Both are the same rule, path, fingerprint and message, which is one flaw reported twice |
 | A run that ends unread counts nothing on its receipt | A run is read only once its build has an inventory, so one superseded or failed while it waits, or held in a shape the release applying it does not read, ends with a receipt naming no drop and no discard |
 | Coverity's native JSON is not read, so its SARIF is matched as plain SARIF | Coverity's `mergeKey` is in its JSON and is lost in its SARIF. A Coverity code finding is matched on the key its SARIF states, as any plain SARIF is (§ Keys) |

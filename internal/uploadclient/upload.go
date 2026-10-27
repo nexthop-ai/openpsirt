@@ -21,8 +21,8 @@ import (
 
 // Target is where a run is sent, and the key it is sent with.
 type Target struct {
-	URL, Key                 string
-	Product, Stream, Variant string
+	URL, Key                      string
+	Product, BranchOrTag, Variant string
 }
 
 // Fields is what is sent beside the document: the values the deployment
@@ -101,14 +101,14 @@ func analysesURL(to Target) (string, error) {
 		return "", fmt.Errorf("%q is not the address of a deployment", to.URL)
 	}
 	for _, part := range []struct{ name, value string }{
-		{"product", to.Product}, {"stream", to.Stream}, {"variant", to.Variant},
+		{"product", to.Product}, {"branch_or_tag", to.BranchOrTag}, {"variant", to.Variant},
 	} {
 		if part.value == "" {
-			return "", fmt.Errorf("a run is sent for a product, a stream and a variant, and names no %s", part.name)
+			return "", fmt.Errorf("a run is sent for a product, a branch or tag and a variant, and names no %s", part.name)
 		}
 	}
 	return base.String() + "/v1/products/" + url.PathEscape(to.Product) +
-		"/branches-and-tags/" + url.PathEscape(to.Stream) +
+		"/branches-and-tags/" + url.PathEscape(to.BranchOrTag) +
 		"/variants/" + url.PathEscape(to.Variant) + "/analyses", nil
 }
 

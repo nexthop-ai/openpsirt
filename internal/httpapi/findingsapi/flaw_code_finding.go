@@ -19,18 +19,18 @@ import (
 
 // FlawCodeFindingBuild is one build a flaw record proposed a flaw against.
 type FlawCodeFindingBuild struct {
-	Stream  string `json:"stream"`
-	Variant string `json:"variant"`
-	Seen    bool   `json:"seen" doc:"Whether the code finding was seen in it. Otherwise it holds the chosen component and the code finding's series never analyzed it"`
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
+	Seen        bool   `json:"seen" doc:"Whether the code finding was seen in it. Otherwise it holds the chosen component and the code finding's series never analyzed it"`
 }
 
 // FlawUnseenBody is a build the flaw is open on whose code finding a comparable run
 // no longer sees.
 type FlawUnseenBody struct {
-	Stream  string              `json:"stream"`
-	Variant string              `json:"variant"`
-	NotSeen CodeFindingRunBody  `json:"not_seen" doc:"The first run on the build that did not see the code finding"`
-	Fixed   *CodeFindingRunBody `json:"fixed,omitempty" doc:"The build a person stated fixed the code finding, where they closed it as fixed"`
+	BranchOrTag string              `json:"branch_or_tag"`
+	Variant     string              `json:"variant"`
+	NotSeen     CodeFindingRunBody  `json:"not_seen" doc:"The first run on the build that did not see the code finding"`
+	Fixed       *CodeFindingRunBody `json:"fixed,omitempty" doc:"The build a person stated fixed the code finding, where they closed it as fixed"`
 }
 
 // FlawSuggestedBody is the component a flaw record's offer ranked first, as the
@@ -44,21 +44,21 @@ type FlawSuggestedBody struct {
 
 // FlawCodeFindingBody is the code finding a flaw was recorded from.
 type FlawCodeFindingBody struct {
-	Occurrence string                 `json:"occurrence" doc:"The code finding's occurrence identity"`
-	Stream     string                 `json:"stream" doc:"The branch or tag of the build its newest finding you read is on"`
-	Variant    string                 `json:"variant" doc:"The variant of that build"`
-	Rule       string                 `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	Path       string                 `json:"path" doc:"Where the code finding is, relative to the top of the checkout"`
-	Line       int                    `json:"line,omitempty" doc:"The line it starts at"`
-	State      CodeFindingState       `json:"state" doc:"Where the code finding stands on that build"`
-	Suggested  FlawSuggestedBody      `json:"suggested" doc:"The component the flaw record's offer ranked first, which the person may have turned down"`
-	Proposed   []FlawCodeFindingBuild `json:"proposed" doc:"The builds the flaw record proposed the flaw against"`
-	RecordedBy string                 `json:"recorded_by" doc:"The person who handed it off, by sign-in identity"`
-	RecordedAt string                 `json:"recorded_at" format:"date-time"`
-	UndoneBy   string                 `json:"undone_by,omitempty" doc:"The person who undid the flaw record, by sign-in identity"`
-	UndoneAt   string                 `json:"undone_at,omitempty" format:"date-time" doc:"When the flaw record was undone. Absent while it stands"`
-	Because    string                 `json:"because,omitempty" doc:"Why the flaw record was undone, in markdown"`
-	FixedIn    []FlawUnseenBody       `json:"fixed_in" doc:"Each build the flaw is still open on whose code finding a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the flaw record is undone"`
+	Occurrence  string                 `json:"occurrence" doc:"The code finding's occurrence identity"`
+	BranchOrTag string                 `json:"branch_or_tag" doc:"The branch or tag of the build its newest finding you read is on"`
+	Variant     string                 `json:"variant" doc:"The variant of that build"`
+	Rule        string                 `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	Path        string                 `json:"path" doc:"Where the code finding is, relative to the top of the checkout"`
+	Line        int                    `json:"line,omitempty" doc:"The line it starts at"`
+	State       CodeFindingState       `json:"state" doc:"Where the code finding stands on that build"`
+	Suggested   FlawSuggestedBody      `json:"suggested" doc:"The component the flaw record's offer ranked first, which the person may have turned down"`
+	Proposed    []FlawCodeFindingBuild `json:"proposed" doc:"The builds the flaw record proposed the flaw against"`
+	RecordedBy  string                 `json:"recorded_by" doc:"The person who handed it off, by sign-in identity"`
+	RecordedAt  string                 `json:"recorded_at" format:"date-time"`
+	UndoneBy    string                 `json:"undone_by,omitempty" doc:"The person who undid the flaw record, by sign-in identity"`
+	UndoneAt    string                 `json:"undone_at,omitempty" format:"date-time" doc:"When the flaw record was undone. Absent while it stands"`
+	Because     string                 `json:"because,omitempty" doc:"Why the flaw record was undone, in markdown"`
+	FixedIn     []FlawUnseenBody       `json:"fixed_in" doc:"Each build the flaw is still open on whose code finding a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the flaw record is undone"`
 }
 
 func registerFlawCodeFinding(api huma.API, in core.Deps) {
@@ -107,7 +107,7 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "the code finding this flaw came from could not be read", err)
 		}
 		body := FlawCodeFindingBody{
-			Occurrence: origin.Occurrence, Stream: origin.Build.Stream, Variant: origin.Build.Variant,
+			Occurrence: origin.Occurrence, BranchOrTag: origin.Build.BranchOrTag, Variant: origin.Build.Variant,
 			Rule: origin.Rule, Path: origin.Path, Line: origin.Line, State: CodeFindingState(origin.State),
 			Suggested: FlawSuggestedBody{Component: origin.Suggested.Component, Ecosystem: origin.Suggested.Ecosystem,
 				Namespace: origin.Suggested.Namespace, From: FlawOfferSource(origin.Suggested.From)},
@@ -120,11 +120,11 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 			body.UndoneBy = who.Identity(*origin.UndoneBy)
 		}
 		for _, b := range origin.Proposed {
-			body.Proposed = append(body.Proposed, FlawCodeFindingBuild{Stream: b.Stream, Variant: b.Variant, Seen: b.Seen})
+			body.Proposed = append(body.Proposed, FlawCodeFindingBuild{BranchOrTag: b.BranchOrTag, Variant: b.Variant, Seen: b.Seen})
 		}
 		for _, u := range origin.FixedIn {
 			not := codeFindingRunBody(&u.NotSeen)
-			body.FixedIn = append(body.FixedIn, FlawUnseenBody{Stream: u.Stream, Variant: u.Variant,
+			body.FixedIn = append(body.FixedIn, FlawUnseenBody{BranchOrTag: u.BranchOrTag, Variant: u.Variant,
 				NotSeen: *not, Fixed: codeFindingRunBody(u.Fixed)})
 		}
 		return &struct{ Body FlawCodeFindingBody }{Body: body}, nil
@@ -143,15 +143,15 @@ func registerFlawCodeFinding(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
 		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body       struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Body        struct {
 			Because string `json:"because" minLength:"1" doc:"Why the flaw record is undone, in markdown"`
 		}
 	}) (*struct{}, error) {
-		at, err := locateCodeFinding(ctx, in, input.Product, input.Stream, input.Variant)
+		at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}

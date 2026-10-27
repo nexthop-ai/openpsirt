@@ -75,9 +75,9 @@ func shiftCast(text string, port int) ([]string, error) {
 	return cast, nil
 }
 
-// firstBuild is the build that sorts first, as its product, stream and
+// firstBuild is the build that sorts first, as its product, branch or tag and
 // variant, so every run of the sweep asks the same one.
-func firstBuild(builds Totals) (product, stream, variant string, ok bool) {
+func firstBuild(builds Totals) (product, branchOrTag, variant string, ok bool) {
 	for _, build := range slices.Sorted(maps.Keys(builds)) {
 		parts := strings.SplitN(build, "/", 3)
 		if len(parts) == 3 {

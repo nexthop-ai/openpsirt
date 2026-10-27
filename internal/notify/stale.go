@@ -420,8 +420,8 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
@@ -572,8 +572,8 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`"tm"."id" AS "team_id"`).
 		ColumnExpr(`"tm"."display_name" AS "team_display"`).

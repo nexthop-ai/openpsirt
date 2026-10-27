@@ -165,8 +165,8 @@ func coversSomething(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fc"`+
 		` JOIN "component" AS "c" ON "c"."id" = "fc"."component_id"`+
 		` LEFT JOIN "component" AS "uc" ON "uc"."id" = "fc"."consumer_id"`+
-		` JOIN "target" AS "tgc" ON "tgc"."id" = "fc"."target_id"`+
-		` JOIN "stream" AS "stc" ON "stc"."id" = "tgc"."stream_id"`+
+		` JOIN "build" AS "tgc" ON "tgc"."id" = "fc"."build_id"`+
+		` JOIN "branch_or_tag" AS "stc" ON "stc"."id" = "tgc"."branch_or_tag_id"`+
 		` WHERE "stc"."product_id" = "de"."product_id" AND "fc"."closed_at" IS NULL`+
 		` AND `+kinds+
 		` AND `+finding.DecisionOccurrenceOf("fc")+
@@ -220,7 +220,7 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 	if where.OpenIn > 0 {
 		kinds, args := kindsOf(kind.VersionCarry, "fo")
 		q = q.Where(`"dv"."issue_id" IN (SELECT "fo"."vulnerability_id" FROM "finding" AS "fo"`+
-			` WHERE "fo"."target_id" = ? AND "fo"."closed_at" IS NULL AND `+kinds+`)`,
+			` WHERE "fo"."build_id" = ? AND "fo"."closed_at" IS NULL AND `+kinds+`)`,
 			append([]any{where.OpenIn}, args...)...)
 	}
 	var groups []ratedWorseGroup

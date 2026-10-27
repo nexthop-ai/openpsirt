@@ -45,7 +45,7 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotListedToSomebodyWhoMayNotReadIt(t 
 		r.ScannedWithEvidence(t)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The recovery console does not clear the previous session.",`+
 				`"severity":"high"}`)
 		if made.Code != http.StatusCreated {

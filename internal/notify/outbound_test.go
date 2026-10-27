@@ -227,7 +227,7 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 // of its own where a receiver reads it without opening the text.
 //
 // A link rebuilt from the row beside the body announces the identifier, the
-// product, the stream, the variant and the component to every server the
+// product, the branch or tag, the variant and the component to every server the
 // request crosses.
 func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
@@ -245,7 +245,7 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 
 		// The shape a disclosure notice takes: every part of what it is about
 		// is in the path.
-		const where = "/products/sonic/streams/master/variants/broadcom" +
+		const where = "/products/sonic/branches-and-tags/master/variants/broadcom" +
 			"/findings/SONIC-2026-7002/components/swss"
 		if err := hook.store.Tell(ctx, notify.Telling{
 			PersonID: hook.admin.ID, Kind: notify.DisclosureDue,
@@ -785,7 +785,7 @@ func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
 			if err := store.Tell(ctx, notify.Telling{
 				PersonID: who.ID, Kind: notify.InventoryMoved,
 				Body:     "sonic master broadcom: 21 names moved in one upload.",
-				Link:     "/products/sonic/streams/master/variants/broadcom/scans/4/changes",
+				Link:     "/products/sonic/branches-and-tags/master/variants/broadcom/scans/4/changes",
 				Together: "one-upload",
 			}); err != nil {
 				t.Fatal(err)

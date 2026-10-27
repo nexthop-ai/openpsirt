@@ -251,7 +251,7 @@ Other bar rules:
 - The search in the bar is the findings list's own search, reached without
   going there first. "/" focuses it, unless somebody is already typing.
 - Upload is in the bar on every screen (REQ-05), because the form picks its own
-  target; the Uploads screen has it too, because that is where the result
+  build; the Uploads screen has it too, because that is where the result
   appears.
 - On a narrow screen the rail goes and a tab bar of three arrives — home,
   findings, queue — which is what somebody reviews and responds from on a
@@ -729,7 +729,7 @@ and the act hangs off it.
 | One row per source version rather than per build | A build shipping a source at two versions holds two folds, and they are two pieces of code to decide about separately. Collapsed to one version, the other is hidden |
 | A deadline is absent where nothing is open, never zero | It is the earliest among what is open, so with nothing open there is no such date |
 | The package identifier travels with the row | The ecosystem is read out of it and so is an upstream address, and neither is stored. Nothing is fetched from either |
-| Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
+| Per build, because the answer differs by build | A branch staying on a maintained older line and a branch that has moved on are different work with different testing, and one target across both would be wrong for one of them |
 | Where it could go carries two counts | What a release fixed is how many of what is open name that exact version; what reaching it closes is that plus everything fixed before it. Sorted on the first, the version worth taking sinks: measured on the demo's kernel, the release that closes all 158 fixed 2 of its own and the one that fixed 49 code findings |
 | Furthest along first where the versions can be ordered, unranked where they cannot | An ordering exists per ecosystem rather than in general, and one version a comparison refuses makes the whole list unrankable. Shown unranked the two counts are equal and the screen says so, rather than implying an order nothing established |
 | The second count is consumers, not occurrences | One decision covers the whole fold, and what varies underneath it is what pulls the package in. An occurrence count is a unit nobody acts in; it is the row's title, being what the ceiling on one action is measured against |
@@ -1263,7 +1263,7 @@ is what the screen is about.
 | A retired tag opens on its own release page and says it is retired | Its address is reached by a link somebody kept, so the page reads retired lines to resolve it. Nothing offers a retired tag as the release before another |
 | A retired variant is marked on the release that was built as it | It is gone from what the product declares and still named by the releases it was built as, because the findings filed against it are still open. Unmarked, a release names a build nothing will ever scan again and says nothing about why |
 | The edit says when a name can no longer be corrected | A published document is held by readers under the name it carried. The drawer says so where somebody is about to type a new one, rather than leaving the refusal to explain it afterwards |
-| An inventory can be uploaded from the interface (REQ-05) | From the bar and from the Uploads screen. The drawer takes the target — prefilled from the scope, refused by the server if undeclared — one inventory — CycloneDX or SPDX, as the file itself says — and any number of OpenVEX suppression documents, which is what the endpoint takes. It posts the same multipart request a pipeline sends, then opens the Uploads screen, where the receipt shows "queued" until the run says what it changed |
+| An inventory can be uploaded from the interface (REQ-05) | From the bar and from the Uploads screen. The drawer takes the build — prefilled from the scope, refused by the server if undeclared — one inventory — CycloneDX or SPDX, as the file itself says — and any number of OpenVEX suppression documents, which is what the endpoint takes. It posts the same multipart request a pipeline sends, then opens the Uploads screen, where the receipt shows "queued" until the run says what it changed |
 | The screen that lists receipts is called Uploads, with one tab per kind of upload | SBOMs, static analysis runs, VEX documents and supplier advisories. § The Uploads screen holds the tabs |
 | The SBOM tab is the receipts | Everything below about receipts is that tab's |
 | It says what each run changed, and what the numbers were measured against | Which scanner, at which version, reading which vulnerability database. Without it, a build with nothing wrong and a build last measured against a months-old database read identically. A run covers a build rather than an upload, so where several uploads are answered by one run the numbers sit on the newest and the rest are blank |
@@ -1866,7 +1866,7 @@ reading the screen sees both disabled, with the reason on hover.
 
 ## A release, gathered
 
-`/products/:product/streams/:name` when that name is a tag. The address a
+`/products/:product/branches-and-tags/:branch_or_tag` when that name is a tag. The address a
 branch and a tag share resolves to whichever screen answers the question that
 line poses, from the catalog rather than from a naming convention: a branch is
 rebuilt nightly and what matters is what it is built as, and a tag never

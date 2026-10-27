@@ -2,39 +2,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSearchParams } from "react-router-dom";
-import { useProductVariants, useStreams } from "../api/catalog";
+import { useProductVariants, useBranchesAndTags } from "../api/catalog";
 import { Failed } from "./Failed";
 
-// A build is a stream and a variant together, never one of them: the same
+// A build is a branch or tag and a variant together, never one of them: the same
 // branch built two ways is two builds, and comparing across the pair without
 // saying so is how a release note reports the wrong hardware.
 function PickBuild({
   label,
-  stream,
+  branch_or_tag: branchOrTag,
   variant,
-  streams,
+  branchesAndTags,
   variants,
-  onStream,
+  onBranchOrTag,
   onVariant,
 }: {
   label: string;
-  stream: string;
+  branch_or_tag: string;
   variant: string;
-  streams: string[];
+  branchesAndTags: string[];
   variants: string[];
-  onStream: (value: string) => void;
+  onBranchOrTag: (value: string) => void;
   onVariant: (value: string) => void;
 }) {
   return (
     <span style={{ display: "inline-flex", gap: 5, alignItems: "center" }}>
       <select
-        aria-label={`${label} stream`}
+        aria-label={`${label} branch or tag`}
         style={{ width: "auto" }}
-        value={stream}
-        onChange={(event) => onStream(event.target.value)}
+        value={branchOrTag}
+        onChange={(event) => onBranchOrTag(event.target.value)}
       >
         <option value="">Select a branch or tag</option>
-        {streams.map((name) => (
+        {branchesAndTags.map((name) => (
           <option key={name} value={name}>
             {name}
           </option>
@@ -62,7 +62,7 @@ function PickBuild({
 type BuildPair = ReturnType<typeof useBuildPair>;
 
 // useBuildPair reads the earlier and the later build from the address, and the
-// product's streams and variants to offer. Setting a value writes the address,
+// product's branches and tags and variants to offer. Setting a value writes the address,
 // and an empty value takes the parameter off.
 export function useBuildPair(product: string) {
   const [params, setParams] = useSearchParams();
@@ -71,7 +71,7 @@ export function useBuildPair(product: string) {
   const to = params.get("to") ?? "";
   const toVariant = params.get("to_variant") ?? "";
 
-  const streams = useStreams(product);
+  const branchesAndTags = useBranchesAndTags(product);
   const variants = useProductVariants(product);
 
   function set(key: string, value: string) {
@@ -91,9 +91,13 @@ export function useBuildPair(product: string) {
     // The two builds alone, as every comparison of them takes them.
     pair: { from, from_variant: fromVariant, to, to_variant: toVariant },
     set,
-    streamNames: (streams.data?.items ?? []).map((each) => each.name ?? ""),
+    branchOrTagNames: (branchesAndTags.data?.items ?? []).map((each) => each.name ?? ""),
     variantNames: (variants.data?.items ?? []).map((each) => each.name ?? ""),
-    readError: streams.isError ? streams.error : variants.isError ? variants.error : null,
+    readError: branchesAndTags.isError
+      ? branchesAndTags.error
+      : variants.isError
+        ? variants.error
+        : null,
   };
 }
 
@@ -113,21 +117,21 @@ export function PickPair({
       )}
       <PickBuild
         label="Earlier build"
-        stream={builds.from}
+        branch_or_tag={builds.from}
         variant={builds.fromVariant}
-        streams={builds.streamNames}
+        branchesAndTags={builds.branchOrTagNames}
         variants={builds.variantNames}
-        onStream={(value) => set("from", value)}
+        onBranchOrTag={(value) => set("from", value)}
         onVariant={(value) => set("from_variant", value)}
       />
       <span style={{ color: "var(--faint)" }}>to</span>
       <PickBuild
         label="Later build"
-        stream={builds.to}
+        branch_or_tag={builds.to}
         variant={builds.toVariant}
-        streams={builds.streamNames}
+        branchesAndTags={builds.branchOrTagNames}
         variants={builds.variantNames}
-        onStream={(value) => set("to", value)}
+        onBranchOrTag={(value) => set("to", value)}
         onVariant={(value) => set("to_variant", value)}
       />
     </>

@@ -390,7 +390,7 @@ func stripUndisclosedSnippets(ctx context.Context, db bun.IDB, productID int64, 
 		ColumnExpr(`"ar"."finding_id" AS "id", "ar"."path"`).
 		Where(kinds, kindArgs...).
 		Where(`"f"."occurrence_identity" IN (?)`, bun.List(occurrences)).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Where(`"ar"."snippet" IS NOT NULL`).
 		Scan(ctx, &kept); err != nil {
 		return fmt.Errorf("read the snippets kept beside the code findings: %w", err)
@@ -419,7 +419,7 @@ func stripUndisclosedSnippets(ctx context.Context, db bun.IDB, productID int64, 
 		ColumnExpr(`"al"."id", "al"."path"`).
 		Where(kinds, kindArgs...).
 		Where(`"f"."occurrence_identity" IN (?)`, bun.List(occurrences)).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Where(`"al"."snippet" IS NOT NULL`).
 		Scan(ctx, &spots); err != nil {
 		return fmt.Errorf("read the snippets kept beside the code findings' occurrences: %w", err)

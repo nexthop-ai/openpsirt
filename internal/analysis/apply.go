@@ -52,7 +52,7 @@ func NewApplier(db *database.DB) *Applier {
 // Drop is an applied run that marked more of a build's open code findings not
 // reproduced than the deployment expects of one run.
 type Drop struct {
-	RunID, SeriesID, TargetID int64
+	RunID, SeriesID, BuildID int64
 	// Missed is how many it marked, and Live how many it could have.
 	Missed, Live int
 }
@@ -84,7 +84,7 @@ type Receipt struct {
 	Inherited           int            `json:"inherited,omitempty" doc:"Results new to the build carried from a code finding of the branch it was cut from"`
 	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the occurrence of a code finding on the build that was closed"`
 	Uncompared          int            `json:"uncompared,omitempty" doc:"Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set"`
-	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build"`
+	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another branch or tag, from the last run on that branch or tag's build"`
 	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent"`
 	Scanners            []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
 	Discarded           map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
@@ -126,7 +126,7 @@ func (a *Applier) Apply(ctx context.Context, runID int64) (series.Status, error)
 	if !pending(run.Status) {
 		return run.Status, nil
 	}
-	built, err := inventoryOf(ctx, a.db.DB, run.TargetID)
+	built, err := inventoryOf(ctx, a.db.DB, run.BuildID)
 	if err != nil {
 		return "", err
 	}
@@ -294,7 +294,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		return run.Status, a.end(ctx, store, run, placed.Receipt)
 	}
 
-	inventory, err := inventoryOf(ctx, tx, run.TargetID)
+	inventory, err := inventoryOf(ctx, tx, run.BuildID)
 	if err != nil {
 		return "", err
 	}
@@ -332,11 +332,11 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		if err != nil {
 			return "", err
 		}
-		// The series' first run on a build cut from another stream is
+		// The series' first run on a build cut from another branch or tag is
 		// matched against the parent build's code findings, so its fingerprints are
 		// compared with what that build last carried.
 		if last == "" && previous == nil {
-			parent, err := parentBuild(ctx, tx, run.TargetID)
+			parent, err := parentBuild(ctx, tx, run.BuildID)
 			if err != nil {
 				return "", err
 			}
@@ -348,7 +348,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		}
 		run.FingerprintsChanged = last != "" && last != run.Fingerprints
 	}
-	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.TargetID)
+	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.BuildID)
 	if err != nil {
 		return "", err
 	}
@@ -371,7 +371,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		}
 		if sharp {
 			receipt.SharpDrop = true
-			said.drop = &Drop{RunID: run.ID, SeriesID: set.ID, TargetID: run.TargetID,
+			said.drop = &Drop{RunID: run.ID, SeriesID: set.ID, BuildID: run.BuildID,
 				Missed: len(missed), Live: live(open)}
 		}
 	}
@@ -390,7 +390,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	if err != nil {
 		return "", err
 	}
-	components, err := componentsOf(ctx, tx, run.TargetID, fresh)
+	components, err := componentsOf(ctx, tx, run.BuildID, fresh)
 	if err != nil {
 		return "", err
 	}

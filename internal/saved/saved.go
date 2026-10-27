@@ -112,7 +112,7 @@ func NewStore(db bun.IDB) *Store {
 // kept query, so testdata/scope-words.json holds them too, and a Go test and a
 // web test each compare their own copy with it.
 var scope = [...]string{
-	"stream", "variant",
+	"branch_or_tag", "variant",
 	"beneath", "beneath_version", "beneath_ecosystem", "beneath_namespace",
 	"differs", "variants", "opened_by_run", "view",
 }

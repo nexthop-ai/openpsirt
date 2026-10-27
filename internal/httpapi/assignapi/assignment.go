@@ -40,10 +40,10 @@ func unassignedPage(rows []finding.Owned, total int) *UnassignedPage {
 			Component: row.Component, Version: row.Version,
 			Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 			Product: row.Product, ProductName: row.ProductName,
-			Stream: row.Stream, Variant: row.Variant,
-			StreamName:  row.StreamName,
-			VariantName: row.VariantName,
-			Occurrences: row.Occurrences, Builds: row.Builds, Occurrence: row.Occurrence,
+			BranchOrTag: row.BranchOrTag, Variant: row.Variant,
+			BranchOrTagName: row.BranchOrTagName,
+			VariantName:     row.VariantName,
+			Occurrences:     row.Occurrences, Builds: row.Builds, Occurrence: row.Occurrence,
 		})
 	}
 	out.Body.Total = total
@@ -63,16 +63,16 @@ type UnassignedBody struct {
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
 	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	// Stream and Variant name a build holding this, not the only one: a screen
+	// Branch or tag and Variant name a build holding this, not the only one: a screen
 	// needs somewhere to link to and an action needs a finding to name. The
 	// field that says there are several is `builds`.
-	Stream      string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant     string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
-	Occurrences int    `json:"occurrences" doc:"The number of findings a decision here would be recorded against, across every build it is in"`
-	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one decision answers"`
-	Occurrence  string `json:"occurrence,omitempty" doc:"The occurrence of a static analysis code finding, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
+	BranchOrTag     string `json:"branch_or_tag" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
+	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant         string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
+	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	Occurrences     int    `json:"occurrences" doc:"The number of findings a decision here would be recorded against, across every build it is in"`
+	Builds          int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one decision answers"`
+	Occurrence      string `json:"occurrence,omitempty" doc:"The occurrence of a static analysis code finding, which addresses its page with the branch or tag and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
 }
 
 // HoldingBody is how much work one person has.
@@ -112,7 +112,7 @@ func registerAssignment(api huma.API, in core.Deps) {
 func registerAssigning(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "assign-finding", Method: http.MethodPut,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/findings/{issue}/components/{component}/assignment",
 		Summary: "Assign a finding to somebody",
 		Description: "Records who is dealing with this issue in this component.\n\n" +
@@ -130,7 +130,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 	}, core.PerProduct, "Giving work to somebody else also needs assigner. Taking unowned work, "+
 		"or handing back your own, does not.", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Stream        string `path:"stream"`
+		BranchOrTag   string `path:"branch_or_tag"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue"`
 		Component     string `path:"component"`
@@ -144,8 +144,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		product, target, issue, component, err := locateFinding(ctx, in, subject,
-			input.Product, input.Stream, input.Variant, input.Vulnerability, input.Component,
+		product, build, issue, component, err := locateFinding(ctx, in, subject,
+			input.Product, input.BranchOrTag, input.Variant, input.Vulnerability, input.Component,
 			input.Choice())
 		if err != nil {
 			return nil, err
@@ -212,7 +212,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 			admits = teamAdmits(team, product)
 		}
 
-		_, withheld, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, target, issue,
+		_, withheld, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, build, issue,
 			component, to, admits)
 		if err != nil {
 			return nil, recipient(err, func(err error) error { return core.RefusedFinding(in, err) })
@@ -252,8 +252,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: input.Vulnerability + " in " + input.Component +
-					", in " + input.Product + " " + input.Stream + " " + input.Variant,
-				Link: weblink.Finding(input.Product, input.Stream, input.Variant,
+					", in " + input.Product + " " + input.BranchOrTag + " " + input.Variant,
+				Link: weblink.Finding(input.Product, input.BranchOrTag, input.Variant,
 					input.Vulnerability, input.Component, ""),
 				// Its subject, so a digest can tell later that this
 				// person was told about this work and leave it out.
@@ -611,14 +611,14 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 // there, and the caller has just read it on a screen that resolved the same
 // name.
 func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
-	product, stream, variant, vulnerability, component string,
+	product, branchOrTag, variant, vulnerability, component string,
 	which graph.Choice) (int64, int64, int64, int64, error) {
 
-	named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+	named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+	build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
@@ -626,7 +626,7 @@ func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	held, err := core.ComponentCarrying(ctx, in, subject, target.ID, issue, component, which,
+	held, err := core.ComponentCarrying(ctx, in, subject, build.ID, issue, component, which,
 		func(err error) error {
 			// A name matching several is not a finding here: an assignment
 			// names one occurrence, and the choices are the finding routes' answer.
@@ -638,7 +638,7 @@ func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	return named.ProductID, target.ID, issue, held, nil
+	return named.ProductID, build.ID, issue, held, nil
 }
 
 // seenBy reports whether the person being told may read what it is about.

@@ -154,10 +154,10 @@ type Filter struct {
 	// dependency tree's cumulative count makes, so the number the tree draws
 	// and the list it opens agree. Nil is no narrowing.
 	Beneath *int64
-	// TargetID is which build the query is over, set by the store rather than
+	// BuildID is which build the query is over, set by the store rather than
 	// by a caller, for the same reason ProductID is: the walk beneath a
 	// component is a walk over one build's edges.
-	TargetID int64
+	BuildID int64
 	// State keeps groups by how far they have been decided. A group is an issue
 	// in a component across every occurrence it sits at, and its occurrences
 	// can be in different states, so what a group's state *is* had to be
@@ -312,11 +312,11 @@ type Filter struct {
 	// looked at.
 	AcrossVariants VariantSpread
 	// VariantID is the variant the selection names, where it names one.
-	// Targets is the builds it holds, which AcrossVariants reads as the
+	// Builds is the builds it holds, which AcrossVariants reads as the
 	// signal that a selection was resolved at all: applied to a filter
 	// nobody resolved, its comparison would find nothing anywhere and keep
 	// every row as though it were unique.
-	Targets   []int64
+	BuildIDs  []int64
 	VariantID *int64
 	// Visible is what the reader may see, set with the two above. A finding
 	// in another variant is compared only where the reader could see it
@@ -435,16 +435,16 @@ func (f Filter) ofRows() Filter {
 // rows on that guess it read the kernel's 271,000 rows once per kept group, and
 // did not finish in two minutes where the one-level form hashes the join in 2
 // s.
-func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
+func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
 	if !f.asksOfGroups() {
 		return f.narrow(q)
 	}
 	if f.keepsAfterGrouping() {
-		return f.amongKept(db, f.ofRows().narrow(q), targets, visible)
+		return f.amongKept(db, f.ofRows().narrow(q), buildIDs, visible)
 	}
-	kept := f.listed(db, targets, visible).
+	kept := f.listed(db, buildIDs, visible).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return f.ofRows().narrow(q.
@@ -474,10 +474,10 @@ func (f Filter) keepsAfterGrouping() bool {
 // every row it is joined to: the one-level kept groups, joined that way to the
 // open occurrences, had built the decision table again for 10,572 occurrences
 // after 55 s for the components waiting, and gave no answer in three minutes.
-func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
+func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, buildIDs []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
-	kept := f.listed(db, targets, visible).
+	kept := f.listed(db, buildIDs, visible).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return db.NewSelect().
@@ -498,11 +498,11 @@ func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
 // with 3,060 decision occurrences, against 2.6 s in two levels. A filter
 // needing a decision also narrows both sides to the issues the decision
 // occurrences name (see decidedIssuesFor).
-func (f Filter) listed(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
+func (f Filter) listed(db bun.IDB, buildIDs []int64, visible []access.Visibility) *bun.SelectQuery {
 	if f.asksDecided() {
-		return f.folded(db, openRows(db, targets, visible), issueAndComponent).GroupExpr(GroupedOn)
+		return f.folded(db, openRows(db, buildIDs, visible), issueAndComponent).GroupExpr(GroupedOn)
 	}
-	return f.narrow(openGroups(db, targets, visible))
+	return f.narrow(openGroups(db, buildIDs, visible))
 }
 
 // narrow applies the filter to a grouped query over finding AS f.
@@ -626,7 +626,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 				TableExpr(`"graph_edge" AS "ge"`).
 				Join(`JOIN "graph_node" AS "gch" ON "gch"."id" = "ge"."child_id"`).
 				ColumnExpr(`"gch"."component_id"`).
-				Where(`"ge"."target_id" = "f"."target_id"`).
+				Where(`"ge"."build_id" = "f"."build_id"`).
 				Where(`"ge"."closed_scan_id" IS NULL`).
 				Where(`"ge"."kind" IN (?)`, bun.List(words)))
 	}
@@ -724,8 +724,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 				WHERE "c1"."id" = "f"."component_id")
 			  AND "ft"."label" IN (?)
 			  AND EXISTS (SELECT 1 FROM "finding" AS "fv"
-				JOIN "target" AS "tv" ON "tv"."id" = "fv"."target_id"
-				JOIN "stream" AS "sv" ON "sv"."id" = "tv"."stream_id"
+				JOIN "build" AS "tv" ON "tv"."id" = "fv"."build_id"
+				JOIN "branch_or_tag" AS "sv" ON "sv"."id" = "tv"."branch_or_tag_id"
 				WHERE "sv"."product_id" = "ft"."product_id"
 				  AND "fv"."vulnerability_id" = "ft"."vulnerability_id"
 				  AND "fv"."component_id" = "ft"."component_id"
@@ -768,7 +768,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.Beneath != nil {
 		// The subtree as the engine walks it, not as a list of identifiers
 		// bound back in: under a build's root that list is the whole build.
-		q = q.Where(`"f"."component_id" IN (?)`, graph.Within(q.DB(), f.TargetID, *f.Beneath))
+		q = q.Where(`"f"."component_id" IN (?)`, graph.Within(q.DB(), f.BuildID, *f.Beneath))
 	}
 	q = f.byState(q)
 	if !f.BelowMinimumSeverity {
@@ -853,7 +853,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	// than over every build there is: "differs" is a statement about what is
 	// being looked at.
 	if f.DiffersBetweenBuilds && f.Builds > 1 {
-		q = q.Having(`COUNT(DISTINCT "f"."target_id") < ?`, f.Builds)
+		q = q.Having(`COUNT(DISTINCT "f"."build_id") < ?`, f.Builds)
 	}
 	return f.statesHaving(q, g)
 }
@@ -881,8 +881,8 @@ func VariantSpreads() []VariantSpread { return []VariantSpread{OnlyThisVariant, 
 // Spelled as a scalar subquery, which is how the other five lookups of this
 // shape here are written, rather than as a join correlated outward from
 // inside a subquery.
-const onThisRowsBranch = `(SELECT "tg0"."stream_id" FROM "target" AS "tg0"` +
-	` WHERE "tg0"."id" = "f"."target_id")`
+const onThisRowsBranch = `(SELECT "tg0"."branch_or_tag_id" FROM "build" AS "tg0"` +
+	` WHERE "tg0"."id" = "f"."build_id")`
 
 // acrossVariants keeps rows by how the variants of a branch share them.
 //
@@ -903,7 +903,7 @@ const onThisRowsBranch = `(SELECT "tg0"."stream_id" FROM "target" AS "tg0"` +
 // occurrences where its variant is alone with it and drops the occurrences
 // where it is not.
 func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
-	if f.AcrossVariants == AnyVariants || len(f.Targets) == 0 {
+	if f.AcrossVariants == AnyVariants || len(f.BuildIDs) == 0 {
 		return q
 	}
 	// The same issue at the same fold, open and seen by this reader; which
@@ -928,18 +928,18 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 		if f.VariantID == nil {
 			return q.Where("1 = 0")
 		}
-		others := q.NewSelect().TableExpr(`"target" AS "tg2"`).
+		others := q.NewSelect().TableExpr(`"build" AS "tg2"`).
 			ColumnExpr(`"tg2"."id"`).
-			Where(`"tg2"."stream_id" = `+onThisRowsBranch).
+			Where(`"tg2"."branch_or_tag_id" = `+onThisRowsBranch).
 			Where(`"tg2"."variant_id" <> ?`, *f.VariantID)
 		return q.Where("NOT EXISTS (?)", heldElsewhere().
-			Where(`"f2"."target_id" IN (?)`, others))
+			Where(`"f2"."build_id" IN (?)`, others))
 	case EveryVariant:
 		// No build on the row's own branch lacks it.
-		lacking := q.NewSelect().TableExpr(`"target" AS "tg2"`).
+		lacking := q.NewSelect().TableExpr(`"build" AS "tg2"`).
 			ColumnExpr(`"tg2"."id"`).
-			Where(`"tg2"."stream_id" = `+onThisRowsBranch).
-			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."target_id" = "tg2"."id"`))
+			Where(`"tg2"."branch_or_tag_id" = `+onThisRowsBranch).
+			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."build_id" = "tg2"."id"`))
 		return q.Where("NOT EXISTS (?)", lacking)
 	}
 	return q
@@ -1077,8 +1077,8 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		alone := narrowing + ` AND ("ss"."within" IS NULL OR NOT EXISTS (SELECT 1
 			FROM "component" AS "pc"
 			JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"
-			JOIN "target" AS "pt" ON "pt"."id" = "pn"."target_id"
-			JOIN "stream" AS "ps" ON "ps"."id" = "pt"."stream_id"
+			JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"
+			JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"
 			WHERE "ps"."product_id" = "ss"."product_id" AND "pn"."closed_scan_id" IS NULL
 			  AND "pc"."name_folded" = "ss"."within"))`
 

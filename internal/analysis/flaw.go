@@ -75,9 +75,9 @@ func Sources() []Source { return []Source{FromConfirmed, FromPlacement, FromRese
 
 // BuildName is one build by the names that address it.
 type BuildName struct {
-	TargetID int64  `bun:"target_id"`
-	Stream   string `bun:"stream"`
-	Variant  string `bun:"variant"`
+	BuildID     int64  `bun:"build_id"`
+	BranchOrTag string `bun:"branch_or_tag"`
+	Variant     string `bun:"variant"`
 }
 
 // Suggestion is a component offered when recording a flaw. An empty Component is the
@@ -156,7 +156,7 @@ type Offer struct {
 // codeFinding is what a flaw record reads about the code finding at an occurrence.
 type codeFinding struct {
 	ID          int64  `bun:"id"`
-	TargetID    int64  `bun:"target_id"`
+	BuildID     int64  `bun:"build_id"`
 	ComponentID int64  `bun:"component_id"`
 	Path        string `bun:"path"`
 	Rule        string `bun:"rule"`
@@ -203,9 +203,9 @@ func newestCodeFinding(ctx context.Context, db bun.IDB, subject access.Subject, 
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
-		ColumnExpr(`"f"."id", "f"."target_id", "f"."component_id", "ar"."path"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		ColumnExpr(`"f"."id", "f"."build_id", "f"."component_id", "ar"."path"`).
 		ColumnExpr(`"vu"."identifier" AS "rule", "si"."last_run_id", "si"."series_id"`).
 		Where(`"s"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
@@ -297,7 +297,7 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 		offer(Suggestion{Component: prior.Component, Ecosystem: prior.Ecosystem,
 			Namespace: prior.Namespace, From: FromConfirmed})
 	}
-	placed, root, err := componentOf(ctx, db, l.TargetID, l.ComponentID)
+	placed, root, err := componentOf(ctx, db, l.BuildID, l.ComponentID)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +305,7 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 		offer(Suggestion{Component: placed.Name, Ecosystem: graph.EcosystemOf(placed.Purl),
 			Namespace: graph.NamespaceOf(placed.Purl), From: FromPlacement})
 	}
-	alike, err := resembling(ctx, db, l.TargetID, out.Prefix)
+	alike, err := resembling(ctx, db, l.BuildID, out.Prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +322,7 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 		}
 		choice := graph.Choice{Ecosystem: s.Ecosystem, Namespace: s.Namespace}
 		for _, b := range out.Seen {
-			_, err := graph.ComponentAsIn(ctx, db, b.TargetID, s.Component, choice)
+			_, err := graph.ComponentAsIn(ctx, db, b.BuildID, s.Component, choice)
 			var several *graph.Ambiguous
 			switch {
 			case errors.Is(err, graph.ErrNoComponent):
@@ -456,7 +456,7 @@ type named struct {
 }
 
 // componentOf is a component, and whether it is what a build is.
-func componentOf(ctx context.Context, db bun.IDB, targetID, componentID int64) (named, bool, error) {
+func componentOf(ctx context.Context, db bun.IDB, buildID, componentID int64) (named, bool, error) {
 	var out named
 	if err := db.NewSelect().TableExpr(`"component" AS "c"`).
 		ColumnExpr(`"c"."name", "c"."purl"`).
@@ -465,7 +465,7 @@ func componentOf(ctx context.Context, db bun.IDB, targetID, componentID int64) (
 		return out, false, fmt.Errorf("read the component the code finding is on: %w", err)
 	}
 	root, err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."component_id" = ?`, componentID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).
@@ -478,7 +478,7 @@ func componentOf(ctx context.Context, db bun.IDB, targetID, componentID int64) (
 
 // resembling is the components a build holds whose names resemble the last
 // segment of a directory, the closest first.
-func resembling(ctx context.Context, db bun.IDB, targetID int64, dir string) ([]named, error) {
+func resembling(ctx context.Context, db bun.IDB, buildID int64, dir string) ([]named, error) {
 	base := strings.ToLower(path.Base(dir))
 	if dir == "" || len(base) < 3 {
 		return nil, nil
@@ -487,7 +487,7 @@ func resembling(ctx context.Context, db bun.IDB, targetID int64, dir string) ([]
 	if err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`DISTINCT "c"."name", "c"."purl"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).
 		Scan(ctx, &held); err != nil {
@@ -531,10 +531,10 @@ func seenIn(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	var out []BuildName
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`DISTINCT "t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
+		ColumnExpr(`DISTINCT "t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		Where(`"s"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(kinds, kindArgs...).
@@ -555,19 +555,19 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 		Version string `bun:"version"`
 		Purl    string `bun:"purl"`
 	}
-	if err := db.NewSelect().TableExpr(`"target" AS "t"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+	if err := db.NewSelect().TableExpr(`"build" AS "t"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		Join(`JOIN "graph_node" AS "n" ON "n"."target_id" = "t"."id"`).
+		Join(`JOIN "graph_node" AS "n" ON "n"."build_id" = "t"."id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		ColumnExpr(`"t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
+		ColumnExpr(`"t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(`"c"."version", "c"."purl"`).
 		Where(`"s"."product_id" = ?`, productID).
 		Where(`"s"."retired_at" IS NULL`).
 		Where(`"va"."retired_at" IS NULL`).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"c"."name_folded" = ?`, graph.Folded(component)).
-		Where(`NOT EXISTS (SELECT 1 FROM "series_run" AS "sr" WHERE "sr"."target_id" = "t"."id" AND "sr"."series_id" = ?)`,
+		Where(`NOT EXISTS (SELECT 1 FROM "series_run" AS "sr" WHERE "sr"."build_id" = "t"."id" AND "sr"."series_id" = ?)`,
 			seriesID).
 		OrderExpr(`"s"."name" ASC, "va"."name" ASC`).
 		Scan(ctx, &rows); err != nil {
@@ -576,13 +576,13 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 	var out []BuildName
 	seen := map[int64]bool{}
 	for _, r := range rows {
-		if seen[r.TargetID] {
+		if seen[r.BuildID] {
 			continue
 		}
 		if len(graph.Narrowed(choice, []graph.Choice{graph.ChoiceOf(r.Version, r.Purl)})) == 0 {
 			continue
 		}
-		seen[r.TargetID] = true
+		seen[r.BuildID] = true
 		out = append(out, r.BuildName)
 	}
 	return out, nil
@@ -648,8 +648,8 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 	from := func(table, alias, message string) *bun.SelectQuery {
 		return db.NewSelect().TableExpr(`"`+table+`" AS "`+alias+`"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "`+alias+`"."finding_id"`).
-			Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+			Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 			ColumnExpr(`COALESCE("`+alias+`"."path", '') AS "path", "`+alias+`"."`+message+`" AS "message_text"`).
 			ColumnExpr(`CASE WHEN "`+alias+`"."snippet" IS NULL THEN NULL ELSE TRUE END AS "snippet"`).
 			Where(`"s"."product_id" = ?`, productID).
@@ -820,7 +820,7 @@ func RecordAsFlaw(ctx context.Context, db bun.IDB, subject access.Subject, in Re
 	}
 	builds := map[int64]bool{}
 	for _, row := range rows {
-		builds[row.TargetID] = true
+		builds[row.BuildID] = true
 	}
 	return &Recorded{Identifier: identifier, Component: component, Builds: len(builds), Occurrences: len(rows)}, nil
 }
@@ -1042,8 +1042,8 @@ func CodeFindingName(ctx context.Context, db bun.IDB, h *finding.CodeFindingFlaw
 		ColumnExpr(`"p"."name" AS "product", "fv"."identifier" AS "flaw"`).
 		ColumnExpr(`(SELECT MAX("vu"."identifier") FROM "finding" AS "f"
 			JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"
-			JOIN "target" AS "t" ON "t"."id" = "f"."target_id"
-			JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"
+			JOIN "build" AS "t" ON "t"."id" = "f"."build_id"
+			JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"
 			WHERE "s"."product_id" = "p"."id" AND "f"."occurrence_identity" = ? AND `+kinds+`) AS "rule"`,
 			append([]any{h.OccurrenceIdentity}, kindArgs...)...).
 		Where(`"p"."id" = ?`, h.ProductID).

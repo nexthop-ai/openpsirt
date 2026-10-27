@@ -141,7 +141,7 @@ func readableWhere(subject access.Subject, column string) (string, []any) {
 // to its findings carries this.
 //
 // The finding's visibility is read through the given alias, and the product
-// through the expression given — the stream's product where the read has
+// through the expression given — the branch or tag's product where the read has
 // joined that far, and the row's where the match already requires the two
 // to agree.
 func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, product string) *bun.SelectQuery {
@@ -247,7 +247,7 @@ func orBrought(subject access.Subject, where string, args []any,
 //
 // Written here rather than through narrowedBy because the product and the
 // visibility sit on different tables in this statement — the product on the
-// stream, the visibility on the finding — and narrowedBy takes one alias for
+// branch or tag, the visibility on the finding — and narrowedBy takes one alias for
 // both.
 func onlyDecidable(query *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	where, args := visibleCondition(subject, `"st"."product_id"`, `"f"."visibility"`, `"f"."vulnerability_id"`,

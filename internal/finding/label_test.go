@@ -19,7 +19,7 @@ import (
 func TestMarkingAFindingWithAWord(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)
@@ -223,7 +223,7 @@ func TestALabelIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib, tool := f.curlFold(t)
-		f.undisclose(t, f.target, "CVE-2026-CURL", tool.Name)
+		f.undisclose(t, f.build, "CVE-2026-CURL", tool.Name)
 		issue := f.issueID(t, "CVE-2026-CURL")
 		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
 
@@ -291,7 +291,7 @@ func TestAPackageJoiningAFoldLaterCarriesItsLabel(t *testing.T) {
 		}
 		f.shipped(t, graph.Snapshot{Root: root, Components: []graph.Described{joined},
 			Dependencies: []graph.Dependency{{Parent: root, Child: joined}}})
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{{
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{{
 			Issue:     finding.Named{Identifier: "CVE-2026-CURL", Severity: "high"},
 			Component: joined, FixState: finding.FixedUpstream, FixedIn: "8.6.0",
 		}}); err != nil {

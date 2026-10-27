@@ -84,18 +84,22 @@ export function Catalog() {
               a year.
             </div>
           </li>
-          {at.product && at.stream && at.variant ? (
+          {at.product && at.branch_or_tag && at.variant ? (
             <li>
               {/* What a customer's own scanner reads. Advisories are about
                   flaws in our own product; this is the document third-party
                   components belong in. */}
               <div>
-                A <b>VEX document</b> for <b>{at.stream}</b> · <b>{at.variant}</b> —{" "}
+                A <b>VEX document</b> for <b>{at.branch_or_tag}</b> · <b>{at.variant}</b> —{" "}
                 <a
                   href={linkTo(
-                    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex",
+                    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex",
                     {
-                      path: { product: at.product, stream: at.stream, variant: at.variant },
+                      path: {
+                        product: at.product,
+                        branch_or_tag: at.branch_or_tag,
+                        variant: at.variant,
+                      },
                     },
                   )}
                 >

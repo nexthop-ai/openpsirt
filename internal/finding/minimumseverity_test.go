@@ -36,7 +36,7 @@ func TestTheMinimumSeverityKeepsThingsOutOfTheListAndSaysHowMany(t *testing.T) {
 		used.Issue.Severity = "low"
 		used.Issue.Exploited = true
 
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{low, high, odd, used}); err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +99,7 @@ func TestNothingBelowTheMinimumSeverityIsOnAClock(t *testing.T) {
 		low.Issue.Severity = "low"
 		high := found("CVE-2026-LOUD", teamd)
 		high.Issue.Severity = "high"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{low, high}); err != nil {
 			t.Fatal(err)
 		}
@@ -272,13 +272,13 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		products := catalog.NewStore(f.db.DB)
-		stream := f.streamOf(t, f.target)
+		branchOrTag := f.branchOrTagOf(t, f.build)
 
-		held, err := products.EndOfLifeForTarget(ctx, f.target)
+		held, err := products.EndOfLifeForBuild(ctx, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if held.On != nil || held.FromStream {
+		if held.On != nil || held.FromBranchOrTag {
 			t.Errorf("with nothing stated the date is %+v", held)
 		}
 		if held.Past(time.Now().UTC()) {
@@ -289,24 +289,24 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		if err := products.SetProductEndOfLife(ctx, f.productID, &march); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeForTarget(ctx, f.target)
+		held, err = products.EndOfLifeForBuild(ctx, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if held.On == nil || !held.On.Equal(march) || held.FromStream {
+		if held.On == nil || !held.On.Equal(march) || held.FromBranchOrTag {
 			t.Errorf("the inherited date is %+v, want the product's March date", held)
 		}
 
 		// The release says something else, and that is what applies.
 		june := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
-		if err := products.SetStreamEndOfLife(ctx, stream, &june); err != nil {
+		if err := products.SetBranchOrTagEndOfLife(ctx, branchOrTag, &june); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeForTarget(ctx, f.target)
+		held, err = products.EndOfLifeForBuild(ctx, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if held.On == nil || !held.On.Equal(june) || !held.FromStream {
+		if held.On == nil || !held.On.Equal(june) || !held.FromBranchOrTag {
 			t.Errorf("the release's own date is %+v, want its June date", held)
 		}
 
@@ -316,14 +316,14 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		if err := products.SetProductEndOfLife(ctx, f.productID, &september); err != nil {
 			t.Fatal(err)
 		}
-		if err := products.SetStreamEndOfLife(ctx, stream, nil); err != nil {
+		if err := products.SetBranchOrTagEndOfLife(ctx, branchOrTag, nil); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeForTarget(ctx, f.target)
+		held, err = products.EndOfLifeForBuild(ctx, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if held.On == nil || !held.On.Equal(september) || held.FromStream {
+		if held.On == nil || !held.On.Equal(september) || held.FromBranchOrTag {
 			t.Errorf("after clearing, the date is %+v, want the product's September date", held)
 		}
 
@@ -332,7 +332,7 @@ func TestAReleaseSaysWhenItGoesOutOfSupportOrFollowsItsProduct(t *testing.T) {
 		if err := products.SetProductEndOfLife(ctx, f.productID, nil); err != nil {
 			t.Fatal(err)
 		}
-		held, err = products.EndOfLifeForTarget(ctx, f.target)
+		held, err = products.EndOfLifeForBuild(ctx, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -36,13 +36,13 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 	kernel := graph.Described{
 		Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10",
 	}
-	target, scan := r.Shipped(t, SeededBuild, hash, graph.Snapshot{
+	build, scan := r.Shipped(t, SeededBuild, hash, graph.Snapshot{
 		Root:         SeededRoot,
 		Components:   []graph.Described{kernel},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: kernel}},
 	})
-	r.Argued(t, target, scan, claims)
-	r.Ran(t, target, []finding.Reported{
+	r.Argued(t, build, scan, claims)
+	r.Ran(t, build, []finding.Reported{
 		{
 			Issue: finding.Named{
 				Identifier: "CVE-2026-9999", Severity: "high",
@@ -176,14 +176,14 @@ func (r *Reach) CurlMovedTo(t *testing.T, upstream string) {
 		Where(`"name" LIKE ?`, "%curl%").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	var targets []int64
-	if err := r.DB.DB.NewSelect().TableExpr(`"target" AS "t"`).
-		ColumnExpr(`"t"."id"`).Scan(ctx, &targets); err != nil {
+	var buildIDs []int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"build" AS "t"`).
+		ColumnExpr(`"t"."id"`).Scan(ctx, &buildIDs); err != nil {
 		t.Fatal(err)
 	}
 	store := triage.NewStore(r.DB.DB)
-	for _, target := range targets {
-		if _, err := store.Lapse(ctx, target); err != nil {
+	for _, build := range buildIDs {
+		if _, err := store.Lapse(ctx, build); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -507,7 +507,7 @@ func (r *Reach) DeclaredAs(t *testing.T, body string) int {
 func (r *Reach) Embargoed(t *testing.T) string {
 	t.Helper()
 	got := AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-		`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+		`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 			`"summary":"The management socket answers before anyone has authenticated.",`+
 			`"severity":"high","component":"libnl-3-200"}`)
 	if got.Code != http.StatusCreated {
@@ -549,16 +549,16 @@ type ReportRead struct {
 //
 // A second release rather than a second variant: the report is per release,
 // and two variants of one are one row.
-func (r *Reach) EndingIn(t *testing.T, stream string, days int) {
+func (r *Reach) EndingIn(t *testing.T, branchOrTag string, days int) {
 	t.Helper()
 	made := AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/branches-and-tags",
-		fmt.Sprintf(`{"name":%q,"kind":"tag","parent":"master"}`, stream))
+		fmt.Sprintf(`{"name":%q,"kind":"tag","parent":"master"}`, branchOrTag))
 	if made.Code != http.StatusCreated {
 		t.Fatalf("declaring a release answered %d: %s", made.Code, made.Body.String())
 	}
 	on := time.Now().UTC().AddDate(0, 0, days).UTC().Format(time.DateOnly)
 	ended := AsPerson(t, r, "admin", http.MethodPut,
-		"/v1/products/mine/branches-and-tags/"+stream+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
+		"/v1/products/mine/branches-and-tags/"+branchOrTag+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
 	if ended.Code != http.StatusNoContent {
 		t.Fatalf("giving it an end date answered %d: %s", ended.Code, ended.Body.String())
 	}
@@ -592,7 +592,7 @@ func (r *Reach) RanReading(t *testing.T, version, records string, started time.T
 	t.Helper()
 	finished := started.Add(time.Minute)
 	if _, err := r.DB.NewInsert().Model(&finding.Run{
-		TargetID: r.TargetOf(t, SeededBuild), Scanner: seededScanner, DatabaseVersion: version, RecordsVersion: records,
+		BuildID: r.BuildOf(t, SeededBuild), Scanner: seededScanner, DatabaseVersion: version, RecordsVersion: records,
 		RanHere: true, StartedAt: started, FinishedAt: &finished,
 	}).Exec(t.Context()); err != nil {
 		t.Fatal(err)

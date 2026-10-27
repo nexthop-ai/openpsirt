@@ -89,8 +89,8 @@ type PlannedUpgrade struct {
 func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int, filter Filter) ([]PlannedUpgrade, int, error) {
 
-	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
-	if err != nil || len(targets) == 0 {
+	visible, buildIDs, err := s.listedIn(ctx, subject, scope, &filter)
+	if err != nil || len(buildIDs) == 0 {
 		return nil, 0, err
 	}
 	limit = database.AList.Of(limit)
@@ -116,7 +116,7 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 	// than the raw word buys, and the ELSE below cannot fire because of it.
 	worst := "MAX(" + rankCase(rating.BandExpr, 0) + ")"
 
-	page := s.bumps(targets, visible, filter).
+	page := s.bumps(buildIDs, visible, filter).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, filter.ProductID).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
@@ -125,7 +125,7 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		ColumnExpr(overParts.occurrences() + ` AS "places"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
 		ColumnExpr(overParts.incident() + ` AS "incident"`).
@@ -143,7 +143,7 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 	total := 0
 	if len(rows) > 0 {
 		total = rows[0].Total
-	} else if total, err = s.countBumps(ctx, targets, visible, filter); err != nil {
+	} else if total, err = s.countBumps(ctx, buildIDs, visible, filter); err != nil {
 		return nil, 0, err
 	}
 
@@ -157,7 +157,7 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 			Exploited: row.Exploited == 1, Incident: row.Incident == 1,
 		})
 	}
-	if err := s.namesIn(ctx, targets, visible, filter, upgrades); err != nil {
+	if err := s.namesIn(ctx, buildIDs, visible, filter, upgrades); err != nil {
 		return nil, 0, err
 	}
 	return upgrades, total, nil
@@ -168,11 +168,11 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 func (s *Store) CountPlannedUpgrades(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
-	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
-	if err != nil || len(targets) == 0 {
+	visible, buildIDs, err := s.listedIn(ctx, subject, scope, &filter)
+	if err != nil || len(buildIDs) == 0 {
 		return 0, err
 	}
-	return s.countBumps(ctx, targets, visible, filter)
+	return s.countBumps(ctx, buildIDs, visible, filter)
 }
 
 // listedIn authorizes a grouped list and resolves the builds it covers, then
@@ -181,23 +181,23 @@ func (s *Store) CountPlannedUpgrades(ctx context.Context, subject access.Subject
 func (s *Store) listedIn(ctx context.Context, subject access.Subject, scope Scope,
 	filter *Filter) ([]access.Visibility, []int64, error) {
 
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, filter)
-	if err != nil || len(targets) == 0 {
+	productID, visible, buildIDs, err := s.inScope(ctx, subject, scope, filter)
+	if err != nil || len(buildIDs) == 0 {
 		return nil, nil, err
 	}
 	if err := s.decidedIssuesFor(ctx, filter, []int64{productID}, false); err != nil {
 		return nil, nil, err
 	}
-	return visible, targets, nil
+	return visible, buildIDs, nil
 }
 
-func (s *Store) countBumps(ctx context.Context, targets []int64,
+func (s *Store) countBumps(ctx context.Context, buildIDs []int64,
 	visible []access.Visibility, filter Filter) (int, error) {
 
 	// Counted over a derived table, named and quoted, because GROUPS is
 	// reserved on MySQL 8.
 	total, err := s.db.NewSelect().
-		TableExpr(`(?) AS "bundled"`, s.bumps(targets, visible, filter).ColumnExpr(FoldedOn)).
+		TableExpr(`(?) AS "bundled"`, s.bumps(buildIDs, visible, filter).ColumnExpr(FoldedOn)).
 		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what the bumps are: %w", err)
@@ -211,22 +211,22 @@ func (s *Store) countBumps(ctx context.Context, targets []int64,
 // component and groups by fold and version. The bump is the second level's key
 // and everything it reports decomposes over the first: occurrences are summed,
 // and the issues and the builds are distinct counts over far fewer rows.
-func (s *Store) bumps(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	inner := occurrenceHeads(openRows(s.db, targets, visible)).
+func (s *Store) bumps(buildIDs []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
+	inner := occurrenceHeads(openRows(s.db, buildIDs, visible)).
 		// An upgrade is a version to move to.
 		Where(`"f"."fixed_in" IS NOT NULL`).
 		Where(`"f"."fixed_in" <> ?`, "").
 		ColumnExpr(`"f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
-		ColumnExpr(`"f"."target_id"`).
+		ColumnExpr(`"f"."build_id"`).
 		ColumnExpr(`"f"."fixed_in"`).
-		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."target_id", "f"."fixed_in"`)
+		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."build_id", "f"."fixed_in"`)
 	if filter.PlannedUpgradeSort == PlannedUpgradesByDeadline {
 		// Under the column's own name, so the order reads the same.
 		inner = inner.ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
 	}
 	return s.db.NewSelect().
-		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, targets, visible)).
+		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, buildIDs, visible)).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		GroupExpr(FoldedOn + `, "f"."fixed_in"`)
 }
@@ -245,8 +245,8 @@ func pullersOf(consumers, direct int) int {
 
 // Build is one release and variant, by name.
 type Build struct {
-	Stream  string
-	Variant string
+	BranchOrTag string
+	Variant     string
 }
 
 // worstWord turns the rank the upgrade query folds severities to back into the
@@ -262,18 +262,18 @@ func worstWord(rank int) string { return wordAt(rank) }
 // A second statement over the page's upgrades rather than a string aggregate in
 // the first: the four engines spell that three ways, and the one thing this
 // needs is a list of names.
-func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.Visibility,
+func (s *Store) namesIn(ctx context.Context, buildIDs []int64, visible []access.Visibility,
 	filter Filter, upgrades []PlannedUpgrade) error {
 
 	if len(upgrades) == 0 {
 		return nil
 	}
 	var rows []struct {
-		Fold    string `bun:"fold"`
-		To      string `bun:"fixed_in"`
-		Name    string `bun:"name"`
-		Stream  string `bun:"stream"`
-		Variant string `bun:"variant"`
+		Fold        string `bun:"fold"`
+		To          string `bun:"fixed_in"`
+		Name        string `bun:"name"`
+		BranchOrTag string `bun:"branch_or_tag"`
+		Variant     string `bun:"variant"`
 	}
 	// The page's folds and the page's versions, as two lists, which is the
 	// trade decorate makes: it admits a fold of one upgrade at the version of
@@ -302,12 +302,12 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		return fmt.Errorf("read which components a bump moves: %w", err)
 	}
 	inFolds, args := database.InAnyOf(`"f"."component_id"`, components)
-	under := filter.asListed(s.db, openRows(s.db, targets, visible).
+	under := filter.asListed(s.db, openRows(s.db, buildIDs, visible).
 		Where(inFolds, args...).
 		Where(`"f"."fixed_in" IN (?)`, bun.List(distinct(versions))).
 		ColumnExpr(`"f"."fixed_in"`).
 		ColumnExpr(`"f"."component_id"`).
-		ColumnExpr(`"f"."target_id"`).
+		ColumnExpr(`"f"."build_id"`).
 		// The issue as well where the groups are restricted after grouping,
 		// which asks it of each group.
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -316,17 +316,17 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 			}
 			return q
 		}).
-		GroupExpr(`"f"."component_id", "f"."target_id", "f"."fixed_in"`), targets, visible)
+		GroupExpr(`"f"."component_id", "f"."build_id", "f"."fixed_in"`), buildIDs, visible)
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, under).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
 		ColumnExpr(`"c"."name" AS "name"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		GroupExpr(FoldedOn + `, "f"."fixed_in", "c"."name", "st"."name", "va"."name"`).
 		// In the order a reader scans them, so an upgrade names its packages and
@@ -344,9 +344,9 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 			seen[at+"\x00c\x00"+row.Name] = true
 			named[at] = append(named[at], row.Name)
 		}
-		if !seen[at+"\x00b\x00"+row.Stream+"\x00"+row.Variant] {
-			seen[at+"\x00b\x00"+row.Stream+"\x00"+row.Variant] = true
-			in[at] = append(in[at], Build{Stream: row.Stream, Variant: row.Variant})
+		if !seen[at+"\x00b\x00"+row.BranchOrTag+"\x00"+row.Variant] {
+			seen[at+"\x00b\x00"+row.BranchOrTag+"\x00"+row.Variant] = true
+			in[at] = append(in[at], Build{BranchOrTag: row.BranchOrTag, Variant: row.Variant})
 		}
 	}
 	for i := range upgrades {
@@ -357,13 +357,13 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 	return nil
 }
 
-// ComponentGroups returns what is open against a target, gathered by the
+// ComponentGroups returns what is open against a build, gathered by the
 // component it is open against rather than by the issue.
 func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int, filter Filter) ([]ComponentGroup, int, error) {
 
-	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
-	if err != nil || len(targets) == 0 {
+	visible, buildIDs, err := s.listedIn(ctx, subject, scope, &filter)
+	if err != nil || len(buildIDs) == 0 {
 		return nil, 0, err
 	}
 	limit = database.AList.Of(limit)
@@ -377,7 +377,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		Incident    int   `bun:"incident"`
 		Total       int   `bun:"total"`
 	}
-	page := s.byComponent(targets, visible, filter).
+	page := s.byComponent(buildIDs, visible, filter).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		// Distinct issues rather than rows, because that is what the findings
 		// list shows and therefore what hiding this component would remove
@@ -413,7 +413,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	total := 0
 	if len(rows) > 0 {
 		total = rows[0].Total
-	} else if total, err = s.countByComponent(ctx, targets, visible, filter); err != nil {
+	} else if total, err = s.countByComponent(ctx, buildIDs, visible, filter); err != nil {
 		return nil, 0, err
 	}
 
@@ -426,11 +426,11 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		return nil, 0, err
 	}
 
-	upgrades, err := s.upgradesFor(ctx, shipped, targets, visible, filter)
+	upgrades, err := s.upgradesFor(ctx, shipped, buildIDs, visible, filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	bands, err := s.bandsFor(ctx, ids, targets, visible, filter)
+	bands, err := s.bandsFor(ctx, ids, buildIDs, visible, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -463,19 +463,19 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 func (s *Store) CountComponentGroups(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
-	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
-	if err != nil || len(targets) == 0 {
+	visible, buildIDs, err := s.listedIn(ctx, subject, scope, &filter)
+	if err != nil || len(buildIDs) == 0 {
 		return 0, err
 	}
-	return s.countByComponent(ctx, targets, visible, filter)
+	return s.countByComponent(ctx, buildIDs, visible, filter)
 }
 
-func (s *Store) countByComponent(ctx context.Context, targets []int64,
+func (s *Store) countByComponent(ctx context.Context, buildIDs []int64,
 	visible []access.Visibility, filter Filter) (int, error) {
 
 	total, err := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`,
-			s.byComponent(targets, visible, filter).ColumnExpr(`"f"."component_id"`)).
+			s.byComponent(buildIDs, visible, filter).ColumnExpr(`"f"."component_id"`)).
 		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what is open by component: %w", err)
@@ -489,10 +489,10 @@ func (s *Store) countByComponent(ctx context.Context, targets []int64,
 // count of issues per component is then a count of rows, which is what keeps
 // the second level small. Everything the first level reads is in finding's
 // covering index, the two exploitation flags included.
-func (s *Store) byComponent(targets []int64, visible []access.Visibility,
+func (s *Store) byComponent(buildIDs []int64, visible []access.Visibility,
 	filter Filter) *bun.SelectQuery {
 
-	inner := occurrenceHeads(openRows(s.db, targets, visible)).
+	inner := occurrenceHeads(openRows(s.db, buildIDs, visible)).
 		ColumnExpr(`"f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id"`)
@@ -505,7 +505,7 @@ func (s *Store) byComponent(targets []int64, visible []access.Visibility,
 		inner = inner.ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
 	}
 	return s.db.NewSelect().
-		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, targets, visible)).
+		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, buildIDs, visible)).
 		GroupExpr(`"f"."component_id"`)
 }
 
@@ -622,7 +622,7 @@ func componentOrder(filter Filter) string {
 //
 // Distinct issues, like the count beside it, so the parts sum to the whole
 // rather than to the number of occurrences.
-func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
+func (s *Store) bandsFor(ctx context.Context, ids []int64, buildIDs []int64,
 	visible []access.Visibility, filter Filter) (map[int64]map[string]int, error) {
 
 	if len(ids) == 0 {
@@ -636,13 +636,13 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 	// The issues open against each component, once each, and only then the
 	// rating: a rating is per issue, so reading it for every occurrence would
 	// read it again for every occurrence the issue sits at.
-	pairs := openRows(s.db, targets, visible).
+	pairs := openRows(s.db, buildIDs, visible).
 		ColumnExpr(`"f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id"`)
 	query := s.db.NewSelect().
-		TableExpr(`(?) AS "f"`, filter.asListed(s.db, pairs, targets, visible)).
+		TableExpr(`(?) AS "f"`, filter.asListed(s.db, pairs, buildIDs, visible)).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		// This product's rating where it has stated one, which is what every
 		// other surface judges a finding by. Read without it, the strip on
@@ -684,7 +684,7 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 // "which of these is nearest" is one this cannot answer and does not pretend
 // to. What it answers is which one closes the most, which is the question
 // somebody choosing between them is actually asking.
-func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Component, targets []int64,
+func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Component, buildIDs []int64,
 	visible []access.Visibility, filter Filter) (map[int64][]Candidate, error) {
 
 	if len(shipped) == 0 {
@@ -700,7 +700,7 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 		Issue       int64  `bun:"vulnerability_id"`
 		FixedIn     string `bun:"fixed_in"`
 	}
-	query := openRows(s.db, targets, visible).
+	query := openRows(s.db, buildIDs, visible).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
@@ -715,7 +715,7 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 		// — and grouped rather than plain because the narrowing asks questions
 		// of the occurrences under an issue, which are aggregates.
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."fixed_in"`)
-	if err := filter.asListed(s.db, query, targets, visible).Scan(ctx, &rows); err != nil {
+	if err := filter.asListed(s.db, query, buildIDs, visible).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where each component could go: %w", err)
 	}
 	per := map[int64][]namedFix{}

@@ -27,14 +27,14 @@ type inventory struct {
 // inventoryOf is the build's newest inventory that has been read, or nil
 // where none has. A result is placed on a component of the build, so a run
 // waits for the build to have components.
-func inventoryOf(ctx context.Context, db bun.IDB, targetID int64) (*inventory, error) {
+func inventoryOf(ctx context.Context, db bun.IDB, buildID int64) (*inventory, error) {
 	var scan struct {
 		ID int64 `bun:"id"`
 	}
 	err := db.NewSelect().
 		TableExpr(`"scan" AS "sc"`).
 		ColumnExpr(`"sc"."id"`).
-		Where(`"sc"."target_id" = ?`, targetID).
+		Where(`"sc"."build_id" = ?`, buildID).
 		Where(`"sc"."components" IS NOT NULL`).
 		OrderExpr(`"sc"."built_at" DESC, "sc"."id" DESC`).
 		Limit(1).
@@ -51,7 +51,7 @@ func inventoryOf(ctx context.Context, db bun.IDB, targetID int64) (*inventory, e
 	err = db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).
 		OrderExpr(`"n"."id" ASC`).
@@ -72,7 +72,7 @@ func inventoryOf(ctx context.Context, db bun.IDB, targetID int64) (*inventory, e
 // platform enumeration names the repository's owner and name. A repository
 // the inventory names no component for is absent, and its results are
 // placed on the build.
-func componentsOf(ctx context.Context, db bun.IDB, targetID int64, fresh []Keyed) (map[string]int64, error) {
+func componentsOf(ctx context.Context, db bun.IDB, buildID int64, fresh []Keyed) (map[string]int64, error) {
 	wanted := map[string]bool{}
 	for _, k := range fresh {
 		if k.Remote != "" {
@@ -92,7 +92,7 @@ func componentsOf(ctx context.Context, db bun.IDB, targetID int64, fresh []Keyed
 	if err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id", "n"."purl", "n"."repository", "n"."cpe"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`("n"."purl" IS NOT NULL OR "n"."repository" IS NOT NULL OR "n"."cpe" IS NOT NULL)`).
 		OrderExpr(`"n"."id" ASC`).

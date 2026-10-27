@@ -99,8 +99,8 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 		// As an integer rather than a boolean: the four engines spell a
 		// boolean three ways.
 		ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM `+finding.IssueFindings("f")+
-			` JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`+
-			` JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`+
+			` JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`+
+			` JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`+
 			` WHERE "si"."id" = "eh"."vulnerability_id"`+
 			` AND "st"."product_id" = "eh"."product_id" AND "f"."visibility" = ?`+
 			` AND `+kinds+`)`+

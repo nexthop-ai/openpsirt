@@ -38,8 +38,13 @@ import { CodeFindingFlaw } from "./CodeFindingFlaw";
 // internal material judges it here, closes it as fixed once a run no longer
 // sees it, and records a confirmed one as a flaw.
 export function CodeFinding() {
-  const { product = "", stream = "", variant = "", occurrence = "" } = useParams();
-  const build: Build = { product, stream, variant };
+  const {
+    product = "",
+    branch_or_tag: branchOrTag = "",
+    variant = "",
+    occurrence = "",
+  } = useParams();
+  const build: Build = { product, branch_or_tag: branchOrTag, variant };
   const codeFinding = useCodeFinding(build, occurrence);
   const may = mayOf(useWho().data, product);
   const triages = !!may?.triages_internal;
@@ -64,8 +69,8 @@ export function CodeFinding() {
         <h2 className="mono">{evidence.rule}</h2>
         <p>
           <span className="mono">{located(at.path, at.start_line)}</span> ·{" "}
-          <Link to={codeFindingsAt(product, { stream, variant })}>
-            {product} · {stream} · {variant}
+          <Link to={codeFindingsAt(product, { branch_or_tag: branchOrTag, variant })}>
+            {product} · {branchOrTag} · {variant}
           </Link>{" "}
           <span className={`state ${CODE_FINDING_TONES[evidence.state]}`}>
             {stateSaid(evidence.state)}

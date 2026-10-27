@@ -402,9 +402,9 @@ func (s Subject) Delegated() bool { return s.delegated }
 // and either, both or neither may be pinned — so a key covers a product, a
 // product and a variant, a product and a release, or all three.
 type Scope struct {
-	ProductID int64
-	StreamID  *int64
-	VariantID *int64
+	ProductID     int64
+	BranchOrTagID *int64
+	VariantID     *int64
 }
 
 // NewPerson returns the subject for somebody who signed in.
@@ -560,7 +560,7 @@ func (s Subject) Holds(role Role, productID int64) bool {
 //
 // Each visibility is its own grant. Reading undisclosed findings does not
 // carry reading disclosed ones: somebody handling private reports is not
-// handed the public stream as well, and somebody who wants both holds both.
+// handed the public branch or tag as well, and somebody who wants both holds both.
 //
 // Triage implies reading at the same visibility: somebody who may decide about
 // a finding can necessarily see it, and a deployment that had to grant both
@@ -963,20 +963,20 @@ func (s Subject) Knows() (ids []int64, all bool) {
 }
 
 // MaySend reports whether a pipeline's key authorizes an upload against this
-// exact target.
+// exact build.
 //
 // Every constraint the key carries must match. A mismatch is refused rather
 // than redirected: a key that covers one release must not quietly accept a
-// scan of another, and an upload states its full target explicitly so there is
+// scan of another, and an upload states its full build explicitly so there is
 // never anything to infer.
-func (s Subject) MaySend(productID, streamID, variantID int64) bool {
+func (s Subject) MaySend(productID, branchOrTagID, variantID int64) bool {
 	if s.Kind != Pipeline || s.scope == nil {
 		return false
 	}
 	if s.scope.ProductID != productID {
 		return false
 	}
-	if s.scope.StreamID != nil && *s.scope.StreamID != streamID {
+	if s.scope.BranchOrTagID != nil && *s.scope.BranchOrTagID != branchOrTagID {
 		return false
 	}
 	if s.scope.VariantID != nil && *s.scope.VariantID != variantID {
@@ -991,9 +991,9 @@ func (s Subject) MaySend(productID, streamID, variantID int64) bool {
 // A person reads it for a product they may know exists. A key reads it for a
 // build it may upload to, whichever key sent each upload: a key that is
 // rotated, or two keys on one build, re-send what the other already sent.
-func (s Subject) ReadsBuild(productID, streamID, variantID int64) bool {
+func (s Subject) ReadsBuild(productID, branchOrTagID, variantID int64) bool {
 	if s.Kind == Pipeline {
-		return s.MaySend(productID, streamID, variantID)
+		return s.MaySend(productID, branchOrTagID, variantID)
 	}
 	return s.Sees(productID)
 }

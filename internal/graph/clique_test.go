@@ -41,20 +41,20 @@ func TestAClimbThroughComponentsThatAllDependOnEachOtherReadsEachEdgeOnce(t *tes
 			graph.Dependency{Parent: root, Child: x},
 			graph.Dependency{Parent: x, Child: y},
 			graph.Dependency{Parent: y, Child: clique[size-1]})
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 
 		ids := make([]int64, 0, size)
 		for _, one := range clique {
-			id, err := f.store.ComponentAs(t.Context(), f.targetID, one.Name, graph.Choice{})
+			id, err := f.store.ComponentAs(t.Context(), f.buildID, one.Name, graph.Choice{})
 			if err != nil {
 				t.Fatalf("%s: %v", one.Name, err)
 			}
 			ids = append(ids, id)
 		}
 
-		nodes, edges, err := f.store.Climbed(t.Context(), f.targetID, ids)
+		nodes, edges, err := f.store.Climbed(t.Context(), f.buildID, ids)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,7 +65,7 @@ func TestAClimbThroughComponentsThatAllDependOnEachOtherReadsEachEdgeOnce(t *tes
 			t.Errorf("the climb read %d nodes and %d edges, want %d and %d", nodes, edges, wantNodes, wantEdges)
 		}
 
-		chains, err := f.store.Chains(t.Context(), everyone(f), f.targetID, ids)
+		chains, err := f.store.Chains(t.Context(), everyone(f), f.buildID, ids)
 		if err != nil {
 			t.Fatal(err)
 		}

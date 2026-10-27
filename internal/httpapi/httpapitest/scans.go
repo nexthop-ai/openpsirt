@@ -62,14 +62,14 @@ func Upload(t *testing.T, path, inventory string, suppressions ...string) *http.
 	return req
 }
 
-// IngestFixture is a migrated database with one declared target and a server
+// IngestFixture is a migrated database with one declared build and a server
 // in front of it.
 type IngestFixture struct {
 	Handler http.Handler
 	DB      *database.DB
 	Queue   *queue.Queue
 	Path    string
-	// Key is a pipeline's credential for the declared target, which is how a
+	// Key is a pipeline's credential for the declared build, which is how a
 	// build actually sends.
 	Key string
 }
@@ -195,8 +195,8 @@ func ProductHere(t *testing.T, f *IngestFixture) int64 {
 func (r *Reach) InventoryOf(t *testing.T, contents string) int64 {
 	t.Helper()
 	ctx := t.Context()
-	target := r.TargetOf(t, SeededBuild)
-	scan, err := ingest.NewStore(r.DB.DB).Newest(ctx, target)
+	build := r.BuildOf(t, SeededBuild)
+	scan, err := ingest.NewStore(r.DB.DB).Newest(ctx, build)
 	if err != nil || scan == nil {
 		t.Fatalf("the build has no upload to hang an inventory on: %v", err)
 	}
@@ -207,7 +207,7 @@ func (r *Reach) InventoryOf(t *testing.T, contents string) int64 {
 	}
 	var runID int64
 	if err := r.DB.DB.NewSelect().Table("scan_run").ColumnExpr(`"id"`).
-		Where(`"target_id" = ?`, target).Order("id DESC").Limit(1).
+		Where(`"build_id" = ?`, build).Order("id DESC").Limit(1).
 		Scan(ctx, &runID); err != nil {
 		t.Fatal(err)
 	}

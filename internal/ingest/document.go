@@ -192,7 +192,7 @@ func (d *Documents) Sent(ctx context.Context, scanIDs []int64) (map[int64][]Docu
 // to hand it to a reader that only ever moves forwards.
 //
 // Its parts are read one at a time and not in one snapshot, so a document let
-// go while it is read runs out of parts before its size. That ends the stream
+// go while it is read runs out of parts before its size. That ends the branch or tag
 // with ErrReleased: ended cleanly, a reader takes the bytes it got for the
 // whole document.
 func (d *Documents) Open(ctx context.Context, doc *Document) io.Reader {
@@ -240,7 +240,7 @@ func (d *Documents) Discard(ctx context.Context, scanID int64) error {
 	})
 }
 
-// ErrReleased ends a document's stream when the document was let go while it
+// ErrReleased ends a document's branch or tag when the document was let go while it
 // was read.
 //
 // A fault rather than a refusal, and not the unexpected end of file a JSON

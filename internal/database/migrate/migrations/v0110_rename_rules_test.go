@@ -11,7 +11,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 )
 
 // rulesV0100 is, in a v0.10.0 database, a standing rule handing work to a
@@ -21,7 +20,7 @@ type rulesV0100 struct{ rule, feed, label, received, published int64 }
 
 func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV0100 {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +69,7 @@ func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV01
 		"not_affected", "acme.json", "digest", person, at)
 	out.received = id(`SELECT MAX("id") FROM "vex_statement"`)
 	exec(`INSERT INTO "vex_issuance" ("target_id", "kind", "ordinal", "digest", "document", "issued_by",
-		"issued_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, declared.Target.ID, "ours", 1, "digest", "{}", person, at)
+		"issued_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, declared.Build.ID, "ours", 1, "digest", "{}", person, at)
 	out.published = id(`SELECT MAX("id") FROM "vex_issuance"`)
 	return out
 }

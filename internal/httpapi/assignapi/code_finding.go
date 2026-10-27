@@ -24,7 +24,7 @@ import (
 func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "assign-code-finding", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment",
 		Summary: "Assign a code finding to somebody",
 		Description: "Records who is dealing with this code finding.\n\n" +
 			"It covers the product, not the build named in the path: what is assigned is the " +
@@ -41,11 +41,11 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 	}, core.PerProduct, "At the code finding's visibility. Giving it to somebody else also needs "+
 		"assigner. Taking a code finding nobody holds, or handing back your own, does not.",
 		core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body       struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Body        struct {
 			Person string `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
 			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
@@ -54,7 +54,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		product, targetID, err := locateCodeFinding(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		product, buildID, err := locateCodeFinding(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		}
 
 		findings := finding.NewStore(in.DB.DB)
-		_, withheld, err := findings.AssignCodeFinding(ctx, subject, targetID, input.Occurrence, to, admits)
+		_, withheld, err := findings.AssignCodeFinding(ctx, subject, buildID, input.Occurrence, to, admits)
 		switch {
 		case errors.Is(err, finding.ErrCodeFindingPastEndOfLife), errors.Is(err, finding.ErrCodeFindingRecordedAsFlaw):
 			return nil, huma.Error409Conflict(err.Error())
@@ -103,7 +103,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		if to == nil || *to == subject.Party() || !seenBy(ctx, in, input.Body.Person, product, withheld) {
 			return &struct{}{}, nil
 		}
-		codeFinding, err := findings.CodeFindingAt(ctx, subject, targetID, input.Occurrence)
+		codeFinding, err := findings.CodeFindingAt(ctx, subject, buildID, input.Occurrence)
 		if err != nil {
 			in.Log().ErrorContext(ctx, "could not say that a code finding was assigned", "error", err)
 			return &struct{}{}, nil
@@ -123,8 +123,8 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		private, internal := notify.Withholding(withheld)
 		core.Tell(ctx, in, "could not say that a code finding was assigned", notify.Telling{
 			PersonID: whoToTell, Kind: notify.Assigned,
-			Body: said + ", in " + input.Product + " " + input.Stream + " " + input.Variant,
-			Link: weblink.CodeFinding(input.Product, input.Stream, input.Variant, input.Occurrence),
+			Body: said + ", in " + input.Product + " " + input.BranchOrTag + " " + input.Variant,
+			Link: weblink.CodeFinding(input.Product, input.BranchOrTag, input.Variant, input.Occurrence),
 			// Withheld at every visibility it holds, so a read narrows the
 			// line by the grant the code finding is read under, and a role lost is a
 			// line no longer read.
@@ -144,20 +144,20 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 // gives: resolving first answers whether a person has an account here to
 // anybody who may read the product.
 func locateCodeFinding(ctx context.Context, in core.Deps, subject access.Subject,
-	product, stream, variant string) (int64, int64, error) {
+	product, branchOrTag, variant string) (int64, int64, error) {
 
-	named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+	named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 	if err != nil {
 		return 0, 0, err
 	}
 	if !triagesAny(subject, named.ProductID) {
 		return 0, 0, core.NoSuchFinding()
 	}
-	target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+	build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 	if err != nil {
 		return 0, 0, err
 	}
-	return named.ProductID, target.ID, nil
+	return named.ProductID, build.ID, nil
 }
 
 // triagesAny reports whether a subject triages a product at any visibility: a

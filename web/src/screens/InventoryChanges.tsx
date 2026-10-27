@@ -18,20 +18,25 @@ import { uploadsAt } from "../app/routes";
 // that stopped shipping it, and telling those apart is somebody reading this
 // page beside the build.
 export function InventoryChanges() {
-  const { product = "", stream = "", variant = "", scan = "" } = useParams();
+  const {
+    product = "",
+    branch_or_tag: branchOrTag = "",
+    variant = "",
+    sbom: scan = "",
+  } = useParams();
   const [offset, setOffset] = useState(0);
   const [only, setOnly] = useState<Kind>("");
-  const at = { product, stream, variant, scan: Number(scan) };
+  const at = { product, branch_or_tag: branchOrTag, variant, scan: Number(scan) };
 
   const changes = useQuery({
     queryKey: ["inventory-changes", at, only, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/changes",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms/{sbom}/changes",
           {
             params: {
-              path: { product, stream, variant, sbom: at.scan },
+              path: { product, branch_or_tag: branchOrTag, variant, sbom: at.scan },
               query: { limit: PAGE, offset, ...(only ? { change: only } : {}) },
             },
           },
@@ -51,7 +56,7 @@ export function InventoryChanges() {
       <div className="screen-head">
         <span className="crumbs">
           <Link
-            to={uploadsAt({ product, stream, variant })}
+            to={uploadsAt({ product, branch_or_tag: branchOrTag, variant })}
             className="linkish"
             style={{ fontWeight: 500 }}
           >
@@ -61,7 +66,7 @@ export function InventoryChanges() {
         </span>
         <h2>Changes in this upload</h2>
         <p>
-          {product} · {stream} · {variant} · against the upload before it
+          {product} · {branchOrTag} · {variant} · against the upload before it
         </p>
       </div>
 

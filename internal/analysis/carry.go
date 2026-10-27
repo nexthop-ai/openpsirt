@@ -27,7 +27,7 @@ type carried struct {
 
 // Where a carried occurrence was found.
 const (
-	// fromParent is a code finding of the stream this one was cut from, on the
+	// fromParent is a code finding of the branch or tag this one was cut from, on the
 	// build of the same variant, paired by the layers on the build's first
 	// run of the series.
 	fromParent = "parent"
@@ -39,7 +39,7 @@ const (
 
 // carry finds, for each result new to this build, a code finding the series already
 // holds that it is the same result as. On the series' first run on the build,
-// the code findings open on the parent stream's build of the same variant are paired
+// the code findings open on the parent branch or tag's build of the same variant are paired
 // with them layer by layer, which is how a new branch inherits what the line
 // it was cut from has decided. Whatever is left is looked up across the
 // series, open or closed, on the whole key alone: a probable pairing with a
@@ -53,7 +53,7 @@ func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fir
 		return out, nil
 	}
 	if first {
-		parent, err := parentBuild(ctx, db, run.TargetID)
+		parent, err := parentBuild(ctx, db, run.BuildID)
 		if err != nil {
 			return nil, err
 		}
@@ -63,22 +63,22 @@ func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fir
 			}
 		}
 	}
-	if err := fromSeriesKey(ctx, db, run.TargetID, seriesID, fresh, out); err != nil {
+	if err := fromSeriesKey(ctx, db, run.BuildID, seriesID, fresh, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// parentBuild is the build of the same variant in the stream this build's
-// stream was cut from, or zero where there is none.
-func parentBuild(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
+// parentBuild is the build of the same variant in the branch or tag this build's
+// branch or tag was cut from, or zero where there is none.
+func parentBuild(ctx context.Context, db bun.IDB, buildID int64) (int64, error) {
 	var ids []int64
 	err := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "tg"."stream_id"`).
-		Join(`JOIN "target" AS "pt" ON "pt"."stream_id" = "s"."parent_id" AND "pt"."variant_id" = "tg"."variant_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "pt" ON "pt"."branch_or_tag_id" = "s"."parent_id" AND "pt"."variant_id" = "tg"."variant_id"`).
 		ColumnExpr(`"pt"."id"`).
-		Where(`"tg"."id" = ?`, targetID).
+		Where(`"tg"."id" = ?`, buildID).
 		Scan(ctx, &ids)
 	if err != nil {
 		return 0, fmt.Errorf("read the build this branch was cut from: %w", err)
@@ -151,7 +151,7 @@ func occurrencesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]stri
 // series on the whole key. A closed code finding on this build comes first, since
 // that is the same result found again here, and then the oldest code finding
 // elsewhere.
-func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fresh []Keyed, out map[int]carried) error {
+func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fresh []Keyed, out map[int]carried) error {
 	var keys []string
 	wanted := map[string]bool{}
 	for i, k := range fresh {
@@ -164,7 +164,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 		ID         int64      `bun:"id"`
 		Key        string     `bun:"match_key"`
 		Occurrence string     `bun:"occurrence_identity"`
-		TargetID   int64      `bun:"target_id"`
+		BuildID    int64      `bun:"build_id"`
 		ClosedAt   *time.Time `bun:"closed_at"`
 	}
 	byKey := map[string][]held{}
@@ -176,7 +176,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 			TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-			ColumnExpr(`"f"."id", "ar"."match_key", "f"."occurrence_identity", "f"."target_id"`).
+			ColumnExpr(`"f"."id", "ar"."match_key", "f"."occurrence_identity", "f"."build_id"`).
 			ColumnExpr(`"f"."closed_at"`).
 			Where(`"si"."series_id" = ?`, seriesID).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
@@ -192,7 +192,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 		hits := byKey[k]
 		sort.Slice(hits, func(i, j int) bool {
 			a, b := hits[i], hits[j]
-			ra, rb := a.TargetID == targetID && a.ClosedAt != nil, b.TargetID == targetID && b.ClosedAt != nil
+			ra, rb := a.BuildID == buildID && a.ClosedAt != nil, b.BuildID == buildID && b.ClosedAt != nil
 			if ra != rb {
 				return ra
 			}
@@ -205,7 +205,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 			continue
 		}
 		c := carried{occurrence: hits[0].Occurrence, on: onKey, from: fromSeries}
-		if hits[0].TargetID == targetID && hits[0].ClosedAt != nil {
+		if hits[0].BuildID == buildID && hits[0].ClosedAt != nil {
 			c.from = fromReopened
 		}
 		out[i] = c

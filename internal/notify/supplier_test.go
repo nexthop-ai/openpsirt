@@ -36,7 +36,7 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		aScannedTarget(t, w)
+		aScannedBuild(t, w)
 		product := w.Product
 		if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PrivateTriage); err != nil {
 			t.Fatal(err)

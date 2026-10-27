@@ -19,19 +19,19 @@ import (
 
 // tag declares a tag of the fixture's product, with a release date where one
 // is given.
-func (f *fixture) tag(t *testing.T, name string, on *time.Time) *catalog.Stream {
+func (f *fixture) tag(t *testing.T, name string, on *time.Time) *catalog.BranchOrTag {
 	t.Helper()
 	cat := catalog.NewStore(f.db.DB)
-	stream, err := cat.DeclareStream(t.Context(), f.product, name, catalog.Tag, nil)
+	branchOrTag, err := cat.DeclareBranchOrTag(t.Context(), f.product, name, catalog.Tag, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if on != nil {
-		if err := cat.SetReleasedOn(t.Context(), stream.ID, on); err != nil {
+		if err := cat.SetReleasedOn(t.Context(), branchOrTag.ID, on); err != nil {
 			t.Fatal(err)
 		}
 	}
-	return stream
+	return branchOrTag
 }
 
 // fromFix is the window counting from the fix, as the shelf runs it.
@@ -194,11 +194,11 @@ func TestAFixIsNamedInATagOfTheRecordsProductOnceAtATime(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := cat.DeclareStream(ctx, elsewhere.ID, "v9.9.9", catalog.Tag, nil); err != nil {
+		if _, err := cat.DeclareBranchOrTag(ctx, elsewhere.ID, "v9.9.9", catalog.Tag, nil); err != nil {
 			t.Fatal(err)
 		}
 		retired := f.tag(t, "v1.0.0", nil)
-		if err := cat.RetireStream(ctx, retired.ID); err != nil {
+		if err := cat.RetireBranchOrTag(ctx, retired.ID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -359,7 +359,7 @@ func TestAFixReleaseSaysWhetherItsLatestScansHoldTheIssueOpen(t *testing.T) {
 		ctx := t.Context()
 		record := f.attacked(t)
 		cat := catalog.NewStore(f.db.DB)
-		tag, err := cat.StreamByName(ctx, f.product, world.TagName)
+		tag, err := cat.BranchOrTagByName(ctx, f.product, world.TagName)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -385,18 +385,18 @@ func TestAFixReleaseSaysWhetherItsLatestScansHoldTheIssueOpen(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target, err := cat.TargetFor(ctx, tag.ID, variant.ID)
+		build, err := cat.BuildFor(ctx, tag.ID, variant.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		run, err := finding.NewStore(f.db.DB).Begin(ctx, finding.Run{
-			TargetID: target.ID, Scanner: "grype", RanHere: true,
+			BuildID: build.ID, Scanner: "grype", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.db.DB.NewUpdate().Table("target").Set(`"last_run_id" = ?`, run.ID).
-			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
+		if _, err := f.db.DB.NewUpdate().Table("build").Set(`"last_run_id" = ?`, run.ID).
+			Where(`"id" = ?`, build.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if got := state(t, f.triager); !got.Scanned || got.Open {
@@ -412,7 +412,7 @@ func TestAFixReleaseSaysWhetherItsLatestScansHoldTheIssueOpen(t *testing.T) {
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		open := &finding.Finding{
-			TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+			BuildID: build.ID, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 			Visibility: access.Private, ComponentID: component, OccurrenceIdentity: "place-of-libfoo",
 			OpenedAt: now, OpenedRunID: &run.ID,
 		}

@@ -706,7 +706,7 @@ being applied correctly to it.
 | Rule | Reason |
 |---|---|
 | A key's scope is constraints, not a path | The product is always required; release and variant are independent, and either, both or neither may be pinned. Every constraint present must match |
-| A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its full target |
+| A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its whole build |
 | A key reads back the receipts of the builds it may upload to and nothing else | The same holds for the documents sent there and what each upload changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Every receipt of the build, whichever key sent it: a rotated key, or a second key on the build, is answered with another sender's scan when it re-sends the same bytes. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many other builds there are |
 | A key reads back the receipts of the analyzer runs sent to the builds it may upload to | A receipt counts the code findings a run opened and saw and names none. A person reads the same receipts where they read internal findings in the product, since the counts are of internal findings (`DESIGN-analysis.md` § Receipts) |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |

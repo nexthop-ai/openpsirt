@@ -29,7 +29,7 @@ import { DAY_MS } from "./when";
 
 export type At = {
   product: string;
-  stream: string;
+  branch_or_tag: string;
   variant: string;
   vulnerability: string;
   component: string;
@@ -73,7 +73,7 @@ export function mayMitigate(outcome: string, justification: string): boolean {
 export function draftKeyFor(at: At): string {
   const kind = at.ecosystem || at.namespace ? `:${at.ecosystem ?? ""}/${at.namespace ?? ""}` : "";
   return (
-    `decide:${at.product}:${at.stream}:${at.variant}:` +
+    `decide:${at.product}:${at.branch_or_tag}:${at.variant}:` +
     `${at.vulnerability}:${at.component}:${at.version}${kind}`
   );
 }
@@ -108,7 +108,7 @@ export function whereOf(at: At) {
   return {
     path: {
       product: at.product,
-      stream: at.stream,
+      branch_or_tag: at.branch_or_tag,
       variant: at.variant,
       issue: at.vulnerability,
       component: at.component,
@@ -425,7 +425,7 @@ export function Decide({
     queryKey: [
       "reach",
       at.product,
-      at.stream,
+      at.branch_or_tag,
       at.variant,
       at.vulnerability,
       at.component,
@@ -436,7 +436,7 @@ export function Decide({
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/reach",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/reach",
           {
             params: whereOf(at),
           },
@@ -448,11 +448,11 @@ export function Decide({
   // One spelling for both halves of the map, because a build differing is taken
   // off the automatic half by the same string.
   const shown = (m: {
-    stream?: string;
-    stream_name?: string;
+    branch_or_tag?: string;
+    branch_or_tag_name?: string;
     variant?: string;
     variant_name?: string;
-  }) => `${m.stream_name || m.stream} · ${m.variant_name || m.variant}`;
+  }) => `${m.branch_or_tag_name || m.branch_or_tag} · ${m.variant_name || m.variant}`;
   const { matching, offered } = useMemo(() => {
     const auto = new Map<string, true>();
     const diff = new Map<string, Other>();
@@ -476,7 +476,7 @@ export function Decide({
         diff.set(key, {
           key,
           build,
-          stream: m.stream ?? "",
+          branch_or_tag: m.branch_or_tag ?? "",
           variant: m.variant ?? "",
           version: m.version ?? "",
           occurrences: (had?.occurrences ?? 0) + (m.occurrences ?? 0),
@@ -535,7 +535,7 @@ export function Decide({
       // some releases and not others — an act nobody performed.
       const here = unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/decision",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/decision",
           {
             params: whereOf(at),
             body: {
@@ -545,7 +545,7 @@ export function Decide({
               ...(applied.length > 0
                 ? {
                     also: applied.map((other) => ({
-                      stream: other.stream,
+                      branch_or_tag: other.branch_or_tag,
                       variant: other.variant,
                       ...(other.version ? { version: other.version } : {}),
                     })),
@@ -821,7 +821,7 @@ export function Decide({
   );
 
   const plan: Plan = {
-    build: `${at.product} · ${at.stream} · ${at.variant}`,
+    build: `${at.product} · ${at.branch_or_tag} · ${at.variant}`,
     covered: covering.length,
     total: open.length,
     consumers: consumersOf(covering),

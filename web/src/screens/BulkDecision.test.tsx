@@ -12,7 +12,7 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 const ISSUES =
-  "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues";
+  "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues";
 
 describe("narrowing a bulk decision", () => {
   it("keeps the component it was opened for", async () => {
@@ -48,7 +48,7 @@ describe("narrowing a bulk decision", () => {
   });
 });
 
-const AT_BUILD = { product: "sonic", stream: "master", variant: "x" };
+const AT_BUILD = { product: "sonic", branch_or_tag: "master", variant: "x" };
 const AT = bulkDecisionAt(AT_BUILD, "openssl");
 const PATTERN = ROUTES.bulkDecision;
 

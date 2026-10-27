@@ -57,8 +57,8 @@ type Reader struct {
 // where the decision to say anything is made, so that a policy about what is
 // worth telling somebody is in one place rather than half here.
 type Stored struct {
-	TargetID int64
-	ScanID   int64
+	BuildID int64
+	ScanID  int64
 }
 
 // NewReader returns a reader over db.
@@ -98,7 +98,7 @@ type Result struct {
 	// ClaimsUnstated counts what this scan's format could not have restated,
 	// so it was carried forward rather than read as withdrawn.
 	ClaimsUnstated int
-	// Superseded says a newer scan for this target was applied first, so this
+	// Superseded says a newer scan for this build was applied first, so this
 	// one was read no further. It is not a failure: the newer picture is the
 	// current one, and applying an older one over it would reopen everything
 	// the newer one closed.
@@ -222,7 +222,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		return nil, err
 	}
 
-	target, err := catalog.NewStore(r.db.DB).Describe(ctx, scan.TargetID)
+	build, err := catalog.NewStore(r.db.DB).Describe(ctx, scan.BuildID)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// already been applied. Applying it then would replace today's picture
 	// with yesterday's and reopen everything the newer one closed — the same
 	// harm the arrival check prevents at the door, arriving from behind.
-	newest, err := scans.Newest(ctx, scan.TargetID)
+	newest, err := scans.Newest(ctx, scan.BuildID)
 	if err != nil {
 		return nil, err
 	}
@@ -306,10 +306,10 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// was sent for. The product is what stands in: a root's own name and
 	// version are excluded from identity and expiry anyway, so what matters is
 	// only that it is stable for this variant.
-	stand := graph.Described{Name: target.Product}
+	stand := graph.Described{Name: build.Product}
 	snapshot := doc.Snapshot(stand)
 
-	// The build's own argument is stored against the target, not against the
+	// The build's own argument is stored against the build, not against the
 	// scan, because it is what the next scan run has to apply.
 	//
 	// The places this scan could have made a claim are passed with it. A claim
@@ -359,12 +359,12 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			// meanwhile is replaced by this one if nothing asks. The build's
 			// row is taken first, as the graph's apply takes it, so a newer
 			// scan being applied has committed before this reads.
-			if _, err := tx.NewUpdate().Table("target").
+			if _, err := tx.NewUpdate().Table("build").
 				Set(`"last_scan_id" = "last_scan_id"`).
-				Where(`"id" = ?`, scan.TargetID).Exec(ctx); err != nil {
+				Where(`"id" = ?`, scan.BuildID).Exec(ctx); err != nil {
 				return fmt.Errorf("take the build: %w", err)
 			}
-			newest, err := NewStore(tx).Newest(ctx, scan.TargetID)
+			newest, err := NewStore(tx).Newest(ctx, scan.BuildID)
 			if err != nil {
 				return err
 			}
@@ -375,18 +375,18 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			// The graph reads scan identifiers as time, so a scan older than
 			// the one the build last applied is not applied over it.
 			var last *int64
-			if err := tx.NewSelect().Table("target").Column("last_scan_id").
-				Where(`"id" = ?`, scan.TargetID).Scan(ctx, &last); err != nil {
+			if err := tx.NewSelect().Table("build").Column("last_scan_id").
+				Where(`"id" = ?`, scan.BuildID).Scan(ctx, &last); err != nil {
 				return fmt.Errorf("read what the build last applied: %w", err)
 			}
 			if last != nil && *last > scanID {
 				overtaken = true
 				return nil
 			}
-			if applied, err = graph.ApplyWithin(ctx, tx, scan.TargetID, scanID, snapshot); err != nil {
+			if applied, err = graph.ApplyWithin(ctx, tx, scan.BuildID, scanID, snapshot); err != nil {
 				return err
 			}
-			if claimed, err = finding.RecordClaimsWithin(ctx, tx, scan.TargetID, scanID,
+			if claimed, err = finding.RecordClaimsWithin(ctx, tx, scan.BuildID, scanID,
 				claims, stated); err != nil {
 				return err
 			}
@@ -395,13 +395,13 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			}
 			// The inventory just stored has to be scanned: it is new, and the
 			// vulnerability data has moved since whatever last looked at this
-			// target. Queued in the transaction that stores it, so the job and
+			// build. Queued in the transaction that stores it, so the job and
 			// the graph it describes commit together. Queued afterwards, a
 			// failure to queue is reported as the read failing after the read
 			// committed, which marks an applied scan failed and reinstates the
 			// one it overtook.
 			if _, err := r.queue.AddTx(ctx, tx, queue.Scan,
-				strconv.FormatInt(scan.TargetID, 10)); err != nil {
+				strconv.FormatInt(scan.BuildID, 10)); err != nil {
 				// A full backlog is not this scan's failure, and what is due
 				// stays due: the periodic pass asks again once the queue has
 				// drained, which is what it does for a re-scan it could not
@@ -423,7 +423,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// whether that is worth telling anybody. After the writes have committed,
 	// because what it reads is the rows they wrote.
 	if r.told != nil {
-		r.told(ctx, Stored{TargetID: scan.TargetID, ScanID: scanID})
+		r.told(ctx, Stored{BuildID: scan.BuildID, ScanID: scanID})
 	}
 
 	result := &Result{
@@ -436,12 +436,12 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		SelfReferences: doc.SelfReferences,
 		ClaimsOpened:   claimed.Opened, ClaimsClosed: claimed.Closed,
 		ClaimsUnstated: claimed.Unstated,
-		Retained:       !target.Moves,
+		Retained:       !build.Moves,
 	}
 
 	if backlogged {
 		r.logger.Warn("an inventory was stored with nothing queued to scan it because the "+
-			"queue is full", "scan", scanID, "build", scan.TargetID)
+			"queue is full", "scan", scanID, "build", scan.BuildID)
 	}
 
 	// A branch is superseded by the next night's build, so what it sent is not
@@ -453,10 +453,10 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// scan is applied, and reported as failed it would be marked so and the
 	// scan it overtook read again over it. The documents are then kept, which
 	// costs storage and changes no answer, and the log line is what says so.
-	if target.Moves {
+	if build.Moves {
 		if err := documents.Discard(ctx, scanID); err != nil {
 			r.logger.Error("could not let go of what a branch scan sent", "scan", scanID,
-				"build", scan.TargetID, "error", err)
+				"build", scan.BuildID, "error", err)
 		}
 	}
 	return result, nil
@@ -492,16 +492,16 @@ func (r *Reader) reinstate(ctx context.Context, reference string) error {
 	}
 	// The failed one is no longer accepted, so this is what stands in its
 	// place — or nothing, where it was the only scan.
-	newest, err := scans.Newest(ctx, failed.TargetID)
+	newest, err := scans.Newest(ctx, failed.BuildID)
 	if err != nil || newest == nil {
 		return err
 	}
 
 	var shown int64
 	if err := r.db.NewSelect().
-		TableExpr(`"target" AS "t"`).
+		TableExpr(`"build" AS "t"`).
 		ColumnExpr(`COALESCE("t"."last_scan_id", 0)`).
-		Where(`"t"."id" = ?`, failed.TargetID).
+		Where(`"t"."id" = ?`, failed.BuildID).
 		Scan(ctx, &shown); err != nil {
 		return fmt.Errorf("read what the build shows: %w", err)
 	}

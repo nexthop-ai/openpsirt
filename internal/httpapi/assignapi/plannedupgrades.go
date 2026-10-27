@@ -59,16 +59,16 @@ type PlannedUpgradeItemBody struct {
 // nothing rejects an undeclared parameter — so the filters a caller sent
 // arrive and are dropped before the handler runs, with no error and no clue.
 type PlannedUpgradeQuery struct {
-	Stream    string             `query:"stream" doc:"Limit to one branch or tag"`
-	Variant   string             `query:"variant" doc:"Limit to one variant"`
-	Severity  core.Rating        `query:"severity" doc:"Keep only issues rated this badly or worse"`
-	Exploited bool               `query:"exploited" doc:"Keep only upgrades closing something known to be exploited"`
-	Component string             `query:"component" doc:"Keep only upgrades moving a component of this name"`
-	Search    string             `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
-	Ecosystem string             `query:"ecosystem" doc:"Keep only components of one package kind"`
-	State     core.Standing      `query:"state" doc:"Keep only groups this far decided"`
-	Sort      plannedUpgradeSort `query:"sort" doc:"The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for"`
-	Ascending bool               `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
+	BranchOrTag string             `query:"branch_or_tag" doc:"Limit to one branch or tag"`
+	Variant     string             `query:"variant" doc:"Limit to one variant"`
+	Severity    core.Rating        `query:"severity" doc:"Keep only issues rated this badly or worse"`
+	Exploited   bool               `query:"exploited" doc:"Keep only upgrades closing something known to be exploited"`
+	Component   string             `query:"component" doc:"Keep only upgrades moving a component of this name"`
+	Search      string             `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
+	Ecosystem   string             `query:"ecosystem" doc:"Keep only components of one package kind"`
+	State       core.Standing      `query:"state" doc:"Keep only groups this far decided"`
+	Sort        plannedUpgradeSort `query:"sort" doc:"The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for"`
+	Ascending   bool               `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
 }
 
 // narrow is the store's own filter, built from the request.
@@ -112,7 +112,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		core.CountedPaging
 	}) (*core.CountedListOutput[PlannedUpgradeItemBody], error) {
 		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err
@@ -135,7 +135,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		}
 
 		out.Body.Total = total
-		oneBuild := scope.StreamID != nil && scope.VariantID != nil
+		oneBuild := scope.BranchOrTagID != nil && scope.VariantID != nil
 		out.Body.Items = plannedUpgradeBodies(upgrades, oneBuild)
 		return out, nil
 	})
@@ -156,14 +156,14 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		PlannedUpgradeQuery
 	}) (*huma.StreamResponse, error) {
 		subject, scope, floor, err := core.ScopedMinimumSeverity(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err
 		}
 		store := finding.NewStore(in.DB.DB)
 		narrowed := input.narrow(floor)
-		oneBuild := scope.StreamID != nil && scope.VariantID != nil
+		oneBuild := scope.BranchOrTagID != nil && scope.VariantID != nil
 		line := "everything"
 		if floor.Hides() {
 			line = floor.Word
@@ -187,7 +187,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 				for _, body := range plannedUpgradeBodies(upgrades, oneBuild) {
 					builds := make([]string, 0, len(body.In))
 					for _, at := range body.In {
-						builds = append(builds, at.Stream+"/"+at.Variant)
+						builds = append(builds, at.BranchOrTag+"/"+at.Variant)
 					}
 					// Empty where the selection is one build, as the list
 					// leaves it out: it is the same number on every row.
@@ -227,7 +227,7 @@ func plannedUpgradeBodies(upgrades []finding.PlannedUpgrade, oneBuild bool) []Pl
 			In:       make([]BuildName, 0, len(upgrade.In)),
 		}
 		for _, at := range upgrade.In {
-			body.In = append(body.In, BuildName{Stream: at.Stream, Variant: at.Variant})
+			body.In = append(body.In, BuildName{BranchOrTag: at.BranchOrTag, Variant: at.Variant})
 		}
 		// Absent where the selection is one build, because then it is the
 		// same number on every row.
@@ -241,8 +241,8 @@ func plannedUpgradeBodies(upgrades []finding.PlannedUpgrade, oneBuild bool) []Pl
 
 // BuildName is a release and variant, as the catalog names them.
 type BuildName struct {
-	Stream  string `json:"stream"`
-	Variant string `json:"variant"`
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
 }
 
 // PlannedBody is one bump a release is waiting on.
@@ -270,7 +270,7 @@ type PlannedBody struct {
 func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-build-planned-upgrades", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades",
 		Summary: "List one build's planned upgrades",
 		Description: "Everything committed for this build, one row per upgrade — a source package " +
 			"at the version it was built at, moving to another version — with what it would " +
@@ -298,15 +298,15 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 			"date.",
 		Tags: []string{"Remediation"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
 	}) (*core.ListOutput[PlannedBody], error) {
-		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		planned, err := finding.NewStore(in.DB.DB).PlannedUpgradesFor(ctx, subject, targetID)
+		planned, err := finding.NewStore(in.DB.DB).PlannedUpgradesFor(ctx, subject, buildID)
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
@@ -317,7 +317,7 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-build-planned-upgrades", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/planned-upgrades.{format}",
 		Summary: "Export one build's planned upgrades",
 		Description: "The same list as a file: one row per upgrade this build is waiting on, " +
@@ -326,19 +326,19 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 			"spreadsheet has no second dimension.",
 		Tags: []string{"Remediation"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Format  string `path:"format" enum:"csv,json"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Format      string `path:"format" enum:"csv,json"`
 	}) (*huma.StreamResponse, error) {
-		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 		// Read whole before a byte is written, like the screen reads it: this
 		// is one build's plan rather than a paged list, and a refusal has to
 		// land before the status is gone.
-		planned, err := finding.NewStore(in.DB.DB).PlannedUpgradesFor(ctx, subject, targetID)
+		planned, err := finding.NewStore(in.DB.DB).PlannedUpgradesFor(ctx, subject, buildID)
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
@@ -346,7 +346,7 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "upgrades this build is waiting on",
 			About: []core.Stated{
-				{Label: "build", Value: input.Product + " " + input.Stream + " (" + input.Variant + ")"},
+				{Label: "build", Value: input.Product + " " + input.BranchOrTag + " (" + input.Variant + ")"},
 			},
 			Header: []string{
 				"upstream", "from", "to", "components", "issues", "occurrences",
@@ -373,7 +373,7 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 				return written, nil
 			},
 		}
-		name := "planned-upgrades-" + core.DownloadName(input.Product+"-"+input.Stream+"-"+input.Variant)
+		name := "planned-upgrades-" + core.DownloadName(input.Product+"-"+input.BranchOrTag+"-"+input.Variant)
 		return &huma.StreamResponse{Body: func(writer huma.Context) {
 			core.WriteExport(writer, input.Format, name, out)
 		}}, nil

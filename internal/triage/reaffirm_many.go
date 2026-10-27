@@ -489,7 +489,7 @@ func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirme
 // a second live decision where the later one already stands, or bring back a
 // decision somebody since took back.
 //
-// A decision made before the row stopped standing replaces nothing. Two streams
+// A decision made before the row stopped standing replaces nothing. Two branches and tags
 // at two versions hold sibling decisions at one occurrence, keyed apart by the
 // versions, and one lapsing leaves the other its own. Rows of one decision are
 // one decision and do not replace each other.
@@ -567,8 +567,8 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 		}
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).

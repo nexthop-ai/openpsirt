@@ -17,7 +17,7 @@ const ROWS = [
     path: "src/a.c",
     line: 7,
     message: "p is leaked",
-    stream: "master",
+    branch_or_tag: "master",
     variant: "broadcom",
     builds: 3,
     opened: "2026-10-01",
@@ -86,7 +86,7 @@ describe("the code findings", () => {
     expect(text()).toContain("master · broadcom +2");
     const link = mount.host().querySelector<HTMLAnchorElement>("td a");
     expect(link?.getAttribute("href")).toBe(
-      "/products/sonic/streams/master/variants/broadcom/code-findings/abc",
+      "/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc",
     );
   });
 
@@ -136,7 +136,9 @@ describe("the code findings", () => {
   });
 
   it("asks for the build the address names", async () => {
-    const asked = await drawn("/products/sonic/code-findings?stream=master&variant=broadcom");
-    expect(asked[0]).toMatchObject({ stream: "master", variant: "broadcom" });
+    const asked = await drawn(
+      "/products/sonic/code-findings?branch_or_tag=master&variant=broadcom",
+    );
+    expect(asked[0]).toMatchObject({ branch_or_tag: "master", variant: "broadcom" });
   });
 });

@@ -33,7 +33,7 @@ func TestAWeaknessThatIsNotAnIdentifierIsTheCallersToFix(t *testing.T) {
 			"one with a suffix": `"CWE-79x"`,
 			"one too long":      `"CWE-` + strings.Repeat("7", 300) + `"`,
 		} {
-			body := `{"builds":[{"stream":"master","variant":"broadcom"}],` +
+			body := `{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],` +
 				`"summary":"The parser reads past its buffer.","severity":"high",` +
 				`"weaknesses":[` + weaknesses + `]}`
 			got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings", body)
@@ -54,11 +54,11 @@ func TestAFlawInOurOwnProductIsRecordedAndReadBackLikeAnyOther(t *testing.T) {
 		const at = "/v1/products/mine/findings"
 		// Recording belongs to a build; the list it appears in takes
 		// the build as a selection.
-		const listing = "/v1/products/mine/findings?stream=master&variant=broadcom"
+		const listing = "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"
 
 		// A reader cannot, and neither can somebody who may only argue about
 		// known issues in shipped components.
-		body := `{"builds":[{"stream":"master","variant":"broadcom"}],` +
+		body := `{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],` +
 			`"summary":"The management socket answers before anyone authenticated.",` +
 			`"severity":"critical"}`
 		for _, who := range []string{"reader", "triager"} {
@@ -131,7 +131,7 @@ func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Not announced anywhere.","severity":"critical"}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"Not announced anywhere.","severity":"critical"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
 		}
@@ -179,7 +179,7 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 		r.ScannedTag(t, "v1.0", "3.7.0")
 		const at = "/v1/products/mine/findings"
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"},{"stream":"v1.0","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"},{"branch_or_tag":"v1.0","variant":"broadcom"}],`+
 				`"summary":"Not announced anywhere.","severity":"critical"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
@@ -192,8 +192,8 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 				Product       string   `json:"product"`
 				Components    []string `json:"components"`
 				Builds        []struct {
-					Stream  string `json:"stream"`
-					Variant string `json:"variant"`
+					BranchOrTag string `json:"branch_or_tag"`
+					Variant     string `json:"variant"`
 				} `json:"builds"`
 				Occurrences int `json:"occurrences"`
 			} `json:"items"`
@@ -205,7 +205,7 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 				len(whole.Items), whole.Total)
 		}
 		row := whole.Items[0]
-		if len(row.Builds) != 2 || row.Builds[0].Stream != "master" || row.Builds[1].Stream != "v1.0" {
+		if len(row.Builds) != 2 || row.Builds[0].BranchOrTag != "master" || row.Builds[1].BranchOrTag != "v1.0" {
 			t.Errorf("the row names the builds %+v, want master and v1.0", row.Builds)
 		}
 		if row.Occurrences != 2 {
@@ -217,11 +217,11 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 
 		var narrowed listing
 		httpapitest.Read(t, r, "private-triage",
-			"/v1/disclosure-deadlines?within=365&product=mine&stream=v1.0", &narrowed)
+			"/v1/disclosure-deadlines?within=365&product=mine&branch_or_tag=v1.0", &narrowed)
 		if len(narrowed.Items) != 1 {
 			t.Fatalf("narrowed to a build carrying it, %d rows, want 1", len(narrowed.Items))
 		}
-		if b := narrowed.Items[0].Builds; len(b) != 1 || b[0].Stream != "v1.0" {
+		if b := narrowed.Items[0].Builds; len(b) != 1 || b[0].BranchOrTag != "v1.0" {
 			t.Errorf("narrowed to v1.0 the row names %+v", b)
 		}
 		if narrowed.Items[0].Occurrences != 1 {
@@ -240,7 +240,7 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		r.ScannedWithEvidence(t)
 		const findings = "/v1/products/mine/findings"
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, findings,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Not announced anywhere.","severity":"high"}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"Not announced anywhere.","severity":"high"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
 		}
@@ -437,7 +437,7 @@ func TestANameTheBuildHoldsTwiceIsRefusedWithTheChoicesToPickFrom(t *testing.T) 
 		const said = `"summary":"The parser accepts a message it should refuse.","severity":"high"`
 
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+said+`,"component":"libnl-3-200"}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+said+`,"component":"libnl-3-200"}`)
 		if got.Code != http.StatusConflict {
 			t.Fatalf("an ambiguous name answered %d: %s", got.Code, got.Body.String())
 		}
@@ -466,7 +466,7 @@ func TestANameTheBuildHoldsTwiceIsRefusedWithTheChoicesToPickFrom(t *testing.T) 
 
 		// Named, it is recorded against that one.
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+said+`,"component":"libnl-3-200","version":"3.9.0"}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+said+`,"component":"libnl-3-200","version":"3.9.0"}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("naming the version answered %d: %s", made.Code, made.Body.String())
 		}
@@ -481,7 +481,7 @@ func TestASummaryOfNothingButSpacesIsTheCallersToFix(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"   ","severity":"high"}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"   ","severity":"high"}`)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a summary of spaces answered %d, want it named as the caller's to fix: %s",
 				got.Code, got.Body.String())
@@ -503,7 +503,7 @@ func TestAVectorThisCannotScoreIsTheCallersToFix(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Something is wrong.",`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"Something is wrong.",`+
 				`"vector":"AV:N/AC:L/Au:N/C:P/I:P/A:P"}`)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a scheme this cannot score answered %d, want it named as the caller's"+
@@ -526,7 +526,7 @@ func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
 				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
@@ -538,7 +538,7 @@ func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(
 			t.Fatal(err)
 		}
 		for _, at := range []struct{ what, path string }{
-			{"inside the product", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"inside the product", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"},
 			{"across every product", "/v1/findings"},
 		} {
 			t.Run(at.what, func(t *testing.T) {
@@ -588,7 +588,7 @@ func TestAFlawMayBeRecordedBeforeAnybodyHasRatedIt(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Found during early triage; how bad it is comes later."}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"Found during early triage; how bad it is comes later."}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("an unrated flaw answered %d: %s", got.Code, got.Body.String())
 		}
@@ -602,7 +602,7 @@ func TestAVectorSettlesTheSeverityRatherThanBeingAskedTwice(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
 				`"vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",`+
 				`"weaknesses":["CWE-306","cwe-306","  "]}`)
 		if made.Code != http.StatusCreated {
@@ -622,7 +622,7 @@ func TestAVectorSettlesTheSeverityRatherThanBeingAskedTwice(t *testing.T) {
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "private-triage",
-			"/v1/products/mine/findings?stream=master&variant=broadcom", &listed)
+			"/v1/products/mine/findings?branch_or_tag=master&variant=broadcom", &listed)
 		for _, item := range listed.Items {
 			if item.Vulnerability != recorded.Identifier {
 				continue
@@ -655,7 +655,7 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 		// otherwise read.
 		recorded := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone authenticated.",`+
 				`"severity":"critical"}`)
 		if recorded.Code != http.StatusCreated {
@@ -707,7 +707,7 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 				"/v1/products/mine/issues/%s/disclosure", ""},
 			{"which builds it affects", http.MethodPut,
 				"/v1/products/mine/issues/%s/builds",
-				`{"builds":[{"stream":"master","variant":"broadcom"}]}`},
+				`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`},
 		}
 
 		// The prober triages this product and may not read undisclosed work,
@@ -745,7 +745,7 @@ func TestARecordedSummaryGoesThroughTheSamePolicyAsAJustification(t *testing.T) 
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"
 		body := func(summary string) string {
-			return `{"builds":[{"stream":"master","variant":"broadcom"}],` +
+			return `{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],` +
 				`"summary":` + quotedJSON(summary) + `,"severity":"high",` +
 				`"component":"libnl-3-200"}`
 		}
@@ -793,7 +793,7 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
 				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
@@ -805,7 +805,7 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, at := range []struct{ what, path string }{
-			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"the findings list", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"},
 			{"the list across products", "/v1/findings"},
 			{"the issue", "/v1/issues/" + recorded.Identifier},
 			{"the forwarded document", "/v1/issues/" + recorded.Identifier + "/document"},

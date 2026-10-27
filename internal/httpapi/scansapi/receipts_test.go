@@ -341,7 +341,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+		build, err := names.BuildFor(ctx, located.BranchOrTagID, located.VariantID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -356,7 +356,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 			t.Helper()
 			sent++
 			scan, outcome, err := uploads.Record(ctx, ingest.Arriving{
-				TargetID: target.ID, ContentHash: strconv.Itoa(sent),
+				BuildID: build.ID, ContentHash: strconv.Itoa(sent),
 				BuiltAt: at, ParserVersion: "test",
 			})
 			if err != nil || outcome != ingest.Accept {
@@ -389,7 +389,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 		findings := finding.NewStore(r.DB.DB)
 		scan := func(t *testing.T, from int64, at time.Time) {
 			t.Helper()
-			if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, from, graph.Snapshot{
+			if _, err := fixture.ApplyGraph(ctx, r.DB.DB, build.ID, from, graph.Snapshot{
 				Root:         product,
 				Components:   []graph.Described{library},
 				Dependencies: []graph.Dependency{{Parent: product, Child: library}},
@@ -397,12 +397,12 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 				t.Fatal(err)
 			}
 			run, err := findings.Begin(ctx, finding.Run{
-				TargetID: target.ID, Scanner: "grype", RanHere: true,
+				BuildID: build.ID, Scanner: "grype", RanHere: true,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+			if _, err := findings.Apply(ctx, build.ID, run.ID, []finding.Reported{{
 				Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
 				Component: library,
 			}}); err != nil {
@@ -475,13 +475,13 @@ func TestAKeyThatReadsNoFindingsIsToldNothingAboutWhatARunChanged(t *testing.T) 
 			t.Fatalf("reading: %v", err)
 		}
 		// A run over that upload, finished, so the receipt has one to report.
-		var target int64
-		if err := f.DB.DB.NewSelect().TableExpr("\"target\"").Column("id").
-			Limit(1).Scan(t.Context(), &target); err != nil {
+		var build int64
+		if err := f.DB.DB.NewSelect().TableExpr("\"build\"").Column("id").
+			Limit(1).Scan(t.Context(), &build); err != nil {
 			t.Fatal(err)
 		}
 		run := map[string]any{
-			"target_id": target, "scanner": "test", "ran_here": true,
+			"build_id": build, "scanner": "test", "ran_here": true,
 			"started_at": time.Now().UTC().Add(-time.Minute), "finished_at": time.Now().UTC(),
 		}
 		if _, err := f.DB.DB.NewInsert().Model(&run).TableExpr("\"scan_run\"").

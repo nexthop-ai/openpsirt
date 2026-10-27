@@ -22,7 +22,13 @@ const at = {
 };
 
 function row(vulnerability: string) {
-  return { vulnerability, component: "zlib", version: "1.3", stream: "main", variant: "x86" };
+  return {
+    vulnerability,
+    component: "zlib",
+    version: "1.3",
+    branch_or_tag: "main",
+    variant: "x86",
+  };
 }
 
 describe("where a finding sits in the list it was opened from", () => {

@@ -115,9 +115,9 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Giving work to somebody else also needs assigner. Taking unowned work, "+
 		"or handing back your own, does not.", core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product"`
+		Product     string `path:"product"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product"`
 		core.AtOneBuild
 		core.Narrowing
 		Body struct {
@@ -127,7 +127,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		}
 	}) (*struct{ Body AssignedMatchingBody }, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err

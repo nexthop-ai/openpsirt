@@ -135,12 +135,12 @@ func registerDecisions(api huma.API, in core.Deps) {
 		link := weblink.DecisionOccurrence(back.DecisionOccurrence.ID)
 		if described, err := store.Describe(ctx, subject, []triage.DecisionOccurrence{back.DecisionOccurrence}); err == nil {
 			if d, ok := described[back.DecisionOccurrence.ID]; ok {
-				link = weblink.Finding(d.Product, d.Stream, d.Variant,
+				link = weblink.Finding(d.Product, d.BranchOrTag, d.Variant,
 					d.Issue.Identifier, d.Component, d.Version)
 				// A rule names no finding page; its code finding is addressed by
 				// its occurrence.
 				if d.Issue.Kind == kind.Rule {
-					link = weblink.CodeFinding(d.Product, d.Stream, d.Variant, back.DecisionOccurrence.OccurrenceIdentity)
+					link = weblink.CodeFinding(d.Product, d.BranchOrTag, d.Variant, back.DecisionOccurrence.OccurrenceIdentity)
 				}
 			}
 		} else if err != nil {

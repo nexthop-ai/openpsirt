@@ -16,10 +16,10 @@ import (
 
 // BuildCountsBody is what one build holds now, by severity band.
 type BuildCountsBody struct {
-	Stream      string `json:"stream"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant     string `json:"variant"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	BranchOrTag     string `json:"branch_or_tag"`
+	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant         string `json:"variant"`
+	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	// Kind says whether this is a branch or a tag. The comparison only means
 	// something for a branch, and a screen asks before drawing the panel at
 	// all rather than drawing one that explains why it is empty.
@@ -90,7 +90,7 @@ const blocking = 5
 func registerReadiness(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-readiness", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/readiness",
 		Summary: "Compare a branch against the last release cut from it",
 		Description: "Answers the question asked before shipping: is what we are about to " +
 			"ship better or worse than what we last shipped. \"8 criticals now, v2.4.1 " +
@@ -115,21 +115,21 @@ func registerReadiness(api huma.API, in core.Deps) {
 			"there are altogether.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
 	}) (*struct{ Body ReadinessBody }, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 
 		ready, err := finding.NewStore(in.DB.DB).
-			ReadyFor(ctx, subject, named.ProductID, named.StreamID, named.VariantID)
+			ReadyFor(ctx, subject, named.ProductID, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
@@ -149,7 +149,7 @@ func registerReadiness(api huma.API, in core.Deps) {
 		// with the same line and the same narrowing, so the list this opens
 		// is the list this counts.
 		scope := finding.Scope{
-			ProductID: &named.ProductID, StreamID: &named.StreamID, VariantID: &named.VariantID,
+			ProductID: &named.ProductID, BranchOrTagID: &named.BranchOrTagID, VariantID: &named.VariantID,
 		}
 		groups, blockers, err := finding.NewStore(in.DB.DB).Groups(ctx, subject, scope,
 			blocking, 0, finding.Filter{
@@ -182,9 +182,9 @@ func registerReadiness(api huma.API, in core.Deps) {
 
 func buildCounts(s finding.Standing) BuildCountsBody {
 	body := BuildCountsBody{
-		Stream: s.Stream, Variant: s.Variant, Kind: core.LineKind(s.Kind), Total: s.Total,
-		StreamName:  s.StreamName,
-		VariantName: s.VariantName,
+		BranchOrTag: s.BranchOrTag, Variant: s.Variant, Kind: core.LineKind(s.Kind), Total: s.Total,
+		BranchOrTagName: s.BranchOrTagName,
+		VariantName:     s.VariantName,
 	}
 	body.Critical, body.High, body.Medium, body.Low = core.BandCounts(s.ByBand)
 	body.LastScannedAt = core.StampAt(s.LastScanned)

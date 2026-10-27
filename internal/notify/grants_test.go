@@ -30,7 +30,7 @@ type split struct {
 	db          *database.DB
 	rights      *access.Store
 	product     int64
-	target      int64
+	build       int64
 	issue       int64
 	component   int64
 	occurrences int
@@ -40,7 +40,7 @@ func aSplit(t *testing.T, w *fixture.World) *split {
 	t.Helper()
 	db := w.DB
 	ctx := t.Context()
-	target := aScannedTarget(t, w)
+	build := aScannedBuild(t, w)
 	product := w.Product
 	named, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 		{Identifier: "CVE-2026-4242", Severity: "high"},
@@ -56,7 +56,7 @@ func aSplit(t *testing.T, w *fixture.World) *split {
 		t.Fatal(err)
 	}
 	return &split{
-		db: db, rights: access.NewStore(db.DB), product: product.ID, target: target,
+		db: db, rights: access.NewStore(db.DB), product: product.ID, build: build,
 		issue: named["CVE-2026-4242"], component: component.ID,
 	}
 }
@@ -121,7 +121,7 @@ func (s *split) queued(t *testing.T, team *access.Team, visibility access.Visibi
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	routed := now.Add(-5 * 24 * time.Hour)
 	row := &finding.Finding{
-		TargetID: s.target, Kind: finding.Vulnerable, VulnerabilityID: s.issue,
+		BuildID: s.build, Kind: finding.Vulnerable, VulnerabilityID: s.issue,
 		Visibility: visibility, ComponentID: s.component,
 		OccurrenceIdentity: fmt.Sprintf("place-%d", s.occurrences),
 		OpenedAt:           now, AssignedTo: &team.PartyID, AssignedAt: &routed,
@@ -322,7 +322,7 @@ func TestACriticalOnAReleaseIsNotToldToWhoeverTriagesOnlyUndisclosedWork(t *test
 		db := w.DB
 		rights := access.NewStore(db.DB)
 		product := w.Product
-		released := w.TargetFor(w.Tag, w.Customer)
+		released := w.BuildFor(w.Tag, w.Customer)
 		privateTriager := recordPerson(t, rights, "private@example.com", false,
 			product.ID, access.PrivateTriage)
 		publicTriager := recordPerson(t, rights, "public@example.com", false,

@@ -85,10 +85,10 @@ func publishedWorld(t *testing.T, f *fixture.World) (*world, string) {
 	t.Helper()
 	w := newWorld(t, f)
 	w.shipped()
-	w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
-	w.decide(w.Target, "CVE-2026-1001", openssl,
+	w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+	w.decide(w.Build, "CVE-2026-1001", openssl,
 		decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
-	w.decide(w.Target, "CVE-2026-1002", libnl,
+	w.decide(w.Build, "CVE-2026-1002", libnl,
 		decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 	named, _ := w.issued(true)
 	w.publishes(w.Product, true)
@@ -518,12 +518,12 @@ func TestTheSurfaceReadsOnlyTheProductsThatPublishNow(t *testing.T) {
 		w, _ := publishedWorld(t, f)
 		other := w.DeclareProduct("other-os", "Other OS")
 		w.hold(other)
-		target := w.TargetFor(w.DeclareStream(other, "main", catalog.Branch, nil),
+		build := w.BuildFor(w.DeclareBranchOrTag(other, "main", catalog.Branch, nil),
 			w.DeclareVariant(other, "x86", true))
 		root := graph.Described{Purl: "pkg:generic/other-os@1.0", Name: "other-os", Version: "1.0"}
-		w.ship(target, root, edge{root, zlib})
-		w.report(target, reported{"CVE-2026-2001", zlib})
-		w.decide(target, "CVE-2026-2001", zlib,
+		w.ship(build, root, edge{root, zlib})
+		w.report(build, reported{"CVE-2026-2001", zlib})
+		w.decide(build, "CVE-2026-2001", zlib,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(other, true)
 		w.write()

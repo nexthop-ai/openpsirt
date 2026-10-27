@@ -25,14 +25,14 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.store.Clock(minting)
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil {
@@ -62,7 +62,7 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 		}
 
 		// The next scan says nothing about it, and leaves it alone.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -79,7 +79,7 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 		// The second one is a different identifier, and nothing about
 		// it says how many came before it.
 		_, next, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "medium",
+			BuildIDs: []int64{f.build}, Severity: "medium",
 			Summary: "The recovery console does not clear the previous session.",
 		})
 		if err != nil {
@@ -112,7 +112,7 @@ func TestAFlawIsClassifiedByABoundedListOfWeaknessIdentifiers(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		entering := func(weaknesses ...string) finding.Entering {
 			return finding.Entering{
-				TargetIDs: []int64{f.target}, Severity: "high",
+				BuildIDs: []int64{f.build}, Severity: "high",
 				Summary: "The parser reads past its buffer.", Weaknesses: weaknesses,
 			}
 		}
@@ -146,7 +146,7 @@ func TestRecordingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		entering := finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "high", Summary: "Something we have not announced.",
+			BuildIDs: []int64{f.build}, Severity: "high", Summary: "Something we have not announced.",
 		}
 
 		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PublicTriage),
@@ -186,17 +186,17 @@ func TestARecordedFlawSaysWhatItIsAndWhereItIs(t *testing.T) {
 		// which is why it is a sentinel rather than a sentence, and why the
 		// caller is told to fix it rather than that something went wrong here.
 		if _, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "high", Summary: "   ",
+			BuildIDs: []int64{f.build}, Severity: "high", Summary: "   ",
 		}); !errors.Is(err, finding.ErrNothingSaid) {
 			t.Errorf("a finding with nothing said about it was recorded: %v", err)
 		}
 		if _, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "urgent", Summary: "Something.",
+			BuildIDs: []int64{f.build}, Severity: "urgent", Summary: "Something.",
 		}); err == nil {
 			t.Error("a severity that is not one was accepted")
 		}
 		_, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: "not-in-this-build", Severity: "high",
+			BuildIDs: []int64{f.build}, Component: "not-in-this-build", Severity: "high",
 			Summary: "Something.",
 		})
 		if !errors.Is(err, finding.ErrNoSuchComponent) {
@@ -206,7 +206,7 @@ func TestARecordedFlawSaysWhatItIsAndWhereItIs(t *testing.T) {
 		// Naming nothing puts it on the build itself, which is the honest
 		// answer where the flaw is in how the pieces fit together.
 		rows, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "high",
+			BuildIDs: []int64{f.build}, Severity: "high",
 			Summary: "The pieces are wired together wrongly.",
 		})
 		if err != nil {
@@ -249,7 +249,7 @@ func TestRecordingAgainstANameTheBuildHoldsTwiceIsRefusedRatherThanGuessed(t *te
 		const said = "The parser accepts a message it should refuse."
 
 		_, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high", Summary: said,
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high", Summary: said,
 		})
 		var several *graph.Ambiguous
 		if !errors.As(err, &several) {
@@ -264,7 +264,7 @@ func TestRecordingAgainstANameTheBuildHoldsTwiceIsRefusedRatherThanGuessed(t *te
 		// Naming the version settles it, and it settles it on the one named
 		// rather than on whichever came first.
 		rows, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: libnl.Name, Version: libnlNew.Version,
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Version: libnlNew.Version,
 			Severity: "high", Summary: said,
 		})
 		if err != nil {
@@ -299,7 +299,7 @@ func TestOneFlawIsRecordedAgainstEveryBuildThatShipsIt(t *testing.T) {
 
 		rows, identifier, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target, other},
+				BuildIDs:  []int64{f.build, other},
 				Component: libnl.Name, Severity: "high",
 				Summary: "The parser accepts a message it should refuse.",
 			})
@@ -350,7 +350,7 @@ func TestABuildNamedTwiceIsOneBuild(t *testing.T) {
 		f.shipped(t, through(libnl))
 		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target, f.target},
+				BuildIDs:  []int64{f.build, f.build},
 				Component: libnl.Name, Severity: "high",
 				Summary: "The parser accepts a message it should refuse.",
 			})
@@ -360,11 +360,11 @@ func TestABuildNamedTwiceIsOneBuild(t *testing.T) {
 		if len(rows) != 1 {
 			t.Errorf("a build named twice holds %d findings at its one occurrence", len(rows))
 		}
-		builds, err := f.store.BuildsForWithin(ctx, f.db.DB, f.productID, []int64{f.target, f.target})
+		builds, err := f.store.BuildsForWithin(ctx, f.db.DB, f.productID, []int64{f.build, f.build})
 		if err != nil {
 			t.Fatalf("a build named twice was refused: %v", err)
 		}
-		if len(builds) != 1 || builds[0] != f.target {
+		if len(builds) != 1 || builds[0] != f.build {
 			t.Errorf("a build named twice reads as %v", builds)
 		}
 	})
@@ -383,7 +383,7 @@ func TestAFlawIsNotRecordedAgainstBuildsThatDoNotHoldIt(t *testing.T) {
 
 		if _, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target, other},
+				BuildIDs:  []int64{f.build, other},
 				Component: libnl.Name, Severity: "high",
 				Summary: "The parser accepts a message it should refuse.",
 			}); err == nil {
@@ -415,7 +415,7 @@ func TestWhichBuildsAFlawAffectsIsCorrectedAsResearchGoes(t *testing.T) {
 
 		// Recorded against one build to begin with.
 		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
 			Summary: "The parser accepts a message it should refuse.",
 		})
 		if err != nil {
@@ -425,7 +425,7 @@ func TestWhichBuildsAFlawAffectsIsCorrectedAsResearchGoes(t *testing.T) {
 
 		// Research says the other variant ships it too.
 		changed, err := f.store.Affects(ctx, who, f.productID, issue,
-			[]int64{f.target, other}, "")
+			[]int64{f.build, other}, "")
 		if err != nil {
 			t.Fatalf("widening: %v", err)
 		}
@@ -447,7 +447,7 @@ func TestWhichBuildsAFlawAffectsIsCorrectedAsResearchGoes(t *testing.T) {
 		var closed finding.Finding
 		if err := f.db.DB.NewSelect().Model(&closed).
 			Where(`"vulnerability_id" = ?`, issue).
-			Where(`"target_id" = ?`, f.target).
+			Where(`"build_id" = ?`, f.build).
 			Where(`"closed_at" IS NOT NULL`).Scan(ctx); err != nil {
 			t.Fatalf("the record went with the build: %v", err)
 		}
@@ -472,7 +472,7 @@ func TestTakingABuildOutNeedsAReasonAndAddingOneDoesNot(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target, other}, Component: libnl.Name, Severity: "high",
+			BuildIDs: []int64{f.build, other}, Component: libnl.Name, Severity: "high",
 			Summary: "The parser accepts a message it should refuse.",
 		})
 		if err != nil {
@@ -493,7 +493,7 @@ func TestWhichBuildsAScannedIssueIsInIsNotOursToSet(t *testing.T) {
 		f.shipped(t, through(libnl))
 		f.foundOnLibnl(t)
 		if _, err := f.store.Affects(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), f.productID,
-			f.issueID(t, "CVE-2026-1"), []int64{f.target}, "because"); err == nil {
+			f.issueID(t, "CVE-2026-1"), []int64{f.build}, "because"); err == nil {
 			t.Error("a scanned issue's builds were set by hand")
 		}
 	})
@@ -564,7 +564,7 @@ func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
 
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told: finding.Told{
 				ReportedBy: "A. Researcher", Contact: "a@example.org",
@@ -644,7 +644,7 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 
 		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
+				BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
 				Summary: "The parser accepts a message it should refuse.",
 			})
 		if err != nil {
@@ -664,7 +664,7 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 		var scanned []string
 		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 			ColumnExpr(`"f"."occurrence_identity"`).
-			Where(`"f"."target_id" = ?`, f.target).
+			Where(`"f"."build_id" = ?`, f.build).
 			Where(`"f"."kind" = ?`, finding.Vulnerable).
 			Scan(ctx, &scanned); err != nil {
 			t.Fatal(err)
@@ -700,7 +700,7 @@ func TestAFlawRecordedAgainstTheBuildIsOneOccurrenceInEveryVariant(t *testing.T)
 
 		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target, other}, Severity: "high",
+				BuildIDs: []int64{f.build, other}, Severity: "high",
 				Summary: "The pieces are assembled in a way that defeats the sandbox.",
 			})
 		if err != nil {
@@ -719,11 +719,11 @@ func TestAFlawRecordedAgainstTheBuildIsOneOccurrenceInEveryVariant(t *testing.T)
 		// was named is what the build is. Each variant's root is called
 		// something different, so an occurrence keyed on the name is a
 		// different occurrence in each of them.
-		named := func(target int64, component string) string {
+		named := func(build int64, component string) string {
 			t.Helper()
 			rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 				finding.Entering{
-					TargetIDs: []int64{target}, Component: component, Severity: "high",
+					BuildIDs: []int64{build}, Component: component, Severity: "high",
 					Summary: "The pieces are assembled in a way that defeats the sandbox.",
 				})
 			if err != nil {
@@ -734,7 +734,7 @@ func TestAFlawRecordedAgainstTheBuildIsOneOccurrenceInEveryVariant(t *testing.T)
 			}
 			return rows[0].OccurrenceIdentity
 		}
-		here := named(f.target, root.Name)
+		here := named(f.build, root.Name)
 		there := named(other, "sonic-mellanox")
 		if here != there {
 			t.Errorf("naming each build's own component gives two occurrences: %s and %s", here, there)
@@ -763,7 +763,7 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 
 		// libnl sits at two occurrences, and one action here writes one.
 		_, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
-			TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
 			Summary: "The parser accepts a message it should refuse.",
 		})
 		if !errors.Is(err, finding.ErrTooManyOccurrences) {
@@ -772,7 +772,7 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 		// Nothing landed: the count is taken before anything is written, and
 		// the whole recording is one transaction either way.
 		open, err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			Where(`"f"."target_id" = ?`, f.target).Count(ctx)
+			Where(`"f"."build_id" = ?`, f.build).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -783,7 +783,7 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 		// A component at one occurrence is inside it, so the bound is on what
 		// would be written rather than on what was named.
 		if _, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		}); err != nil {
 			t.Errorf("recording one occurrence under a cap of one was refused: %v", err)
@@ -808,10 +808,10 @@ func TestEachProductAnswersItsOwnReportUnderAMergedIssue(t *testing.T) {
 			f.productID: {access.PublicTriage, access.PrivateTriage},
 			other:       {access.PublicTriage, access.PrivateTriage},
 		}, 0)
-		entered := func(target int64, contact string) string {
+		entered := func(build int64, contact string) string {
 			t.Helper()
 			rows, _, err := f.store.Enter(ctx, both, finding.Entering{
-				TargetIDs: []int64{target}, Component: swss.Name, Severity: "high",
+				BuildIDs: []int64{build}, Component: swss.Name, Severity: "high",
 				Summary: "The management socket accepts a request nobody authenticated.",
 				Told:    finding.Told{ReportedBy: "A. Researcher", Contact: contact},
 			})
@@ -825,7 +825,7 @@ func TestEachProductAnswersItsOwnReportUnderAMergedIssue(t *testing.T) {
 			}
 			return name
 		}
-		first := entered(f.target, "first@example.org")
+		first := entered(f.build, "first@example.org")
 		second := entered(elsewhere, "second@example.org")
 		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
 			{Identifier: first, Aliases: []string{second}},
@@ -882,7 +882,7 @@ func TestAMintedNameKeptOnlyAsAnAliasIsNotDrawnAgain(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		entering := finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		}
 		first, _, err := finding.NewStoreDrawing(f.db.DB, 481907).Enter(ctx, who, entering)
@@ -922,7 +922,7 @@ func TestDrawingOnlyNamesSpokenForStopsAndSaysSo(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		entering := finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		}
 		if _, _, err := finding.NewStoreDrawing(f.db.DB, 7).Enter(ctx, who, entering); err != nil {
@@ -947,7 +947,7 @@ func TestAFlawRecordedOnATagCarriesNoDeadline(t *testing.T) {
 
 		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target, cut},
+				BuildIDs:  []int64{f.build, cut},
 				Component: libnl.Name, Severity: "high",
 				Summary: "The parser accepts a message it should refuse.",
 			})
@@ -959,9 +959,9 @@ func TestAFlawRecordedOnATagCarriesNoDeadline(t *testing.T) {
 		}
 		for _, row := range rows {
 			switch {
-			case row.TargetID == cut && row.DueAt != nil:
+			case row.BuildID == cut && row.DueAt != nil:
 				t.Errorf("the flaw recorded on a tag is due %v, want no deadline", row.DueAt)
-			case row.TargetID == f.target && row.DueAt == nil:
+			case row.BuildID == f.build && row.DueAt == nil:
 				t.Error("the flaw recorded on a moving line carries no deadline")
 			}
 		}

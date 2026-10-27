@@ -54,7 +54,7 @@ type flawCodeFindingBuild struct {
 
 	ID                int64 `bun:"id,pk,autoincrement"`
 	FlawCodeFindingID int64 `bun:"flaw_code_finding_id,notnull"`
-	TargetID          int64 `bun:"target_id,notnull"`
+	BuildID           int64 `bun:"build_id,notnull"`
 	Seen              bool  `bun:"seen,notnull"`
 }
 
@@ -81,10 +81,10 @@ func recordOrigin(ctx context.Context, tx bun.IDB, productID int64, occurrenceId
 	proposed := map[int64]bool{}
 	var order []int64
 	for _, b := range offer.Seen {
-		if _, ok := proposed[b.TargetID]; !ok {
-			order = append(order, b.TargetID)
+		if _, ok := proposed[b.BuildID]; !ok {
+			order = append(order, b.BuildID)
 		}
-		proposed[b.TargetID] = true
+		proposed[b.BuildID] = true
 	}
 	if picked := strings.TrimSpace(chosen.Component); picked != "" {
 		for _, s := range offer.Suggestions {
@@ -93,17 +93,17 @@ func recordOrigin(ctx context.Context, tx bun.IDB, productID int64, occurrenceId
 				continue
 			}
 			for _, b := range s.Unanalyzed {
-				if _, ok := proposed[b.TargetID]; !ok {
-					order = append(order, b.TargetID)
-					proposed[b.TargetID] = false
+				if _, ok := proposed[b.BuildID]; !ok {
+					order = append(order, b.BuildID)
+					proposed[b.BuildID] = false
 				}
 			}
 			break
 		}
 	}
-	for _, target := range order {
+	for _, build := range order {
 		if _, err := tx.NewInsert().Model(&flawCodeFindingBuild{
-			FlawCodeFindingID: row.ID, TargetID: target, Seen: proposed[target],
+			FlawCodeFindingID: row.ID, BuildID: build, Seen: proposed[build],
 		}).Exec(ctx); err != nil {
 			return fmt.Errorf("record the builds the flaw was proposed against: %w", err)
 		}
@@ -232,8 +232,8 @@ func takeFlawBack(ctx context.Context, tx bun.IDB, subject access.Subject, produ
 		Visibility access.Visibility `bun:"visibility"`
 	}
 	if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."id", "f"."visibility"`).
 		Where(`"s"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
@@ -334,22 +334,22 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	state, stateArgs := stateOf(productID)
 	var codeFinding struct {
-		TargetID int64  `bun:"target_id"`
-		Stream   string `bun:"stream"`
-		Variant  string `bun:"variant"`
-		Rule     string `bun:"rule"`
-		Path     string `bun:"path"`
-		Line     *int   `bun:"start_line"`
-		State    State  `bun:"state"`
+		BuildID     int64  `bun:"build_id"`
+		BranchOrTag string `bun:"branch_or_tag"`
+		Variant     string `bun:"variant"`
+		Rule        string `bun:"rule"`
+		Path        string `bun:"path"`
+		Line        *int   `bun:"start_line"`
+		State       State  `bun:"state"`
 	}
 	err = db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"f"."target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
+		ColumnExpr(`"f"."build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(`"vu"."identifier" AS "rule", "ar"."path", "ar"."start_line"`).
 		ColumnExpr(state+` AS "state"`, stateArgs...).
 		Where(`"s"."product_id" = ?`, productID).
@@ -366,17 +366,17 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 	}
 	out := &FlawOrigin{
 		Occurrence: row.OccurrenceIdentity, Rule: codeFinding.Rule, Path: codeFinding.Path, Line: atLeast(codeFinding.Line), State: codeFinding.State,
-		Build: BuildName{TargetID: codeFinding.TargetID, Stream: codeFinding.Stream, Variant: codeFinding.Variant},
+		Build: BuildName{BuildID: codeFinding.BuildID, BranchOrTag: codeFinding.BranchOrTag, Variant: codeFinding.Variant},
 		Suggested: Suggestion{Component: row.SuggestedComponent, Ecosystem: row.SuggestedEcosystem,
 			Namespace: row.SuggestedNamespace, From: row.SuggestedFrom},
 		RecordedBy: row.RecordedBy, RecordedAt: row.RecordedAt,
 		UndoneBy: row.UndoneBy, UndoneAt: row.UndoneAt, UndoneNote: row.UndoneNote,
 	}
 	if err := db.NewSelect().TableExpr(`"flaw_code_finding_build" AS "flb"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "flb"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "flb"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant", "flb"."seen"`).
+		ColumnExpr(`"t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant", "flb"."seen"`).
 		Where(`"flb"."flaw_code_finding_id" = ?`, row.ID).
 		OrderExpr(`"flb"."seen" DESC, "s"."name" ASC, "va"."name" ASC`).
 		Scan(ctx, &out.Proposed); err != nil {
@@ -403,16 +403,16 @@ func noLongerDetectedFor(ctx context.Context, db bun.IDB, reach finding.CodeFind
 	}
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"t"."id" AS "target_id", "s"."name" AS "stream", "va"."name" AS "variant"`).
+		ColumnExpr(`"t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(`"si"."absent_run_id", "si"."fixed_run_id"`).
 		Where(`"s"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(codeFindings, codeFindingArgs...).
 		Where(reach.Full, reach.FullArgs...).
-		Where(`EXISTS (SELECT 1 FROM "finding" AS "ef" WHERE "ef"."target_id" = "f"."target_id"
+		Where(`EXISTS (SELECT 1 FROM "finding" AS "ef" WHERE "ef"."build_id" = "f"."build_id"
 			AND "ef"."vulnerability_id" = ? AND "ef"."closed_at" IS NULL AND `+entered+`)`,
 			append([]any{vulnerabilityID}, enteredArgs...)...).
 		OrderExpr(`"s"."name" ASC, "va"."name" ASC, "f"."id" DESC`).
@@ -425,10 +425,10 @@ func noLongerDetectedFor(ctx context.Context, db bun.IDB, reach finding.CodeFind
 	// after a fixed closure opens anew there.
 	spoken := map[int64]bool{}
 	for _, row := range rows {
-		if spoken[row.TargetID] {
+		if spoken[row.BuildID] {
 			continue
 		}
-		spoken[row.TargetID] = true
+		spoken[row.BuildID] = true
 		if row.AbsentRunID == nil {
 			continue
 		}

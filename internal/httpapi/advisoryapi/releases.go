@@ -19,7 +19,7 @@ type AdvisoryReleaseBody struct {
 	Product       string             `json:"product"`
 	ProductName   string             `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	Vulnerability string             `json:"vulnerability"`
-	Stream        string             `json:"stream"`
+	BranchOrTag   string             `json:"branch_or_tag"`
 	Variant       string             `json:"variant"`
 	Status        core.ReleaseStatus `json:"status" doc:"What the document states about the release"`
 	// Decided is where the decisions put it, which differs from the status
@@ -44,8 +44,8 @@ type ReleaseCoveringBody struct {
 
 // MadeOnBody is one build a decision was made on.
 type MadeOnBody struct {
-	Stream  string `json:"stream"`
-	Variant string `json:"variant"`
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
 }
 
 func registerReleases(api huma.API, in core.Deps) {
@@ -82,7 +82,7 @@ func registerReleases(api huma.API, in core.Deps) {
 		for _, one := range rows {
 			body := AdvisoryReleaseBody{
 				Product: one.Covered.Product, ProductName: one.Covered.ProductName,
-				Vulnerability: one.Covered.Issue, Stream: one.Stream, Variant: one.Variant,
+				Vulnerability: one.Covered.Issue, BranchOrTag: one.BranchOrTag, Variant: one.Variant,
 				Status: core.ReleaseStatus(one.Status), Decided: core.ReleaseStatus(one.Decided()),
 				Marked: one.Overridden, Changed: one.Changed,
 				Elsewhere: one.MadeElsewhere(),
@@ -95,7 +95,7 @@ func registerReleases(api huma.API, in core.Deps) {
 				}
 				for _, built := range one.Grounds.MadeOn {
 					body.Covered.MadeOn = append(body.Covered.MadeOn,
-						MadeOnBody{Stream: built.Stream, Variant: built.Variant})
+						MadeOnBody{BranchOrTag: built.BranchOrTag, Variant: built.Variant})
 				}
 			}
 			out.Body.Items = append(out.Body.Items, body)
@@ -119,7 +119,7 @@ func registerReleases(api huma.API, in core.Deps) {
 		Body     struct {
 			Product       string `json:"product" minLength:"1"`
 			Vulnerability string `json:"vulnerability" minLength:"1" doc:"The identifier the issue is filed under"`
-			Stream        string `json:"stream" minLength:"1"`
+			BranchOrTag   string `json:"branch_or_tag" minLength:"1"`
 			Variant       string `json:"variant" minLength:"1"`
 			Affected      bool   `json:"affected" doc:"True marks the release affected, false clears the mark"`
 		}
@@ -129,7 +129,7 @@ func registerReleases(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		if err := advisory.NewStore(in.DB.DB).MarkAffected(ctx, subject, input.Advisory,
-			input.Body.Product, input.Body.Vulnerability, input.Body.Stream,
+			input.Body.Product, input.Body.Vulnerability, input.Body.BranchOrTag,
 			input.Body.Variant, input.Body.Affected); err != nil {
 			return nil, advisoryRefused(in, err, "the release could not be marked")
 		}

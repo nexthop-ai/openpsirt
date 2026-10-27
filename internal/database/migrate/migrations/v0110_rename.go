@@ -50,6 +50,8 @@ var tablesRenamedV0110 = []tableRename{
 	{"finding_tag", "finding_label"},
 	{"vex_statement", "received_vex_statement"},
 	{"vex_issuance", "published_vex"},
+	{"stream", "branch_or_tag"},
+	{"target", "build"},
 }
 
 // columnRename is a column's name before and after, on its table as v0.11.0
@@ -68,6 +70,22 @@ var columnsRenamedV0110 = []columnRename{
 	{"decision_comment", "claim_id", "decision_id"},
 	{"decision_build", "claim_id", "decision_id"},
 	{"upgrade", "claim_id", "decision_id"},
+	{"advisory_agreed_status", "stream_id", "branch_or_tag_id"},
+	{"advisory_override", "stream_id", "branch_or_tag_id"},
+	{"api_key", "stream_id", "branch_or_tag_id"},
+	{"incident_fix", "stream_id", "branch_or_tag_id"},
+	{"incident_fix", "live_stream_id", "live_branch_or_tag_id"},
+	{"build", "stream_id", "branch_or_tag_id"},
+	{"decision_build", "target_id", "build_id"},
+	{"finding", "target_id", "build_id"},
+	{"graph_edge", "target_id", "build_id"},
+	{"graph_node", "target_id", "build_id"},
+	{"scan", "target_id", "build_id"},
+	{"scan_refusal", "target_id", "build_id"},
+	{"scan_run", "target_id", "build_id"},
+	{"suppression", "target_id", "build_id"},
+	{"upgrade", "target_id", "build_id"},
+	{"published_vex", "target_id", "build_id"},
 	{"finding", "place_identity", "occurrence_identity"},
 	{"incident_fix", "exploited_here_id", "incident_id"},
 	{"told_outside", "exploited_here_id", "incident_id"},
@@ -156,7 +174,7 @@ var namesRenamedV0110 = []nameRename{
 	{aPrimaryKey, "decision_build", "claim_build_pkey", "decision_build_pkey"},
 	{aUnique, "decision_build", "claim_build_once", "decision_build_once"},
 	{aForeignKey, "decision_build", "claim_build_claim_fk", "decision_build_decision_fk"},
-	{aForeignKey, "decision_build", "claim_build_target_fk", "decision_build_target_fk"},
+	{aForeignKey, "decision_build", "claim_build_target_fk", "decision_build_build_fk"},
 
 	{anIndex, "finding", "finding_place_idx", "finding_occurrence_idx"},
 
@@ -172,7 +190,7 @@ var namesRenamedV0110 = []nameRename{
 	{aPrimaryKey, "incident_fix", "exploited_fix_pkey", "incident_fix_pkey"},
 	{aUnique, "incident_fix", "exploited_fix_live_unique", "incident_fix_live_unique"},
 	{aForeignKey, "incident_fix", "exploited_fix_record_fk", "incident_fix_incident_fk"},
-	{aForeignKey, "incident_fix", "exploited_fix_stream_fk", "incident_fix_stream_fk"},
+	{aForeignKey, "incident_fix", "exploited_fix_stream_fk", "incident_fix_branch_or_tag_fk"},
 	{aForeignKey, "incident_fix", "exploited_fix_namer_fk", "incident_fix_namer_fk"},
 	{aForeignKey, "incident_fix", "exploited_fix_withdrawer_fk", "incident_fix_withdrawer_fk"},
 
@@ -220,8 +238,33 @@ var namesRenamedV0110 = []nameRename{
 
 	{aPrimaryKey, "published_vex", "vex_issuance_pkey", "published_vex_pkey"},
 	{aUnique, "published_vex", "vex_issuance_once_per_kind", "published_vex_once_per_kind"},
-	{aForeignKey, "published_vex", "vex_issuance_target_fk", "published_vex_target_fk"},
+	{aForeignKey, "published_vex", "vex_issuance_target_fk", "published_vex_build_fk"},
 	{aForeignKey, "published_vex", "vex_issuance_by_fk", "published_vex_by_fk"},
+
+	{aPrimaryKey, "branch_or_tag", "stream_pkey", "branch_or_tag_pkey"},
+	{aUnique, "branch_or_tag", "stream_name_unique", "branch_or_tag_name_unique"},
+	{aForeignKey, "branch_or_tag", "stream_parent_fk", "branch_or_tag_parent_fk"},
+	{aForeignKey, "branch_or_tag", "stream_product_fk", "branch_or_tag_product_fk"},
+
+	{aPrimaryKey, "build", "target_pkey", "build_pkey"},
+	{aUnique, "build", "target_unique", "build_unique"},
+	{aForeignKey, "build", "target_stream_fk", "build_branch_or_tag_fk"},
+	{aForeignKey, "build", "target_variant_fk", "build_variant_fk"},
+	{anIndex, "build", "target_variant_idx", "build_variant_idx"},
+
+	{aForeignKey, "advisory_agreed_status", "advisory_agreed_status_stream_fk",
+		"advisory_agreed_status_branch_or_tag_fk"},
+	{aForeignKey, "advisory_override", "advisory_override_stream_fk", "advisory_override_branch_or_tag_fk"},
+	{aForeignKey, "api_key", "api_key_stream_fk", "api_key_branch_or_tag_fk"},
+	{aForeignKey, "finding", "finding_target_id_fk", "finding_build_id_fk"},
+	{aForeignKey, "graph_edge", "graph_edge_target_fk", "graph_edge_build_fk"},
+	{aForeignKey, "graph_node", "graph_node_target_fk", "graph_node_build_fk"},
+	{aForeignKey, "scan", "scan_target_fk", "scan_build_fk"},
+	{aForeignKey, "scan_refusal", "scan_refusal_target_fk", "scan_refusal_build_fk"},
+	{aUnique, "scan_refusal", "scan_refusal_target_unique", "scan_refusal_build_unique"},
+	{aForeignKey, "scan_run", "scan_run_target_id_fk", "scan_run_build_id_fk"},
+	{aForeignKey, "suppression", "suppression_target_id_fk", "suppression_build_id_fk"},
+	{aForeignKey, "upgrade", "upgrade_target_id_fk", "upgrade_build_id_fk"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
@@ -274,6 +317,17 @@ var keptV0110 = map[string]func(*columnTypes) []string{
 	"job":          jobBaseline,
 	"told_outside": obligationBaseline,
 	"product":      productV0100,
+
+	"advisory_agreed_status": advisoryJudgmentBaseline,
+	"advisory_override":      advisoryJudgmentBaseline,
+	"api_key":                accessBaseline,
+	"finding":                findingV0100,
+	"graph_edge":             graphEdgeBaseline,
+	"graph_node":             graphNodeV090,
+	"scan":                   scanBaseline,
+	"scan_refusal":           scanBaseline,
+	"scan_run":               issueBaseline,
+	"suppression":            suppressionV090,
 }
 
 // declaredV0110 is v0.11.0's declaration of a table it renames or renames
@@ -310,6 +364,8 @@ func declaredV0110(t *columnTypes, table string) []string {
 		statements = vexStatementV0100(t)
 	case "vex_issuance":
 		statements = vexIssuanceBaseline(t)
+	case "stream", "target":
+		statements = catalogBaseline(t)
 	case "":
 		kept, ok := keptV0110[table]
 		if !ok {

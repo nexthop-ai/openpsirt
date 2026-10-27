@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// assigned reads who holds each open finding of this target.
+// assigned reads who holds each open finding of this build.
 func (f *fixture) assigned(t *testing.T) map[int64]int64 {
 	t.Helper()
 	held := map[int64]int64{}
@@ -30,7 +30,7 @@ func TestAssigningCoversEveryOccurrenceOfOneIssue(t *testing.T) {
 	// means to do, so the whole group moves together.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +40,7 @@ func TestAssigningCoversEveryOccurrenceOfOneIssue(t *testing.T) {
 		}
 
 		moved, _, err := f.store.Assign(t.Context(), f.holding(t, access.PublicTriage, access.Assigner),
-			f.target, open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil)
+			f.build, open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,18 +60,18 @@ func TestHandingSomethingBackIsTheSameActionAsGivingItOut(t *testing.T) {
 	// produces two paths that drift apart.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		open := f.open(t)
 		who := f.holding(t, access.PublicTriage, access.Assigner)
 
-		if _, _, err := f.store.Assign(t.Context(), who, f.target,
+		if _, _, err := f.store.Assign(t.Context(), who, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := f.store.Assign(t.Context(), who, f.target,
+		if _, _, err := f.store.Assign(t.Context(), who, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, nil, nil); err != nil {
 			t.Fatal(err)
 		}
@@ -87,13 +87,13 @@ func TestWhenSomebodyGoesTheirWorkComesBack(t *testing.T) {
 	// in anybody's own list because they are not here.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl), found("CVE-2026-2", swss)}); err != nil {
 			t.Fatal(err)
 		}
 		triager := f.holding(t, access.PublicTriage, access.Assigner)
 		for _, row := range f.open(t) {
-			if _, _, err := f.store.Assign(t.Context(), triager, f.target,
+			if _, _, err := f.store.Assign(t.Context(), triager, f.build,
 				row.VulnerabilityID, row.ComponentID, ptr(int64(7)), nil); err != nil {
 				t.Fatal(err)
 			}
@@ -126,12 +126,12 @@ func TestWorkCanBeHandedToSomebodyElse(t *testing.T) {
 	// dealing with it now, where releasing says nobody is.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		open := f.open(t)
-		if _, _, err := f.store.Assign(t.Context(), f.holding(t, access.PublicTriage, access.Assigner), f.target,
+		if _, _, err := f.store.Assign(t.Context(), f.holding(t, access.PublicTriage, access.Assigner), f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
 			t.Fatal(err)
 		}
@@ -156,14 +156,14 @@ func TestSomebodyWhoMayNotSeeAFindingCannotAssignIt(t *testing.T) {
 	// has disclosed is not one somebody may hand around.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		open := f.open(t)
 
 		outsider := access.NewPerson(5, "outsider", false, nil, 105)
-		if _, _, err := f.store.Assign(t.Context(), outsider, f.target,
+		if _, _, err := f.store.Assign(t.Context(), outsider, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err == nil {
 			t.Error("somebody holding nothing assigned a finding")
 		}
@@ -178,21 +178,21 @@ func TestTheAssignerRightDoesNotStandOnItsOwn(t *testing.T) {
 	// somebody else has to do.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		open := f.open(t)
 
 		dispatcher := f.holding(t, access.PublicRead, access.Assigner)
-		if _, _, err := f.store.Assign(t.Context(), dispatcher, f.target,
+		if _, _, err := f.store.Assign(t.Context(), dispatcher, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err == nil {
 			t.Error("the assigner right alone gave work to somebody")
 		}
 		// Nor to themselves: taking unowned work is the triager's exception,
 		// and this identity is not one.
 		theirs := dispatcher.Party()
-		if _, _, err := f.store.Assign(t.Context(), dispatcher, f.target,
+		if _, _, err := f.store.Assign(t.Context(), dispatcher, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, &theirs, nil); err == nil {
 			t.Error("the assigner right alone took work")
 		}
@@ -216,7 +216,7 @@ func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 	// message.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl), found("CVE-2026-2", swss)}); err != nil {
 			t.Fatal(err)
 		}
@@ -236,11 +236,11 @@ func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 		// findings here and they hold different numbers of occurrences, so
 		// indexing into an unordered read makes this assert a different
 		// thing on different runs.
-		library, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), f.target, libnl.Name, graph.Choice{})
+		library, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), f.build, libnl.Name, graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		at, atTotal, _, err := f.store.AtComponent(t.Context(), who, f.target,
+		at, atTotal, _, err := f.store.AtComponent(t.Context(), who, f.build,
 			library, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -265,7 +265,7 @@ func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -308,7 +308,7 @@ func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
 		}
 		// And it still names a build, because a screen has to link somewhere
 		// and an action has to name a finding.
-		if both[0].Stream == "" || both[0].Variant == "" {
+		if both[0].BranchOrTag == "" || both[0].Variant == "" {
 			t.Errorf("the item names no build to act through: %+v", both[0])
 		}
 	})
@@ -322,7 +322,7 @@ func TestVariantsAtDifferentVersionsAreDifferentWork(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -368,7 +368,7 @@ func TestTheSameComponentInTwoProductsIsTwoPiecesOfWork(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -410,7 +410,7 @@ func TestAssigningCoversEveryBuildOfTheProductHoldingIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -429,7 +429,7 @@ func TestAssigningCoversEveryBuildOfTheProductHoldingIt(t *testing.T) {
 
 		// Named by the build being looked at; what is assigned is the work it
 		// belongs to.
-		moved, _, err := f.store.Assign(ctx, who, f.target, issue, component, &person, nil)
+		moved, _, err := f.store.Assign(ctx, who, f.build, issue, component, &person, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -456,7 +456,7 @@ func TestTakingUnownedWorkIsTriageAndGivingItAwayIsNot(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -468,16 +468,16 @@ func TestTakingUnownedWorkIsTriageAndGivingItAwayIsNot(t *testing.T) {
 		mine, other := triager.Party(), int64(2)
 
 		// Taking what nobody owns, for yourself: triage is enough.
-		if _, _, err := f.store.Assign(ctx, triager, f.target, issue, component, &mine, nil); err != nil {
+		if _, _, err := f.store.Assign(ctx, triager, f.build, issue, component, &mine, nil); err != nil {
 			t.Fatalf("a triager could not pick up unowned work: %v", err)
 		}
 		// And handing their own back.
-		if _, _, err := f.store.Assign(ctx, triager, f.target, issue, component, nil, nil); err != nil {
+		if _, _, err := f.store.Assign(ctx, triager, f.build, issue, component, nil, nil); err != nil {
 			t.Fatalf("a triager could not hand back their own work: %v", err)
 		}
 
 		// Giving it to somebody else is the other right.
-		_, _, err := f.store.Assign(ctx, triager, f.target, issue, component, &other, nil)
+		_, _, err := f.store.Assign(ctx, triager, f.build, issue, component, &other, nil)
 		if !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a triager gave work to somebody else: %v", err)
 		}
@@ -486,13 +486,13 @@ func TestTakingUnownedWorkIsTriageAndGivingItAwayIsNot(t *testing.T) {
 		// taking work off a colleague is the act the right exists to name,
 		// and doing it to yourself is still doing it.
 		dispatcher := f.holding(t, access.PublicTriage, access.Assigner)
-		if _, _, err := f.store.Assign(ctx, dispatcher, f.target, issue, component, &other, nil); err != nil {
+		if _, _, err := f.store.Assign(ctx, dispatcher, f.build, issue, component, &other, nil); err != nil {
 			t.Fatalf("an assigner could not give work away: %v", err)
 		}
-		if _, _, err := f.store.Assign(ctx, triager, f.target, issue, component, &mine, nil); !errors.Is(err, access.ErrDenied) {
+		if _, _, err := f.store.Assign(ctx, triager, f.build, issue, component, &mine, nil); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a triager took work off somebody else: %v", err)
 		}
-		if _, _, err := f.store.Assign(ctx, dispatcher, f.target, issue, component, &mine, nil); err != nil {
+		if _, _, err := f.store.Assign(ctx, dispatcher, f.build, issue, component, &mine, nil); err != nil {
 			t.Errorf("an assigner could not take work off somebody else: %v", err)
 		}
 	})
@@ -504,7 +504,7 @@ func TestWorkIsNotGivenAwayWithoutTheAssignerRightThroughAnyPath(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}

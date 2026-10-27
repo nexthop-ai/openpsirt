@@ -492,7 +492,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		q = q.Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(notRecordedAsFlawIn).
-			Where(inThisProductAs(`"f"."target_id"`), productID).
+			Where(inThisProductAs(`"f"."build_id"`), productID).
 			Where(kinds, kindArgs...)
 		q, err := s.codeFindingsInSupport(ctx, q, productID)
 		if err != nil {
@@ -582,7 +582,7 @@ const codeFindingPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `'
 // its end of life, which is kept as it stands (REQ-15). The rule CodeFindingEnded
 // holds, asked of each row.
 func (s *Store) codeFindingsInSupport(ctx context.Context, q *bun.SelectQuery, productID int64) (*bun.SelectQuery, error) {
-	ended, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, s.now().UTC())
+	ended, err := catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, s.now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -590,10 +590,10 @@ func (s *Store) codeFindingsInSupport(ctx context.Context, q *bun.SelectQuery, p
 		return q, nil
 	}
 	return q.Where(`("f"."kind" <> ? OR EXISTS (SELECT 1 FROM "finding" AS "fs"
-		JOIN "target" AS "ts" ON "ts"."id" = "fs"."target_id"
-		JOIN "stream" AS "ss" ON "ss"."id" = "ts"."stream_id"
+		JOIN "build" AS "ts" ON "ts"."id" = "fs"."build_id"
+		JOIN "branch_or_tag" AS "ss" ON "ss"."id" = "ts"."branch_or_tag_id"
 		WHERE "fs"."occurrence_identity" = "f"."occurrence_identity" AND "fs"."kind" = ?
-		  AND "ss"."product_id" = ? AND "ts"."stream_id" NOT IN (?)))`,
+		  AND "ss"."product_id" = ? AND "ts"."branch_or_tag_id" NOT IN (?)))`,
 		kind.Analysis, kind.Analysis, productID, bun.List(ended)), nil
 }
 
@@ -607,8 +607,8 @@ func (s *Store) codeFindingsInSupport(ctx context.Context, q *bun.SelectQuery, p
 func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]int64, error) {
 	var builds []int64
 	err := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"tg"."id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Scan(ctx, &builds)
@@ -624,7 +624,7 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 			TableExpr(`"graph_node" AS "n"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 			ColumnExpr(`DISTINCT "n"."component_id"`).
-			Where(`"n"."target_id" = ?`, build).
+			Where(`"n"."build_id" = ?`, build).
 			Where(`"n"."closed_scan_id" IS NULL`).
 			Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 				if glob, like := globbed(name); glob {

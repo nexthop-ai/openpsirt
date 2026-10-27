@@ -142,7 +142,7 @@ func TestATokenNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 func TestAKeyIsListedWithTheReleaseAndVariantItIsPinnedTo(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/keys",
-			`{"name":"pinned","product":"mine","stream":"master","variant":"broadcom"}`)
+			`{"name":"pinned","product":"mine","branch_or_tag":"master","variant":"broadcom"}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("creating a key answered %d: %s", made.Code, made.Body.String())
 		}
@@ -152,9 +152,9 @@ func TestAKeyIsListedWithTheReleaseAndVariantItIsPinnedTo(t *testing.T) {
 		}
 		var out struct {
 			Items []struct {
-				Name    string `json:"name"`
-				Stream  string `json:"stream"`
-				Variant string `json:"variant"`
+				Name        string `json:"name"`
+				BranchOrTag string `json:"branch_or_tag"`
+				Variant     string `json:"variant"`
 			} `json:"items"`
 		}
 		if err := json.Unmarshal(listed.Body.Bytes(), &out); err != nil {
@@ -164,8 +164,8 @@ func TestAKeyIsListedWithTheReleaseAndVariantItIsPinnedTo(t *testing.T) {
 			if key.Name != "pinned" {
 				continue
 			}
-			if key.Stream != "master" || key.Variant != "broadcom" {
-				t.Errorf("the pinned key is listed with release %q and variant %q", key.Stream, key.Variant)
+			if key.BranchOrTag != "master" || key.Variant != "broadcom" {
+				t.Errorf("the pinned key is listed with release %q and variant %q", key.BranchOrTag, key.Variant)
 			}
 			return
 		}

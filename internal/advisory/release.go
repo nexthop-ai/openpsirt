@@ -29,10 +29,10 @@ func ReleaseStatuses() []string { return []string{KnownAffected, KnownNotAffecte
 
 // Release is one build of the product and where it stands on the issue.
 type Release struct {
-	StreamID  int64
-	VariantID int64
-	Stream    string
-	Variant   string
+	BranchOrTagID int64
+	VariantID     int64
+	BranchOrTag   string
+	Variant       string
 	// Holds says the issue is open there. False is a release that held it and
 	// no longer does, which is the one that was fixed.
 	Holds bool
@@ -69,10 +69,10 @@ type Grounds struct {
 
 // Built is one build a decision was made on.
 type Built struct {
-	StreamID  int64
-	VariantID int64
-	Stream    string
-	Variant   string
+	BranchOrTagID int64
+	VariantID     int64
+	BranchOrTag   string
+	Variant       string
 }
 
 // MadeElsewhere says the covering decision records the builds it was made on
@@ -99,14 +99,14 @@ func (r Release) NoFixPlanned() bool {
 }
 
 // Name is how the release is written in the document.
-func (r Release) Name() string { return r.Stream + " (" + r.Variant + ")" }
+func (r Release) Name() string { return r.BranchOrTag + " (" + r.Variant + ")" }
 
 // ProductID is the identifier statements refer to it by. A release is named by
-// its stream and its variant together, never by one of them: the same branch
+// its branch or tag and its variant together, never by one of them: the same branch
 // built two ways is two builds, and naming only the branch would claim
 // something about hardware nobody built for.
 func (r Release) ProductID(product string) string {
-	return product + ":" + r.Stream + ":" + r.Variant
+	return product + ":" + r.BranchOrTag + ":" + r.Variant
 }
 
 // Decided is where the release's decisions put it, before any override: known
@@ -158,29 +158,29 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 	visible := access.Visible(subject, productID)
 	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	var rows []struct {
-		StreamID  int64  `bun:"stream_id"`
-		VariantID int64  `bun:"variant_id"`
-		Stream    string `bun:"stream"`
-		Variant   string `bun:"variant"`
-		Open      int    `bun:"open"`
-		Settled   int    `bun:"settled"`
-		Root      string `bun:"root_identifier"`
+		BranchOrTagID int64  `bun:"branch_or_tag_id"`
+		VariantID     int64  `bun:"variant_id"`
+		BranchOrTag   string `bun:"branch_or_tag"`
+		Variant       string `bun:"variant"`
+		Open          int    `bun:"open"`
+		Settled       int    `bun:"settled"`
+		Root          string `bun:"root_identifier"`
 	}
 	// One statement rather than one per build: a product with thirty tags
 	// would otherwise be thirty round trips to write one document, and the
 	// answer would be assembled from thirty moments rather than one.
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		// This build's own name for itself, from the scan that inventory
-		// arrived on. Joined on the target's current scan, which is one row by
+		// arrived on. Joined on the build's current scan, which is one row by
 		// key, so it cannot multiply the findings counted below.
 		Join(`LEFT JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
-		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"va"."id" AS "variant_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		// Counted rather than filtered, so a release that held the flaw and no
 		// longer does is still a row — that is the release somebody upgrades
@@ -217,10 +217,10 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 
 	out := make([]Release, 0, len(rows))
 	for _, row := range rows {
-		at := [2]int64{row.StreamID, row.VariantID}
+		at := [2]int64{row.BranchOrTagID, row.VariantID}
 		release := Release{
-			StreamID: row.StreamID, VariantID: row.VariantID,
-			Stream: row.Stream, Variant: row.Variant,
+			BranchOrTagID: row.BranchOrTagID, VariantID: row.VariantID,
+			BranchOrTag: row.BranchOrTag, Variant: row.Variant,
 			Holds:      row.Open > 0 || row.Settled == 0,
 			Identifier: row.Root, Overridden: overridden[at],
 		}
@@ -235,8 +235,8 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 	// the same whatever it was generated against — which is what lets somebody
 	// diff two of them and see a real change.
 	sort.Slice(out, func(i, j int) bool {
-		if out[i].Stream != out[j].Stream {
-			return out[i].Stream < out[j].Stream
+		if out[i].BranchOrTag != out[j].BranchOrTag {
+			return out[i].BranchOrTag < out[j].BranchOrTag
 		}
 		return out[i].Variant < out[j].Variant
 	})
@@ -244,29 +244,29 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 }
 
 // standingIn is the decision each build of the product stands under for this
-// issue, keyed by its stream and variant, where one covers every open occurrence.
+// issue, keyed by its branch or tag and variant, where one covers every open occurrence.
 func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 	visible []access.Visibility) (map[[2]int64]*Grounds, error) {
 
 	var rows []struct {
-		StreamID  int64 `bun:"stream_id"`
-		VariantID int64 `bun:"variant_id"`
+		BranchOrTagID int64 `bun:"branch_or_tag_id"`
+		VariantID     int64 `bun:"variant_id"`
 		finding.Covering
 	}
 	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		ColumnExpr(`"t"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"t"."branch_or_tag_id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"t"."variant_id" AS "variant_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, issueID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"t"."stream_id", "t"."variant_id"`)
+		GroupExpr(`"t"."branch_or_tag_id", "t"."variant_id"`)
 	if err := finding.WhollyCovered(q, productID, visible, finding.ForReleases).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read which releases a decision covers: %w", err)
 	}
@@ -287,7 +287,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 		return nil, err
 	}
 	for _, row := range rows {
-		out[[2]int64{row.StreamID, row.VariantID}] = &Grounds{
+		out[[2]int64{row.BranchOrTagID, row.VariantID}] = &Grounds{
 			DecisionOccurrence: row.DecidedBy, Outcome: row.Outcome,
 			Reason:     said[row.DecidedBy].Justification,
 			Mitigation: said[row.DecidedBy].Mitigation,
@@ -315,13 +315,13 @@ func madeOn(ctx context.Context, db bun.IDB, occurrences []int64) (map[int64][]B
 	err := db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(`JOIN "decision_build" AS "cb" ON "cb"."decision_id" = "de"."decision_id"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "cb"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "cb"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		ColumnExpr(`"de"."id" AS "id"`).
-		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"va"."id" AS "variant_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		Where(where, args...).
 		Scan(ctx, &rows)
@@ -336,8 +336,8 @@ func madeOn(ctx context.Context, db bun.IDB, occurrences []int64) (map[int64][]B
 	for id := range out {
 		sort.Slice(out[id], func(i, j int) bool {
 			a, b := out[id][i], out[id][j]
-			if a.Stream != b.Stream {
-				return a.Stream < b.Stream
+			if a.BranchOrTag != b.BranchOrTag {
+				return a.BranchOrTag < b.BranchOrTag
 			}
 			return a.Variant < b.Variant
 		})
@@ -359,7 +359,7 @@ type Override struct {
 	AdvisoryID      int64      `bun:"advisory_id,notnull"`
 	ProductID       int64      `bun:"product_id,notnull"`
 	VulnerabilityID int64      `bun:"vulnerability_id,notnull"`
-	StreamID        int64      `bun:"stream_id,notnull"`
+	BranchOrTagID   int64      `bun:"branch_or_tag_id,notnull"`
 	VariantID       int64      `bun:"variant_id,notnull"`
 	SetAt           time.Time  `bun:"set_at,notnull"`
 	SetBy           int64      `bun:"set_by,notnull"`
@@ -368,7 +368,7 @@ type Override struct {
 }
 
 // overridesOf is the releases this advisory marks affected for one issue in
-// one product, keyed by stream and variant.
+// one product, keyed by branch or tag and variant.
 //
 // Read as the issue the marked row stands for, so a mark filed under an issue
 // that merged into another marks the other.
@@ -376,13 +376,13 @@ func overridesOf(ctx context.Context, db bun.IDB, advisoryID, productID,
 	issueID int64) (map[[2]int64]bool, error) {
 
 	var rows []struct {
-		StreamID  int64 `bun:"stream_id"`
-		VariantID int64 `bun:"variant_id"`
+		BranchOrTagID int64 `bun:"branch_or_tag_id"`
+		VariantID     int64 `bun:"variant_id"`
 	}
 	err := db.NewSelect().
 		TableExpr(`"advisory_override" AS "ao"`).
 		Join(`JOIN "vulnerability" AS "ov" ON "ov"."id" = "ao"."vulnerability_id"`).
-		ColumnExpr(`"ao"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"ao"."branch_or_tag_id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"ao"."variant_id" AS "variant_id"`).
 		Where(`"ao"."advisory_id" = ?`, advisoryID).
 		Where(`"ao"."product_id" = ?`, productID).
@@ -394,7 +394,7 @@ func overridesOf(ctx context.Context, db bun.IDB, advisoryID, productID,
 	}
 	out := make(map[[2]int64]bool, len(rows))
 	for _, row := range rows {
-		out[[2]int64{row.StreamID, row.VariantID}] = true
+		out[[2]int64{row.BranchOrTagID, row.VariantID}] = true
 	}
 	return out, nil
 }

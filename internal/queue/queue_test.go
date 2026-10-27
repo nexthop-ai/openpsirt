@@ -565,7 +565,7 @@ func TestSettlingOutlivesTheCancellationThatEndedTheWork(t *testing.T) {
 func TestARenewedClaimIsNotTakenOver(t *testing.T) {
 	// The claim timeout bounds how long a worker may go silent, not how long a
 	// job may take. Without renewal, a scan of a large image outlives its
-	// claim and a second worker scans the same target alongside the first —
+	// claim and a second worker scans the same build alongside the first —
 	// which the conditional update cannot prevent, because from the database's
 	// point of view the second claim is legitimate.
 	//

@@ -22,7 +22,7 @@ func TestACriticalOnAReleaseIsNeverALead(t *testing.T) {
 		db := w.DB
 		ctx := t.Context()
 		rights := access.NewStore(db.DB)
-		released := w.TargetFor(w.Tag, w.Customer)
+		released := w.BuildFor(w.Tag, w.Customer)
 		triager := recordPerson(t, rights, "triager@example.com", false, w.Product.ID, access.PublicTriage)
 
 		critical(t, db, released.ID, "CVE-2026-SHIPPED", "critical")

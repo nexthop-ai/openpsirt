@@ -119,26 +119,26 @@ var (
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
-		// The branch is the seeded target; the tag needs one of its own,
+		// The branch is the seeded build; the tag needs one of its own,
 		// because what an advisory says about a release that never moves is
 		// half of what this store answers.
-		tagged := w.TargetFor(w.Tag, w.Customer)
-		earlier := w.DeclareStream(w.Product, "v2.3.9", catalog.Tag, &w.Branch.ID)
-		older := w.TargetFor(earlier, w.Customer)
+		tagged := w.BuildFor(w.Tag, w.Customer)
+		earlier := w.DeclareBranchOrTag(w.Product, "v2.3.9", catalog.Tag, &w.Branch.ID)
+		older := w.BuildFor(earlier, w.Customer)
 		// A second product with a branch and a build, so an advisory can span
 		// two.
 		second := w.DeclareProduct("switchd", "Switch Daemon")
-		secondBranch := w.DeclareStream(second, "main", catalog.Branch, nil)
+		secondBranch := w.DeclareBranchOrTag(second, "main", catalog.Branch, nil)
 		secondVariant := w.DeclareVariant(second, "mellanox", true)
-		secondTarget := w.TargetFor(secondBranch, secondVariant)
+		secondBuild := w.BuildFor(secondBranch, secondVariant)
 		another := w.DeclarePerson("reader", "A Reader", false)
-		mellanox := w.TargetFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true))
+		mellanox := w.BuildFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true))
 		f := &fixture{
 			db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
 			scans:   ingest.NewStore(w.DB.DB),
-			product: w.Product.ID, master: w.Target.ID, tagged: tagged.ID,
+			product: w.Product.ID, master: w.Build.ID, tagged: tagged.ID,
 			older:        older.ID,
-			otherProduct: second.ID, other: secondTarget.ID, second: another,
+			otherProduct: second.ID, other: secondBuild.ID, second: another,
 			otherVariant: mellanox.ID,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
 				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
@@ -161,26 +161,26 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 
 // shipped stores a graph against one build, as an inventory naming its own
 // root does.
-func (f *fixture) shipped(t *testing.T, target int64) {
+func (f *fixture) shipped(t *testing.T, build int64) {
 	t.Helper()
-	f.shippedAs(t, target, root.Purl)
+	f.shippedAs(t, build, root.Purl)
 }
 
 // shippedAs is the same, with what the document declared itself to be — empty
 // for a document that named no component of its own.
-func (f *fixture) shippedAs(t *testing.T, target int64, declared string) {
+func (f *fixture) shippedAs(t *testing.T, build int64, declared string) {
 	t.Helper()
 	ctx := t.Context()
 	f.seq++
 	f.built = f.built.Add(time.Hour)
 	scan, outcome, err := f.scans.Record(ctx, ingest.Arriving{
-		TargetID: target, ContentHash: fmt.Sprintf("hash-%d", f.seq), BuiltAt: f.built,
+		BuildID: build, ContentHash: fmt.Sprintf("hash-%d", f.seq), BuiltAt: f.built,
 		ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixtures.ApplyGraph(ctx, f.db, target, scan.ID, graph.Snapshot{
+	if _, err := fixtures.ApplyGraph(ctx, f.db, build, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{carrier},
 		Dependencies: []graph.Dependency{{Parent: root, Child: carrier}},
 	}); err != nil {
@@ -194,17 +194,17 @@ func (f *fixture) shippedAs(t *testing.T, target int64, declared string) {
 }
 
 // recorded enters a flaw against one build and returns what it was filed as.
-func (f *fixture) recorded(t *testing.T, target int64) string {
+func (f *fixture) recorded(t *testing.T, build int64) string {
 	t.Helper()
-	return f.recordedAs(t, target)
+	return f.recordedAs(t, build)
 }
 
 // disclosed is the same, already announced — so nothing but the product rules
 // it out of a read.
-func (f *fixture) disclosed(t *testing.T, target int64) string {
+func (f *fixture) disclosed(t *testing.T, build int64) string {
 	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
-		TargetIDs: []int64{target}, Component: carrier.Name, Severity: "high",
+		BuildIDs: []int64{build}, Component: carrier.Name, Severity: "high",
 		Summary:   "The management socket answers before anyone authenticated.",
 		Disclosed: true,
 	})
@@ -216,10 +216,10 @@ func (f *fixture) disclosed(t *testing.T, target int64) string {
 
 // recordedAs is recorded, classified as these kinds of flaw, the root cause
 // first.
-func (f *fixture) recordedAs(t *testing.T, target int64, weaknesses ...string) string {
+func (f *fixture) recordedAs(t *testing.T, build int64, weaknesses ...string) string {
 	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
-		TargetIDs: []int64{target}, Component: carrier.Name, Severity: "high",
+		BuildIDs: []int64{build}, Component: carrier.Name, Severity: "high",
 		Summary:    "The management socket answers before anyone authenticated.",
 		Weaknesses: weaknesses,
 	})
@@ -249,7 +249,7 @@ func TestAnAdvisoryNamesEveryReleaseHoldingTheFlawAndNamesEachInTheTree(t *testi
 			t.Fatalf("the document carries %d vulnerabilities", len(doc.Vulnerabilities))
 		}
 		affected := doc.Vulnerabilities[0].Status.KnownAffected
-		// Named by stream and variant together, never by one of them: the same
+		// Named by branch or tag and variant together, never by one of them: the same
 		// branch built two ways is two builds, and naming only the branch
 		// would claim something about hardware nobody built for. In name
 		// order, which is what a reader of the document sees.
@@ -366,7 +366,7 @@ func TestAnAdvisoryIsRefusedWhereNobodyHasSaidWhoPublishesIt(t *testing.T) {
 // Recording it again would mint a second identifier, which is a second flaw.
 // One flaw present in two releases is one issue with a finding in each, and
 // that is what an advisory aggregates.
-func (f *fixture) alsoIn(t *testing.T, identifier string, target int64) {
+func (f *fixture) alsoIn(t *testing.T, identifier string, build int64) {
 	t.Helper()
 	ctx := t.Context()
 	issueID, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, identifier)
@@ -378,14 +378,14 @@ func (f *fixture) alsoIn(t *testing.T, identifier string, target int64) {
 		TableExpr("\"graph_node\" AS \"n\"").
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"c"."id"`).
-		Where(`"n"."target_id" = ?`, target).
+		Where(`"n"."build_id" = ?`, build).
 		Where(`"c"."name" = ?`, carrier.Name).
 		Limit(1).Scan(ctx, &componentID); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	row := &finding.Finding{
-		TargetID: target, Kind: finding.Entered, Visibility: access.Private,
+		BuildID: build, Kind: finding.Entered, Visibility: access.Private,
 		VulnerabilityID: issueID, ComponentID: componentID,
 		OccurrenceIdentity: finding.OccurrenceIdentity(carrier.Name, ""),
 		OpenedAt:           now,
@@ -410,7 +410,7 @@ func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.
 		// RED while anything it covers is held back, whatever the document's
 		// editorial state says.
 		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
-			TargetIDs: []int64{f.master}, Component: carrier.Name, Severity: "high",
+			BuildIDs: []int64{f.master}, Component: carrier.Name, Severity: "high",
 			Summary:   "The management socket answers before anyone authenticated.",
 			Disclosed: true,
 		})
@@ -578,7 +578,7 @@ func TestAFlawAssessedUnderAnUncarriedSchemeStatesNoScore(t *testing.T) {
 		} {
 			t.Run(c.what, func(t *testing.T) {
 				_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
-					TargetIDs: []int64{f.master}, Component: carrier.Name,
+					BuildIDs: []int64{f.master}, Component: carrier.Name,
 					Summary: "The management socket answers before anyone authenticated.",
 					Vector:  c.vector,
 				})
@@ -612,7 +612,7 @@ func TestAFlawRatedUnderBothGenerationsStatesTheOneTheDocumentCarries(t *testing
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
-			TargetIDs: []int64{f.master}, Component: carrier.Name,
+			BuildIDs: []int64{f.master}, Component: carrier.Name,
 			Summary: "The management socket answers before anyone authenticated.",
 			Vector:  "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H",
 		})
@@ -646,7 +646,7 @@ func TestAFlawRatedUnderBothGenerationsStatesTheOneTheDocumentCarries(t *testing
 func TestAPublishedScoreStatesOnlyTheBaseVector(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
-			TargetIDs: []int64{f.master}, Component: carrier.Name,
+			BuildIDs: []int64{f.master}, Component: carrier.Name,
 			Summary: "The management socket answers before anyone authenticated.",
 			Vector:  "CVSS:3.1/E:Q/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/FOO:BAR",
 		})
@@ -675,7 +675,7 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
-			TargetIDs: []int64{f.master}, Component: carrier.Name,
+			BuildIDs: []int64{f.master}, Component: carrier.Name,
 			Summary: "The management socket answers before anyone authenticated.",
 			Vector:  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
 			Told:    finding.Told{ReportedBy: "A. Reporter", Credit: "anonymous"},
@@ -1168,7 +1168,7 @@ func TestAReleaseTheRecordSaysWasNeverAffectedIsNotNamed(t *testing.T) {
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"closed_at" = ?`, time.Now().UTC()).
 			Set(`"closed_because" = ?`, finding.Unaffected).
-			Where(`"target_id" = ?`, f.tagged).Where(`"vulnerability_id" = ?`, issueID).
+			Where(`"build_id" = ?`, f.tagged).Where(`"vulnerability_id" = ?`, issueID).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

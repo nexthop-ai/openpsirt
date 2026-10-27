@@ -39,12 +39,12 @@ var precisionRank = func() string {
 	return out + ` ELSE 0 END`
 }()
 
-// Scope narrows a product's leads to one stream, one variant or one build,
+// Scope narrows a product's leads to one branch or tag, one variant or one build,
 // and to one analyzer series. Unset is every one under the product.
 type Scope struct {
-	ProductID int64
-	StreamID  *int64
-	VariantID *int64
+	ProductID     int64
+	BranchOrTagID *int64
+	VariantID     *int64
 	// Series is a series' name, matched without regard to capitals. A name
 	// no series of the product holds lists nothing.
 	Series string
@@ -59,17 +59,17 @@ func CodeFindingAssignees() []string { return []string{finding.HeldByNobody} }
 // QueueRow is one code finding in a product: its occurrence, and what the newest of its
 // findings in the scope says about it.
 type QueueRow struct {
-	Occurrence string    `bun:"occurrence_identity"`
-	Rule       string    `bun:"rule"`
-	Path       string    `bun:"path"`
-	Line       *int      `bun:"start_line"`
-	Function   string    `bun:"enclosing"`
-	Message    string    `bun:"message_text"`
-	Stream     string    `bun:"stream"`
-	Variant    string    `bun:"variant"`
-	State      State     `bun:"stands"`
-	Builds     int       `bun:"builds"`
-	Opened     time.Time `bun:"opened"`
+	Occurrence  string    `bun:"occurrence_identity"`
+	Rule        string    `bun:"rule"`
+	Path        string    `bun:"path"`
+	Line        *int      `bun:"start_line"`
+	Function    string    `bun:"enclosing"`
+	Message     string    `bun:"message_text"`
+	BranchOrTag string    `bun:"branch_or_tag"`
+	Variant     string    `bun:"variant"`
+	State       State     `bun:"stands"`
+	Builds      int       `bun:"builds"`
+	Opened      time.Time `bun:"opened"`
 	// Holder is the party dealing with the code finding on that build, where anybody
 	// is: a person, or a team it is queued with.
 	Holder *int64 `bun:"assigned_to"`
@@ -136,7 +136,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	// so the queue counts none of them, and a code finding open only there leaves
 	// the queue though it may still be decided where it is seen elsewhere.
 	// The lists by state still show it.
-	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, time.Now().UTC())
+	ended, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 			return q.Where(`"l"."stands" = ?`, string(want))
 		}
 		if len(ended) > 0 {
-			q = q.Where(`"l"."stream_id" NOT IN (?)`, bun.List(ended))
+			q = q.Where(`"l"."branch_or_tag_id" NOT IN (?)`, bun.List(ended))
 		}
 		return queued(q)
 	}
@@ -202,7 +202,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 		ColumnExpr(`"l"."occurrence_identity", MAX("l"."id") AS "newest"`).
 		// Builds rather than rows: a code finding fixed, seen again and fixed again
 		// on one build is two closed rows there.
-		ColumnExpr(`COUNT(DISTINCT "l"."target_id") AS "builds", MIN("l"."opened_at") AS "opened"`).
+		ColumnExpr(`COUNT(DISTINCT "l"."build_id") AS "builds", MIN("l"."opened_at") AS "opened"`).
 		GroupExpr(`"l"."occurrence_identity"`).
 		OrderExpr(`MAX("l"."tier") DESC, MAX("l"."corroborated") DESC`).
 		OrderExpr(`MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
@@ -224,12 +224,12 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		ColumnExpr(`"f"."occurrence_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
-		ColumnExpr(`"s"."name" AS "stream", "va"."name" AS "variant", "f"."assigned_to"`).
+		ColumnExpr(`"s"."name" AS "branch_or_tag", "va"."name" AS "variant", "f"."assigned_to"`).
 		// A finding has one sighting, and its last run is the run the evidence
 		// reads.
 		Join(`JOIN "series_run" AS "sr" ON "sr"."id" = "si"."last_run_id"`).
@@ -268,10 +268,10 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
 		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
-		ColumnExpr(`"f"."id", "f"."occurrence_identity", "f"."target_id", "f"."opened_at", "si"."series_id", "t"."stream_id"`).
+		ColumnExpr(`"f"."id", "f"."occurrence_identity", "f"."build_id", "f"."opened_at", "si"."series_id", "t"."branch_or_tag_id"`).
 		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 		ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
 		ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
@@ -281,12 +281,12 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
 		Where(`"s"."product_id" = ?`, scope.ProductID).
 		Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
-			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."target_id" = "f"."target_id"
+			WHERE "fo"."occurrence_identity" = "f"."occurrence_identity" AND "fo"."build_id" = "f"."build_id"
 			  AND "fo"."closed_at" IS NULL))`).
 		Where(`("f"."visibility" IN (?) OR `+reach.Included+`)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		Where(kinds, kindArgs...)
-	if scope.StreamID != nil {
-		q = q.Where(`"t"."stream_id" = ?`, *scope.StreamID)
+	if scope.BranchOrTagID != nil {
+		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
 	}
 	if scope.VariantID != nil {
 		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)

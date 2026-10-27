@@ -34,7 +34,7 @@ export function UpstreamOffers({ product }: { product?: string }) {
           <header>
             <Link
               to={findingAt(
-                { product: one.product, stream: one.stream, variant: one.variant },
+                { product: one.product, branch_or_tag: one.branch_or_tag, variant: one.variant },
                 { vulnerability: one.issue, component: one.component, version: one.version },
               )}
               className="id"
@@ -42,7 +42,7 @@ export function UpstreamOffers({ product }: { product?: string }) {
               {one.issue} · {one.component} {one.version}
             </Link>{" "}
             <span className="hint">
-              {one.product} {one.stream}/{one.variant} · {one.publisher} says{" "}
+              {one.product} {one.branch_or_tag}/{one.variant} · {one.publisher} says{" "}
               <b>{one.status.replace("_", " ")}</b>
               {one.justification && <> · {one.justification.replaceAll("_", " ")}</>}
               {one.within && <> · in {one.within}</>}

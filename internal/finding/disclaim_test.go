@@ -71,7 +71,7 @@ func (f *fixture) publishes(t *testing.T, said []finding.Statement, digest strin
 	}
 }
 
-// placedAt is each row the target holds, by the name of what pulls it in.
+// placedAt is each row the build holds, by the name of what pulls it in.
 func placedAt(t *testing.T, f *fixture, rows []finding.Finding) map[string]finding.Finding {
 	t.Helper()
 	names := map[int64]string{}
@@ -391,7 +391,7 @@ func TestAStatementTheBuildsOwnPatchAlreadyAnswersClosesNothing(t *testing.T) {
 	// The build's word about its own code is asked first.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, beside(acmeY))
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, []sbom.Suppression{{
 			Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 			Targets: []sbom.Target{{Purl: zlib.Purl}},
 		}}, everyOrigin); err != nil {
@@ -432,7 +432,7 @@ func TestAnOccurrenceTheSupplierAnswersOnSomeRoutesIsNotRunningOut(t *testing.T)
 			t.Helper()
 			run := f.run(t)
 			f.seenAt(t, run, time.Now().UTC().Add(-60*24*time.Hour))
-			if _, err := f.store.Apply(t.Context(), f.target, run,
+			if _, err := f.store.Apply(t.Context(), f.build, run,
 				[]finding.Reported{found(inside, zlib)}); err != nil {
 				t.Fatal(err)
 			}
@@ -470,7 +470,7 @@ func TestAStatementAboutAComponentInsideAProductIsEvidenceOnlyBeneathIt(t *testi
 				t.Fatal(err)
 			}
 			got, err := f.store.SaidAbout(ctx, who, f.productID, interned[issue],
-				[]string{issue}, "zlib", zlib.Purl, f.target, componentID)
+				[]string{issue}, "zlib", zlib.Purl, f.build, componentID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -560,7 +560,7 @@ func TestTheRegisterListsWhatASupplierClosedWithTheirWords(t *testing.T) {
 		f.reported(t, found(inside, zlib))
 		who := f.holding(t, access.PublicTriage)
 
-		rows, total, err := f.store.Register(t.Context(), who, f.target, finding.Registering{
+		rows, total, err := f.store.Register(t.Context(), who, f.build, finding.Registering{
 			Because: []finding.Closure{finding.Disclaimed},
 		}, 50, 0)
 		if err != nil {
@@ -615,7 +615,7 @@ func TestAStatementAboutAPlatformNothingHereShipsIsEvidenceByPackage(t *testing.
 			t.Fatal(err)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned[inside],
-			[]string{inside}, "zlib", zlib.Purl, f.target, componentID)
+			[]string{inside}, "zlib", zlib.Purl, f.build, componentID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -765,7 +765,7 @@ func TestAStatementAboutOneReleaseOfTheProductIsEvidenceOnAnother(t *testing.T) 
 			t.Fatal(err)
 		}
 		said, err := f.store.SaidAbout(ctx, f.planner(t, access.PublicTriage), f.productID,
-			interned[inside], []string{inside}, "zlib", zlib.Purl, f.target, componentID)
+			interned[inside], []string{inside}, "zlib", zlib.Purl, f.build, componentID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -979,7 +979,7 @@ func TestEveryOtherClosureTakesTheSuppliersAnswerOffTheOccurrence(t *testing.T) 
 			f.reported(t, r)
 		}},
 		{"the build patches it", func(t *testing.T, f *fixture) {
-			if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
+			if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, []sbom.Suppression{{
 				Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 				Targets: []sbom.Target{{Purl: zlib.Purl}},
 			}}, everyOrigin); err != nil {

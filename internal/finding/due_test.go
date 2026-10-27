@@ -52,7 +52,7 @@ func TestWhatIsRunningOutIsOrderedByDeadlineNotByAge(t *testing.T) {
 		f.seenAt(t, oldRun, time.Now().UTC().Add(-100*24*time.Hour))
 		mild := found("CVE-2026-OLD", swss)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(t.Context(), f.target, oldRun,
+		if _, err := f.store.Apply(t.Context(), f.build, oldRun,
 			[]finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
@@ -64,7 +64,7 @@ func TestWhatIsRunningOutIsOrderedByDeadlineNotByAge(t *testing.T) {
 		urgent := found("CVE-2026-NOW", teamd)
 		urgent.Issue.Severity = "medium"
 		urgent.Issue.Exploited = true
-		if _, err := f.store.Apply(t.Context(), f.target, newRun,
+		if _, err := f.store.Apply(t.Context(), f.build, newRun,
 			[]finding.Reported{mild, urgent}); err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +110,7 @@ func TestWhatIsRunningOutCountsPastThePage(t *testing.T) {
 			found("CVE-2026-B", swss),
 			found("CVE-2026-C", teamd),
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, run, reported); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, run, reported); err != nil {
 			t.Fatal(err)
 		}
 
@@ -163,7 +163,7 @@ func TestWhatIsRunningOutIsOneRowPerIssueAtAComponent(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		f.seenAt(t, run, time.Now().UTC().Add(-60*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -195,7 +195,7 @@ func TestAnUnratedFindingDoesNotGetTheLongestDeadline(t *testing.T) {
 		f.seenAt(t, run, time.Now().UTC().Add(-100*24*time.Hour))
 		unrated := found("CVE-2026-QUIET", swss)
 		unrated.Issue.Severity = ""
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{unrated}); err != nil {
 			t.Fatal(err)
 		}
@@ -220,13 +220,13 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		f.seenAt(t, run, time.Now().UTC().Add(-100*24*time.Hour))
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 		open := f.open(t)
 		triager := f.holding(t, access.PublicTriage, access.Assigner)
-		if _, _, err := f.store.Assign(t.Context(), triager, f.target,
+		if _, _, err := f.store.Assign(t.Context(), triager, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
 			t.Fatal(err)
 		}
@@ -285,13 +285,13 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		f.seenAt(t, run, time.Now().UTC().Add(-100*24*time.Hour))
-		if _, err := f.store.Apply(ctx, f.target, run,
+		if _, err := f.store.Apply(ctx, f.build, run,
 			[]finding.Reported{found("CVE-2026-1", swss)}); err != nil {
 			t.Fatal(err)
 		}
 		open := f.open(t)
 		triager := f.holding(t, access.PublicTriage, access.Assigner)
-		if _, _, err := f.store.Assign(ctx, triager, f.target,
+		if _, _, err := f.store.Assign(ctx, triager, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
 			t.Fatal(err)
 		}
@@ -445,7 +445,7 @@ func TestChangingHowLongSomethingMayStayOpenMovesTheDeadline(t *testing.T) {
 		f.seenAt(t, run, seen)
 		high := found("CVE-2026-HIGH", swss)
 		high.Issue.Severity = "high"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{high}); err != nil {
 			t.Fatal(err)
 		}
@@ -492,7 +492,7 @@ func TestWhatIsRunningOutNarrowsToWhatIsSelected(t *testing.T) {
 		f.seenAt(t, run, time.Now().UTC().Add(-40*24*time.Hour))
 		high := found("CVE-2026-SCOPE", swss)
 		high.Issue.Severity = "high"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{high}); err != nil {
 			t.Fatal(err)
 		}
@@ -566,7 +566,7 @@ func (f *fixture) deadlineOrZero(t *testing.T, identifier string) time.Time {
 
 // deadlineIn is deadlineOrZero on one build, for the checks about what
 // reaches a build other than the one being scanned.
-func (f *fixture) deadlineIn(t *testing.T, target int64, identifier string) time.Time {
+func (f *fixture) deadlineIn(t *testing.T, build int64, identifier string) time.Time {
 	t.Helper()
 	var due *time.Time
 	err := f.db.DB.NewSelect().
@@ -574,7 +574,7 @@ func (f *fixture) deadlineIn(t *testing.T, target int64, identifier string) time
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		ColumnExpr(`"f"."due_at"`).
 		Where(`"v"."identifier" = ?`, identifier).
-		Where(`"f"."target_id" = ?`, target).
+		Where(`"f"."build_id" = ?`, build).
 		Where(`"f"."closed_at" IS NULL`).
 		Limit(1).Scan(t.Context(), &due)
 	if err != nil {
@@ -712,7 +712,7 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 		f.seenAt(t, scan, time.Now().UTC().Add(-14*24*time.Hour))
 		rated := found("CVE-2026-HIGH", libnl)
 		rated.Issue.Severity = "high"
-		if _, err := f.store.Apply(t.Context(), f.target, scan,
+		if _, err := f.store.Apply(t.Context(), f.build, scan,
 			[]finding.Reported{rated}); err != nil {
 			t.Fatal(err)
 		}
@@ -720,7 +720,7 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 		// One recorded by hand, opened and rated high a fortnight ago.
 		opened := time.Now().UTC().Add(-14 * 24 * time.Hour).Truncate(time.Microsecond)
 		entered := finding.Finding{
-			TargetID: f.target, Kind: finding.Entered,
+			BuildID: f.build, Kind: finding.Entered,
 			Visibility:         access.Public,
 			VulnerabilityID:    f.interned(t, "SONIC-2026-0007"),
 			ComponentID:        f.open(t)[0].ComponentID,
@@ -789,18 +789,18 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 		tag := f.release(t)
 		branch := f.anotherBranch(t, "release-2.5")
 
-		for _, target := range []int64{tag, branch} {
-			f.shippedTo(t, target, twoConsumers())
-			if _, err := f.store.Apply(ctx, target, f.runOn(t, target),
+		for _, build := range []int64{tag, branch} {
+			f.shippedTo(t, build, twoConsumers())
+			if _, err := f.store.Apply(ctx, build, f.runOn(t, build),
 				[]finding.Reported{found("CVE-2026-8899", libnl)}); err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		clocked := func(target int64) int {
+		clocked := func(build int64) int {
 			t.Helper()
 			n, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-				Where(`"target_id" = ?`, target).
+				Where(`"build_id" = ?`, build).
 				Where(`"closed_at" IS NULL`).
 				Where(`"due_at" IS NOT NULL`).Count(ctx)
 			if err != nil {
@@ -819,7 +819,7 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 		// tag, or before this rule was.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"due_at" = ?`, time.Now().UTC().AddDate(0, 0, 30)).
-			Where(`"target_id" = ?`, tag).Exec(ctx); err != nil {
+			Where(`"build_id" = ?`, tag).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Recompute(ctx, finding.DefaultWindows()); err != nil {
@@ -855,7 +855,7 @@ func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
 			high.Issue.Severity = "high"
 			reported = append(reported, high)
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 
@@ -927,7 +927,7 @@ func TestPagingWhatIsRunningOutVisitsEveryRowOnceInOneOrder(t *testing.T) {
 					t.Fatal(err)
 				}
 				row := &finding.Finding{
-					TargetID: f.target, Kind: finding.Vulnerable,
+					BuildID: f.build, Kind: finding.Vulnerable,
 					VulnerabilityID: interned["CVE-2026-STDLIB"], Visibility: access.Public,
 					ComponentID: component.ID, OccurrenceIdentity: purl,
 					OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
@@ -1009,7 +1009,7 @@ func TestPagingWhatIsRunningOutPlacesRowsThatDifferOnlyInBeingExploited(t *testi
 				occurrence += "#exploited"
 			}
 			row := &finding.Finding{
-				TargetID: f.target, Kind: finding.Vulnerable,
+				BuildID: f.build, Kind: finding.Vulnerable,
 				VulnerabilityID: interned["CVE-2026-MERGED"], Visibility: access.Public,
 				ComponentID: component.ID, OccurrenceIdentity: occurrence,
 				OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
@@ -1067,14 +1067,14 @@ func TestARewriteStoppedPartWayLeavesNoDeadlineOnATag(t *testing.T) {
 		tag := f.release(t)
 		exploited := found("CVE-2026-STOPPED", libnl)
 		exploited.Issue.Exploited = true
-		for _, target := range []int64{f.target, tag} {
-			f.shippedTo(t, target, twoConsumers())
-			if _, err := f.store.Apply(t.Context(), target, f.runOn(t, target),
+		for _, build := range []int64{f.build, tag} {
+			f.shippedTo(t, build, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), build, f.runOn(t, build),
 				[]finding.Reported{exploited}); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if f.deadlineIn(t, f.target, "CVE-2026-STOPPED").IsZero() {
+		if f.deadlineIn(t, f.build, "CVE-2026-STOPPED").IsZero() {
 			t.Fatal("the branch carries no deadline, so this proves nothing")
 		}
 

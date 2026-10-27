@@ -120,7 +120,7 @@ func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID 
 		TableExpr(`"finding" AS "f"`).
 		Where(kinds, kindArgs...).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Where(`"f"."visibility" = ?`, access.Private).
 		Exists(ctx)
 	if err != nil {
@@ -153,7 +153,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 			access.Private, access.Private).
 		Where(kinds, kindArgs...).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Scan(ctx, &held)
 	if err != nil {
 		return nil, fmt.Errorf("read whether this issue is undisclosed: %w", err)
@@ -244,7 +244,7 @@ func (s *Store) ToTell(ctx context.Context, subject access.Subject,
 		ColumnExpr(`DISTINCT "ps"."id"`).
 		Where(kinds, kindArgs...).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		OrderExpr(`"ps"."id"`).
 		Scan(ctx, &out.People)
 	if err != nil {

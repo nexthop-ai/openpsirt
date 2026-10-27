@@ -397,7 +397,7 @@ func TestEveryRowIsReachableBySomeFixState(t *testing.T) {
 			Set(`"fix_state" = ?`, "wont-fix").
 			Where(`"vulnerability_id" = (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL1").
-			Where(`"target_id" = (SELECT MAX("target_id") FROM "finding")`).
+			Where(`"build_id" = (SELECT MAX("build_id") FROM "finding")`).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

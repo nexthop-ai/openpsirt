@@ -11,9 +11,10 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const AT = "/products/sonic/streams/master/variants/arm/dependencies";
-const PATTERN = "/products/:product/streams/:stream/variants/:variant/dependencies";
-const BUILD = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}";
+const AT = "/products/sonic/branches-and-tags/master/variants/arm/dependencies";
+const PATTERN =
+  "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/dependencies";
+const BUILD = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}";
 
 const node = (component: string, of: Record<string, unknown> = {}) => ({
   component,

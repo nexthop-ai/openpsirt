@@ -35,7 +35,7 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 	// the query rather than a handler that remembered to ask.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -94,7 +94,7 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 func TestFindingsInAProductSomebodyHoldsNothingOnAreRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +111,7 @@ func TestFindingsInAProductSomebodyHoldsNothingOnAreRefused(t *testing.T) {
 func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl),
 			found("CVE-2026-2", libnl),
 		}); err != nil {
@@ -219,7 +219,7 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		runID := f.run(t)
-		if _, err := f.store.Apply(ctx, f.target, runID,
+		if _, err := f.store.Apply(ctx, f.build, runID,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -242,28 +242,28 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 					return err
 				}},
 				{"what each run changed", func(s access.Subject) error {
-					_, err := f.store.Changes(ctx, s, f.target, []int64{runID})
+					_, err := f.store.Changes(ctx, s, f.build, []int64{runID})
 					return err
 				}},
 				{"what no run changed", func(s access.Subject) error {
-					_, err := f.store.Changes(ctx, s, f.target, nil)
+					_, err := f.store.Changes(ctx, s, f.build, nil)
 					return err
 				}},
 				{"one run", func(s access.Subject) error {
-					_, err := f.store.Ran(ctx, s, f.target, runID)
+					_, err := f.store.Ran(ctx, s, f.build, runID)
 					return err
 				}},
 				{"the upgrades promised", func(s access.Subject) error {
-					_, err := f.store.PlannedUpgradesFor(ctx, s, f.target)
+					_, err := f.store.PlannedUpgradesFor(ctx, s, f.build)
 					return err
 				}},
 				{"the patches carried", func(s access.Subject) error {
-					_, _, err := f.store.CarriedPatches(ctx, s, f.target, "", 10, 0)
+					_, _, err := f.store.CarriedPatches(ctx, s, f.build, "", 10, 0)
 					return err
 				}},
 				{"what publishers said", func(s access.Subject) error {
 					_, err := f.store.SaidAbout(ctx, s, f.productID, issue,
-						[]string{"CVE-2026-1"}, "libnl", "", f.target, 0)
+						[]string{"CVE-2026-1"}, "libnl", "", f.build, 0)
 					return err
 				}},
 				{"how the builds stand", func(s access.Subject) error {

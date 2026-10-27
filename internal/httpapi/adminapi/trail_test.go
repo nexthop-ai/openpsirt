@@ -132,7 +132,7 @@ var administrativeActs = []trailedAct{
 		// The one act that hands out a new way into the deployment, and the
 		// one the trail recorded the withdrawal of without the grant.
 		id: "create-key", what: "a pipeline credential minted", method: http.MethodPost,
-		path: "/v1/keys", body: `{"name":"builder","product":"mine","stream":"master"}`,
+		path: "/v1/keys", body: `{"name":"builder","product":"mine","branch_or_tag":"master"}`,
 		kind: "credential", about: "builder",
 	},
 	{
@@ -214,7 +214,7 @@ var administrativeActs = []trailedAct{
 		kind: "support", about: "mine",
 	},
 	{
-		id: "set-stream-end-of-life", what: "a release's support date",
+		id: "set-branch-or-tag-end-of-life", what: "a release's support date",
 		method: http.MethodPut, path: "/v1/products/mine/branches-and-tags/master/end-of-life",
 		body: `{"on":"2027-01-01"}`, kind: "support", about: "mine master",
 	},
@@ -257,7 +257,7 @@ var administrativeActs = []trailedAct{
 	{
 		// On a release and a product nothing else here reads, for the reason
 		// the variant acts above use one nothing is built as.
-		id: "amend-stream", what: "a release renamed", method: http.MethodPatch,
+		id: "amend-branch-or-tag", what: "a release renamed", method: http.MethodPatch,
 		path: "/v1/products/spare/branches-and-tags/old-line", body: `{"name":"retired-line"}`,
 		kind: "catalog", about: "spare old-line",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
@@ -269,7 +269,7 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
-		id: "retire-stream", what: "a release retired", method: http.MethodDelete,
+		id: "retire-branch-or-tag", what: "a release retired", method: http.MethodDelete,
 		path: "/v1/products/spare/branches-and-tags/retired-line",
 		kind: "catalog", about: "spare retired-line",
 	},
@@ -555,7 +555,7 @@ var administrativeActs = []trailedAct{
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := names.DeclareStream(t.Context(), product.ID, "v9.0.1", catalog.Tag, nil); err != nil {
+			if _, err := names.DeclareBranchOrTag(t.Context(), product.ID, "v9.0.1", catalog.Tag, nil); err != nil {
 				t.Fatal(err)
 			}
 			return httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
@@ -722,9 +722,9 @@ var outsideTheTrail = map[string]string{
 	// something retired, or filling in what a tag was cut from, does leave a
 	// row, which TestBringingBackWhatWasRetiredIsRecordedLikeRetiringIt and
 	// TestFillingInWhatATagWasCutFromIsRecorded drive.
-	"declare-product": "the catalog",
-	"declare-stream":  "the catalog",
-	"declare-variant": "the catalog",
+	"declare-product":       "the catalog",
+	"declare-branch-or-tag": "the catalog",
+	"declare-variant":       "the catalog",
 
 	// Work moving, which is recorded where work is.
 	"hand-back-assignments": "recorded in the assignment history",
@@ -1295,20 +1295,20 @@ func TestATrailRowNamesWhatATypedNameResolvedTo(t *testing.T) {
 		}
 
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/keys",
-			`{"name":"spelled","product":"MINE","stream":"Master"}`)
+			`{"name":"spelled","product":"MINE","branch_or_tag":"Master"}`)
 		if got.Code >= 300 {
 			t.Fatalf("creating a key answered %d: %s", got.Code, got.Body.String())
 		}
 		var created struct {
 			Item struct {
-				Product string `json:"product"`
-				Stream  string `json:"stream"`
+				Product     string `json:"product"`
+				BranchOrTag string `json:"branch_or_tag"`
 			} `json:"item"`
 		}
 		if err := json.Unmarshal(got.Body.Bytes(), &created); err != nil {
 			t.Fatal(err)
 		}
-		if key := created.Item; key.Product != "mine" || key.Stream != "master" {
+		if key := created.Item; key.Product != "mine" || key.BranchOrTag != "master" {
 			t.Errorf("the key answers %+v, want the names declared: mine · master", created.Item)
 		}
 		if _, became := newest(t, "credential"); became != "mine · master" {

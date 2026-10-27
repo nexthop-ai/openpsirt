@@ -50,7 +50,7 @@ type RunBody struct {
 func registerRun(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-scan-run", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/runs/{run}",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/runs/{run}",
 		Summary: "Show a known vulnerability scan",
 		Description: "One run, with what it was measured with and what it changed — broken " +
 			"down by the rating in force, and with how much of what it opened is known to be " +
@@ -66,16 +66,16 @@ func registerRun(api huma.API, in core.Deps) {
 			"and reopen — and narrowed by what you may see, like every other count here.",
 		Tags: []string{"Ingest"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Run     int64  `path:"run" doc:"The run, as a receipt or a finding names it"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Run         int64  `path:"run" doc:"The run, as a receipt or a finding names it"`
 	}) (*struct{ Body RunBody }, error) {
-		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, targetID, input.Run)
+		ran, err := finding.NewStore(in.DB.DB).Ran(ctx, subject, buildID, input.Run)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that run could not be looked up",
 				func() error { return huma.Error404NotFound("no such run on this build") })

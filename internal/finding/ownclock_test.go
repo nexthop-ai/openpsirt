@@ -37,7 +37,7 @@ func TestAFlawNobodyHasRatedHasNoDeadlineUntilItIsRated(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name,
+			BuildIDs: []int64{f.build}, Component: swss.Name,
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -102,7 +102,7 @@ func TestARecordedFlawIsHeldToTheWindowsForOurOwnProducts(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "critical",
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -135,7 +135,7 @@ func TestARecordedFlawBelowTheMinimumSeverityIsOffTheClock(t *testing.T) {
 		}
 		who := f.planner(t, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "low",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "low",
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -174,7 +174,7 @@ func TestRatingAFlawAgainDoesNotRestartItsClock(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name,
+			BuildIDs: []int64{f.build}, Component: swss.Name,
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -226,7 +226,7 @@ func TestOnlyAFlawReportedFromOutsideCarriesADisclosureDate(t *testing.T) {
 		record := func(told finding.Told) string {
 			t.Helper()
 			_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-				TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+				BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 				Summary: "The management socket accepts a request nobody authenticated.",
 				Told:    told,
 			})
@@ -294,7 +294,7 @@ func TestAnIssueSaysWhereItIsAFlawRecordedHere(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		scanned := f.anIssueHere(t, who, "A known issue in a component somebody else wrote.")
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -329,7 +329,7 @@ func TestABuildAddedToAFlawKeepsTheClockItAlreadyHas(t *testing.T) {
 		f.shippedTo(t, other, through(libnl))
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
 			Summary: "The parser accepts a message it should refuse.",
 			Told:    finding.Told{FoundHere: true},
 		})
@@ -344,7 +344,7 @@ func TestABuildAddedToAFlawKeepsTheClockItAlreadyHas(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID,
-			[]int64{f.target, other}, ""); err != nil {
+			[]int64{f.build, other}, ""); err != nil {
 			t.Fatal(err)
 		}
 		// Any policy save recounts every recorded flaw.
@@ -355,7 +355,7 @@ func TestABuildAddedToAFlawKeepsTheClockItAlreadyHas(t *testing.T) {
 		for _, row := range f.rowsOf(t, identifier) {
 			if row.RatedAt == nil || !row.RatedAt.Equal(rated) || row.DueAt == nil || !row.DueAt.Equal(want) {
 				t.Errorf("the build at %d is rated %v and due %v, want %v and %v",
-					row.TargetID, row.RatedAt, row.DueAt, rated, want)
+					row.BuildID, row.RatedAt, row.DueAt, rated, want)
 			}
 		}
 	})

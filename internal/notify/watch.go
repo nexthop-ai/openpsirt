@@ -319,7 +319,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 
 	var rows []struct {
 		Product       string `bun:"product"`
-		Stream        string `bun:"stream"`
+		BranchOrTag   string `bun:"branch_or_tag"`
 		Variant       string `bun:"variant"`
 		Component     string `bun:"component"`
 		Vulnerability string `bun:"vulnerability"`
@@ -366,17 +366,17 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 
 	for _, row := range rows {
 		private := row.Undisclosed
-		where := row.Product + " " + row.Stream + " " + row.Variant
+		where := row.Product + " " + row.BranchOrTag + " " + row.Variant
 		why := "is rated critical"
 		if row.Exploited {
 			why = "is being exploited"
 		}
 		holds := Holds{
-			About: identify("critical-on-release", row.Product, row.Stream, row.Variant,
+			About: identify("critical-on-release", row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component),
 			Body: fmt.Sprintf("%s %s and is open against %s, which has been released. Nothing has been decided about it.",
 				row.Vulnerability, why, where),
-			Link: weblink.Finding(row.Product, row.Stream, row.Variant,
+			Link: weblink.Finding(row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component, ""),
 			Private:         private,
 			ProductID:       &row.ProductID,
@@ -429,7 +429,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 		if !row.Quiet {
 			continue
 		}
-		where := row.Product + " " + row.Stream + " " + row.Variant
+		where := row.Product + " " + row.BranchOrTag + " " + row.Variant
 		days := int(row.Since.Hours() / 24)
 		// Put into words rather than printed, because "0 days" is what
 		// arithmetic gives for a threshold measured in hours and is not
@@ -459,9 +459,9 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			// 191 characters and the column holds 191, and a hash is a fixed
 			// width that is only ever compared for equality. The names people
 			// read are in the body.
-			About: identify("quiet", row.Product, row.Stream, row.Variant),
+			About: identify("quiet", row.Product, row.BranchOrTag, row.Variant),
 			Body:  body,
-			Link:  weblink.Uploads(row.Product, row.Stream, row.Variant),
+			Link:  weblink.Uploads(row.Product, row.BranchOrTag, row.Variant),
 		})
 	}
 	return holding, nil
@@ -485,8 +485,8 @@ func administrators(people []access.Account) []int64 {
 // were.
 //
 // Several fields are each written with their length first, because a name may
-// contain whatever separator would join them: product "a b" and stream "c"
-// joined with a space are product "a" and stream "b c". One field is hashed as
+// contain whatever separator would join them: product "a b" and branch or tag "c"
+// joined with a space are product "a" and branch or tag "b c". One field is hashed as
 // it is.
 func identify(fields ...string) string {
 	if len(fields) == 1 {

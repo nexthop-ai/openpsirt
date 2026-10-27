@@ -260,7 +260,7 @@ func TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight(t *
 		// that the refusal below is about the right to close rather than about
 		// the right to see it at all.
 		recorded := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200","disclosed":true}`)
 		if recorded.Code != http.StatusCreated {
@@ -313,8 +313,8 @@ func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 
 		// Recorded against two builds, then narrowed to one.
 		recorded := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"},`+
-				`{"stream":"master","variant":"mellanox"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"},`+
+				`{"branch_or_tag":"master","variant":"mellanox"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200","disclosed":true}`)
 		if recorded.Code != http.StatusCreated {
@@ -329,7 +329,7 @@ func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 
 		at := "/v1/products/mine/issues/" + flaw.Identifier + "/builds"
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"reason":"The mellanox build never shipped the component."}`)
 		if got.Code != http.StatusOK {
 			t.Fatalf("narrowing the builds answered %d: %s", got.Code, got.Body.String())
@@ -354,7 +354,7 @@ func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 		// Taking a build out with no reason is refused: closing a finding as
 		// never-affected is a decision, and one with no reason is not.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
-			`{"builds":[{"stream":"master","variant":"mellanox"}]}`),
+			`{"builds":[{"branch_or_tag":"master","variant":"mellanox"}]}`),
 			http.StatusUnprocessableEntity)
 	})
 }

@@ -63,13 +63,13 @@ const subjectNamed = "subject"
 // same address. They answer nothing about findings, so they need no subject:
 // what they return is the pair of names that was already resolved.
 var resolving = map[string]string{
-	"TargetFor":      "the build a release and a variant name",
-	"ExistingTarget": "the same, refusing one nothing has been filed against",
-	"TargetRow":      "the same, with the refusal a route answers",
-	"Describe":       "how a build is spelled on screen",
-	"ComponentAs":    "which component in that build a name stands for, at a stated version",
-	"ComponentAsIn":  "the same, refused where the name is held twice",
-	"append":         "collecting resolved builds to ask about together",
+	"BuildFor":      "the build a release and a variant name",
+	"ExistingBuild": "the same, refusing one nothing has been filed against",
+	"BuildRow":      "the same, with the refusal a route answers",
+	"Describe":      "how a build is spelled on screen",
+	"ComponentAs":   "which component in that build a name stands for, at a stated version",
+	"ComponentAsIn": "the same, refused where the name is held twice",
+	"append":        "collecting resolved builds to ask about together",
 }
 
 // A resolver's answer stands for the same permissive resolution and is

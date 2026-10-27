@@ -43,7 +43,7 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
 	},
 	"finding/assign.go": {
-		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its stream",
+		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its branch or tag",
 	},
 	"finding/disclaim.go": {
 		{"f", "lt"}: "two rows of one build at one occurrence",
@@ -56,7 +56,7 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"f", "fs"}: "two rows of one code finding in the product bound",
 	},
 	"notify/stale.go": {
-		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its stream",
+		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its branch or tag",
 	},
 	"triage/decision.go": {
 		{"de", "lh"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",

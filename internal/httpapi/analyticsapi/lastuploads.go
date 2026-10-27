@@ -39,10 +39,10 @@ type lastUploadsOutput struct {
 
 // LastUploadBody is one declared build and when a scan last arrived for it.
 type LastUploadBody struct {
-	Product    string        `json:"product"`
-	Stream     string        `json:"stream"`
-	StreamKind core.LineKind `json:"stream_kind" doc:"Whether this line moves"`
-	Variant    string        `json:"variant"`
+	Product         string        `json:"product"`
+	BranchOrTag     string        `json:"branch_or_tag"`
+	BranchOrTagKind core.LineKind `json:"branch_or_tag_kind" doc:"Whether this line moves"`
+	Variant         string        `json:"variant"`
 	// LastReceivedAt is absent where nothing has ever been filed against this
 	// build, which is a different situation from a scan that failed.
 	LastReceivedAt string `json:"last_received_at,omitempty" doc:"The moment a scan last arrived. Absent where none ever has"`
@@ -131,14 +131,14 @@ func registerLastUploads(api huma.API, in core.Deps) {
 		out.Body.Items = make([]LastUploadBody, 0, len(rows))
 		for _, row := range rows {
 			body := LastUploadBody{
-				Product:        row.Product,
-				Stream:         row.Stream,
-				StreamKind:     core.LineKind(row.StreamKind),
-				Variant:        row.Variant,
-				QuietDays:      int(row.Since.Hours() / 24),
-				Quiet:          row.Quiet,
-				OutOfSupport:   row.OutOfSupport,
-				RetiredFromUse: row.RetiredFromUse,
+				Product:         row.Product,
+				BranchOrTag:     row.BranchOrTag,
+				BranchOrTagKind: core.LineKind(row.BranchOrTagKind),
+				Variant:         row.Variant,
+				QuietDays:       int(row.Since.Hours() / 24),
+				Quiet:           row.Quiet,
+				OutOfSupport:    row.OutOfSupport,
+				RetiredFromUse:  row.RetiredFromUse,
 			}
 			if row.LastReceivedAt != nil {
 				body.LastReceivedAt = core.Stamp(*row.LastReceivedAt)
@@ -220,7 +220,7 @@ func registerLastUploadsExport(api huma.API, in core.Deps) {
 			What:  "last upload per build",
 			About: []core.Stated{{Label: "quiet after days", Value: strconv.Itoa(int(quietAfter.Hours() / 24))}},
 			Header: []string{
-				"product", "stream", "kind", "variant",
+				"product", "branch_or_tag", "kind", "variant",
 				"last_received_at", "last_refused_at", "refused_because",
 				"quiet_days", "quiet", "out_of_support", "retired",
 			},
@@ -243,7 +243,7 @@ func registerLastUploadsExport(api huma.API, in core.Deps) {
 						why = *row.RefusedBecause
 					}
 					written = append(written, []string{
-						row.Product, row.Stream, row.StreamKind, row.Variant, last,
+						row.Product, row.BranchOrTag, row.BranchOrTagKind, row.Variant, last,
 						refused, why,
 						strconv.Itoa(int(row.Since.Hours() / 24)),
 						strconv.FormatBool(row.Quiet),

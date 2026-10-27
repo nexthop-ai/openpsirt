@@ -28,17 +28,17 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	// The same query, with the line inverted rather than removed.
 	below := filter
 	below.MinimumSeverity = MinimumSeverity{}
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &below)
+	productID, visible, buildIDs, err := s.inScope(ctx, subject, scope, &below)
 	if err != nil {
 		return 0, err
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return 0, nil
 	}
 	if err := s.decidedIssuesFor(ctx, &below, []int64{productID}, false); err != nil {
 		return 0, err
 	}
-	rows := openRows(s.db, targets, visible)
+	rows := openRows(s.db, buildIDs, visible)
 	if words := filter.MinimumSeverity.admits(); len(words) > 0 {
 		// The line's own condition, negated: no exploitation signal at
 		// all, and rated beneath the line. Both read the way

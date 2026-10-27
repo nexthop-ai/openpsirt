@@ -31,7 +31,7 @@ func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
 		}
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			moves("CVE-2026-1", "3.9.0"),
 			moves("CVE-2026-2", "3.9.0"),
 			moves("CVE-2026-3", "3.8.0"),
@@ -80,14 +80,14 @@ func TestAComponentCarriesWhereItCouldGoAndWhatThatWouldClose(t *testing.T) {
 }
 
 func TestAComponentIsAnsweredPerBuildBecauseTheAnswerDiffers(t *testing.T) {
-	// The whole difficulty of upgrading a shared component: one stream stays
+	// The whole difficulty of upgrading a shared component: one branch or tag stays
 	// on a maintained older line and another moves on, so the version shipped
 	// and the version to move to are both per build. A single answer for the
 	// product would be wrong for one of them.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: libnl,
 				FixState: finding.FixedUpstream, FixedIn: "3.9.0",
@@ -138,7 +138,7 @@ func TestWhatAPromisedUpgradeCoversIsDerivedRatherThanMarked(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, through(libnl))
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			found("CVE-2026-1", libnl),
 		}); err != nil {
 			t.Fatal(err)
@@ -192,7 +192,7 @@ func TestTheBinariesOfOneSourcePackageAreOneEntryWhicheverNameIsAsked(t *testing
 				{Parent: swss, Child: gnutls},
 			},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-20", Severity: "high"}, Component: libcurl,
 				FixState: finding.FixedUpstream, FixedIn: "8.5.0-3",
@@ -250,7 +250,7 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
 		// Against libnl alone, so its two consumers carry nothing of their own.
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: libnl,
 				FixState: finding.FixedUpstream, FixedIn: "3.9.0",
@@ -315,7 +315,7 @@ func TestTheVersionWorthTakingCodeFindingsRatherThanTheOneThatFixedMost(t *testi
 		run := f.run(t)
 		// Three fixed in an earlier release, one in the newest: the shape that
 		// reads backwards when the count is what sorts.
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			fixedIn("CVE-2026-1", "3.8.0"),
 			fixedIn("CVE-2026-2", "3.8.0"),
 			fixedIn("CVE-2026-3", "3.8.0"),
@@ -368,7 +368,7 @@ func TestVersionsNobodyCanOrderAreNotRanked(t *testing.T) {
 			Dependencies: []graph.Dependency{{Parent: root, Child: runtime}},
 		})
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			{
 				Issue: finding.Named{Identifier: "CVE-2026-10", Severity: "high"}, Component: runtime,
 				FixState: finding.FixedUpstream, FixedIn: "go1.26.5",
@@ -419,7 +419,7 @@ func TestAWordAnAdvisoryWroteWhereAVersionBelongsIsNotTheUpgrade(t *testing.T) {
 		}
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, run, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, run, []finding.Reported{
 			fixedIn("CVE-2026-1", "3.8.0"),
 			fixedIn("CVE-2026-2", "3.9.0"),
 			fixedIn("CVE-2026-3", "unfixed"),
@@ -481,7 +481,7 @@ func ranked(id string, component graph.Described, severity string, score float64
 func spread(t *testing.T, f *fixture) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 		ranked("CVE-2026-1", swss, "high", 7.5),
 		ranked("CVE-2026-2", swss, "high", 7.5),
 		ranked("CVE-2026-3", swss, "high", 7.5),
@@ -682,7 +682,7 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 							FixState:  finding.FixedUpstream, FixedIn: fixed,
 						})
 					}
-					if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+					if _, err := f.store.Apply(t.Context(), f.build, f.run(t), reported); err != nil {
 						t.Fatal(err)
 					}
 
@@ -734,7 +734,7 @@ func TestACommitmentStandsWhenALaterInventoryStatesMore(t *testing.T) {
 		who := f.someoneElse(t, access.PublicTriage)
 		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID,
 			f.componentID(t, libnl.Name), "3.9.0", nil, nil,
-			[]int64{f.target}, map[int64]string{}); err != nil {
+			[]int64{f.build}, map[int64]string{}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -753,7 +753,7 @@ func TestACommitmentStandsWhenALaterInventoryStatesMore(t *testing.T) {
 		}
 		f.shipped(t, restated)
 
-		planned, err := f.store.PlannedUpgradesFor(ctx, who, f.target)
+		planned, err := f.store.PlannedUpgradesFor(ctx, who, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}

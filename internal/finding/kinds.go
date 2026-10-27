@@ -45,11 +45,11 @@ func (s *Store) PackageKinds(ctx context.Context, subject access.Subject, scope 
 	if err != nil {
 		return nil, err
 	}
-	targets, err := s.Builds(ctx, scope)
+	buildIDs, err := s.Builds(ctx, scope)
 	if err != nil {
 		return nil, err
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return []PackageKind{}, nil
 	}
 	kinds, args := kind.Triage.Where(`"f"."kind"`)
@@ -58,7 +58,7 @@ func (s *Store) PackageKinds(ctx context.Context, subject access.Subject, scope 
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, args...)
@@ -81,8 +81,8 @@ func (s *Store) PackageKindsAnywhere(ctx context.Context, subject access.Subject
 	pairs := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).

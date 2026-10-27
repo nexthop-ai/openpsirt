@@ -300,7 +300,7 @@ export type Release = Body<"ReleaseBody">;
 export function Across({ releases }: { releases: Release[] }) {
   const data = releases.map((r) => {
     return {
-      at: [r.stream, r.variant].filter(Boolean).join(" · "),
+      at: [r.branch_or_tag, r.variant].filter(Boolean).join(" · "),
       ...folded(r.by_severity ?? {}),
     };
   });
@@ -329,7 +329,7 @@ export function Across({ releases }: { releases: Release[] }) {
 export function Releases({
   points,
 }: {
-  points: { stream?: string; stream_name?: string; open?: number; cut?: string }[];
+  points: { branch_or_tag?: string; branch_or_tag_name?: string; open?: number; cut?: string }[];
 }) {
   if (points.length === 0) return null;
   const W = 560,
@@ -367,7 +367,7 @@ export function Releases({
         const height = ((point.open ?? 0) / most) * H;
         const x = L + i * slot + (slot - bar) / 2;
         return (
-          <g key={`${point.stream}-${i}`}>
+          <g key={`${point.branch_or_tag}-${i}`}>
             <rect
               x={x}
               y={T + H - height}
@@ -377,13 +377,14 @@ export function Releases({
               rx={2}
             >
               <title>
-                {point.stream_name || point.stream}: {(point.open ?? 0).toLocaleString()} open
+                {point.branch_or_tag_name || point.branch_or_tag}:{" "}
+                {(point.open ?? 0).toLocaleString()} open
               </title>
             </rect>
             {/* Every release is named. A tick every other bar would leave
                 somebody counting to work out which one they are looking at. */}
             <text className="axis" x={x + bar / 2} y={T + H + 16} textAnchor="middle">
-              {point.stream_name || point.stream}
+              {point.branch_or_tag_name || point.branch_or_tag}
             </text>
           </g>
         );

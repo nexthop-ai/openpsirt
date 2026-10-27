@@ -888,7 +888,7 @@ type Ending struct {
 // finished by a worker that no longer holds it acquires a reading per copy.
 //
 // noun is what the reference is called in a log line, because "scan" and
-// "target" are the same field to this package and not to an operator reading
+// "build" are the same field to this package and not to an operator reading
 // it. recover runs only where the failure is the work's own — not on a
 // cancellation and not on a takeover — which is the one respect the two
 // workers genuinely differ; it is a closure rather than a flag so that the

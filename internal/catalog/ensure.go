@@ -123,15 +123,15 @@ func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*P
 	return created, Declared{Created: true}, nil
 }
 
-// EnsureStream declares a branch or tag, or confirms one already declared.
-func (s *Store) EnsureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, Declared, error) {
-	return ensureOnce(s, func() (*Stream, Declared, error) {
-		return s.ensureStream(ctx, productID, name, kind, parentID)
+// EnsureBranchOrTag declares a branch or tag, or confirms one already declared.
+func (s *Store) EnsureBranchOrTag(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*BranchOrTag, Declared, error) {
+	return ensureOnce(s, func() (*BranchOrTag, Declared, error) {
+		return s.ensureBranchOrTag(ctx, productID, name, kind, parentID)
 	})
 }
 
-func (s *Store) ensureStream(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*Stream, Declared, error) {
-	existing, err := s.StreamByName(ctx, productID, name)
+func (s *Store) ensureBranchOrTag(ctx context.Context, productID int64, name string, kind Kind, parentID *int64) (*BranchOrTag, Declared, error) {
+	existing, err := s.BranchOrTagByName(ctx, productID, name)
 	switch {
 	case err == nil:
 		// A line's movement is not something that can quietly change. A tag
@@ -151,7 +151,7 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 		// Declaring a retired one brings it back, the way a product and a
 		// variant come back. A pipeline runs this on every build and the name
 		// is still spoken for while retired.
-		restored, err := bringBack(ctx, &existing.RetiredAt, existing.ID, s.restoreStream)
+		restored, err := bringBack(ctx, &existing.RetiredAt, existing.ID, s.restoreBranchOrTag)
 		if err != nil {
 			return nil, Declared{}, err
 		}
@@ -175,7 +175,7 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 		return nil, Declared{}, err
 	}
 
-	created, err := s.DeclareStream(ctx, productID, name, kind, parentID)
+	created, err := s.DeclareBranchOrTag(ctx, productID, name, kind, parentID)
 	if err != nil {
 		return nil, Declared{}, err
 	}
@@ -273,7 +273,7 @@ func (s *Store) Products(ctx context.Context, subject access.Subject) ([]Product
 	return rows, nil
 }
 
-// Streams lists the branches and tags of a product.
+// BranchesAndTags lists the branches and tags of a product.
 //
 // Guarded here rather than by whoever asked. Somebody who cannot see a product
 // cannot see what releases it has either, and finding that out endpoint by
@@ -284,18 +284,18 @@ func (s *Store) Products(ctx context.Context, subject access.Subject) ([]Product
 // was given rather than choosing one — a release reached by a link somebody
 // kept has to resolve to what it is, and a tag that resolves to nothing is
 // drawn as a branch.
-func (s *Store) Streams(ctx context.Context, subject access.Subject, productID int64, retired bool) ([]Stream, error) {
+func (s *Store) BranchesAndTags(ctx context.Context, subject access.Subject, productID int64, retired bool) ([]BranchOrTag, error) {
 	if !subject.Sees(productID) {
 		return nil, access.Denied("list the releases of a product")
 	}
-	var rows []Stream
+	var rows []BranchOrTag
 	query := s.db.NewSelect().Model(&rows).Where(`"product_id" = ?`, productID)
 	if !retired {
 		query = query.Where(`"s"."retired_at" IS NULL`)
 	}
 	err := query.Order("kind", "name").Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list streams: %w", err)
+		return nil, fmt.Errorf("list branches and tags: %w", err)
 	}
 	return rows, nil
 }
@@ -332,18 +332,18 @@ func (s *Store) Variants(ctx context.Context, subject access.Subject, productID 
 // product can name a different one, and then the check is answering a question
 // nobody asked. It is correct at every call site today, which is exactly the
 // kind of correctness that stops being true when somebody adds another.
-func (s *Store) BuiltAs(ctx context.Context, subject access.Subject, streamID int64) ([]Variant, error) {
-	var stream Stream
-	if err := s.db.NewSelect().Model(&stream).Where(`"id" = ?`, streamID).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up the release %d: %w", streamID, err)
+func (s *Store) BuiltAs(ctx context.Context, subject access.Subject, branchOrTagID int64) ([]Variant, error) {
+	var branchOrTag BranchOrTag
+	if err := s.db.NewSelect().Model(&branchOrTag).Where(`"id" = ?`, branchOrTagID).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("look up the release %d: %w", branchOrTagID, err)
 	}
-	if !subject.Sees(stream.ProductID) {
+	if !subject.Sees(branchOrTag.ProductID) {
 		return nil, access.Denied("list what a release is built as")
 	}
 	var rows []Variant
 	err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN "target" AS "tg" ON "tg"."variant_id" = "v"."id"`).
-		Where(`"tg"."stream_id" = ?`, streamID).Order("v.name").Scan(ctx)
+		Join(`JOIN "build" AS "tg" ON "tg"."variant_id" = "v"."id"`).
+		Where(`"tg"."branch_or_tag_id" = ?`, branchOrTagID).Order("v.name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list what a release is built as: %w", err)
 	}
@@ -372,16 +372,16 @@ func (s *Store) VisibleProduct(ctx context.Context, subject access.Subject, name
 	return product, nil
 }
 
-// VisibleStream finds a release of a product this subject may know about.
+// VisibleBranchOrTag finds a release of a product this subject may know about.
 //
 // A release inside a product they cannot see does not exist as far as they are
 // concerned, and neither does one that was never declared.
-func (s *Store) VisibleStream(ctx context.Context, subject access.Subject, product, stream string) (*Product, *Stream, error) {
+func (s *Store) VisibleBranchOrTag(ctx context.Context, subject access.Subject, product, branchOrTag string) (*Product, *BranchOrTag, error) {
 	p, err := s.VisibleProduct(ctx, subject, product)
 	if err != nil {
 		return nil, nil, err
 	}
-	st, err := s.StreamByName(ctx, p.ID, stream)
+	st, err := s.BranchOrTagByName(ctx, p.ID, branchOrTag)
 	if err != nil {
 		return nil, nil, fmt.Errorf("product %q: %w", product, err)
 	}
@@ -423,23 +423,23 @@ func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 		return out, nil
 	}
 
-	var streams []struct {
+	var branchesAndTags []struct {
 		ProductID int64  `bun:"product_id"`
 		Kind      string `bun:"kind"`
 		Count     int    `bun:"count"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"stream" AS "st"`).
+		TableExpr(`"branch_or_tag" AS "st"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"st"."kind" AS "kind"`).
 		ColumnExpr(`COUNT(*) AS "count"`).
 		Where(`"st"."product_id" IN (?)`, bun.List(productIDs)).
 		Where(`"st"."retired_at" IS NULL`).
 		GroupExpr(`"st"."product_id", "st"."kind"`).
-		Scan(ctx, &streams); err != nil {
+		Scan(ctx, &branchesAndTags); err != nil {
 		return nil, fmt.Errorf("count branches and tags: %w", err)
 	}
-	for _, row := range streams {
+	for _, row := range branchesAndTags {
 		shape := out[row.ProductID]
 		if Kind(row.Kind) == Tag {
 			shape.Tags = row.Count

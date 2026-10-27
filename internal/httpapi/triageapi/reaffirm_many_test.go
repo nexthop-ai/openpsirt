@@ -435,7 +435,7 @@ func TestReAffirmingAPromiseTakesNoCap(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`","reasoning":"Taking the 8.5.0 bump.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 		var promise int64
@@ -523,17 +523,17 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 			Where(`"name" = ?`, "libnl-3-200").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		var targets []int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"target" AS "t"`).
-			ColumnExpr(`"t"."id"`).Scan(ctx, &targets); err != nil {
+		var buildIDs []int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"build" AS "t"`).
+			ColumnExpr(`"t"."id"`).Scan(ctx, &buildIDs); err != nil {
 			t.Fatal(err)
 		}
-		for _, target := range targets {
-			if _, err := triage.NewStore(r.DB.DB).Lapse(ctx, target); err != nil {
+		for _, build := range buildIDs {
+			if _, err := triage.NewStore(r.DB.DB).Lapse(ctx, build); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if _, err := r.DB.DB.NewUpdate().Table("stream").
+		if _, err := r.DB.DB.NewUpdate().Table("branch_or_tag").
 			Set(`"kind" = ?`, catalog.Tag).Where(`"name" = ?`, "master").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

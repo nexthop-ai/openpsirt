@@ -40,7 +40,7 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 			t.Fatal(err)
 		}
 		notify.AnalysisDrops(w.DB.DB, slog.New(slog.NewTextHandler(io.Discard, nil)))(ctx,
-			analysis.Drop{RunID: 7, SeriesID: set.ID, TargetID: w.Target.ID, Missed: 30, Live: 40})
+			analysis.Drop{RunID: 7, SeriesID: set.ID, BuildID: w.Build.ID, Missed: 30, Live: 40})
 
 		told := func(who *access.Account, role access.Role) []notify.Notification {
 			subject := access.NewPerson(who.ID, who.Identity, false,
@@ -85,7 +85,7 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 // at, and comparable or not.
 func analyzed(t *testing.T, w *fixtures.World, set *series.Series, at time.Time, comparable bool) {
 	t.Helper()
-	run := &series.Run{SeriesID: set.ID, TargetID: w.Target.ID,
+	run := &series.Run{SeriesID: set.ID, BuildID: w.Build.ID,
 		ContentHash: strconv.FormatInt(at.UnixNano(), 16), BuiltAt: at, ReceivedAt: at,
 		Status: series.Applied, Comparable: &comparable, AppliedAt: &at}
 	if !comparable {
@@ -185,7 +185,7 @@ func TestASeriesSilentForThreeOfItsUsualGapsHasGoneQuiet(t *testing.T) {
 		}
 
 		// An upload turned away since is named, with what its sender was told.
-		if err := series.NewStore(w.DB.DB).Refused(ctx, series.Refusal{TargetID: w.Target.ID,
+		if err := series.NewStore(w.DB.DB).Refused(ctx, series.Refusal{BuildID: w.Build.ID,
 			Series: "Clang-Tidy/default", Kind: kind.Analysis, At: now.Add(-time.Hour),
 			Reason: "the documents could not be read"}); err != nil {
 			t.Fatal(err)

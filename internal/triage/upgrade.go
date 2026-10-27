@@ -34,8 +34,8 @@ type Upgrade struct {
 	By time.Time
 	// Builds are the releases this is promised for. The same component can be
 	// promised a different version in another build, which is the ordinary
-	// case rather than a conflict: a stream on a maintained older line and a
-	// stream that has moved on are different work.
+	// case rather than a conflict: a branch or tag on a maintained older line and a
+	// branch or tag that has moved on are different work.
 	Builds    []int64
 	Reasoning string
 	// HoldBy is the party carrying the work, where somebody said. A person
@@ -112,7 +112,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
-		// Only the builds this is promised for. An upgrade of one stream says
+		// Only the builds this is promised for. An upgrade of one branch or tag says
 		// nothing about another, which is the whole reason the target is per
 		// build.
 		reaching, err := findings.OccurrencesOnComponentWithin(ctx, tx, subject, up.ProductID,
@@ -410,11 +410,11 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 	if len(rows) == 0 {
 		return true, nil
 	}
-	var targets []int64
+	var buildIDs []int64
 	if decision.Outcome == UpgradeNeeded {
 		if err := tx.NewSelect().Table("upgrade").
-			ColumnExpr(`DISTINCT "target_id"`).
-			Where(`"decision_id" = ?`, decision.ID).Scan(ctx, &targets); err != nil {
+			ColumnExpr(`DISTINCT "build_id"`).
+			Where(`"decision_id" = ?`, decision.ID).Scan(ctx, &buildIDs); err != nil {
 			return false, fmt.Errorf("read which releases this was promised for: %w", err)
 		}
 	} else if err := tx.NewSelect().
@@ -425,16 +425,16 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`DISTINCT "f"."target_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		ColumnExpr(`DISTINCT "f"."build_id"`).
 		Where(`"de"."decision_id" = ?`, decision.ID).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.VersionCarry, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
-		Scan(ctx, &targets); err != nil {
+		Scan(ctx, &buildIDs); err != nil {
 		return false, fmt.Errorf("read which builds this promise covers: %w", err)
 	}
 	occurrences := make([]finding.At, 0, len(rows))
@@ -443,7 +443,7 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 			VulnerabilityID: row.VulnerabilityID, OccurrenceIdentity: row.OccurrenceIdentity,
 		})
 	}
-	binding, err := findings.DeadlineAt(ctx, tx, subject, rows[0].ProductID, targets, occurrences)
+	binding, err := findings.DeadlineAt(ctx, tx, subject, rows[0].ProductID, buildIDs, occurrences)
 	if err != nil {
 		return false, err
 	}

@@ -9,7 +9,7 @@ describe("queueNarrowing", () => {
     expect(
       queueNarrowing(
         new URLSearchParams(
-          "proposed_by=alice&older_than=30&severity=high&outcome=wont-fix&release=2026.03",
+          "proposed_by=alice&older_than=30&severity=high&outcome=wont-fix&branch_or_tag=2026.03",
         ),
       ),
     ).toEqual({
@@ -17,13 +17,13 @@ describe("queueNarrowing", () => {
       older_than: 30,
       severity: "high",
       outcome: ["wont-fix"],
-      release: "2026.03",
+      branch_or_tag: "2026.03",
     });
   });
   it("leaves out what the server would refuse", () => {
     expect(
       queueNarrowing(
-        new URLSearchParams("older_than=soon&severity=awful&outcome=constructor&release=%20"),
+        new URLSearchParams("older_than=soon&severity=awful&outcome=constructor&branch_or_tag=%20"),
       ),
     ).toEqual({});
   });
@@ -34,6 +34,8 @@ describe("queueNarrowing", () => {
 
 describe("narrowedBy", () => {
   it("counts the filters on", () => {
-    expect(narrowedBy(new URLSearchParams("proposed_by=alice&release=main&product=x"))).toBe(2);
+    expect(narrowedBy(new URLSearchParams("proposed_by=alice&branch_or_tag=main&product=x"))).toBe(
+      2,
+    );
   });
 });

@@ -72,7 +72,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
-		cat, product, branch, variant, target := w.Catalog, w.Product, w.Branch, w.Customer, w.Target
+		cat, product, branch, variant, build := w.Catalog, w.Product, w.Branch, w.Customer, w.Build
 
 		// Somebody granted reading on the one product these builds
 		// belong to. The narrowing is the ordinary one, which is what
@@ -100,18 +100,18 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 			seq++
 			built = built.Add(24 * time.Hour)
 			scan, _, err := scans.Record(ctx, ingest.Arriving{
-				TargetID: target.ID, ContentHash: fmt.Sprintf("hash-%d", seq),
+				BuildID: build.ID, ContentHash: fmt.Sprintf("hash-%d", seq),
 				BuiltAt: built, ParserVersion: "measure",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 			snap := shape(versionOf)
-			if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID, snap); err != nil {
+			if _, err := world.ApplyGraph(ctx, db.DB, build.ID, scan.ID, snap); err != nil {
 				t.Fatal(err)
 			}
 			run, err := store.Begin(ctx, finding.Run{
-				TargetID: target.ID, Scanner: "measure",
+				BuildID: build.ID, Scanner: "measure",
 				ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
 			})
 			if err != nil {
@@ -120,7 +120,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 			reported := reports(versionOf, extra)
 			before := statements.n.Load()
 			start := time.Now()
-			applied, err := store.Apply(ctx, target.ID, run.ID, reported)
+			applied, err := store.Apply(ctx, build.ID, run.ID, reported)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -154,9 +154,9 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 				count("graph_node"), count("graph_edge"))
 			dbtest.SettleStatistics(t, db)
 			timed(t, ctx, store, who, finding.Scope{
-				ProductID: &product.ID, StreamID: &branch.ID, VariantID: &variant.ID,
+				ProductID: &product.ID, BranchOrTagID: &branch.ID, VariantID: &variant.ID,
 			})
-			timedHistory(t, ctx, store, scans, graphs, who, target.ID, product.ID)
+			timedHistory(t, ctx, store, scans, graphs, who, build.ID, product.ID)
 		}
 		report("after night 1")
 
@@ -217,13 +217,13 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		beside, err := cat.TargetFor(ctx, branch.ID, second.ID)
+		beside, err := cat.BuildFor(ctx, branch.ID, second.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		versionOf := func(i int) string { return version[i] }
 		scan, _, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: beside.ID, ContentHash: "beside", BuiltAt: built,
+			BuildID: beside.ID, ContentHash: "beside", BuiltAt: built,
 			ParserVersion: "measure",
 		})
 		if err != nil {
@@ -233,7 +233,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 			t.Fatal(err)
 		}
 		run, err := store.Begin(ctx, finding.Run{
-			TargetID: beside.ID, Scanner: "measure",
+			BuildID: beside.ID, Scanner: "measure",
 			ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
 		})
 		if err != nil {
@@ -248,7 +248,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		}
 
 		dbtest.SettleStatistics(t, db)
-		onBranch := finding.Scope{ProductID: &product.ID, StreamID: &branch.ID}
+		onBranch := finding.Scope{ProductID: &product.ID, BranchOrTagID: &branch.ID}
 		start := time.Now()
 		_, common, err := store.Groups(ctx, who, onBranch, 50, 0,
 			finding.Filter{AcrossVariants: finding.EveryVariant})
@@ -258,7 +258,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		everyTook := time.Since(start)
 
 		ofOne := finding.Scope{
-			ProductID: &product.ID, StreamID: &branch.ID, VariantID: &second.ID,
+			ProductID: &product.ID, BranchOrTagID: &branch.ID, VariantID: &second.ID,
 		}
 		start = time.Now()
 		_, specific, err := store.Groups(ctx, who, ofOne, 50, 0,
@@ -337,16 +337,16 @@ func reports(versionOf func(int) string, extra int) []finding.Reported {
 // the size of a build.
 //
 // Both were named as unbounded rather than measured: the receipts page reads
-// every finished run of a target and every scan filed against it, whatever
+// every finished run of a build and every scan filed against it, whatever
 // page is asked for, and then pairs them; the release comparison counts what
 // is open against every build of a product. A year of nights is what tells the
 // difference between a shape that grows and a shape that matters.
 func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
-	scans *ingest.Store, graphs *graph.Store, who access.Subject, target, product int64) {
+	scans *ingest.Store, graphs *graph.Store, who access.Subject, build, product int64) {
 
 	t.Helper()
 	start := time.Now()
-	first, filed, err := scans.Receipts(ctx, who, target, 50, 0)
+	first, filed, err := scans.Receipts(ctx, who, build, 50, 0)
 	if err != nil {
 		t.Fatalf("receipts: %v", err)
 	}
@@ -360,7 +360,7 @@ func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
 		deep = filed - 50
 	}
 	start = time.Now()
-	last, _, err := scans.Receipts(ctx, who, target, 50, deep)
+	last, _, err := scans.Receipts(ctx, who, build, 50, deep)
 	if err != nil {
 		t.Fatalf("receipts at %d: %v", deep, err)
 	}
@@ -383,7 +383,7 @@ func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
 		ids = append(ids, receipt.Scan.ID)
 	}
 	start = time.Now()
-	deltas, err := graphs.Deltas(ctx, who, target, ids)
+	deltas, err := graphs.Deltas(ctx, who, build, ids)
 	if err != nil {
 		t.Fatalf("inventory deltas: %v", err)
 	}
@@ -402,7 +402,7 @@ func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
 	var moved int
 	if len(ids) > 0 {
 		start = time.Now()
-		_, total, err := graphs.Changes(ctx, who, target, ids[0], "", 200, 0)
+		_, total, err := graphs.Changes(ctx, who, build, ids[0], "", 200, 0)
 		if err != nil {
 			t.Fatalf("inventory changes: %v", err)
 		}
@@ -500,7 +500,7 @@ func TestMeasureAPlannedUpgradePage(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
-		product, branch, variant, target := w.Product, w.Branch, w.Customer, w.Target
+		product, branch, variant, build := w.Product, w.Branch, w.Customer, w.Build
 
 		store := finding.NewStore(db.DB)
 		scans := ingest.NewStore(db.DB)
@@ -508,26 +508,26 @@ func TestMeasureAPlannedUpgradePage(t *testing.T) {
 			map[int64][]access.Role{product.ID: {access.PrivateRead}}, 0)
 
 		scan, _, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "upgrades", BuiltAt: time.Now().UTC(),
+			BuildID: build.ID, ContentHash: "upgrades", BuiltAt: time.Now().UTC(),
 			ParserVersion: "measure",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		versionOf := func(int) string { return "1.0" }
-		if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID,
+		if _, err := world.ApplyGraph(ctx, db.DB, build.ID, scan.ID,
 			shape(versionOf)); err != nil {
 			t.Fatal(err)
 		}
 		run, err := store.Begin(ctx, finding.Run{
-			TargetID: target.ID, Scanner: "measure",
+			BuildID: build.ID, Scanner: "measure",
 			ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		start := time.Now()
-		applied, err := store.Apply(ctx, target.ID, run.ID, reports(versionOf, bigIssues-issues))
+		applied, err := store.Apply(ctx, build.ID, run.ID, reports(versionOf, bigIssues-issues))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -551,7 +551,7 @@ func TestMeasureAPlannedUpgradePage(t *testing.T) {
 		}
 
 		scope := finding.Scope{
-			ProductID: &product.ID, StreamID: &branch.ID, VariantID: &variant.ID,
+			ProductID: &product.ID, BranchOrTagID: &branch.ID, VariantID: &variant.ID,
 		}
 		// Three runs, because the first pays for a cold cache and what a person
 		// waits for is the ordinary one.
@@ -597,7 +597,7 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
-		target := w.Target
+		build := w.Build
 
 		statements := &counting{}
 		db = dbtest.Hooked(db, statements)
@@ -616,17 +616,17 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 			seq++
 			built = built.Add(24 * time.Hour)
 			scan, _, err := scans.Record(ctx, ingest.Arriving{
-				TargetID: target.ID, ContentHash: fmt.Sprintf("clock-%d", seq),
+				BuildID: build.ID, ContentHash: fmt.Sprintf("clock-%d", seq),
 				BuiltAt: built, ParserVersion: "measure",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID, shape(steady)); err != nil {
+			if _, err := world.ApplyGraph(ctx, db.DB, build.ID, scan.ID, shape(steady)); err != nil {
 				t.Fatal(err)
 			}
 			run, err := store.Begin(ctx, finding.Run{
-				TargetID: target.ID, Scanner: "measure",
+				BuildID: build.ID, Scanner: "measure",
 				ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
 			})
 			if err != nil {
@@ -648,7 +648,7 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 			}
 			before := statements.n.Load()
 			start := time.Now()
-			applied, err := store.Apply(ctx, target.ID, run.ID, reported)
+			applied, err := store.Apply(ctx, build.ID, run.ID, reported)
 			if err != nil {
 				t.Fatal(err)
 			}

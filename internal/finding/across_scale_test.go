@@ -44,7 +44,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
-		product, target := w.Product, w.Target
+		product, build := w.Product, w.Build
 		other := seedAcross(t, w)
 
 		// Decisions to read: an upgrade promised over ten packages, and one
@@ -86,13 +86,13 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			return id
 		}
 		for n := range 5 {
-			plan(n, target.ID)
+			plan(n, build.ID)
 		}
 		// Five promises lapse, so lapsed is a state something is in, and two
 		// cover every build of the product, so agreed is one too.
 		before := newest()
 		for n := 5; n < 10; n++ {
-			plan(n, target.ID)
+			plan(n, build.ID)
 		}
 		if _, err := db.DB.NewUpdate().TableExpr(`"decision_occurrence" AS "de"`).
 			Set(`"state" = ?`, "lapsed").Set(`"live_key" = NULL`).Set(`"ended_at" = ?`, time.Now().UTC()).
@@ -100,9 +100,9 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		kernelBuild := w.TargetFor(w.Branch, w.Internal)
+		kernelBuild := w.BuildFor(w.Branch, w.Internal)
 		for n := 10; n < 12; n++ {
-			plan(n, target.ID, kernelBuild.ID)
+			plan(n, build.ID, kernelBuild.ID)
 		}
 		var kernel struct {
 			Issue      int64  `bun:"vulnerability_id"`
@@ -259,7 +259,7 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 		product := w.Product
 		store := finding.NewStore(db.DB)
 		seedAcross(t, w)
-		kernelBuild := w.TargetFor(w.Branch, w.Internal)
+		kernelBuild := w.BuildFor(w.Branch, w.Internal)
 
 		person, err := access.NewStore(db.DB).Ensure(ctx, "triager", "A triager", nil, nil)
 		if err != nil {
@@ -366,7 +366,7 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 
 		at := time.Now()
 		_, listed, err := store.Groups(ctx, triager, finding.Scope{
-			ProductID: &product.ID, StreamID: &w.Branch.ID, VariantID: &w.Internal.ID,
+			ProductID: &product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Internal.ID,
 		}, 50, 0, finding.Filter{})
 		if err != nil {
 			t.Fatal(err)
@@ -390,10 +390,10 @@ func seedAcross(t *testing.T, w *world.World) *catalog.Product {
 	db := w.DB
 	store := finding.NewStore(db.DB)
 	scans := ingest.NewStore(db.DB)
-	seed := func(target *catalog.Target, extra, kernel int) {
+	seed := func(build *catalog.Build, extra, kernel int) {
 		t.Helper()
 		scan, _, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: fmt.Sprint("across-", target.ID),
+			BuildID: build.ID, ContentHash: fmt.Sprint("across-", build.ID),
 			BuiltAt: time.Now().UTC(), ParserVersion: "measure",
 		})
 		if err != nil {
@@ -418,28 +418,28 @@ func seedAcross(t *testing.T, w *world.World) *catalog.Product {
 				})
 			}
 		}
-		if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID, snap); err != nil {
+		if _, err := world.ApplyGraph(ctx, db.DB, build.ID, scan.ID, snap); err != nil {
 			t.Fatal(err)
 		}
 		run, err := store.Begin(ctx, finding.Run{
-			TargetID: target.ID, Scanner: "measure",
+			BuildID: build.ID, Scanner: "measure",
 			ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := store.Apply(ctx, target.ID, run.ID, reported); err != nil {
+		if _, err := store.Apply(ctx, build.ID, run.ID, reported); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	seed(w.Target, bigIssues-issues, 0)
+	seed(w.Build, bigIssues-issues, 0)
 	other := w.DeclareProduct("other", "Other")
-	seed(w.TargetFor(w.DeclareStream(other, "main", catalog.Branch, nil),
+	seed(w.BuildFor(w.DeclareBranchOrTag(other, "main", catalog.Branch, nil),
 		w.DeclareVariant(other, "only", true)), 0, 0)
-	seed(w.TargetFor(w.Branch, w.Internal), 0, issuesAtAKernelOccurrence)
+	seed(w.BuildFor(w.Branch, w.Internal), 0, issuesAtAKernelOccurrence)
 	return other
 }
 

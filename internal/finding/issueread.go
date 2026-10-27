@@ -266,8 +266,8 @@ func RecordedElsewhere(ctx context.Context, db bun.IDB, productID int64,
 		ColumnExpr(`"ro"."id"`).
 		Where(`"ro"."id" IN (?)`, bun.List(ids)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "rf"
-			JOIN "target" AS "rt" ON "rt"."id" = "rf"."target_id"
-			JOIN "stream" AS "rs" ON "rs"."id" = "rt"."stream_id"
+			JOIN "build" AS "rt" ON "rt"."id" = "rf"."build_id"
+			JOIN "branch_or_tag" AS "rs" ON "rs"."id" = "rt"."branch_or_tag_id"
 			WHERE "rf"."vulnerability_id" = "ro"."issue_id"
 			AND "rf"."kind" = ? AND "rs"."product_id" <> ?)`, Entered, productID).
 		Scan(ctx, &elsewhere); err != nil {
@@ -292,8 +292,8 @@ func recordedOutOfReachOf(subject access.Subject, column string) (string, []any)
 	readings := access.Split(products, subject.Reads)
 	visible, args := access.VisibleWhere(`"rs"."product_id"`, `"rf"."visibility"`, readings)
 	return `EXISTS (SELECT 1 FROM "finding" AS "rf"
-		JOIN "target" AS "rt" ON "rt"."id" = "rf"."target_id"
-		JOIN "stream" AS "rs" ON "rs"."id" = "rt"."stream_id"
+		JOIN "build" AS "rt" ON "rt"."id" = "rf"."build_id"
+		JOIN "branch_or_tag" AS "rs" ON "rs"."id" = "rt"."branch_or_tag_id"
 		WHERE "rf"."vulnerability_id" = (SELECT "ri"."issue_id" FROM "vulnerability" AS "ri" WHERE "ri"."id" = ` + column + `)
 		AND "rf"."kind" = ? AND NOT (` + visible + `))`, append([]any{Entered}, args...)
 }

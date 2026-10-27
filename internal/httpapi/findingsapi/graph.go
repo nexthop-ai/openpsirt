@@ -68,7 +68,7 @@ type AroundBody struct {
 func registerGraph(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-top-level-components", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components",
 		Summary: "List what a build pulls in directly",
 		Description: "Returns the build's own component and what it depends on, most findings " +
 			"first. The root is named separately from the list because it is what the list " +
@@ -88,13 +88,13 @@ func registerGraph(api huma.API, in core.Deps) {
 			"answering \"what else is under this\" once you are already somewhere.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Term    string `query:"q" maxLength:"200" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of matches returned. Only read when searching"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Term        string `query:"q" maxLength:"200" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
+		Limit       int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of matches returned. Only read when searching"`
 	}) (*rootsOutput, error) {
-		subject, target, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +106,7 @@ func registerGraph(api huma.API, in core.Deps) {
 		// exist, one name at a time. A case collaborator is the reach that
 		// meets it: they hold nothing on the product and may open exactly one
 		// finding.
-		tally, err := store.Counts(ctx, subject, target)
+		tally, err := store.Counts(ctx, subject, build)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			return nil, core.NothingScannedThere()
@@ -122,7 +122,7 @@ func registerGraph(api huma.API, in core.Deps) {
 		// of components rather than a position, and naming a root
 		// beside them would invite drawing them as though they hung off it.
 		if strings.TrimSpace(input.Term) != "" {
-			found, err := store.Search(ctx, subject, target, input.Term, input.Limit)
+			found, err := store.Search(ctx, subject, build, input.Term, input.Limit)
 			switch {
 			case errors.Is(err, access.ErrDenied):
 				return nil, core.NothingScannedThere()
@@ -134,7 +134,7 @@ func registerGraph(api huma.API, in core.Deps) {
 			return out, nil
 		}
 
-		root, roots, err := store.Roots(ctx, subject, target)
+		root, roots, err := store.Roots(ctx, subject, build)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			return nil, core.NothingScannedThere()
@@ -151,7 +151,7 @@ func registerGraph(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-component-neighbors", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/components/{component}/around",
 		Summary: "Show what is directly above and below a component",
 		Description: "Returns what pulls this component in, and what it pulls in.\n\n" +
@@ -167,19 +167,19 @@ func registerGraph(api huma.API, in core.Deps) {
 			"the choices.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product   string `path:"product"`
-		Stream    string `path:"stream"`
-		Variant   string `path:"variant"`
-		Component string `path:"component" doc:"The component's name, as the findings list gives it"`
-		Version   string `query:"version" doc:"The version, where the build ships that name at more than one"`
-		Ecosystem string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components"`
-		Namespace string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Component   string `path:"component" doc:"The component's name, as the findings list gives it"`
+		Version     string `query:"version" doc:"The version, where the build ships that name at more than one"`
+		Ecosystem   string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components"`
+		Namespace   string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components"`
 	}) (*struct{ Body AroundBody }, error) {
-		subject, target, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		above, below, err := graph.NewStore(in.DB.DB).Around(ctx, subject, target,
+		above, below, err := graph.NewStore(in.DB.DB).Around(ctx, subject, build,
 			input.Component, graph.Choice{
 				Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
 			})

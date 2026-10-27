@@ -74,7 +74,7 @@ export function openFor(
 // keeps being put off, and what has been argued away.
 //
 // It is figures rather than a list, so it prints rather than exporting.
-// There is no stream behind a set of aggregates, and inventing one would
+// There is no branch or tag behind a set of aggregates, and inventing one would
 // publish a file nothing here computed. Every figure links to the list it
 // counts instead, and that list exports — which is also what somebody asking
 // for "the numbers as a file" actually wants, since a row nobody can trace

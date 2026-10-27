@@ -85,8 +85,8 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 		} else {
 			kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "finding" AS "f" `+
-				`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id" `+
-				`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" `+
+				`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id" `+
+				`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" `+
 				`WHERE "f"."vulnerability_id" = "vk"."issue_id" AND "st"."product_id" = "p"."id" `+
 				`AND `+kinds+` AND "f"."visibility" = ?) THEN 0 ELSE 1 END AS "private"`,
 				append(kindArgs, string(access.Public))...)

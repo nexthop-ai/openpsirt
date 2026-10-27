@@ -24,7 +24,7 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "critical",
 			Vector:  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
@@ -43,7 +43,7 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 		if err != nil {
 			t.Fatal(err)
 		}
-		stream, err := cat.DeclareStream(ctx, other.ID, "main", catalog.Branch, nil)
+		branchOrTag, err := cat.DeclareBranchOrTag(ctx, other.ID, "main", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -51,17 +51,17 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 		if err != nil {
 			t.Fatal(err)
 		}
-		target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
+		build, err := cat.BuildFor(ctx, branchOrTag.ID, variant.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		mine := f.target
-		f.target = target.ID
+		mine := f.build
+		f.build = build.ID
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		f.target = mine
+		f.build = mine
 		if _, err := f.db.DB.NewInsert().Model(&finding.Finding{
-			TargetID: target.ID, Kind: finding.Vulnerable, Visibility: access.Public,
+			BuildID: build.ID, Kind: finding.Vulnerable, Visibility: access.Public,
 			VulnerabilityID: issue, ComponentID: f.componentID(t, swss.Name),
 			OccurrenceIdentity: finding.OccurrenceIdentity(swss.Name, ""), OpenedAt: time.Now().UTC(),
 			OpenedRunID: &run,
@@ -107,7 +107,7 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 
 		elsewhere := access.NewPerson(2, "elsewhere", false,
 			map[int64][]access.Role{other.ID: {access.PublicRead, access.PrivateRead}}, 0)
-		there := finding.Scope{ProductID: &other.ID, StreamID: &stream.ID, VariantID: &variant.ID}
+		there := finding.Scope{ProductID: &other.ID, BranchOrTagID: &branchOrTag.ID, VariantID: &variant.ID}
 		if got := read(t, elsewhere, there); got.listed == 0 || got.critical != 0 ||
 			got.score != 0 || got.counted != 0 || got.summary != "" {
 			t.Errorf("a reader of the other product alone was told %+v: "+
@@ -132,7 +132,7 @@ func TestARecordedFlawFiledUnderAPublishedNameTakesTheFeedsWord(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "critical",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil {
@@ -211,7 +211,7 @@ func TestTheRecordingProductsReleaseNoteAndComponentCarryTheScoreItRecorded(t *t
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "critical",
 			Vector:  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
@@ -220,7 +220,7 @@ func TestTheRecordingProductsReleaseNoteAndComponentCarryTheScoreItRecorded(t *t
 		}
 		reader := f.planner(t, access.PublicRead, access.PrivateRead)
 
-		comparison, err := f.store.Compare(ctx, reader, earlier, f.target, true)
+		comparison, err := f.store.Compare(ctx, reader, earlier, f.build, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -234,7 +234,7 @@ func TestTheRecordingProductsReleaseNoteAndComponentCarryTheScoreItRecorded(t *t
 			t.Errorf("the release note scores the recorded flaw %d, want 980", noted)
 		}
 
-		occurrences, _, _, err := f.store.AtComponent(ctx, reader, f.target, f.componentID(t, swss.Name), "", 50, 0)
+		occurrences, _, _, err := f.store.AtComponent(ctx, reader, f.build, f.componentID(t, swss.Name), "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,7 +260,7 @@ func TestWithdrawingARatingClaimReturnsARecordedFlawToItsRecordedWord(t *testing
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil {
@@ -311,7 +311,7 @@ func TestAMergeCarriesARecordedRatingToTheIssueKept(t *testing.T) {
 		f.applied(t, found("CVE-2026-7", teamd))
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "critical",
 			Vector:  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
@@ -364,7 +364,7 @@ func TestAFilledWordReranksAndReclocksAnotherProductsFinding(t *testing.T) {
 			t.Helper()
 			var got clock
 			if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).Column("urgency", "due_at").
-				Where(`"target_id" = ?`, elsewhere).Where(`"vulnerability_id" = ?`, issue).
+				Where(`"build_id" = ?`, elsewhere).Where(`"vulnerability_id" = ?`, issue).
 				Limit(1).Scan(ctx, &got); err != nil {
 				t.Fatal(err)
 			}
@@ -411,7 +411,7 @@ func TestARecordedNameFindsNothingForAReaderItIsWithheldFrom(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "critical",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
 		if err != nil {

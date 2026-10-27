@@ -19,11 +19,11 @@ import (
 func (f *fixture) cutFrom(t *testing.T, name string) int64 {
 	t.Helper()
 	cat := catalog.NewStore(f.db.DB)
-	branch, err := cat.StreamByName(t.Context(), f.productID, "master")
+	branch, err := cat.BranchOrTagByName(t.Context(), f.productID, "master")
 	if err != nil {
 		t.Fatal(err)
 	}
-	declared, err := cat.DeclareStream(t.Context(), f.productID, name, catalog.Tag, &branch.ID)
+	declared, err := cat.DeclareBranchOrTag(t.Context(), f.productID, name, catalog.Tag, &branch.ID)
 	if err != nil {
 		t.Fatalf("declare %s: %v", name, err)
 	}
@@ -31,11 +31,11 @@ func (f *fixture) cutFrom(t *testing.T, name string) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target, err := cat.TargetFor(t.Context(), declared.ID, variant.ID)
+	build, err := cat.BuildFor(t.Context(), declared.ID, variant.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return target.ID
+	return build.ID
 }
 
 // critical is one reported issue rated critical, so the bands can be told
@@ -65,7 +65,7 @@ func TestABranchIsComparedAgainstWhatWasLastShippedFromIt(t *testing.T) {
 		// The branch has picked up a second critical since.
 		f.shipped(t, twoConsumers())
 		here := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, here, []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, here, []finding.Reported{
 			critical("CVE-2026-1", libnl), critical("CVE-2026-2", teamd),
 		}); err != nil {
 			t.Fatal(err)
@@ -75,7 +75,7 @@ func TestABranchIsComparedAgainstWhatWasLastShippedFromIt(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicRead)
-		branch, err := catalog.NewStore(f.db.DB).StreamByName(t.Context(), f.productID, "master")
+		branch, err := catalog.NewStore(f.db.DB).BranchOrTagByName(t.Context(), f.productID, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -92,9 +92,9 @@ func TestABranchIsComparedAgainstWhatWasLastShippedFromIt(t *testing.T) {
 			t.Fatalf("nothing to compare against, though a release was cut and scanned: %q",
 				ready.Why)
 		}
-		if ready.Shipped.Stream != world.TagName {
+		if ready.Shipped.BranchOrTag != world.TagName {
 			t.Errorf("compared against %q, want the release cut from this branch",
-				ready.Shipped.Stream)
+				ready.Shipped.BranchOrTag)
 		}
 		// Two criticals now against one shipped, counted as issues at
 		// components rather than as occurrences — libnl sits under two consumers,
@@ -123,13 +123,13 @@ func TestAReleaseNobodyScannedIsNotComparedAgainstAsZero(t *testing.T) {
 		// between being cut and its pipeline running.
 		f.cutFrom(t, "v2.5.0")
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{critical("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
 
 		cat := catalog.NewStore(f.db.DB)
-		branch, err := cat.StreamByName(t.Context(), f.productID, "master")
+		branch, err := cat.BranchOrTagByName(t.Context(), f.productID, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -162,7 +162,7 @@ func TestAReleaseBuiltAnotherWayIsNotTheComparison(t *testing.T) {
 	// regression somebody then goes looking for.
 	each(t, func(t *testing.T, f *fixture) {
 		cat := catalog.NewStore(f.db.DB)
-		branch, err := cat.StreamByName(t.Context(), f.productID, "master")
+		branch, err := cat.BranchOrTagByName(t.Context(), f.productID, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,12 +170,12 @@ func TestAReleaseBuiltAnotherWayIsNotTheComparison(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		release, err := cat.DeclareStream(t.Context(), f.productID, "v2.4.2", catalog.Tag, &branch.ID)
+		release, err := cat.DeclareBranchOrTag(t.Context(), f.productID, "v2.4.2", catalog.Tag, &branch.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// The release exists, is scanned, and is built the other way.
-		built, err := cat.TargetFor(t.Context(), release.ID, other.ID)
+		built, err := cat.BuildFor(t.Context(), release.ID, other.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -222,7 +222,7 @@ func TestAReleaseIsNotComparedAgainstItself(t *testing.T) {
 		}
 
 		cat := catalog.NewStore(f.db.DB)
-		tag, err := cat.StreamByName(t.Context(), f.productID, "v2.4.3")
+		tag, err := cat.BranchOrTagByName(t.Context(), f.productID, "v2.4.3")
 		if err != nil {
 			t.Fatal(err)
 		}

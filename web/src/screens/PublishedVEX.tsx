@@ -23,20 +23,20 @@ import { linkTo } from "../api/links";
 // Two documents, each with its own identifier and its own revisions: ours, and
 // ours with what suppliers state about their own products beside it.
 export function PublishedVEX() {
-  const { product = "", stream = "", variant = "" } = useParams();
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const kind: "ours" | "with-suppliers" =
     params.get("kind") === "with-suppliers" ? "with-suppliers" : "ours";
   const asked = kind === "with-suppliers" ? { kind } : {};
-  const path = { product, stream, variant };
+  const path = { product, branch_or_tag: branchOrTag, variant };
   const queries = useQueryClient();
 
   const gone = useQuery({
-    queryKey: ["published-vex", product, stream, variant, kind],
+    queryKey: ["published-vex", product, branchOrTag, variant, kind],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance",
           {
             params: { path, query: asked },
           },
@@ -47,7 +47,7 @@ export function PublishedVEX() {
     mutationFn: async () =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance",
           {
             params: { path, query: asked },
           },
@@ -55,7 +55,7 @@ export function PublishedVEX() {
       ),
     onSuccess: () => {
       void queries.invalidateQueries({
-        queryKey: ["published-vex", product, stream, variant, kind],
+        queryKey: ["published-vex", product, branchOrTag, variant, kind],
       });
     },
   });
@@ -64,7 +64,7 @@ export function PublishedVEX() {
 
   return (
     <>
-      <Crumbs product={product} stream={stream} variant={variant} />
+      <Crumbs product={product} branch_or_tag={branchOrTag} variant={variant} />
       <div className="screen-head">
         <h2>Published VEX</h2>
         <p>
@@ -74,7 +74,7 @@ export function PublishedVEX() {
             : "Approved dismissals and public findings only."}{" "}
           <a
             href={linkTo(
-              "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex",
+              "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex",
               {
                 path,
                 query: asked,
@@ -152,7 +152,7 @@ export function PublishedVEX() {
                       <td>
                         <a
                           href={linkTo(
-                            "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}",
+                            "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance/{version}",
                             {
                               path: { ...path, version: row.version ?? 0 },
                               query: asked,
@@ -186,7 +186,7 @@ export function PublishedVEX() {
             Recorded as version {record.data.version}.{" "}
             <a
               href={linkTo(
-                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}",
+                "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance/{version}",
                 {
                   path: { ...path, version: record.data.version },
                   query: asked,

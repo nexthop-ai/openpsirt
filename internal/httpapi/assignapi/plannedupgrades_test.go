@@ -105,14 +105,14 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		// reasoning's alone.
 		unreasoned := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		httpapitest.RefusedWith(t, unreasoned, http.StatusUnprocessableEntity)
 		if !strings.Contains(unreasoned.Body.String(), "reasoning") {
 			t.Errorf("the refusal does not name the reasoning: %s", unreasoned.Body.String())
 		}
 
 		// One act, one transaction. A release past end-of-life cannot be a fix
-		// target, and that refusal comes from the half that writes the intent
+		// build, and that refusal comes from the half that writes the intent
 		// — after the decisions have been written. Nothing may survive it: a
 		// bump half declared is a release plan that says a bump is declared
 		// for a release it is not.
@@ -125,7 +125,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		refused := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 				`"reasoning":"Taking the bump.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		// The caller may triage here; what they asked for cannot be done, and
 		// the answer names the release so they know which one to drop.
 		httpapitest.RefusedWith(t, refused, http.StatusUnprocessableEntity)
@@ -163,7 +163,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("declaring a bump answered %d: %s", got.Code, got.Body.String())
 		}
@@ -246,7 +246,7 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -323,8 +323,8 @@ func TestAnUpgradeIsOneDecisionPerOccurrenceHoweverManyBuildsShipIt(t *testing.T
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"},`+
-				`{"stream":"master","variant":"mellanox"}]}`)
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"},`+
+				`{"branch_or_tag":"master","variant":"mellanox"}]}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("declaring a bump across two builds answered %d: %s",
 				got.Code, got.Body.String())
@@ -381,7 +381,7 @@ func TestABuildHasOneCommitmentPerFold(t *testing.T) {
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.6.0-1","by":"`+ahead+`",`+
 				`"reasoning":"Taking the 8.6.0 bump in the next build.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -459,7 +459,7 @@ func TestAPromisedUpgradeSaysWhereItStandsAndLapsesAsOneItem(t *testing.T) {
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"`+ahead+`",`+
 				`"reasoning":"Taking the 8.5.0 bump in the next build.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 		if one := standing(t); one.State != "planned" || one.By != ahead {
@@ -527,7 +527,7 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"2030-01-01",`+
 				`"reasoning":"Taking the 8.5.0 bump.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
@@ -626,7 +626,7 @@ func TestAPromiseCarriesNoBoundAndADecisionKeepsItsOwn(t *testing.T) {
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		if promised.Code != http.StatusCreated {
 			t.Fatalf("a promise past the cap answered %d: %s",
 				promised.Code, promised.Body.String())
@@ -854,7 +854,7 @@ func TestThePlannedUpgradeFileSaysWhatTheListSays(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/planned-upgrades.csv?stream=master&variant=broadcom", "")
+			"/v1/products/mine/planned-upgrades.csv?branch_or_tag=master&variant=broadcom", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
 		}
@@ -885,7 +885,7 @@ func TestTheBuildPlannedUpgradeFileSaysWhatTheListSays(t *testing.T) {
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 				`"reasoning":"Taking the 8.5.0 bump.",`+
-				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+				`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 

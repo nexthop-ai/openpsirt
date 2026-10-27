@@ -11,7 +11,7 @@ import (
 )
 
 // Somebody working private reports holds the undisclosed half alone, and is
-// not handed the disclosed stream with it. Each visibility is its own grant,
+// not handed the disclosed branch or tag with it. Each visibility is its own grant,
 // and this is the identity the two private-only roles exist for.
 func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -95,7 +95,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 
 		// Recording a flaw that is already public asks for the public half.
 		if got := httpapitest.AsPerson(t, r, "embargo-triager", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"disclosed":true,`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"disclosed":true,`+
 				`"summary":"A flaw somebody announced last week.",`+
 				`"severity":"high","component":"libnl-3-200"}`); got.Code != http.StatusNotFound {
 			t.Errorf("private triage recording a disclosed flaw answered %d: %s",

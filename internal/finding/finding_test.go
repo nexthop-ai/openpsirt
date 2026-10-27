@@ -35,7 +35,7 @@ type fixture struct {
 	db        *database.DB
 	store     *finding.Store
 	graph     *graph.Store
-	target    int64
+	build     int64
 	productID int64
 	// tag is the release the default world cut from the branch, and variant
 	// the way the branch is built.
@@ -73,100 +73,100 @@ func (f *fixture) shipped(t *testing.T, snap graph.Snapshot) {
 	f.seq++
 	f.built = f.built.Add(time.Hour)
 	scan, outcome, err := f.scans.Record(t.Context(), ingest.Arriving{
-		TargetID: f.target, ContentHash: fmt.Sprintf("hash-%d", f.seq), BuiltAt: f.built,
+		BuildID: f.build, ContentHash: fmt.Sprintf("hash-%d", f.seq), BuiltAt: f.built,
 		ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := world.ApplyGraph(t.Context(), f.db, f.target, scan.ID, snap); err != nil {
+	if _, err := world.ApplyGraph(t.Context(), f.db, f.build, scan.ID, snap); err != nil {
 		t.Fatalf("apply graph: %v", err)
 	}
 	f.lastScan = scan.ID
 }
 
 // anotherBuild declares a second release of the same product, as a tag, and
-// returns its target.
+// returns its build.
 //
 // Anything reporting *per build* has to be tested against more than one, or
 // the grouping is enforced by there being nothing to group.
-func (f *fixture) anotherBuild(t *testing.T, stream string) int64 {
+func (f *fixture) anotherBuild(t *testing.T, branchOrTag string) int64 {
 	t.Helper()
-	return f.buildOfKind(t, stream, catalog.Tag)
+	return f.buildOfKind(t, branchOrTag, catalog.Tag)
 }
 
 // release is the default world's tag built as the fixture's variant: the
 // release cut from the fixture's branch.
 func (f *fixture) release(t *testing.T) int64 {
 	t.Helper()
-	target, err := catalog.NewStore(f.db.DB).TargetFor(t.Context(), f.tag, f.variant)
+	build, err := catalog.NewStore(f.db.DB).BuildFor(t.Context(), f.tag, f.variant)
 	if err != nil {
 		t.Fatalf("build %s: %v", world.TagName, err)
 	}
-	return target.ID
+	return build.ID
 }
 
 // anotherBranch is the same for a release that moves, which is what a test
 // about deadlines needs: a tag was built once and carries none.
-func (f *fixture) anotherBranch(t *testing.T, stream string) int64 {
+func (f *fixture) anotherBranch(t *testing.T, branchOrTag string) int64 {
 	t.Helper()
-	return f.buildOfKind(t, stream, catalog.Branch)
+	return f.buildOfKind(t, branchOrTag, catalog.Branch)
 }
 
-func (f *fixture) buildOfKind(t *testing.T, stream string, kind catalog.Kind) int64 {
+func (f *fixture) buildOfKind(t *testing.T, branchOrTag string, kind catalog.Kind) int64 {
 	t.Helper()
-	return f.buildOfKindIn(t, f.productID, stream, kind)
+	return f.buildOfKindIn(t, f.productID, branchOrTag, kind)
 }
 
 // anotherBranchOf is anotherBranch in a product other than the fixture's own,
 // for the checks about what reaches one product and not another.
-func (f *fixture) anotherBranchOf(t *testing.T, productID int64, stream string) int64 {
+func (f *fixture) anotherBranchOf(t *testing.T, productID int64, branchOrTag string) int64 {
 	t.Helper()
-	return f.buildOfKindIn(t, productID, stream, catalog.Branch)
+	return f.buildOfKindIn(t, productID, branchOrTag, catalog.Branch)
 }
 
-func (f *fixture) buildOfKindIn(t *testing.T, productID int64, stream string,
+func (f *fixture) buildOfKindIn(t *testing.T, productID int64, branchOrTag string,
 	kind catalog.Kind) int64 {
 
 	t.Helper()
 	cat := catalog.NewStore(f.db.DB)
-	declared, err := cat.DeclareStream(t.Context(), productID, stream, kind, nil)
+	declared, err := cat.DeclareBranchOrTag(t.Context(), productID, branchOrTag, kind, nil)
 	if err != nil {
-		t.Fatalf("declare %s: %v", stream, err)
+		t.Fatalf("declare %s: %v", branchOrTag, err)
 	}
 	variant, err := cat.VariantByName(t.Context(), productID, "broadcom")
 	if err != nil {
 		t.Fatalf("variant: %v", err)
 	}
-	target, err := cat.TargetFor(t.Context(), declared.ID, variant.ID)
+	build, err := cat.BuildFor(t.Context(), declared.ID, variant.ID)
 	if err != nil {
-		t.Fatalf("target for %s: %v", stream, err)
+		t.Fatalf("build for %s: %v", branchOrTag, err)
 	}
-	return target.ID
+	return build.ID
 }
 
 // shippedTo stores a graph against a build other than the fixture's own.
-func (f *fixture) shippedTo(t *testing.T, target int64, snap graph.Snapshot) {
+func (f *fixture) shippedTo(t *testing.T, build int64, snap graph.Snapshot) {
 	t.Helper()
 	f.seq++
 	f.built = f.built.Add(time.Hour)
 	scan, outcome, err := f.scans.Record(t.Context(), ingest.Arriving{
-		TargetID: target, ContentHash: fmt.Sprintf("hash-%d", f.seq), BuiltAt: f.built,
+		BuildID: build, ContentHash: fmt.Sprintf("hash-%d", f.seq), BuiltAt: f.built,
 		ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := world.ApplyGraph(t.Context(), f.db, target, scan.ID, snap); err != nil {
+	if _, err := world.ApplyGraph(t.Context(), f.db, build, scan.ID, snap); err != nil {
 		t.Fatalf("apply graph: %v", err)
 	}
 }
 
 // runOn starts a scan run against a build other than the fixture's own.
-func (f *fixture) runOn(t *testing.T, target int64) int64 {
+func (f *fixture) runOn(t *testing.T, build int64) int64 {
 	t.Helper()
 	r, err := f.store.Begin(t.Context(), finding.Run{
-		TargetID: target, Scanner: "grype", ScannerVersion: "0.100.0",
+		BuildID: build, Scanner: "grype", ScannerVersion: "0.100.0",
 		DatabaseVersion: "2026-08-28", RanHere: true,
 	})
 	if err != nil {
@@ -193,7 +193,7 @@ func twoConsumers() graph.Snapshot {
 func (f *fixture) run(t *testing.T) int64 {
 	t.Helper()
 	r, err := f.store.Begin(t.Context(), finding.Run{
-		TargetID: f.target, Scanner: "grype", ScannerVersion: "0.100.0",
+		BuildID: f.build, Scanner: "grype", ScannerVersion: "0.100.0",
 		DatabaseVersion: "2026-08-28", RanHere: true,
 	})
 	if err != nil {
@@ -219,19 +219,19 @@ func (f *fixture) openClaims(t *testing.T) []finding.Claim {
 	t.Helper()
 	var rows []finding.Claim
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, f.target).Where(`"closed_scan_id" IS NULL`).
+		Where(`"build_id" = ?`, f.build).Where(`"closed_scan_id" IS NULL`).
 		Order("id").Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return rows
 }
 
-// every is each row the target holds, open or closed, oldest first.
+// every is each row the build holds, open or closed, oldest first.
 func (f *fixture) every(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	err := f.db.DB.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, f.target).Order("id").Scan(t.Context())
+		Where(`"build_id" = ?`, f.build).Order("id").Scan(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func (f *fixture) open(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	err := f.db.DB.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, f.target).Where(`"closed_at" IS NULL`).Scan(t.Context())
+		Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NULL`).Scan(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func (f *fixture) open(t *testing.T) []finding.Finding {
 // product, its branch built as the customer variant, and the tag cut from the
 // branch, as identifiers.
 type seededCatalog struct {
-	product, stream, variant, target, tag int64
+	product, branchOrTag, variant, build, tag int64
 }
 
 // catalogSeed is the catalog every test here starts from, seeded once per
@@ -264,7 +264,7 @@ var catalogSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (seeded
 		return seededCatalog{}, err
 	}
 	return seededCatalog{
-		product: w.Product.ID, stream: w.Branch.ID, variant: w.Customer.ID, target: w.Target.ID,
+		product: w.Product.ID, branchOrTag: w.Branch.ID, variant: w.Customer.ID, build: w.Build.ID,
 		tag: w.Tag.ID,
 	}, nil
 })
@@ -274,9 +274,9 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	catalogSeed.Each(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		fn(t, &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-			target: c.target, productID: c.product, tag: c.tag, variant: c.variant, scans: ingest.NewStore(db.DB),
+			build: c.build, productID: c.product, tag: c.tag, variant: c.variant, scans: ingest.NewStore(db.DB),
 			scope: finding.Scope{
-				ProductID: &c.product, StreamID: &c.stream, VariantID: &c.variant,
+				ProductID: &c.product, BranchOrTagID: &c.branchOrTag, VariantID: &c.variant,
 			},
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		})
@@ -291,9 +291,9 @@ func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	catalogSeed.Servers(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		fn(t, &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-			target: c.target, productID: c.product, tag: c.tag, variant: c.variant, scans: ingest.NewStore(db.DB),
+			build: c.build, productID: c.product, tag: c.tag, variant: c.variant, scans: ingest.NewStore(db.DB),
 			scope: finding.Scope{
-				ProductID: &c.product, StreamID: &c.stream, VariantID: &c.variant,
+				ProductID: &c.product, BranchOrTagID: &c.branchOrTag, VariantID: &c.variant,
 			},
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		})
@@ -328,7 +328,7 @@ func (f *fixture) planner(t *testing.T, roles ...access.Role) access.Subject {
 // fails the test where the scan fails.
 func (f *fixture) applied(t *testing.T, reported ...finding.Reported) finding.Applied {
 	t.Helper()
-	got, err := f.store.Apply(t.Context(), f.target, f.run(t), reported)
+	got, err := f.store.Apply(t.Context(), f.build, f.run(t), reported)
 	if err != nil {
 		t.Fatal(err)
 	}

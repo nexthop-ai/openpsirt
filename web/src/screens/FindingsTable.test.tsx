@@ -30,7 +30,7 @@ async function draw(rows: Row[], decided: Decided) {
         spanning={false}
         oneBuild
         sortable={(label) => label}
-        buildOf={() => ({ product: "sonic", stream: "master", variant: "broadcom" })}
+        buildOf={() => ({ product: "sonic", branch_or_tag: "master", variant: "broadcom" })}
         siblings={new Map()}
         carrying=""
         prepared={null}

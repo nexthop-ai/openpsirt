@@ -360,8 +360,8 @@ func rootOwners(ctx context.Context, db bun.IDB, products []int64,
 		OrderExpr(`MAX("sc"."id") DESC`).
 		Limit(MostRoots)
 	if !all {
-		q = q.Join(`JOIN "target" AS "tg" ON "tg"."id" = "sc"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		q = q.Join(`JOIN "build" AS "tg" ON "tg"."id" = "sc"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}
 	var declared []string

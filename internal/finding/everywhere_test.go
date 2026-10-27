@@ -31,7 +31,7 @@ func TestTwoVersionsOfAComponentAreTwoSightingsAndAreCountedAsTwo(t *testing.T) 
 				{Parent: teamd, Child: libnlNew},
 			},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-1", libnlNew),
 		}); err != nil {
 			t.Fatal(err)
@@ -70,7 +70,7 @@ func TestTheProductsCarryingAnIssueAreCountedPastThePage(t *testing.T) {
 		ctx := t.Context()
 		reported := []finding.Reported{found("CVE-2026-1", libnl)}
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 		var others []int64

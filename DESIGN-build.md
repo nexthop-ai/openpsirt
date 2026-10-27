@@ -48,7 +48,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/database/migrate/migrations/` | The migrations |
 | `internal/schema/` | Applies this application's schema. Exists so that using the runner registers the migrations |
 | `internal/dbtest/` | Runs a test against every database available to it |
-| `internal/catalog/` | Products, streams and variants. See `DESIGN-data-model.md` |
+| `internal/catalog/` | Products, branches and tags, and variants. See `DESIGN-data-model.md` |
 | `internal/ingest/` | Arriving scans. See `DESIGN-ingest.md` |
 | `internal/queue/` | Durable background work. See `DESIGN-queue.md` |
 | `internal/sbom/`, `internal/scanner/` | Reading an inventory and scanning it. See `DESIGN-ingest.md` |
@@ -501,7 +501,7 @@ test needs to reach the rows, such as an identifier or a secret shown once.
 | SQLite | Once per binary, against the template, before the first copy |
 | The three servers | Per test, after the binary's database is emptied |
 
-A test that needs a product, its streams, its variants and a build of them
+A test that needs a product, its branches and tags, its variants and a build of them
 takes them from one shared default world rather than declaring its own. The
 world is seeded either per test or as the rows a package's template starts
 from, and it keeps apart the attributes a hand-written seed collapses.
@@ -509,7 +509,7 @@ from, and it keeps apart the attributes a hand-written seed collapses.
 | The default world holds | So that |
 |---|---|
 | A product whose display name is not its name in other capitals | A read answering the display name where the name is resolved fails |
-| A branch and a tag cut from it | A read keyed on the stream answers more than one bucket |
+| A branch and a tag cut from it | A read keyed on the branch or tag answers more than one bucket |
 | One variant reaching customers and one not | A rule keyed on that flag is shown on both sides |
 | A person whose display name is neither empty nor their identity | A read of one never coincides with the other |
 

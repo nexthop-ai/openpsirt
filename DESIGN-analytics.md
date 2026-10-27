@@ -180,7 +180,7 @@ last release a customer actually has, which is rarely the previous one.
 
 | Rule | Reason |
 |---|---|
-| Both builds are authorized, not one | The first version authorized the later target and applied that answer to the earlier one, so somebody who could reach one product could read findings out of another |
+| Both builds are authorized, not one | The first version authorized the later build and applied that answer to the earlier one, so somebody who could reach one product could read findings out of another |
 | Public findings only unless asked otherwise | The destination is usually a public document. Where the two builds differ in what the reader may see, the narrower answer governs |
 | Ordered worst first and stably | A release note that reorders between reads is one nobody can diff |
 | Bounded by the size of a build, not the calendar | Every open entry of both builds, which is what diffing them means. There is no page of a diff |
@@ -584,7 +584,7 @@ report that exists to find it.
 | It says "this should be empty" only where every outcome asked for is a dismissal, of a vulnerability or a code finding | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
 | What was asked for is printed with every value | A sheet headed "dismissed — not applicable" over rows that also hold deferrals is a sheet nobody can check against anything |
 | The audit log narrows to one build, reached through the findings at each occurrence | A decision names no build, deliberately — it is keyed on the product, the issue and the occurrence, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the decision, because an occurrence identity carries none |
-| A build is a product, a stream and a variant together, or none of them | Named alone, a stream would narrow to a stream of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
+| A build is a product, a branch or tag and a variant together, or none of them | Named alone, a branch or tag would narrow to one of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
 | The file carries every agreement with its dates, beside who agrees now | What somebody agreed to and then stopped agreeing to is what an audit is looking for, and the file carried neither it nor any date. The two are different questions and a column mixing them is the one answer an auditor must not be given |
 
 ## Dismissals and last uploads

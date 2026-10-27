@@ -24,8 +24,8 @@ type Level int
 const (
 	// ByProduct counts what is open against each product.
 	ByProduct Level = iota
-	// ByStream counts against each branch or tag.
-	ByStream
+	// ByBranchOrTag counts against each branch or tag.
+	ByBranchOrTag
 	// ByVariant counts against each variant.
 	ByVariant
 )
@@ -34,8 +34,8 @@ func (l Level) column() (string, bool) {
 	switch l {
 	case ByProduct:
 		return `"st"."product_id"`, true
-	case ByStream:
-		return `"tg"."stream_id"`, true
+	case ByBranchOrTag:
+		return `"tg"."branch_or_tag_id"`, true
 	case ByVariant:
 		return `"tg"."variant_id"`, true
 	}
@@ -67,8 +67,8 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 	inner := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(column+` AS "grouped_by"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).

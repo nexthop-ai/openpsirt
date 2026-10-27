@@ -24,7 +24,7 @@ func TestOneIssueUnderTwoNamesIsOneIssue(t *testing.T) {
 
 		// First run: reported under an advisory identifier that knows the
 		// national one as an alias.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("GHSA-aaaa-bbbb-cccc", libnl, "CVE-2026-1")}); err != nil {
 			t.Fatal(err)
 		}
@@ -34,7 +34,7 @@ func TestOneIssueUnderTwoNamesIsOneIssue(t *testing.T) {
 		}
 
 		// Second run: the same issue, reported the other way round.
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)})
 		if err != nil {
 			t.Fatal(err)
@@ -62,11 +62,11 @@ func TestAnAliasSuppliedLaterFindsTheIssueAlreadyHeld(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("GHSA-aaaa-bbbb-cccc", libnl, "CVE-2026-1")})
 		if err != nil {
 			t.Fatalf("an issue reported under a second name: %v", err)
@@ -90,7 +90,7 @@ func TestAnIssueIsFiledUnderItsMostRecognizedName(t *testing.T) {
 	// not whichever database the scanner happened to consult first.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("GHSA-aaaa-bbbb-cccc", libnl, "CVE-2026-1")}); err != nil {
 			t.Fatal(err)
 		}
@@ -109,7 +109,7 @@ func TestAnIssueAgainstSomethingWeDoNotHaveIsReported(t *testing.T) {
 	// worth seeing, not quietly discarding.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-9", at("openssl", "3.0.11"))})
 		if err != nil {
 			t.Fatal(err)
@@ -151,7 +151,7 @@ func TestWhatKindOfFlawAnIssueIsIsAddedToAndNeverTakenAway(t *testing.T) {
 			t.Helper()
 			one := found("CVE-2026-1", swss)
 			one.Issue.Weaknesses = cwes
-			if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			if _, err := f.store.Apply(ctx, f.build, f.run(t),
 				[]finding.Reported{one}); err != nil {
 				t.Fatal(err)
 			}

@@ -134,7 +134,7 @@ func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."component_id"`).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(kinds, kindArgs...)
 	if err := InTheFoldOf(q, componentID).
@@ -166,7 +166,7 @@ func (s *Store) LabelsOn(ctx context.Context, productID, vulnerabilityID,
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."component_id"`).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...)
@@ -225,8 +225,8 @@ func (s *Store) LabelsInUse(ctx context.Context, subject access.Subject,
 	// matches nothing the caller may see would be its own small oracle.
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	onSomethingReadable := `EXISTS (SELECT 1 FROM "finding" AS "f"
-		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
-		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+		JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"
+		JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
 		WHERE "st"."product_id" = "ft"."product_id"
 		  AND "f"."vulnerability_id" = "ft"."vulnerability_id"
 		  AND "f"."component_id" = "ft"."component_id"
@@ -284,7 +284,7 @@ type foldMark struct {
 // marksOnFolds reads the words on the packages of some folds, each one
 // narrowed to a package carrying a finding of its issue in its product that
 // the reader may see: readable narrows a query over finding AS "f" joined to
-// its stream as "st".
+// its branch or tag as "st".
 //
 // Through the fold, because a label belongs to it: a package that joined the
 // fold after the word was put on carries no row of its own. Narrowed by the
@@ -299,8 +299,8 @@ func (s *Store) marksOnFolds(ctx context.Context, products, issues []int64, fold
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	seen := readable(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr("1").
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = "ft"."product_id"`).

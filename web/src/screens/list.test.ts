@@ -233,7 +233,7 @@ describe("the filters as the server takes them", () => {
   });
 
   it("leaves out a build the address does not name", () => {
-    expect(where(new URLSearchParams("stream=main"))).toEqual({ stream: "main" });
+    expect(where(new URLSearchParams("branch_or_tag=main"))).toEqual({ branch_or_tag: "main" });
     expect(where(new URLSearchParams())).toEqual({});
   });
 });
@@ -347,9 +347,9 @@ describe("widening out of a scope", () => {
   it("lets the address being built own the branch and the variant", () => {
     // findingsPath puts back whichever of these the new scope still has, so
     // carrying the old ones would name a build the new path is not about.
-    const asked = new URLSearchParams("state=undecided&stream=master&variant=broadcom");
-    const out = query(widened("/products/sonic/findings?stream=master", asked));
-    expect(out.getAll("stream")).toEqual(["master"]);
+    const asked = new URLSearchParams("state=undecided&branch_or_tag=master&variant=broadcom");
+    const out = query(widened("/products/sonic/findings?branch_or_tag=master", asked));
+    expect(out.getAll("branch_or_tag")).toEqual(["master"]);
     expect(out.getAll("variant")).toEqual([]);
     expect(out.get("state")).toBe("undecided");
   });
@@ -366,7 +366,7 @@ describe("widening out of a scope", () => {
 
   it("drops a subtree, which is a walk over the build being widened out of", () => {
     const asked = new URLSearchParams("beneath=curl&beneath_version=8&state=undecided");
-    const out = query(widened("/products/sonic/findings?stream=master", asked));
+    const out = query(widened("/products/sonic/findings?branch_or_tag=master", asked));
     expect(out.get("beneath")).toBeNull();
     expect(out.get("beneath_version")).toBeNull();
     expect(out.get("state")).toBe("undecided");

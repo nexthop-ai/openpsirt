@@ -125,7 +125,7 @@ func keyedBy(q *bun.SelectQuery, keys []partKey) *bun.SelectQuery {
 // over them reads the same at either level.
 func (f Filter) folded(db bun.IDB, rows *bun.SelectQuery, keys []partKey) *bun.SelectQuery {
 	if f.DiffersBetweenBuilds && f.Builds > 1 {
-		keys = append(keys[:len(keys):len(keys)], partKey{expr: `"f"."target_id"`, name: "target_id"})
+		keys = append(keys[:len(keys):len(keys)], partKey{expr: `"f"."build_id"`, name: "build_id"})
 	}
 	var inner *bun.SelectQuery
 	if f.asksDecided() {

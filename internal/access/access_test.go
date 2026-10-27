@@ -28,10 +28,10 @@ type fixture struct {
 	db *database.DB
 	// catalog declares products, for the tests that need one to appear after
 	// somebody was already granted something.
-	catalog  *catalog.Store
-	products map[string]int64
-	streams  map[string]int64
-	variants map[string]int64
+	catalog         *catalog.Store
+	products        map[string]int64
+	branchesAndTags map[string]int64
+	variants        map[string]int64
 }
 
 // holding is somebody holding the given roles on one product.
@@ -62,7 +62,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			store:    access.NewStore(db.DB),
 			db:       db,
 			catalog:  cat,
-			products: map[string]int64{}, streams: map[string]int64{}, variants: map[string]int64{},
+			products: map[string]int64{}, branchesAndTags: map[string]int64{}, variants: map[string]int64{},
 		}
 		for _, name := range []string{"sonic", "onie"} {
 			product, err := cat.DeclareProduct(ctx, name, name)
@@ -70,11 +70,11 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 				t.Fatal(err)
 			}
 			f.products[name] = product.ID
-			stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+			branchOrTag, err := cat.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			f.streams[name] = stream.ID
+			f.branchesAndTags[name] = branchOrTag.ID
 			variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
 			if err != nil {
 				t.Fatal(err)
@@ -164,7 +164,7 @@ func TestReadingPublicIsNotReadingPrivate(t *testing.T) {
 }
 
 // Each visibility is its own grant. Somebody working private reports holds
-// the undisclosed half and is not handed the disclosed stream with it.
+// the undisclosed half and is not handed the disclosed branch or tag with it.
 func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 	embargo := access.NewPerson(7, "embargo", false, map[int64][]access.Role{
 		4: {access.PrivateRead},
@@ -416,7 +416,7 @@ func TestAKeyMaySendAndNothingElse(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !subject.MaySend(f.products["sonic"], f.streams["sonic"], f.variants["sonic"]) {
+		if !subject.MaySend(f.products["sonic"], f.branchesAndTags["sonic"], f.variants["sonic"]) {
 			t.Error("a key cannot send against the product it is scoped to")
 		}
 		if subject.Reads(access.Public, f.products["sonic"]) ||
@@ -449,9 +449,9 @@ func TestAKeyIsRefusedWhereItsConstraintsDoNotMatch(t *testing.T) {
 	// scan of another.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		stream := f.streams["sonic"]
+		branchOrTag := f.branchesAndTags["sonic"]
 		_, secret, err := f.store.NewKey(ctx, "pinned", access.Scope{
-			ProductID: f.products["sonic"], StreamID: &stream,
+			ProductID: f.products["sonic"], BranchOrTagID: &branchOrTag,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -460,13 +460,13 @@ func TestAKeyIsRefusedWhereItsConstraintsDoNotMatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !subject.MaySend(f.products["sonic"], stream, f.variants["sonic"]) {
+		if !subject.MaySend(f.products["sonic"], branchOrTag, f.variants["sonic"]) {
 			t.Error("a pinned key was refused its own release")
 		}
-		if subject.MaySend(f.products["sonic"], f.streams["onie"], f.variants["sonic"]) {
+		if subject.MaySend(f.products["sonic"], f.branchesAndTags["onie"], f.variants["sonic"]) {
 			t.Error("a key pinned to one release accepted another")
 		}
-		if subject.MaySend(f.products["onie"], f.streams["onie"], f.variants["onie"]) {
+		if subject.MaySend(f.products["onie"], f.branchesAndTags["onie"], f.variants["onie"]) {
 			t.Error("a key reached another product entirely")
 		}
 	})

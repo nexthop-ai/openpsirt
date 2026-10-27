@@ -112,9 +112,9 @@ function whyNone(reason: string | undefined): string {
 export function Finding() {
   const {
     product = "",
-    stream = "",
+    branch_or_tag: branchOrTag = "",
     variant = "",
-    vulnerability = "",
+    issue: vulnerability = "",
     component = "",
   } = useParams();
   const [params] = useSearchParams();
@@ -129,7 +129,7 @@ export function Finding() {
   const walking = params.has("from");
   const from = params.get("from") ?? "";
   const who = useWho();
-  const at = { product, stream, variant, vulnerability, component };
+  const at = { product, branch_or_tag: branchOrTag, variant, vulnerability, component };
   // The same finding with what picks its component, as the panes acting on it
   // take it.
   const located: At = { ...at, version, ecosystem, namespace };
@@ -157,7 +157,7 @@ export function Finding() {
   // The rest of what belongs to one finding, put back on walking to the next:
   // the confirmation of what was recorded, the decision being extended, and
   // the rating form and what it recorded.
-  useReseed(`${product}|${stream}|${variant}|${oneFinding}`, () => {
+  useReseed(`${product}|${branchOrTag}|${variant}|${oneFinding}`, () => {
     setRecorded(null);
     setExtending(null);
     setReclassifying(false);
@@ -175,10 +175,16 @@ export function Finding() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}",
           {
             params: {
-              path: { product, stream, variant, issue: vulnerability, component },
+              path: {
+                product,
+                branch_or_tag: branchOrTag,
+                variant,
+                issue: vulnerability,
+                component,
+              },
               query: whichOf({ version, ecosystem, namespace }),
             },
           },
@@ -244,12 +250,12 @@ export function Finding() {
         queryFn: async () =>
           unwrap(
             await api.GET(
-              "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision",
+              "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision",
               {
                 params: {
                   path: {
                     product,
-                    stream,
+                    branch_or_tag: branchOrTag,
                     variant,
                     issue: vulnerability,
                     occurrence: occurrence.occurrence ?? "",
@@ -354,7 +360,7 @@ export function Finding() {
   // the list may have been across several.
   const back = walking
     ? productFindingsAt(product, from)
-    : buildFindingsAt({ product, stream, variant });
+    : buildFindingsAt({ product, branch_or_tag: branchOrTag, variant });
   const mine = (proposedBy: string) => !!who.data && proposedBy === who.data.identity;
 
   return (
@@ -407,7 +413,7 @@ export function Finding() {
           <span className={`state ${state.cls}`}>{state.label}</span>
         </h2>
         <p>
-          {product} · {stream} · {variant} · {distinct}{" "}
+          {product} · {branchOrTag} · {variant} · {distinct}{" "}
           {distinct === 1 ? "occurrence" : "occurrences"} ·{" "}
           <b style={{ color: "var(--ink)" }}>
             {decided} of {distinct} decided
@@ -700,7 +706,10 @@ export function Finding() {
             <Link
               className="linkish id"
               title={`Open ${it.component}`}
-              to={componentAt(product, it.component ?? "", it.version, { stream, variant })}
+              to={componentAt(product, it.component ?? "", it.version, {
+                branch_or_tag: branchOrTag,
+                variant,
+              })}
             >
               {it.component} {it.version}
             </Link>
@@ -1145,7 +1154,7 @@ export function Finding() {
                   // stayed mounted and kept the previous build's answers in its
                   // fields — an outcome and a justification about one variant,
                   // offered against another.
-                  key={`${prefill.opened}:${product}:${stream}:${variant}:${vulnerability}:${component}:${version}`}
+                  key={`${prefill.opened}:${product}:${branchOrTag}:${variant}:${vulnerability}:${component}:${version}`}
                 />
               </div>
             )}
@@ -1211,7 +1220,7 @@ export function Finding() {
         <div className="card">
           <Occurrences
             occurrences={occurrences}
-            build={{ product, stream, variant }}
+            build={{ product, branch_or_tag: branchOrTag, variant }}
             version={it.version}
           />
         </div>
@@ -1242,7 +1251,7 @@ export function Finding() {
           <FlawCodeFindingCard
             product={product}
             vulnerability={vulnerability}
-            stream={stream}
+            branch_or_tag={branchOrTag}
             variant={variant}
           />
         )}
@@ -1251,7 +1260,7 @@ export function Finding() {
           <Resolve
             at={at}
             vulnerability={vulnerability}
-            prefill={fixedFromCodeFinding(flawCodeFinding.data, stream, variant)}
+            prefill={fixedFromCodeFinding(flawCodeFinding.data, branchOrTag, variant)}
           />
         )}
 

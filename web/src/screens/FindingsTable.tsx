@@ -151,7 +151,7 @@ export function FindingsTable({
   oneBuild: boolean;
   sortable: (label: keyof typeof SORTS) => React.ReactNode;
   // The build a row's actions and links are about.
-  buildOf: (row: Row) => { product: string; stream: string; variant: string };
+  buildOf: (row: Row) => { product: string; branch_or_tag: string; variant: string };
   // The other rows on this page that are the same issue at another binary of
   // one source package.
   siblings: Map<string, number>;

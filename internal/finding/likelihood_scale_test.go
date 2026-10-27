@@ -47,7 +47,7 @@ func TestMeasureALikelihoodDay(t *testing.T) {
 		}
 		tag := f.anotherBuild(t, "24.06")
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), report(&yesterday, 0)); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), report(&yesterday, 0)); err != nil {
 			t.Fatal(err)
 		}
 		f.shippedTo(t, tag, twoConsumers())
@@ -59,7 +59,7 @@ func TestMeasureALikelihoodDay(t *testing.T) {
 		f.hook(asked)
 		run := f.run(t)
 		start := time.Now()
-		applied, err := f.store.Apply(ctx, f.target, run, report(&today, 1))
+		applied, err := f.store.Apply(ctx, f.build, run, report(&today, 1))
 		if err != nil {
 			t.Fatal(err)
 		}

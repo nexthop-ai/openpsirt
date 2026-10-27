@@ -5,7 +5,7 @@ package catalog
 
 import "github.com/uptrace/bun"
 
-// What a product, a stream or a variant is called on a screen: its display
+// What a product, a branch or tag or a variant is called on a screen: its display
 // name, or its name where it has none.
 //
 // One rule for every reader and every endpoint. A label that is blank on one
@@ -28,17 +28,17 @@ func ShownExpr(alias string) string {
 	return `COALESCE(NULLIF("` + alias + `"."display_name", ''), "` + alias + `"."name")`
 }
 
-// BuildNames adds the six columns that name a build — its product, stream and
+// BuildNames adds the six columns that name a build — its product, branch or tag and
 // variant, each by name and as shown — to a statement joining those three rows
 // under these aliases. Passed to Apply. A grouped statement groups by each
 // row's name and display name.
-func BuildNames(product, stream, variant string) func(*bun.SelectQuery) *bun.SelectQuery {
+func BuildNames(product, branchOrTag, variant string) func(*bun.SelectQuery) *bun.SelectQuery {
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.
 			ColumnExpr(`"` + product + `"."name" AS "product"`).
 			ColumnExpr(ShownExpr(product) + ` AS "product_name"`).
-			ColumnExpr(`"` + stream + `"."name" AS "stream"`).
-			ColumnExpr(ShownExpr(stream) + ` AS "stream_name"`).
+			ColumnExpr(`"` + branchOrTag + `"."name" AS "branch_or_tag"`).
+			ColumnExpr(ShownExpr(branchOrTag) + ` AS "branch_or_tag_name"`).
 			ColumnExpr(`"` + variant + `"."name" AS "variant"`).
 			ColumnExpr(ShownExpr(variant) + ` AS "variant_name"`)
 	}

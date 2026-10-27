@@ -135,9 +135,9 @@ export function LastUploads() {
                   <tbody>
                     {builds.map((build) => (
                       <tr
-                        key={`${build.product} ${build.stream} ${build.variant}`}
+                        key={`${build.product} ${build.branch_or_tag} ${build.variant}`}
                         className="row opens"
-                        onClick={opener(scansAt(build.product, build.stream, build.variant))}
+                        onClick={opener(scansAt(build.product, build.branch_or_tag, build.variant))}
                       >
                         <td>{build.product}</td>
                         <td>
@@ -145,11 +145,11 @@ export function LastUploads() {
                               somebody goes to see what did arrive and when. */}
                           <Link
                             className="id"
-                            to={scansAt(build.product, build.stream, build.variant)}
+                            to={scansAt(build.product, build.branch_or_tag, build.variant)}
                           >
-                            {build.stream}
+                            {build.branch_or_tag}
                           </Link>{" "}
-                          <span className="hint">{build.stream_kind}</span>
+                          <span className="hint">{build.branch_or_tag_kind}</span>
                         </td>
                         <td>{build.variant}</td>
                         <td>
@@ -190,8 +190,8 @@ function fileAt(format: "csv" | "json", asked: string): string {
   return linkedFile("/v1/last-uploads.{format}", format, { query: asked });
 }
 
-function scansAt(product: string, stream: string, variant: string): string {
-  return uploadsAt({ product, stream, variant });
+function scansAt(product: string, branchOrTag: string, variant: string): string {
+  return uploadsAt({ product, branch_or_tag: branchOrTag, variant });
 }
 
 // The one word a build's row says about its state, in the order the counts

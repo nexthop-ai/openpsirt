@@ -20,7 +20,7 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Not announced anywhere.",`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"Not announced anywhere.",`+
 				`"severity":"high","component":"libnl-3-200"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
@@ -117,7 +117,7 @@ func TestWhoeverDisclosesAnIssueIsNotToldOfIt(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Not announced anywhere.",`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"Not announced anywhere.",`+
 				`"severity":"high","component":"libnl-3-200"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())

@@ -70,7 +70,7 @@ type WaitingBody struct {
 	Issues             int    `json:"issues" doc:"The number of distinct issues it covers"`
 	Occurrences        int    `json:"occurrences" doc:"The number of distinct occurrences it covers"`
 	// Builds is every build the decision's rows currently cover, by matching.
-	Builds []string `json:"builds" doc:"Every build the decision currently covers, as stream and variant"`
+	Builds []string `json:"builds" doc:"Every build the decision currently covers, as branch or tag and variant"`
 	// Outliers is the rows of a bulk set that do not look like the rest. Only
 	// for a decision over many issues.
 	Outliers *OutliersBody `json:"outliers,omitempty" doc:"For a decision over many issues: the issues that do not look like the rest, and how many there are"`
@@ -576,14 +576,14 @@ func registerTriage(api huma.API, in core.Deps) {
 // occurrenceDecisionPath the decision made there. Every route about an
 // occurrence names it through OccurrencePath.
 const (
-	occurrencePathPrefix   = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}"
+	occurrencePathPrefix   = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}"
 	occurrenceDecisionPath = occurrencePathPrefix + "/decision"
 )
 
 // OccurrencePath is the five names an occurrence of a finding is addressed by.
 type OccurrencePath struct {
 	Product       string `path:"product"`
-	Stream        string `path:"stream"`
+	BranchOrTag   string `path:"branch_or_tag"`
 	Variant       string `path:"variant"`
 	Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 	Occurrence    string `path:"occurrence" doc:"The occurrence, as the findings list gives it"`
@@ -643,7 +643,7 @@ func registerProposing(api huma.API, in core.Deps) {
 					"component, where it covers everything open on it in the releases you name")
 		}
 
-		at, target, err := decidingAbout(ctx, in, subject, input.Product, input.Stream,
+		at, build, err := decidingAbout(ctx, in, subject, input.Product, input.BranchOrTag,
 			input.Variant, input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err
@@ -670,10 +670,10 @@ func registerProposing(api huma.API, in core.Deps) {
 			// arriving scan moves — and never supplied by the caller, since
 			// the need for a second person is not a thing the person making
 			// the commitment may state.
-			BindingAcross: []int64{target},
+			BindingAcross: []int64{build},
 			FromStatement: core.Cited(input.Body.FromStatement),
 			// Made on the build in the path, which is the one on screen.
-			MadeOn: []int64{target},
+			MadeOn: []int64{build},
 		}
 		proposal.DeferredUntil, proposal.CommittedTo, err = promisedDates(
 			input.Body.DeferredUntil, input.Body.CommittedTo)

@@ -52,10 +52,10 @@ func TestWhoMayReachWhat(t *testing.T) {
 			absent     = "/v1/products/nosuch/branches-and-tags"
 			version    = "/v1/version"
 
-			mineFound           = "/v1/products/mine/findings?stream=master&variant=broadcom"
+			mineFound           = "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"
 			mineMinimumSeverity = "/v1/products/mine/minimum-severity"
 			mineEOL             = "/v1/products/mine/end-of-life"
-			streamEOL           = "/v1/products/mine/branches-and-tags/master/end-of-life"
+			branchOrTagEOL      = "/v1/products/mine/branches-and-tags/master/end-of-life"
 			mineScans           = "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"
 			// What one upload changed about the build's inventory. Reached
 			// on the same terms the receipt carrying its counts is: they are
@@ -65,7 +65,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			// What the scanner cannot match in one build, and its file.
 			mineUnmatched   = "/v1/products/mine/branches-and-tags/master/variants/broadcom/unmatched-components"
 			theirsUnmatched = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/unmatched-components"
-			theirFound      = "/v1/products/theirs/findings?stream=master&variant=broadcom"
+			theirFound      = "/v1/products/theirs/findings?branch_or_tag=master&variant=broadcom"
 			// The same list with the branch and the variant left
 			// at "all". Widening the selection is exactly the
 			// shape that leaves a check behind on the narrow path.
@@ -169,10 +169,10 @@ func TestWhoMayReachWhat(t *testing.T) {
 			// deadline and what a build going quiet means, so it is
 			// administration for the same reason.
 			{"reader", http.MethodPut, mineEOL, http.StatusForbidden},
-			{"triager", http.MethodPut, streamEOL, http.StatusForbidden},
+			{"triager", http.MethodPut, branchOrTagEOL, http.StatusForbidden},
 			{"", http.MethodPut, mineEOL, http.StatusUnauthorized},
 			{"admin", http.MethodPut, mineEOL, http.StatusNoContent},
-			{"admin", http.MethodPut, streamEOL, http.StatusNoContent},
+			{"admin", http.MethodPut, branchOrTagEOL, http.StatusNoContent},
 
 			// An administrator reaches everything, including what nobody
 			// else can see.
@@ -457,7 +457,7 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 			"/v1/products/mine/branches-and-tags",
 			"/v1/products/mine/variants",
 			"/v1/products/mine/branches-and-tags/master/variants",
-			"/v1/products/mine/findings?stream=master&variant=broadcom",
+			"/v1/products/mine/findings?branch_or_tag=master&variant=broadcom",
 			"/v1/people",
 			"/v1/keys",
 			// A pipeline has no owner for a token to be a live reference to.
@@ -641,7 +641,7 @@ func TestTheApiDocumentIsServedToSomebodyRecognized(t *testing.T) {
 	})
 }
 
-func TestAKeyReachesOnlyTheTargetItIsScopedTo(t *testing.T) {
+func TestAKeyReachesOnlyTheBuildItIsScopedTo(t *testing.T) {
 	// The scope is checked at the endpoint, not only in the model. A key
 	// covering one product must be refused another, and refused in a way that
 	// does not say whether that other product exists.
@@ -773,7 +773,7 @@ func TestWhatAnOperationSaysItNeedsIsWhatItEnforces(t *testing.T) {
 // filled puts the fixture's own names into a templated path.
 func filled(path string) string {
 	for from, to := range map[string]string{
-		"{product}": "mine", "{stream}": "master", "{variant}": "broadcom",
+		"{product}": "mine", "{branch_or_tag}": "master", "{variant}": "broadcom",
 	} {
 		path = strings.ReplaceAll(path, from, to)
 	}

@@ -28,7 +28,7 @@ func (f *fixture) occurrencesOf(t *testing.T, identifier string) map[string]find
 	if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"f"."id" AS "id"`).ColumnExpr(`"uc"."name" AS "name"`).
-		Where(`"f"."vulnerability_id" = ?`, issue).Where(`"f"."target_id" = ?`, f.target).
+		Where(`"f"."vulnerability_id" = ?`, issue).Where(`"f"."build_id" = ?`, f.build).
 		Where(`"f"."closed_at" IS NULL`).Scan(t.Context(), &consumers); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestAReleaseCountsAnIssueAtAComponentOnceAtTheProductsRating(t *testing.T) 
 			held = true
 			if release.Open != 1 || release.BySeverity["low"] != 1 {
 				t.Errorf("%s · %s holds %d open, split %v; want 1, rated low",
-					release.Stream, release.Variant, release.Open, release.BySeverity)
+					release.BranchOrTag, release.Variant, release.Open, release.BySeverity)
 			}
 		}
 		if !held {
@@ -161,7 +161,7 @@ func (f *fixture) ratedTwoWays(t *testing.T) access.Subject {
 	ctx := t.Context()
 	both := []finding.Reported{found("CVE-2026-1", libnl), found("CVE-2026-2", libnl)}
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.Apply(ctx, f.target, f.run(t), both); err != nil {
+	if _, err := f.store.Apply(ctx, f.build, f.run(t), both); err != nil {
 		t.Fatal(err)
 	}
 	elsewhere := f.inAnotherProduct(t, "hedgehog")

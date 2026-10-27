@@ -35,15 +35,15 @@ function rank(state?: string): number {
 // issues it closes, a coordinator reads a build and the upgrades it is waiting
 // on. One query, so the two cannot come to disagree.
 export function PlannedUpgrades() {
-  const { product = "", stream = "", variant = "" } = useParams();
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "" } = useParams();
   const plan = useQuery({
-    queryKey: ["build-planned-upgrades", product, stream, variant],
+    queryKey: ["build-planned-upgrades", product, branchOrTag, variant],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades",
           {
-            params: { path: { product, stream, variant } },
+            params: { path: { product, branch_or_tag: branchOrTag, variant } },
           },
         ),
       ),
@@ -66,8 +66,8 @@ export function PlannedUpgrades() {
           <span className="n">{rows.filter((row) => row.state !== "landed").length}</span>
         </h2>
         <p>
-          Upgrades {stream} · {variant} is waiting on. Marked landed when a scan no longer finds the
-          old version.
+          Upgrades {branchOrTag} · {variant} is waiting on. Marked landed when a scan no longer
+          finds the old version.
         </p>
         {late > 0 && (
           <div className="alert warn">
@@ -83,8 +83,8 @@ export function PlannedUpgrades() {
         <p className="hint">
           {/* A link somebody follows rather than a request this page makes, so
               the browser fetches it with the session it already has. */}
-          Download <a href={fileAt(product, stream, variant, "csv")}>CSV</a> ·{" "}
-          <a href={fileAt(product, stream, variant, "json")}>JSON</a>.
+          Download <a href={fileAt(product, branchOrTag, variant, "csv")}>CSV</a> ·{" "}
+          <a href={fileAt(product, branchOrTag, variant, "json")}>JSON</a>.
         </p>
       )}
 
@@ -166,12 +166,17 @@ export function PlannedUpgrades() {
 }
 
 // The address the file comes from.
-function fileAt(product: string, stream: string, variant: string, format: "csv" | "json"): string {
+function fileAt(
+  product: string,
+  branchOrTag: string,
+  variant: string,
+  format: "csv" | "json",
+): string {
   return linkedFile(
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades.{format}",
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades.{format}",
     format,
     {
-      path: { product, stream, variant },
+      path: { product, branch_or_tag: branchOrTag, variant },
     },
   );
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// Runner scans what a target contains and records what was found.
+// Runner scans what a build contains and records what was found.
 //
 // Separate work from reading a scan, because the two happen at different
 // times: an inventory is read once when it arrives, and it is scanned again
@@ -54,9 +54,9 @@ func NewRunner(db *database.DB, q *queue.Queue, s Scanner, logger *slog.Logger, 
 	return &Runner{db: db, queue: q, scanner: s, logger: logger, name: name}
 }
 
-// Outcome is what scanning one target did.
+// Outcome is what scanning one build did.
 type Outcome struct {
-	TargetID   int64
+	BuildID    int64
 	RunID      int64
 	Components int
 	Applied    finding.Applied
@@ -88,7 +88,7 @@ func (r *Runner) Narrowing(records *cverecord.Held) *Runner {
 	return r
 }
 
-// Once claims one target and scans it, reporting whether there was anything to
+// Once claims one build and scans it, reporting whether there was anything to
 // do.
 func (r *Runner) Once(ctx context.Context) (*Outcome, error) {
 	job, err := r.queue.Claim(ctx, r.name, queue.Scan)
@@ -102,7 +102,7 @@ func (r *Runner) Once(ctx context.Context) (*Outcome, error) {
 	// a day.
 	records, wait := r.narrowedWith(ctx, job.Reference)
 	if wait != nil {
-		r.logger.Warn("a scan waits for the CVE record snapshot", "target", job.Reference, "reason", wait)
+		r.logger.Warn("a scan waits for the CVE record snapshot", "build", job.Reference, "reason", wait)
 		if err := r.queue.Postpone(ctx, job.ID, r.name, untilRecords, wait.Error()); err != nil {
 			return nil, fmt.Errorf("hand back a scan waiting for the CVE record snapshot: %w", err)
 		}
@@ -112,12 +112,12 @@ func (r *Runner) Once(ctx context.Context) (*Outcome, error) {
 	// The claim is renewed while the scan runs. A scan of a large image
 	// legitimately takes longer than a claim is honored for with nothing heard
 	// from the worker, and without renewal a second worker would take the job
-	// over and scan the same target alongside this one.
+	// over and scan the same build alongside this one.
 	working, release := r.queue.Holding(ctx, job.ID, r.name, r.logger)
 	outcome, err := r.scan(working, job.Reference, records)
 	taken := release()
 
-	ending := r.queue.Settle(ctx, job, r.name, "target", r.logger, err, taken, nil)
+	ending := r.queue.Settle(ctx, job, r.name, "build", r.logger, err, taken, nil)
 	if ending.HandedOver {
 		return nil, nil
 	}
@@ -135,8 +135,8 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 		if err != nil || outcome == nil {
 			return false, err
 		}
-		r.logger.Info("scanned a target",
-			"target", outcome.TargetID, "run", outcome.RunID,
+		r.logger.Info("scanned a build",
+			"build", outcome.BuildID, "run", outcome.RunID,
 			"components", outcome.Components,
 			"findings_opened", outcome.Applied.Opened,
 			"findings_closed", outcome.Applied.Closed,
@@ -165,12 +165,12 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 		if outcome.Applied.Unexplained >= unexplainedAlert {
 			r.logger.Warn("several findings disappeared with nothing to explain it, "+
 				"which usually means one scan went wrong rather than many things changing",
-				"target", outcome.TargetID, "run", outcome.RunID,
+				"build", outcome.BuildID, "run", outcome.RunID,
 				"unexplained", outcome.Applied.Unexplained,
 				"closed", outcome.Applied.Closed)
 		}
 		return true, nil
-	}, func(err error) { r.logger.Error("scanning a target", "error", err) })
+	}, func(err error) { r.logger.Error("scanning a build", "error", err) })
 }
 
 // unexplainedAlert is how many unexplained disappearances in one scan suggest
@@ -185,7 +185,7 @@ const unexplainedAlert = 5
 // back for. A fetch takes minutes.
 const untilRecords = 5 * time.Minute
 
-// narrowedWith is the CVE record snapshot a scan of a target narrows with, or
+// narrowedWith is the CVE record snapshot a scan of a build narrows with, or
 // why the scan has to wait for one.
 //
 // A snapshot that cannot be read is waited for: run without it, every finding
@@ -201,12 +201,12 @@ func (r *Runner) narrowedWith(ctx context.Context, reference string) (*cverecord
 	if records != nil || r.records == nil {
 		return records, nil
 	}
-	targetID, err := strconv.ParseInt(reference, 10, 64)
+	buildID, err := strconv.ParseInt(reference, 10, 64)
 	if err != nil {
-		// The scan reports a reference that is not a target, as it always has.
+		// The scan reports a reference that is not a build, as it always has.
 		return nil, nil
 	}
-	last, err := finding.NewStore(r.db.DB).LastRecordsVersion(ctx, targetID)
+	last, err := finding.NewStore(r.db.DB).LastRecordsVersion(ctx, buildID)
 	switch {
 	case err != nil:
 		return nil, err
@@ -217,14 +217,14 @@ func (r *Runner) narrowedWith(ctx context.Context, reference string) (*cverecord
 	return nil, nil
 }
 
-// scan runs the scanner over one target's contents.
+// scan runs the scanner over one build's contents.
 func (r *Runner) scan(ctx context.Context, reference string, records *cverecord.Snapshot) (*Outcome, error) {
-	targetID, err := strconv.ParseInt(reference, 10, 64)
+	buildID, err := strconv.ParseInt(reference, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("job names %q, which is not a target: %w", reference, err)
+		return nil, fmt.Errorf("job names %q, which is not a build: %w", reference, err)
 	}
 
-	components, err := graph.NewStore(r.db.DB).CurrentComponents(ctx, targetID)
+	components, err := graph.NewStore(r.db.DB).CurrentComponents(ctx, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -232,14 +232,14 @@ func (r *Runner) scan(ctx context.Context, reference string, records *cverecord.
 	findings := finding.NewStore(r.db.DB)
 
 	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: targetID, Scanner: r.scanner.Name(), RanHere: true,
+		BuildID: buildID, Scanner: r.scanner.Name(), RanHere: true,
 		RecordsVersion: records.Version(),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	outcome, result, err := r.assess(ctx, targetID, run.ID, components, records, findings)
+	outcome, result, err := r.assess(ctx, buildID, run.ID, components, records, findings)
 	// The run is recorded as having ended either way. A scanner that stopped
 	// working is otherwise indistinguishable from a product that stopped
 	// having problems — and a shutdown that canceled the scan must not also
@@ -258,7 +258,7 @@ func (r *Runner) scan(ctx context.Context, reference string, records *cverecord.
 
 // assess writes the inventory, runs the scanner over it, and records what came
 // back.
-func (r *Runner) assess(ctx context.Context, targetID, runID int64, components []graph.Described,
+func (r *Runner) assess(ctx context.Context, buildID, runID int64, components []graph.Described,
 	records *cverecord.Snapshot, findings *finding.Store) (*Outcome, Result, error) {
 	// A build holding nothing but itself has nothing to scan, and the scanner
 	// is not asked. Handed an inventory of no components it exits with an
@@ -282,7 +282,7 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	if err := narrow(records, components, result.Reported); err != nil {
 		return nil, result, err
 	}
-	applied, err := findings.Apply(ctx, targetID, runID, result.Reported)
+	applied, err := findings.Apply(ctx, buildID, runID, result.Reported)
 	if err != nil {
 		return nil, result, err
 	}
@@ -299,10 +299,10 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	// A failure here is reported and not fatal. What was found is recorded and
 	// correct; the marking is a prompt, and losing a scan over a prompt would
 	// be the wrong trade.
-	lapsed, err := triage.NewStore(r.db.DB).Lapse(ctx, targetID)
+	lapsed, err := triage.NewStore(r.db.DB).Lapse(ctx, buildID)
 	if err != nil {
 		r.logger.Error("could not mark what the code moved out from under",
-			"target", targetID, "error", err)
+			"build", buildID, "error", err)
 	}
 	if r.told != nil && len(lapsed.Told) > 0 {
 		r.told(ctx, lapsed.Told)
@@ -314,10 +314,10 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	// nothing matched changes, so a decision this fails to mark stands until the
 	// next scan with the issue open sweeps again.
 	worse, err := triage.NewStore(r.db.DB).LapseRatedWorse(ctx,
-		triage.RatedWorseWhere{OpenIn: targetID})
+		triage.RatedWorseWhere{OpenIn: buildID})
 	if err != nil {
 		r.logger.Error("could not mark what a rating rise outgrew",
-			"target", targetID, "error", err)
+			"build", buildID, "error", err)
 	}
 	if r.told != nil && len(worse.Told) > 0 {
 		r.told(ctx, worse.Told)
@@ -328,11 +328,11 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	// planner's statistics fall behind. Not fatal: what was found is recorded,
 	// and stale statistics make a query slow rather than wrong.
 	if err := database.RefreshStatistics(ctx, r.db); err != nil {
-		r.logger.Error("could not refresh the planner's statistics", "target", targetID, "error", err)
+		r.logger.Error("could not refresh the planner's statistics", "build", buildID, "error", err)
 	}
 
 	return &Outcome{
-		TargetID: targetID, RunID: runID,
+		BuildID: buildID, RunID: runID,
 		Components: len(components), Applied: applied, Lapsed: lapsed.Rows,
 	}, result, nil
 }

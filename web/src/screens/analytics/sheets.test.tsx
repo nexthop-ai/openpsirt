@@ -46,7 +46,8 @@ function links(name: string): string[] {
     .map((each) => each.getAttribute("href") ?? "");
 }
 
-const REGISTER = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register";
+const REGISTER =
+  "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register";
 
 describe("the disposition register", () => {
   const row = {
@@ -69,7 +70,7 @@ describe("the disposition register", () => {
   };
 
   async function drawn(answer: (query: Record<string, unknown>) => Answer) {
-    scoped({ product: "sonic", stream: "master", variant: "arm" });
+    scoped({ product: "sonic", branch_or_tag: "master", variant: "arm" });
     const spy = serve((path, init) =>
       path === REGISTER ? answer((init as Asked).params?.query ?? {}) : undefined,
     );
@@ -134,7 +135,7 @@ describe("the releases out of support", () => {
               items: [
                 {
                   product: "sonic",
-                  stream: "202305",
+                  branch_or_tag: "202305",
                   kind: "branch",
                   ended_on: "2026-01-01",
                   ended_days: 1,
@@ -145,7 +146,7 @@ describe("the releases out of support", () => {
               ending: [
                 {
                   product: "sonic",
-                  stream: "202411",
+                  branch_or_tag: "202411",
                   kind: "tag",
                   ended_on: "2026-12-01",
                   ended_days: -30,

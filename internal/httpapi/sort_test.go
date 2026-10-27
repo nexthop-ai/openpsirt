@@ -127,7 +127,7 @@ func TestEveryOrderTheDocumentOffersIsOneTheStoreSortsBy(t *testing.T) {
 		// The fixture's own build, which is what the placeholders in a path
 		// stand for.
 		named := strings.NewReplacer(
-			"{product}", "mine", "{stream}", "master", "{variant}", "broadcom",
+			"{product}", "mine", "{branch_or_tag}", "master", "{variant}", "broadcom",
 			"{format}", "json")
 		asked := 0
 		for path, words := range declared {

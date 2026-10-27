@@ -41,10 +41,10 @@ func RefusedWith(t *testing.T, got *httptest.ResponseRecorder, want int) {
 }
 
 // Build names one build of a product by its three names.
-type Build struct{ Product, Stream, Variant string }
+type Build struct{ Product, BranchOrTag, Variant string }
 
 // SeededBuild is the build every Reach is declared with.
-var SeededBuild = Build{Product: "mine", Stream: "master", Variant: "broadcom"}
+var SeededBuild = Build{Product: "mine", BranchOrTag: "master", Variant: "broadcom"}
 
 // The scanner run every seed reports through.
 const (
@@ -53,31 +53,31 @@ const (
 	seededDatabaseVersion = "2026-08-28"
 )
 
-// TargetOf is the target a build's names resolve to. The names must already
+// BuildOf is the build a build's names resolve to. The names must already
 // be declared.
-func (r *Reach) TargetOf(t testing.TB, b Build) int64 {
+func (r *Reach) BuildOf(t testing.TB, b Build) int64 {
 	t.Helper()
 	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(t.Context(), b.Product, b.Stream, b.Variant)
+	located, err := names.Locate(t.Context(), b.Product, b.BranchOrTag, b.Variant)
 	if err != nil {
 		t.Fatal(err)
 	}
-	target, err := names.TargetFor(t.Context(), located.StreamID, located.VariantID)
+	build, err := names.BuildFor(t.Context(), located.BranchOrTagID, located.VariantID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return target.ID
+	return build.ID
 }
 
-// Recorded records one accepted upload against a target, built now, and
+// Recorded records one accepted upload against a build, built now, and
 // answers with its scan.
 //
 // The hash is what tells two uploads of one build apart, so a seed applied
 // twice to one build passes a hash of its own each time.
-func (r *Reach) Recorded(t testing.TB, target int64, hash string) int64 {
+func (r *Reach) Recorded(t testing.TB, build int64, hash string) int64 {
 	t.Helper()
 	made, outcome, err := ingest.NewStore(r.DB.DB).Record(t.Context(), ingest.Arriving{
-		TargetID: target, ContentHash: hash, ParserVersion: "test",
+		BuildID: build, ContentHash: hash, ParserVersion: "test",
 		// Not ahead of the clock: a build stamped in the future is refused,
 		// because accepting one means no later scan is ever newer.
 		BuiltAt: time.Now().UTC(),
@@ -90,38 +90,38 @@ func (r *Reach) Recorded(t testing.TB, target int64, hash string) int64 {
 
 // Shipped records an upload of a build and applies its graph, with no scanner
 // run: what a build holds before anything has been reported against it.
-func (r *Reach) Shipped(t testing.TB, b Build, hash string, snapshot graph.Snapshot) (target, scan int64) {
+func (r *Reach) Shipped(t testing.TB, b Build, hash string, snapshot graph.Snapshot) (build, scan int64) {
 	t.Helper()
-	target = r.TargetOf(t, b)
-	scan = r.Recorded(t, target, hash)
-	if _, err := fixture.ApplyGraph(t.Context(), r.DB.DB, target, scan, snapshot); err != nil {
+	build = r.BuildOf(t, b)
+	scan = r.Recorded(t, build, hash)
+	if _, err := fixture.ApplyGraph(t.Context(), r.DB.DB, build, scan, snapshot); err != nil {
 		t.Fatal(err)
 	}
-	return target, scan
+	return build, scan
 }
 
 // Argued records what an upload argues about what it ships, with statements
 // and pedigree both stated by the build.
-func (r *Reach) Argued(t testing.TB, target, scan int64, claims []sbom.Suppression) {
+func (r *Reach) Argued(t testing.TB, build, scan int64, claims []sbom.Suppression) {
 	t.Helper()
-	if _, err := fixture.RecordClaims(t.Context(), r.DB.DB, target, scan, claims,
+	if _, err := fixture.RecordClaims(t.Context(), r.DB.DB, build, scan, claims,
 		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// Ran applies one scanner run reporting these findings against a target.
-func (r *Reach) Ran(t testing.TB, target int64, reported []finding.Reported) {
+// Ran applies one scanner run reporting these findings against a build.
+func (r *Reach) Ran(t testing.TB, build int64, reported []finding.Reported) {
 	t.Helper()
 	findings := finding.NewStore(r.DB.DB)
 	run, err := findings.Begin(t.Context(), finding.Run{
-		TargetID: target, Scanner: seededScanner, ScannerVersion: seededScannerVersion,
+		BuildID: build, Scanner: seededScanner, ScannerVersion: seededScannerVersion,
 		DatabaseVersion: seededDatabaseVersion, RanHere: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := findings.Apply(t.Context(), target, run.ID, reported); err != nil {
+	if _, err := findings.Apply(t.Context(), build, run.ID, reported); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -129,12 +129,12 @@ func (r *Reach) Ran(t testing.TB, target int64, reported []finding.Reported) {
 // ScanAt ships a build and applies one run reporting these findings against
 // it.
 func (r *Reach) ScanAt(t testing.TB, b Build, hash string, snapshot graph.Snapshot,
-	reported []finding.Reported) (target, scan int64) {
+	reported []finding.Reported) (build, scan int64) {
 
 	t.Helper()
-	target, scan = r.Shipped(t, b, hash, snapshot)
-	r.Ran(t, target, reported)
-	return target, scan
+	build, scan = r.Shipped(t, b, hash, snapshot)
+	r.Ran(t, build, reported)
+	return build, scan
 }
 
 // Scan is ScanAt on the seeded build. Every test here reads back through the

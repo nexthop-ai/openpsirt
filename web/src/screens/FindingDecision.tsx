@@ -596,7 +596,7 @@ export function PreviousCard({
   onReuse,
 }: {
   items: Previous[];
-  at: { product: string; stream: string; variant: string; vulnerability: string };
+  at: { product: string; branch_or_tag: string; variant: string; vulnerability: string };
   undecided: boolean;
   onReuse: (reasoning: string, outcome: string, justification: string) => void;
 }) {
@@ -622,7 +622,7 @@ function Prior({
   onReuse,
 }: {
   item: Previous;
-  at: { product: string; stream: string; variant: string; vulnerability: string };
+  at: { product: string; branch_or_tag: string; variant: string; vulnerability: string };
   undecided: boolean;
   onReuse: (reasoning: string, outcome: string, justification: string) => void;
 }) {
@@ -635,12 +635,12 @@ function Prior({
     mutationFn: async () =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation",
           {
             params: {
               path: {
                 product: at.product,
-                stream: at.stream,
+                branch_or_tag: at.branch_or_tag,
                 variant: at.variant,
                 issue: at.vulnerability,
                 occurrence: item.occurrence,

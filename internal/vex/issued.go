@@ -49,9 +49,9 @@ type Published struct {
 	bun.BaseModel `bun:"table:published_vex,alias:vi"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
-	// TargetID is the build the document was about, which is what its
+	// BuildID is the build the document was about, which is what its
 	// identifier names.
-	TargetID int64 `bun:"target_id,notnull"`
+	BuildID int64 `bun:"build_id,notnull"`
 	// Kind is which document about the build went out. Each kind numbers its
 	// own revisions.
 	Kind Kind `bun:"kind,notnull"`
@@ -95,12 +95,12 @@ type Published struct {
 // second pair of eyes on each statement it carries was taken when the decision
 // was approved.
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string, kind Kind) (*Published, error) {
+	product, branchOrTag, variant string, kind Kind) (*Published, error) {
 
 	if !who.Stated() {
 		return nil, ErrNoPublisher
 	}
-	named, target, err := s.locate(ctx, subject, product, stream, variant)
+	named, build, err := s.locate(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// closed or a patch dropped while it was recorded leaves a statement
 		// nobody stands behind in what went out, and a retry records a
 		// document describing a database that has moved.
-		doc, err := s.within(tx).document(ctx, who, named, target,
+		doc, err := s.within(tx).document(ctx, who, named, build,
 			[]access.Visibility{access.Public}, kind)
 		if err != nil {
 			return err
@@ -140,7 +140,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// database. A retry of a rolled-back attempt would re-insert a model
 		// carrying both of that attempt's answers.
 		recorded = &Published{
-			TargetID: target.ID, Kind: kind, Digest: digest,
+			BuildID: build.ID, Kind: kind, Digest: digest,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
 		// Scanned into a value rather than read through a cursor: a cursor
@@ -149,7 +149,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		var highest int
 		if err := tx.NewSelect().Model((*Published)(nil)).
 			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
-			Where(`"target_id" = ?`, target.ID).
+			Where(`"build_id" = ?`, build.ID).
 			Where(`"kind" = ?`, kind).
 			Scan(ctx, &highest); err != nil {
 			return err
@@ -217,9 +217,9 @@ type Went struct {
 // see is one they are told does not exist, and a row saying a document about
 // it went out is as much a disclosure as the document.
 func (s *Store) Issuances(ctx context.Context, subject access.Subject,
-	product, stream, variant string, kind Kind) ([]Went, error) {
+	product, branchOrTag, variant string, kind Kind) ([]Went, error) {
 
-	_, target, err := s.locate(ctx, subject, product, stream, variant)
+	_, build, err := s.locate(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"vi"."digest" AS "digest"`).
 		ColumnExpr(`"pe"."identity" AS "issued_by"`).
 		ColumnExpr(`"vi"."issued_at" AS "issued_at"`).
-		Where(`"vi"."target_id" = ?`, target.ID).
+		Where(`"vi"."build_id" = ?`, build.ID).
 		Where(`"vi"."kind" = ?`, kind).
 		OrderExpr(`"vi"."ordinal" ASC`).
 		Scan(ctx, &rows)
@@ -249,19 +249,19 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 // The comparison is between settled digests, so a document regenerated with
 // nothing but its moment and its version moved reads as unchanged.
 func (s *Store) Changed(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string, kind Kind) (*bool, error) {
+	product, branchOrTag, variant string, kind Kind) (*bool, error) {
 
 	if !who.Stated() {
 		return nil, nil
 	}
-	named, target, err := s.locate(ctx, subject, product, stream, variant)
+	named, build, err := s.locate(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, err
 	}
 	var last string
 	err = s.idb().NewSelect().Model((*Published)(nil)).
 		Column("digest").
-		Where(`"target_id" = ?`, target.ID).
+		Where(`"build_id" = ?`, build.ID).
 		Where(`"kind" = ?`, kind).
 		OrderExpr(`"ordinal" DESC`).
 		Limit(1).
@@ -272,7 +272,7 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 	if err != nil {
 		return nil, fmt.Errorf("read what last went out: %w", err)
 	}
-	doc, err := s.document(ctx, who, named, target, []access.Visibility{access.Public}, kind)
+	doc, err := s.document(ctx, who, named, build, []access.Visibility{access.Public}, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -290,16 +290,16 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 // Narrowed the way the record of issuances is, because the bytes are what the
 // row describes.
 func (s *Store) Sent(ctx context.Context, subject access.Subject,
-	product, stream, variant string, kind Kind, ordinal int) (string, error) {
+	product, branchOrTag, variant string, kind Kind, ordinal int) (string, error) {
 
-	_, target, err := s.locate(ctx, subject, product, stream, variant)
+	_, build, err := s.locate(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return "", err
 	}
 	var body string
 	err = s.idb().NewSelect().Model((*Published)(nil)).
 		Column("document").
-		Where(`"target_id" = ?`, target.ID).
+		Where(`"build_id" = ?`, build.ID).
 		Where(`"kind" = ?`, kind).
 		Where(`"ordinal" = ?`, ordinal).
 		Limit(1).
@@ -323,11 +323,11 @@ var ErrNoSuchRevision = refusal.New("no document went out as that revision")
 // the next one generated after an issuance is the second, and says so before
 // it goes out, because the bytes an operator sends have to carry the number
 // they will be known by.
-func (s *Store) revision(ctx context.Context, targetID int64, kind Kind) (int, error) {
+func (s *Store) revision(ctx context.Context, buildID int64, kind Kind) (int, error) {
 	var highest int
 	err := s.idb().NewSelect().Model((*Published)(nil)).
 		ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"kind" = ?`, kind).
 		Scan(ctx, &highest)
 	if err != nil {
@@ -393,26 +393,26 @@ func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool
 	return anyIssuedWhere(ctx, db, `"tg"."variant_id" = ?`, variantID, "variant")
 }
 
-// AnyIssuedForStream reports whether a document has gone out for any variant of
+// AnyIssuedForBranchOrTag reports whether a document has gone out for any variant of
 // one release.
 //
 // The release is inside the same identifier the variant is, for the same
 // reasons AnyIssuedForVariant gives.
-func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
-	return anyIssuedWhere(ctx, db, `"tg"."stream_id" = ?`, streamID, "release")
+func AnyIssuedForBranchOrTag(ctx context.Context, db bun.IDB, branchOrTagID int64) (bool, error) {
+	return anyIssuedWhere(ctx, db, `"tg"."branch_or_tag_id" = ?`, branchOrTagID, "release")
 }
 
 // AnyIssuedForProduct reports whether a document has gone out for any build of
 // one product.
 func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool, error) {
 	return anyIssuedWhere(ctx, db,
-		`"tg"."stream_id" IN (SELECT "id" FROM "stream" WHERE "product_id" = ?)`,
+		`"tg"."branch_or_tag_id" IN (SELECT "id" FROM "branch_or_tag" WHERE "product_id" = ?)`,
 		productID, "product")
 }
 
 func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, what string) (bool, error) {
 	issued, err := db.NewSelect().Model((*Published)(nil)).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "vi"."target_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "vi"."build_id"`).
 		Where(where, id).
 		Exists(ctx)
 	if err != nil {
@@ -435,7 +435,7 @@ func stillNamed(ctx context.Context, tx bun.IDB, named *catalog.Named) error {
 		name  string
 	}{
 		{(*catalog.Product)(nil), named.ProductID, named.Product},
-		{(*catalog.Stream)(nil), named.StreamID, named.Stream},
+		{(*catalog.BranchOrTag)(nil), named.BranchOrTagID, named.BranchOrTag},
 		{(*catalog.Variant)(nil), named.VariantID, named.Variant},
 	} {
 		result, err := tx.NewUpdate().Model(level.model).

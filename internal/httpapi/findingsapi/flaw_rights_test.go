@@ -29,7 +29,7 @@ func answered(t *testing.T, r *httpapitest.Reach, occurrence string, cases []ask
 
 // recordAsFlawNamingNoBuild is a flaw record whose body names a build nobody made,
 // which a caller without the rights is refused before it is looked up.
-const recordAsFlawNamingNoBuild = `{"builds":[{"stream":"nosuch","variant":"broadcom"}],"summary":"p leaks"}`
+const recordAsFlawNamingNoBuild = `{"builds":[{"branch_or_tag":"nosuch","variant":"broadcom"}],"summary":"p leaks"}`
 
 func TestRecordingAsAFlawAndIncludingInDisclosureTakeBothTriageRoles(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {

@@ -105,10 +105,10 @@ export function Support() {
                   </thead>
                   <tbody>
                     {rows.map((row) => (
-                      <tr key={`${row.product} ${row.stream}`} className="row">
+                      <tr key={`${row.product} ${row.branch_or_tag}`} className="row">
                         <td>{row.product}</td>
                         <td>
-                          {row.stream} <span className="hint">{row.kind}</span>
+                          {row.branch_or_tag} <span className="hint">{row.kind}</span>
                         </td>
                         <td>
                           {row.ended_on}{" "}
@@ -128,7 +128,7 @@ export function Support() {
                               about. Linked without both, every row here opens
                               an empty list under a number that is not zero. */}
                           <Link
-                            to={openAt(row.product, row.stream, row.kind)}
+                            to={openAt(row.product, row.branch_or_tag, row.kind)}
                             className={row.open > 0 ? "state open" : undefined}
                           >
                             {row.open.toLocaleString()}
@@ -172,10 +172,10 @@ export function Support() {
               </thead>
               <tbody>
                 {ending.map((row) => (
-                  <tr key={`${row.product} ${row.stream}`} className="row">
+                  <tr key={`${row.product} ${row.branch_or_tag}`} className="row">
                     <td>{row.product}</td>
                     <td>
-                      {row.stream} <span className="hint">{row.kind}</span>
+                      {row.branch_or_tag} <span className="hint">{row.kind}</span>
                     </td>
                     <td>
                       {row.ended_on}{" "}
@@ -189,7 +189,7 @@ export function Support() {
                       {/* Still in support, so this one links as the list's own
                           default would read it rather than past end of life. */}
                       <Link
-                        to={endingAt(row.product, row.stream, row.kind)}
+                        to={endingAt(row.product, row.branch_or_tag, row.kind)}
                         className={row.open > 0 ? "state open" : undefined}
                       >
                         {row.open.toLocaleString()}
@@ -231,14 +231,14 @@ function fileAt(format: "csv" | "json", asked: string): string {
 // open on a release that has not gone yet. The same list, without the
 // past-end-of-life filter: this one is still in support, which is what makes it
 // something somebody can still act on.
-function endingAt(product: string, stream: string, kind: string): string {
-  const asked = new URLSearchParams({ stream });
+function endingAt(product: string, branchOrTag: string, kind: string): string {
+  const asked = new URLSearchParams({ branch_or_tag: branchOrTag });
   asked.set("on", kind === "tag" ? "tag" : "branch");
   return findingsPath({ product }, false, asked);
 }
 
-function openAt(product: string, stream: string, kind: string): string {
-  const asked = new URLSearchParams({ stream });
+function openAt(product: string, branchOrTag: string, kind: string): string {
+  const asked = new URLSearchParams({ branch_or_tag: branchOrTag });
   asked.set("on", kind === "tag" ? "tag" : "branch");
   asked.set("support", "past-eol");
   return findingsPath({ product }, false, asked);

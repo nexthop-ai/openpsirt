@@ -48,18 +48,18 @@ const TABS: { type: UploadType; label: string; title: string }[] = [
 // The tabs come from the every-kind list, which leaves out a kind the reader
 // may not read. Each tab's rows come from that kind's own list.
 export function Uploads() {
-  const { product = "", stream = "", variant = "", type } = useParams();
-  const build = { product, stream, variant };
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "", type } = useParams();
+  const build = { product, branch_or_tag: branchOrTag, variant };
   const [uploading, setUploading] = useState(false);
 
   const kinds = useQuery({
-    queryKey: ["uploads", product, stream, variant],
+    queryKey: ["uploads", product, branchOrTag, variant],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/uploads",
           {
-            params: { path: { product, stream, variant } },
+            params: { path: { product, branch_or_tag: branchOrTag, variant } },
           },
         ),
       ),
@@ -81,7 +81,7 @@ export function Uploads() {
       <div className="screen-head">
         <h2>Uploads</h2>
         <p>
-          {product} · {stream} · {variant}
+          {product} · {branchOrTag} · {variant}
         </p>
         <span style={{ marginLeft: "auto" }}>
           <button type="button" className="btn" onClick={() => setUploading(true)}>
@@ -137,16 +137,16 @@ export function Uploads() {
 // wrong, so a build that has gone quiet is named at the top rather than being
 // invisible on the screen about it.
 function SBOMs({ build }: { build: Build }) {
-  const { product, stream, variant } = build;
+  const { product, branch_or_tag: branchOrTag, variant } = build;
   const at = build;
   const scans = useQuery({
-    queryKey: ["scans", product, stream, variant],
+    queryKey: ["scans", product, branchOrTag, variant],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms",
           {
-            params: { path: { product, stream, variant } },
+            params: { path: { product, branch_or_tag: branchOrTag, variant } },
           },
         ),
       ),
@@ -191,11 +191,11 @@ function SBOMs({ build }: { build: Build }) {
       {quiet.map((build) => (
         <div
           className="alert"
-          key={`${build.stream} ${build.variant}`}
+          key={`${build.branch_or_tag} ${build.variant}`}
           style={{ marginBottom: 10 }}
         >
           <strong>
-            {build.stream} · {build.variant}: no inventory
+            {build.branch_or_tag} · {build.variant}: no inventory
             {build.last_received_at ? ` for ${build.quiet_days} days` : " ever"}
           </strong>
           <span>
@@ -216,7 +216,7 @@ function SBOMs({ build }: { build: Build }) {
 
       {retired.length > 0 && (
         <p className="hint" style={{ marginBottom: 10 }}>
-          {retired.map((build) => `${build.stream} · ${build.variant}`).join(", ")}
+          {retired.map((build) => `${build.branch_or_tag} · ${build.variant}`).join(", ")}
           {retired.length === 1 ? " is" : " are"} out of support, so nothing is expected to arrive
           for {retired.length === 1 ? "it" : "them"}. The findings and the history stay.
         </p>
@@ -254,7 +254,7 @@ function SBOMs({ build }: { build: Build }) {
                         word is where somebody asks "what did it find". */}
                     {scan.run_id ? (
                       <Link
-                        to={runAt({ product, stream, variant }, scan.run_id)}
+                        to={runAt({ product, branch_or_tag: branchOrTag, variant }, scan.run_id)}
                         title="The known vulnerability scan: what it changed, and the tooling it was measured with"
                       >
                         <State state={scan.state} />
@@ -376,13 +376,13 @@ function SBOMs({ build }: { build: Build }) {
 . Here because this is the screen somebody is on when a line
           has just had its first scan, which is the moment the question
           arises. */}
-      <Carried at={{ product, stream, variant }} />
+      <Carried at={{ product, branch_or_tag: branchOrTag, variant }} />
 
       {/* What the build says about itself, which is the other half of what it
           sent: the inventory says what it ships and this says what it has
           already dealt with. Folded by default — most visits are
           about whether a scan landed. */}
-      <CarriedPatches at={{ product, stream, variant }} />
+      <CarriedPatches at={{ product, branch_or_tag: branchOrTag, variant }} />
     </>
   );
 }
@@ -411,7 +411,7 @@ function Sent({
   scan,
   sent,
 }: {
-  at: { product: string; stream: string; variant: string };
+  at: { product: string; branch_or_tag: string; variant: string };
   scan: number;
   sent: {
     document_id?: number;
@@ -424,9 +424,15 @@ function Sent({
   if (sent.length === 0) return <span className="hint">—</span>;
   const where = (document: number) =>
     linkTo(
-      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/documents/{document}",
+      "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms/{sbom}/documents/{document}",
       {
-        path: { product: at.product, stream: at.stream, variant: at.variant, sbom: scan, document },
+        path: {
+          product: at.product,
+          branch_or_tag: at.branch_or_tag,
+          variant: at.variant,
+          sbom: scan,
+          document,
+        },
       },
     );
   return (
@@ -509,7 +515,7 @@ function Moved({
   scan,
   inventory,
 }: {
-  at: { product: string; stream: string; variant: string };
+  at: { product: string; branch_or_tag: string; variant: string };
   scan: number;
   inventory?: { added?: number; removed?: number; changed?: number };
 }) {

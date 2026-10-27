@@ -50,16 +50,16 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			{"productNamedVisibly", "/v1/products/mine/findings"},
 			{"locatedVisibly", "/v1/products/mine/branches-and-tags/master/variants/broadcom/components"},
 			{"locatedVisibly", "/v1/products/mine/branches-and-tags/master/variants/broadcom/unmatched-components"},
-			{"targetRow", "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"},
+			{"buildRow", "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"},
 			{"issueHere", "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 				"CVE-2026-9999/components/libnl-3-200"},
-			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"the findings list", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"},
 			// Arms that answer per route rather than through the helper: a
 			// run, a person, a token, a notification.
 			{"a run on a build", "/v1/products/mine/branches-and-tags/master/variants/broadcom/runs/1"},
 			{"a token of your own", "/v1/tokens"},
 			{"a branch named in a selection",
-				"/v1/products/mine/findings?stream=master"},
+				"/v1/products/mine/findings?branch_or_tag=master"},
 			{"a document a build sent",
 				"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms/1/documents/1"},
 			{"productNamed", "/v1/products/mine/findings/components"},

@@ -166,7 +166,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 	fmt.Fprintf(&out, "\n## Its occurrences\n\n%s\n\n", howManyCarry(total, len(rows)))
 	for _, row := range rows {
 		fmt.Fprintf(&out, "- %s %s (%s) — %s %s",
-			markdown.Literal(row.Product), markdown.Literal(row.Stream),
+			markdown.Literal(row.Product), markdown.Literal(row.BranchOrTag),
 			markdown.Literal(row.Variant), markdown.Literal(row.Component),
 			markdown.Literal(row.Version))
 		if row.Occurrences > 1 {

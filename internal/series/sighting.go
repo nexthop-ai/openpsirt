@@ -31,13 +31,13 @@ type Sighting struct {
 
 // Sightings is the open findings of a kind a series reports against one build,
 // with what the series knows of each.
-func (s *Store) Sightings(ctx context.Context, k kind.Kind, seriesID, targetID int64) ([]Sighting, error) {
+func (s *Store) Sightings(ctx context.Context, k kind.Kind, seriesID, buildID int64) ([]Sighting, error) {
 	var held []Sighting
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{k})
 	err := s.db.NewSelect().Model(&held).
 		Join(`JOIN "finding" AS "f" ON "f"."id" = "si"."finding_id"`).
 		Where(`"si"."series_id" = ?`, seriesID).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(where, args...).
 		Scan(ctx)

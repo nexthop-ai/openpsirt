@@ -72,17 +72,17 @@ func (b *build) holding(t *testing.T, names ...string) {
 	b.seq++
 	b.built = b.built.Add(time.Hour)
 	rec, outcome, err := b.scans.Record(t.Context(), ingest.Arriving{
-		TargetID: b.world.Target.ID, ContentHash: fmt.Sprintf("hash-%d", b.seq),
+		BuildID: b.world.Build.ID, ContentHash: fmt.Sprintf("hash-%d", b.seq),
 		BuiltAt: b.built, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record upload %d: outcome %v, err %v", b.seq, outcome, err)
 	}
-	if _, err := fixtures.ApplyGraph(t.Context(), b.db, b.world.Target.ID, rec.ID, snap); err != nil {
+	if _, err := fixtures.ApplyGraph(t.Context(), b.db, b.world.Build.ID, rec.ID, snap); err != nil {
 		t.Fatal(err)
 	}
 	notify.Movements(b.db.DB, slog.New(slog.NewTextHandler(io.Discard, nil)))(
-		t.Context(), ingest.Stored{TargetID: b.world.Target.ID, ScanID: rec.ID})
+		t.Context(), ingest.Stored{BuildID: b.world.Build.ID, ScanID: rec.ID})
 }
 
 // told is what one person is waiting on, of this kind.
@@ -146,7 +146,7 @@ func TestAnUploadThatChangedMuchOfABuildIsToldTo(t *testing.T) {
 		// are: a message carrying the rows would be a list of a build's
 		// contents in everybody's mail.
 		if !strings.HasSuffix(told[0].Link, "/changes") ||
-			!strings.Contains(told[0].Link, "/products/sonic/streams/master/variants/broadcom/uploads/") {
+			!strings.Contains(told[0].Link, "/products/sonic/branches-and-tags/master/variants/broadcom/uploads/") {
 			t.Errorf("the link is %q, want the listing for this upload", told[0].Link)
 		}
 		for _, name := range held {

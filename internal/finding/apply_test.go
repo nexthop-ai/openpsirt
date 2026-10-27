@@ -27,7 +27,7 @@ func TestAnIssueBecomingWorseMovesTheFindingsItIsOpenAgainst(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high", Likelihood: 0.01},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{unlikely}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{unlikely}); err != nil {
 			t.Fatal(err)
 		}
 		opened := f.open(t)
@@ -39,7 +39,7 @@ func TestAnIssueBecomingWorseMovesTheFindingsItIsOpenAgainst(t *testing.T) {
 
 		likely := unlikely
 		likely.Issue.Likelihood = 0.9
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{likely})
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{likely})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,7 +75,7 @@ func TestAReportThatKnowsLessDoesNotLowerAFinding(t *testing.T) {
 			},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{known}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{known}); err != nil {
 			t.Fatal(err)
 		}
 		opened := f.open(t)
@@ -88,7 +88,7 @@ func TestAReportThatKnowsLessDoesNotLowerAFinding(t *testing.T) {
 		quieter := known
 		quieter.Issue.Likelihood = 0
 		quieter.Issue.Exploited = false
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{quieter})
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{quieter})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +129,7 @@ func TestAnIssueBecomingExploitedIsClockedFromWhenThatWasLearned(t *testing.T) {
 			Component: libnl, FixState: finding.FixedUpstream,
 		}
 		opening := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, opening, []finding.Reported{quiet}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, opening, []finding.Reported{quiet}); err != nil {
 			t.Fatal(err)
 		}
 		opened := f.open(t)
@@ -149,7 +149,7 @@ func TestAnIssueBecomingExploitedIsClockedFromWhenThatWasLearned(t *testing.T) {
 		exploited := quiet
 		exploited.Issue.Exploited = true
 		learning := f.run(t)
-		applied, err := f.store.Apply(t.Context(), f.target, learning, []finding.Reported{exploited})
+		applied, err := f.store.Apply(t.Context(), f.build, learning, []finding.Reported{exploited})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -220,7 +220,7 @@ func TestANewFindingIsClockedByTheRatingInForce(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		mild := found("CVE-2026-RAISE", swss)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{mild}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
 		f.recorded(t, 1, "someone")
@@ -249,7 +249,7 @@ func TestANewFindingIsClockedByTheRatingInForce(t *testing.T) {
 			Join(`JOIN "scan_run" AS "r" ON "r"."id" = "f"."opened_run_id"`).
 			ColumnExpr(`"f"."due_at" AS "due_at"`).
 			ColumnExpr(`"r"."started_at" AS "started_at"`).
-			Where(`"f"."target_id" = ?`, other).
+			Where(`"f"."build_id" = ?`, other).
 			Scan(t.Context(), &rows)
 		if err != nil {
 			t.Fatal(err)
@@ -282,7 +282,7 @@ func TestAScanDoesNotCloseWhatAPersonRecorded(t *testing.T) {
 	// component that stopped shipping.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -303,7 +303,7 @@ func TestAScanDoesNotCloseWhatAPersonRecorded(t *testing.T) {
 
 		// The next scan reports the same component and nothing else. Under the
 		// old sweep this closed the entered row.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -322,7 +322,7 @@ func TestAScanDoesNotCloseWhatAPersonRecorded(t *testing.T) {
 
 		// And the scan still governs its own: a component it stops reporting
 		// closes, which is the behavior the narrowing must not have broken.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), nil); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), nil); err != nil {
 			t.Fatal(err)
 		}
 		var scannedOpen int
@@ -361,7 +361,7 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
 		}
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{quiet}); err != nil {
 			t.Fatal(err)
 		}
@@ -375,14 +375,14 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 		// rescanned, and will not be.
 		exploited := quiet
 		exploited.Issue.Exploited = true
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{exploited}); err != nil {
 			t.Fatal(err)
 		}
 
 		var onTheTag []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&onTheTag).
-			Where(`"target_id" = ?`, tag).Where(`"closed_at" IS NULL`).
+			Where(`"build_id" = ?`, tag).Where(`"closed_at" IS NULL`).
 			Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -402,7 +402,7 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 		}
 		var onTheBranch []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&onTheBranch).
-			Where(`"target_id" = ?`, f.target).Where(`"closed_at" IS NULL`).
+			Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NULL`).
 			Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -431,7 +431,7 @@ func TestANewFindingIsOrderedByItsOwnProductsRating(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		mild := found("CVE-2026-ORDER", swss)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{mild}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
 		elsewhere := f.inAnotherProduct(t, "other-product")
@@ -448,7 +448,7 @@ func TestANewFindingIsOrderedByItsOwnProductsRating(t *testing.T) {
 			"critical", "Reachable from the network in how we ship it."); err != nil {
 			t.Fatal(err)
 		}
-		rated := f.urgencyIn(t, f.target, "CVE-2026-ORDER")
+		rated := f.urgencyIn(t, f.build, "CVE-2026-ORDER")
 		if rated <= published {
 			t.Fatalf("the rating did not move the order: %d against %d", rated, published)
 		}
@@ -483,7 +483,7 @@ func TestANewFindingIsOrderedByItsOwnProductsRating(t *testing.T) {
 }
 
 // urgencyIn is where an issue sits in the order, in one build.
-func (f *fixture) urgencyIn(t *testing.T, target int64, identifier string) int64 {
+func (f *fixture) urgencyIn(t *testing.T, build int64, identifier string) int64 {
 	t.Helper()
 	var rank int64
 	err := f.db.DB.NewSelect().
@@ -491,11 +491,11 @@ func (f *fixture) urgencyIn(t *testing.T, target int64, identifier string) int64
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		ColumnExpr(`MAX("f"."urgency")`).
 		Where(`"v"."identifier" = ?`, identifier).
-		Where(`"f"."target_id" = ?`, target).
+		Where(`"f"."build_id" = ?`, build).
 		Where(`"f"."closed_at" IS NULL`).
 		Scan(t.Context(), &rank)
 	if err != nil {
-		t.Fatalf("read where %s sits in build %d: %v", identifier, target, err)
+		t.Fatalf("read where %s sits in build %d: %v", identifier, build, err)
 	}
 	return rank
 }
@@ -522,7 +522,7 @@ func TestAFallingLikelihoodIsTakenRatherThanItsPeak(t *testing.T) {
 			},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{peak}); err != nil {
 			t.Fatal(err)
 		}
@@ -533,7 +533,7 @@ func TestAFallingLikelihoodIsTakenRatherThanItsPeak(t *testing.T) {
 		today.Issue.Likelihood = 0.05
 		today.Issue.LikelihoodPercentile = 0.6
 		today.Issue.LikelihoodOn = &settled
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{today}); err != nil {
 			t.Fatal(err)
 		}
@@ -547,7 +547,7 @@ func TestAFallingLikelihoodIsTakenRatherThanItsPeak(t *testing.T) {
 		// And the stale report arriving late does not put the peak back:
 		// which of two estimates is newer is about the day, not about which
 		// scan ran last.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{peak}); err != nil {
 			t.Fatal(err)
 		}
@@ -585,7 +585,7 @@ func TestAScoreRisingDoesNotCarryAStaleEstimateWithIt(t *testing.T) {
 			},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{peak}); err != nil {
 			t.Fatal(err)
 		}
@@ -594,7 +594,7 @@ func TestAScoreRisingDoesNotCarryAStaleEstimateWithIt(t *testing.T) {
 		today := peak
 		today.Issue.Likelihood = 0.05
 		today.Issue.LikelihoodOn = &settled
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{today}); err != nil {
 			t.Fatal(err)
 		}
@@ -604,7 +604,7 @@ func TestAScoreRisingDoesNotCarryAStaleEstimateWithIt(t *testing.T) {
 		// earlier day and must not.
 		worse := peak
 		worse.Issue.Score = 9.0
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{worse}); err != nil {
 			t.Fatal(err)
 		}
@@ -644,7 +644,7 @@ func TestAnUndatedEstimateDoesNotWipeTheDayAStoredOneHas(t *testing.T) {
 			},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{known}); err != nil {
 			t.Fatal(err)
 		}
@@ -657,7 +657,7 @@ func TestAnUndatedEstimateDoesNotWipeTheDayAStoredOneHas(t *testing.T) {
 		undated.Issue.Likelihood = 0.9
 		undated.Issue.LikelihoodOn = nil
 		undated.Issue.Score = 9.0
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{undated}); err != nil {
 			t.Fatal(err)
 		}
@@ -704,7 +704,7 @@ func TestLearningSomethingIsExploitedDoesNotHandBackAClockNothingCouldMeet(t *te
 			Component: libnl, FixState: finding.NoFix,
 		}
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{nothing}); err != nil {
 			t.Fatal(err)
 		}
@@ -716,7 +716,7 @@ func TestLearningSomethingIsExploitedDoesNotHandBackAClockNothingCouldMeet(t *te
 
 		exploited := nothing
 		exploited.Issue.Exploited = true
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{exploited}); err != nil {
 			t.Fatal(err)
 		}

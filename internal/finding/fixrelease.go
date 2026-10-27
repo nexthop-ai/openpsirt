@@ -36,18 +36,18 @@ type ReleaseState struct {
 // findings their visibility on the product reaches, and nothing where they do
 // not see the product.
 func HeldOpenIn(ctx context.Context, db bun.IDB, subject access.Subject, productID,
-	vulnerabilityID int64, streams []int64) (map[int64]ReleaseState, error) {
+	vulnerabilityID int64, branchesAndTags []int64) (map[int64]ReleaseState, error) {
 
-	out := make(map[int64]ReleaseState, len(streams))
-	if len(streams) == 0 {
+	out := make(map[int64]ReleaseState, len(branchesAndTags))
+	if len(branchesAndTags) == 0 {
 		return out, nil
 	}
 	var scanned []int64
 	if err := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`DISTINCT "tg"."stream_id"`).
-		Where(`"tg"."stream_id" IN (?)`, bun.List(streams)).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		ColumnExpr(`DISTINCT "tg"."branch_or_tag_id"`).
+		Where(`"tg"."branch_or_tag_id" IN (?)`, bun.List(branchesAndTags)).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"tg"."last_run_id" IS NOT NULL`).
 		Scan(ctx, &scanned); err != nil {
@@ -64,11 +64,11 @@ func HeldOpenIn(ctx context.Context, db bun.IDB, subject access.Subject, product
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`DISTINCT "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		ColumnExpr(`DISTINCT "tg"."branch_or_tag_id"`).
 		Where(kinds, kindArgs...).
-		Where(`"tg"."stream_id" IN (?)`, bun.List(streams)).
+		Where(`"tg"."branch_or_tag_id" IN (?)`, bun.List(branchesAndTags)).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID)

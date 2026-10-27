@@ -10,10 +10,11 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const AT = "/products/sonic/streams/master/variants/broadcom/code-findings/abc";
-const PATTERN = "/products/:product/streams/:stream/variants/:variant/code-findings/:occurrence";
+const AT = "/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc";
+const PATTERN =
+  "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/code-findings/:occurrence";
 const CODE_FINDING =
-  "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}";
+  "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}";
 
 const CONFIRMED = {
   rule: "clang/unix.Malloc",
@@ -32,15 +33,15 @@ const OFFER = {
   prefix: "src/zlib",
   together: 0,
   seen: [
-    { stream: "master", variant: "broadcom" },
-    { stream: "master", variant: "mellanox" },
+    { branch_or_tag: "master", variant: "broadcom" },
+    { branch_or_tag: "master", variant: "mellanox" },
   ],
   suggestions: [
     {
       component: "zlib",
       from: "resembles",
-      lacking: [{ stream: "master", variant: "mellanox" }],
-      unanalyzed: [{ stream: "release", variant: "broadcom" }],
+      lacking: [{ branch_or_tag: "master", variant: "mellanox" }],
+      unanalyzed: [{ branch_or_tag: "release", variant: "broadcom" }],
     },
     { from: "build", lacking: [], unanalyzed: [] },
   ],
@@ -108,7 +109,7 @@ describe("recording as a flaw a code finding", () => {
     const [path, init] = sent()[0] ?? [];
     expect(path).toBe(`${CODE_FINDING}/flaw`);
     expect((init as { body: unknown }).body).toEqual({
-      builds: [{ stream: "master", variant: "broadcom" }],
+      builds: [{ branch_or_tag: "master", variant: "broadcom" }],
       summary: "p leaks",
       component: "zlib",
     });
@@ -158,8 +159,8 @@ describe("recording as a flaw a code finding", () => {
     await press(mount.host(), "Record as a flaw");
     await settle();
     expect((sent()[0]?.[1] as { body: { builds: unknown } }).body.builds).toEqual([
-      { stream: "master", variant: "broadcom" },
-      { stream: "release", variant: "broadcom" },
+      { branch_or_tag: "master", variant: "broadcom" },
+      { branch_or_tag: "release", variant: "broadcom" },
     ]);
   });
 
@@ -186,7 +187,7 @@ describe("recording as a flaw a code finding", () => {
     await press(mount.host(), "Record as a flaw");
     await settle();
     expect((sent()[0]?.[1] as { body: unknown }).body).toEqual({
-      builds: [{ stream: "master", variant: "mellanox" }],
+      builds: [{ branch_or_tag: "master", variant: "mellanox" }],
       summary: "p leaks",
     });
   });

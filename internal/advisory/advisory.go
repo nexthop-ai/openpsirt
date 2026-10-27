@@ -295,8 +295,8 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 	// flaw with one discovery.
 	var row finding.Finding
 	err = s.db.NewSelect().Model(&row).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, issue.ID).
 		Where(`"f"."visibility" IN (?)`, bun.List(access.Visible(subject, productID))).
@@ -333,8 +333,8 @@ func (s *Store) here(ctx context.Context, subject access.Subject,
 
 	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	count, err := s.db.NewSelect().Model((*finding.Finding)(nil)).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, issueID).
 		Where(`"f"."visibility" IN (?)`, bun.List(access.Visible(subject, productID))).

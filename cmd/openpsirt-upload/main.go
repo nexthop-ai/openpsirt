@@ -109,8 +109,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	)
 	fs.StringVar(&to.URL, "url", os.Getenv("OPENPSIRT_URL"), "the deployment's address")
 	fs.StringVar(&to.Product, "product", "", "the declared product the build is of")
-	fs.StringVar(&to.Stream, "stream", "", "the declared branch or tag")
-	fs.StringVar(&to.Variant, "variant", "", "the declared way the stream is built")
+	fs.StringVar(&to.BranchOrTag, "branch-or-tag", "", "the declared branch or tag")
+	fs.StringVar(&to.Variant, "variant", "", "the declared way the branch or tag is built")
 	fs.Var(&series, "series", "which analysis this is, the same for every build: the tool and its configuration; "+
 		"TOOL=NAME names one analyzer's where the output is of several")
 	fs.StringVar(&commit, "commit", "", "the commit analyzed; the checked-out commit where unset")

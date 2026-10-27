@@ -21,7 +21,7 @@ import (
 func registerVEX(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-vex", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex",
 		Summary: "Generate a VEX document for a build",
 		Description: "Returns an OpenVEX document saying what stands about the third-party " +
 			"components this build ships: every approved `not applicable` and `already fixed` " +
@@ -43,7 +43,7 @@ func registerVEX(api huma.API, in core.Deps) {
 		core.PublicRights()...),
 		func(ctx context.Context, input *struct {
 			Product     string       `path:"product"`
-			Stream      string       `path:"stream"`
+			BranchOrTag string       `path:"branch_or_tag"`
 			Variant     string       `path:"variant"`
 			Undisclosed bool         `query:"undisclosed" doc:"Include findings nobody has announced. A preview, not a document to publish"`
 			Kind        documentKind `query:"kind" doc:"Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours"`
@@ -53,7 +53,7 @@ func registerVEX(api huma.API, in core.Deps) {
 				return nil, err
 			}
 			doc, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).For(ctx, subject, in.Publisher,
-				input.Product, input.Stream, input.Variant, input.Undisclosed, input.Kind.kind())
+				input.Product, input.BranchOrTag, input.Variant, input.Undisclosed, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "the document could not be generated")
 			}
@@ -62,7 +62,7 @@ func registerVEX(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-published-vex", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance",
 		Summary: "List the published VEX for a build",
 		Description: "What has been published for this build, oldest first: which revision, " +
 			"when, and what the document hashed to at the time.\n\n" +
@@ -80,10 +80,10 @@ func registerVEX(api huma.API, in core.Deps) {
 		"a row saying a document about this build went out is as much a disclosure as the "+
 		"document.", core.PublicRights()...),
 		func(ctx context.Context, input *struct {
-			Product string       `path:"product"`
-			Stream  string       `path:"stream"`
-			Variant string       `path:"variant"`
-			Kind    documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
+			Product     string       `path:"product"`
+			BranchOrTag string       `path:"branch_or_tag"`
+			Variant     string       `path:"variant"`
+			Kind        documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
 		}) (*publishedVEXList, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
@@ -91,12 +91,12 @@ func registerVEX(api huma.API, in core.Deps) {
 			}
 			store := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling)
 			gone, err := store.Issuances(ctx, subject,
-				input.Product, input.Stream, input.Variant, input.Kind.kind())
+				input.Product, input.BranchOrTag, input.Variant, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "what has gone out could not be read")
 			}
 			changed, err := store.Changed(ctx, subject, in.Publisher,
-				input.Product, input.Stream, input.Variant, input.Kind.kind())
+				input.Product, input.BranchOrTag, input.Variant, input.Kind.kind())
 			switch {
 			case errors.Is(err, vex.ErrTooLarge):
 				// What went out is still what went out. A build that grew past
@@ -120,7 +120,7 @@ func registerVEX(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "record-published-vex", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance",
 		Summary: "Record a published VEX",
 		Description: "Records that the document for this build was published: when, by whom, " +
 			"and a digest of the document as it stands now. Answers with the document " +
@@ -141,10 +141,10 @@ func registerVEX(api huma.API, in core.Deps) {
 		"eyes on each statement it carries was taken when the decision was approved.",
 		access.PublicTriage),
 		func(ctx context.Context, input *struct {
-			Product string       `path:"product"`
-			Stream  string       `path:"stream"`
-			Variant string       `path:"variant"`
-			Kind    documentKind `query:"kind" doc:"Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours"`
+			Product     string       `path:"product"`
+			BranchOrTag string       `path:"branch_or_tag"`
+			Variant     string       `path:"variant"`
+			Kind        documentKind `query:"kind" doc:"Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours"`
 		}) (*struct {
 			Status int
 			Body   VEXRecordedBody
@@ -154,7 +154,7 @@ func registerVEX(api huma.API, in core.Deps) {
 				return nil, err
 			}
 			recorded, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).Issued(ctx, subject, in.Publisher,
-				input.Product, input.Stream, input.Variant, input.Kind.kind())
+				input.Product, input.BranchOrTag, input.Variant, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "that could not be recorded")
 			}
@@ -173,7 +173,7 @@ func registerVEX(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-published-vex", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance/{version}",
 		Summary: "Read a published VEX",
 		Description: "The OpenVEX document recorded as one revision, byte for byte as it went " +
 			"out. It carries the version it was recorded under and the moment it was " +
@@ -184,18 +184,18 @@ func registerVEX(api huma.API, in core.Deps) {
 		"the document is about the whole build rather than about one issue.",
 		core.PublicRights()...),
 		func(ctx context.Context, input *struct {
-			Product string       `path:"product"`
-			Stream  string       `path:"stream"`
-			Variant string       `path:"variant"`
-			Version int          `path:"version" minimum:"1" doc:"Which revision, counting from one"`
-			Kind    documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
+			Product     string       `path:"product"`
+			BranchOrTag string       `path:"branch_or_tag"`
+			Variant     string       `path:"variant"`
+			Version     int          `path:"version" minimum:"1" doc:"Which revision, counting from one"`
+			Kind        documentKind `query:"kind" doc:"Which document about the build: ours or with-suppliers. Absent means ours"`
 		}) (*struct{ Body json.RawMessage }, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
 			}
 			sent, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).Sent(ctx, subject,
-				input.Product, input.Stream, input.Variant, input.Kind.kind(), input.Version)
+				input.Product, input.BranchOrTag, input.Variant, input.Kind.kind(), input.Version)
 			if errors.Is(err, vex.ErrNoSuchRevision) {
 				return nil, huma.Error404NotFound("no document went out as that revision")
 			}

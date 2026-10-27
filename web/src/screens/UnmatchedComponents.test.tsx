@@ -11,11 +11,11 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 const ROUTE =
-  "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components";
+  "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components";
 
 async function drawn(
   total = 2,
-  at = "/products/sonic/streams/master/variants/arm/unmatched-components",
+  at = "/products/sonic/branches-and-tags/master/variants/arm/unmatched-components",
 ) {
   const spy = serve((path) =>
     path === ROUTE
@@ -39,7 +39,7 @@ async function drawn(
     screen(
       <UnmatchedComponents />,
       at,
-      "/products/:product/streams/:stream/variants/:variant/unmatched-components",
+      "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/unmatched-components",
     ),
   );
   await settle();

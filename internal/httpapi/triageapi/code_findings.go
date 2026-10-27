@@ -29,7 +29,7 @@ type CodeFindingDecisionBody struct {
 // codeFindingDecisionPath is the decision about one code finding, addressed by its occurrence on
 // one build. A rule's name holds a slash, so the code finding is addressed by its
 // occurrence alone rather than under its issue.
-const codeFindingDecisionPath = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision"
+const codeFindingDecisionPath = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision"
 
 // errCodeFindingClosed refuses a decision about a code finding somebody stated was fixed.
 var errCodeFindingClosed = errors.New("closed")
@@ -43,32 +43,32 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 			"`dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or " +
 			"`mitigated`. A dismissal and `not-security` take effect once somebody else holding " +
 			"`approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.\n\n" +
-			"The decision covers the code finding on every stream and variant it is seen on, and every code finding " +
+			"The decision covers the code finding on every branch or tag and variant it is seen on, and every code finding " +
 			"another analyzer reports as the same flaw on the build that nothing answers yet, as one " +
 			"decision agreed to once. A code finding that " +
 			"is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw " +
 			"is refused with 409, because its flaw is judged instead.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body       CodeFindingDecisionBody
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Body        CodeFindingDecisionBody
 	}) (*struct{ Body core.DecisionOccurrenceBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, err
 		}
-		codeFinding, err := finding.NewStore(in.DB.DB).CodeFindingAt(ctx, subject, target.ID, input.Occurrence)
+		codeFinding, err := finding.NewStore(in.DB.DB).CodeFindingAt(ctx, subject, build.ID, input.Occurrence)
 		if err == nil && codeFinding.ClosedAt != nil {
 			err = errCodeFindingClosed
 		}
@@ -87,7 +87,7 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 			Justification: triage.Justification(input.Body.Reason),
 			Reasoning:     input.Body.Reasoning,
 			By:            subject.ID,
-			MadeOn:        []int64{target.ID},
+			MadeOn:        []int64{build.ID},
 		}
 		// One decision over the code finding and every code finding that is the same flaw and
 		// that nothing answers yet, worked out where the decision is written.
@@ -132,7 +132,7 @@ type CodeFindingFixedBody struct {
 func registerCodeFindingFixed(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "fix-code-finding", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/fixed",
 		Summary: "Close a code finding as fixed",
 		Description: "Closes a code finding on one build because it is fixed there. The code finding has to be one " +
 			"the newest comparable run did not see: a code finding a run still sees is refused with 409. " +
@@ -144,11 +144,11 @@ func registerCodeFindingFixed(api huma.API, in core.Deps) {
 			"A code finding seen again opens anew at the same occurrence.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body       struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Body        struct {
 			Because string `json:"because" minLength:"1" doc:"What fixed it, in markdown"`
 			FixedIn int64  `json:"fixed_in" minimum:"1" doc:"The run whose build fixed it"`
 		}
@@ -157,15 +157,15 @@ func registerCodeFindingFixed(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, err
 		}
-		done, err := finding.NewStore(in.DB.DB).FixCodeFinding(ctx, subject, target.ID, input.Occurrence, input.Body.Because,
+		done, err := finding.NewStore(in.DB.DB).FixCodeFinding(ctx, subject, build.ID, input.Occurrence, input.Body.Because,
 			input.Body.FixedIn)
 		switch {
 		case errors.Is(err, finding.ErrStillSeen), errors.Is(err, finding.ErrCodeFindingPastEndOfLife):

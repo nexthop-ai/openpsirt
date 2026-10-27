@@ -54,10 +54,10 @@ type analysisParts struct {
 
 // AnalysisInput is an arriving analyzer run.
 type AnalysisInput struct {
-	Product string `path:"product" doc:"The declared product this build is of"`
-	Stream  string `path:"stream" doc:"The declared branch or tag"`
-	Variant string `path:"variant" doc:"The declared way that stream is built"`
-	RawBody huma.MultipartFormFiles[analysisParts]
+	Product     string `path:"product" doc:"The declared product this build is of"`
+	BranchOrTag string `path:"branch_or_tag" doc:"The declared branch or tag"`
+	Variant     string `path:"variant" doc:"The declared way that branch or tag is built"`
+	RawBody     huma.MultipartFormFiles[analysisParts]
 }
 
 // AnalysisOutput is what became of it.
@@ -79,7 +79,7 @@ func registerAnalyses(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "upload-analysis",
 		Method:      http.MethodPost,
-		Path:        "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
+		Path:        "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses",
 		Summary:     "Upload static analysis results",
 		Description: "Accepts one analyzer run as SARIF 2.1.0 documents in repeated multipart fields " +
 			"named `sarif`, each optionally compressed with gzip. The other fields fill what the " +
@@ -96,7 +96,7 @@ func registerAnalyses(api huma.API, in core.Deps) {
 		MaxBodyBytes: analysisLimits(in).MaxCompressed + core.Envelope,
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
-				_, _, err := admittedAnalysis(hc.Context(), in, hc.Param("product"), hc.Param("stream"), hc.Param("variant"))
+				_, _, err := admittedAnalysis(hc.Context(), in, hc.Param("product"), hc.Param("branch_or_tag"), hc.Param("variant"))
 				return err
 			},
 			Limit:   core.Fixed(analysisLimits(in).MaxCompressed + core.Envelope),
@@ -122,7 +122,7 @@ func analysisDocuments(in core.Deps) int {
 
 func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*AnalysisOutput, error) {
 	parts := input.RawBody.Data()
-	subject, named, err := admittedAnalysis(ctx, in, input.Product, input.Stream, input.Variant)
+	subject, named, err := admittedAnalysis(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +153,8 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	switch {
 	case named.ProductRetired:
 		retired = fmt.Sprintf("product %q", input.Product)
-	case named.StreamRetired:
-		retired = fmt.Sprintf("release %q of %q", input.Stream, input.Product)
+	case named.BranchOrTagRetired:
+		retired = fmt.Sprintf("release %q of %q", input.BranchOrTag, input.Product)
 	case named.VariantRetired:
 		retired = fmt.Sprintf("variant %q of %q", input.Variant, input.Product)
 	}
@@ -208,9 +208,9 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 		stated.BuiltAt = time.Now().UTC()
 	}
 
-	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
+	build, err := catalog.NewStore(in.DB.DB).BuildFor(ctx, named.BranchOrTagID, named.VariantID)
 	if err != nil {
-		return nil, core.WentWrong(in.Logger, "the target could not be recorded", err)
+		return nil, core.WentWrong(in.Logger, "the build could not be recorded", err)
 	}
 
 	var (
@@ -221,7 +221,7 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 		store := series.NewStore(tx)
 		var err error
 		run, repeat, err = store.Receive(ctx, series.Arriving{
-			ProductID: named.ProductID, TargetID: target.ID, Kind: kind.Analysis,
+			ProductID: named.ProductID, BuildID: build.ID, Kind: kind.Analysis,
 			Series: stated.Series, ContentHash: hash, Commit: stated.Commit, BuiltAt: stated.BuiltAt,
 			Credential: access.Sender(subject), Params: stated.Params,
 		})
@@ -343,14 +343,14 @@ func readAnalysis(files []huma.FormFile, limits sarif.Limits) ([]sarif.Log, []st
 func analysisRefused(ctx context.Context, in core.Deps, subject access.Subject, named *catalog.Named,
 	name, reason string) {
 
-	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
+	build, err := catalog.NewStore(in.DB.DB).BuildFor(ctx, named.BranchOrTagID, named.VariantID)
 	if err == nil {
 		var credential *string
 		if sender := access.Sender(subject); sender != "" {
 			credential = &sender
 		}
 		err = series.NewStore(in.DB.DB).Refused(ctx, series.Refusal{
-			TargetID: target.ID, Series: name, Kind: kind.Analysis, Reason: reason, Credential: credential,
+			BuildID: build.ID, Series: name, Kind: kind.Analysis, Reason: reason, Credential: credential,
 		})
 	}
 	if err != nil {
@@ -365,7 +365,7 @@ func analysisRefused(ctx context.Context, in core.Deps, subject access.Subject, 
 func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, int, string) {
 	return func(hctx huma.Context, _ int, reason string) {
 		ctx := hctx.Context()
-		subject, named, err := admittedAnalysis(ctx, in, hctx.Param("product"), hctx.Param("stream"),
+		subject, named, err := admittedAnalysis(ctx, in, hctx.Param("product"), hctx.Param("branch_or_tag"),
 			hctx.Param("variant"))
 		if err != nil {
 			return
@@ -377,10 +377,10 @@ func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, int, string) 
 // admittedAnalysis is the sender and the build an analyzer upload names. A
 // person sends where they triage internal findings in the product, which is
 // what every result opens as.
-func admittedAnalysis(ctx context.Context, in core.Deps, product, stream, variant string) (
+func admittedAnalysis(ctx context.Context, in core.Deps, product, branchOrTag, variant string) (
 	access.Subject, *catalog.Named, error) {
 
-	subject, named, err := admitted(ctx, in, product, stream, variant)
+	subject, named, err := admitted(ctx, in, product, branchOrTag, variant)
 	if err != nil {
 		return access.Subject{}, nil, err
 	}

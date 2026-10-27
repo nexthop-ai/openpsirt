@@ -29,9 +29,9 @@ import (
 // still applies, and one word for two things is how two readers come to mean
 // different ones.
 type BuildStanding struct {
-	TargetID int64
-	Stream   string
-	Variant  string
+	BuildID     int64
+	BranchOrTag string
+	Variant     string
 	// Open is issues at components, the unit every count here uses.
 	Open int
 	// Overdue is how many of those are past a deadline, and Exploited how many
@@ -98,7 +98,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
@@ -111,7 +111,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		ColumnExpr(occurrencesDecided(anyDecision)).
 		ColumnExpr(occurrencesDecided(decisionApproved))
 	var groups []struct {
-		TargetID        int64      `bun:"target_id"`
+		BuildID         int64      `bun:"build_id"`
 		VulnerabilityID int64      `bun:"vulnerability_id"`
 		ComponentID     int64      `bun:"component_id"`
 		Occurrences     int        `bun:"places"`
@@ -122,11 +122,11 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	}
 	err = q.Join(`LEFT JOIN (?) AS "dd" ON "dd"."finding_id" = "f"."id"`,
 		decisionsAtOccurrences(q, productID, anyDecision, decisionApproved)).
-		Where(inThisProductAs(`"f"."target_id"`), productID).
+		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
+		GroupExpr(`"f"."build_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &groups)
 	if err != nil {
 		return nil, whole, fmt.Errorf("read how this product's builds stand: %w", err)
@@ -162,10 +162,10 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	for _, group := range groups {
 		one := thing{occurrences: group.Occurrences, anyDecision: group.AnyDecision, approved: group.Approved,
 			dueAt: group.DueAt, exploited: group.Exploited > 0}
-		build, held := builds[group.TargetID]
+		build, held := builds[group.BuildID]
 		if !held {
-			build = &BuildStanding{TargetID: group.TargetID}
-			builds[group.TargetID] = build
+			build = &BuildStanding{BuildID: group.BuildID}
+			builds[group.BuildID] = build
 		}
 		count(build, one)
 		k := key{group.VulnerabilityID, group.ComponentID}
@@ -188,7 +188,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		count(&whole, *across[k])
 	}
 
-	// Each build's stream and variant, for the builds holding something.
+	// Each build's branch or tag and variant, for the builds holding something.
 	ids := make([]int64, 0, len(builds))
 	for id := range builds {
 		ids = append(ids, id)
@@ -198,23 +198,23 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		return []BuildStanding{}, whole, nil
 	}
 	var named []struct {
-		TargetID int64  `bun:"target_id"`
-		Stream   string `bun:"stream"`
-		Variant  string `bun:"variant"`
+		BuildID     int64  `bun:"build_id"`
+		BranchOrTag string `bun:"branch_or_tag"`
+		Variant     string `bun:"variant"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"tg"."id" AS "target_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"tg"."id" AS "build_id"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		Where(`"tg"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &named); err != nil {
 		return nil, whole, fmt.Errorf("read the builds of this product: %w", err)
 	}
 	for _, build := range named {
-		builds[build.TargetID].Stream, builds[build.TargetID].Variant = build.Stream, build.Variant
+		builds[build.BuildID].BranchOrTag, builds[build.BuildID].Variant = build.BranchOrTag, build.Variant
 	}
 
 	out := make([]BuildStanding, 0, len(ids))

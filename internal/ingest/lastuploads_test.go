@@ -29,17 +29,17 @@ func scanned(t *testing.T, fn func(t *testing.T, db *database.DB, s *ingest.Stor
 		// The world's build is the one filed against recently. A second
 		// variant of the same branch is the one that went silent, and a
 		// product the reader holds nothing on has the third.
-		ours, current := w.Product.ID, w.Target.ID
-		silent := w.TargetFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true)).ID
+		ours, current := w.Product.ID, w.Build.ID
+		silent := w.BuildFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true)).ID
 		elsewhere := w.DeclareProduct("edge-router", "Edge Router")
 		theirs := elsewhere.ID
-		hidden := w.TargetFor(w.DeclareStream(elsewhere, "main", catalog.Branch, nil),
+		hidden := w.BuildFor(w.DeclareBranchOrTag(elsewhere, "main", catalog.Branch, nil),
 			w.DeclareVariant(elsewhere, "generic", true)).ID
 
-		file := func(target int64, hash string, ago time.Duration) {
+		file := func(build int64, hash string, ago time.Duration) {
 			at := time.Now().UTC().Add(-ago)
 			if _, _, err := store.Record(ctx, ingest.Arriving{
-				TargetID: target, ContentHash: hash, BuiltAt: at,
+				BuildID: build, ContentHash: hash, BuiltAt: at,
 				ParserVersion: "test", Credential: "key-1",
 			}); err != nil {
 				t.Fatal(err)
@@ -96,7 +96,7 @@ func TestLastUploadsCountFromDeclarationWhereNothingEverArrived(t *testing.T) {
 	// the mistake this asserts against.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		cat := catalog.NewStore(s.DB())
-		br, err := cat.DeclareStream(t.Context(), ours, "never-built", catalog.Branch, nil)
+		br, err := cat.DeclareBranchOrTag(t.Context(), ours, "never-built", catalog.Branch, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -104,7 +104,7 @@ func TestLastUploadsCountFromDeclarationWhereNothingEverArrived(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := cat.TargetFor(t.Context(), br.ID, v.ID); err != nil {
+		if _, err := cat.BuildFor(t.Context(), br.ID, v.ID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -114,7 +114,7 @@ func TestLastUploadsCountFromDeclarationWhereNothingEverArrived(t *testing.T) {
 		}
 		var found bool
 		for _, row := range rows {
-			if row.Stream == "never-built" {
+			if row.BranchOrTag == "never-built" {
 				found = true
 				if row.LastReceivedAt != nil {
 					t.Error("nothing was ever filed against it, so it has no last arrival")
@@ -267,16 +267,16 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 		}
 		for _, row := range after {
 			if !row.OutOfSupport {
-				t.Errorf("%s %s does not read as out of support", row.Stream, row.Variant)
+				t.Errorf("%s %s does not read as out of support", row.BranchOrTag, row.Variant)
 			}
 			if row.Quiet {
 				t.Errorf("%s %s is reported as having gone quiet while out of support",
-					row.Stream, row.Variant)
+					row.BranchOrTag, row.Variant)
 			}
 			// And the silence is still measured and still shown, so a reader
 			// can see it stopped rather than being told nothing.
 			if row.Since == 0 {
-				t.Errorf("%s %s reports no silence at all", row.Stream, row.Variant)
+				t.Errorf("%s %s reports no silence at all", row.BranchOrTag, row.Variant)
 			}
 		}
 	})
@@ -296,7 +296,7 @@ func TestLastUploadsSayWhetherAnybodyIsTrying(t *testing.T) {
 		// The build rather than the product it is under. A refusal is recorded
 		// against the thing an upload was addressed to, and the fixture hands
 		// back product identifiers.
-		ours := targetOf(t, db, "master", "broadcom")
+		ours := buildOf(t, db, "master", "broadcom")
 
 		rows, err := s.LastUploads(ctx, reader, finding.Scope{}, 7*24*time.Hour)
 		if err != nil {
@@ -309,7 +309,7 @@ func TestLastUploadsSayWhetherAnybodyIsTrying(t *testing.T) {
 		}
 
 		why := "the upload could not be read"
-		if err := s.Refused(ctx, reader, ingest.Refusal{TargetID: ours, Reason: why}); err != nil {
+		if err := s.Refused(ctx, reader, ingest.Refusal{BuildID: ours, Reason: why}); err != nil {
 			t.Fatal(err)
 		}
 		told := refusalsIn(t, s, reader)
@@ -324,7 +324,7 @@ func TestLastUploadsSayWhetherAnybodyIsTrying(t *testing.T) {
 		// a minute. The row is replaced rather than added to, so what a report
 		// holds is the last refusal and not a history of one build.
 		later := "the inventory could not be read"
-		if err := s.Refused(ctx, reader, ingest.Refusal{TargetID: ours, Reason: later}); err != nil {
+		if err := s.Refused(ctx, reader, ingest.Refusal{BuildID: ours, Reason: later}); err != nil {
 			t.Fatal(err)
 		}
 		told = refusalsIn(t, s, reader)
@@ -358,20 +358,20 @@ func refusalsIn(t *testing.T, s *ingest.Store, reader access.Subject) []string {
 	return told
 }
 
-// targetOf is the build a release and a variant name, by their names.
+// buildOf is the build a release and a variant name, by their names.
 //
 // The coverage fixture hands back products, and a refusal is recorded against
 // the build an upload was addressed to. Looked up rather than threaded through
 // the fixture, so the tests that do not need it keep the signature they have.
-func targetOf(t *testing.T, db *database.DB, stream, variant string) int64 {
+func buildOf(t *testing.T, db *database.DB, branchOrTag, variant string) int64 {
 	t.Helper()
 	var id int64
 	if err := db.DB.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(`"tg"."id"`).
-		Where(`"st"."name" = ?`, stream).Where(`"va"."name" = ?`, variant).
+		Where(`"st"."name" = ?`, branchOrTag).Where(`"va"."name" = ?`, variant).
 		Scan(t.Context(), &id); err != nil {
 		t.Fatal(err)
 	}

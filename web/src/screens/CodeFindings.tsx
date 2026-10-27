@@ -28,12 +28,19 @@ export function CodeFindings() {
   const [params, setParams] = useSearchParams();
   const asked = params.get("state") ?? "";
   const state = Object.hasOwn(CODE_FINDING_STATES, asked) ? (asked as CodeFindingState) : undefined;
-  const stream = params.get("stream") ?? undefined;
+  const branchOrTag = params.get("branch_or_tag") ?? undefined;
   const variant = params.get("variant") ?? undefined;
   const series = params.get("series") ?? undefined;
   const assigned = params.get("assigned") === "nobody" ? "nobody" : undefined;
   const [offset, setOffset] = useState(0);
-  const listed = useCodeFindings(product, { state, stream, variant, series, assigned, offset });
+  const listed = useCodeFindings(product, {
+    state,
+    branch_or_tag: branchOrTag,
+    variant,
+    series,
+    assigned,
+    offset,
+  });
   const opener = useRowOpener();
   const reads = !!mayOf(useWho().data, product)?.reads_internal;
 
@@ -41,9 +48,13 @@ export function CodeFindings() {
     setOffset(0);
     setParams(
       Object.fromEntries(
-        Object.entries({ state: next, stream, variant, series, assigned: unheld }).filter(
-          ([, value]) => value !== undefined,
-        ),
+        Object.entries({
+          state: next,
+          branch_or_tag: branchOrTag,
+          variant,
+          series,
+          assigned: unheld,
+        }).filter(([, value]) => value !== undefined),
       ) as Record<string, string>,
       { replace: true },
     );
@@ -53,7 +64,7 @@ export function CodeFindings() {
   const file = (format: "csv" | "json") =>
     fileAt("/v1/products/{product}/code-findings.{format}", format, {
       path: { product },
-      query: codeFindingsQuery({ state, stream, variant, series, assigned }),
+      query: codeFindingsQuery({ state, branch_or_tag: branchOrTag, variant, series, assigned }),
     });
   const counts = listed.data?.states ?? {};
   const rows = listed.data?.items ?? [];
@@ -64,7 +75,7 @@ export function CodeFindings() {
         <h2>Security testing</h2>
         <p>
           Code findings in <Link to={productAt(product)}>{product}</Link>
-          {stream && ` · ${stream}`}
+          {branchOrTag && ` · ${branchOrTag}`}
           {variant && ` · ${variant}`}
           {series && ` · ${series}`}
           {assigned && " · unassigned"}
@@ -99,7 +110,6 @@ export function CodeFindings() {
           </button>
         ))}
       </div>
-
       <label className="hint">
         <input
           type="checkbox"
@@ -108,7 +118,6 @@ export function CodeFindings() {
         />{" "}
         Unassigned only
       </label>
-
       {!state &&
         listed.data &&
         (listed.data.waiting > 0 || listed.data.ruled > 0 || listed.data.past_end_of_life > 0) && (
@@ -124,7 +133,7 @@ export function CodeFindings() {
                   key="ruled"
                   to={codeFindingsAt(product, {
                     state: "dismissed",
-                    stream,
+                    branch_or_tag: branchOrTag,
                     variant,
                     series,
                     assigned,
@@ -143,7 +152,6 @@ export function CodeFindings() {
               .flatMap((each, i) => (i === 0 ? [each] : [" · ", each]))}
           </p>
         )}
-
       {listed.isPending ? (
         <Loading />
       ) : listed.isError ? (
@@ -177,12 +185,12 @@ export function CodeFindings() {
               <tbody>
                 {rows.map((row) => {
                   const to = codeFindingAt(
-                    { product, stream: row.stream, variant: row.variant },
+                    { product, branch_or_tag: row.branch_or_tag, variant: row.variant },
                     row.occurrence,
                   );
                   return (
                     <tr
-                      key={`${row.occurrence}/${row.stream}/${row.variant}`}
+                      key={`${row.occurrence}/${row.branch_or_tag}/${row.variant}`}
                       className="row opens"
                       onClick={opener(to)}
                     >
@@ -196,7 +204,7 @@ export function CodeFindings() {
                       </td>
                       <td>{row.message}</td>
                       <td className="hint" style={{ whiteSpace: "nowrap" }}>
-                        {row.stream} · {row.variant}
+                        {row.branch_or_tag} · {row.variant}
                         {row.builds > 1 && ` +${row.builds - 1}`}
                       </td>
                       <td className="hint" style={{ whiteSpace: "nowrap" }}>

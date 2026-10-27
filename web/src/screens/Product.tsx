@@ -166,12 +166,16 @@ export function Product() {
               </thead>
               <tbody>
                 {builds.map((row) => {
-                  const build = { product, stream: row.stream ?? "", variant: row.variant ?? "" };
+                  const build = {
+                    product,
+                    branch_or_tag: row.branch_or_tag ?? "",
+                    variant: row.variant ?? "",
+                  };
                   return (
-                    <tr key={`${row.stream} ${row.variant}`} className="row">
+                    <tr key={`${row.branch_or_tag} ${row.variant}`} className="row">
                       <td>
                         <Link to={buildFindingsAt(build, counted())} className="id">
-                          {row.stream}
+                          {row.branch_or_tag}
                         </Link>{" "}
                         <span className="hint">·</span> <span className="id">{row.variant}</span>
                         {row.out_of_support && (

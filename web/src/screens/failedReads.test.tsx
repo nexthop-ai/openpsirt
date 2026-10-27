@@ -22,7 +22,7 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const BUILD = "/products/:product/streams/:stream/variants/:variant";
+const BUILD = "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant";
 
 function failing(path: string) {
   serve((asked) => {
@@ -58,7 +58,11 @@ describe("a secondary read that fails", () => {
   it("says which builds went quiet could not be read", async () => {
     failing("/v1/last-uploads");
     mount.render(
-      screen(<Uploads />, "/products/sonic/streams/master/variants/x/uploads", `${BUILD}/uploads`),
+      screen(
+        <Uploads />,
+        "/products/sonic/branches-and-tags/master/variants/x/uploads",
+        `${BUILD}/uploads`,
+      ),
     );
     await settle();
     expect(mount.host().textContent).toContain("Which builds have gone quiet could not be read.");
@@ -109,7 +113,9 @@ describe("a secondary read that fails", () => {
 
   it("says the release trend could not be read rather than drawing the calendar", async () => {
     failing("/v1/trend/releases");
-    mount.render(screen(<Home who={ANA} />, "/products/sonic/streams/master/variants/x", BUILD));
+    mount.render(
+      screen(<Home who={ANA} />, "/products/sonic/branches-and-tags/master/variants/x", BUILD),
+    );
     await settle();
     expect(mount.host().textContent).toContain("The release trend could not be read.");
   });
@@ -130,7 +136,7 @@ describe("a secondary read that fails", () => {
         <Decide
           at={{
             product: "sonic",
-            stream: "master",
+            branch_or_tag: "master",
             variant: "broadcom",
             vulnerability: "CVE-2026-1",
             component: "openssl",

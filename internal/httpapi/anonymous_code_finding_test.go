@@ -55,7 +55,7 @@ func TestTheAnonymousSubjectReadsNoCodeFinding(t *testing.T) {
 				continue
 			}
 			reached++
-			filled := strings.NewReplacer("{product}", "mine", "{stream}", "master",
+			filled := strings.NewReplacer("{product}", "mine", "{branch_or_tag}", "master",
 				"{variant}", "broadcom", "{occurrence}", occurrence, "{format}", "csv").Replace(path)
 			if got := r.Body(t, "", http.MethodGet, filled); got.Code != http.StatusUnauthorized {
 				t.Errorf("%s answered %d with no credential, want 401", filled, got.Code)
@@ -73,8 +73,8 @@ func TestTheAnonymousSubjectReadsNoCodeFinding(t *testing.T) {
 		if !anybody.Reads(access.Public, mine.ID) {
 			t.Fatal("the anonymous subject reads nothing of the product, so this checks nothing")
 		}
-		target := r.TargetOf(t, httpapitest.SeededBuild)
-		if _, err := finding.NewStore(r.DB.DB).CodeFindingAt(ctx, anybody, target, occurrence); !errors.Is(err, finding.ErrNoOpenFinding) {
+		build := r.BuildOf(t, httpapitest.SeededBuild)
+		if _, err := finding.NewStore(r.DB.DB).CodeFindingAt(ctx, anybody, build, occurrence); !errors.Is(err, finding.ErrNoOpenFinding) {
 			t.Errorf("the anonymous subject reading the code finding was answered %v", err)
 		}
 		for _, state := range []analysis.State{"", analysis.RecordedAsFlaw} {

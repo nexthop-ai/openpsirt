@@ -104,7 +104,7 @@ export function Dated({
         </span>
         <span style={{ color: "var(--muted)" }}>
           {f
-            ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
+            ? `${f.product_name || f.product} · ${f.branch_or_tag_name || f.branch_or_tag} · ${f.variant_name || f.variant}`
             : decision.product}
           {decision.issues > 1 && <> · {decision.issues.toLocaleString()} issues</>}
         </span>
@@ -304,7 +304,7 @@ export function Card({
             </>
           )}
           {f
-            ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
+            ? `${f.product_name || f.product} · ${f.branch_or_tag_name || f.branch_or_tag} · ${f.variant_name || f.variant}`
             : decision.product}
           {bulk && decision.issues > 1 && <> · {decision.issues.toLocaleString()} issues</>}
           {extension && decision.derivedFrom && (

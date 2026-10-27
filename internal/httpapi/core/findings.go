@@ -332,16 +332,16 @@ func BeneathIn(ctx context.Context, in Deps, scope finding.Scope, name string,
 			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
 				" needs a product, a branch and a variant that name exactly one build")
 	}
-	targets, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
+	buildIDs, err := finding.NewStore(in.DB.DB).Builds(ctx, scope)
 	if err != nil {
 		return nil, WentWrong(in.Logger, "cannot tell which builds are in scope", err)
 	}
-	if len(targets) != 1 {
+	if len(buildIDs) != 1 {
 		return nil, huma.Error422UnprocessableEntity(
 			"a subtree is a walk over one build's edges, so narrowing beneath a component" +
 				" needs a branch and a variant that name exactly one build")
 	}
-	componentID, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targets[0], name, which)
+	componentID, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, buildIDs[0], name, which)
 	if err != nil {
 		var several *graph.Ambiguous
 		if errors.As(err, &several) {

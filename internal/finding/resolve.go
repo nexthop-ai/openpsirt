@@ -55,7 +55,7 @@ type Resolved struct {
 // letting somebody overrule it is precisely what resolution computed, not
 // declared was written against.
 func (s *Store) Resolve(ctx context.Context, subject access.Subject,
-	targetID, vulnerabilityID int64, because string) (*Resolved, error) {
+	buildID, vulnerabilityID int64, because string) (*Resolved, error) {
 
 	because = strings.TrimSpace(because)
 	if because == "" {
@@ -67,7 +67,7 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 		var rows []Finding
 		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 		err := tx.NewSelect().Model(&rows).
-			Where(`"target_id" = ?`, targetID).
+			Where(`"build_id" = ?`, buildID).
 			Where(`"vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"closed_at" IS NULL`).
 			Where(kinds, kindArgs...).

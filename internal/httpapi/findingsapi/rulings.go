@@ -91,12 +91,12 @@ func registerRulings(api huma.API, in core.Deps) {
 		if err := finding.MayWorkReports(subject, product.ID); err != nil {
 			return nil, core.Asked(in.Logger, err)
 		}
-		var target int64
+		var build int64
 		if input.Body.DuplicateOf != "" {
 			// Resolved here and asked again inside the write. An issue this
 			// person may not be told of answers exactly as one that is not
 			// here.
-			target, err = core.IssueHere(ctx, in, subject, product.ID, input.Body.DuplicateOf)
+			build, err = core.IssueHere(ctx, in, subject, product.ID, input.Body.DuplicateOf)
 			if err != nil {
 				return nil, err
 			}
@@ -105,7 +105,7 @@ func registerRulings(api huma.API, in core.Deps) {
 			References:  input.Body.Reports,
 			Disposition: finding.Disposition(input.Body.Disposition),
 			Reasoning:   input.Body.Reasoning,
-			DuplicateOf: target,
+			DuplicateOf: build,
 		})
 		if err != nil {
 			return nil, refusedRuling(in, err, "that ruling could not be recorded")

@@ -126,7 +126,7 @@ func (CodeFindingAssignee) Schema(huma.Registry) *huma.Schema {
 func registerCodeFindings(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-code-finding-evidence", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}",
 		Summary: "Get a code finding's evidence",
 		Description: "Returns what the newest run that saw a code finding on a build said about it: where it " +
 			"is, the path the analyzer took to it, and the other places it names. Each place links " +
@@ -138,10 +138,10 @@ func registerCodeFindings(api huma.API, in core.Deps) {
 			"the two.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 	}) (*struct{ Body CodeFindingEvidenceBody }, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -149,15 +149,15 @@ func registerCodeFindings(api huma.API, in core.Deps) {
 		}
 		// Resolved for somebody granted the code finding alone as well: the names
 		// it sits at, and nothing past them.
-		named, err := core.LocatedForCodeFinding(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		named, err := core.LocatedForCodeFinding(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, err
 		}
-		codeFinding, err := finding.NewStore(in.DB.DB).CodeFindingAt(ctx, subject, target.ID, input.Occurrence)
+		codeFinding, err := finding.NewStore(in.DB.DB).CodeFindingAt(ctx, subject, build.ID, input.Occurrence)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that code finding could not be looked up", core.NoSuchFinding)
 		}

@@ -29,7 +29,7 @@ const PAGE = 25;
 export function CarriedPatches({
   at,
 }: {
-  at: { product: string; stream: string; variant: string };
+  at: { product: string; branch_or_tag: string; variant: string };
 }) {
   const [component, setComponent] = useState("");
   const [offset, setOffset] = useState(0);
@@ -44,7 +44,7 @@ export function CarriedPatches({
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried-patches",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried-patches",
           {
             params: {
               path: at,

@@ -26,7 +26,7 @@ func TestADeadlineRunsFromWhenTheFixExistedRatherThanFromWhenWeSawIt(t *testing.
 			Component: libnl, FixState: finding.FixUnknown,
 		}
 		opening := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, opening,
+		if _, err := f.store.Apply(t.Context(), f.build, opening,
 			[]finding.Reported{none}); err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +40,7 @@ func TestADeadlineRunsFromWhenTheFixExistedRatherThanFromWhenWeSawIt(t *testing.
 		arrived := opened.Add(100 * 24 * time.Hour)
 		released.FixedAt = &arrived
 
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{released}); err != nil {
 			t.Fatal(err)
 		}
@@ -71,7 +71,7 @@ func TestRewritingTheWindowsCountsFromWhenTheFixArrived(t *testing.T) {
 			Component: swss, FixState: finding.FixUnknown,
 		}
 		opening := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, opening,
+		if _, err := f.store.Apply(t.Context(), f.build, opening,
 			[]finding.Reported{none, early}); err != nil {
 			t.Fatal(err)
 		}
@@ -89,7 +89,7 @@ func TestRewritingTheWindowsCountsFromWhenTheFixArrived(t *testing.T) {
 		already.FixState, already.FixedIn = finding.FixedUpstream, "1.0.1"
 		before := opened.Add(-10 * 24 * time.Hour)
 		already.FixedAt = &before
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{released, already}); err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +120,7 @@ func TestRewritingTheWindowsKeepsAnIssueAttackedHereOnTheClock(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-ATTACKED", Severity: "low"},
 			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{low}); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{low}); err != nil {
 			t.Fatal(err)
 		}
 		if err := finding.IncidentChanged(t.Context(), f.db.DB,
@@ -153,7 +153,7 @@ func TestAFixThatLandedBeforeWeSawItLeavesTheDeadlineWhereItWas(t *testing.T) {
 			FixedIn: "3.5.7", FixedAt: &long,
 		}
 		opening := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, opening,
+		if _, err := f.store.Apply(t.Context(), f.build, opening,
 			[]finding.Reported{old}); err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestNothingUpstreamWouldCloseItSoItCarriesNoDeadline(t *testing.T) {
 					Issue:     finding.Named{Identifier: identifier, Severity: "high"},
 					Component: libnl, FixState: one.state,
 				}
-				if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 					[]finding.Reported{reported}); err != nil {
 					t.Fatal(err)
 				}
@@ -225,7 +225,7 @@ func TestAFixArrivingStartsAClockThatWasNotRunning(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-APPEARS", Severity: "high"},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{none}); err != nil {
 			t.Fatal(err)
 		}
@@ -236,7 +236,7 @@ func TestAFixArrivingStartsAClockThatWasNotRunning(t *testing.T) {
 		released := none
 		released.FixState = finding.FixedUpstream
 		released.FixedIn = "3.5.7"
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{released}); err != nil {
 			t.Fatal(err)
 		}
@@ -256,7 +256,7 @@ func TestUpstreamWithdrawingAFixStopsTheClock(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-WITHDRAWN", Severity: "high"},
 			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.5.7",
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{released}); err != nil {
 			t.Fatal(err)
 		}
@@ -266,7 +266,7 @@ func TestUpstreamWithdrawingAFixStopsTheClock(t *testing.T) {
 
 		gone := released
 		gone.FixState, gone.FixedIn = finding.NoFix, ""
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{gone}); err != nil {
 			t.Fatal(err)
 		}
@@ -293,7 +293,7 @@ func TestNoOtherPathHandsBackAClockNothingCouldMeet(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-STUCK", Severity: "high"},
 			Component: libnl, FixState: finding.NoFix,
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{nothing}); err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func TestNoOtherPathHandsBackAClockNothingCouldMeet(t *testing.T) {
 					t.Helper()
 					exploited := nothing
 					exploited.Issue.Exploited = true
-					if _, err := f.store.Apply(ctx, f.target, f.run(t),
+					if _, err := f.store.Apply(ctx, f.build, f.run(t),
 						[]finding.Reported{exploited}); err != nil {
 						t.Fatal(err)
 					}
@@ -377,7 +377,7 @@ func TestAFixDatedAfterWeSawItIsNotWhatTheClockRunsFrom(t *testing.T) {
 			FixedIn: "3.9.0", FixedAt: &ahead,
 		}
 		opening := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, opening,
+		if _, err := f.store.Apply(t.Context(), f.build, opening,
 			[]finding.Reported{absurd}); err != nil {
 			t.Fatal(err)
 		}
@@ -411,7 +411,7 @@ func TestAnUpstreamRefusalOfAnExploitedIssueKeepsItsDeadline(t *testing.T) {
 			f.shipped(t, twoConsumers())
 			missing := refused("CVE-2026-NOFIX-USED", true)
 			missing.FixState = finding.NoFix
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 				[]finding.Reported{refused("CVE-2026-REFUSED-USED", true), missing}); err != nil {
 				t.Fatal(err)
 			}
@@ -429,14 +429,14 @@ func TestAnUpstreamRefusalOfAnExploitedIssueKeepsItsDeadline(t *testing.T) {
 	t.Run("exploitation learned while open", func(t *testing.T) {
 		each(t, func(t *testing.T, f *fixture) {
 			f.shipped(t, twoConsumers())
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 				[]finding.Reported{refused("CVE-2026-REFUSED-LATER", false)}); err != nil {
 				t.Fatal(err)
 			}
 			if due := f.deadlineOrZero(t, "CVE-2026-REFUSED-LATER"); !due.IsZero() {
 				t.Fatalf("a refusal nobody is exploiting carries a deadline of %s", due)
 			}
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 				[]finding.Reported{refused("CVE-2026-REFUSED-LATER", true)}); err != nil {
 				t.Fatal(err)
 			}
@@ -460,7 +460,7 @@ func TestAnUpstreamRefusalOfAnExploitedIssueKeepsItsDeadline(t *testing.T) {
 				t.Fatalf("a refusal nobody is exploiting carries a deadline of %s", due)
 			}
 			f.shipped(t, twoConsumers())
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 				[]finding.Reported{refused("CVE-2026-REFUSED-ELSEWHERE", true)}); err != nil {
 				t.Fatal(err)
 			}
@@ -473,7 +473,7 @@ func TestAnUpstreamRefusalOfAnExploitedIssueKeepsItsDeadline(t *testing.T) {
 	t.Run("attacked here", func(t *testing.T) {
 		each(t, func(t *testing.T, f *fixture) {
 			f.shipped(t, twoConsumers())
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 				[]finding.Reported{refused("CVE-2026-REFUSED-HERE", false)}); err != nil {
 				t.Fatal(err)
 			}
@@ -498,7 +498,7 @@ func TestAnUpstreamRefusalOfAnExploitedIssueKeepsItsDeadline(t *testing.T) {
 	t.Run("a window edited", func(t *testing.T) {
 		each(t, func(t *testing.T, f *fixture) {
 			f.shipped(t, twoConsumers())
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 				[]finding.Reported{
 					refused("CVE-2026-REFUSED-KEPT", true),
 					refused("CVE-2026-REFUSED-IDLE", false),

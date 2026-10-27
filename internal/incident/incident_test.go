@@ -39,7 +39,7 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	if err != nil {
 		return cast{}, err
 	}
-	product, target := w.Product, w.Target
+	product, build := w.Product, w.Build
 	elsewhere, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "other", "Other")
 	if err != nil {
 		return cast{}, err
@@ -53,7 +53,7 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	issue := interned["CVE-2026-1"]
 
 	run, err := finding.NewStore(db.DB).Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", RanHere: true,
+		BuildID: build.ID, Scanner: "grype", RanHere: true,
 	})
 	if err != nil {
 		return cast{}, err
@@ -66,7 +66,7 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 		return cast{}, err
 	}
 	if _, err := db.DB.NewInsert().Model(&finding.Finding{
-		TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: issue,
+		BuildID: build.ID, Kind: finding.Vulnerable, VulnerabilityID: issue,
 		Visibility: access.Public, ComponentID: component.ID, OccurrenceIdentity: "place-of-libfoo",
 		OpenedAt: now, OpenedRunID: &run.ID,
 	}).Exec(ctx); err != nil {

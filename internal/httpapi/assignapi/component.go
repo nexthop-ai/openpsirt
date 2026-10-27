@@ -20,10 +20,10 @@ import (
 
 // PerBuildBody is one build's answer about a source package.
 type PerBuildBody struct {
-	Stream  string `json:"stream"`
-	Variant string `json:"variant"`
-	Source  string `json:"source" doc:"The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing"`
-	Version string `json:"version" doc:"The version the source package was built at"`
+	BranchOrTag string `json:"branch_or_tag"`
+	Variant     string `json:"variant"`
+	Source      string `json:"source" doc:"The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing"`
+	Version     string `json:"version" doc:"The version the source package was built at"`
 	// Ecosystem is read out of the identifiers rather than stored, and every
 	// binary of one fold shares it: the package type is part of the fold.
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the package identifiers name"`
@@ -46,7 +46,7 @@ type PerBuildBody struct {
 	Consumers   int `json:"consumers" doc:"The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted"`
 	Occurrences int `json:"occurrences" doc:"The number of times those sit somewhere in this build. What the ceiling on one action is measured against"`
 	// Upgrades are the versions this build could move to.
-	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets"`
+	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and a branch or tag that has moved on have different builds"`
 	DueAt    string             `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`
 	// CommittedTo is the promise already made for this build, read off the
 	// decisions.
@@ -122,8 +122,8 @@ func registerComponent(api huma.API, in core.Deps) {
 			"`libcurl4t64` and `curl` answer alike. A binary whose inventory names no source " +
 			"package is its own source. A source shipped at two versions in one build is two " +
 			"entries: two pieces of code, decided about separately.\n\n" +
-			"Answered per build, because the answer differs by build. A stream staying " +
-			"on a maintained older line and a stream that has moved on are different work.\n\n" +
+			"Answered per build, because the answer differs by build. A branch or tag staying " +
+			"on a maintained older line and a branch or tag that has moved on are different work.\n\n" +
 			"Counts cover the source package: an issue open on three of its binaries is one " +
 			"issue. Each entry in `packages` carries its own counts.\n\n" +
 			"Where it could go carries two counts. `fixed_here` is how many of what is " +
@@ -187,7 +187,7 @@ func registerComponent(api huma.API, in core.Deps) {
 				})
 			}
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
-				Stream: build.Stream, Variant: build.Variant,
+				BranchOrTag: build.BranchOrTag, Variant: build.Variant,
 				Source: build.Source, Version: build.SourceVersion, Ecosystem: ecosystem,
 				Packages:   packages,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
@@ -210,7 +210,7 @@ type PlanUpgradeBody struct {
 	// Builds is which releases this is promised for. The same component
 	// can be promised a different version in another release, which is the
 	// ordinary case.
-	Builds    []BuildName `json:"builds" minItems:"1" maxItems:"2000" doc:"The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version"`
+	Builds    []BuildName `json:"builds" minItems:"1" maxItems:"2000" doc:"The releases this is promised for. A branch or tag staying on a maintained older line takes its own promise with its own version"`
 	Reasoning string      `json:"reasoning" minLength:"1" doc:"The reason this is the answer here. Required like every other decision: what an auditor reads is the reasoning, not the outcome"`
 	// Person is who carries it. A team as readily as a person: moving a
 	// package is work a queue tracks rather than a decision one person
@@ -288,15 +288,15 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		}
 		builds := make([]int64, 0, len(input.Body.Builds))
 		for _, at := range input.Body.Builds {
-			located, err := core.LocatedVisibly(ctx, in, subject, input.Product, at.Stream, at.Variant)
+			located, err := core.LocatedVisibly(ctx, in, subject, input.Product, at.BranchOrTag, at.Variant)
 			if err != nil {
 				return nil, err
 			}
-			target, err := core.TargetRow(ctx, in, located.StreamID, located.VariantID)
+			build, err := core.BuildRow(ctx, in, located.BranchOrTagID, located.VariantID)
 			if err != nil {
 				return nil, err
 			}
-			builds = append(builds, target.ID)
+			builds = append(builds, build.ID)
 		}
 
 		holder, admits, err := carrying(ctx, in, subject, product.ID, input.Body.Person,

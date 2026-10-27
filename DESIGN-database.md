@@ -536,8 +536,9 @@ Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
 says what a report's case holds.
 
 It renames the triage and incident records, the standing rules, the supplier
-advisory feeds, the finding labels and the VEX tables first, so the rest of it
-and the release's declarations are written against the new names.
+advisory feeds, the finding labels, the VEX tables, and the branches and tags
+and their builds first, so the rest of it and the release's declarations are
+written against the new names.
 
 | v0.10.0 table | v0.11.0 table |
 |---|---|
@@ -552,6 +553,8 @@ and the release's declarations are written against the new names.
 | `finding_tag` | `finding_label` |
 | `vex_statement` | `received_vex_statement` |
 | `vex_issuance` | `published_vex` |
+| `stream` | `branch_or_tag` |
+| `target` | `build` |
 
 | Column | v0.11.0 name |
 |---|---|
@@ -563,11 +566,15 @@ and the release's declarations are written against the new names.
 | `triage_floor`, on `product` | `minimum_severity` |
 | `routed_by`, on `finding` | `assigned_by_rule` |
 | `tag`, on `finding_label` | `label` |
+| `stream_id`, on `advisory_agreed_status`, `advisory_override`, `api_key`, `build` and `incident_fix` | `branch_or_tag_id` |
+| `live_stream_id`, on `incident_fix` | `live_branch_or_tag_id` |
+| `target_id`, on `decision_build`, `finding`, `graph_edge`, `graph_node`, `published_vex`, `scan`, `scan_refusal`, `scan_run`, `suppression` and `upgrade` | `build_id` |
 
 Every index and constraint named after a renamed table or column is renamed
 with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`,
 `finding_place_idx` is `finding_occurrence_idx`, and `told_outside_record_idx`,
 named for the record an incident was, is `told_outside_incident_idx`.
+`claim_build_target_fk` is `decision_build_build_fk`.
 `job_set_aside_idx`, which lists the failed jobs, is `job_failed_idx`. The tables v0.11.0 creates are
 declared under the new names, `decision_stamp` among them.
 
@@ -639,6 +646,7 @@ stored values, and the changes after them.
 | A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
 | A v0.10.0 database holding an incident, a release carrying its fix, a notice outside, a window counted from another and limited to a product, and a finding the incident ranks first | Upgraded, each row read back under its v0.11.0 name pointing where it did, each renamed table's declaration describing the table built, and a window declared after it numbered after the rows it had |
 | The same two, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
+| A v0.10.0 database holding a finding on a branch's build | Upgraded, the finding read back through `build` and `branch_or_tag` on the branch it was filed against |
 | A v0.10.0 database holding a routing rule and a supplier, upgraded whole and stopped after each of their renames | The rule read back as an assignment rule placing findings and the supplier as a supplier advisory feed, and each renamed table's declaration describing the table built |
 | A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
 | A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a failed job, a kept filter naming the renamed words, the bulk action limit and a change on the trail of the renamed kind | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
@@ -1140,7 +1148,7 @@ statement without one, so the quick loop never sees this.
 
 An act is one transaction, and an act is what a person asked for. Recording
 somebody and granting them the roles named, declaring a team and putting people
-on it, filling in a stream's parent and recording when it went out, storing a
+on it, filling in a tag's parent and recording when it went out, storing a
 graph with what the build argued about its own patches: each is one request, and
 written as a statement per part a refusal partway through answers "nothing
 happened" over a database where half of it did. The caller then corrects the

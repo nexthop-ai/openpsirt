@@ -250,8 +250,8 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "fr"."vulnerability_id"`).
 		Join(`JOIN "vulnerability" AS "ri" ON "ri"."id" = "fr"."vulnerability_id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "ri"."issue_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		ColumnExpr(`"fr"."id" AS "report_id"`).
 		ColumnExpr(`MIN("fr"."reference") AS "reference"`).

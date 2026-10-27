@@ -121,7 +121,8 @@ the wrong thing.
 A store's refusal that no handler has an arm for is an oracle too. It falls
 through to the fault answer, so the route says 500 where a stranger is told
 404, and the pair says the build is there — one name at a time, with the
-fault's own text naming which of product, stream and variant is undeclared.
+fault's own text naming which of product, branch or tag, and variant is
+undeclared.
 Every store refusal is typed and every handler that can meet one answers it the
 way a name that reaches nothing is answered.
 
@@ -519,7 +520,7 @@ or team a row is about, are named the same way.
 |---|---|
 | A field naming a person carries the sign-in identity | A caller matches the record against a person, and a screen matches it against the viewer's own identity to decide what is theirs |
 | A field naming a product, a branch or tag, a variant or a team carries its name | A caller filters a list and builds a path from what it was handed, and a label resolves to nothing |
-| A label, where a response carries one, is the field's name suffixed `_name` | `proposed_by` and `proposed_by_name`, `product` and `product_name`, `stream` and `stream_name`, `team` and `team_name`. One suffix, so a caller finds the label without reading each field's description |
+| A label, where a response carries one, is the field's name suffixed `_name` | `proposed_by` and `proposed_by_name`, `product` and `product_name`, `branch_or_tag` and `branch_or_tag_name`, `team` and `team_name`. One suffix, so a caller finds the label without reading each field's description |
 | A label beside a person or a team is absent where it would repeat the name; a label beside a product, branch or tag, or variant falls back to the name | Absent beside a person reads as "the same". A build is named on every list alike |
 | Not every field carries a label | The lists a person reads by name carry one. Adding a label beside a name is additive, so the rest gain one as a screen needs it |
 | The holder of work is a person's identity or a team's name, beside `person_name` | The holder's own list resolves it, and a team's label matches no team |
@@ -579,7 +580,7 @@ Recorded because the conclusion is the deliverable.
 | A note states something the scope does not, or is omitted | A note saying the opposite of the value beside it is worse than none: an operation answered without a credential can declare that it requires one |
 | Paging is `limit` and `offset`, with a total | A cursor is better under concurrent writes and worse for jumping to a page. The total is separate from the page because somebody deciding whether to start work needs to know how much there is |
 | A list answers with an object, not an array | An array at the top level has nowhere to put the total |
-| Names in paths, identifiers in bodies | A product, stream and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
+| Names in paths, identifiers in bodies | A product, branch or tag, and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
 | A removal takes something out of use rather than out of the database | A team, an assignment rule, an outbound destination and a variant are each reached by `DELETE` and each keep their row. What they hold is named by findings, decisions and documents that went to customers, so removing the row would take those with it |
 | An amendment leaves out what it does not change, and naming nothing is refused | Absent and cleared are different requests wherever a field has a default, and a request that asks for nothing answered as done would say something happened |
 | An occurrence in a path is the identity the findings list gave out | A caller free to compose one would be choosing which decisions apply where |

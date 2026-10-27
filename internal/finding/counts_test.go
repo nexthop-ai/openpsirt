@@ -69,16 +69,16 @@ func TestCountingNarrowsToWhatWasAskedFor(t *testing.T) {
 	// The three levels answer different questions and must not answer each
 	// other's. The issue is open in four builds of one product: three
 	// releases, and two variants of the first. So the product level has one
-	// bucket, the variant level two and the stream level three, and each
+	// bucket, the variant level two and the branch or tag level three, and each
 	// bucket is keyed by what that level names.
 	//
-	// Verified by grouping every level by the stream's column, and by
+	// Verified by grouping every level by the branch or tag's column, and by
 	// swapping the product and variant levels: each answers the wrong number
 	// of buckets.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		builds := []int64{
-			f.target,
+			f.build,
 			f.anotherVariant(t, "mellanox"),
 			f.anotherBuild(t, "v2"),
 			f.anotherBuild(t, "v3"),
@@ -100,8 +100,8 @@ func TestCountingNarrowsToWhatWasAskedFor(t *testing.T) {
 				switch level {
 				case finding.ByProduct:
 					seen[*scope.ProductID] = true
-				case finding.ByStream:
-					seen[*scope.StreamID] = true
+				case finding.ByBranchOrTag:
+					seen[*scope.BranchOrTagID] = true
 				case finding.ByVariant:
 					seen[*scope.VariantID] = true
 				}
@@ -117,7 +117,7 @@ func TestCountingNarrowsToWhatWasAskedFor(t *testing.T) {
 			buckets int
 		}{
 			{finding.ByProduct, 1},
-			{finding.ByStream, 3},
+			{finding.ByBranchOrTag, 3},
 			{finding.ByVariant, 2},
 		} {
 			counts, err := f.store.OpenBy(ctx, who, finding.Scope{}, want.level)

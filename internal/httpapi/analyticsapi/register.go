@@ -89,9 +89,9 @@ func (closure) Schema(huma.Registry) *huma.Schema {
 // read that failed fails the register, because an absent block is the answer
 // for an unscanned build and a fault is not that.
 func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
-	targetID int64, product, stream, variant string) (*core.MeasuredBody, error) {
+	buildID int64, product, branchOrTag, variant string) (*core.MeasuredBody, error) {
 
-	scan, err := ingest.NewStore(in.DB.DB).Newest(ctx, targetID)
+	scan, err := ingest.NewStore(in.DB.DB).Newest(ctx, buildID)
 	if err != nil {
 		return nil, core.WentWrong(in.Logger, "what the register was measured with could not be read", err)
 	}
@@ -102,7 +102,7 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 		Scan: scan.ID, ScanHash: scan.ContentHash,
 		BuiltAt: core.Stamp(scan.BuiltAt),
 	}
-	last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, targetID)
+	last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, buildID)
 	if err != nil && !errors.Is(err, access.ErrDenied) {
 		return nil, core.WentWrong(in.Logger, "what the register was measured with could not be read", err)
 	}
@@ -130,7 +130,7 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 		if held {
 			measured.DocumentAt = fmt.Sprintf(
 				"/v1/products/%s/branches-and-tags/%s/variants/%s/sboms/%d/documents/%d",
-				url.PathEscape(product), url.PathEscape(stream), url.PathEscape(variant),
+				url.PathEscape(product), url.PathEscape(branchOrTag), url.PathEscape(variant),
 				scan.ID, document.ID)
 		}
 		break
@@ -180,7 +180,7 @@ func (r Registering) narrow() finding.Registering {
 }
 
 func registerRegister(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register"
+	const path = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register"
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-disposition-register", Method: http.MethodGet, Path: path,
 		Summary: "List every known vulnerability in a build and its disposition",
@@ -193,9 +193,9 @@ func registerRegister(api huma.API, in core.Deps) {
 			"happened to it.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
 		Registering
 		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500"`
 		Offset int `query:"offset" minimum:"0"`
@@ -206,11 +206,11 @@ func registerRegister(api huma.API, in core.Deps) {
 			Measured *core.MeasuredBody `json:"measured,omitempty" doc:"The tools the register was measured with. Absent where nothing has been uploaded to the build"`
 		}
 	}, error) {
-		subject, target, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).Register(ctx, subject, target,
+		rows, total, err := finding.NewStore(in.DB.DB).Register(ctx, subject, build,
 			input.narrow(), input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
@@ -223,8 +223,8 @@ func registerRegister(api huma.API, in core.Deps) {
 			}
 		}{}
 		out.Body.Total = total
-		out.Body.Measured, err = measuredWith(ctx, in, subject, target,
-			input.Product, input.Stream, input.Variant)
+		out.Body.Measured, err = measuredWith(ctx, in, subject, build,
+			input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -246,13 +246,13 @@ func registerRegister(api huma.API, in core.Deps) {
 			"like every other export here.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Format  string `path:"format" enum:"csv,json"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Format      string `path:"format" enum:"csv,json"`
 		Registering
 	}) (*huma.StreamResponse, error) {
-		subject, target, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -264,15 +264,15 @@ func registerRegister(api huma.API, in core.Deps) {
 		// has is the more dangerous of the two: a file that claims to have
 		// left things out reads as complete about what remains.
 		store := finding.NewStore(in.DB.DB)
-		// Asked before a byte is written. Once the stream has started the
+		// Asked before a byte is written. Once the branch or tag has started the
 		// status is gone, so a refusal reaching it there can only be stated in
 		// the file, as an export that stopped early with a 200 in front of
 		// it.
-		if err := store.MayReadRegister(ctx, subject, target); err != nil {
+		if err := store.MayReadRegister(ctx, subject, build); err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
-		measured, err := measuredWith(ctx, in, subject, target,
-			input.Product, input.Stream, input.Variant)
+		measured, err := measuredWith(ctx, in, subject, build,
+			input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +282,7 @@ func registerRegister(api huma.API, in core.Deps) {
 			// register applies none, and the comment above says why saying so
 			// would be worse than silence.
 			About: append([]core.Stated{
-				{Label: "build", Value: input.Product + " " + input.Stream + " (" + input.Variant + ")"},
+				{Label: "build", Value: input.Product + " " + input.BranchOrTag + " (" + input.Variant + ")"},
 			}, measured.Stating()...),
 			Header: []string{
 				"issue", "severity", "component", "version", "occurrence", "consumer", "state",
@@ -296,8 +296,8 @@ func registerRegister(api huma.API, in core.Deps) {
 			// re-sorts the build's quarter of a million rows and skips past
 			// the ones already written — 52 minutes for a real build, against
 			// 1.9 seconds for one cursor over the same rows in the same order.
-			Stream: func(ctx context.Context, each func([]string) error) error {
-				return store.RegisterEach(ctx, subject, target, input.narrow(),
+			BranchOrTag: func(ctx context.Context, each func([]string) error) error {
+				return store.RegisterEach(ctx, subject, build, input.narrow(),
 					func(row finding.Disposed) error {
 						body := disposedBody(ctx, in, row)
 						met := ""
@@ -315,7 +315,7 @@ func registerRegister(api huma.API, in core.Deps) {
 					})
 			},
 		}
-		name := "register-" + strings.ToLower(input.Product+"-"+input.Stream+"-"+input.Variant)
+		name := "register-" + strings.ToLower(input.Product+"-"+input.BranchOrTag+"-"+input.Variant)
 		release, err := streams.take()
 		if err != nil {
 			return nil, err

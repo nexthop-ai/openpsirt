@@ -154,13 +154,13 @@ func codeFindingV0110(t *columnTypes) []string {
 		`CREATE TABLE "flaw_code_finding_build" (
 			"id"                   ` + t.id + `,
 			"flaw_code_finding_id" ` + t.ref + ` NOT NULL,
-			"target_id"            ` + t.ref + ` NOT NULL,
+			"build_id"            ` + t.ref + ` NOT NULL,
 			-- True where the code finding was seen in it, false where it holds the
 			-- chosen component and the code finding's series never analyzed it.
 			"seen"                 ` + t.boolean + ` NOT NULL,
-			CONSTRAINT "flaw_code_finding_build_unique" UNIQUE ("flaw_code_finding_id", "target_id"),
+			CONSTRAINT "flaw_code_finding_build_unique" UNIQUE ("flaw_code_finding_id", "build_id"),
 			CONSTRAINT "flaw_code_finding_build_code_finding_fk" FOREIGN KEY ("flaw_code_finding_id") REFERENCES "flaw_code_finding"("id"),
-			CONSTRAINT "flaw_code_finding_build_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+			CONSTRAINT "flaw_code_finding_build_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id")
 		)` + t.suffix,
 
 		// The component a path prefix was confirmed as at a flaw record, which

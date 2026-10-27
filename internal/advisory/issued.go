@@ -197,15 +197,15 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
 		WHERE "ac"."advisory_id" = "ad"."id" AND (`+covered+`) AND (NOT EXISTS (
 			SELECT 1 FROM `+finding.IssueFindings("f")+`
-			JOIN "target" AS "t" ON "t"."id" = "f"."target_id"
-			JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"
+			JOIN "build" AS "t" ON "t"."id" = "f"."build_id"
+			JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"
 			WHERE "st"."product_id" = "ac"."product_id"
 			  AND "si"."id" = "ac"."vulnerability_id"
 			  AND "f"."kind" = ?
 			  AND `+where+`) OR EXISTS (
 			SELECT 1 FROM `+finding.IssueFindings("f")+`
-			JOIN "target" AS "t" ON "t"."id" = "f"."target_id"
-			JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"
+			JOIN "build" AS "t" ON "t"."id" = "f"."build_id"
+			JOIN "branch_or_tag" AS "st" ON "st"."id" = "t"."branch_or_tag_id"
 			WHERE "st"."product_id" = "ac"."product_id"
 			  AND "si"."id" = "ac"."vulnerability_id"
 			  AND "f"."visibility" = ?
@@ -299,7 +299,7 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 	return issued, nil
 }
 
-// AnyIssuedForStream reports whether a published advisory named one release.
+// AnyIssuedForBranchOrTag reports whether a published advisory named one release.
 //
 // A release reaches the product tree by holding one of the issues the advisory
 // covers, so that is what is asked. Asked of the product instead, a release
@@ -322,15 +322,15 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 // shared between two products made an advisory for either refuse a rename on
 // the other, which is the over-refusal asking about the release rather than
 // about the product exists to avoid.
-func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
+func AnyIssuedForBranchOrTag(ctx context.Context, db bun.IDB, branchOrTagID int64) (bool, error) {
 	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	issued, err := db.NewSelect().Model((*Issuance)(nil)).
 		Join(`JOIN "advisory_issue" AS "ac" ON "ac"."advisory_id" = "ai"."advisory_id"`).
 		Join(`JOIN "vulnerability" AS "acv" ON "acv"."id" = "ac"."vulnerability_id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "acv"."issue_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		Where(`"tg"."stream_id" = ?`, streamID).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Where(`"tg"."branch_or_tag_id" = ?`, branchOrTagID).
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = "ac"."product_id"`).
 		Where(`"ac"."added_at" <= "ai"."issued_at"`).

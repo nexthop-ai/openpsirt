@@ -64,11 +64,11 @@ type readerFixture struct {
 
 // accept records a scan and stores what a build sent with it, the way an
 // upload does, and leaves the work behind.
-func (f *readerFixture) accept(t *testing.T, targetID int64, builtAt time.Time, inventory string, suppressions ...string) int64 {
+func (f *readerFixture) accept(t *testing.T, buildID int64, builtAt time.Time, inventory string, suppressions ...string) int64 {
 	t.Helper()
 	ctx := t.Context()
 	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: targetID, ContentHash: inventory[:16] + builtAt.String(),
+		BuildID: buildID, ContentHash: inventory[:16] + builtAt.String(),
 		BuiltAt: builtAt, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -91,11 +91,11 @@ func (f *readerFixture) accept(t *testing.T, targetID int64, builtAt time.Time, 
 
 // store records a scan and what came with it, leaving the caller to decide
 // when — and in what order — it gets read.
-func (f *readerFixture) store(t *testing.T, targetID int64, builtAt time.Time, inventory string) int64 {
+func (f *readerFixture) store(t *testing.T, buildID int64, builtAt time.Time, inventory string) int64 {
 	t.Helper()
 	ctx := t.Context()
 	scan, outcome, err := ingest.NewStore(f.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: targetID, ContentHash: inventory[:16] + builtAt.String(),
+		BuildID: buildID, ContentHash: inventory[:16] + builtAt.String(),
 		BuiltAt: builtAt, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -114,14 +114,14 @@ func eachReader(t *testing.T, fn func(t *testing.T, f *readerFixture)) {
 		db := w.DB
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		// Both releases are built as the one customer variant, which is two
-		// targets over one variant.
-		branchTarget := w.Target
-		tagTarget := w.TargetFor(w.Tag, w.Customer)
+		// builds over one variant.
+		branchBuild := w.Build
+		tagBuild := w.BuildFor(w.Tag, w.Customer)
 
 		q := queue.New(db, queue.DefaultOptions())
 		told := &[]ingest.Stored{}
 		fn(t, &readerFixture{
-			db: db, queue: q, branch: branchTarget.ID, tag: tagTarget.ID,
+			db: db, queue: q, branch: branchBuild.ID, tag: tagBuild.ID,
 			told: told,
 			reader: ingest.NewReader(db, q, sbom.Limits{}, quiet, "test").
 				Telling(func(_ context.Context, stored ingest.Stored) {
@@ -169,7 +169,7 @@ func TestAnAcceptedScanBecomesStoredGraph(t *testing.T) {
 			t.Errorf("left %q to be done, want a scan", waiting.Kind)
 		}
 		if waiting.Reference != strconv.FormatInt(f.branch, 10) {
-			t.Errorf("left a scan of %q, want the target just read", waiting.Reference)
+			t.Errorf("left a scan of %q, want the build just read", waiting.Reference)
 		}
 	})
 }
@@ -485,7 +485,7 @@ func TestAScanReadOnALaterAttemptStandsAndBringsNothingOlderBack(t *testing.T) {
 		// fails for a reason the second does not meet.
 		scans := ingest.NewStore(f.db.DB)
 		newer, outcome, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: f.branch, ContentHash: "newer", BuiltAt: now.Add(-time.Hour),
+			BuildID: f.branch, ContentHash: "newer", BuiltAt: now.Add(-time.Hour),
 			ParserVersion: "test",
 		})
 		if err != nil || outcome != ingest.Accept {
@@ -814,7 +814,7 @@ func TestAStoredInventoryIsHandedOnToWhoeverWouldSaySomethingAboutIt(t *testing.
 		if len(*f.told) != 1 {
 			t.Fatalf("%d inventories were handed on, want the one that was read", len(*f.told))
 		}
-		if got := (*f.told)[0]; got.ScanID != scanID || got.TargetID != f.branch {
+		if got := (*f.told)[0]; got.ScanID != scanID || got.BuildID != f.branch {
 			t.Errorf("handed on %+v, want scan %d of build %d", got, scanID, f.branch)
 		}
 	})
@@ -836,10 +836,10 @@ func TestAnInventoryNothingCouldReadIsHandedToNobody(t *testing.T) {
 }
 
 // nodesNow is the components present in a build now.
-func nodesNow(ctx context.Context, db bun.IDB, targetID int64) ([]graph.Node, error) {
+func nodesNow(ctx context.Context, db bun.IDB, buildID int64) ([]graph.Node, error) {
 	var nodes []graph.Node
 	err := db.NewSelect().Model(&nodes).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"closed_scan_id" IS NULL`).
 		Scan(ctx)
 	return nodes, err
@@ -865,7 +865,7 @@ func TestAReArguedBuildWhoseFirstReadFailedIsAppliedOnTheRetry(t *testing.T) {
 
 		scans := ingest.NewStore(f.db.DB)
 		again, outcome, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: f.branch, ContentHash: "re-argued", InventoryHash: hash,
+			BuildID: f.branch, ContentHash: "re-argued", InventoryHash: hash,
 			BuiltAt: at, ParserVersion: "test",
 		})
 		if err != nil || outcome != ingest.Accept {
@@ -922,7 +922,7 @@ func TestASubmissionTakenAgainIsAppliedUnderANewerScanThanAnyBefore(t *testing.T
 
 		// Tuesday's build arrives first and cannot be read.
 		tuesday := ingest.Arriving{
-			TargetID: f.branch, ContentHash: "tuesday", BuiltAt: now.Add(-time.Hour),
+			BuildID: f.branch, ContentHash: "tuesday", BuiltAt: now.Add(-time.Hour),
 			ParserVersion: "test",
 		}
 		failed, outcome, err := scans.Record(ctx, tuesday)
@@ -942,7 +942,7 @@ func TestASubmissionTakenAgainIsAppliedUnderANewerScanThanAnyBefore(t *testing.T
 
 		// Monday's build arrives after it and is applied.
 		monday, outcome, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: f.branch, ContentHash: "monday", BuiltAt: now.Add(-2 * time.Hour),
+			BuildID: f.branch, ContentHash: "monday", BuiltAt: now.Add(-2 * time.Hour),
 			ParserVersion: "test",
 		})
 		if err != nil || outcome != ingest.Accept {
@@ -985,7 +985,7 @@ func TestASubmissionTakenAgainIsAppliedUnderANewerScanThanAnyBefore(t *testing.T
 
 		var inverted int64
 		inverted, err = f.db.DB.NewSelect().Model((*graph.Node)(nil)).
-			Where(`"target_id" = ?`, f.branch).
+			Where(`"build_id" = ?`, f.branch).
 			Where(`"closed_scan_id" IS NOT NULL`).
 			Where(`"closed_scan_id" < "opened_scan_id"`).
 			Count(ctx)

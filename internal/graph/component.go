@@ -429,7 +429,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		// Two writers describing the same component are agreeing. The
 		// read above is inside the caller's transaction, which satisfies the
 		// rule about reading outside one — but it says nothing about another
-		// transaction, against another target, finding the same component
+		// transaction, against another build, finding the same component
 		// absent at the same moment. A unique violation is not a retryable
 		// failure, so a loser failing on it fails the whole scan apply, for a
 		// component that is present. Two replicas reading two scans at once is

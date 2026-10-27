@@ -252,12 +252,12 @@ func (s *Store) carrying() int {
 // and silence already reads as affected in this format, which is the honest
 // answer for something we have only postponed.
 func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string, undisclosed bool, kind Kind) (*Statements, error) {
+	product, branchOrTag, variant string, undisclosed bool, kind Kind) (*Statements, error) {
 
 	if !who.Stated() {
 		return nil, ErrNoPublisher
 	}
-	named, target, err := s.locate(ctx, subject, product, stream, variant)
+	named, build, err := s.locate(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 		}
 		visible = append(visible, access.Private)
 	}
-	return s.document(ctx, who, named, target, visible, kind)
+	return s.document(ctx, who, named, build, visible, kind)
 }
 
 // ErrNoPublisher says the deployment has not been told who it publishes as.
@@ -289,10 +289,10 @@ var ErrNoPublisher = refusal.New("this deployment has not said who it publishes 
 // reading what has all ask the same question of the same names. Asked again it
 // is a second set of round trips for an answer already in hand.
 func (s *Store) locate(ctx context.Context, subject access.Subject,
-	product, stream, variant string) (*catalog.Named, *catalog.Target, error) {
+	product, branchOrTag, variant string) (*catalog.Named, *catalog.Build, error) {
 
 	names := catalog.NewStore(s.db)
-	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+	named, err := names.LocateVisible(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -309,11 +309,11 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 		return nil, nil, access.Denied(
 			fmt.Sprintf("read disclosed findings in product %d", named.ProductID))
 	}
-	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	build, err := names.ExistingBuild(ctx, named.BranchOrTagID, named.VariantID)
 	if err != nil {
 		return nil, nil, err
 	}
-	return named, target, nil
+	return named, build, nil
 }
 
 // nodeJoin is the build's open node for a finding's component, which holds the
@@ -325,14 +325,14 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 //
 // A container image is stored with no version, and the identifier this build
 // stamped it with is its node's open image version, joined beside it.
-const nodeJoin = `LEFT JOIN "graph_node" AS "gn" ON "gn"."target_id" = "f"."target_id"
+const nodeJoin = `LEFT JOIN "graph_node" AS "gn" ON "gn"."build_id" = "f"."build_id"
 			AND "gn"."component_id" = "f"."component_id" AND "gn"."closed_scan_id" IS NULL
 		LEFT JOIN "image_version" AS "giv" ON "giv"."node_id" = "gn"."id" AND "giv"."closed_scan_id" IS NULL`
 
 // document assembles what stands about one build, at the visibilities asked
 // for.
 func (s *Store) document(ctx context.Context, who publisher.Named, named *catalog.Named,
-	target *catalog.Target, visible []access.Visibility, kind Kind) (*Statements, error) {
+	build *catalog.Build, visible []access.Visibility, kind Kind) (*Statements, error) {
 
 	if kind != Ours && kind != WithSuppliers {
 		return nil, refusal.Errorf("%q is not a kind of document this writes", kind)
@@ -352,7 +352,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// build ships rather than everything the product has ever decided.
 	q := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(nodeJoin).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
@@ -361,7 +361,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		ColumnExpr(`"v"."identifier" AS "identifier"`).
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
-		Where(`"f"."target_id" = ?`, target.ID).
+		Where(`"f"."build_id" = ?`, build.ID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Apply(vexKinds("f")).
 		// The issue's key is grouped alongside its name so the aliases can be
@@ -385,19 +385,19 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
 	}
-	fixed, err := s.patched(ctx, target.ID, visible)
+	fixed, err := s.patched(ctx, build.ID, visible)
 	if err != nil {
 		return nil, err
 	}
 	// Where a component's occurrences disagree, each occurrence a decision covers is
 	// stated on its own, naming what pulls the component in as the product.
-	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, target.ID, visible, s.carrying())
+	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, build.ID, visible, s.carrying())
 	if err != nil {
 		return nil, err
 	}
 	var stated []statedBySupplier
 	if kind == WithSuppliers {
-		if stated, err = s.disclaimed(ctx, target.ID, visible); err != nil {
+		if stated, err = s.disclaimed(ctx, build.ID, visible); err != nil {
 			return nil, err
 		}
 	}
@@ -416,7 +416,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed decisions: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
-			ErrTooLarge, named.Product, named.Stream, named.Variant, s.carrying())
+			ErrTooLarge, named.Product, named.BranchOrTag, named.Variant, s.carrying())
 	}
 
 	// The words each of those decisions rests on, read off the decision the
@@ -437,7 +437,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// Which revision this is, read from what has gone out for this build.
 	// A document generated twice with nothing published in between is the
 	// same revision, which is what its identifier staying still says.
-	revision, err := s.revision(ctx, target.ID, kind)
+	revision, err := s.revision(ctx, build.ID, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +488,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		}
 	}
 
-	shipped, err := s.rootOf(ctx, named, target.ID)
+	shipped, err := s.rootOf(ctx, named, build.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -562,7 +562,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 // The row read beside each is the lowest, which names the same row on every
 // engine, and is read rather than aggregated: a time read through an
 // aggregate comes back as text on one engine and a time on another.
-func (s *Store) closedInBuild(targetID int64, visible []access.Visibility,
+func (s *Store) closedInBuild(buildID int64, visible []access.Visibility,
 	because finding.Closure) *bun.SelectQuery {
 
 	return s.idb().NewSelect().
@@ -575,7 +575,7 @@ func (s *Store) closedInBuild(targetID int64, visible []access.Visibility,
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
 		ColumnExpr(`MIN("f"."id") AS "first"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_because" = ?`, because).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Apply(vexKinds("f")).
@@ -587,7 +587,7 @@ func (s *Store) closedInBuild(targetID int64, visible []access.Visibility,
 
 // stillShips says the component of a finding `f` is still in its build.
 const stillShips = `EXISTS (SELECT 1 FROM "graph_node" AS "n"
-	WHERE "n"."target_id" = "f"."target_id" AND "n"."component_id" = "f"."component_id"
+	WHERE "n"."build_id" = "f"."build_id" AND "n"."component_id" = "f"."component_id"
 		AND "n"."closed_scan_id" IS NULL)`
 
 // noneOpenByNameAndPurl keeps a query to findings `f` with no occurrence of the
@@ -601,7 +601,7 @@ func noneOpenByNameAndPurl(q *bun.SelectQuery) *bun.SelectQuery {
 	kinds, args := findingkind.VEX.Where(`"o"."kind"`)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
 	JOIN "component" AS "oc" ON "oc"."id" = "o"."component_id"
-	WHERE "o"."target_id" = "f"."target_id" AND "o"."vulnerability_id" = "f"."vulnerability_id"
+	WHERE "o"."build_id" = "f"."build_id" AND "o"."vulnerability_id" = "f"."vulnerability_id"
 		AND "o"."closed_at" IS NULL AND "oc"."name" = "c"."name"
 		AND COALESCE("oc"."purl", '') = COALESCE("c"."purl", '')
 		AND `+kinds+`)`, args...)
@@ -637,7 +637,7 @@ type fixedByPatch struct {
 //
 // A build that drops the patch reopens the finding, and the statement goes
 // with it.
-func (s *Store) patched(ctx context.Context, targetID int64,
+func (s *Store) patched(ctx context.Context, buildID int64,
 	visible []access.Visibility) ([]fixedByPatch, error) {
 
 	var rows []struct {
@@ -647,7 +647,7 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		Purl            string `bun:"purl"`
 		First           int64  `bun:"first"`
 	}
-	err := s.closedInBuild(targetID, visible, finding.Patched).
+	err := s.closedInBuild(buildID, visible, finding.Patched).
 		Join(`JOIN "suppression" AS "sup" ON "sup"."id" = "f"."suppressed_by"`).
 		Where(`"sup"."closed_scan_id" IS NULL`).
 		Scan(ctx, &rows)
@@ -749,7 +749,7 @@ func (s statedBySupplier) attributed() string {
 //   - nothing has been recorded at its occurrence since, the build's own patch
 //     included
 //   - no other supplier's statement closed an occurrence of it
-func (s *Store) disclaimed(ctx context.Context, targetID int64,
+func (s *Store) disclaimed(ctx context.Context, buildID int64,
 	visible []access.Visibility) ([]statedBySupplier, error) {
 
 	var rows []struct {
@@ -759,7 +759,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		Purl            string `bun:"purl"`
 		First           int64  `bun:"first"`
 	}
-	err := s.closedInBuild(targetID, visible, finding.Disclaimed).
+	err := s.closedInBuild(buildID, visible, finding.Disclaimed).
 		Join(`JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Where(`"ss"."superseded_at" IS NULL`).
 		// What the occurrence holds now: a later row at it, patched by the build
@@ -931,7 +931,7 @@ func identify(who publisher.Named, named *catalog.Named, kind Kind) string {
 
 // build is how the thing somebody holds is named in the document's identifier.
 func build(named *catalog.Named) string {
-	return named.Product + ":" + named.Stream + ":" + named.Variant
+	return named.Product + ":" + named.BranchOrTag + ":" + named.Variant
 }
 
 // rootOf is how a statement names the build: the package identifier its
@@ -939,13 +939,13 @@ func build(named *catalog.Named) string {
 // matches the product against, and what a deployment loading both reads as the
 // build's own claim. The build's names stand in where the inventory named no
 // root by a package identifier that states a version.
-func (s *Store) rootOf(ctx context.Context, named *catalog.Named, targetID int64) (string, error) {
+func (s *Store) rootOf(ctx context.Context, named *catalog.Named, buildID int64) (string, error) {
 	var root string
 	err := s.idb().NewSelect().
-		TableExpr(`"target" AS "t"`).
+		TableExpr(`"build" AS "t"`).
 		Join(`JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
 		ColumnExpr(`COALESCE("sc"."root_identifier", '')`).
-		Where(`"t"."id" = ?`, targetID).
+		Where(`"t"."id" = ?`, buildID).
 		Scan(ctx, &root)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("read how the build names itself: %w", err)

@@ -23,7 +23,7 @@ func TestAnUnratedRecordedFlawReadsAsNotRatedAcrossProducts(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name,
+			BuildIDs: []int64{f.build}, Component: swss.Name,
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told:    finding.Told{FoundHere: true},
 		})

@@ -272,11 +272,11 @@ func TestCarryingIsBoundedByTheIssuesAReviewerReads(t *testing.T) {
 
 // alsoCarries puts a second issue at the fixture's occurrence on each line, beside
 // the first.
-func (f *fixture) alsoCarries(t *testing.T, issue int64, targets ...int64) {
+func (f *fixture) alsoCarries(t *testing.T, issue int64, buildIDs ...int64) {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where(`"target_id" IN (?)`, bun.List(targets)).
+		Where(`"build_id" IN (?)`, bun.List(buildIDs)).
 		Where(`"vulnerability_id" = ?`, f.issue).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestADecisionIsNotCarriedOntoAnOccurrenceUndisclosedToItsCarrier(t *testing
 		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"visibility" = ?`, access.Private).
-			Where(`"target_id" = ?`, next).Exec(ctx); err != nil {
+			Where(`"build_id" = ?`, next).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -343,25 +343,25 @@ func TestADecisionIsNotCarriedOntoAnOccurrenceUndisclosedToItsCarrier(t *testing
 }
 
 // anotherLine declares a build of this product holding the fixture's own occurrence
-// at the given versions, and returns its target.
+// at the given versions, and returns its build.
 //
 // A carry is about two lines holding the same occurrence at different versions, so
 // a test of it needs findings on both — the decision alone says nothing about
 // where it would land.
-func (f *fixture) anotherLine(t *testing.T, stream, component, consumer string) int64 {
+func (f *fixture) anotherLine(t *testing.T, branchOrTag, component, consumer string) int64 {
 	t.Helper()
-	return f.anotherLineOf(t, catalog.Tag, stream, component, consumer)
+	return f.anotherLineOf(t, catalog.Tag, branchOrTag, component, consumer)
 }
 
-// anotherLineOf is anotherLine for a stream of the given kind. A dated
+// anotherLineOf is anotherLine for a branch or tag of the given kind. A dated
 // decision is refused on a tag, so carrying one needs a branch.
-func (f *fixture) anotherLineOf(t *testing.T, kind catalog.Kind, stream, component, consumer string) int64 {
+func (f *fixture) anotherLineOf(t *testing.T, kind catalog.Kind, branchOrTag, component, consumer string) int64 {
 	t.Helper()
 	ctx := t.Context()
 	cat := catalog.NewStore(f.db.DB)
-	declared, err := cat.DeclareStream(ctx, f.product, stream, kind, nil)
+	declared, err := cat.DeclareBranchOrTag(ctx, f.product, branchOrTag, kind, nil)
 	if err != nil {
-		t.Fatalf("declare %s: %v", stream, err)
+		t.Fatalf("declare %s: %v", branchOrTag, err)
 	}
 	// Declared once and looked up after, because two lines of the same product
 	// are the same variant built twice.
@@ -371,25 +371,25 @@ func (f *fixture) anotherLineOf(t *testing.T, kind catalog.Kind, stream, compone
 			t.Fatalf("variant: %v", err)
 		}
 	}
-	target, err := cat.TargetFor(ctx, declared.ID, variant.ID)
+	build, err := cat.BuildFor(ctx, declared.ID, variant.ID)
 	if err != nil {
-		t.Fatalf("target: %v", err)
+		t.Fatalf("build: %v", err)
 	}
-	f.occurrenceAt(t, stream, target.ID, component, consumer)
-	return target.ID
+	f.occurrenceAt(t, branchOrTag, build.ID, component, consumer)
+	return build.ID
 }
 
 // occurrenceAt records one open finding at the fixture's occurrence, at these versions.
-func (f *fixture) occurrenceAt(t *testing.T, stream string, target int64, component, consumer string) {
+func (f *fixture) occurrenceAt(t *testing.T, branchOrTag string, build int64, component, consumer string) {
 	t.Helper()
 	ctx := t.Context()
 	carrier := &graph.Component{
-		Identity: "c-" + stream + "-" + component + "-" + consumer, Name: "libfoo", Version: component,
+		Identity: "c-" + branchOrTag + "-" + component + "-" + consumer, Name: "libfoo", Version: component,
 		UpstreamName: "libfoo", UpstreamVersion: component,
 		Purl: "pkg:deb/debian/libfoo@" + component,
 	}
 	holder := &graph.Component{
-		Identity: "u-" + stream + "-" + component + "-" + consumer, Name: "libbar", Version: consumer,
+		Identity: "u-" + branchOrTag + "-" + component + "-" + consumer, Name: "libbar", Version: consumer,
 		UpstreamName: "libbar", UpstreamVersion: consumer,
 		Purl: "pkg:deb/debian/libbar@" + consumer,
 	}
@@ -399,7 +399,7 @@ func (f *fixture) occurrenceAt(t *testing.T, stream string, target int64, compon
 		}
 	}
 	row := &finding.Finding{
-		TargetID: target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+		BuildID: build, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 		Visibility: access.Public, ComponentID: carrier.ID, ConsumerID: &holder.ID,
 		OccurrenceIdentity: f.at().OccurrenceIdentity, Urgency: 1, OpenedAt: time.Now().UTC(),
 	}

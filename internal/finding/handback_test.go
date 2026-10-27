@@ -19,7 +19,7 @@ func (f *fixture) heldEverywhere(t *testing.T, party int64) {
 	t.Helper()
 	ctx := t.Context()
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+	if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{
 		found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl),
 	}); err != nil {
 		t.Fatal(err)

@@ -6,7 +6,7 @@
 // A file of their own so the shapes the tree is built on are stated once,
 // separately from the screen that draws them.
 
-export type At = { product: string; stream: string; variant: string };
+export type At = { product: string; branch_or_tag: string; variant: string };
 export type Node = {
   component: string;
   version: string;

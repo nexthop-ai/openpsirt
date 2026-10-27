@@ -127,7 +127,7 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrenceOf[deep])+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"the window overflows"}`); got.Code != http.StatusCreated {
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"component":"zlib","summary":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
 		var offer findingsapi.FlawOfferBody

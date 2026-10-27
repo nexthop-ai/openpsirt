@@ -746,7 +746,7 @@ func TestEveryExportSaysWhatItIsAndWhenItWasTaken(t *testing.T) {
 	// Unfilled, the request is refused and the file is never looked at, so an
 	// unknown name fails the test rather than skipping the route.
 	filled := map[string]string{
-		"product": "mine", "stream": "master", "variant": "broadcom", "format": "csv",
+		"product": "mine", "branch_or_tag": "master", "variant": "broadcom", "format": "csv",
 		"from": "master", "from_variant": "broadcom",
 		"to": "master", "to_variant": "broadcom",
 	}

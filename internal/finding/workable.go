@@ -94,7 +94,7 @@ func (w Workable) asks() bool {
 	return (len(w.Kinds) > 0 && len(w.Kinds) < 2) || (len(w.Support) > 0 && len(w.Support) < 2)
 }
 
-// narrow applies it to a query that joins target AS tg and stream AS st.
+// narrow applies it to a query that joins build AS tg and branch_or_tag AS st.
 //
 // The end-of-life rule is the catalog's own, read as the set of releases it
 // says are past their date rather than restated as a condition here: it
@@ -109,7 +109,7 @@ func (w Workable) narrow(ctx context.Context, db bun.IDB, now time.Time,
 	if len(w.Support) != 1 {
 		return q, nil
 	}
-	past, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, now)
+	past, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, now)
 	if err != nil {
 		return nil, err
 	}

@@ -409,7 +409,7 @@ func TestACodeFindingSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKept
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		ended := func(on *time.Time) {
 			t.Helper()
-			if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, on).
+			if _, err := r.DB.DB.NewUpdate().TableExpr(`"branch_or_tag"`).Set(`"eol_on" = ?`, on).
 				Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
 				t.Fatal(err)
 			}
@@ -490,10 +490,10 @@ func TestAFixedCodeFindingNamesOnlyAnAppliedComparableRunOfItsSeriesOnItsBuild(t
 		var later struct {
 			ID     int64 `bun:"id"`
 			Series int64 `bun:"series_id"`
-			Target int64 `bun:"target_id"`
+			Build  int64 `bun:"build_id"`
 		}
 		if err := r.DB.DB.NewSelect().TableExpr(`"series_run" AS "sr"`).
-			ColumnExpr(`"sr"."id", "sr"."series_id", "sr"."target_id"`).
+			ColumnExpr(`"sr"."id", "sr"."series_id", "sr"."build_id"`).
 			Where(`"sr"."built_at" = (SELECT MAX("m"."built_at") FROM "series_run" AS "m" WHERE "m"."series_id" =
 				(SELECT "s0"."series_id" FROM "series_run" AS "s0" ORDER BY "s0"."id" LIMIT 1))`).
 			Where(`"sr"."series_id" = (SELECT "s1"."series_id" FROM "series_run" AS "s1" ORDER BY "s1"."id" LIMIT 1)`).
@@ -510,10 +510,10 @@ func TestAFixedCodeFindingNamesOnlyAnAppliedComparableRunOfItsSeriesOnItsBuild(t
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := names.DeclareStream(t.Context(), mine.ID, "v1", catalog.Branch, nil); err != nil {
+		if _, err := names.DeclareBranchOrTag(t.Context(), mine.ID, "v1", catalog.Branch, nil); err != nil {
 			t.Fatal(err)
 		}
-		otherBuild := r.TargetOf(t, httpapitest.Build{Product: "mine", Stream: "v1", Variant: "broadcom"})
+		otherBuild := r.BuildOf(t, httpapitest.Build{Product: "mine", BranchOrTag: "v1", Variant: "broadcom"})
 		body := fmt.Sprintf(`{"because":"the bounds check landed","fixed_in":%d}`, later.ID)
 		for _, c := range []struct {
 			name   string
@@ -521,7 +521,7 @@ func TestAFixedCodeFindingNamesOnlyAnAppliedComparableRunOfItsSeriesOnItsBuild(t
 			value  any
 			was    any
 		}{
-			{"on another build", "target_id", otherBuild, later.Target},
+			{"on another build", "build_id", otherBuild, later.Build},
 			{"of another series", "series_id", otherSeries, later.Series},
 			{"not comparable", "comparable", false, true},
 			{"not applied", "status", "superseded", "applied"},

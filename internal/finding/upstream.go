@@ -103,23 +103,23 @@ func (s *Store) setDeclined(ctx context.Context, subject access.Subject, stateme
 // open finding here it speaks about: the same issue, at a component of the
 // same name and version. It is offered for review and never applied by itself.
 type Offer struct {
-	Statement  int64  `bun:"statement_id"`
-	Product    int64  `bun:"product_id"`
-	Stream     string `bun:"stream"`
-	Variant    string `bun:"variant"`
-	Finding    int64  `bun:"finding_id"`
-	Publisher  string `bun:"publisher"`
-	Issue      string `bun:"issue"`
-	Component  string `bun:"component"`
-	Version    string `bun:"version"`
-	Status     string `bun:"status"`
-	Document   string `bun:"document"`
-	Within     string `bun:"within"`
-	Target     int64  `bun:"target_id"`
-	Justified  string `bun:"justification"`
-	Reasoning  string `bun:"reasoning"`
-	Identifier string `bun:"document_id"`
-	Issued     int64  `bun:"vulnerability_id"`
+	Statement   int64  `bun:"statement_id"`
+	Product     int64  `bun:"product_id"`
+	BranchOrTag string `bun:"branch_or_tag"`
+	Variant     string `bun:"variant"`
+	Finding     int64  `bun:"finding_id"`
+	Publisher   string `bun:"publisher"`
+	Issue       string `bun:"issue"`
+	Component   string `bun:"component"`
+	Version     string `bun:"version"`
+	Status      string `bun:"status"`
+	Document    string `bun:"document"`
+	Within      string `bun:"within"`
+	Build       int64  `bun:"build_id"`
+	Justified   string `bun:"justification"`
+	Reasoning   string `bun:"reasoning"`
+	Identifier  string `bun:"document_id"`
+	Issued      int64  `bun:"vulnerability_id"`
 }
 
 // MostOffers bounds one page of offers. The queue is read by a person, and a
@@ -165,17 +165,17 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		TableExpr(`"received_vex_statement" AS "ss"`).
 		Join(`JOIN "component" AS "c" ON "c"."name_folded" = "ss"."component" AND "c"."version" = "ss"."about"`).
 		Join(`JOIN "finding" AS "f" ON "f"."component_id" = "c"."id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "ss"."product_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" AND "st"."product_id" = "ss"."product_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(WordsJoin("ss")).
 		ColumnExpr(`"ss"."id" AS "statement_id"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."id" AS "finding_id"`).
-		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"ss"."publisher" AS "publisher"`).
 		ColumnExpr(`"v"."identifier" AS "issue"`).

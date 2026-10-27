@@ -33,9 +33,9 @@ import (
 type Upgrade struct {
 	bun.BaseModel `bun:"table:upgrade,alias:ug"`
 
-	ID       int64  `bun:"id,pk,autoincrement"`
-	TargetID int64  `bun:"target_id,notnull"`
-	FoldKey  string `bun:"fold_key,notnull"`
+	ID      int64  `bun:"id,pk,autoincrement"`
+	BuildID int64  `bun:"build_id,notnull"`
+	FoldKey string `bun:"fold_key,notnull"`
 	// FromVersion is the version in hand when the commitment was made and
 	// ToVersion the version it moves to. Both are kept because neither can be
 	// recovered: they are read off the findings that are still open, and
@@ -94,7 +94,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		remove = remove.Where(`"decision_id" IS NULL`)
 	}
 	if len(wanted) > 0 {
-		remove = remove.Where(`"target_id" NOT IN (?)`, bun.List(wanted))
+		remove = remove.Where(`"build_id" NOT IN (?)`, bun.List(wanted))
 	}
 	if _, err := remove.Exec(ctx); err != nil {
 		return 0, fmt.Errorf("withdraw what is no longer committed: %w", err)
@@ -109,9 +109,9 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	var already []int64
 	if err := db.NewSelect().
 		TableExpr(`"upgrade" AS "ug"`).
-		ColumnExpr(`"ug"."target_id"`).
+		ColumnExpr(`"ug"."build_id"`).
 		Where(`"ug"."fold_key" = ?`, fold).
-		Where(inThisProductAs(`"ug"."target_id"`), productID).
+		Where(inThisProductAs(`"ug"."build_id"`), productID).
 		Scan(ctx, &already); err != nil {
 		return 0, fmt.Errorf("read what is already committed: %w", err)
 	}
@@ -148,7 +148,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 			continue
 		}
 		row := &Upgrade{
-			TargetID: id, FoldKey: fold,
+			BuildID: id, FoldKey: fold,
 			FromVersion: from, ToVersion: strings.TrimSpace(to),
 			CommittedTo: by, DecisionID: decisionID,
 			DeclaredBy: subject.ID, DeclaredAt: now,
@@ -252,16 +252,16 @@ type Planned struct {
 // point: what has landed is exactly the part where the findings are closed, and
 // a plan that dropped those rows could only ever say what is left.
 func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
-	targetID int64) ([]Planned, error) {
+	buildID int64) ([]Planned, error) {
 
-	_, visible, err := readableIn(ctx, s.db, subject, targetID)
+	_, visible, err := readableIn(ctx, s.db, subject, buildID)
 	if err != nil {
 		return nil, err
 	}
 
 	var rows []Upgrade
 	if err := s.db.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, targetID).Order("declared_at ASC", "id ASC").
+		Where(`"build_id" = ?`, buildID).Order("declared_at ASC", "id ASC").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this build is waiting on: %w", err)
 	}
@@ -291,7 +291,7 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		Where(kinds, kindArgs...).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
@@ -304,11 +304,11 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 		counts[row.Fold] = struct{ Issues, Occurrences int }{row.Issues, row.Occurrences}
 	}
 
-	named, err := s.packagesIn(ctx, targetID, visible, folds)
+	named, err := s.packagesIn(ctx, buildID, visible, folds)
 	if err != nil {
 		return nil, err
 	}
-	held, err := s.heldPerFold(ctx, targetID, visible, folds)
+	held, err := s.heldPerFold(ctx, buildID, visible, folds)
 	if err != nil {
 		return nil, err
 	}
@@ -339,12 +339,12 @@ func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 
 // movedTo changes what a commitment is moving to, or refuses where an
 // agreement stands over it.
-func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID int64,
+func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, buildID int64,
 	to string, by *time.Time, decisionID *int64) error {
 
 	var standing Upgrade
 	if err := db.NewSelect().Model(&standing).
-		Where(`"fold_key" = ?`, fold).Where(`"target_id" = ?`, targetID).
+		Where(`"fold_key" = ?`, fold).Where(`"build_id" = ?`, buildID).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what is already committed: %w", err)
 	}
@@ -364,7 +364,7 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 		Set(`"to_version" = ?`, to).
 		Set(`"committed_to" = ?`, by).
 		Set(`"decision_id" = ?`, decisionID).
-		Where(`"fold_key" = ?`, fold).Where(`"target_id" = ?`, targetID).Exec(ctx); err != nil {
+		Where(`"fold_key" = ?`, fold).Where(`"build_id" = ?`, buildID).Exec(ctx); err != nil {
 		return fmt.Errorf("change what this release is moving to: %w", err)
 	}
 	return nil
@@ -377,7 +377,7 @@ type packages struct {
 }
 
 // packagesIn names the packages each fold covers in one build.
-func (s *Store) packagesIn(ctx context.Context, targetID int64,
+func (s *Store) packagesIn(ctx context.Context, buildID int64,
 	visible []access.Visibility, folds []string) (map[string]packages, error) {
 
 	var rows []struct {
@@ -393,7 +393,7 @@ func (s *Store) packagesIn(ctx context.Context, targetID int64,
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
 		ColumnExpr(`"c"."name" AS "name"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr(FoldedOn+`, "c"."name"`).
@@ -419,7 +419,7 @@ type holder struct {
 }
 
 // heldPerFold reads who is carrying what is still open under each fold.
-func (s *Store) heldPerFold(ctx context.Context, targetID int64,
+func (s *Store) heldPerFold(ctx context.Context, buildID int64,
 	visible []access.Visibility, folds []string) (map[string]holder, error) {
 
 	var rows []struct {
@@ -446,7 +446,7 @@ func (s *Store) heldPerFold(ctx context.Context, targetID int64,
 		// the count of holders is the count of rows.
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`COUNT("f"."assigned_to") AS "held"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
@@ -583,8 +583,8 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	builds = distinct(builds)
 	var here []int64
 	err := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"tg"."id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"tg"."id" IN (?)`, bun.List(builds)).
@@ -606,7 +606,7 @@ func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64
 	if len(ids) == 0 {
 		return out, nil
 	}
-	past, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, s.now().UTC())
+	past, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, s.now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -618,12 +618,12 @@ func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64
 		Release string `bun:"release"`
 	}
 	err = db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"tg"."id" AS "id"`).
 		ColumnExpr(`"st"."name" AS "release"`).
 		Where(`"tg"."id" IN (?)`, bun.List(ids)).
-		Where(`"tg"."stream_id" IN (?)`, bun.List(past)).
+		Where(`"tg"."branch_or_tag_id" IN (?)`, bun.List(past)).
 		Scan(ctx, &retired)
 	if err != nil {
 		return nil, fmt.Errorf("read which of these builds are out of support: %w", err)

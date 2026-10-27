@@ -47,19 +47,19 @@ const REASONS: Record<Body<"ReasonCountBody">["reason"], { label: string; fix: s
 // Such a component reports no findings, which is also what a clean one
 // reports. The tree's header counts them and links here.
 export function UnmatchedComponents() {
-  const { product = "", stream = "", variant = "" } = useParams();
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const reason = params.get("reason") ?? "";
   const [offset, setOffset] = useState(0);
   const coverage = useQuery({
-    queryKey: ["unmatched-components", product, stream, variant, reason, offset],
+    queryKey: ["unmatched-components", product, branchOrTag, variant, reason, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components",
           {
             params: {
-              path: { product, stream, variant },
+              path: { product, branch_or_tag: branchOrTag, variant },
               query: {
                 ...(reason ? { reason: reason as never } : {}),
                 limit: PAGE,
@@ -85,13 +85,13 @@ export function UnmatchedComponents() {
 
   return (
     <>
-      <Crumbs product={product} stream={stream} variant={variant} />
+      <Crumbs product={product} branch_or_tag={branchOrTag} variant={variant} />
       <div className="screen-head">
         <h2>
           Unmatched components <span className="n">{data.unmatched.toLocaleString()}</span>
         </h2>
         <p>
-          {stream} · {variant} — {data.unmatched.toLocaleString()} of{" "}
+          {branchOrTag} · {variant} — {data.unmatched.toLocaleString()} of{" "}
           {data.components.toLocaleString()} components can't be matched, so they report no
           findings.
         </p>
@@ -127,8 +127,15 @@ export function UnmatchedComponents() {
           </div>
 
           <p className="hint">
-            Download <a href={fileAt({ product, stream, variant }, "csv", reason)}>CSV</a> ·{" "}
-            <a href={fileAt({ product, stream, variant }, "json", reason)}>JSON</a>.
+            Download{" "}
+            <a href={fileAt({ product, branch_or_tag: branchOrTag, variant }, "csv", reason)}>
+              CSV
+            </a>{" "}
+            ·{" "}
+            <a href={fileAt({ product, branch_or_tag: branchOrTag, variant }, "json", reason)}>
+              JSON
+            </a>
+            .
           </p>
 
           <Wide>
@@ -148,7 +155,10 @@ export function UnmatchedComponents() {
                   >
                     <td>
                       <Link
-                        to={componentAt(product, row.name, row.version, { stream, variant })}
+                        to={componentAt(product, row.name, row.version, {
+                          branch_or_tag: branchOrTag,
+                          variant,
+                        })}
                         className="linkish"
                       >
                         {row.name}
@@ -179,12 +189,12 @@ export function UnmatchedComponents() {
 
 // The address the file comes from, asking what the screen asked.
 function fileAt(
-  at: { product: string; stream: string; variant: string },
+  at: { product: string; branch_or_tag: string; variant: string },
   format: "csv" | "json",
   reason: string,
 ): string {
   return linkedFile(
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}",
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components.{format}",
     format,
     {
       path: at,

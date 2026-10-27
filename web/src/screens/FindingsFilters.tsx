@@ -844,10 +844,10 @@ export function Narrowed({
   // other and says so. It rides on the path rather than in the parameters, so
   // it draws a chip of its own: a list that narrows itself and does not say so
   // is how two people read one screen and disagree about what it holds.
-  scope: { product: string; stream: string; variant: string };
+  scope: { product: string; branch_or_tag: string; variant: string };
   // Widening by a level. Removing a scope chip only ever widens, like every
   // other chip here.
-  widen: (to: { product: string; stream: string; variant: string }) => void;
+  widen: (to: { product: string; branch_or_tag: string; variant: string }) => void;
   clear: (chip: Active) => void;
   clearAll: () => void;
 }) {
@@ -857,20 +857,20 @@ export function Narrowed({
     where.push({
       label: "Product",
       value: scope.product,
-      to: { product: "", stream: "", variant: "" },
+      to: { product: "", branch_or_tag: "", variant: "" },
     });
-    if (scope.stream) {
+    if (scope.branch_or_tag) {
       where.push({
         label: "Branch or tag",
-        value: scope.stream,
-        to: { product: scope.product, stream: "", variant: "" },
+        value: scope.branch_or_tag,
+        to: { product: scope.product, branch_or_tag: "", variant: "" },
       });
     }
     if (scope.variant) {
       where.push({
         label: "Variant",
         value: scope.variant,
-        to: { product: scope.product, stream: scope.stream, variant: "" },
+        to: { product: scope.product, branch_or_tag: scope.branch_or_tag, variant: "" },
       });
     }
   }

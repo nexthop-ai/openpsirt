@@ -6,7 +6,7 @@ import { draftKeyFor, mayMitigate, mustMitigate, type At } from "./Decide";
 
 const at: At = {
   product: "sonic",
-  stream: "master",
+  branch_or_tag: "master",
   variant: "broadcom",
   vulnerability: "CVE-2026-1",
   component: "stdlib",
@@ -31,7 +31,7 @@ describe("where a decision's reasoning is kept", () => {
 
   it("does not share a draft across builds of one product", () => {
     expect(draftKeyFor({ ...at, variant: "mellanox" })).not.toBe(draftKeyFor(at));
-    expect(draftKeyFor({ ...at, stream: "202411" })).not.toBe(draftKeyFor(at));
+    expect(draftKeyFor({ ...at, branch_or_tag: "202411" })).not.toBe(draftKeyFor(at));
   });
 
   it("does not share a draft across issues or components", () => {

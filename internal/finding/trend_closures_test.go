@@ -29,7 +29,7 @@ func TestTheTrendCountsOnlyAFixAsResolved(t *testing.T) {
 				now := time.Now().UTC()
 				run := f.run(t)
 				f.seenAt(t, run, now.Add(-20*24*time.Hour))
-				if _, err := f.store.Apply(t.Context(), f.target, run,
+				if _, err := f.store.Apply(t.Context(), f.build, run,
 					[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 					t.Fatal(err)
 				}

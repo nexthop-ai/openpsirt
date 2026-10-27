@@ -39,7 +39,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 		reports[4].Issue.Exploited = true
 		reports[5].Issue.Severity = "medium"
 		reports[5].FixedIn = ""
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reports); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), reports); err != nil {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
@@ -286,7 +286,7 @@ func TestOneUndisclosedOccurrenceMakesTheWholeGroupUndisclosed(t *testing.T) {
 		// One issue at a package two things pull in, so the fold holds two
 		// occurrences — and one of them is not disclosed.
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}

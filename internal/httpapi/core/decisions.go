@@ -36,7 +36,7 @@ type StandingDecisionBody struct {
 	ProposedByName string   `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string   `json:"proposed_at"`
 	Occurrences    int      `json:"occurrences" doc:"The number of this finding's occurrences the decision covers"`
-	Builds         []string `json:"builds" doc:"Every build the decision currently covers, as stream and variant"`
+	Builds         []string `json:"builds" doc:"Every build the decision currently covers, as branch or tag and variant"`
 	ApprovedBy     string   `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
 	ApprovedByName string   `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string   `json:"approved_at,omitempty"`

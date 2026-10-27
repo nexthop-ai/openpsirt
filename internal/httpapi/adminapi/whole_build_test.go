@@ -24,7 +24,7 @@ func TestNamingOneWholeBuildIsNotNarrowedByWhatKindOfReleaseItIs(t *testing.T) {
 		var onBranch struct {
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings?stream=master&variant=broadcom", &onBranch)
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom", &onBranch)
 		if onBranch.Total == 0 {
 			t.Fatal("the fixture's branch build holds nothing, so this proves nothing")
 		}
@@ -35,7 +35,7 @@ func TestNamingOneWholeBuildIsNotNarrowedByWhatKindOfReleaseItIs(t *testing.T) {
 			Total int `json:"total"`
 		}
 		httpapitest.Read(t, r, "triager",
-			"/v1/products/mine/findings?stream=master&variant=broadcom&on=tag", &asked)
+			"/v1/products/mine/findings?branch_or_tag=master&variant=broadcom&on=tag", &asked)
 		if asked.Total != onBranch.Total {
 			t.Errorf("naming one build and asking for tags answered %d, want %d — the "+
 				"selection already named the release", asked.Total, onBranch.Total)

@@ -22,13 +22,13 @@ import (
 // list, an outage reads as an upload that changed nothing.
 func TestAnInventoryChangeWhoseBuildCouldNotBeReadIsAFault(t *testing.T) {
 	ctx := t.Context()
-	handle := dbtest.Without(t, "target")
+	handle := dbtest.Without(t, "build")
 	names := catalog.NewStore(handle.DB)
 	product, err := names.DeclareProduct(ctx, "mine", "mine")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := names.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
+	if _, err := names.DeclareBranchOrTag(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := names.DeclareVariant(ctx, product.ID, "broadcom", true); err != nil {

@@ -101,14 +101,17 @@ export function Dependencies() {
 // a node says how much of their own work hangs beneath it, never how much the
 // build holds there.
 function Yours() {
-  const { product = "", stream = "", variant = "" } = useParams();
-  const at = useMemo(() => ({ product, stream, variant }), [product, stream, variant]);
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "" } = useParams();
+  const at = useMemo(
+    () => ({ product, branch_or_tag: branchOrTag, variant }),
+    [product, branchOrTag, variant],
+  );
   const mine = useQuery({
     queryKey: ["tree-mine", at],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/mine",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/mine",
           { params: { path: at } },
         ),
       ),
@@ -119,11 +122,11 @@ function Yours() {
 
   return (
     <div>
-      <Crumbs product={product} stream={stream} variant={variant} />
+      <Crumbs product={product} branch_or_tag={branchOrTag} variant={variant} />
       <div className="screen-head">
         <h2>Dependency paths</h2>
         <p>
-          {product} · {stream} · {variant}
+          {product} · {branchOrTag} · {variant}
         </p>
       </div>
       <div className="card">
@@ -211,8 +214,11 @@ function Yours() {
 }
 
 function Whole() {
-  const { product = "", stream = "", variant = "" } = useParams();
-  const at = useMemo(() => ({ product, stream, variant }), [product, stream, variant]);
+  const { product = "", branch_or_tag: branchOrTag = "", variant = "" } = useParams();
+  const at = useMemo(
+    () => ({ product, branch_or_tag: branchOrTag, variant }),
+    [product, branchOrTag, variant],
+  );
   const [params, setParams] = useSearchParams();
   // The row being looked at, as an identity rather than a name:
   // where a build ships one name twice, the two rows are two components.
@@ -235,7 +241,7 @@ function Whole() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components",
           {
             params: { path: at, query: term ? { q: term } : {} },
           },
@@ -349,18 +355,18 @@ function Whole() {
 
   return (
     <div>
-      <Crumbs product={product} stream={stream} variant={variant} />
+      <Crumbs product={product} branch_or_tag={branchOrTag} variant={variant} />
       <div className="screen-head">
         <h2>Dependencies</h2>
         <p>
-          {product} · {stream} · {variant} — {(top.data?.components ?? 0).toLocaleString()}{" "}
+          {product} · {branchOrTag} · {variant} — {(top.data?.components ?? 0).toLocaleString()}{" "}
           components, {(top.data?.edges ?? 0).toLocaleString()} edges
           {(top.data?.unmatched ?? 0) > 0 && (
             <>
               {" "}
               ·{" "}
               <Link
-                to={unmatchedComponentsAt({ product, stream, variant })}
+                to={unmatchedComponentsAt({ product, branch_or_tag: branchOrTag, variant })}
                 title="The scanner can't match these, so nothing will be found in them."
               >
                 {(top.data?.unmatched ?? 0).toLocaleString()} unmatched

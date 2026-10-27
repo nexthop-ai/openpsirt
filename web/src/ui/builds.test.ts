@@ -13,34 +13,36 @@ describe("what names one build", () => {
     // `main` + `arm` + `64` and `main` + `arm64` + nothing are two builds and
     // concatenate to one string. Both of the keys that omitted the separator
     // produced exactly this collision.
-    expect(buildKey({ stream: "main", variant: "arm" }, "64")).not.toBe(
-      buildKey({ stream: "main", variant: "arm64" }),
+    expect(buildKey({ branch_or_tag: "main", variant: "arm" }, "64")).not.toBe(
+      buildKey({ branch_or_tag: "main", variant: "arm64" }),
     );
   });
 
   it("keeps the version rather than appending the word undefined", () => {
     // `+ undefined` appends the text, which is how a version went missing
     // from a key that looked like it carried one.
-    expect(buildKey({ stream: "main", variant: "arm" })).not.toContain("undefined");
-    expect(fromBuildKey(buildKey({ stream: "main", variant: "arm" })).version).toBe("");
+    expect(buildKey({ branch_or_tag: "main", variant: "arm" })).not.toContain("undefined");
+    expect(fromBuildKey(buildKey({ branch_or_tag: "main", variant: "arm" })).version).toBe("");
   });
 
   it("reads back the three names it was given", () => {
-    expect(fromBuildKey(buildKey({ stream: "202411", variant: "broadcom" }, "8.14.1"))).toEqual({
-      stream: "202411",
+    expect(
+      fromBuildKey(buildKey({ branch_or_tag: "202411", variant: "broadcom" }, "8.14.1")),
+    ).toEqual({
+      branch_or_tag: "202411",
       variant: "broadcom",
       version: "8.14.1",
     });
   });
 
   it("tells two versions of one build apart", () => {
-    const build = { stream: "master", variant: "broadcom" };
+    const build = { branch_or_tag: "master", variant: "broadcom" };
     expect(buildKey(build, "8.14.1")).not.toBe(buildKey(build, "8.15.0"));
   });
 
   it("gives the same build the same key", () => {
-    expect(buildKey({ stream: "master", variant: "broadcom" }, "8.14.1")).toBe(
-      buildKey({ stream: "master", variant: "broadcom" }, "8.14.1"),
+    expect(buildKey({ branch_or_tag: "master", variant: "broadcom" }, "8.14.1")).toBe(
+      buildKey({ branch_or_tag: "master", variant: "broadcom" }, "8.14.1"),
     );
   });
 });

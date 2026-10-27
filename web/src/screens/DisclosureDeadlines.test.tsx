@@ -30,8 +30,8 @@ const row = (product: string) => ({
   product,
   components: ["openpsirt-image"],
   builds: [
-    { stream: "main", variant: "container" },
-    { stream: "v1.0", variant: "container" },
+    { branch_or_tag: "main", variant: "container" },
+    { branch_or_tag: "v1.0", variant: "container" },
   ],
   severity: "high",
   disclose_at: "2027-01-01T00:00:00Z",
@@ -61,7 +61,7 @@ describe("the disclosure deadlines screen", () => {
   });
 
   it("asks for the scope picked and says which it is", async () => {
-    remember({ product: "sonic", stream: "main" });
+    remember({ product: "sonic", branch_or_tag: "main" });
     const asked: Record<string, unknown>[] = [];
     serve((path, init) => {
       if (path === "/v1/session/me") return { data: me };
@@ -73,7 +73,7 @@ describe("the disclosure deadlines screen", () => {
     });
     mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
     await settle();
-    expect(asked.at(-1)).toMatchObject({ product: "sonic", stream: "main" });
+    expect(asked.at(-1)).toMatchObject({ product: "sonic", branch_or_tag: "main" });
     expect(mount.host().querySelector(".screen-head p")?.textContent).toContain("sonic · main");
     const shortcut = Array.from(mount.host().querySelectorAll("a")).find(
       (each) => each.textContent === "Record a reported flaw",
@@ -95,8 +95,8 @@ describe("the builds a row names", () => {
   it("names each build's variant where they differ", () => {
     expect(
       buildsWords([
-        { stream: "main", variant: "broadcom" },
-        { stream: "202411", variant: "mellanox" },
+        { branch_or_tag: "main", variant: "broadcom" },
+        { branch_or_tag: "202411", variant: "mellanox" },
       ]),
     ).toBe("main · broadcom, 202411 · mellanox");
   });

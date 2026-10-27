@@ -43,7 +43,7 @@ func versions(t *testing.T, f *fixture) []graph.ImageVersion {
 	var rows []graph.ImageVersion
 	if err := f.db.DB.NewSelect().Model(&rows).
 		Join(`JOIN "graph_node" AS "n" ON "n"."id" = "iv"."node_id"`).
-		Where(`"n"."target_id" = ?`, f.targetID).
+		Where(`"n"."build_id" = ?`, f.buildID).
 		Order("iv.id").Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -105,20 +105,20 @@ func TestARebuiltImageKeepsItsNodeAndEdgesAndRecordsTheVersion(t *testing.T) {
 	// the one thing that moved, and it is recorded.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		first, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa")))
+		first, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), imaged(image("docker-swss", "master.1-aaa")))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if first.VersionsOpened != 1 || first.VersionsClosed != 0 {
 			t.Errorf("a first build recorded %+v, want one version opened", first)
 		}
-		nodes, err := f.store.CurrentNodes(ctx, f.targetID)
+		nodes, err := f.store.CurrentNodes(ctx, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		before := rowCounts(t, f)
 
-		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +134,7 @@ func TestARebuiltImageKeepsItsNodeAndEdgesAndRecordsTheVersion(t *testing.T) {
 		if !maps.Equal(after, before) {
 			t.Errorf("rows went from %v to %v, want one more image version and nothing else", before, after)
 		}
-		again, err := f.store.CurrentNodes(ctx, f.targetID)
+		again, err := f.store.CurrentNodes(ctx, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -160,7 +160,7 @@ func TestARebuiltImageKeepsItsNodeAndEdgesAndRecordsTheVersion(t *testing.T) {
 		}
 
 		// The same build again writes nothing.
-		applied, err = fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
+		applied, err = fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -175,7 +175,7 @@ func TestAPackageMovingInsideARebuiltImageStillMoves(t *testing.T) {
 	// an image closes the old node and opens the new one as it always did.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
 			t.Fatal(err)
 		}
 		moved := imaged(image("docker-swss", "master.2-bbb"))
@@ -183,7 +183,7 @@ func TestAPackageMovingInsideARebuiltImageStillMoves(t *testing.T) {
 		moved.Components[2] = newer
 		moved.Dependencies[1].Child = newer
 		moved.Dependencies[3].Parent = newer
-		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), moved)
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), moved)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -213,14 +213,14 @@ func TestTwoImagesOfOneNameInOneBuildKeepTheirVersions(t *testing.T) {
 				{Parent: a, Child: openssl},
 			},
 		}
-		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), snap)
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if applied.NodesOpened != 4 || applied.VersionsOpened != 0 {
 			t.Errorf("two layers of one name wrote %+v, want four nodes and no image versions", applied)
 		}
-		held, err := f.store.CurrentComponents(ctx, f.targetID)
+		held, err := f.store.CurrentComponents(ctx, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -240,7 +240,7 @@ func TestTwoImagesOfOneNameInOneBuildKeepTheirVersions(t *testing.T) {
 			Root: root, Components: []graph.Described{a, openssl},
 			Dependencies: []graph.Dependency{{Parent: root, Child: a}, {Parent: a, Child: openssl}},
 		}
-		applied, err = fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), alone)
+		applied, err = fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), alone)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,10 +253,10 @@ func TestTwoImagesOfOneNameInOneBuildKeepTheirVersions(t *testing.T) {
 func TestAnImageThatLeavesClosesItsVersion(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree())
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), tree())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -277,10 +277,10 @@ func TestTheScannerIsGivenAnImageAsStored(t *testing.T) {
 	// identifier without a version.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
 			t.Fatal(err)
 		}
-		held, err := f.store.CurrentComponents(ctx, f.targetID)
+		held, err := f.store.CurrentComponents(ctx, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Body } from "../api/client";
-import { buildFindingsAt, plannedUpgradesAt, streamAt, streamsAt } from "../app/routes";
+import {
+  buildFindingsAt,
+  plannedUpgradesAt,
+  branchOrTagAt,
+  branchesAndTagsAt,
+} from "../app/routes";
 
 type Build = Body<"PerBuildBody">;
 
 // The findings list names binaries, so a source package is every binary of it.
 export const findingsAt = (product: string, row: Build, names: string[]) =>
   buildFindingsAt(
-    { product, stream: row.stream ?? "", variant: row.variant ?? "" },
+    { product, branch_or_tag: row.branch_or_tag ?? "", variant: row.variant ?? "" },
     new URLSearchParams(names.map((name) => ["component", name])),
   );
 
@@ -32,18 +37,18 @@ export function openIssues(product: string, row: Build): { label: string; to: st
 // they share, or to the product's releases where they span several.
 export function promiseLinks(
   product: string,
-  builds: { stream: string; variant: string }[],
+  builds: { branch_or_tag: string; variant: string }[],
 ): { label: string; to: string }[] {
   if (builds.length <= 3) {
     return builds.map((build) => ({
-      label: `Planned upgrades in ${build.stream} · ${build.variant} →`,
+      label: `Planned upgrades in ${build.branch_or_tag} · ${build.variant} →`,
       to: plannedUpgradesAt({ product, ...build }),
     }));
   }
-  const streams = new Set(builds.map((build) => build.stream));
-  if (streams.size === 1) {
-    const [stream = ""] = streams;
-    return [{ label: `${stream} →`, to: streamAt(product, stream) }];
+  const branchesAndTags = new Set(builds.map((build) => build.branch_or_tag));
+  if (branchesAndTags.size === 1) {
+    const [branchOrTag = ""] = branchesAndTags;
+    return [{ label: `${branchOrTag} →`, to: branchOrTagAt(product, branchOrTag) }];
   }
-  return [{ label: "Releases →", to: streamsAt(product) }];
+  return [{ label: "Releases →", to: branchesAndTagsAt(product) }];
 }

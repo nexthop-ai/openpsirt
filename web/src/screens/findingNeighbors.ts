@@ -49,7 +49,7 @@ export function useFindingNeighbors(
     () =>
       withinBuild(
         withinVariant(listQuery(list), Boolean(list.get("variant"))),
-        Boolean(list.get("stream") && list.get("variant")),
+        Boolean(list.get("branch_or_tag") && list.get("variant")),
       ),
     [list],
   );
@@ -75,7 +75,7 @@ export function useFindingNeighbors(
   const held = useMemo(() => {
     if (!walking) return undefined;
     const page = client.getQueryData<Page>(
-      findingsPageKey(product, list.get("stream") ?? "", list.get("variant") ?? "", listed),
+      findingsPageKey(product, list.get("branch_or_tag") ?? "", list.get("variant") ?? "", listed),
     );
     if (!page) return undefined;
     const items = page.items ?? [];
@@ -121,7 +121,7 @@ export function useFindingNeighbors(
         to: findingAt(
           {
             product,
-            stream: row.stream || (list.get("stream") ?? ""),
+            branch_or_tag: row.branch_or_tag || (list.get("branch_or_tag") ?? ""),
             variant: row.variant || (list.get("variant") ?? ""),
           },
           row,

@@ -10,8 +10,8 @@ const mount = mounted();
 
 const build = (of: Partial<Body<"LastUploadBody">>): Body<"LastUploadBody"> => ({
   product: "sonic",
-  stream: "master",
-  stream_kind: "branch",
+  branch_or_tag: "master",
+  branch_or_tag_kind: "branch",
   variant: "broadcom",
   quiet_days: 3,
   ...of,

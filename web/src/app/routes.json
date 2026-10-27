@@ -28,18 +28,18 @@
       "q",
       "running",
       "state",
-      "stream",
+      "branch_or_tag",
       "support",
       "variant"
     ]
   },
   "decision": { "path": "/decisions/:id" },
   "decisionOccurrence": { "path": "/decision-occurrences/:id" },
-  "issue": { "path": "/issues/:vulnerability" },
+  "issue": { "path": "/issues/:issue" },
   "products": { "path": "/products" },
   "product": { "path": "/products/:product" },
-  "streams": { "path": "/products/:product/streams" },
-  "stream": { "path": "/products/:product/streams/:stream" },
+  "branchesAndTags": { "path": "/products/:product/branches-and-tags" },
+  "branchOrTag": { "path": "/products/:product/branches-and-tags/:branch_or_tag" },
   "variants": { "path": "/products/:product/variants" },
   "productFindings": {
     "path": "/products/:product/findings",
@@ -64,17 +64,17 @@
       "q",
       "running",
       "state",
-      "stream",
+      "branch_or_tag",
       "support",
       "variant"
     ]
   },
   "productComponent": {
     "path": "/products/:product/components/:component",
-    "query": ["stream", "variant", "version"]
+    "query": ["branch_or_tag", "variant", "version"]
   },
   "buildFindings": {
-    "path": "/products/:product/streams/:stream/variants/:variant/findings",
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/findings",
     "query": [
       "assigned",
       "below",
@@ -96,37 +96,43 @@
       "q",
       "running",
       "state",
-      "stream",
+      "branch_or_tag",
       "support",
       "variant"
     ]
   },
   "finding": {
-    "path": "/products/:product/streams/:stream/variants/:variant/findings/:vulnerability/components/:component",
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/findings/:issue/components/:component",
     "query": ["ecosystem", "from", "namespace", "rule", "version"]
   },
   "dependencies": {
-    "path": "/products/:product/streams/:stream/variants/:variant/dependencies",
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/dependencies",
     "query": ["at", "ecosystem", "namespace", "path", "q", "version"]
   },
   "bulkDecision": {
-    "path": "/products/:product/streams/:stream/variants/:variant/components/:component/bulk-decision",
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/components/:component/bulk-decision",
     "query": ["contains", "ecosystem", "namespace", "version"]
   },
-  "uploads": { "path": "/products/:product/streams/:stream/variants/:variant/uploads" },
-  "uploadsOf": { "path": "/products/:product/streams/:stream/variants/:variant/uploads/:type" },
-  "inventoryChanges": {
-    "path": "/products/:product/streams/:stream/variants/:variant/uploads/:scan/changes"
+  "uploads": {
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads"
   },
-  "run": { "path": "/products/:product/streams/:stream/variants/:variant/runs/:run" },
+  "uploadsOf": {
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads/:type"
+  },
+  "inventoryChanges": {
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads/:sbom/changes"
+  },
+  "run": {
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/runs/:run"
+  },
   "plannedUpgrades": {
-    "path": "/products/:product/streams/:stream/variants/:variant/planned-upgrades"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/planned-upgrades"
   },
   "unmatchedComponents": {
-    "path": "/products/:product/streams/:stream/variants/:variant/unmatched-components"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/unmatched-components"
   },
   "vex": {
-    "path": "/products/:product/streams/:stream/variants/:variant/vex",
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/vex",
     "query": ["kind"]
   },
   "comparison": {
@@ -143,10 +149,10 @@
   },
   "codeFindings": {
     "path": "/products/:product/code-findings",
-    "query": ["state", "stream", "variant", "series"]
+    "query": ["state", "branch_or_tag", "variant", "series"]
   },
   "codeFinding": {
-    "path": "/products/:product/streams/:stream/variants/:variant/code-findings/:occurrence"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/code-findings/:occurrence"
   },
   "suppressionRules": { "path": "/products/:product/suppression-rules" },
   "repositories": { "path": "/products/:product/repositories" },
@@ -185,26 +191,29 @@
   "formerVulnerabilityReports": { "path": "/products/:product/inbox" },
   "formerVulnerabilityReport": { "path": "/products/:product/inbox/:reference" },
   "formerDependencies": {
-    "path": "/products/:product/streams/:stream/variants/:variant/components"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/components"
   },
-  "formerInventories": { "path": "/products/:product/streams/:stream/variants/:variant/scans" },
+  "formerInventories": {
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/scans"
+  },
   "formerUploads": {
-    "path": "/products/:product/streams/:stream/variants/:variant/inventories"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/inventories"
   },
   "formerUploadChanges": {
-    "path": "/products/:product/streams/:stream/variants/:variant/inventories/:scan/changes"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/inventories/:sbom/changes"
   },
   "formerInventoryChanges": {
-    "path": "/products/:product/streams/:stream/variants/:variant/scans/:scan/changes"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/scans/:sbom/changes"
   },
   "formerDecision": { "path": "/claims/:id" },
   "formerBulkDecision": {
     "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide"
   },
+  "formerStreams": { "path": "/products/:product/streams/*" },
   "formerMatchCoverage": {
-    "path": "/products/:product/streams/:stream/variants/:variant/match-coverage"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/match-coverage"
   },
   "formerPendingUpgrades": {
-    "path": "/products/:product/streams/:stream/variants/:variant/pending-upgrades"
+    "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/pending-upgrades"
   }
 }

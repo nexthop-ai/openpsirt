@@ -9,7 +9,13 @@ import type { paths } from "../api/schema";
 // The review queue's filters, as the address carries them and the queue and
 // its export are asked with. One list, so the screen, the file and a link
 // somebody sends ask the same question.
-const QUEUE_FILTERS = ["proposed_by", "older_than", "severity", "outcome", "release"] as const;
+const QUEUE_FILTERS = [
+  "proposed_by",
+  "older_than",
+  "severity",
+  "outcome",
+  "branch_or_tag",
+] as const;
 
 // The filters as the queue's own parameters declare them.
 type Narrowing = Pick<
@@ -36,8 +42,8 @@ export function queueNarrowing(params: URLSearchParams): Narrowing {
   }
   const outcomes = params.getAll("outcome").filter((word) => outcomeWords().includes(word));
   if (outcomes.length > 0) out.outcome = outcomes as NonNullable<Narrowing["outcome"]>;
-  const release = params.get("release")?.trim();
-  if (release) out.release = release;
+  const branchOrTag = params.get("branch_or_tag")?.trim();
+  if (branchOrTag) out.branch_or_tag = branchOrTag;
   return out;
 }
 
@@ -56,7 +62,7 @@ export function QueueFilters({
   onAsk: (next: URLSearchParams) => void;
 }) {
   const [who, setWho] = useState(params.get("proposed_by") ?? "");
-  const [release, setRelease] = useState(params.get("release") ?? "");
+  const [branchOrTag, setBranchOrTag] = useState(params.get("branch_or_tag") ?? "");
 
   function set(key: (typeof QUEUE_FILTERS)[number], value: string) {
     // Leaving a box without changing it asks nothing new, and asking again
@@ -129,15 +135,15 @@ export function QueueFilters({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          set("release", release);
+          set("branch_or_tag", branchOrTag);
         }}
       >
         <input
           {...notACredential}
           type="text"
-          value={release}
-          onChange={(event) => setRelease(event.target.value)}
-          onBlur={() => set("release", release)}
+          value={branchOrTag}
+          onChange={(event) => setBranchOrTag(event.target.value)}
+          onBlur={() => set("branch_or_tag", branchOrTag)}
           placeholder="Branch or tag"
           aria-label="Branch or tag name"
           title="Decisions covering an open finding in a branch or tag of this name"
@@ -153,7 +159,7 @@ export function QueueFilters({
             for (const key of QUEUE_FILTERS) next.delete(key);
             next.delete("offset");
             setWho("");
-            setRelease("");
+            setBranchOrTag("");
             onAsk(next);
           }}
         >

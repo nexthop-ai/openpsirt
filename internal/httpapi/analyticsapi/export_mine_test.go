@@ -50,7 +50,7 @@ func TestTheFileOfYourDecisionsHoldsWhatTheMineTabLists(t *testing.T) {
 		if waiting := file("triager", "/v1/review-queue.csv?mine=true"); len(waiting) != 1 {
 			t.Errorf("the queue's own file still holds the approved decision: %v", waiting)
 		}
-		for _, column := range []string{"stream", "variant"} {
+		for _, column := range []string{"branch_or_tag", "variant"} {
 			if at := httpapitest.IndexOf(mine[0], column); at < 0 || mine[1][at] == "" {
 				t.Errorf("the decision's row names no %s, which the tab shows: %v", column, mine)
 			}

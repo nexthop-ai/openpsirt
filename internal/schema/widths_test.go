@@ -77,12 +77,12 @@ func TestWhatAScannerCallsItselfIsNotBoundedByAColumn(t *testing.T) {
 	oversized := strings.Repeat("s", 4096)
 
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
-		ctx, db, target := t.Context(), w.DB, w.Target.ID
+		ctx, db, build := t.Context(), w.DB, w.Build.ID
 		if _, err := db.ExecContext(ctx,
-			`INSERT INTO "scan_run" ("target_id", "scanner", "scanner_version",
+			`INSERT INTO "scan_run" ("build_id", "scanner", "scanner_version",
 				"database_version", "ran_here", "started_at")
 			 VALUES (?, ?, ?, ?, ?, ?)`,
-			target, oversized, oversized, oversized, true, time.Now().UTC()); err != nil {
+			build, oversized, oversized, oversized, true, time.Now().UTC()); err != nil {
 			t.Fatalf("a scanner's own words were refused at %d bytes: %v", len(oversized), err)
 		}
 		// Read back by the build rather than by an inserted identifier, which
@@ -92,7 +92,7 @@ func TestWhatAScannerCallsItselfIsNotBoundedByAColumn(t *testing.T) {
 		var scanner, version, data string
 		if err := db.QueryRowContext(ctx,
 			`SELECT "scanner", "scanner_version", "database_version"
-			 FROM "scan_run" WHERE "target_id" = ?`, target).Scan(&scanner, &version, &data); err != nil {
+			 FROM "scan_run" WHERE "build_id" = ?`, build).Scan(&scanner, &version, &data); err != nil {
 			t.Fatalf("read back: %v", err)
 		}
 		for what, got := range map[string]string{

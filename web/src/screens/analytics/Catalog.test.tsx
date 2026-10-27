@@ -68,17 +68,17 @@ describe("a catalog entry that needs a scope", () => {
   });
 
   it("asks for a whole build where its screen is about one", () => {
-    mount.render(screen(<Catalog />, "/products/sonic/streams/master"));
+    mount.render(screen(<Catalog />, "/products/sonic/branches-and-tags/master"));
     expect(row("Release comparison").tagName).toBe("A");
     expect(row("Planned upgrades").querySelector(".needs")?.textContent).toBe("Needs a build");
   });
 
   it("is a link once the scope holds what it needs", () => {
-    mount.render(screen(<Catalog />, "/products/sonic/streams/master/variants/broadcom"));
+    mount.render(screen(<Catalog />, "/products/sonic/branches-and-tags/master/variants/broadcom"));
     const upgrades = row("Planned upgrades");
     expect(upgrades.tagName).toBe("A");
     expect(upgrades.getAttribute("href")).toBe(
-      "/products/sonic/streams/master/variants/broadcom/planned-upgrades",
+      "/products/sonic/branches-and-tags/master/variants/broadcom/planned-upgrades",
     );
   });
 });

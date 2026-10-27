@@ -304,7 +304,7 @@ func documentPaths(t *testing.T, name string, from ...io.Reader) (map[string]int
 // decision about the other. Elements are named without their namespace, as
 // the reader matches them.
 //
-// The walk is a stream of tokens, holding the elements open at any one time
+// The walk is a branch or tag of tokens, holding the elements open at any one time
 // and the paths one component carries, so a full-size document costs what it
 // does in JSON.
 func xmlDocumentPaths(t *testing.T, name string, r io.Reader) (map[string]int, map[string]int, int) {

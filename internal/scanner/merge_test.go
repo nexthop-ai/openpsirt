@@ -95,7 +95,7 @@ func (f *runFixture) occurrenceOf(t *testing.T, who access.Subject, issueName, c
 	if component == "libswsscommon" {
 		consumer = ""
 	}
-	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, who, f.target, issue,
+	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, who, f.build, issue,
 		finding.OccurrenceIdentity(component, consumer))
 	if err != nil {
 		t.Fatal(err)
@@ -606,7 +606,7 @@ func (f *runFixture) openFindings(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where(`"target_id" = ?`, f.target).Where(`"closed_at" IS NULL`).
+		Where(`"build_id" = ?`, f.build).Where(`"closed_at" IS NULL`).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}

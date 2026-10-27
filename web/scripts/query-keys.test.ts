@@ -44,13 +44,16 @@ describe("an invalidation that reaches no read", () => {
   it("reaches a read whose key goes on past its literal part", () => {
     expect(
       found(
-        `useQuery({ queryKey: ["streams", product], queryFn });`,
-        `q.invalidateQueries({ queryKey: ["streams", "sonic"] });`,
+        `useQuery({ queryKey: ["branches_and_tags", product], queryFn });`,
+        `q.invalidateQueries({ queryKey: ["branches_and_tags", "sonic"] });`,
       ),
     ).toEqual([]);
-    expect(reaches({ words: ["streams", "sonic"] }, { words: ["streams"], open: false })).toBe(
-      false,
-    );
+    expect(
+      reaches(
+        { words: ["branches_and_tags", "sonic"] },
+        { words: ["branches_and_tags"], open: false },
+      ),
+    ).toBe(false);
   });
 
   it("reads keys declared inside a list of queries", () => {

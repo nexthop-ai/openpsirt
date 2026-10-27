@@ -103,7 +103,7 @@ func TestARetiredVariantTakesNoScan(t *testing.T) {
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager",
-			"/v1/products/mine/findings?stream=master&variant=broadcom", &open)
+			"/v1/products/mine/findings?branch_or_tag=master&variant=broadcom", &open)
 		if len(open.Items) == 0 {
 			t.Error("retiring a variant took its findings with it")
 		}
@@ -215,7 +215,7 @@ func TestRenamingIsRefusedOnceAnAdvisoryHasGoneOut(t *testing.T) {
 
 		// A flaw of our own, on an advisory, agreed to and published.
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone authenticated.",`+
 				`"severity":"critical"}`)
 		if made.Code != http.StatusCreated {
@@ -348,7 +348,7 @@ func TestAnAdvisoryForOneProductDoesNotRefuseAnothersRename(t *testing.T) {
 		// an advisory to a release through the finding alone reaches every
 		// product that holds the same issue.
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone authenticated.",`+
 				`"severity":"critical"}`)
 		if made.Code != http.StatusCreated {

@@ -21,12 +21,12 @@ import (
 // reasoning text, where nothing can filter on it and an approver reads it as
 // part of the argument.
 func registerLabels(api huma.API, in core.Deps) {
-	const at = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+	const at = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 		"/findings/{issue}/components/{component}/labels/{label}"
 
 	labeling := func(add bool) func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Stream        string `path:"stream"`
+		BranchOrTag   string `path:"branch_or_tag"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue"`
 		Component     string `path:"component"`
@@ -35,7 +35,7 @@ func registerLabels(api huma.API, in core.Deps) {
 	}) (*struct{}, error) {
 		return func(ctx context.Context, input *struct {
 			Product       string `path:"product"`
-			Stream        string `path:"stream"`
+			BranchOrTag   string `path:"branch_or_tag"`
 			Variant       string `path:"variant"`
 			Vulnerability string `path:"issue"`
 			Component     string `path:"component"`
@@ -47,7 +47,7 @@ func registerLabels(api huma.API, in core.Deps) {
 				return nil, err
 			}
 			product, _, issue, component, err := locateFinding(ctx, in, subject,
-				input.Product, input.Stream, input.Variant, input.Vulnerability, input.Component,
+				input.Product, input.BranchOrTag, input.Variant, input.Vulnerability, input.Component,
 				input.Choice())
 			if err != nil {
 				return nil, err

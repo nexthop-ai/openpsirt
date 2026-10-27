@@ -34,17 +34,17 @@ import (
 type Fix struct {
 	bun.BaseModel `bun:"table:incident_fix,alias:ef"`
 
-	ID          int64      `bun:"id,pk,autoincrement"`
-	IncidentID  int64      `bun:"incident_id,notnull"`
-	StreamID    int64      `bun:"stream_id,notnull"`
-	NamedBy     int64      `bun:"named_by,notnull"`
-	NamedAt     time.Time  `bun:"named_at,notnull"`
-	WithdrawnBy *int64     `bun:"withdrawn_by"`
-	WithdrawnAt *time.Time `bun:"withdrawn_at"`
-	// LiveStreamID is the release while the naming stands, and null once it
+	ID            int64      `bun:"id,pk,autoincrement"`
+	IncidentID    int64      `bun:"incident_id,notnull"`
+	BranchOrTagID int64      `bun:"branch_or_tag_id,notnull"`
+	NamedBy       int64      `bun:"named_by,notnull"`
+	NamedAt       time.Time  `bun:"named_at,notnull"`
+	WithdrawnBy   *int64     `bun:"withdrawn_by"`
+	WithdrawnAt   *time.Time `bun:"withdrawn_at"`
+	// LiveBranchOrTagID is the release while the naming stands, and null once it
 	// is withdrawn. Unique beside the record, so a record names a release
 	// once at a time, held by the database rather than by a check.
-	LiveStreamID *int64 `bun:"live_stream_id"`
+	LiveBranchOrTagID *int64 `bun:"live_branch_or_tag_id"`
 
 	// Release is the name the release's address takes, and ReleaseName its
 	// spelling on screen.
@@ -116,8 +116,8 @@ func (s *Store) NameFix(ctx context.Context, subject access.Subject, recordID in
 		if err != nil {
 			return err
 		}
-		stream := new(catalog.Stream)
-		if err := tx.NewSelect().Model(stream).
+		branchOrTag := new(catalog.BranchOrTag)
+		if err := tx.NewSelect().Model(branchOrTag).
 			Where(`"s"."product_id" = ?`, record.ProductID).
 			Where(`"s"."name" = ?`, typedname.Matching(release)).
 			Scan(ctx); err != nil {
@@ -126,18 +126,18 @@ func (s *Store) NameFix(ctx context.Context, subject access.Subject, recordID in
 			}
 			return fmt.Errorf("read the release carrying the fix: %w", err)
 		}
-		if stream.Kind != catalog.Tag {
-			return refusal.Errorf("%q is a branch, which moves. A fix is named in a tag", stream.Name)
+		if branchOrTag.Kind != catalog.Tag {
+			return refusal.Errorf("%q is a branch, which moves. A fix is named in a tag", branchOrTag.Name)
 		}
-		if stream.Retired() {
-			return refusal.Errorf("%q is retired", stream.Name)
+		if branchOrTag.Retired() {
+			return refusal.Errorf("%q is retired", branchOrTag.Name)
 		}
 		*fix = Fix{
-			IncidentID: record.ID, StreamID: stream.ID,
+			IncidentID: record.ID, BranchOrTagID: branchOrTag.ID,
 			NamedBy: subject.ID, NamedAt: s.now().Truncate(time.Microsecond),
-			LiveStreamID: &stream.ID,
-			Release:      stream.Name, ReleaseName: catalog.Shown(stream.DisplayName, stream.Name),
-			ReleasedOn: stream.ReleasedOn,
+			LiveBranchOrTagID: &branchOrTag.ID,
+			Release:           branchOrTag.Name, ReleaseName: catalog.Shown(branchOrTag.DisplayName, branchOrTag.Name),
+			ReleasedOn: branchOrTag.ReleasedOn,
 		}
 		if _, err := tx.NewInsert().Model(fix).Exec(ctx); err != nil {
 			if database.IsDuplicate(err) {
@@ -145,7 +145,7 @@ func (s *Store) NameFix(ctx context.Context, subject access.Subject, recordID in
 			}
 			return fmt.Errorf("name the release carrying the fix: %w", err)
 		}
-		return noteFix(ctx, tx, subject, record, nil, trail.Said(stream.Name, true))
+		return noteFix(ctx, tx, subject, record, nil, trail.Said(branchOrTag.Name, true))
 	})
 	if err != nil {
 		return nil, err
@@ -183,7 +183,7 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 			Set(`"withdrawn_at" = ?`, s.now().Truncate(time.Microsecond)).
 			Set(`"withdrawn_by" = ?`, subject.ID).
 			// Released, so the release may be named again.
-			Set(`"live_stream_id" = ?`, nil).
+			Set(`"live_branch_or_tag_id" = ?`, nil).
 			Where(`"id" = ?`, fix.ID).
 			// Still standing when this lands. Two people withdrawing at once
 			// would otherwise both write, and the trail would say it twice.
@@ -200,8 +200,8 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 			return ErrNoSuchFix
 		}
 		var name string
-		if err := tx.NewSelect().Model((*catalog.Stream)(nil)).ColumnExpr(`"s"."name"`).
-			Where(`"s"."id" = ?`, fix.StreamID).Scan(ctx, &name); err != nil {
+		if err := tx.NewSelect().Model((*catalog.BranchOrTag)(nil)).ColumnExpr(`"s"."name"`).
+			Where(`"s"."id" = ?`, fix.BranchOrTagID).Scan(ctx, &name); err != nil {
 			return fmt.Errorf("read the release named as carrying the fix: %w", err)
 		}
 		return noteFix(ctx, tx, subject, record, trail.Said(name, true), nil)
@@ -307,7 +307,7 @@ func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"st"."name" AS "release"`).
 		ColumnExpr(`"st"."display_name" AS "release_display"`).
 		ColumnExpr(`"st"."released_on" AS "released_on"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "ef"."stream_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "ef"."branch_or_tag_id"`).
 		Where(`"ef"."incident_id" IN (?)`, bun.List(ids)).
 		Order("ef.named_at ASC", "ef.id ASC").
 		Scan(ctx, &rows); err != nil {
@@ -321,17 +321,17 @@ func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
 	}
 	for recordID, fixes := range out {
 		record := allowed[recordID]
-		streams := make([]int64, 0, len(fixes))
+		branchesAndTags := make([]int64, 0, len(fixes))
 		for _, fix := range fixes {
-			streams = append(streams, fix.StreamID)
+			branchesAndTags = append(branchesAndTags, fix.BranchOrTagID)
 		}
 		states, err := finding.HeldOpenIn(ctx, s.db, subject, record.ProductID,
-			record.VulnerabilityID, streams)
+			record.VulnerabilityID, branchesAndTags)
 		if err != nil {
 			return nil, err
 		}
 		for i := range fixes {
-			fixes[i].State = states[fixes[i].StreamID]
+			fixes[i].State = states[fixes[i].BranchOrTagID]
 		}
 	}
 	return out, nil

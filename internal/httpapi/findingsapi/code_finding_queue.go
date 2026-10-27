@@ -20,18 +20,18 @@ import (
 
 // CodeFindingRowBody is one code finding in a product's list of them.
 type CodeFindingRowBody struct {
-	Occurrence string           `json:"occurrence" doc:"The code finding's occurrence identity, which addresses it on every build it is on"`
-	Rule       string           `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	Path       string           `json:"path" doc:"The file, from the top of the checkout"`
-	Line       int              `json:"line,omitempty" doc:"The line the result starts at"`
-	Function   string           `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
-	Message    string           `json:"message" doc:"What the analyzer says"`
-	ThirdParty bool             `json:"third_party,omitempty" doc:"Whether the code finding is in code the newest run that saw it declared third-party"`
-	Stream     string           `json:"stream" doc:"The branch or tag of the newest build the code finding is listed on, to link to"`
-	Variant    string           `json:"variant" doc:"The variant of that build"`
-	State      CodeFindingState `json:"state" doc:"Where the code finding stands on that build"`
-	Builds     int              `json:"builds" doc:"The number of builds in the list's scope the code finding is listed on, in the state the list asks for"`
-	Opened     string           `json:"opened" format:"date" doc:"When the code finding was first opened on any of them"`
+	Occurrence  string           `json:"occurrence" doc:"The code finding's occurrence identity, which addresses it on every build it is on"`
+	Rule        string           `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	Path        string           `json:"path" doc:"The file, from the top of the checkout"`
+	Line        int              `json:"line,omitempty" doc:"The line the result starts at"`
+	Function    string           `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
+	Message     string           `json:"message" doc:"What the analyzer says"`
+	ThirdParty  bool             `json:"third_party,omitempty" doc:"Whether the code finding is in code the newest run that saw it declared third-party"`
+	BranchOrTag string           `json:"branch_or_tag" doc:"The branch or tag of the newest build the code finding is listed on, to link to"`
+	Variant     string           `json:"variant" doc:"The variant of that build"`
+	State       CodeFindingState `json:"state" doc:"Where the code finding stands on that build"`
+	Builds      int              `json:"builds" doc:"The number of builds in the list's scope the code finding is listed on, in the state the list asks for"`
+	Opened      string           `json:"opened" format:"date" doc:"When the code finding was first opened on any of them"`
 	core.HolderBody
 }
 
@@ -53,11 +53,11 @@ type CodeFindingsOutput struct {
 // its file. One struct, because a file taking fewer filters than its list
 // answers a different question under the same name.
 type CodeFindingsAsked struct {
-	Product string           `path:"product"`
-	Stream  string           `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-	Variant string           `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
-	Series  string           `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing"`
-	State   CodeFindingState `query:"state" doc:"List the code findings in one state. Left out, the queue"`
+	Product     string           `path:"product"`
+	BranchOrTag string           `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+	Variant     string           `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+	Series      string           `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing"`
+	State       CodeFindingState `query:"state" doc:"List the code findings in one state. Left out, the queue"`
 	// Assigned is the findings list's parameter and value for work nobody
 	// holds, so the two read alike.
 	Assigned CodeFindingAssignee `query:"assigned" doc:"Limit to the code findings with no holder on the build each row names. Every count is then of those code findings"`
@@ -71,7 +71,7 @@ func (a CodeFindingsAsked) scoped(ctx context.Context, in core.Deps) (access.Sub
 		return subject, analysis.Scope{}, err
 	}
 	scope, err := core.Scoped(ctx, in, subject, core.ScopeQuery{
-		Product: a.Product, Stream: a.Stream, Variant: a.Variant,
+		Product: a.Product, BranchOrTag: a.BranchOrTag, Variant: a.Variant,
 	})
 	if err != nil {
 		return subject, analysis.Scope{}, err
@@ -80,7 +80,7 @@ func (a CodeFindingsAsked) scoped(ctx context.Context, in core.Deps) (access.Sub
 		return subject, analysis.Scope{}, core.Refused(in.Logger, err, "cannot read the code findings")
 	}
 	return subject, analysis.Scope{
-		ProductID: *scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
+		ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
 		Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
 	}, nil
 }
@@ -102,8 +102,8 @@ func codeFindingRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow
 	for _, r := range rows {
 		row := CodeFindingRowBody{
 			Occurrence: r.Occurrence, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message,
-			ThirdParty: r.ThirdParty,
-			Stream:     r.Stream, Variant: r.Variant, State: CodeFindingState(r.State), Builds: r.Builds,
+			ThirdParty:  r.ThirdParty,
+			BranchOrTag: r.BranchOrTag, Variant: r.Variant, State: CodeFindingState(r.State), Builds: r.Builds,
 			Opened: r.Opened.UTC().Format(time.DateOnly),
 		}
 		if r.Line != nil {
@@ -121,7 +121,7 @@ func codeFindingRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow
 // codeFindingCells fills them.
 func codeFindingColumns() []string {
 	return []string{
-		"rule", "path", "line", "function", "message", "state", "stream", "variant",
+		"rule", "path", "line", "function", "message", "state", "branch_or_tag", "variant",
 		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "occurrence", "third_party",
 	}
 }
@@ -135,7 +135,7 @@ func codeFindingCells(row CodeFindingRowBody) []string {
 	}
 	return []string{
 		row.Rule, row.Path, line, row.Function, row.Message,
-		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened,
+		string(row.State), row.BranchOrTag, row.Variant, strconv.Itoa(row.Builds), row.Opened,
 		row.AssignedTo, row.AssignedName, strconv.FormatBool(row.AssignedTeam), row.Occurrence,
 		strconv.FormatBool(row.ThirdParty),
 	}
@@ -159,7 +159,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			"releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in " +
 			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +
 			"it off are refused with 409. " +
-			"`stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps " +
+			"`branch_or_tag`, `variant` and `series` are optional and independent. `assigned=nobody` keeps " +
 			"the code findings nobody holds on the build each row names, and combines with every other filter. " +
 			"Supports limit and offset.",
 		Tags: []string{"Findings"},

@@ -72,11 +72,11 @@ var ErrNoSuchRun = refusal.New("no such run on this build")
 // because a count is a disclosure with the details removed rather than a
 // different kind of answer.
 func (s *Store) Ran(ctx context.Context, subject access.Subject,
-	targetID, runID int64) (*RanDetail, error) {
+	buildID, runID int64) (*RanDetail, error) {
 
 	// A refusal, shaped by its caller into the same 404 a run that is not
 	// there gets, so a refusal is told apart from a read that failed.
-	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 	// holds, with the path doing the authorizing and the identifier doing the
 	// reading.
 	err = s.db.NewSelect().Model(&run).
-		Where(`"id" = ?`, runID).Where(`"target_id" = ?`, targetID).Scan(ctx)
+		Where(`"id" = ?`, runID).Where(`"build_id" = ?`, buildID).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("no such run on this build: %w", ErrNoSuchRun)
 	}
@@ -112,7 +112,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			Count     int    `bun:"count"`
 			Exploited int    `bun:"exploited"`
 		}
-		inner, run := runChanged(s.db, targetID, column, visible)
+		inner, run := runChanged(s.db, buildID, column, visible)
 		inner = inner.
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(rating.Here, productID).
@@ -179,7 +179,7 @@ const (
 // Distinct rows grouped over rather than COUNT DISTINCT over two columns,
 // which not every engine takes. One spelling, so the receipts and the run's
 // own screen cannot disagree about what a run opened.
-func runChanged(db bun.IDB, targetID int64, column runColumn,
+func runChanged(db bun.IDB, buildID int64, column runColumn,
 	visible []access.Visibility) (*bun.SelectQuery, string) {
 
 	kinds, args := kind.Statistics.Where(`"f"."kind"`)
@@ -188,7 +188,7 @@ func runChanged(db bun.IDB, targetID int64, column runColumn,
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, args...).
 		Where(wasOpen), string(database.Column(db, "f."+string(column)))

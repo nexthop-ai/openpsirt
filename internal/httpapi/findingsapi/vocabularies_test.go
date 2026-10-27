@@ -26,7 +26,7 @@ func TestAPackageKindOfferedIsOneTheFindingsListFinds(t *testing.T) {
 
 		for _, at := range []string{
 			"/v1/products/mine/findings/package-kinds",
-			"/v1/products/mine/findings/package-kinds?stream=master&variant=broadcom",
+			"/v1/products/mine/findings/package-kinds?branch_or_tag=master&variant=broadcom",
 			"/v1/findings/package-kinds",
 		} {
 			var got packageKinds
@@ -40,7 +40,7 @@ func TestAPackageKindOfferedIsOneTheFindingsListFinds(t *testing.T) {
 			Total int `json:"total"`
 		}
 		httpapitest.Read(t, r, "reader",
-			"/v1/products/mine/findings?stream=master&variant=broadcom&ecosystem=deb", &listed)
+			"/v1/products/mine/findings?branch_or_tag=master&variant=broadcom&ecosystem=deb", &listed)
 		if listed.Total != 1 {
 			t.Errorf("the list narrowed to the kind offered holds %d rows, want the 1 counted", listed.Total)
 		}

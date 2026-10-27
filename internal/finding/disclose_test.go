@@ -23,7 +23,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		rows, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "high",
+			BuildIDs: []int64{f.build}, Severity: "high",
 			Summary: "The management socket answers before anyone authenticated.",
 		})
 		if err != nil {
@@ -73,7 +73,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 		// date on it would be a deadline for something that has happened.
 		discloseds, _, err := f.store.Enter(t.Context(), f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target}, Severity: "high", Disclosed: true,
+				BuildIDs: []int64{f.build}, Severity: "high", Disclosed: true,
 				Summary: "Already announced.",
 			})
 		if err != nil {
@@ -98,7 +98,7 @@ func TestWhatIsApproachingDisclosureIsItselfUndisclosed(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
-				TargetIDs: []int64{f.target}, Severity: "critical",
+				BuildIDs: []int64{f.build}, Severity: "critical",
 				Summary: "Something nobody outside knows about.",
 			}); err != nil {
 			t.Fatal(err)
@@ -139,7 +139,7 @@ func TestAnEmbargoIsOneRowPerIssueAndProductAndPagesCountEmbargoes(t *testing.T)
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		for _, summary := range []string{"The first flaw.", "The second flaw."} {
 			if _, _, err := f.store.Enter(ctx, who, finding.Entering{
-				TargetIDs: []int64{f.target, older}, Severity: "high", Summary: summary,
+				BuildIDs: []int64{f.build, older}, Severity: "high", Summary: summary,
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -155,7 +155,7 @@ func TestAnEmbargoIsOneRowPerIssueAndProductAndPagesCountEmbargoes(t *testing.T)
 				len(rows), total)
 		}
 		for _, row := range rows {
-			if len(row.Builds) != 2 || row.Builds[0].Stream != "202411" || row.Builds[1].Stream != "master" {
+			if len(row.Builds) != 2 || row.Builds[0].BranchOrTag != "202411" || row.Builds[1].BranchOrTag != "master" {
 				t.Errorf("%s names the builds %+v, want 202411 and master", row.Vulnerability, row.Builds)
 			}
 			if row.Occurrences != 2 {
@@ -195,7 +195,7 @@ func TestTheDisclosureDeadlinesAreNarrowedToTheScopeAskedFor(t *testing.T) {
 		f.shippedTo(t, older, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		if _, _, err := f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target, older}, Severity: "high", Summary: "In both builds.",
+			BuildIDs: []int64{f.build, older}, Severity: "high", Summary: "In both builds.",
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -209,7 +209,7 @@ func TestTheDisclosureDeadlinesAreNarrowedToTheScopeAskedFor(t *testing.T) {
 			t.Fatalf("narrowed to a build carrying it, %d rows of a total %d, want 1 of 1",
 				len(rows), total)
 		}
-		if b := rows[0].Builds; len(b) != 1 || b[0].Stream != "202411" {
+		if b := rows[0].Builds; len(b) != 1 || b[0].BranchOrTag != "202411" {
 			t.Errorf("narrowed to 202411 the row names %+v", b)
 		}
 		if rows[0].Occurrences != 1 {
@@ -233,7 +233,7 @@ func TestTheDisclosureDeadlinesAreNarrowedToTheScopeAskedFor(t *testing.T) {
 func (f *fixture) embargoed(t *testing.T, who access.Subject) int64 {
 	t.Helper()
 	rows, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-		TargetIDs: []int64{f.target}, Severity: "high",
+		BuildIDs: []int64{f.build}, Severity: "high",
 		Summary: "Not announced anywhere yet.",
 	})
 	if err != nil {

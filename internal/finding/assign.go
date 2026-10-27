@@ -236,14 +236,14 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 //
 // The visibilities other than public among what moved come back, each once,
 // which decides what may be said about the act outside the application.
-func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
+func (s *Store) Assign(ctx context.Context, subject access.Subject, buildID, vulnerabilityID,
 	componentID int64, to *int64, admits Admits) (moved int64, withheld []access.Visibility, err error) {
 
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		moved, withheld = 0, nil
 		inner := &Store{db: tx, now: s.now, reach: s.reach}
 		var err error
-		moved, withheld, err = inner.assign(ctx, subject, targetID, vulnerabilityID,
+		moved, withheld, err = inner.assign(ctx, subject, buildID, vulnerabilityID,
 			componentID, to, admits)
 		return err
 	})
@@ -255,10 +255,10 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 // One transaction, because whether the recipient may hold the work depends on
 // what is open there, and a scan recording an undisclosed occurrence between a
 // read of that and the write would hand the new row over unasked.
-func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
+func (s *Store) assign(ctx context.Context, subject access.Subject, buildID, vulnerabilityID,
 	componentID int64, to *int64, admits Admits) (int64, []access.Visibility, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -424,16 +424,16 @@ func oneFinding(productID, vulnerabilityID, componentID int64) func(*bun.SelectQ
 // the disclosure — so what matters is every visibility in the set rather than
 // that of whichever row somebody happened to be looking at.
 func (s *Store) WithheldOnComponent(ctx context.Context, subject access.Subject,
-	productID int64, targets []int64, component, version string) ([]access.Visibility, error) {
+	productID int64, buildIDs []int64, component, version string) ([]access.Visibility, error) {
 
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
 		return nil, err
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return nil, nil
 	}
-	folds, err := OneFoldNamed(ctx, s.db, targets, component, version)
+	folds, err := OneFoldNamed(ctx, s.db, buildIDs, component, version)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +445,7 @@ func (s *Store) WithheldOnComponent(ctx context.Context, subject access.Subject,
 	// about the binary alone would miss the embargo sitting on its sibling.
 	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	withheld, err := withheldAmong(ctx, s.db, visible, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where(`"target_id" IN (?)`, bun.List(targets)).
+		return q.Where(`"build_id" IN (?)`, bun.List(buildIDs)).
 			Where(kinds, kindArgs...).
 			Where(`"component_id" IN (SELECT "c"."id" FROM "component" AS "c"
 			WHERE `+FoldedOn+` IN (?))`, bun.List(folds))
@@ -543,8 +543,8 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
 	if err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`DISTINCT "st"."product_id" AS "product_id", "f"."visibility" AS "visibility"`).
 		Where(`"f"."assigned_to" = ?`, from).
 		Where(`"f"."closed_at" IS NULL`).
@@ -640,8 +640,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	mine := func() *bun.SelectQuery {
 		query := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(notRecordedAsFlaw).
@@ -780,16 +780,16 @@ type Owned struct {
 	// Product is the name that addresses it, and ProductName the one shown.
 	Product     string `bun:"product"`
 	ProductName string `bun:"-"`
-	// Stream and Variant name a build holding this, not the only one. A
+	// Branch or tag and Variant name a build holding this, not the only one. A
 	// screen needs somewhere to link to and an action needs a finding to name,
 	// and where several builds hold the same code any of them will do. What
 	// says there are several is Builds, so a screen can show that instead of
 	// naming one of them as though it were the answer.
-	Stream      string `bun:"stream"`
-	StreamName  string `bun:"-"`
-	Variant     string `bun:"variant"`
-	VariantName string `bun:"-"`
-	Urgency     int64  `bun:"urgency"`
+	BranchOrTag     string `bun:"branch_or_tag"`
+	BranchOrTagName string `bun:"-"`
+	Variant         string `bun:"variant"`
+	VariantName     string `bun:"-"`
+	Urgency         int64  `bun:"urgency"`
 	// Undisclosed says at least one of the findings behind this row is one
 	// nobody has announced. Any is enough: what may be said about a group
 	// outside this deployment is decided by the most careful row in it .
@@ -814,20 +814,20 @@ type Owned struct {
 const codeFindingOccurrence = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
 
 // notRecordedAsFlaw is whether the finding under "f", in the product of the
-// stream under "st", is no code finding recorded as a flaw. A code finding recorded as a flaw is
+// branch or tag under "st", is no code finding recorded as a flaw. A code finding recorded as a flaw is
 // closed work for its holder: its flaw is held and listed as itself.
 const notRecordedAsFlaw = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
 	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // notRecordedAsFlawIn is notRecordedAsFlaw over the finding under "f" alone, in the
-// product its build is in, for a statement that joins no stream.
+// product its build is in, for a statement that joins no branch or tag.
 const notRecordedAsFlawIn = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-	JOIN "stream" AS "hs" ON "hs"."product_id" = "lh"."product_id"
-	JOIN "target" AS "ht" ON "ht"."stream_id" = "hs"."id"
-	WHERE "ht"."id" = "f"."target_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
+	JOIN "branch_or_tag" AS "hs" ON "hs"."product_id" = "lh"."product_id"
+	JOIN "build" AS "ht" ON "ht"."branch_or_tag_id" = "hs"."id"
+	WHERE "ht"."id" = "f"."build_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // pieceOfWork is what one piece of work held is grouped by, over the finding
-// under "f" and its stream under "st": an issue in a component in a product,
+// under "f" and its branch or tag under "st": an issue in a component in a product,
 // or one code finding in a product. A code finding's builds may name different versions of
 // its component, and it is still one occurrence to judge.
 const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` +
@@ -929,14 +929,14 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 	var ended []int64
 	if len(holders) == 0 {
 		var err error
-		if ended, err = catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, s.now().UTC()); err != nil {
+		if ended, err = catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, s.now().UTC()); err != nil {
 			return nil, 0, err
 		}
 	}
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(notRecordedAsFlaw)
@@ -946,7 +946,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		if len(holders) == 0 {
 			q = q.Where(`"f"."assigned_to" IS NULL`)
 			if len(ended) > 0 {
-				q = q.Where(`("f"."kind" <> ? OR "tg"."stream_id" NOT IN (?))`, kind.Analysis, bun.List(ended))
+				q = q.Where(`("f"."kind" <> ? OR "tg"."branch_or_tag_id" NOT IN (?))`, kind.Analysis, bun.List(ended))
 			}
 		} else {
 			q = q.Where(`"f"."assigned_to" IN (?)`, bun.List(holders))
@@ -983,7 +983,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		VulnerabilityID int64     `bun:"vulnerability_id"`
 		ComponentID     int64     `bun:"component_id"`
 		ProductID       int64     `bun:"product_id"`
-		TargetID        int64     `bun:"target_id"`
+		BuildID         int64     `bun:"build_id"`
 		Builds          int       `bun:"builds"`
 		Urgency         int64     `bun:"urgency"`
 		Exploited       int       `bun:"exploited"`
@@ -1006,8 +1006,8 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		// screen presenting it as the only one. MIN rather than any other
 		// choice because it is stable: a row that named a different build
 		// between two reads would move under somebody.
-		ColumnExpr(`MIN("f"."target_id") AS "target_id"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
+		ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
 		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(incidentAcross+` AS "incident"`).
@@ -1051,11 +1051,11 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 
 	issues := make([]int64, 0, len(heads))
 	components := make([]int64, 0, len(heads))
-	targets := make([]int64, 0, len(heads))
+	buildIDs := make([]int64, 0, len(heads))
 	for _, head := range heads {
 		issues = append(issues, head.VulnerabilityID)
 		components = append(components, head.ComponentID)
-		targets = append(targets, head.TargetID)
+		buildIDs = append(buildIDs, head.BuildID)
 	}
 	named, err := issuesNamed(ctx, s.db, subject, issues)
 	if err != nil {
@@ -1080,7 +1080,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 	if err != nil {
 		return nil, 0, err
 	}
-	builds, err := targetsNamed(ctx, s.db, targets)
+	builds, err := namedBuilds(ctx, s.db, buildIDs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1102,41 +1102,41 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		if component, held := shipped[head.ComponentID]; held {
 			row.Component, row.Version, row.Purl = component.Name, component.Version, component.Purl
 		}
-		if build, held := builds[head.TargetID]; held {
-			row.Product, row.Stream, row.Variant = build.Product, build.Stream, build.Variant
+		if build, held := builds[head.BuildID]; held {
+			row.Product, row.BranchOrTag, row.Variant = build.Product, build.BranchOrTag, build.Variant
 			row.ProductName = build.ProductName
-			row.StreamName, row.VariantName = build.StreamName, build.VariantName
+			row.BranchOrTagName, row.VariantName = build.BranchOrTagName, build.VariantName
 		}
 		rows = append(rows, row)
 	}
 	return rows, total, nil
 }
 
-// buildName is what a build is called on a screen: its product, stream and
+// buildName is what a build is called on a screen: its product, branch or tag and
 // variant, as people know them.
 type buildName struct {
-	TargetID    int64  `bun:"target_id"`
-	Product     string `bun:"product"`
-	ProductName string `bun:"product_name"`
-	Stream      string `bun:"stream"`
-	StreamName  string `bun:"stream_name"`
-	Variant     string `bun:"variant"`
-	VariantName string `bun:"variant_name"`
+	BuildID         int64  `bun:"build_id"`
+	Product         string `bun:"product"`
+	ProductName     string `bun:"product_name"`
+	BranchOrTag     string `bun:"branch_or_tag"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	Variant         string `bun:"variant"`
+	VariantName     string `bun:"variant_name"`
 }
 
-// targetsNamed reads the names of the builds these targets are, by target.
-func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]buildName, error) {
+// namedBuilds reads the names of these builds, by build.
+func namedBuilds(ctx context.Context, db bun.IDB, ids []int64) (map[int64]buildName, error) {
 	held := map[int64]buildName{}
 	if len(ids) == 0 {
 		return held, nil
 	}
 	var builds []buildName
 	err := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
-		ColumnExpr(`"tg"."id" AS "target_id"`).
+		ColumnExpr(`"tg"."id" AS "build_id"`).
 		Apply(catalog.BuildNames("p", "st", "va")).
 		Where(`"tg"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &builds)
@@ -1144,7 +1144,7 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 		return nil, fmt.Errorf("name the builds on the page: %w", err)
 	}
 	for _, build := range builds {
-		held[build.TargetID] = build
+		held[build.BuildID] = build
 	}
 	return held, nil
 }

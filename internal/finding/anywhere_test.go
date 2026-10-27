@@ -20,7 +20,7 @@ import (
 func TestTheListAcrossProductsAnswersOnlyForWhatIsHeld(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)
@@ -137,7 +137,7 @@ func TestTheListAcrossProductsAnswersOnlyForWhatIsHeld(t *testing.T) {
 func TestTheListAcrossProductsKeepsEachProductsMinimumSeverity(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			lowly("CVE-2026-1", libnl),
 		}); err != nil {
 			t.Fatal(err)
@@ -202,7 +202,7 @@ func TestASeverityAskedAcrossProductsRaisesAProductsOwnLowerMinimumSeverity(t *t
 			Issue:     finding.Named{Identifier: "CVE-2026-3", Severity: "medium", Exploited: true},
 			Component: teamd,
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "medium"}, Component: libnl},
 			{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "critical"}, Component: swss},
 			used,
@@ -261,7 +261,7 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		said := "The parser accepts a length nobody bounded.\nA second line nothing shows."
 		reported := found("CVE-2026-9", binary)
 		reported.Issue.Description = said
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{reported}); err != nil {
 			t.Fatal(err)
 		}
@@ -403,7 +403,7 @@ func TestTheListAcrossProductsSaysWhatIsExploited(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		used := found("CVE-2026-1", libnl)
 		used.Issue.Exploited = true
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			used, found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)

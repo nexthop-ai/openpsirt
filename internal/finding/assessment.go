@@ -592,8 +592,8 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 	// rows learning it from the ones that already carried it.
 	if err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Where(kinds, kindArgs...).
 		ColumnExpr(`"f"."id" AS "id"`).
@@ -725,8 +725,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	}
 	err = tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(rating.Here, productID).
@@ -872,8 +872,8 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 			readable := onlyReadable(s.db.NewSelect().
 				ColumnExpr("1").
 				TableExpr(IssueFindings("f")).
-				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 				Where(kinds, kindArgs...).
 				Where(`"si"."id" = "asm"."vulnerability_id"`).
 				Where(`"st"."product_id" = "asm"."product_id"`),
@@ -1024,7 +1024,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	// finding is exploited and what it is rated now, and a build carries
 	// thousands of findings of one issue. Each issue asked is read as the
 	// issue it stands for, keyed by the name the rating was filed under, and
-	// each finding is rated in its own stream's product. The two lists admit
+	// each finding is rated in its own branch or tag's product. The two lists admit
 	// an issue of one rating in the product of another, and those groups are
 	// read and left out below.
 	type group struct {
@@ -1046,10 +1046,10 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		var read []group
 		q := s.db.NewSelect().
 			TableExpr(IssueFindings("f")).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
-			Join(rating.For(rating.OnStream)).
+			Join(rating.For(rating.OnBranchOrTag)).
 			ColumnExpr(`"si"."id" AS "filed"`).
 			ColumnExpr(`"st"."product_id" AS "product_id"`).
 			ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).

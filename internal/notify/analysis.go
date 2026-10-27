@@ -30,14 +30,14 @@ func AnalysisDrops(db *bun.DB, logger *slog.Logger) func(context.Context, analys
 			// the same, so a message nobody could compose is not a reason to
 			// fail the run.
 			logger.Error("could not say an analyzer run dropped sharply",
-				"run", drop.RunID, "build", drop.TargetID, "error", err)
+				"run", drop.RunID, "build", drop.BuildID, "error", err)
 		}
 	}
 }
 
 // dropped tells everybody who reads internal findings in the product.
 func dropped(ctx context.Context, db *bun.DB, drop analysis.Drop) error {
-	placed, err := catalog.NewStore(db).Describe(ctx, drop.TargetID)
+	placed, err := catalog.NewStore(db).Describe(ctx, drop.BuildID)
 	if err != nil {
 		return fmt.Errorf("read which build the run was for: %w", err)
 	}
@@ -51,8 +51,8 @@ func dropped(ctx context.Context, db *bun.DB, drop analysis.Drop) error {
 		return err
 	}
 	body := fmt.Sprintf("%s %s %s: one run of %s marked %d of %d open code findings no longer detected. "+
-		"It was applied.", placed.Product, placed.Stream, placed.Variant, name, drop.Missed, drop.Live)
-	where := weblink.CodeFindings(placed.Addressed.Product, placed.Addressed.Stream, placed.Addressed.Variant,
+		"It was applied.", placed.Product, placed.BranchOrTag, placed.Variant, name, drop.Missed, drop.Live)
+	where := weblink.CodeFindings(placed.Addressed.Product, placed.Addressed.BranchOrTag, placed.Addressed.Variant,
 		string(analysis.NoLongerDetected), name)
 	together := identify("security-testing-dropped " + strconv.FormatInt(drop.RunID, 10))
 	productID := placed.ProductID

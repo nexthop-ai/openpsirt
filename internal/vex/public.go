@@ -99,7 +99,7 @@ type Built struct {
 // The subject has to read disclosed work in the product. What it reads is
 // never more than that, whoever it is.
 func (s *Store) Public(ctx context.Context, subject access.Subject, named *catalog.Named,
-	targetID int64) (*Built, error) {
+	buildID int64) (*Built, error) {
 
 	if !subject.Reads(access.Public, named.ProductID) {
 		return nil, access.Denied(fmt.Sprintf("read disclosed findings in product %d", named.ProductID))
@@ -113,7 +113,7 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 		Purl            string `bun:"purl"`
 		finding.Covering
 	}
-	if err := finding.WhollyCovered(s.grouped(targetID, visible), named.ProductID, visible,
+	if err := finding.WhollyCovered(s.grouped(buildID, visible), named.ProductID, visible,
 		finding.ForStatements).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what stands about this build: %w", err)
 	}
@@ -124,15 +124,15 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 		Purl            string `bun:"purl"`
 		finding.Affected
 	}
-	if err := finding.WhollyAffected(s.grouped(targetID, visible), named.ProductID,
+	if err := finding.WhollyAffected(s.grouped(buildID, visible), named.ProductID,
 		visible).Scan(ctx, &affected); err != nil {
 		return nil, fmt.Errorf("read what applies in this build: %w", err)
 	}
-	fixed, err := s.patched(ctx, targetID, visible)
+	fixed, err := s.patched(ctx, buildID, visible)
 	if err != nil {
 		return nil, err
 	}
-	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, targetID, visible, s.carrying())
+	placed, err := finding.CoveredAtOccurrences(ctx, s.idb(), named.ProductID, buildID, visible, s.carrying())
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	// past it.
 	if len(rows)+len(affected)+len(placed)+len(fixed) > s.carrying() {
 		return nil, fmt.Errorf("%w: %s %s %s states more than %d statements",
-			ErrTooLarge, named.Product, named.Stream, named.Variant, s.carrying())
+			ErrTooLarge, named.Product, named.BranchOrTag, named.Variant, s.carrying())
 	}
 
 	decided := make([]int64, 0, len(rows)+len(placed)+len(affected))
@@ -185,7 +185,7 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	for issue := range withheld {
 		delete(alsoCalled, issue)
 	}
-	root, err := s.rootOf(ctx, named, targetID)
+	root, err := s.rootOf(ctx, named, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -250,10 +250,10 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 // grouped is the findings of one build at the visibilities given, one row per
 // issue and component by its name and package identifier, carrying the columns
 // every statement about a component reads.
-func (s *Store) grouped(targetID int64, visible []access.Visibility) *bun.SelectQuery {
+func (s *Store) grouped(buildID int64, visible []access.Visibility) *bun.SelectQuery {
 	return s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(nodeJoin).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
@@ -262,7 +262,7 @@ func (s *Store) grouped(targetID int64, visible []access.Visibility) *bun.Select
 		ColumnExpr(`"v"."identifier" AS "identifier"`).
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Apply(vexKinds("f")).
 		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).

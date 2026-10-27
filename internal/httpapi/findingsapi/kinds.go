@@ -40,20 +40,20 @@ func registerKinds(api huma.API, in core.Deps) {
 		Summary: "List package kinds with open findings",
 		Description: "Returns each kind of package that open findings in the product sit at, " +
 			"with how many.\n\n" + kindsSaid + "\n\n" +
-			"`stream` and `variant` are optional and independent, as they are on the findings " +
+			"`branch_or_tag` and `variant` are optional and independent, as they are on the findings " +
 			"list.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+		Product     string `path:"product"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 	}) (*PackageKindsOutput, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
 		scope, err := core.Scoped(ctx, in, subject, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		})
 		if err != nil {
 			return nil, err

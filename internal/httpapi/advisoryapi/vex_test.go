@@ -752,11 +752,11 @@ func TestAVEXDocumentSaysNothingFixedWhileAnOccurrenceIsOpen(t *testing.T) {
 				"fold_key", "first_seen_at")
 			SELECT '`+hash+`', "purl", "name", '5.10-2', '`+hash+`', "first_seen_at"
 			FROM "component" WHERE "name" = 'linux-image'`)
-		r.PatchedRows(t, `INSERT INTO "finding" ("target_id", "kind", "vulnerability_id",
+		r.PatchedRows(t, `INSERT INTO "finding" ("build_id", "kind", "vulnerability_id",
 				"visibility", "component_id", "occurrence_identity", "urgency",
 				"urgency_exploited", "urgency_incident", "urgency_shipped",
 				"opened_at")
-			SELECT "target_id", "kind", "vulnerability_id", "visibility",
+			SELECT "build_id", "kind", "vulnerability_id", "visibility",
 				(SELECT "id" FROM "component" WHERE "identity" = '`+hash+`'),
 				"occurrence_identity", "urgency", "urgency_exploited", "urgency_incident",
 				"urgency_shipped", "opened_at"

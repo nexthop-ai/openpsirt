@@ -173,7 +173,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 
 	var rows []struct {
 		Product         string    `bun:"product"`
-		Stream          string    `bun:"stream"`
+		BranchOrTag     string    `bun:"branch_or_tag"`
 		Variant         string    `bun:"variant"`
 		Component       string    `bun:"component"`
 		Vulnerability   string    `bun:"vulnerability"`
@@ -249,10 +249,10 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		holds := Holds{
 			// One condition per occurrence, because the link and whoever holds the
 			// work are per occurrence.
-			About: identify(about, row.Product, row.Stream, row.Variant,
+			About: identify(about, row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component),
 			Body: body,
-			Link: weblink.Finding(row.Product, row.Stream, row.Variant,
+			Link: weblink.Finding(row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component, ""),
 			// Every one of these is about a finding nobody has
 			// announced — that is what an embargo is — so what

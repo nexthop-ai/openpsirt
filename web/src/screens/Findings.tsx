@@ -106,7 +106,7 @@ const NAMED_AT_ONCE = 2000;
 // and where the component sits — and opens the finding, which is where a
 // decision is made with the evidence beside it.
 export function Findings() {
-  const { product = "", stream: named = "", variant: builtAs = "" } = useParams();
+  const { product = "", branch_or_tag: named = "", variant: builtAs = "" } = useParams();
   // No product in the path means every product the reader may see. The server
   // takes the same filters for both lists, so the screen is the one thing that
   // differs.
@@ -116,16 +116,19 @@ export function Findings() {
   // The branch and the variant come from the path on a build's own list and
   // from the picker's selection otherwise. Either may be "all": the list is
   // not one of the screens that needs a whole build.
-  const stream = named || params.get("stream") || "";
+  const branchOrTag = named || params.get("branch_or_tag") || "";
   const variant = builtAs || params.get("variant") || "";
-  const oneBuild = Boolean(stream && variant);
+  const oneBuild = Boolean(branchOrTag && variant);
   // The selection the server needs, beside the filters.
   //
   // Held rather than rebuilt each render, so the memo below it does not
   // recompute every time.
   const selection = useMemo(
-    () => ({ ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) }),
-    [stream, variant],
+    () => ({
+      ...(branchOrTag ? { branch_or_tag: branchOrTag } : {}),
+      ...(variant ? { variant } : {}),
+    }),
+    [branchOrTag, variant],
   );
   const { offset, go } = usePaging();
   const page = pageSize(params);
@@ -286,10 +289,10 @@ export function Findings() {
   // before and the row after under exactly these filters.
   const carrying = useMemo(() => {
     const now = new URLSearchParams(asked);
-    if (stream) now.set("stream", stream);
+    if (branchOrTag) now.set("branch_or_tag", branchOrTag);
     if (variant) now.set("variant", variant);
     return now.toString();
-  }, [asked, stream, variant]);
+  }, [asked, branchOrTag, variant]);
 
   // The decision a saved filter prepares, where this list is exactly one somebody
   // kept and that one prepares anything. Read off the address rather than
@@ -326,7 +329,7 @@ export function Findings() {
   // filter because another filter is on.
   const kindsHere = useQuery({
     enabled: more,
-    queryKey: ["package-kinds", product, stream, variant],
+    queryKey: ["package-kinds", product, branchOrTag, variant],
     queryFn: async () =>
       spanning
         ? unwrap(await api.GET("/v1/findings/package-kinds", {}))
@@ -342,7 +345,7 @@ export function Findings() {
   const { hand, handMatching } = useHandOver({ product, query, selection, buildOf });
   const { findings, byIssue, byComponent, byUpgrade } = useFindingsViews({
     product,
-    stream,
+    branch_or_tag: branchOrTag,
     variant,
     spanning,
     query,
@@ -372,7 +375,7 @@ export function Findings() {
   function buildOf(row: Row) {
     return {
       product: row.product || product,
-      stream: row.stream || stream,
+      branch_or_tag: row.branch_or_tag || branchOrTag,
       variant: row.variant || variant,
     };
   }
@@ -667,7 +670,7 @@ export function Findings() {
           across that would carry rows chosen under one question into an act
           taken under another. */}
         <Saved
-          onBuild={Boolean(stream || variant)}
+          onBuild={Boolean(branchOrTag || variant)}
           onPicked={(next) => {
             ask(next, true);
             setDeclined(null);
@@ -681,7 +684,7 @@ export function Findings() {
           meant opening a panel and looking at nine controls. */}
       <Narrowed
         params={asked}
-        scope={{ product, stream, variant }}
+        scope={{ product, branch_or_tag: branchOrTag, variant }}
         // Widening a level is a move rather than a parameter change, because
         // the selection rides on the path. The filters travel with it: what
         // was asked of one product is the same question asked of all of them,
@@ -810,12 +813,12 @@ export function Findings() {
         <div className="screen-head">
           <h2>Findings</h2>
           <p>
-            {product} · {stream || "every branch"} · {variant || "every variant"}
+            {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
           </p>
         </div>
         {controls}
         <ByBump
-          at={{ product, stream, variant }}
+          at={{ product, branch_or_tag: branchOrTag, variant }}
           query={query}
           offset={offset}
           size={page}
@@ -844,12 +847,12 @@ export function Findings() {
         <div className="screen-head">
           <h2>Findings</h2>
           <p>
-            {product} · {stream || "every branch"} · {variant || "every variant"}
+            {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
           </p>
         </div>
         {controls}
         <ByComponent
-          at={{ product, stream, variant }}
+          at={{ product, branch_or_tag: branchOrTag, variant }}
           // The same question the by-issue view asks, built in the one place
           // that builds it, so switching views keeps every filter the chips
           // above say is on.
@@ -945,7 +948,7 @@ export function Findings() {
             <>Every product you can read</>
           ) : (
             <>
-              {product} · {stream || "every branch"} · {variant || "every variant"}
+              {product} · {branchOrTag || "every branch"} · {variant || "every variant"}
             </>
           )}
         </p>

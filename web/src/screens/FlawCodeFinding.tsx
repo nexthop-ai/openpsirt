@@ -37,11 +37,11 @@ export function useFlawCodeFinding(product: string, vulnerability: string, enabl
 // reproduced here.
 export function fixedFromCodeFinding(
   codeFinding: FlawCodeFinding | null | undefined,
-  stream: string,
+  branchOrTag: string,
   variant: string,
 ): string {
   const here = (codeFinding?.fixed_in ?? []).find(
-    (b) => b.stream === stream && b.variant === variant,
+    (b) => b.branch_or_tag === branchOrTag && b.variant === variant,
   );
   if (!here) return "";
   const run = here.fixed ?? here.not_seen;
@@ -52,25 +52,30 @@ export function fixedFromCodeFinding(
 export function FlawCodeFindingCard({
   product,
   vulnerability,
-  stream,
+  branch_or_tag: branchOrTag,
   variant,
 }: {
   product: string;
   vulnerability: string;
-  stream: string;
+  branch_or_tag: string;
   variant: string;
 }) {
   const codeFinding = useFlawCodeFinding(product, vulnerability);
   if (!codeFinding.data) return null;
   const it = codeFinding.data;
-  const here = (it.fixed_in ?? []).find((b) => b.stream === stream && b.variant === variant);
+  const here = (it.fixed_in ?? []).find(
+    (b) => b.branch_or_tag === branchOrTag && b.variant === variant,
+  );
   return (
     <div className="card">
       <h3>Static analysis code finding</h3>
       <p>
         <Link
           className="mono"
-          to={codeFindingAt({ product, stream: it.stream, variant: it.variant }, it.occurrence)}
+          to={codeFindingAt(
+            { product, branch_or_tag: it.branch_or_tag, variant: it.variant },
+            it.occurrence,
+          )}
         >
           {it.rule} · {located(it.path, it.line)}
         </Link>{" "}
@@ -80,7 +85,7 @@ export function FlawCodeFindingCard({
       </p>
       <p className="hint">
         Suggested: {it.suggested.component ?? "the build itself"} · Proposed for{" "}
-        {(it.proposed ?? []).map((b) => `${b.stream}/${b.variant}`).join(", ") || "no build"}
+        {(it.proposed ?? []).map((b) => `${b.branch_or_tag}/${b.variant}`).join(", ") || "no build"}
       </p>
       {it.undone_at && (
         <div>

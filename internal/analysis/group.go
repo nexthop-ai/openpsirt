@@ -41,7 +41,7 @@ func nearby(lines int) string {
 	n := strconv.Itoa(lines)
 	return `"ag"."last_path_identity" = "ar"."last_path_identity" AND "ag"."last_path" = "ar"."last_path"
 	  AND "ag"."last_line" BETWEEN "ar"."last_line" - ` + n + ` AND "ar"."last_line" + ` + n + `
-	  AND "g"."target_id" = "f"."target_id" AND "g"."closed_at" IS NULL
+	  AND "g"."build_id" = "f"."build_id" AND "g"."closed_at" IS NULL
 	  AND "g"."kind" = '` + string(kind.Analysis) + `'
 	  AND "g"."vulnerability_id" <> "f"."vulnerability_id"
 	  AND EXISTS (SELECT 1 FROM "rule_family" AS "fa"
@@ -89,7 +89,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, c
 	}
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		Join(`JOIN "finding" AS "g" ON "g"."target_id" = "f"."target_id"`).
+		Join(`JOIN "finding" AS "g" ON "g"."build_id" = "f"."build_id"`).
 		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "g"."vulnerability_id"`).
 		ColumnExpr(`"g"."occurrence_identity", "vu"."identifier" AS "rule", "ag"."last_path", "ag"."last_line"`).
@@ -129,7 +129,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 	if err != nil {
 		return nil, err
 	}
-	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, time.Now().UTC())
+	ended, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -160,10 +160,10 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 			args := append([]any{productID}, kindArgs...)
 			args = append(args, bun.List(ended))
 			return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fs"
-				JOIN "target" AS "ts" ON "ts"."id" = "fs"."target_id"
-				JOIN "stream" AS "ss" ON "ss"."id" = "ts"."stream_id"
+				JOIN "build" AS "ts" ON "ts"."id" = "fs"."build_id"
+				JOIN "branch_or_tag" AS "ss" ON "ss"."id" = "ts"."branch_or_tag_id"
 				WHERE "ss"."product_id" = ? AND "fs"."occurrence_identity" = "f"."occurrence_identity"
-				  AND `+kinds+` AND "ts"."stream_id" NOT IN (?))`, args...)
+				  AND `+kinds+` AND "ts"."branch_or_tag_id" NOT IN (?))`, args...)
 		}).
 		OrderExpr(`"f"."occurrence_identity" ASC`).
 		Scan(ctx, &out); err != nil {

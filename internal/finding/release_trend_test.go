@@ -17,7 +17,7 @@ func TestATrendOverReleasesHasOnePointPerReleaseOldestFirst(t *testing.T) {
 	// the step change they were.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		// The fixture's own stream is a branch, so it must not appear.
+		// The fixture's own branch or tag is a branch, so it must not appear.
 		f.shipped(t, through(libnl))
 		f.foundOnLibnl(t)
 		// Two tagged releases of the same product, one worse than the other.
@@ -44,8 +44,8 @@ func TestATrendOverReleasesHasOnePointPerReleaseOldestFirst(t *testing.T) {
 		if len(points) != 2 {
 			t.Fatalf("plotted %d points, want one per tagged release: %+v", len(points), points)
 		}
-		if points[0].Stream != "v1.0" || points[1].Stream != "v1.1" {
-			t.Errorf("the releases are in the order %q, %q", points[0].Stream, points[1].Stream)
+		if points[0].BranchOrTag != "v1.0" || points[1].BranchOrTag != "v1.1" {
+			t.Errorf("the releases are in the order %q, %q", points[0].BranchOrTag, points[1].BranchOrTag)
 		}
 		// Counted in issues, like the calendar trend, so two charts on one
 		// screen cannot quote different units for the same word.
@@ -112,7 +112,7 @@ func TestAScannedBuildWithNothingOpenIsStillAReleaseOfItsOwn(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		dirty := f.run(t)
-		if _, err := f.store.Apply(t.Context(), f.target, dirty,
+		if _, err := f.store.Apply(t.Context(), f.build, dirty,
 			[]finding.Reported{found("CVE-2026-DIRTY", libnl)}); err != nil {
 			t.Fatal(err)
 		}

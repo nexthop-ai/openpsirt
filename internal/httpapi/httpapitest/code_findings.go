@@ -103,7 +103,7 @@ func ApplyRunOn(t *testing.T, r *Reach, db *database.DB, seriesName string, buil
 		t.Fatal(err)
 	}
 	given := analysis.Describe([]sarif.Log{log}, analysis.Stated{Series: seriesName, BuiltAt: built})
-	target := r.TargetOf(t, SeededBuild)
+	build := r.BuildOf(t, SeededBuild)
 	var runID int64
 	if err := database.InTransaction(ctx, r.DB.DB, func(ctx context.Context, tx bun.Tx) error {
 		repositories, err := sourcelink.NewStore(tx).Config(ctx, located.ProductID)
@@ -116,7 +116,7 @@ func ApplyRunOn(t *testing.T, r *Reach, db *database.DB, seriesName string, buil
 		}
 		store := series.NewStore(tx)
 		run, _, err := store.Receive(ctx, series.Arriving{
-			ProductID: located.ProductID, TargetID: target,
+			ProductID: located.ProductID, BuildID: build,
 			Kind: kind.Analysis, Series: given.Series,
 			ContentHash: fmt.Sprintf("run-%d", built.UnixNano()), BuiltAt: given.BuiltAt, Params: given.Params,
 		})
@@ -142,7 +142,7 @@ func SeededCodeFinding(t *testing.T, r *Reach) string {
 	// Marked made, as reading the inventory does, so a run has a build to
 	// place its results in.
 	scans := ingest.NewStore(r.DB.DB)
-	scan, err := scans.Newest(ctx, r.TargetOf(t, SeededBuild))
+	scan, err := scans.Newest(ctx, r.BuildOf(t, SeededBuild))
 	if err != nil || scan == nil {
 		t.Fatalf("the build has no upload: %v", err)
 	}
@@ -194,7 +194,7 @@ func RecordedCodeFindingHeldBy(t *testing.T, r *Reach, included bool, holder str
 		t.Fatalf("the code finding was not confirmed: %d %s", w.Code, w.Body.String())
 	}
 	w := AsPerson(t, r, "code-finding-handler", "POST", at+"/flaw",
-		`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks on the early return","include_in_disclosure":`+
+		`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks on the early return","include_in_disclosure":`+
 			strconv.FormatBool(included)+`}`)
 	if w.Code != 201 {
 		t.Fatalf("the code finding was not recorded as a flaw: %d %s", w.Code, w.Body.String())

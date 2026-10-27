@@ -249,11 +249,11 @@ type KeyBody struct {
 	// in place of it: this field is what create-key resolves, and a display
 	// name resolves to nothing.
 	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
-	// Stream and Variant narrow it further. Either, both or neither may be
+	// Branch or tag and Variant narrow it further. Either, both or neither may be
 	// given: a key covering a whole product cannot imply which release an
-	// upload is for, which is why an upload always states its own target.
-	Stream  string `json:"stream,omitempty" doc:"Optionally, the one release it may send for"`
-	Variant string `json:"variant,omitempty" doc:"Optionally, the one variant it may send for"`
+	// upload is for, which is why an upload always states its own build.
+	BranchOrTag string `json:"branch_or_tag,omitempty" doc:"Optionally, the one release it may send for"`
+	Variant     string `json:"variant,omitempty" doc:"Optionally, the one variant it may send for"`
 	// Secret is returned when the credential is created, and never again.
 	Secret string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
 	// CreatedAt is when it was issued. A credential's age is half of what

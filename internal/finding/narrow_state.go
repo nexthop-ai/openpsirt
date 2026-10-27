@@ -83,7 +83,7 @@ const (
 // component under the same consumer would match.
 //
 // product is how the query names the finding's product: a bound number, the
-// stream it has joined, or the decision's own product where the query is
+// branch or tag it has joined, or the decision's own product where the query is
 // already narrowed to it. Anything else is a programming error, because it is
 // placed in the statement as written.
 func DecisionOccurrenceAt(product string) string {

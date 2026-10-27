@@ -74,7 +74,7 @@ func scopeWord(stated string) string {
 // other's business.
 type reader struct {
 	// in is the document, buffered so that its first character can be looked
-	// at before either encoding's stream is started on it. b reads it as JSON
+	// at before either encoding's branch or tag is started on it. b reads it as JSON
 	// and x as XML, and only one of the two is ever set.
 	in         *bufio.Reader
 	b          *docread.JSON
@@ -236,7 +236,7 @@ func (c *reader) bind(ref string, described graph.Described) error {
 }
 
 // builtAt reads the header value saying when the build was made, at the
-// stream's current value. An empty value leaves the document undated.
+// branch or tag's current value. An empty value leaves the document undated.
 func (c *reader) builtAt() error {
 	raw, err := c.b.Str()
 	if err != nil {

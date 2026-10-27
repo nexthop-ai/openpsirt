@@ -11,7 +11,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 )
 
 // savedV0100 is a kept filter's address as v0.10.0 wrote it, naming every
@@ -31,7 +30,7 @@ const (
 // trail of the renamed kind beside one of a kind kept.
 func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}

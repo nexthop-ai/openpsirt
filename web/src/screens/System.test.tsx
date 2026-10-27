@@ -39,7 +39,7 @@ const READS: Record<string, Answer> = {
         {
           id: 9,
           kind: "scan",
-          reference: "target:4",
+          reference: "build:4",
           attempts: 5,
           stopped_at: "2026-01-01T00:00:00Z",
         },

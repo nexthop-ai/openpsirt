@@ -48,7 +48,7 @@ type Delta struct {
 // The same statements for the whole set however many uploads it holds,
 // because the surface asking is a page of receipts: a set per upload would be a
 // hundred round trips to fill three columns.
-func (s *Store) Deltas(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) Deltas(ctx context.Context, subject access.Subject, buildID int64,
 	scanIDs []int64) (map[int64]Delta, error) {
 
 	if len(scanIDs) == 0 {
@@ -58,11 +58,11 @@ func (s *Store) Deltas(ctx context.Context, subject access.Subject, targetID int
 	// over the document a build sent, in the same class as the component and
 	// placed counts a receipt already carries, and the pipeline that sent it
 	// is who asks.
-	if err := s.shipsTo(ctx, subject, targetID); err != nil {
+	if err := s.shipsTo(ctx, subject, buildID); err != nil {
 		return nil, err
 	}
 
-	wanted, err := s.comparable(ctx, targetID, scanIDs)
+	wanted, err := s.comparable(ctx, buildID, scanIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (s *Store) Deltas(ctx context.Context, subject access.Subject, targetID int
 		return out, nil
 	}
 
-	rows, err := s.moved(ctx, targetID, wanted)
+	rows, err := s.moved(ctx, buildID, wanted)
 	if err != nil {
 		return nil, err
 	}
@@ -115,17 +115,17 @@ func count(changes []Change) Delta {
 // whatever the document placed. A build nothing has ever been applied to
 // leaves that subquery empty, and the comparison against it is true of no
 // scan — which is the same answer for the same reason.
-func (s *Store) comparable(ctx context.Context, targetID int64, scanIDs []int64) ([]int64, error) {
+func (s *Store) comparable(ctx context.Context, buildID int64, scanIDs []int64) ([]int64, error) {
 	first := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "fn"`).
 		ColumnExpr(`MIN("fn"."opened_scan_id")`).
-		Where(`"fn"."target_id" = ?`, targetID)
+		Where(`"fn"."build_id" = ?`, buildID)
 
 	var wanted []int64
 	err := s.db.NewSelect().
 		TableExpr(`"scan" AS "sc"`).
 		ColumnExpr(`"sc"."id"`).
-		Where(`"sc"."target_id" = ?`, targetID).
+		Where(`"sc"."build_id" = ?`, buildID).
 		Where(`"sc"."id" IN (?)`, bun.List(scanIDs)).
 		Where(`"sc"."id" > (?)`, first).
 		Scan(ctx, &wanted)
@@ -205,7 +205,7 @@ func (f *folder) folded() []movedRow {
 // third column: 54,902 lookups each reading the build's whole range, 40.5 s for
 // one upload that removed a file inventory. Read once by the build instead,
 // the rows are matched to the names here.
-func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]movedRow, error) {
+func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64) ([]movedRow, error) {
 	earliest, latest := scanIDs[0], scanIDs[0]
 	asked := make(map[int64]bool, len(scanIDs))
 	for _, id := range scanIDs {
@@ -225,7 +225,7 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 		ColumnExpr(`"tn"."opened_scan_id" AS "opened"`).
 		ColumnExpr(`"tn"."closed_scan_id" AS "closed"`).
 		ColumnExpr(`"tc"."name_folded" AS "nm"`).
-		Where(`"tn"."target_id" = ?`, targetID).
+		Where(`"tn"."build_id" = ?`, buildID).
 		Where(`"tn"."is_root" = ?`, false).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where(`"tn"."opened_scan_id" IN (?)`, bun.List(scanIDs)).
@@ -275,7 +275,7 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 		// here, and either spelling names the same thing on a screen.
 		ColumnExpr(`"c"."name" AS "dsp"`).
 		ColumnExpr(`"c"."version" AS "ver"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		// The build's own root is not one of its components, and its version
 		// is not stored, so it can neither arrive nor move.
 		Where(`"n"."is_root" = ?`, false).
@@ -358,16 +358,16 @@ func ChangeKinds() []ChangeKind { return []ChangeKind{Added, Removed, Changed} }
 // The page is taken after the comparison rather than in the statement. What is
 // read is the scan's own delta — the names it opened or closed a row of — so
 // the cost is what the upload changed rather than what the build contains.
-func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, scanID int64,
+func (s *Store) Changes(ctx context.Context, subject access.Subject, buildID, scanID int64,
 	only ChangeKind, limit, offset int) ([]Change, int, error) {
 
 	// The rule the counts are answered under, for the reason they are: this is
 	// what a build sent rather than what is open against it.
-	if err := s.shipsTo(ctx, subject, targetID); err != nil {
+	if err := s.shipsTo(ctx, subject, buildID); err != nil {
 		return nil, 0, err
 	}
 
-	wanted, err := s.comparable(ctx, targetID, []int64{scanID})
+	wanted, err := s.comparable(ctx, buildID, []int64{scanID})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -377,7 +377,7 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, s
 		return nil, 0, nil
 	}
 
-	rows, err := s.moved(ctx, targetID, wanted)
+	rows, err := s.moved(ctx, buildID, wanted)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -546,8 +546,8 @@ type Movement struct {
 // out what happened, in the same shape as the passes that derive what is true
 // across every product before deciding who may hear each part. Who is told is
 // decided where the telling is.
-func (s *Store) Moved(ctx context.Context, targetID, scanID int64) (Movement, bool, error) {
-	wanted, err := s.comparable(ctx, targetID, []int64{scanID})
+func (s *Store) Moved(ctx context.Context, buildID, scanID int64) (Movement, bool, error) {
+	wanted, err := s.comparable(ctx, buildID, []int64{scanID})
 	if err != nil {
 		return Movement{}, false, err
 	}
@@ -555,13 +555,13 @@ func (s *Store) Moved(ctx context.Context, targetID, scanID int64) (Movement, bo
 		return Movement{}, false, nil
 	}
 
-	rows, err := s.moved(ctx, targetID, wanted)
+	rows, err := s.moved(ctx, buildID, wanted)
 	if err != nil {
 		return Movement{}, false, err
 	}
 	moved := Movement{Delta: count(changed(rows)[scanID])}
 
-	held, err := s.held(ctx, targetID, scanID)
+	held, err := s.held(ctx, buildID, scanID)
 	if err != nil {
 		return Movement{}, false, err
 	}
@@ -575,7 +575,7 @@ func (s *Store) Moved(ctx context.Context, targetID, scanID int64) (Movement, bo
 // The same side of the scan the comparison reads — a row the scan closed was
 // still there on the near side of it — and the same exclusion: the build's own
 // root is not one of its components.
-func (s *Store) held(ctx context.Context, targetID, scanID int64) (int, error) {
+func (s *Store) held(ctx context.Context, buildID, scanID int64) (int, error) {
 	var held int
 	// Scanned rather than counted: the count is of names rather than of rows,
 	// and asking the query builder to count wraps this in a count of its one
@@ -584,7 +584,7 @@ func (s *Store) held(ctx context.Context, targetID, scanID int64) (int, error) {
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`COUNT(DISTINCT "c"."name_folded")`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."is_root" = ?`, false).
 		Where(`"n"."opened_scan_id" < ?`, scanID).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {

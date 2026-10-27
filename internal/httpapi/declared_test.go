@@ -31,7 +31,7 @@ type asked struct {
 // still not an answer — so a parameter missing from here weakens the check for
 // that operation without breaking it.
 var standIn = map[string]string{
-	"product": "mine", "stream": "master", "variant": "broadcom",
+	"product": "mine", "branch_or_tag": "master", "variant": "broadcom",
 	"issue": "CVE-2026-9999", "component": "libnl-3-200",
 	"identity": "reader", "name": "master", "format": "json",
 	"role": "public-read", "kind": "branch", "alias": "CVE-2026-1000",

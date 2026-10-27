@@ -18,15 +18,15 @@ func TestTheReleasesListAnswersAnUnreadableProductAsUndeclared(t *testing.T) {
 		r.Scanned(t)
 		var releases struct {
 			Items []struct {
-				Stream  string `json:"stream"`
-				Variant string `json:"variant"`
-				Open    int    `json:"open"`
+				BranchOrTag string `json:"branch_or_tag"`
+				Variant     string `json:"variant"`
+				Open        int    `json:"open"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/releases", &releases)
 		found := false
 		for _, one := range releases.Items {
-			if one.Stream == "master" && one.Variant == "broadcom" {
+			if one.BranchOrTag == "master" && one.Variant == "broadcom" {
 				found = true
 				if one.Open == 0 {
 					t.Errorf("the scanned build counts nothing open: %+v", one)

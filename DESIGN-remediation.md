@@ -66,7 +66,7 @@ A commitment is one build moving one fold: a source package, at the version it
 was built at, going to another version. That is the piece of work somebody
 actually does, and it is one row.
 
-A release is named by its stream and its variant together, never by one of them:
+A release is named by its branch or tag and its variant together, never by one of them:
 the same branch built two ways is two builds, and a plan naming only the branch
 would claim a fix for hardware nobody built for.
 
@@ -636,7 +636,7 @@ Nothing is sent anywhere.
 | Generating or recording a document with no publisher configured answers 409; any other failure is a fault | The missing publisher is the store's own refusal, matched by identity. Reading what has gone out needs no publisher, so its failures are faults wherever none is configured |
 | A document about an undisclosed flaw travels no further, whatever its editorial state | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either. The distribution label is what carries this; the tracking status says where the document is in its life |
 | The label is decided from every occurrence of each issue in its product | One undisclosed occurrence makes the issue embargoed there, whichever occurrence was recorded first or which the reader sees. A reader who may not read undisclosed work in that product is not shown the advisory at all: listing it, opening it by name and generating its document refuse together, because a listing that admits it beside a document that refuses says undisclosed work exists |
-| Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
+| Releases are named by branch or tag and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
 | A release whose every open occurrence stands under approved, live decisions with one outcome states what they say | The rule the VEX document of a build reads, through the one query both documents use. Not applicable or a wrong match, with its reason, is known not affected; already fixed is fixed; will not fix stays known affected, and says no fix is planned. A release partly covered stays known affected, because the document has no finer grain than the release |
 | Where the decisions at a release differ, the earliest speaks | The decision that has stood longest, as in the VEX document. Its reason and its mitigation are read off that one decision |
@@ -699,7 +699,7 @@ component the document is about, where it declared one.
 
 Assembled from approved `not-applicable`, `mismatched` and `already-fixed`
 decisions (REQ-39), from `wont-fix` decisions that say what a holder can do
-instead, and from the patches the build declares, for one product, stream and
+instead, and from the patches the build declares, for one product, branch or tag, and
 variant.
 
 Two documents describe a build, chosen when one is generated.

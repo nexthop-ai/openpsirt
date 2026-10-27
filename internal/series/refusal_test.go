@@ -19,7 +19,7 @@ import (
 func TestARefusalOfASeriesReplacesTheLastOneOfThatSeriesOnTheBuild(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		target := fixture.New(t, db).Target.ID
+		build := fixture.New(t, db).Build.ID
 		store := series.NewStore(db.DB)
 		at := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 		for i, r := range []series.Refusal{
@@ -27,12 +27,12 @@ func TestARefusalOfASeriesReplacesTheLastOneOfThatSeriesOnTheBuild(t *testing.T)
 			{Series: "Nightly", Reason: "second", At: at.Add(time.Minute)},
 			{Series: "weekly", Reason: "other", At: at.Add(2 * time.Minute)},
 		} {
-			r.TargetID, r.Kind = target, kind.Analysis
+			r.BuildID, r.Kind = build, kind.Analysis
 			if err := store.Refused(ctx, r); err != nil {
 				t.Fatalf("refusal %d: %v", i, err)
 			}
 		}
-		got, err := store.RefusalsOf(ctx, target, kind.Analysis)
+		got, err := store.RefusalsOf(ctx, build, kind.Analysis)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -45,14 +45,14 @@ func TestARefusalOfASeriesReplacesTheLastOneOfThatSeriesOnTheBuild(t *testing.T)
 func TestALongReasonIsRecordedCutWhereACharacterStarts(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		target := fixture.New(t, db).Target.ID
+		build := fixture.New(t, db).Build.ID
 		store := series.NewStore(db.DB)
 		reason := strings.Repeat("a", 1999) + strings.Repeat("é", 10)
-		if err := store.Refused(ctx, series.Refusal{TargetID: target, Kind: kind.Analysis,
+		if err := store.Refused(ctx, series.Refusal{BuildID: build, Kind: kind.Analysis,
 			Series: "nightly", Reason: reason}); err != nil {
 			t.Fatalf("a long reason was not recorded: %v", err)
 		}
-		got, err := store.RefusalsOf(ctx, target, kind.Analysis)
+		got, err := store.RefusalsOf(ctx, build, kind.Analysis)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,19 +69,19 @@ func TestTwoRefusalsOfASeriesRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 	// The series' refusal is recorded either way, so that is not a failure.
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		target := fixture.New(t, db).Target.ID
+		build := fixture.New(t, db).Build.ID
 		first, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer func() { _ = first.Rollback() }()
-		if err := series.NewStore(first).Refused(ctx, series.Refusal{TargetID: target, Kind: kind.Analysis,
+		if err := series.NewStore(first).Refused(ctx, series.Refusal{BuildID: build, Kind: kind.Analysis,
 			Series: "nightly", Reason: "first"}); err != nil {
 			t.Fatal(err)
 		}
 		second := make(chan error, 1)
 		go func() {
-			second <- series.NewStore(db.DB).Refused(ctx, series.Refusal{TargetID: target, Kind: kind.Analysis,
+			second <- series.NewStore(db.DB).Refused(ctx, series.Refusal{BuildID: build, Kind: kind.Analysis,
 				Series: "nightly", Reason: "second"})
 		}()
 		time.Sleep(500 * time.Millisecond)
@@ -91,7 +91,7 @@ func TestTwoRefusalsOfASeriesRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 		if err := <-second; err != nil {
 			t.Errorf("the refusal that lost the race reports %v", err)
 		}
-		got, err := series.NewStore(db.DB).RefusalsOf(ctx, target, kind.Analysis)
+		got, err := series.NewStore(db.DB).RefusalsOf(ctx, build, kind.Analysis)
 		if err != nil {
 			t.Fatal(err)
 		}

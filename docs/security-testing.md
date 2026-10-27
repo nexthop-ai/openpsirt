@@ -13,7 +13,7 @@ output and the checkout, and sends one run per analyzer per build. Each result
 is recorded as an internal finding of the build, and the run's receipt counts
 what it opened, saw again and no longer found.
 
-Sending one needs the product, stream and variant declared and a pipeline key,
+Sending one needs the product, branch or tag, and variant declared and a pipeline key,
 as [Build pipelines](pipeline.md) describes for an inventory. A run is applied
 once its build's inventory has been read, so the two uploads may arrive in
 either order.
@@ -103,7 +103,7 @@ export OPENPSIRT_URL=https://openpsirt.example.com
 export OPENPSIRT_KEY=…   # the pipeline key
 
 openpsirt-upload upload \
-  --product sonic --stream main --variant broadcom \
+  --product sonic --branch-or-tag main --variant broadcom \
   --series clang-sa \
   --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --compile-commands build/compile_commands.json \
@@ -114,7 +114,7 @@ Run it inside the checkout, or name the checkout with `--source-root`.
 
 | Flag | |
 |---|---|
-| `--product`, `--stream`, `--variant` | The build the run is of |
+| `--product`, `--branch-or-tag`, `--variant` | The build the run is of |
 | `--series` | Which analysis this is: the tool and its configuration, the same on every build. Each run is compared with the series' last. `TOOL=NAME` names one analyzer's, where the output is of several |
 | `--built` | When the build was made, in RFC 3339. Without it, the run is dated when it arrives |
 | `--commit` | The commit analyzed. The commit checked out where unset |
@@ -223,7 +223,7 @@ jobs:
           status=0
           ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
           openpsirt-upload upload \
-            --product sonic --stream main --variant ${{ matrix.variant }} \
+            --product sonic --branch-or-tag main --variant ${{ matrix.variant }} \
             --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --rules-file .openpsirt/ruff.rules --exit-status "$status" \
             ruff.sarif
@@ -250,7 +250,7 @@ variables:
   - status=0; ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
   - >
     openpsirt-upload upload
-    --product sonic --stream "$CI_COMMIT_BRANCH" --variant "$VARIANT"
+    --product sonic --branch-or-tag "$CI_COMMIT_BRANCH" --variant "$VARIANT"
     --series ruff --built "$CI_PIPELINE_CREATED_AT"
     --rules-file .openpsirt/ruff.rules --exit-status "$status"
     ruff.sarif
@@ -281,14 +281,14 @@ analysis-windows:
       python -m ruff check --output-format sarif --output-file ruff.sarif --exit-zero .
       $status = $LASTEXITCODE
       openpsirt-upload upload `
-        --product sonic --stream "$env:CI_COMMIT_BRANCH" --variant "$env:VARIANT" `
+        --product sonic --branch-or-tag "$env:CI_COMMIT_BRANCH" --variant "$env:VARIANT" `
         --series ruff --built "$env:CI_PIPELINE_CREATED_AT" `
         --rules-file .openpsirt/ruff.rules --exit-status $status `
         ruff.sarif
 ```
 
 `OPENPSIRT_URL` and `OPENPSIRT_KEY` are CI/CD variables, the key masked.
-`CI_PIPELINE_CREATED_AT` is already RFC 3339. A stream named from
+`CI_PIPELINE_CREATED_AT` is already RFC 3339. A branch named from
 `CI_COMMIT_BRANCH` has to have been declared, as
 [Build pipelines](pipeline.md) says.
 
@@ -331,7 +331,7 @@ pipeline {
                       status=0
                       ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
                       openpsirt-upload upload \\
-                        --product sonic --stream main --variant "$VARIANT" \\
+                        --product sonic --branch-or-tag main --variant "$VARIANT" \\
                         --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \\
                         --rules-file .openpsirt/ruff.rules --exit-status "$status" \\
                         ruff.sarif
@@ -349,7 +349,7 @@ pipeline {
                       $status = $LASTEXITCODE
                       $built = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
                       openpsirt-upload upload `
-                        --product sonic --stream main --variant "$env:VARIANT" `
+                        --product sonic --branch-or-tag main --variant "$env:VARIANT" `
                         --series ruff --built $built `
                         --rules-file .openpsirt/ruff.rules --exit-status $status `
                         ruff.sarif
@@ -430,7 +430,7 @@ steps:
       status=0
       ruff check --output-format sarif --output-file ruff.sarif --exit-zero . || status=$?
       openpsirt-upload upload \
-        --product sonic --stream "$(Build.SourceBranchName)" --variant "$(variant)" \
+        --product sonic --branch-or-tag "$(Build.SourceBranchName)" --variant "$(variant)" \
         --series ruff --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         --rules-file .openpsirt/ruff.rules --exit-status "$status" \
         ruff.sarif
@@ -496,7 +496,7 @@ A value the SARIF states wins over the field.
 | 202 `queued` | Stored, and applied once the build's inventory has been read |
 | 200 `already_held` | The same documents for the same series, build and build time |
 | 422 | A document or a field could not be read; the detail names which |
-| 409 | The product, stream or variant is retired |
+| 409 | The product, branch or tag, or variant is retired |
 | 503 | The deployment is busy. `curl --retry` sends it again after `Retry-After` |
 
 A direct upload goes without what the client adds:
@@ -527,7 +527,7 @@ Each recipe runs in the checkout with `OPENPSIRT_URL` and `OPENPSIRT_KEY`
 set, the client on the path, and the build named once:
 
 ```bash
-build=(--product sonic --stream main --variant broadcom --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+build=(--product sonic --branch-or-tag main --variant broadcom --built "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
 ```
 
 A `.rules` file names the rules the analyzer's configuration enables, as

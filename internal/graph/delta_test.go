@@ -26,7 +26,7 @@ import (
 // delta asks for one scan's answer and fails where there is none.
 func delta(t *testing.T, f *fixture, scanID int64) graph.Delta {
 	t.Helper()
-	answers, err := f.store.Deltas(t.Context(), everyone(f), f.targetID, []int64{scanID})
+	answers, err := f.store.Deltas(t.Context(), everyone(f), f.buildID, []int64{scanID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func delta(t *testing.T, f *fixture, scanID int64) graph.Delta {
 func applied(t *testing.T, f *fixture, snap graph.Snapshot) int64 {
 	t.Helper()
 	scanID := f.scan(t)
-	if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, scanID, snap); err != nil {
+	if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, scanID, snap); err != nil {
 		t.Fatal(err)
 	}
 	return scanID
@@ -50,7 +50,7 @@ func applied(t *testing.T, f *fixture, snap graph.Snapshot) int64 {
 func TestTheFirstInventoryHasNothingToDifferFrom(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		first := applied(t, f, tree())
-		answers, err := f.store.Deltas(t.Context(), everyone(f), f.targetID, []int64{first})
+		answers, err := f.store.Deltas(t.Context(), everyone(f), f.buildID, []int64{first})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -216,7 +216,7 @@ func TestEachScanOnAPageIsAnsweredAgainstTheOneBeforeIt(t *testing.T) {
 		shrunk := tree()
 		fourth := applied(t, f, shrunk)
 
-		answers, err := f.store.Deltas(t.Context(), everyone(f), f.targetID,
+		answers, err := f.store.Deltas(t.Context(), everyone(f), f.buildID,
 			[]int64{second, third, fourth})
 		if err != nil {
 			t.Fatal(err)
@@ -256,7 +256,7 @@ func TestAScanIsAnsweredTheSameAloneAsItIsBesideItsSuccessors(t *testing.T) {
 		next.Dependencies = append(next.Dependencies, graph.Dependency{Parent: curl, Child: arriving})
 		third := applied(t, f, next)
 
-		page, err := f.store.Deltas(t.Context(), everyone(f), f.targetID, []int64{second, third})
+		page, err := f.store.Deltas(t.Context(), everyone(f), f.buildID, []int64{second, third})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -283,7 +283,7 @@ func TestAScanOfAnotherBuildIsAnsweredForByNothing(t *testing.T) {
 		applied(t, f, tree())
 
 		other := elsewhere(t, f)
-		mine, err := f.store.Deltas(t.Context(), everyone(f), f.targetID, []int64{other})
+		mine, err := f.store.Deltas(t.Context(), everyone(f), f.buildID, []int64{other})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -299,7 +299,7 @@ func TestAnInventoryIsNotReadableBySomebodyWhoDoesNotReachTheProduct(t *testing.
 		second := applied(t, f, tree())
 
 		outsider := access.NewPerson(2, "outsider", false, nil, 0)
-		if _, err := f.store.Deltas(t.Context(), outsider, f.targetID, []int64{second}); !errors.Is(err, access.ErrDenied) {
+		if _, err := f.store.Deltas(t.Context(), outsider, f.buildID, []int64{second}); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a subject with nothing on the product was answered: %v", err)
 		}
 	})
@@ -315,7 +315,7 @@ func elsewhere(t *testing.T, f *fixture) int64 {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target, err := cat.TargetFor(ctx, *f.scope.StreamID, variant.ID)
+	build, err := cat.BuildFor(ctx, *f.scope.BranchOrTagID, variant.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,13 +323,13 @@ func elsewhere(t *testing.T, f *fixture) int64 {
 	f.seq++
 	f.built = f.built.Add(time.Hour)
 	rec, outcome, err := f.scans.Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: fmt.Sprintf("other-%d", f.seq),
+		BuildID: build.ID, ContentHash: fmt.Sprintf("other-%d", f.seq),
 		BuiltAt: f.built, ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record a scan of the other build: outcome %v, err %v", outcome, err)
 	}
-	if _, err := fixtures.ApplyGraph(ctx, f.db, target.ID, rec.ID, tree()); err != nil {
+	if _, err := fixtures.ApplyGraph(ctx, f.db, build.ID, rec.ID, tree()); err != nil {
 		t.Fatal(err)
 	}
 	return rec.ID

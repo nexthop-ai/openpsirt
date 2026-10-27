@@ -41,19 +41,19 @@ const (
 // analysisBuild is one series on one build in use, with the names a message
 // needs.
 type analysisBuild struct {
-	ProductID int64  `bun:"product_id"`
-	StreamID  int64  `bun:"stream_id"`
-	SeriesID  int64  `bun:"series_id"`
-	TargetID  int64  `bun:"target_id"`
-	Product   string `bun:"product"`
-	Stream    string `bun:"stream"`
-	Variant   string `bun:"variant"`
+	ProductID     int64  `bun:"product_id"`
+	BranchOrTagID int64  `bun:"branch_or_tag_id"`
+	SeriesID      int64  `bun:"series_id"`
+	BuildID       int64  `bun:"build_id"`
+	Product       string `bun:"product"`
+	BranchOrTag   string `bun:"branch_or_tag"`
+	Variant       string `bun:"variant"`
 	// The same three as an address names them.
-	ProductName string `bun:"product_name"`
-	StreamName  string `bun:"stream_name"`
-	VariantName string `bun:"variant_name"`
-	Series      string `bun:"series"`
-	Folded      string `bun:"series_folded"`
+	ProductName     string `bun:"product_name"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	VariantName     string `bun:"variant_name"`
+	Series          string `bun:"series"`
+	Folded          string `bun:"series_folded"`
 }
 
 // analysisRuns is the applied runs of analyzer series against builds still in
@@ -62,19 +62,19 @@ func analysisRuns(db bun.IDB) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr(`"series_run" AS "sr"`).
 		Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "sr"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "sr"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"sr"."series_id" AS "series_id"`).
-		ColumnExpr(`"sr"."target_id" AS "target_id"`).
+		ColumnExpr(`"sr"."build_id" AS "build_id"`).
 		ColumnExpr(`"p"."display_name" AS "product"`).
-		ColumnExpr(`"st"."display_name" AS "stream"`).
+		ColumnExpr(`"st"."display_name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."display_name" AS "variant"`).
 		ColumnExpr(`"p"."name" AS "product_name"`).
-		ColumnExpr(`"st"."name" AS "stream_name"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant_name"`).
 		ColumnExpr(`"se"."name" AS "series"`).
 		ColumnExpr(`"se"."name_folded" AS "series_folded"`).
@@ -89,7 +89,7 @@ func analysisRuns(db bun.IDB) *bun.SelectQuery {
 // pastEndOfLife is the releases past their end of life, whose builds are
 // left alone on purpose for the reason a retired one is.
 func (w *sweep) pastEndOfLife(ctx context.Context) (map[int64]bool, error) {
-	ended, err := catalog.NewStore(w.db).StreamsPastEndOfLife(ctx, time.Now().UTC())
+	ended, err := catalog.NewStore(w.db).BranchesAndTagsPastEndOfLife(ctx, time.Now().UTC())
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (w *sweep) analysesNotComparable(ctx context.Context) (map[int64][]Holds, e
 		Where(`"sr"."comparable" = ?`, false).
 		// The newest applied run, in the order the applier reads them.
 		Where(`NOT EXISTS (SELECT 1 FROM "series_run" AS "nw" `+
-			`WHERE "nw"."series_id" = "sr"."series_id" AND "nw"."target_id" = "sr"."target_id" `+
+			`WHERE "nw"."series_id" = "sr"."series_id" AND "nw"."build_id" = "sr"."build_id" `+
 			`AND "nw"."status" = ? AND ("nw"."built_at" > "sr"."built_at" `+
 			`OR ("nw"."built_at" = "sr"."built_at" AND "nw"."id" > "sr"."id")))`, series.Applied).
 		Scan(ctx, &rows)
@@ -146,16 +146,16 @@ func (w *sweep) analysesNotComparable(ctx context.Context) (map[int64][]Holds, e
 		return nil, err
 	}
 	for _, row := range rows {
-		if past[row.StreamID] {
+		if past[row.BranchOrTagID] {
 			continue
 		}
 		w.tellInternal(out, row.ProductID, Holds{
 			About: identify("security-testing-not-comparable", strconv.FormatInt(row.SeriesID, 10),
-				strconv.FormatInt(row.TargetID, 10)),
+				strconv.FormatInt(row.BuildID, 10)),
 			Body: fmt.Sprintf("%s %s %s: the last run of %s could not be compared, because %s. "+
 				"Nothing it stops reporting is marked no longer detected until a run can be.",
-				row.Product, row.Stream, row.Variant, row.Series, uncomparable(row.Reason)),
-			Link: weblink.CodeFindings(row.ProductName, row.StreamName, row.VariantName, "", ""),
+				row.Product, row.BranchOrTag, row.Variant, row.Series, uncomparable(row.Reason)),
+			Link: weblink.CodeFindings(row.ProductName, row.BranchOrTagName, row.VariantName, "", ""),
 		})
 	}
 	return out, nil
@@ -200,22 +200,22 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 	err := w.db.NewSelect().
 		TableExpr(`(?) AS "ranked"`, analysisRuns(w.db).
 			ColumnExpr(`"sr"."received_at" AS "received_at"`).
-			ColumnExpr(`ROW_NUMBER() OVER (PARTITION BY "sr"."series_id", "sr"."target_id" `+
+			ColumnExpr(`ROW_NUMBER() OVER (PARTITION BY "sr"."series_id", "sr"."build_id" `+
 				`ORDER BY "sr"."received_at" DESC, "sr"."id" DESC) AS "newest"`)).
 		ColumnExpr(`"ranked".*`).
 		Where(`"ranked"."newest" <= ?`, quietGaps+1).
-		OrderExpr(`"ranked"."series_id", "ranked"."target_id", "ranked"."received_at" DESC`).
+		OrderExpr(`"ranked"."series_id", "ranked"."build_id", "ranked"."received_at" DESC`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read when each analyzer series last arrived: %w", err)
 	}
 
-	type pair struct{ series, target int64 }
+	type pair struct{ series, build int64 }
 	var order []pair
 	runs := make(map[pair][]time.Time)
 	named := make(map[pair]analysisBuild)
 	for _, row := range rows {
-		at := pair{row.SeriesID, row.TargetID}
+		at := pair{row.SeriesID, row.BuildID}
 		if _, seen := named[at]; !seen {
 			order = append(order, at)
 			named[at] = row.analysisBuild
@@ -234,7 +234,7 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 	now := time.Now().UTC()
 	for _, at := range order {
 		build := named[at]
-		if past[build.StreamID] {
+		if past[build.BranchOrTagID] {
 			continue
 		}
 		silent, quiet := quietFor(runs[at], now)
@@ -242,21 +242,21 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 			continue
 		}
 		body := fmt.Sprintf("%s %s %s: no run of %s has been applied for %s.",
-			build.Product, build.Stream, build.Variant, build.Series, plainly(int(silent.Hours()/24)))
+			build.Product, build.BranchOrTag, build.Variant, build.Series, plainly(int(silent.Hours()/24)))
 		turned, err := w.lastRefused(ctx, build, runs[at][0])
 		if err != nil {
 			return nil, err
 		}
 		if turned != nil {
 			body = fmt.Sprintf("%s %s %s: no run of %s has been applied for %s, and an upload "+
-				"of it was turned away on %s: %s", build.Product, build.Stream, build.Variant,
+				"of it was turned away on %s: %s", build.Product, build.BranchOrTag, build.Variant,
 				build.Series, plainly(int(silent.Hours()/24)), day(turned.At), turned.Reason)
 		}
 		w.tellInternal(out, build.ProductID, Holds{
 			About: identify("security-testing-stopped", strconv.FormatInt(at.series, 10),
-				strconv.FormatInt(at.target, 10)),
+				strconv.FormatInt(at.build, 10)),
 			Body: body,
-			Link: weblink.CodeFindings(build.ProductName, build.StreamName, build.VariantName, "", ""),
+			Link: weblink.CodeFindings(build.ProductName, build.BranchOrTagName, build.VariantName, "", ""),
 		})
 	}
 	return out, nil
@@ -290,7 +290,7 @@ func (w *sweep) lastRefused(ctx context.Context, build analysisBuild,
 	since time.Time) (*series.Refusal, error) {
 	var turned []series.Refusal
 	err := w.db.NewSelect().Model(&turned).
-		Where(`"sx"."target_id" = ?`, build.TargetID).
+		Where(`"sx"."build_id" = ?`, build.BuildID).
 		Where(`"sx"."kind" = ?`, kind.Analysis).
 		Where(`"sx"."series_folded" = ?`, build.Folded).
 		Where(`"sx"."at" > ?`, since).

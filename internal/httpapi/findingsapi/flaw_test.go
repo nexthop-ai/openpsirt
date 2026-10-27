@@ -78,7 +78,7 @@ func TestAConfirmedCodeFindingIsRecordedAsFlawAsAFlawOnce(t *testing.T) {
 			t.Fatalf("the code finding reads %s with %+v; want recorded as a flaw, internal only, as %s", got.State, got.RecordedAsFlaw, flaw)
 		}
 		again := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"again"}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"again"}`)
 		httpapitest.RefusedWith(t, again, http.StatusConflict)
 		// The flaw is judged now, not the code finding.
 		decided := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
@@ -90,7 +90,7 @@ func TestAConfirmedCodeFindingIsRecordedAsFlawAsAFlawOnce(t *testing.T) {
 func TestOnlyAConfirmedCodeFindingIsRecordedAsFlawBySomebodyWorkingBothHalves(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
-		body := `{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`
+		body := `{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost,
 			codeFindingAt(occurrence)+"/flaw", body), http.StatusConflict)
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
@@ -317,7 +317,7 @@ func TestARecordAsFlawOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 			t.Errorf("an inclusion discloses the messages %+v; want the analyzer's message at src/a.c", said)
 		}
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`); got.Code != http.StatusCreated {
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
 
@@ -339,7 +339,7 @@ func TestARecordAsFlawOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		}
 		// The build itself replaces what src was confirmed as.
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(other)+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows"}`); got.Code != http.StatusCreated {
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"n overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the second flaw record answered %d: %s", got.Code, got.Body)
 		}
 		remembered, err := r.DB.DB.NewSelect().TableExpr(`"code_finding_component" AS "lco"`).Count(t.Context())
@@ -470,7 +470,7 @@ func TestAnUndoneBatchLeavesTheConfirmationARecordAsFlawRestsOn(t *testing.T) {
 			t.Fatalf("agreeing to the confirmation answered %d: %s", got.Code, got.Body)
 		}
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
 		got = httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodDelete, "/v1/approval-batches/tuesday", "")

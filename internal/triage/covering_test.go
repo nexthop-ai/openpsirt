@@ -16,21 +16,21 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// build is one target of a product with a scan run to open findings under,
+// build is one build of a product with a scan run to open findings under,
 // which is the least a finding needs to exist.
 type build struct {
-	target, run int64
+	build, run int64
 }
 
 // build declares a release of a product and returns it as somewhere to put
 // findings.
-func (f *fixture) build(t *testing.T, productID int64, stream string) build {
+func (f *fixture) build(t *testing.T, productID int64, branchOrTag string) build {
 	t.Helper()
 	ctx := t.Context()
 	cat := catalog.NewStore(f.db.DB)
-	declared, err := cat.DeclareStream(ctx, productID, stream, catalog.Tag, nil)
+	declared, err := cat.DeclareBranchOrTag(ctx, productID, branchOrTag, catalog.Tag, nil)
 	if err != nil {
-		t.Fatalf("declare %s: %v", stream, err)
+		t.Fatalf("declare %s: %v", branchOrTag, err)
 	}
 	// One variant per product, declared the first time a build of it is
 	// asked for.
@@ -40,17 +40,17 @@ func (f *fixture) build(t *testing.T, productID int64, stream string) build {
 			t.Fatalf("declare the variant: %v", err)
 		}
 	}
-	target, err := cat.TargetFor(ctx, declared.ID, variant.ID)
+	made, err := cat.BuildFor(ctx, declared.ID, variant.ID)
 	if err != nil {
-		t.Fatalf("target for %s: %v", stream, err)
+		t.Fatalf("build for %s: %v", branchOrTag, err)
 	}
 	run, err := finding.NewStore(f.db.DB).Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", RanHere: true,
+		BuildID: made.ID, Scanner: "grype", RanHere: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return build{target: target.ID, run: run.ID}
+	return build{build: made.ID, run: run.ID}
 }
 
 // component records one package at one version, stating no upstream, so the
@@ -72,7 +72,7 @@ func (f *fixture) component(t *testing.T, name, version string) int64 {
 func (f *fixture) finds(t *testing.T, in build, componentID int64, occurrence string, visibility access.Visibility) int64 {
 	t.Helper()
 	row := &finding.Finding{
-		TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+		BuildID: in.build, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 		Visibility: visibility, ComponentID: componentID, OccurrenceIdentity: occurrence,
 		OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
 	}
@@ -108,7 +108,7 @@ func (f *fixture) stateOf(t *testing.T, id int64) triage.State {
 
 func TestADecisionStandsWhileAnyBuildInTheProductStillMatchesIt(t *testing.T) {
 	// A decision is a lookup shared by every build whose code matches it .
-	// One release stream moving on while another still ships the version
+	// One release branch or tag moving on while another still ships the version
 	// decided about leaves the decision covering the other, and a decision
 	// about code that is still there is not one anybody needs to make
 	// again. It lapses when the last build holding those versions moves.
@@ -127,14 +127,14 @@ func TestADecisionStandsWhileAnyBuildInTheProductStillMatchesIt(t *testing.T) {
 		decided := f.agreed(t, at)
 
 		// A sweep of a build that moved nothing marks nothing.
-		if n, err := f.store.Lapse(ctx, first.target); err != nil || n.Rows != 0 {
+		if n, err := f.store.Lapse(ctx, first.build); err != nil || n.Rows != 0 {
 			t.Fatalf("a sweep of an unmoved build marked %d rows (%v)", n.Rows, err)
 		}
 
 		// The first build moves. The second still ships 1.2.3, so the
 		// decision still covers it and stands.
 		f.moves(t, first, inFirst, bumped, "place-of-libfoo")
-		if n, err := f.store.Lapse(ctx, first.target); err != nil || n.Rows != 0 {
+		if n, err := f.store.Lapse(ctx, first.build); err != nil || n.Rows != 0 {
 			t.Fatalf("a decision still covering another build was marked: %d (%v)", n.Rows, err)
 		}
 		if state := f.stateOf(t, decided.ID); state != triage.Approved {
@@ -143,7 +143,7 @@ func TestADecisionStandsWhileAnyBuildInTheProductStillMatchesIt(t *testing.T) {
 
 		// The second moves too, and nothing in the product matches any more.
 		f.moves(t, second, inSecond, bumped, "place-of-libfoo")
-		if n, err := f.store.Lapse(ctx, second.target); err != nil || n.Rows != 1 {
+		if n, err := f.store.Lapse(ctx, second.build); err != nil || n.Rows != 1 {
 			t.Fatalf("the last build moving marked %d rows, want 1 (%v)", n.Rows, err)
 		}
 		if state := f.stateOf(t, decided.ID); state != triage.LapsedState {
@@ -169,7 +169,7 @@ func TestASweepOfAnotherProductLeavesADecisionAlone(t *testing.T) {
 		at.ConsumerUpstream = ""
 		decided := f.agreed(t, at)
 
-		if n, err := f.store.Lapse(ctx, theirs.target); err != nil || n.Rows != 0 {
+		if n, err := f.store.Lapse(ctx, theirs.build); err != nil || n.Rows != 0 {
 			t.Fatalf("another product's sweep marked %d rows (%v)", n.Rows, err)
 		}
 		if state := f.stateOf(t, decided.ID); state != triage.Approved {

@@ -47,12 +47,12 @@ type unmatchedComponentsOutput struct {
 
 // unmatchedIn reads what one build holds that the scanner cannot match, and
 // how much it holds in all.
-func unmatchedIn(ctx context.Context, in core.Deps, product, stream, variant string) ([]graph.Unmatched, int, error) {
-	subject, target, err := core.Browsing(ctx, in, product, stream, variant)
+func unmatchedIn(ctx context.Context, in core.Deps, product, branchOrTag, variant string) ([]graph.Unmatched, int, error) {
+	subject, build, err := core.Browsing(ctx, in, product, branchOrTag, variant)
 	if err != nil {
 		return nil, 0, err
 	}
-	listed, held, err := graph.NewStore(in.DB.DB).Unmatched(ctx, subject, target)
+	listed, held, err := graph.NewStore(in.DB.DB).Unmatched(ctx, subject, build)
 	switch {
 	case errors.Is(err, access.ErrDenied):
 		return nil, 0, core.NothingScannedThere()
@@ -82,7 +82,7 @@ func onlyReason(listed []graph.Unmatched, reason string) []graph.Unmatched {
 func registerUnmatchedComponents(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-unmatched-components", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components",
 		Summary: "List unmatched components",
 		Description: "Returns the components the build holds now that the vulnerability scanner " +
 			"has no way to match, with the reason for each and a count per reason. Such a " +
@@ -91,14 +91,14 @@ func registerUnmatchedComponents(api huma.API, in core.Deps) {
 			"meeting several reasons is listed under the first in the order `reasons` gives.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string           `path:"product"`
-		Stream  string           `path:"stream"`
-		Variant string           `path:"variant"`
-		Reason  core.Unmatchable `query:"reason" doc:"One reason alone"`
-		Limit   int              `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
-		Offset  int              `query:"offset" minimum:"0" doc:"The number skipped"`
+		Product     string           `path:"product"`
+		BranchOrTag string           `path:"branch_or_tag"`
+		Variant     string           `path:"variant"`
+		Reason      core.Unmatchable `query:"reason" doc:"One reason alone"`
+		Limit       int              `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
+		Offset      int              `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*unmatchedComponentsOutput, error) {
-		listed, held, err := unmatchedIn(ctx, in, input.Product, input.Stream, input.Variant)
+		listed, held, err := unmatchedIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -131,22 +131,22 @@ func registerUnmatchedComponents(api huma.API, in core.Deps) {
 func registerUnmatchedComponentsExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-unmatched-components", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components.{format}",
 		Summary: "Export unmatched components",
 		Description: "Every component the unmatched components list names, as a file, in the same order, " +
 			"with the reason for each.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Product string           `path:"product"`
-		Stream  string           `path:"stream"`
-		Variant string           `path:"variant"`
-		Format  string           `path:"format" enum:"csv,json"`
-		Reason  core.Unmatchable `query:"reason" doc:"One reason alone"`
+		Product     string           `path:"product"`
+		BranchOrTag string           `path:"branch_or_tag"`
+		Variant     string           `path:"variant"`
+		Format      string           `path:"format" enum:"csv,json"`
+		Reason      core.Unmatchable `query:"reason" doc:"One reason alone"`
 	}) (*huma.StreamResponse, error) {
 		// Worked out whole before the response starts, so a build out of reach
 		// is refused with a status rather than a file cut short. It is bounded
 		// by what one build holds now.
-		listed, _, err := unmatchedIn(ctx, in, input.Product, input.Stream, input.Variant)
+		listed, _, err := unmatchedIn(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -154,7 +154,7 @@ func registerUnmatchedComponentsExport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "components a scanner cannot match",
 			About: []core.Stated{
-				{Label: "build", Value: input.Product + " " + input.Stream + " (" + input.Variant + ")"},
+				{Label: "build", Value: input.Product + " " + input.BranchOrTag + " (" + input.Variant + ")"},
 				{Label: "reason", Value: string(input.Reason)},
 			},
 			Header: []string{"reason", "name", "version", "purl", "cpe"},

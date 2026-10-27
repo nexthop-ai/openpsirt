@@ -8,7 +8,7 @@ import {
   uploadsAt,
   unmatchedComponentsAt,
   analyticsReportAt,
-  streamsAt,
+  branchesAndTagsAt,
   type Build,
   plannedUpgradesAt,
 } from "../../app/routes";
@@ -197,7 +197,7 @@ export const GROUPS: Group[] = [
       {
         name: "Release readiness",
         answers: "A branch against the last release cut from it. On the branches and tags list.",
-        to: (at) => streamsAt(at.product ?? ""),
+        to: (at) => branchesAndTagsAt(at.product ?? ""),
         needs: "product",
       },
       {
@@ -252,7 +252,11 @@ export const ON_SCREENS: Report[] = [
 // The whole build a selection names, for an entry that points at one of its
 // screens.
 function buildOf(at: Scoped): Build {
-  return { product: at.product ?? "", stream: at.stream ?? "", variant: at.variant ?? "" };
+  return {
+    product: at.product ?? "",
+    branch_or_tag: at.branch_or_tag ?? "",
+    variant: at.variant ?? "",
+  };
 }
 
 // What a selection is missing for an entry, or null where it holds enough.
@@ -262,7 +266,7 @@ function buildOf(at: Scoped): Build {
 // selection would open on a scope that means nothing.
 function lacks(needs: Needs | undefined, at: Scoped): Needs | null {
   if (needs === "product") return at.product ? null : "product";
-  if (needs === "build") return at.product && at.stream && at.variant ? null : "build";
+  if (needs === "build") return at.product && at.branch_or_tag && at.variant ? null : "build";
   return null;
 }
 
@@ -295,7 +299,7 @@ export function byProduct(product: string | undefined): string {
 export function scopeWords(at: Scoped): string {
   return [
     at.product ?? "Every product",
-    at.stream ?? "every branch",
+    at.branch_or_tag ?? "every branch",
     at.variant ?? "every variant",
   ].join(" · ");
 }

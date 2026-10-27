@@ -106,8 +106,8 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		ColumnExpr(`DISTINCT "c"."purl" AS "purl"`).
 		ColumnExpr(`"c"."latest_checked_at" AS "latest_checked_at"`).
 		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "n"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "n"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		// Still carried. A component that was in a build last year and is not
 		// now is not a name that would leave this deployment tonight. The
 		// same set the pass asks about, spelled as a join here because the

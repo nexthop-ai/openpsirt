@@ -173,7 +173,7 @@ func TestASavedFilterIsOneListPerPersonAndKeepsNoScope(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if kept := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
 			"/v1/session/me/saved-filters/overdue-kernel",
-			`{"query":"stream=master&severity=critical&variant=x86"}`); kept.Code != http.StatusNoContent {
+			`{"query":"branch_or_tag=master&severity=critical&variant=x86"}`); kept.Code != http.StatusNoContent {
 			t.Fatalf("keeping a filter answered %d: %s", kept.Code, kept.Body.String())
 		}
 		var out struct {

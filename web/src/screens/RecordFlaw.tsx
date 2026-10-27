@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { uploadReportFile, useAfterReport, useRecordReport, useReport } from "../api/intake";
 import { api } from "../api/client";
-import { useProductVariants, useProducts, useStreams } from "../api/catalog";
+import { useProductVariants, useProducts, useBranchesAndTags } from "../api/catalog";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useScope } from "../app/scope";
 import { mayOf, useWho } from "../app/session";
@@ -70,7 +70,9 @@ export function RecordFlaw() {
   // goes out on several lines and as several variants at once, and a flaw in
   // it is one issue in every build that ships it. The builds are the product
   // of the two, and the ones that do not exist are simply not offered.
-  const [streams, setStreams] = useState<string[]>(scope.stream ? [scope.stream] : []);
+  const [branchesAndTags, setBranchesAndTags] = useState<string[]>(
+    scope.branch_or_tag ? [scope.branch_or_tag] : [],
+  );
   const [variants, setVariants] = useState<string[]>(scope.variant ? [scope.variant] : []);
   // Seeded from the decision where it is already cached, which is the ordinary
   // arrival from the report's own page. The reseed below covers a decision that
@@ -126,7 +128,7 @@ export function RecordFlaw() {
   const mayHide = !!may?.may_hide;
   const mayPublish = !!may?.triages_public;
   const mayRecord = mayHide || mayPublish;
-  const whole = product !== "" && streams.length > 0 && variants.length > 0;
+  const whole = product !== "" && branchesAndTags.length > 0 && variants.length > 0;
   // Filing a report is working reports, which asks for the right to triage
   // undisclosed work. Without it the only path is recording a flaw that is
   // already public, and from a report there is nothing left to file.
@@ -150,7 +152,7 @@ export function RecordFlaw() {
   useReseed(product, () => setChose(null));
 
   const products = useProducts();
-  const lines = useStreams(product);
+  const lines = useBranchesAndTags(product);
   // The variants the product is built as, rather than one line's own. A variant
   // belongs to the product, so with several lines chosen this is the set to
   // pick from — a per-line list would be an arbitrary one of them.
@@ -160,7 +162,7 @@ export function RecordFlaw() {
   // from memory is a name the server refuses, and a build holds thousands of
   // components, so the list is searched rather than loaded.
   const holding = useQuery({
-    queryKey: ["components", product, streams[0], variants[0], component],
+    queryKey: ["components", product, branchesAndTags[0], variants[0], component],
     enabled: whole && component.trim().length >= 2,
     // Offered from the first build chosen. The name has to exist in every one
     // of them — the server refuses otherwise, naming the build that does not
@@ -169,10 +171,14 @@ export function RecordFlaw() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components",
           {
             params: {
-              path: { product, stream: streams[0] ?? "", variant: variants[0] ?? "" },
+              path: {
+                product,
+                branch_or_tag: branchesAndTags[0] ?? "",
+                variant: variants[0] ?? "",
+              },
               query: { q: component.trim(), limit: 20 },
             },
           },
@@ -186,7 +192,9 @@ export function RecordFlaw() {
         await api.POST("/v1/products/{product}/findings", {
           params: { path: { product } },
           body: {
-            builds: streams.flatMap((s) => variants.map((v) => ({ stream: s, variant: v }))),
+            builds: branchesAndTags.flatMap((s) =>
+              variants.map((v) => ({ branch_or_tag: s, variant: v })),
+            ),
             summary: summary.trim(),
             // Left out rather than sent empty. "Not worked out yet" is the
             // absence of the field, and an empty string is a value the
@@ -343,7 +351,7 @@ export function RecordFlaw() {
             disabled={!!fromReport}
             onChange={(event) => {
               setProduct(event.target.value);
-              setStreams([]);
+              setBranchesAndTags([]);
               setVariants([]);
               setComponent("");
             }}
@@ -513,11 +521,11 @@ export function RecordFlaw() {
                   value: each.name ?? "",
                   label: each.kind === "tag" ? `${each.name} (tag)` : (each.name ?? ""),
                 }))}
-                chosen={streams}
+                chosen={branchesAndTags}
                 disabled={product === ""}
                 empty={unpicked(product, lines)}
                 onChange={(next) => {
-                  setStreams(next);
+                  setBranchesAndTags(next);
                   setComponent("");
                 }}
               />
@@ -731,8 +739,8 @@ export function RecordFlaw() {
                 : !recordNow
                   ? "Goes to Vulnerability reports for judging."
                   : whole
-                    ? `Against ${streams.length * variants.length} ${
-                        streams.length * variants.length === 1 ? "build" : "builds"
+                    ? `Against ${branchesAndTags.length * variants.length} ${
+                        branchesAndTags.length * variants.length === 1 ? "build" : "builds"
                       }: one issue, a finding per occurrence. A build without the component is refused.`
                     : "Pick at least one branch or tag and one variant."}
           </span>

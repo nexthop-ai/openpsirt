@@ -55,7 +55,7 @@ func (f *fixture) hideIssue(t *testing.T, identifier string) {
 func TestPackageKindsAreCountedOverWhatTheReaderMaySee(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, kinded())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			// Two issues at a Debian package that sits at two occurrences: two
 			// rows on the list, and four findings.
 			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
@@ -106,7 +106,7 @@ func TestPackageKindsCountEachRowOnceAcrossBuilds(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, kinded())
 		reported := []finding.Reported{found("CVE-2026-1", libnl), found("CVE-2026-2", gomod)}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 		other := f.anotherBranch(t, "2026.06")
@@ -142,7 +142,7 @@ func TestAPackageKindCountsTheRowsTheFilterFinds(t *testing.T) {
 			{Parent: swss, Child: gomod}, {Parent: root, Child: teamd}, {Parent: teamd, Child: unnamed},
 		}
 		f.shipped(t, snap)
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", lib), found("CVE-2026-1", route), found("CVE-2026-2", gomod),
 		}); err != nil {
 			t.Fatal(err)
@@ -189,14 +189,14 @@ func TestAPackageKindIsReadAsTheFilterReadsIt(t *testing.T) {
 func TestPackageKindsLeaveOutWhatHasClosed(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, kinded())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", gomod),
 		}); err != nil {
 			t.Fatal(err)
 		}
 		// The next run reports the Go module's issue alone, which closes the
 		// Debian package's.
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-2", gomod),
 		}); err != nil {
 			t.Fatal(err)

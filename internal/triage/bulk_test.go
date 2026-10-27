@@ -43,7 +43,7 @@ func TestABulkDecisionRecordsTheRatingInForceAsItsBaseline(t *testing.T) {
 		f.finds(t, in, libfoo, "place-of-libfoo", access.Public)
 
 		_, recorded, _, err := f.store.BulkDecision(ctx, f.triager, triage.BulkDecisionAt{
-			TargetID: in.target, ComponentID: libfoo, VulnerabilityIDs: []int64{f.issue},
+			BuildID: in.build, ComponentID: libfoo, VulnerabilityIDs: []int64{f.issue},
 		}, triage.Proposal{
 			Outcome: triage.NotApplicable, Justification: triage.CodeNotInExecutePath,
 			Reasoning: "The parser is never reached: we only call the encoder.",
@@ -82,7 +82,7 @@ func TestABulkDecisionNamesTheDecisionThatBlockedIt(t *testing.T) {
 		f.finds(t, in, libfoo, "place-of-libfoo", access.Public)
 
 		at := triage.BulkDecisionAt{
-			TargetID: in.target, ComponentID: libfoo, VulnerabilityIDs: []int64{f.issue},
+			BuildID: in.build, ComponentID: libfoo, VulnerabilityIDs: []int64{f.issue},
 		}
 		decision := triage.Proposal{
 			Outcome: triage.NotApplicable, Justification: triage.CodeNotInExecutePath,

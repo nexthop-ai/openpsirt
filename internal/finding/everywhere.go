@@ -33,7 +33,7 @@ import (
 type Sighting struct {
 	Product     string
 	ProductName string
-	Stream      string
+	BranchOrTag string
 	Variant     string
 	Component   string
 	Version     string
@@ -84,8 +84,8 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -113,7 +113,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	var rows []struct {
 		Product     string     `bun:"product"`
 		ProductName string     `bun:"product_name"`
-		Stream      string     `bun:"stream"`
+		BranchOrTag string     `bun:"branch_or_tag"`
 		Variant     string     `bun:"variant"`
 		Component   string     `bun:"component"`
 		Version     string     `bun:"version"`
@@ -129,7 +129,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	sightings := narrow(s.db.NewSelect()).
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`MIN("c"."version") AS "version"`).
@@ -167,7 +167,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		out = append(out, Sighting{
 			Product: row.Product, ProductName: row.ProductName,
-			Stream: row.Stream, Variant: row.Variant,
+			BranchOrTag: row.BranchOrTag, Variant: row.Variant,
 			Component: row.Component, Version: row.Version,
 			Occurrences: row.Occurrences,
 			State:       stateWord(row.Occurrences, row.Waiting, row.Approved, row.Lapsed),
@@ -184,8 +184,8 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		if a.Product != b.Product {
 			return a.Product < b.Product
 		}
-		if a.Stream != b.Stream {
-			return a.Stream < b.Stream
+		if a.BranchOrTag != b.BranchOrTag {
+			return a.BranchOrTag < b.BranchOrTag
 		}
 		if a.Variant != b.Variant {
 			return a.Variant < b.Variant

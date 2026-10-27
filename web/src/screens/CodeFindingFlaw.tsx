@@ -39,7 +39,7 @@ const FROM: Record<Suggestion["from"], (prefix: string) => string> = {
   build: () => "Code in no component",
 };
 
-const buildKey = (b: Seen) => `${b.stream}\u0000${b.variant}`;
+const buildKey = (b: Seen) => `${b.branch_or_tag}\u0000${b.variant}`;
 
 // The flaw card: the form where the code finding is confirmed and not recorded
 // as a flaw, the flaw where it is, and nothing otherwise.
@@ -146,7 +146,7 @@ function RecordedAsFlaw({
           list={async () =>
             unwrap(
               await api.GET(
-                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators",
+                "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/collaborators",
                 { params: { path: { ...build, occurrence } } },
               ),
             )
@@ -154,7 +154,7 @@ function RecordedAsFlaw({
           add={async (identity) =>
             unwrap(
               await api.PUT(
-                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}",
+                "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}",
                 {
                   params: { path: { ...build, occurrence, identity } },
                 },
@@ -164,7 +164,7 @@ function RecordedAsFlaw({
           remove={async (identity) =>
             unwrap(
               await api.DELETE(
-                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}",
+                "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}",
                 {
                   params: { path: { ...build, occurrence, identity } },
                 },
@@ -313,7 +313,7 @@ function RecordAsFlawForm({ build, occurrence }: { build: Build; occurrence: str
                 }}
               />{" "}
               <span className="mono">
-                {b.stream} · {b.variant}
+                {b.branch_or_tag} · {b.variant}
               </span>
               {lacking.has(key) && <span className="hint"> · does not hold it</span>}
             </label>
@@ -338,7 +338,7 @@ function RecordAsFlawForm({ build, occurrence }: { build: Build; occurrence: str
                 }}
               />{" "}
               <span className="mono">
-                {b.stream} · {b.variant}
+                {b.branch_or_tag} · {b.variant}
               </span>
               <span className="hint"> · not analyzed</span>
             </label>
@@ -374,7 +374,7 @@ function RecordAsFlawForm({ build, occurrence }: { build: Build; occurrence: str
         onClick={() =>
           chosen &&
           recordAsFlaw.mutate({
-            builds: builds.map((b) => ({ stream: b.stream, variant: b.variant })),
+            builds: builds.map((b) => ({ branch_or_tag: b.branch_or_tag, variant: b.variant })),
             summary: summary.trim(),
             ...(chosen.component ? { component: chosen.component } : {}),
             ...(chosen.ecosystem ? { ecosystem: chosen.ecosystem } : {}),

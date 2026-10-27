@@ -50,9 +50,9 @@ type Reset struct {
 // of an advisory's affected list with no explanation is the state a history
 // exists to prevent.
 func (s *Store) Affects(ctx context.Context, subject access.Subject,
-	productID, vulnerabilityID int64, targets []int64, because string) (*Reset, error) {
+	productID, vulnerabilityID int64, buildIDs []int64, because string) (*Reset, error) {
 
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return nil, ErrNoBuild
 	}
 	if subject.Kind != access.Person || subject.ID == 0 {
@@ -66,16 +66,16 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 
-	wanted := make(map[int64]bool, len(targets))
-	for _, target := range targets {
-		other, err := productOf(ctx, s.db, target)
+	wanted := make(map[int64]bool, len(buildIDs))
+	for _, build := range buildIDs {
+		other, err := productOf(ctx, s.db, build)
 		if err != nil {
 			return nil, err
 		}
 		if other != productID {
 			return nil, ErrSeveralProducts
 		}
-		wanted[target] = true
+		wanted[build] = true
 	}
 
 	// Everything filed now, and the flaw's subject, asked once before the
@@ -94,11 +94,11 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	for target := range wanted {
-		if standingAt(standing, target) {
+	for build := range wanted {
+		if standingAt(standing, build) {
 			continue
 		}
-		if _, _, err := carrying(ctx, s.db, target, Entering{Component: component}); err != nil {
+		if _, _, err := carrying(ctx, s.db, build, Entering{Component: component}); err != nil {
 			return nil, err
 		}
 	}
@@ -147,10 +147,10 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 				return access.Denied(
 					fmt.Sprintf("say what is affected in product %d", productID))
 			}
-			here[row.TargetID] = true
-			if !wanted[row.TargetID] {
+			here[row.BuildID] = true
+			if !wanted[row.BuildID] {
 				closing = append(closing, row.ID)
-				leaving[row.TargetID] = true
+				leaving[row.BuildID] = true
 			}
 		}
 		if len(closing) > 0 && because == "" {
@@ -180,11 +180,11 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// disjoint by construction — and doing the opening first means a
 		// failure leaves the set larger rather than smaller, which is the
 		// safer direction for a list of what is affected.
-		for target := range wanted {
-			if here[target] {
+		for build := range wanted {
+			if here[build] {
 				continue
 			}
-			componentID, name, err := carrying(ctx, tx, target, Entering{Component: component})
+			componentID, name, err := carrying(ctx, tx, build, Entering{Component: component})
 			if err != nil {
 				return err
 			}
@@ -192,7 +192,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			// sits comes from the build's own graph, so a flaw filed against
 			// another build is keyed the way a scan of that build would key
 			// it.
-			sittings, err := sittingsOf(ctx, tx, target, componentID)
+			sittings, err := sittingsOf(ctx, tx, build, componentID)
 			if err != nil {
 				return err
 			}
@@ -202,7 +202,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 					"and one action here writes %d", ErrTooManyOccurrences, opened, cap)
 			}
 			for _, sitting := range sittings {
-				row := openIn(target, vulnerabilityID, componentID, name,
+				row := openIn(build, vulnerabilityID, componentID, name,
 					sitting, &rows[0], now)
 				if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
 					return fmt.Errorf("record it against another build: %w", err)
@@ -253,11 +253,11 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 // and at the same rating as the ones recorded first. Working it out again from
 // today's settings would give the newest build a later deadline for the same
 // flaw.
-func openIn(targetID, vulnerabilityID, componentID int64, name string,
+func openIn(buildID, vulnerabilityID, componentID int64, name string,
 	where sits, like *Finding, now time.Time) *Finding {
 
 	return &Finding{
-		TargetID: targetID, Kind: Entered, Visibility: like.Visibility,
+		BuildID: buildID, Kind: Entered, Visibility: like.Visibility,
 		VulnerabilityID:    vulnerabilityID,
 		ComponentID:        componentID,
 		ConsumerID:         optional(where.consumerID),
@@ -276,8 +276,8 @@ func filedAgainst(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 	var rows []Finding
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().Model(&rows).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
@@ -291,9 +291,9 @@ func filedAgainst(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 }
 
 // standingAt reports whether one of these findings is in that build.
-func standingAt(rows []Finding, targetID int64) bool {
+func standingAt(rows []Finding, buildID int64) bool {
 	for i := range rows {
-		if rows[i].TargetID == targetID {
+		if rows[i].BuildID == buildID {
 			return true
 		}
 	}

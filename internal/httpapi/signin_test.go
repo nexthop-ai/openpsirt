@@ -441,8 +441,8 @@ func TestSigningInComesBackToWhereSomebodyWas(t *testing.T) {
 	// reasoning is the difference between carrying on and starting again .
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		where := signedInFrom(t, r,
-			"?return=%2Fproducts%2Fsonic%2Fstreams%2Fmaster%2Fvariants%2Fbroadcom%2Ffindings")
-		if where != "/products/sonic/streams/master/variants/broadcom/findings" {
+			"?return=%2Fproducts%2Fsonic%2Fbranches-and-tags%2Fmaster%2Fvariants%2Fbroadcom%2Ffindings")
+		if where != "/products/sonic/branches-and-tags/master/variants/broadcom/findings" {
 			t.Errorf("a sign-in that began on a findings list landed on %q", where)
 		}
 

@@ -60,7 +60,7 @@ func TestAFileCarriesTheLabelBesideTheName(t *testing.T) {
 		}{
 			{"triager", "/v1/running-out.csv?days=365", map[string]string{
 				"product": "mine", "product name": httpapitest.ShownAs("mine"),
-				"stream": "master", "stream name": "Master",
+				"branch_or_tag": "master", "branch or tag name": "Master",
 				"variant": "broadcom", "variant name": "Broadcom",
 			}},
 			{"triager", "/v1/audit.csv", map[string]string{
@@ -105,16 +105,16 @@ func TestABuildsCountsNameItByTheNamesThatAddressIt(t *testing.T) {
 		r.Scanned(t)
 		var readiness struct {
 			Now struct {
-				Stream      string `json:"stream"`
-				StreamName  string `json:"stream_name"`
-				Variant     string `json:"variant"`
-				VariantName string `json:"variant_name"`
+				BranchOrTag     string `json:"branch_or_tag"`
+				BranchOrTagName string `json:"branch_or_tag_name"`
+				Variant         string `json:"variant"`
+				VariantName     string `json:"variant_name"`
 			} `json:"now"`
 		}
 		httpapitest.Read(t, r, "triager",
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom/readiness", &readiness)
 		now := readiness.Now
-		if now.Stream != "master" || now.StreamName != "Master" ||
+		if now.BranchOrTag != "master" || now.BranchOrTagName != "Master" ||
 			now.Variant != "broadcom" || now.VariantName != "Broadcom" {
 			t.Errorf("the counts name the build as %+v, want the names with the spellings beside them",
 				now)
@@ -130,10 +130,10 @@ func TestAListNamesABuildByTheNamesThatAddressIt(t *testing.T) {
 		r.Scanned(t)
 
 		type row struct {
-			Stream      string `json:"stream"`
-			StreamName  string `json:"stream_name"`
-			Variant     string `json:"variant"`
-			VariantName string `json:"variant_name"`
+			BranchOrTag     string `json:"branch_or_tag"`
+			BranchOrTagName string `json:"branch_or_tag_name"`
+			Variant         string `json:"variant"`
+			VariantName     string `json:"variant_name"`
 		}
 		for _, path := range []string{"/v1/running-out?days=365", "/v1/unassigned"} {
 			var list struct {
@@ -145,7 +145,7 @@ func TestAListNamesABuildByTheNamesThatAddressIt(t *testing.T) {
 				continue
 			}
 			for _, one := range list.Items {
-				if one.Stream != "master" || one.StreamName != "Master" ||
+				if one.BranchOrTag != "master" || one.BranchOrTagName != "Master" ||
 					one.Variant != "broadcom" || one.VariantName != "Broadcom" {
 					t.Errorf("%s names the build as %+v, want the addresses with the spellings beside them",
 						path, one)
@@ -162,7 +162,7 @@ func TestABuildWithNoDisplayNamesIsNamedByItsNames(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
-		for _, table := range []string{"product", "stream", "variant"} {
+		for _, table := range []string{"product", "branch_or_tag", "variant"} {
 			if _, err := r.DB.DB.NewUpdate().Table(table).
 				Set(`"display_name" = ?`, "").Where("1 = 1").Exec(t.Context()); err != nil {
 				t.Fatal(err)
@@ -170,18 +170,18 @@ func TestABuildWithNoDisplayNamesIsNamedByItsNames(t *testing.T) {
 		}
 
 		type row struct {
-			Product     string `json:"product"`
-			ProductName string `json:"product_name"`
-			Stream      string `json:"stream"`
-			StreamName  string `json:"stream_name"`
-			Variant     string `json:"variant"`
-			VariantName string `json:"variant_name"`
+			Product         string `json:"product"`
+			ProductName     string `json:"product_name"`
+			BranchOrTag     string `json:"branch_or_tag"`
+			BranchOrTagName string `json:"branch_or_tag_name"`
+			Variant         string `json:"variant"`
+			VariantName     string `json:"variant_name"`
 		}
 		named := func(what string, one row, build bool) {
 			if one.Product != "" && one.ProductName != one.Product {
 				t.Errorf("%s labels product %q as %q", what, one.Product, one.ProductName)
 			}
-			if build && (one.Stream == "" || one.StreamName != one.Stream ||
+			if build && (one.BranchOrTag == "" || one.BranchOrTagName != one.BranchOrTag ||
 				one.Variant == "" || one.VariantName != one.Variant) {
 				t.Errorf("%s labels the build as %+v, want each label to be its name", what, one)
 			}

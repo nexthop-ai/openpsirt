@@ -47,7 +47,7 @@ func TestAScansSweepClosesNoCodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		asKind(t, r, "CVE-2026-1000", "analysis", "internal")
-		r.Ran(t, r.TargetOf(t, httpapitest.SeededBuild), nil)
+		r.Ran(t, r.BuildOf(t, httpapitest.SeededBuild), nil)
 		if got := openRows(t, r, "CVE-2026-9999"); got != 0 {
 			t.Fatalf("the sweep left %d vulnerability findings open, so this checks nothing", got)
 		}
@@ -214,7 +214,7 @@ func TestAnAdvisoryNamesNoReleaseOfALead(t *testing.T) {
 		r.Scanned(t)
 		r.ScannedAlso(t, "mellanox", "3.7.0")
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"},{"stream":"master","variant":"mellanox"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"},{"branch_or_tag":"master","variant":"mellanox"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200"}`)
 		if made.Code != http.StatusCreated {
@@ -257,7 +257,7 @@ func TestAnAdvisoryNamesNoReleaseOfALead(t *testing.T) {
 		// The flaw's finding on one build only, so the advisory is still read
 		// through the other.
 		r.PatchedRows(t, `UPDATE "finding" SET "kind" = 'analysis'
-			WHERE "kind" = 'entered' AND "target_id" = `+httpapitest.Itoa(r.TargetOf(t, httpapitest.SeededBuild)))
+			WHERE "kind" = 'entered' AND "build_id" = `+httpapitest.Itoa(r.BuildOf(t, httpapitest.SeededBuild)))
 		if got := releases(); got["mine:master:broadcom"] || !got["mine:master:mellanox"] {
 			t.Errorf("the advisory names %v; want the release whose finding is the flaw's alone", got)
 		}

@@ -44,7 +44,7 @@ func newStreamSlots(db *database.DB) streamSlots {
 }
 
 // take claims a slot, or refuses with a time to ask again. The release is
-// called once the stream has finished writing.
+// called once the branch or tag has finished writing.
 func (s streamSlots) take() (func(), error) {
 	select {
 	case s <- struct{}{}:
@@ -93,15 +93,15 @@ func registerExport(api huma.API, in core.Deps) {
 			"Takes every filter the findings list takes.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Format  string `path:"format" enum:"csv,json"`
-		Stream  string `query:"stream"`
-		Variant string `query:"variant"`
+		Product     string `path:"product"`
+		Format      string `path:"format" enum:"csv,json"`
+		BranchOrTag string `query:"branch_or_tag"`
+		Variant     string `query:"variant"`
 		core.AtOneBuild
 		core.Narrowing
 	}) (*huma.StreamResponse, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err
@@ -126,7 +126,7 @@ func registerExport(api huma.API, in core.Deps) {
 		parts, codeFindings := []core.Paged{findings}, withCodeFindings(input.Narrowing, input.AtOneBuild)
 		if codeFindings.Value == codeFindingsListed {
 			parts = append(parts, codeFindingRows(in, subject, analysis.Scope{
-				ProductID: *scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
+				ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
 			}, ""))
 		}
 		out := core.Exporting{
@@ -240,7 +240,7 @@ func findingColumns() []string {
 	return []string{
 		"issue", "severity", "score", "score scheme", "exploited", "component", "version",
 		"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
-		"stream", "variant", "code finding", "path", "line", "function", "message",
+		"branch_or_tag", "variant", "code finding", "path", "line", "function", "message",
 	}
 }
 
@@ -261,7 +261,7 @@ func findingCells(g finding.Group) []string {
 		g.Component, g.Version, g.Ecosystem, g.FixedIn,
 		strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
 		string(g.State), opened, due,
-		g.Stream, g.Variant, "false", "", "", "", "",
+		g.BranchOrTag, g.Variant, "false", "", "", "", "",
 	}
 }
 
@@ -319,6 +319,6 @@ func codeFindingCells(r analysis.QueueRow) []string {
 	}
 	return []string{
 		r.Rule, "", "", "", "", "", "", "", "", "", "", "", r.Opened.UTC().Format(time.DateOnly), "",
-		r.Stream, r.Variant, "true", r.Path, line, r.Function, r.Message,
+		r.BranchOrTag, r.Variant, "true", r.Path, line, r.Function, r.Message,
 	}
 }

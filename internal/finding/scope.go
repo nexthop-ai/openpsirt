@@ -30,15 +30,15 @@ import (
 // interface prevents by leaving those unselectable and the caller refuses
 // rather than guessing which product was meant.
 type Scope struct {
-	ProductID *int64
-	StreamID  *int64
-	VariantID *int64
+	ProductID     *int64
+	BranchOrTagID *int64
+	VariantID     *int64
 }
 
-// Narrow applies the scope to a query that already joins target AS tg and
-// stream AS st.
+// Narrow applies the scope to a query that already joins build AS tg and
+// branch_or_tag AS st.
 //
-// Filtering on the identifiers the target already carries rather than by
+// Filtering on the identifiers the build already carries rather than by
 // joining names: every one of these queries has the joins for other reasons,
 // and comparing an integer the row holds is cheaper than comparing a string
 // through a join that exists to produce a label.
@@ -46,8 +46,8 @@ func (s Scope) Narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if s.ProductID != nil {
 		q = q.Where(`"st"."product_id" = ?`, *s.ProductID)
 	}
-	if s.StreamID != nil {
-		q = q.Where(`"tg"."stream_id" = ?`, *s.StreamID)
+	if s.BranchOrTagID != nil {
+		q = q.Where(`"tg"."branch_or_tag_id" = ?`, *s.BranchOrTagID)
 	}
 	if s.VariantID != nil {
 		q = q.Where(`"tg"."variant_id" = ?`, *s.VariantID)
@@ -93,7 +93,7 @@ func (s *Store) buildsWorking(ctx context.Context, scope Scope, only Workable) (
 // wholeBuild reports whether the scope names one build rather than a set to
 // choose from.
 func (s Scope) wholeBuild() bool {
-	return s.StreamID != nil && s.VariantID != nil
+	return s.BranchOrTagID != nil && s.VariantID != nil
 }
 
 func (s *Store) buildsIn(ctx context.Context, db bun.IDB, scope Scope,
@@ -101,8 +101,8 @@ func (s *Store) buildsIn(ctx context.Context, db bun.IDB, scope Scope,
 
 	var ids []int64
 	q := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"tg"."id"`).
 		OrderExpr(`"tg"."id"`)
 	q = scope.Narrow(q)

@@ -13,7 +13,7 @@ import (
 
 // oneBuild is the selection a subtree is askable over: a product, a branch and
 // a variant naming exactly one build.
-const oneBuild = "product=mine&stream=master&variant=broadcom"
+const oneBuild = "product=mine&branch_or_tag=master&variant=broadcom"
 
 // trendRoutes are the two answers drawn from one trend: the chart and its
 // export. Both resolve the component the same way and refuse the same way.
@@ -84,7 +84,7 @@ func TestATrendBeneathAComponentAnswersAnUnreadableProductAlikeWhateverItHolds(t
 		r.ShipsUnderTwoNamespaces(t, httpapitest.SeededLib)
 		for _, route := range trendRoutes {
 			undeclared := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
-				route+"?product=nobody-declared-this&stream=master&variant=broadcom&beneath=libswsscommon", "")
+				route+"?product=nobody-declared-this&branch_or_tag=master&variant=broadcom&beneath=libswsscommon", "")
 			httpapitest.RefusedWith(t, undeclared, http.StatusNotFound)
 			for _, beneath := range []string{
 				"beneath=libswsscommon", "beneath=nothing-here", "beneath=libnl-3-200",

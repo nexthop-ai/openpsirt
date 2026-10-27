@@ -130,8 +130,8 @@ func recordedColumn(column string, text bool) string {
 	}
 	return `CASE WHEN ` + own + ` IS NOT NULL THEN ` + own +
 		` WHEN "f"."kind" = '` + string(Entered) + `' THEN (SELECT "rr"."` + column + `"` +
-		` FROM "recorded_rating" AS "rr", "target" AS "rt", "stream" AS "rs"` +
-		` WHERE "rt"."id" = "f"."target_id" AND "rs"."id" = "rt"."stream_id"` +
+		` FROM "recorded_rating" AS "rr", "build" AS "rt", "branch_or_tag" AS "rs"` +
+		` WHERE "rt"."id" = "f"."build_id" AND "rs"."id" = "rt"."branch_or_tag_id"` +
 		` AND "rr"."product_id" = "rs"."product_id"` +
 		` AND "rr"."vulnerability_id" = "f"."vulnerability_id") END`
 }
@@ -194,8 +194,8 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 	var products []int64
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id"`).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
@@ -212,20 +212,20 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 // inThisProduct narrows a statement over findings to one product, by the
 // builds that product holds.
 //
-// Written as a condition on the target rather than as a join, because the
+// Written as a condition on the build rather than as a join, because the
 // statements that need it are updates and no engine here spells a joined
 // update the same way.
-const inThisProduct = `"target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
-	JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+const inThisProduct = `"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
+	JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
 	WHERE "st"."product_id" = ?)`
 
 // inThisProductAs is the same condition over a qualified column, for the reads
 // that alias the table they narrow.
 //
-// Named rather than written out, so every read that narrows a target to a
+// Named rather than written out, so every read that narrows a build to a
 // product asks it in one spelling.
 func inThisProductAs(column string) string {
-	return column + ` IN (SELECT "tg"."id" FROM "target" AS "tg"
-	JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+	return column + ` IN (SELECT "tg"."id" FROM "build" AS "tg"
+	JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
 	WHERE "st"."product_id" = ?)`
 }

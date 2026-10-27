@@ -14,7 +14,7 @@ function query(path: string): Record<string, string[]> {
   return out;
 }
 
-const branch = { product: "sonic", stream: "master" };
+const branch = { product: "sonic", branch_or_tag: "master" };
 
 // The list's own defaults lifted, because no bucket applies them.
 const everything = query(`?${UNNARROWED}`);
@@ -22,7 +22,7 @@ const everything = query(`?${UNNARROWED}`);
 describe("an aging bucket's link", () => {
   it("asks for the youngest bucket by its end alone", () => {
     expect(query(openFor(branch, 0, 7))).toEqual({
-      stream: ["master"],
+      branch_or_tag: ["master"],
       open_under: ["7"],
       below: ["yes"],
       ...everything,
@@ -31,7 +31,7 @@ describe("an aging bucket's link", () => {
 
   it("asks for a bucket in the middle by both ends", () => {
     expect(query(openFor(branch, 7, 28))).toEqual({
-      stream: ["master"],
+      branch_or_tag: ["master"],
       open_for: ["7"],
       open_under: ["28"],
       below: ["yes"],
@@ -41,7 +41,7 @@ describe("an aging bucket's link", () => {
 
   it("asks for the oldest bucket by its start alone", () => {
     expect(query(openFor(branch, 90, 0))).toEqual({
-      stream: ["master"],
+      branch_or_tag: ["master"],
       open_for: ["90"],
       below: ["yes"],
       ...everything,
@@ -50,7 +50,7 @@ describe("an aging bucket's link", () => {
 
   it("keeps a further filter as its own parameter on a partial scope", () => {
     expect(query(openFor(branch, 28, 90, { state: "undecided" }))).toEqual({
-      stream: ["master"],
+      branch_or_tag: ["master"],
       state: ["undecided"],
       open_for: ["28"],
       open_under: ["90"],

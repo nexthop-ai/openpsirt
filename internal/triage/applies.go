@@ -282,7 +282,7 @@ type Filter struct {
 	// Issue and Component name what the decision was about.
 	Issue     string
 	Component string
-	// TargetID keeps decisions about occurrences one build holds.
+	// BuildID keeps decisions about occurrences one build holds.
 	//
 	// A decision names no build, deliberately — it is keyed on the
 	// product, the issue and the occurrence, so that it carries across the
@@ -290,7 +290,7 @@ type Filter struct {
 	// question: which of these decisions is about something this build
 	// actually ships. Reached through the findings at the occurrence, the way the
 	// component filter beside it is.
-	TargetID int64
+	BuildID int64
 }
 
 // List returns decision occurrences matching a filter, newest first, with how many there

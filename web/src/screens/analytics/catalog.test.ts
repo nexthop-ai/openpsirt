@@ -37,7 +37,7 @@ describe("the catalog and the addresses that answer it", () => {
   // Two names over one screen read as two reports, and somebody opens both to
   // find the same page.
   it("lists each address once", () => {
-    const whole = { product: "sonic", stream: "master", variant: "broadcom" };
+    const whole = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
     const addresses = CATALOG.map((report) => leadsTo(report, whole, GATED).to);
     expect(addresses.length).toBeGreaterThan(0);
     expect(new Set(addresses).size).toBe(addresses.length);
@@ -77,10 +77,12 @@ describe("where a catalog row leads", () => {
       to: null,
       needs: "build",
     });
-    expect(leadsTo(upgrades, { product: "sonic", stream: "master" }, GATED).needs).toBe("build");
-    const whole = { product: "sonic", stream: "master", variant: "broadcom" };
+    expect(leadsTo(upgrades, { product: "sonic", branch_or_tag: "master" }, GATED).needs).toBe(
+      "build",
+    );
+    const whole = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
     expect(leadsTo(upgrades, whole, GATED).to).toBe(
-      "/products/sonic/streams/master/variants/broadcom/planned-upgrades",
+      "/products/sonic/branches-and-tags/master/variants/broadcom/planned-upgrades",
     );
   });
 
@@ -95,7 +97,7 @@ describe("what a sheet says it was asked of", () => {
   // the same on paper without it.
   it("names every level, and says so where one is not picked", () => {
     expect(scopeWords({})).toBe("Every product · every branch · every variant");
-    expect(scopeWords({ product: "sonic", stream: "master" })).toBe(
+    expect(scopeWords({ product: "sonic", branch_or_tag: "master" })).toBe(
       "sonic · master · every variant",
     );
   });
@@ -106,7 +108,7 @@ describe("every address a report leads to", () => {
   // router here; the slug reports are pinned by the test above. An address
   // that matches no route redirects to the front page, so a report that leads
   // nowhere looks exactly like one nobody clicked.
-  const anywhere = { product: "sonic", stream: "master", variant: "broadcom" };
+  const anywhere = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
 
   it("resolves to a screen", () => {
     const leading = CATALOG.filter((report) => report.to);

@@ -35,16 +35,16 @@ import (
 // the page, because it has already counted them: the caller asked for both and
 // was running the whole narrowing twice for the second — on a set the store's
 // own comment sizes at 222,435 of 272,539 open rows.
-func (s *Store) AtComponent(ctx context.Context, subject access.Subject, targetID,
+func (s *Store) AtComponent(ctx context.Context, subject access.Subject, buildID,
 	componentID int64, contains string, limit, offset int) ([]Deciding, int, int, error) {
 
-	return s.atComponent(ctx, subject, targetID, componentID, contains, limit, offset)
+	return s.atComponent(ctx, subject, buildID, componentID, contains, limit, offset)
 }
 
-func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetID,
+func (s *Store) atComponent(ctx context.Context, subject access.Subject, buildID,
 	componentID int64, contains string, limit, offset int) ([]Deciding, int, int, error) {
 
-	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
+	productID, visible, err := readableIn(ctx, s.db, subject, buildID)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -64,7 +64,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible))
@@ -175,7 +175,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// for what a decision is keyed on, and that read carries no clock.
 			ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 			Where(kinds, kindArgs...).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -201,7 +201,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	// arbitrary occurrence per issue. A decision is recorded per occurrence, so
 	// one built from MIN(occurrence_identity) covers one consumer and leaves
 	// the rest open while reporting that it covered them.
-	everywhere, err := s.occurrencesOf(ctx, targetID, fold, issues, visible)
+	everywhere, err := s.occurrencesOf(ctx, buildID, fold, issues, visible)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -227,7 +227,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 }
 
 // occurrencesOf reads every occurrence a set of issues has at one component.
-func (s *Store) occurrencesOf(ctx context.Context, targetID int64, fold []int64, issues []int64,
+func (s *Store) occurrencesOf(ctx context.Context, buildID int64, fold []int64, issues []int64,
 	visible []access.Visibility) (map[int64][]Deciding, error) {
 
 	everywhere := map[int64][]Deciding{}
@@ -252,7 +252,7 @@ func (s *Store) occurrencesOf(ctx context.Context, targetID int64, fold []int64,
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		Where(kinds, kindArgs...).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
@@ -389,10 +389,10 @@ type Narrowing struct {
 // count sent along with the request is the caller's word twice over. Read with
 // the same visibility rule the candidate list used, so the two numbers compare
 // against each other rather than against different populations.
-func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, targetID int64,
+func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, buildID int64,
 	fold []int64, contains string, named int) (Narrowing, error) {
 
-	_, visible, err := readableIn(ctx, tx, subject, targetID)
+	_, visible, err := readableIn(ctx, tx, subject, buildID)
 	if err != nil {
 		return Narrowing{}, err
 	}
@@ -402,7 +402,7 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(kinds, kindArgs...).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).

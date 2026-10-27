@@ -4,8 +4,15 @@
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { mounted } from "../test/mount";
-import { Moved, built } from "./moved";
-import { ROUTES, bulkDecisionAt, decisionAt, inventoryChangesAt, personAt } from "./routes";
+import { Moved, MovedUnder, built } from "./moved";
+import {
+  ROUTES,
+  bulkDecisionAt,
+  decisionAt,
+  fromStreamsAt,
+  inventoryChangesAt,
+  personAt,
+} from "./routes";
 
 const mount = mounted();
 
@@ -42,11 +49,45 @@ describe("a former address", () => {
   it("carries a build, and the upload under it", () => {
     expect(
       landing(
-        "/products/sonic/streams/main/variants/broadcom/scans/7/changes",
+        "/products/sonic/branches-and-tags/main/variants/broadcom/scans/7/changes",
         ROUTES.formerInventoryChanges,
-        (at) => inventoryChangesAt(built(at), Number(at.scan)),
+        (at) => inventoryChangesAt(built(at), Number(at.sbom)),
       ),
-    ).toBe("/products/sonic/streams/main/variants/broadcom/uploads/7/changes");
+    ).toBe("/products/sonic/branches-and-tags/main/variants/broadcom/uploads/7/changes");
+  });
+
+  it("carries everything under a former prefix, still escaped", () => {
+    mount.render(
+      <MemoryRouter initialEntries={["/products/sonic/streams/a%2Fb/variants/v/findings?q=x"]}>
+        <Routes>
+          <Route
+            path={ROUTES.formerStreams}
+            element={<MovedUnder to={(at, rest) => fromStreamsAt(at.product ?? "", rest)} />}
+          />
+          <Route path="*" element={<Here />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(mount.host().querySelector("#here")?.textContent).toBe(
+      "/products/sonic/branches-and-tags/a%2Fb/variants/v/findings?q=x",
+    );
+  });
+
+  it("forwards a former prefix alone to the list it named", () => {
+    mount.render(
+      <MemoryRouter initialEntries={["/products/sonic/streams"]}>
+        <Routes>
+          <Route
+            path={ROUTES.formerStreams}
+            element={<MovedUnder to={(at, rest) => fromStreamsAt(at.product ?? "", rest)} />}
+          />
+          <Route path="*" element={<Here />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(mount.host().querySelector("#here")?.textContent).toBe(
+      "/products/sonic/branches-and-tags",
+    );
   });
 
   it("forwards a claim to the decision it is now", () => {

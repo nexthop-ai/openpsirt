@@ -51,14 +51,19 @@ export function embargoKey(row: { product?: string; vulnerability?: string }): s
 // The builds a row names. The variant is said once where every build shares it,
 // which is the ordinary case of one image cut from several branches.
 export function buildsWords(
-  builds: { stream: string; stream_name?: string; variant: string; variant_name?: string }[],
+  builds: {
+    branch_or_tag: string;
+    branch_or_tag_name?: string;
+    variant: string;
+    variant_name?: string;
+  }[],
 ): string {
   const variants = new Set(builds.map((b) => b.variant_name || b.variant));
   if (variants.size === 1) {
-    return `${builds.map((b) => b.stream_name || b.stream).join(", ")} · ${[...variants][0]}`;
+    return `${builds.map((b) => b.branch_or_tag_name || b.branch_or_tag).join(", ")} · ${[...variants][0]}`;
   }
   return builds
-    .map((b) => `${b.stream_name || b.stream} · ${b.variant_name || b.variant}`)
+    .map((b) => `${b.branch_or_tag_name || b.branch_or_tag} · ${b.variant_name || b.variant}`)
     .join(", ");
 }
 
@@ -161,7 +166,7 @@ export function DisclosureDeadlines() {
         </h2>
         <p>
           {scope.product
-            ? [scope.product, scope.stream, scope.variant].filter(Boolean).join(" · ")
+            ? [scope.product, scope.branch_or_tag, scope.variant].filter(Boolean).join(" · ")
             : "Every product you can see"}{" "}
           · embargoes running out, soonest first. Reaching a date discloses nothing on its own.
         </p>

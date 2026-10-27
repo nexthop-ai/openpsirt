@@ -169,7 +169,7 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		out.Body.Items = make([]ReleaseBody, 0, len(releases))
 		for _, r := range releases {
 			out.Body.Items = append(out.Body.Items, ReleaseBody{
-				Stream: r.Stream, Kind: r.Kind, Variant: r.Variant,
+				BranchOrTag: r.BranchOrTag, Kind: r.Kind, Variant: r.Variant,
 				Open: r.Open, BySeverity: r.BySeverity,
 			})
 		}
@@ -204,7 +204,7 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		from, to, err := input.targets(ctx, in, subject, input.Product)
+		from, to, err := input.buildIDs(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -234,31 +234,31 @@ func registerAnalytics(api huma.API, in core.Deps) {
 // TwoBuilds names the two builds of one product a comparison is between, for
 // every comparison: of findings, as release notes, and of inventories.
 type TwoBuilds struct {
-	From        string `query:"from" required:"true" doc:"The earlier build's stream — a branch or a tag"`
+	From        string `query:"from" required:"true" doc:"The earlier build's branch or tag — a branch or a tag"`
 	FromVariant string `query:"from_variant" required:"true" doc:"The earlier build's variant"`
-	To          string `query:"to" required:"true" doc:"The later build's stream"`
+	To          string `query:"to" required:"true" doc:"The later build's branch or tag"`
 	ToVariant   string `query:"to_variant" required:"true" doc:"The later build's variant"`
 }
 
-// targets resolves the two builds. Either one out of reach answers as never
+// builds resolves the two builds. Either one out of reach answers as never
 // scanned.
-func (pair TwoBuilds) targets(ctx context.Context, in core.Deps, subject access.Subject,
+func (pair TwoBuilds) buildIDs(ctx context.Context, in core.Deps, subject access.Subject,
 	product string) (from, to int64, err error) {
 
-	if from, err = core.TargetIDOf(ctx, in, subject, product, pair.From, pair.FromVariant); err != nil {
+	if from, err = core.BuildIDOf(ctx, in, subject, product, pair.From, pair.FromVariant); err != nil {
 		return 0, 0, err
 	}
-	to, err = core.TargetIDOf(ctx, in, subject, product, pair.To, pair.ToVariant)
+	to, err = core.BuildIDOf(ctx, in, subject, product, pair.To, pair.ToVariant)
 	return from, to, err
 }
 
 // ReleasePointBody is the state one release shipped with.
 type ReleasePointBody struct {
-	Stream     string         `json:"stream"`
-	StreamName string         `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Cut        string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
-	Open       int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
-	BySeverity map[string]int `json:"by_severity,omitempty"`
+	BranchOrTag     string         `json:"branch_or_tag"`
+	BranchOrTagName string         `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Cut             string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
+	Open            int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
+	BySeverity      map[string]int `json:"by_severity,omitempty"`
 }
 
 // registerReleaseTrend offers the trend on the other axis.
@@ -309,9 +309,9 @@ func registerReleaseTrend(api huma.API, in core.Deps) {
 		out.Body.Items = make([]ReleasePointBody, 0, len(points))
 		for _, point := range points {
 			out.Body.Items = append(out.Body.Items, ReleasePointBody{
-				Stream: point.Stream, Cut: core.Stamp(point.Cut),
-				StreamName: point.StreamName,
-				Open:       point.Open, BySeverity: point.BySeverity,
+				BranchOrTag: point.BranchOrTag, Cut: core.Stamp(point.Cut),
+				BranchOrTagName: point.BranchOrTagName,
+				Open:            point.Open, BySeverity: point.BySeverity,
 			})
 		}
 		return out, nil
@@ -352,7 +352,7 @@ func registerNotes(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		names := catalog.NewStore(in.DB.DB)
-		from, to, err := input.targets(ctx, in, subject, input.Product)
+		from, to, err := input.buildIDs(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -402,14 +402,14 @@ func registerNotes(api huma.API, in core.Deps) {
 // describing names a build the way whoever reads a release note knows it,
 // falling back to what the request called it.
 //
-// A heading naming the stream and variant this deployment files a build under
+// A heading naming the branch or tag and variant this deployment files a build under
 // is our internals on the first line of a document going to a customer.
-func describing(ctx context.Context, names *catalog.Store, targetID int64, stream, variant string) string {
-	placed, err := names.Describe(ctx, targetID)
+func describing(ctx context.Context, names *catalog.Store, buildID int64, branchOrTag, variant string) string {
+	placed, err := names.Describe(ctx, buildID)
 	if err != nil || placed == nil {
-		return strings.TrimSpace(stream + " " + variant)
+		return strings.TrimSpace(branchOrTag + " " + variant)
 	}
-	return strings.TrimSpace(placed.Stream + " " + placed.Variant)
+	return strings.TrimSpace(placed.BranchOrTag + " " + placed.Variant)
 }
 
 func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
@@ -464,7 +464,7 @@ type CarriedBody struct {
 func registerCarry(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "preview-carried-decisions", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried",
 		Summary: "Show what triage a new line would inherit",
 		Description: "Returns what an existing line's decisions would mean for this one, " +
 			"without changing anything. Ask before creating a line: the answer is what " +
@@ -484,16 +484,16 @@ func registerCarry(api huma.API, in core.Deps) {
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
-		Stream      string `path:"stream"`
+		BranchOrTag string `path:"branch_or_tag"`
 		Variant     string `path:"variant"`
-		From        string `query:"from" required:"true" doc:"The stream to inherit from"`
-		FromVariant string `query:"from_variant" required:"true" doc:"That stream's variant"`
+		From        string `query:"from" required:"true" doc:"The branch or tag to inherit from"`
+		FromVariant string `query:"from_variant" required:"true" doc:"That branch or tag's variant"`
 	}) (*struct{ Body CarriedBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		_, to, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		_, to, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -520,7 +520,7 @@ func registerCarry(api huma.API, in core.Deps) {
 func registerCarrying(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "carry-decisions", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried",
 		Summary: "Carry chosen triage onto a new line",
 		Description: "Takes the decisions named onto this build as new decisions waiting for " +
 			"agreement, each carrying the words from the line it came from.\n\n" +
@@ -538,10 +538,10 @@ func registerCarrying(api huma.API, in core.Deps) {
 		Tags:          []string{"Triage"},
 		DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		From    string `query:"from" required:"true" doc:"The line to carry from — a branch or a tag"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		From        string `query:"from" required:"true" doc:"The line to carry from — a branch or a tag"`
 		// The same pair the preview takes, so the two cannot come to disagree
 		// about which build is being carried from.
 		FromVariant string `query:"from_variant" required:"true" doc:"That line's variant"`
@@ -553,7 +553,7 @@ func registerCarrying(api huma.API, in core.Deps) {
 			Carried int `json:"carried" doc:"The number of decisions written, each waiting for a second person"`
 		}
 	}, error) {
-		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, buildID, err := core.VisibleBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -561,13 +561,13 @@ func registerCarrying(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		fromTarget, err := core.TargetRow(ctx, in, from.StreamID, from.VariantID)
+		fromBuild, err := core.BuildRow(ctx, in, from.BranchOrTagID, from.VariantID)
 		if err != nil {
 			return nil, err
 		}
 
 		carried, err := triage.NewStore(in.DB.DB).Carry(ctx, subject,
-			fromTarget.ID, targetID, input.Body.DecisionOccurrences, triage.Bounds{})
+			fromBuild.ID, buildID, input.Body.DecisionOccurrences, triage.Bounds{})
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
@@ -596,9 +596,9 @@ func inherited(rows []triage.Inherited) []InheritedBody {
 
 // ReleaseBody is one build and how much stands open against it.
 type ReleaseBody struct {
-	Stream     string         `json:"stream" doc:"The branch or tag"`
-	Kind       string         `json:"kind" doc:"The kind of stream: a branch or a tag"`
-	Variant    string         `json:"variant"`
-	Open       int            `json:"open" doc:"Every open finding at this build"`
-	BySeverity map[string]int `json:"by_severity,omitempty" doc:"That total split by the rating in force"`
+	BranchOrTag string         `json:"branch_or_tag" doc:"The branch or tag"`
+	Kind        string         `json:"kind" doc:"The kind of branch or tag: a branch or a tag"`
+	Variant     string         `json:"variant"`
+	Open        int            `json:"open" doc:"Every open finding at this build"`
+	BySeverity  map[string]int `json:"by_severity,omitempty" doc:"That total split by the rating in force"`
 }

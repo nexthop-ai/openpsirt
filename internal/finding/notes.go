@@ -15,7 +15,7 @@ import (
 // Note is what a release note says about itself: which two builds it compares,
 // when it was produced, and what it was produced against.
 //
-// The names are what the releases are called rather than the stream and
+// The names are what the releases are called rather than the branch or tag and
 // variant this deployment files them under. A customer reading "main
 // container" does not know what that is, and a heading naming our internals is
 // the first line of a document going to them.

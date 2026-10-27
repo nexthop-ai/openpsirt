@@ -26,7 +26,7 @@ func TestRatingSomethingWorseTakesEffectAtOnce(t *testing.T) {
 		run := f.run(t)
 		mild := found("CVE-2026-RAISE", swss)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
@@ -65,7 +65,7 @@ func TestRatingSomethingMilderWaitsForSomebodyElse(t *testing.T) {
 		run := f.run(t)
 		bad := found("CVE-2026-LOWER", swss)
 		bad.Issue.Severity = "critical"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func TestReadingAProductDoesNotCarryRatingAnIssueInIt(t *testing.T) {
 	// needed at all.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-NOBODY", swss)}); err != nil {
 			t.Fatal(err)
 		}
@@ -151,7 +151,7 @@ func TestWithdrawingTakesThePublishedRatingBack(t *testing.T) {
 		run := f.run(t)
 		mild := found("CVE-2026-BACK", swss)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +184,7 @@ func TestOneClaimStandsPerIssue(t *testing.T) {
 		run := f.run(t)
 		one := found("CVE-2026-ONCE", swss)
 		one.Issue.Severity = "medium"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{one}); err != nil {
 			t.Fatal(err)
 		}
@@ -210,7 +210,7 @@ func TestAWithdrawnAssessmentDoesNotStandInTheWayOfAFreshOne(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		one := found("CVE-2026-AGAIN", swss)
 		one.Issue.Severity = "medium"
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{one}); err != nil {
 			t.Fatal(err)
 		}
@@ -250,7 +250,7 @@ func TestTwoAssessmentsProposedAtOnceLeaveOneStanding(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		one := found("CVE-2026-RACE", swss)
 		one.Issue.Severity = "medium"
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{one}); err != nil {
 			t.Fatal(err)
 		}
@@ -310,7 +310,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		bad := found("CVE-2026-CROSS", libnl)
 		bad.Issue.Severity = "high"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
@@ -382,7 +382,7 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		bad := found("CVE-2026-QUIET", libnl)
 		bad.Issue.Severity = "high"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
@@ -434,7 +434,7 @@ func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		bad := found("CVE-2026-BOTH", libnl)
 		bad.Issue.Severity = "high"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
@@ -638,7 +638,7 @@ func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
 
 		bad := found("CVE-2026-BOTH", swss)
 		bad.Issue.Severity = "critical"
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
@@ -674,7 +674,7 @@ func TestRatingAProductAsksForTriageOnThatProduct(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		bad := found("CVE-2026-ELSE", swss)
 		bad.Issue.Severity = "high"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
 		elsewhere := f.inAnotherProduct(t, "other-product")
@@ -720,7 +720,7 @@ func TestAgreeingToARatingAsksForTheRoleOnItsOwnProduct(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		bad := found("CVE-2026-AGREE", swss)
 		bad.Issue.Severity = "high"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
 		elsewhere := f.inAnotherProduct(t, "other-product")
@@ -772,7 +772,7 @@ func TestTwoProductsHoldDifferentRatingsOfOneIssue(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		bad := found("CVE-2026-TWO", swss)
 		bad.Issue.Severity = "medium"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{bad}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
 		elsewhere := f.inAnotherProduct(t, "other-product")
@@ -818,7 +818,7 @@ func TestAProductWithNoRatingOfItsOwnReadsThePublishedOne(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		mild := found("CVE-2026-NONE", libnl)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{mild}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
 		elsewhere := f.inAnotherProduct(t, "other-product")
@@ -915,7 +915,7 @@ func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
 		run := f.run(t)
 		bad := found("CVE-2026-RACE", swss)
 		bad.Issue.Severity = "critical"
-		if _, err := f.store.Apply(t.Context(), f.target, run,
+		if _, err := f.store.Apply(t.Context(), f.build, run,
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
@@ -1017,7 +1017,7 @@ func (f *fixture) pageOfRatings(t *testing.T) (access.Subject, []int64) {
 	shared.Issue.Severity = "high"
 	own := found("CVE-2026-PAGE-B", swss)
 	own.Issue.Severity = "critical"
-	if _, err := f.store.Apply(ctx, f.target, f.run(t),
+	if _, err := f.store.Apply(ctx, f.build, f.run(t),
 		[]finding.Reported{shared, own}); err != nil {
 		t.Fatal(err)
 	}
@@ -1100,22 +1100,22 @@ func TestReclockingLeavesATagAndARetiredReleaseOffTheClock(t *testing.T) {
 		ctx := t.Context()
 		tag := f.anotherBuild(t, "24.06")
 		retired := f.anotherBranch(t, "release-23")
-		var stream int64
-		if err := f.db.DB.NewSelect().TableExpr(`"target"`).Column("stream_id").
-			Where(`"id" = ?`, retired).Scan(ctx, &stream); err != nil {
+		var branchOrTag int64
+		if err := f.db.DB.NewSelect().TableExpr(`"build"`).Column("branch_or_tag_id").
+			Where(`"id" = ?`, retired).Scan(ctx, &branchOrTag); err != nil {
 			t.Fatal(err)
 		}
 		yesterday := time.Now().UTC().AddDate(0, 0, -1)
-		if err := catalog.NewStore(f.db.DB).SetStreamEndOfLife(ctx, stream, &yesterday); err != nil {
+		if err := catalog.NewStore(f.db.DB).SetBranchOrTagEndOfLife(ctx, branchOrTag, &yesterday); err != nil {
 			t.Fatal(err)
 		}
 		reported := finding.Reported{
 			Issue:     finding.Named{Identifier: "CVE-2026-RECLOCK", Severity: "high"},
 			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
 		}
-		for _, target := range []int64{f.target, tag, retired} {
-			f.shippedTo(t, target, twoConsumers())
-			if _, err := f.store.Apply(ctx, target, f.runOn(t, target),
+		for _, build := range []int64{f.build, tag, retired} {
+			f.shippedTo(t, build, twoConsumers())
+			if _, err := f.store.Apply(ctx, build, f.runOn(t, build),
 				[]finding.Reported{reported}); err != nil {
 				t.Fatal(err)
 			}
@@ -1128,7 +1128,7 @@ func TestReclockingLeavesATagAndARetiredReleaseOffTheClock(t *testing.T) {
 			if due := f.deadlineIn(t, retired, "CVE-2026-RECLOCK"); !due.IsZero() {
 				t.Errorf("after %s, a release past end of life carries a deadline, %s", when, due)
 			}
-			if f.deadlineIn(t, f.target, "CVE-2026-RECLOCK").IsZero() {
+			if f.deadlineIn(t, f.build, "CVE-2026-RECLOCK").IsZero() {
 				t.Errorf("after %s, the branch carries no deadline", when)
 			}
 		}
@@ -1143,7 +1143,7 @@ func TestReclockingLeavesATagAndARetiredReleaseOffTheClock(t *testing.T) {
 
 		exploited := reported
 		exploited.Issue.Exploited = true
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{exploited}); err != nil {
 			t.Fatal(err)
 		}

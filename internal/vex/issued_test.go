@@ -147,7 +147,7 @@ func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
 		id    func(w *fixture.World) int64
 	}{
 		{"product", (*catalog.Product)(nil), func(w *fixture.World) int64 { return w.Product.ID }},
-		{"stream", (*catalog.Stream)(nil), func(w *fixture.World) int64 { return w.Branch.ID }},
+		{"branch_or_tag", (*catalog.BranchOrTag)(nil), func(w *fixture.World) int64 { return w.Branch.ID }},
 		{"variant", (*catalog.Variant)(nil), func(w *fixture.World) int64 { return w.Customer.ID }},
 	} {
 		t.Run(level.name, func(t *testing.T) {

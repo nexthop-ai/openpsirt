@@ -31,13 +31,13 @@ func TestAnUndisclosedFlawsNameIsNotAnAliasInADocumentOfDisclosedWork(t *testing
 		swss := graph.Described{Purl: "pkg:deb/sonic/swss@1.0.0", Name: "swss", Version: "1.0.0"}
 		openssl := graph.Described{Purl: "pkg:deb/debian/openssl@3.0.11", Name: "openssl", Version: "3.0.11"}
 		scan, outcome, err := ingest.NewStore(db).Record(ctx, ingest.Arriving{
-			TargetID: w.Target.ID, ContentHash: "hash-1",
+			BuildID: w.Build.ID, ContentHash: "hash-1",
 			BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
 		})
 		if err != nil || outcome != ingest.Accept {
 			t.Fatalf("record scan: %v %v", outcome, err)
 		}
-		if _, err := fixture.ApplyGraph(ctx, db, w.Target.ID, scan.ID, graph.Snapshot{
+		if _, err := fixture.ApplyGraph(ctx, db, w.Build.ID, scan.ID, graph.Snapshot{
 			Root: root, Components: []graph.Described{swss, openssl},
 			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: openssl}},
 		}); err != nil {
@@ -56,17 +56,17 @@ func TestAnUndisclosedFlawsNameIsNotAnAliasInADocumentOfDisclosedWork(t *testing
 		proposer, approver := person("ana@example.com"), person("ben@example.com")
 		findings := finding.NewStore(db)
 		_, flaw, err := findings.Enter(ctx, proposer, finding.Entering{
-			TargetIDs: []int64{w.Target.ID}, Component: swss.Name,
+			BuildIDs: []int64{w.Build.ID}, Component: swss.Name,
 			Summary: "The management socket answers anybody.", Told: finding.Told{FoundHere: true},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		run, err := findings.Begin(ctx, finding.Run{TargetID: w.Target.ID, Scanner: "grype", RanHere: true})
+		run, err := findings.Begin(ctx, finding.Run{BuildID: w.Build.ID, Scanner: "grype", RanHere: true})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := findings.Apply(ctx, w.Target.ID, run.ID, []finding.Reported{{
+		if _, err := findings.Apply(ctx, w.Build.ID, run.ID, []finding.Reported{{
 			Issue:     finding.Named{Identifier: "CVE-2026-3001", Aliases: []string{flaw}, Severity: "high"},
 			Component: openssl,
 		}}); err != nil {
@@ -78,11 +78,11 @@ func TestAnUndisclosedFlawsNameIsNotAnAliasInADocumentOfDisclosedWork(t *testing
 		}
 		var open []finding.Finding
 		if err := db.NewSelect().Model(&open).
-			Where(`"target_id" = ?`, w.Target.ID).Where(`"visibility" = ?`, access.Public).
+			Where(`"build_id" = ?`, w.Build.ID).Where(`"visibility" = ?`, access.Public).
 			Where(`"closed_at" IS NULL`).Scan(ctx); err != nil || len(open) != 1 {
 			t.Fatalf("the report opened %d disclosed findings: %v", len(open), err)
 		}
-		at, err := findings.OccurrenceFor(ctx, proposer, w.Target.ID, issue, open[0].OccurrenceIdentity)
+		at, err := findings.OccurrenceFor(ctx, proposer, w.Build.ID, issue, open[0].OccurrenceIdentity)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,7 +94,7 @@ func TestAnUndisclosedFlawsNameIsNotAnAliasInADocumentOfDisclosedWork(t *testing
 				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 			},
 			Outcome: triage.NotApplicable, Justification: triage.CodeNotPresent,
-			Reasoning: "Not built.", By: proposer.ID, NeedsApproval: true, MadeOn: []int64{w.Target.ID},
+			Reasoning: "Not built.", By: proposer.ID, NeedsApproval: true, MadeOn: []int64{w.Build.ID},
 		})
 		if err != nil {
 			t.Fatal(err)

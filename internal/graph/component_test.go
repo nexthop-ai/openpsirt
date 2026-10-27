@@ -136,7 +136,7 @@ func TestAPackageIdentifierKeepsWhatIdentityThrowsAway(t *testing.T) {
 // Two writers describing the same component are agreeing, not colliding.
 //
 // The lookup is inside the caller's transaction, which says nothing about
-// another transaction against another target finding the same component
+// another transaction against another build finding the same component
 // absent at the same moment. A unique violation is not retryable, so the
 // loser did not retry: its whole scan apply failed and the producer was told
 // its upload could not be read, for a component that is now present. Two
@@ -436,7 +436,7 @@ func TestTheScannerIsHandedWhatALaterInventoryStated(t *testing.T) {
 		stated := "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64&distro=debian-13&upstream=linux"
 		applied(t, f, kernel(stated))
 
-		listed, err := f.store.CurrentComponents(t.Context(), f.targetID)
+		listed, err := f.store.CurrentComponents(t.Context(), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -454,10 +454,10 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		other := f.world.DeclareProduct("edge", "Edge")
-		otherStream := f.world.DeclareStream(other, "main", catalog.Branch, nil)
+		otherBranchOrTag := f.world.DeclareBranchOrTag(other, "main", catalog.Branch, nil)
 		otherVariant := f.world.DeclareVariant(other, "box", true)
-		theirs := f.world.TargetFor(otherStream, otherVariant).ID
-		sibling := f.world.TargetFor(f.world.Branch, f.world.Internal).ID
+		theirs := f.world.BuildFor(otherBranchOrTag, otherVariant).ID
+		sibling := f.world.BuildFor(f.world.Branch, f.world.Internal).ID
 
 		holding := func(d graph.Described) graph.Snapshot {
 			return graph.Snapshot{
@@ -467,7 +467,7 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 			}
 		}
 		bare := graph.Described{Purl: "pkg:deb/debian/openssl@3.0.11-1", Name: "openssl", Version: "3.0.11-1"}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), holding(bare)); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), holding(bare)); err != nil {
 			t.Fatal(err)
 		}
 		stated := bare
@@ -477,9 +477,9 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		held := func(target int64) graph.Described {
+		held := func(build int64) graph.Described {
 			t.Helper()
-			listed, err := f.store.CurrentComponents(ctx, target)
+			listed, err := f.store.CurrentComponents(ctx, build)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -488,7 +488,7 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 			}
 			return listed[0]
 		}
-		if got := held(f.targetID); got.Purl != bare.Purl || got.UpstreamName != "" {
+		if got := held(f.buildID); got.Purl != bare.Purl || got.UpstreamName != "" {
 			t.Errorf("another product's scan changed what this build's scanner is given: %+v", got)
 		}
 		if got := held(theirs); got.Purl != stated.Purl || got.UpstreamVersion != "3.0.11" {
@@ -500,7 +500,7 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(ctx, f.db, sibling, f.scanOf(t, sibling), holding(stated)); err != nil {
 			t.Fatal(err)
 		}
-		if got := held(f.targetID); got.Purl != stated.Purl || got.UpstreamName != "openssl" {
+		if got := held(f.buildID); got.Purl != stated.Purl || got.UpstreamName != "openssl" {
 			t.Errorf("a build of the same product stating it left this build's scanner given %+v", got)
 		}
 	})
@@ -520,7 +520,7 @@ func TestABuildHoldsTheRepositoryItsNewestInventoryStates(t *testing.T) {
 			t.Helper()
 			var got []string
 			if err := f.db.NewSelect().TableExpr(`"graph_node" AS "n"`).ColumnExpr(`"n"."repository"`).
-				Where(`"n"."target_id" = ?`, f.targetID).Where(`"n"."closed_scan_id" IS NULL`).
+				Where(`"n"."build_id" = ?`, f.buildID).Where(`"n"."closed_scan_id" IS NULL`).
 				Where(`"n"."repository" IS NOT NULL`).Scan(ctx, &got); err != nil {
 				t.Fatal(err)
 			}
@@ -533,7 +533,7 @@ func TestABuildHoldsTheRepositoryItsNewestInventoryStates(t *testing.T) {
 			described graph.Described
 			want      int
 		}{{bare, 0}, {stating, 1}, {bare, 0}} {
-			if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), holding(step.described)); err != nil {
+			if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), holding(step.described)); err != nil {
 				t.Fatal(err)
 			}
 			if got := held(); len(got) != step.want {

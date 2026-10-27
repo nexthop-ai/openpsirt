@@ -29,7 +29,7 @@ type Change struct {
 //
 // Every run asked about is in the answer, a run that changed nothing and a run
 // this build never held as zeros.
-func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) Changes(ctx context.Context, subject access.Subject, buildID int64,
 	runIDs []int64) (map[int64]Change, error) {
 
 	// Counts carry the reader's visibility like every other read does. A
@@ -39,7 +39,7 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 	// who may count nothing is refused, as every other read of a build
 	// refuses them, and before the list is looked at, so an empty list is
 	// refused alike.
-	_, visible, err := readableIn(ctx, s.db, subject, targetID)
+	_, visible, err := readableIn(ctx, s.db, subject, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 			RunID int64 `bun:"run_id"`
 			Count int   `bun:"count"`
 		}
-		inner, run := runChanged(s.db, targetID, column, visible)
+		inner, run := runChanged(s.db, buildID, column, visible)
 		inner = inner.
 			ColumnExpr(run+` AS "run_id"`).
 			Where(run+" IN (?)", bun.List(runIDs))

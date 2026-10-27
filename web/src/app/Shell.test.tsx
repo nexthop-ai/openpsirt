@@ -91,11 +91,11 @@ describe("the code findings entry", () => {
   });
 
   it("opens the product's queue on the branch and variant picked", async () => {
-    await railAt("/products/sonic/streams/main/variants/x86", [
+    await railAt("/products/sonic/branches-and-tags/main/variants/x86", [
       { product: "sonic", reads_internal: true },
     ]);
     expect(entry("Security testing")?.getAttribute("href")).toBe(
-      "/products/sonic/code-findings?stream=main&variant=x86",
+      "/products/sonic/code-findings?branch_or_tag=main&variant=x86",
     );
   });
 

@@ -25,7 +25,7 @@ import (
 
 func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 	// The identifier, description, score and aliases come from a feed, the
-	// component from a scan file, the product, stream and variant from
+	// component from a scan file, the product, branch or tag and variant from
 	// whoever declared them, and the names beside a decision from a sign-in.
 	// The document is one somebody forwards. Each is text in it: no link,
 	// image, markup, heading or list a third party opened.
@@ -96,7 +96,7 @@ func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 		// The build's names, renamed once the decision no longer needs them
 		// in a path.
 		names := catalog.NewStore(r.DB.DB)
-		if err := names.RenameStream(ctx, located.ProductID, located.StreamID, "![stream](x)"); err != nil {
+		if err := names.RenameBranchOrTag(ctx, located.ProductID, located.BranchOrTagID, "![branch or tag](x)"); err != nil {
 			t.Fatal(err)
 		}
 		if err := names.RenameVariant(ctx, located.ProductID, located.VariantID, "![variant](x)"); err != nil {
@@ -111,7 +111,7 @@ func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 			t.Fatalf("the document answered %d: %s", got.Code, got.Body.String())
 		}
 		written := got.Body.String()
-		for _, carried := range []string{"Upgrade now", "evil.example/t.gif", "![ID]", "![sv]", "![stream]",
+		for _, carried := range []string{"Upgrade now", "evil.example/t.gif", "![ID]", "![sv]", "![branch or tag]",
 			"![variant]", "![product]", "![proposer]", "![approver]"} {
 			if !strings.Contains(shownText(written), carried) {
 				t.Fatalf("the document does not carry %q, so this checked nothing:\n%s", carried, written)
@@ -188,7 +188,7 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 			Total         int    `json:"total"`
 			Items         []struct {
 				Product     string `json:"product"`
-				Stream      string `json:"stream"`
+				BranchOrTag string `json:"branch_or_tag"`
 				Variant     string `json:"variant"`
 				Component   string `json:"component"`
 				Occurrences int    `json:"occurrences"`

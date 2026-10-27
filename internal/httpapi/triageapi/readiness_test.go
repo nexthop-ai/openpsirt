@@ -131,7 +131,7 @@ func TestReadinessForATagNotYetBuiltSaysNothingHasBeenScanned(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				tag, err := names.DeclareStream(ctx, product.ID, "v2.5.0", catalog.Tag, nil)
+				tag, err := names.DeclareBranchOrTag(ctx, product.ID, "v2.5.0", catalog.Tag, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -140,7 +140,7 @@ func TestReadinessForATagNotYetBuiltSaysNothingHasBeenScanned(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if _, err := names.TargetFor(ctx, tag.ID, variant.ID); err != nil {
+					if _, err := names.BuildFor(ctx, tag.ID, variant.ID); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -153,7 +153,7 @@ func TestReadinessForATagNotYetBuiltSaysNothingHasBeenScanned(t *testing.T) {
 				}
 				var out struct {
 					Now struct {
-						Stream        string `json:"stream"`
+						BranchOrTag   string `json:"branch_or_tag"`
 						Total         int    `json:"total"`
 						LastScannedAt string `json:"last_scanned_at"`
 					} `json:"now"`
@@ -165,7 +165,7 @@ func TestReadinessForATagNotYetBuiltSaysNothingHasBeenScanned(t *testing.T) {
 				if out.Why != finding.NothingScannedYet {
 					t.Errorf("why reads %q, want %q", out.Why, finding.NothingScannedYet)
 				}
-				if out.Now.Stream != "v2.5.0" || out.Now.Total != 0 || out.Now.LastScannedAt != "" {
+				if out.Now.BranchOrTag != "v2.5.0" || out.Now.Total != 0 || out.Now.LastScannedAt != "" {
 					t.Errorf("the build reads %+v", out.Now)
 				}
 			})

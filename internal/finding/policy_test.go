@@ -53,17 +53,17 @@ func TestEveryFieldSomebodyTypesGoesThroughTheSubmissionPolicy(t *testing.T) {
 		refused("an embargo extension", err)
 
 		open := f.open(t)
-		_, err = f.store.Resolve(ctx, who, f.target, open[0].VulnerabilityID, raw)
+		_, err = f.store.Resolve(ctx, who, f.build, open[0].VulnerabilityID, raw)
 		refused("a closure by a person", err)
 
-		_, err = f.store.Affects(ctx, who, f.productID, issue, []int64{f.target}, raw)
+		_, err = f.store.Affects(ctx, who, f.productID, issue, []int64{f.build}, raw)
 		refused("a reason for correcting the affected builds", err)
 
 		_, err = f.store.Disclose(ctx, who, f.productID, issue, raw)
 		refused("a reason for disclosing", err)
 
 		_, _, err = f.store.Enter(ctx, who, finding.Entering{
-			TargetIDs: []int64{f.target}, Severity: "high", Summary: raw,
+			BuildIDs: []int64{f.build}, Severity: "high", Summary: raw,
 		})
 		refused("a recorded flaw's summary", err)
 	})

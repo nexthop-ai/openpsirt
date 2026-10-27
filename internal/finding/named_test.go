@@ -58,7 +58,7 @@ func TestTwoSourceVersionsInOneBuildAreTwoEntriesAndOnePromiseEach(t *testing.T)
 			Components:   []graph.Described{root, swss, older, newer},
 			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: swss, Child: older}, {Parent: root, Child: newer}},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-31", older), found("CVE-2026-32", newer),
 		}); err != nil {
 			t.Fatal(err)
@@ -74,14 +74,14 @@ func TestTwoSourceVersionsInOneBuildAreTwoEntriesAndOnePromiseEach(t *testing.T)
 		}
 
 		_, err = f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
-			[]int64{f.target}, "libcurl4t64", "")
+			[]int64{f.build}, "libcurl4t64", "")
 		var several *graph.Ambiguous
 		if !errors.As(err, &several) || len(several.Choices) != 2 {
 			t.Fatalf("a promise naming no version reached %v, want a refusal offering both", err)
 		}
 
 		reached, err := f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
-			[]int64{f.target}, "curl", "8.5.0-2")
+			[]int64{f.build}, "curl", "8.5.0-2")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -102,7 +102,7 @@ func TestAnUndisclosedFindingOnASiblingBinaryCountsForTheSourcePackage(t *testin
 			Components:   []graph.Described{root, swss, lib, gnutls},
 			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: gnutls}},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-41", lib), found("CVE-2026-42", gnutls),
 		}); err != nil {
 			t.Fatal(err)
@@ -111,7 +111,7 @@ func TestAnUndisclosedFindingOnASiblingBinaryCountsForTheSourcePackage(t *testin
 
 		both := f.holding(t, access.PublicTriage, access.PrivateTriage)
 		withheld, err := f.store.WithheldOnComponent(t.Context(), both, f.productID,
-			[]int64{f.target}, "libcurl4t64", "")
+			[]int64{f.build}, "libcurl4t64", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +171,7 @@ func TestABlankNameReachesNothing(t *testing.T) {
 	// cap on what it writes.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-61", libnl), found("CVE-2026-62", swss),
 		}); err != nil {
 			t.Fatal(err)
@@ -179,7 +179,7 @@ func TestABlankNameReachesNothing(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		for _, blank := range []string{"", " "} {
 			reached, err := f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
-				[]int64{f.target}, blank, "")
+				[]int64{f.build}, blank, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -204,7 +204,7 @@ func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
 			Components:   []graph.Described{root, swss, lib, gnutls},
 			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: swss, Child: lib}, {Parent: swss, Child: gnutls}},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-61", lib), found("CVE-2026-62", gnutls),
 		}); err != nil {
 			t.Fatal(err)
@@ -214,7 +214,7 @@ func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
 		seen := &statements{}
 		f.hook(seen)
 		reached, err := f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
-			[]int64{f.target}, "libcurl4t64", "")
+			[]int64{f.build}, "libcurl4t64", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -222,7 +222,7 @@ func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
 			t.Errorf("naming one binary reached %d issues, want both binaries' two", len(reached))
 		}
 		if _, err := f.store.WithheldOnComponent(t.Context(), who, f.productID,
-			[]int64{f.target}, "curl", ""); err != nil {
+			[]int64{f.build}, "curl", ""); err != nil {
 			t.Fatal(err)
 		}
 		builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), "curl")

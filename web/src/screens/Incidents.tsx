@@ -6,7 +6,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, type Body } from "../api/client";
-import { useProducts, useStreams } from "../api/catalog";
+import { useProducts, useBranchesAndTags } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { AddButton } from "../ui/Declare";
@@ -333,7 +333,7 @@ function NameFix({
   const [release, setRelease] = useState("");
   // The product's tags, offered while typing. A tag declared before any scan
   // of it is among them, which is the usual case.
-  const tags = useStreams(product);
+  const tags = useBranchesAndTags(product);
   const name = useMutation({
     mutationFn: async () =>
       unwrap(

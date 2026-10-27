@@ -23,7 +23,7 @@ type issuesV0100 struct{ scanned, recorded, untouched int64 }
 
 func seedIssuesV0100(t *testing.T, ctx context.Context, db *database.DB) issuesV0100 {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func seedIssuesV0100(t *testing.T, ctx context.Context, db *database.DB) issuesV
 			"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
 			"urgency_shipped", "opened_at")
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			declared.Target.ID, kind, visibility, issue, component, "place-libfoo", 1, false, false, true, at)
+			declared.Build.ID, kind, visibility, issue, component, "place-libfoo", 1, false, false, true, at)
 	}
 	finding(out.scanned, "vulnerability", "public")
 	finding(out.recorded, "entered", "private")
@@ -92,8 +92,30 @@ func TestAV0100DatabaseUpgradesToV0110(t *testing.T) {
 		dbtest.MigrateTo(t, db, v0110)
 		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 		issues.kindsAre(t, ctx, db)
+		findingsAreOnTheirBranch(t, ctx, db)
 		leaveAtLatest(t, ctx, db)
 	})
+}
+
+// findingsAreOnTheirBranch asserts every finding still names the build it was
+// filed against, read through the tables a branch or tag and a build are
+// renamed to.
+func findingsAreOnTheirBranch(t *testing.T, ctx context.Context, db *database.DB) {
+	t.Helper()
+	var named []string
+	if err := db.DB.NewRaw(`SELECT "bt"."name" FROM "finding" AS "f"
+		JOIN "build" AS "b" ON "b"."id" = "f"."build_id"
+		JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "b"."branch_or_tag_id"`).Scan(ctx, &named); err != nil {
+		t.Fatal(err)
+	}
+	if len(named) != 2 {
+		t.Fatalf("%d findings are read through their build, want both", len(named))
+	}
+	for _, each := range named {
+		if each != world.BranchName {
+			t.Errorf("a finding is on %q after the upgrade, want %q", each, world.BranchName)
+		}
+	}
 }
 
 // A start that stopped after adding the column is carried on, and still marks
@@ -127,7 +149,7 @@ func kindOf(db *database.DB) string {
 // person who recorded both.
 func acknowledgedV0100(t *testing.T, ctx context.Context, db *database.DB) int64 {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}

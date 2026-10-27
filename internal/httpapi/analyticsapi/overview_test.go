@@ -32,12 +32,12 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 		}
 
 		type build struct {
-			Stream     string `json:"stream"`
-			Variant    string `json:"variant"`
-			Open       int    `json:"open"`
-			Undecided  int    `json:"undecided"`
-			Agreed     int    `json:"agreed"`
-			LastScanAt string `json:"last_scan_at"`
+			BranchOrTag string `json:"branch_or_tag"`
+			Variant     string `json:"variant"`
+			Open        int    `json:"open"`
+			Undecided   int    `json:"undecided"`
+			Agreed      int    `json:"agreed"`
+			LastScanAt  string `json:"last_scan_at"`
 		}
 		read := func(t *testing.T, who string) struct {
 			Name      string  `json:"name"`
@@ -83,7 +83,7 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 		if scanned == nil || scanned.Open != 2 || scanned.LastScanAt == "" {
 			t.Fatalf("the scanned build reads %+v", scanned)
 		}
-		if scanned.Stream == "" || scanned.Variant == "" {
+		if scanned.BranchOrTag == "" || scanned.Variant == "" {
 			t.Errorf("a build came back unnamed: %+v", scanned)
 		}
 
@@ -216,13 +216,13 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 		// cannot be doing the authorizing while the identifier does the
 		// reading.
 		var elsewhere int64
-		if err := r.DB.DB.NewSelect().TableExpr("\"target\" AS \"tg\"").ColumnExpr(`"tg"."id"`).
-			Where(`"tg"."id" <> (SELECT "sr"."target_id" FROM "scan_run" AS "sr" WHERE "sr"."id" = ?)`, runID).
+		if err := r.DB.DB.NewSelect().TableExpr("\"build\" AS \"tg\"").ColumnExpr(`"tg"."id"`).
+			Where(`"tg"."id" <> (SELECT "sr"."build_id" FROM "scan_run" AS "sr" WHERE "sr"."id" = ?)`, runID).
 			Limit(1).Scan(t.Context(), &elsewhere); err != nil {
 			t.Fatal(err)
 		}
 		other := map[string]any{
-			"target_id": elsewhere, "scanner": "grype", "ran_here": true,
+			"build_id": elsewhere, "scanner": "grype", "ran_here": true,
 			"started_at": time.Now().UTC(), "finished_at": time.Now().UTC(),
 		}
 		if _, err := r.DB.DB.NewInsert().Model(&other).TableExpr("\"scan_run\"").
@@ -231,7 +231,7 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 		}
 		var theirs int64
 		if err := r.DB.DB.NewSelect().TableExpr("\"scan_run\" AS \"sr\"").ColumnExpr(`MAX("sr"."id")`).
-			Where(`"sr"."target_id" = ?`, elsewhere).Scan(t.Context(), &theirs); err != nil {
+			Where(`"sr"."build_id" = ?`, elsewhere).Scan(t.Context(), &theirs); err != nil {
 			t.Fatal(err)
 		}
 		missing := fmt.Sprintf(

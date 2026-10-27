@@ -74,7 +74,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		// Asked afresh on every attempt: the filter is a value, and inScope
 		// writes the product, the builds and the reader into it.
 		narrowed := filter
-		productID, visible, targets, err := inner.inScope(ctx, subject, scope, &narrowed)
+		productID, visible, buildIDs, err := inner.inScope(ctx, subject, scope, &narrowed)
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		if err := mayMove(subject, productID, to, dispatches); err != nil {
 			return err
 		}
-		if len(targets) == 0 {
+		if len(buildIDs) == 0 {
 			return nil
 		}
 		// Inside the attempt, like the builds: the issues are read from the
@@ -96,7 +96,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 			return err
 		}
 
-		pieces, err := inner.pieces(ctx, targets, visible, narrowed)
+		pieces, err := inner.pieces(ctx, buildIDs, visible, narrowed)
 		if err != nil {
 			return err
 		}
@@ -227,14 +227,14 @@ const inFold = `"component_id" IN (SELECT "c"."id" FROM "component" AS "c" WHERE
 // The page's own statement without its order and its bounds, narrowed by the
 // same filter, so a filter that holds on the list holds here and a group
 // condition — how far decided, who holds it — is asked of the same group.
-func (s *Store) pieces(ctx context.Context, targets []int64, visible []access.Visibility,
+func (s *Store) pieces(ctx context.Context, buildIDs []int64, visible []access.Visibility,
 	filter Filter) ([]Piece, error) {
 
 	var rows []struct {
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Fold            string `bun:"fold"`
 	}
-	q := filter.listed(s.db, targets, visible).
+	q := filter.listed(s.db, buildIDs, visible).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	if err := q.Scan(ctx, &rows); err != nil {

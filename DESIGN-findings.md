@@ -665,7 +665,7 @@ colliding.
 | Rule | |
 |---|---|
 | The lookup is inside the writing transaction | A retry runs against a database that has moved |
-| **A row another writer got to first is left alone** | The lookup says nothing about another transaction, against another target, finding the same component absent at the same moment — and a unique violation is not a retryable failure, so the loser did not retry: its whole scan apply failed and the producer was told its upload could not be read, for a component that is now present. Two replicas reading two scans at once is the shipped arrangement |
+| **A row another writer got to first is left alone** | The lookup says nothing about another transaction, against another build, finding the same component absent at the same moment — and a unique violation is not a retryable failure, so the loser did not retry: its whole scan apply failed and the producer was told its upload could not be read, for a component that is now present. Two replicas reading two scans at once is the shipped arrangement |
 | The identifiers are read back rather than taken from the rows | A row somebody else wrote carries their identifier, and a row this statement skipped carries none |
 
 ## Recorded flaws
@@ -1091,7 +1091,7 @@ change" is counted by.
 
 | Rule | Reason |
 |---|---|
-| One writer at a time, per target | Recording what a run found begins by taking the target row. Two runs in flight would both read the same open findings, compute the same difference and write it, leaving two open rows for one finding. An ordinary update is a lock every supported engine honors. The test runs two overlapping applications and was checked by removing the hold, which reproduces the double-open on all three server engines |
+| One writer at a time, per build | Recording what a run found begins by taking the build row. Two runs in flight would both read the same open findings, compute the same difference and write it, leaving two open rows for one finding. An ordinary update is a lock every supported engine honors. The test runs two overlapping applications and was checked by removing the hold, which reproduces the double-open on all three server engines |
 | A finding that is already open still moves | A fix appears, upstream declines to fix it, the build answers it. A run compares what it found against what is recorded and updates the parts that can move, stamping when they moved. Only those parts are compared: everything else is what makes it that finding |
 | Findings that moved to the same values are one write | Grouped by every value the update writes to every row it names, the columns it leaves alone excepted, so each row receives exactly what it would alone |
 | The order is written from each finding's own value | Chosen by the finding's identifier inside the statement. The likelihood is close to unique to an issue, so grouping by the order is a statement per issue |
@@ -1800,7 +1800,7 @@ the run is for is the *growth*, which is stable across both samples.
 
 | Finding | Detail |
 |---|---|
-| The reads hold up | The findings list grew between 1.5 and 3.5 times while the table grew 16.8, because it is indexed on the target and whether a finding is closed |
+| The reads hold up | The findings list grew between 1.5 and 3.5 times while the table grew 16.8, because it is indexed on the build and whether a finding is closed |
 | Trend is the one that grows, about linearly | 18 ms to 394 ms on SQLite, 7 ms to 114 ms on PostgreSQL, 15 ms to 1.19 s on MySQL. It reads every interval overlapping the window rather than a page, and the open set grows as issues accumulate. It is the first query to reshape if a deployment reports a slow front page |
 | The four engines write a night in about the same time | 0.32 s to 0.36 s on average. A night is **60 statements on every engine**, so what one statement costs on each, which differs by an order of magnitude between MariaDB and MySQL, does not decide it |
 
@@ -1911,7 +1911,7 @@ person is asked for. What moved is the spelling a query needs.
 | Rule | |
 |---|---|
 | A query presenting a severity joins the rating | The expression reads a column of the joined rating, so a statement that reads it without the join does not compile on any of the four engines. That is the failure being chosen; the alternative is a query that silently answers for the wrong product |
-| It says which product it is asking about | Bound where the scope names one product, read off the row's own stream where the list spans products, read off the decision where the row is a decision. Three named spellings rather than a string parameter, because a placeholder cannot bind a column name |
+| It says which product it is asking about | Bound where the scope names one product, read off the row's own branch or tag where the list spans products, read off the decision where the row is a decision. Three named spellings rather than a string parameter, because a placeholder cannot bind a column name |
 | A flaw recorded here is rated by the product that recorded it, and its rating is that product's rating in force | Its word, score, vector and scheme are held per product, never on the issue row every product holding the issue reads. A rating on that row sorts, filters, counts and clocks every product's findings of the issue, which tells readers who may not see an undisclosed flaw how bad it is. The word is in force in the recording product, a rating claim there replaces it, and withdrawing the claim returns to it |
 | The recording product's lists, documents and exports carry the score it recorded | Read beside the issue's own on a recorded flaw's rows alone, so the lookup is made for few rows. The issue page and a finding's evidence carry it where every record of the issue is in the reader's reach. Sorting by score reads the issue's own: a recorded flaw with no published score sorts with the unscored, as a product's own word never decided that order |
 | A query reading the published word says so | Five do, deliberately: what needs a second person is a rating milder than what the *world* called it, and a product that had already rated it milder would otherwise let the next step down through unwatched. Those alias the column `published`. Aliased `severity` they read as the rating in force, which is the one thing they must not be taken for |

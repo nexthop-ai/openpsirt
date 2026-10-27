@@ -72,7 +72,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tag, err := cat.DeclareStream(ctx, product.ID, "v1.0.1", catalog.Tag, nil)
+		tag, err := cat.DeclareBranchOrTag(ctx, product.ID, "v1.0.1", catalog.Tag, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

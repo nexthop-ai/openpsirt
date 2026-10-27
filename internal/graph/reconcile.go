@@ -18,12 +18,12 @@ import (
 // A node that is still present is written only where what the scan says about
 // it differs from the row: its root flag, or the identifiers the build stated
 // for it. An unchanged rebuild writes nothing.
-func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
+func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	wanted map[int64]stated) (map[int64]int64, int, int, error) {
 
 	var open []Node
 	err := tx.NewSelect().Model(&open).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"closed_scan_id" IS NULL`).
 		Scan(ctx)
 	if err != nil {
@@ -63,7 +63,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			continue
 		}
 		missing = append(missing, Node{
-			TargetID: targetID, ComponentID: componentID,
+			BuildID: buildID, ComponentID: componentID,
 			IsRoot: says.isRoot, OpenedScanID: scanID,
 			Purl: says.purl, CPE: says.cpe,
 			UpstreamName: says.upstreamName, UpstreamVersion: says.upstreamVersion,
@@ -165,10 +165,10 @@ type edgeAt struct {
 }
 
 // reconcileEdges does the same for dependencies.
-func reconcileEdges(ctx context.Context, tx bun.IDB, targetID, scanID int64, wanted map[edgeAt]bool) (int, int, error) {
+func reconcileEdges(ctx context.Context, tx bun.IDB, buildID, scanID int64, wanted map[edgeAt]bool) (int, int, error) {
 	var open []Edge
 	err := tx.NewSelect().Model(&open).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"closed_scan_id" IS NULL`).
 		Scan(ctx)
 	if err != nil {
@@ -192,7 +192,7 @@ func reconcileEdges(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 			continue
 		}
 		missing = append(missing, Edge{
-			TargetID: targetID, ParentID: key.Parent, ChildID: key.Child, Kind: key.Kind,
+			BuildID: buildID, ParentID: key.Parent, ChildID: key.Child, Kind: key.Kind,
 			OpenedScanID: scanID,
 		})
 	}

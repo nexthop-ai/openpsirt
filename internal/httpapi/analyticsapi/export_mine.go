@@ -40,7 +40,7 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 			What: "your decisions",
 			Header: []string{
 				"decision", "proposed", "outcome", "became", "when", "by", "by name",
-				"issue", "product", "product name", "stream", "stream name",
+				"issue", "product", "product name", "branch_or_tag", "branch or tag name",
 				"variant", "variant name", "component",
 				"rows", "issues", "occurrences", "reasoning",
 			},
@@ -79,10 +79,10 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 					// The build as well as the product, as the tab names it: two
 					// decisions on one component in two builds are otherwise told
 					// apart by number alone.
-					var product, productName, stream, streamName, variant, variantName, component string
+					var product, productName, branchOrTag, branchOrTagName, variant, variantName, component string
 					if where := named[i].Finding; where != nil {
 						product, productName = where.Product, where.ProductName
-						stream, streamName = where.Stream, where.StreamName
+						branchOrTag, branchOrTagName = where.BranchOrTag, where.BranchOrTagName
 						variant, variantName = where.Variant, where.VariantName
 						component = where.Component + " " + where.Version
 					}
@@ -91,7 +91,7 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 						core.Stamp(row.DecisionOccurrence.ProposedAt),
 						string(row.Decision.Outcome), string(row.Happened), when, by, byName,
 						named[i].Occurrence.Vulnerability, product, productName,
-						stream, streamName, variant, variantName, component,
+						branchOrTag, branchOrTagName, variant, variantName, component,
 						strconv.Itoa(row.Rows), strconv.Itoa(row.Issues), strconv.Itoa(row.Occurrences),
 						row.Reasoning,
 					})

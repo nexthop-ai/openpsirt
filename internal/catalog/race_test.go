@@ -52,7 +52,7 @@ func TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 				return err
 			}},
 			{"a branch", func() error {
-				_, _, err := store.EnsureStream(ctx, product.ID, "raced", catalog.Branch, nil)
+				_, _, err := store.EnsureBranchOrTag(ctx, product.ID, "raced", catalog.Branch, nil)
 				return err
 			}},
 			{"a variant", func() error {
@@ -81,7 +81,7 @@ func TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 
 		// And the build a scan is filed against, which is the upload path and
 		// the one a pipeline reaches without declaring anything.
-		stream, err := store.StreamByName(ctx, product.ID, "raced")
+		branchOrTag, err := store.BranchOrTagByName(ctx, product.ID, "raced")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,13 +90,13 @@ func TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 			t.Fatal(err)
 		}
 		var wait sync.WaitGroup
-		targets := make([]*catalog.Target, 2)
+		buildIDs := make([]*catalog.Build, 2)
 		failures := make([]error, 2)
 		wait.Add(2)
-		for i := range targets {
+		for i := range buildIDs {
 			go func() {
 				defer wait.Done()
-				targets[i], failures[i] = store.TargetFor(ctx, stream.ID, variant.ID)
+				buildIDs[i], failures[i] = store.BuildFor(ctx, branchOrTag.ID, variant.ID)
 			}()
 		}
 		wait.Wait()
@@ -108,9 +108,9 @@ func TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 		}
 		// And they agree about which build it is. Two rows would be two
 		// histories for one thing somebody ships.
-		if targets[0].ID != targets[1].ID {
+		if buildIDs[0].ID != buildIDs[1].ID {
 			t.Errorf("one build was recorded as two: %d and %d",
-				targets[0].ID, targets[1].ID)
+				buildIDs[0].ID, buildIDs[1].ID)
 		}
 	})
 }
@@ -141,8 +141,8 @@ func TestADeclarationThatLosesItsRaceInsideATransactionIsTakenAgain(t *testing.T
 				_, _, err := s.EnsureProduct(ctx, "racing", "Racing")
 				return err
 			}},
-			{"stream", func(ctx context.Context, s *catalog.Store) error {
-				_, _, err := s.EnsureStream(ctx, product.ID, "raced", catalog.Branch, nil)
+			{"branch_or_tag", func(ctx context.Context, s *catalog.Store) error {
+				_, _, err := s.EnsureBranchOrTag(ctx, product.ID, "raced", catalog.Branch, nil)
 				return err
 			}},
 			{"variant", func(ctx context.Context, s *catalog.Store) error {

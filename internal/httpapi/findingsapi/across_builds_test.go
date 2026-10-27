@@ -16,9 +16,9 @@ type decided struct {
 	DecisionID int64 `json:"decision_id"`
 	Recorded   int   `json:"recorded"`
 	Also       []struct {
-		Stream   string `json:"stream"`
-		Variant  string `json:"variant"`
-		Recorded int    `json:"recorded"`
+		BranchOrTag string `json:"branch_or_tag"`
+		Variant     string `json:"variant"`
+		Recorded    int    `json:"recorded"`
 	} `json:"also"`
 }
 
@@ -36,7 +36,7 @@ func TestOneDecisionAcrossBuildsIsWrittenWholeOrNotAtAll(t *testing.T) {
 		// A build nobody scanned, named beside one somebody did.
 		refused := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
-				`"also":[{"stream":"master","variant":"nosuch"}]}`)
+				`"also":[{"branch_or_tag":"master","variant":"nosuch"}]}`)
 		if refused.Code != http.StatusNotFound {
 			t.Fatalf("naming a build that is not there answered %d, want 404: %s",
 				refused.Code, refused.Body.String())
@@ -51,7 +51,7 @@ func TestOneDecisionAcrossBuildsIsWrittenWholeOrNotAtAll(t *testing.T) {
 		// both.
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
-				`"also":[{"stream":"master","variant":"mellanox","version":"3.8.0"}]}`)
+				`"also":[{"branch_or_tag":"master","variant":"mellanox","version":"3.8.0"}]}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("deciding across two builds answered %d: %s", got.Code, got.Body.String())
 		}
@@ -89,7 +89,7 @@ func TestABuildNamedTwiceInOneDecisionIsRefused(t *testing.T) {
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/decision",
 			`{"outcome":"wont-fix","reasoning":"Not worth it.",`+
-				`"also":[{"stream":"master","variant":"broadcom"}]}`)
+				`"also":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("naming the same build twice answered %d, want 422: %s",
 				got.Code, got.Body.String())

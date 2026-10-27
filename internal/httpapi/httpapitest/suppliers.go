@@ -58,9 +58,9 @@ func (r *Reach) ScannedInsideAcmeAt(t *testing.T, hash, version string, outsideT
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: SeededRoot, Child: curl}, graph.Dependency{Parent: curl, Child: zlib})
 	}
-	target, scan := r.Shipped(t, SeededBuild, hash, snap)
-	r.Argued(t, target, scan, claims)
-	r.Ran(t, target, []finding.Reported{{
+	build, scan := r.Shipped(t, SeededBuild, hash, snap)
+	r.Argued(t, build, scan, claims)
+	r.Ran(t, build, []finding.Reported{{
 		Issue: finding.Named{
 			Identifier: "CVE-2022-37434", Severity: "critical",
 			Description: "A heap overflow in inflateGetHeader.", Score: 9.8,

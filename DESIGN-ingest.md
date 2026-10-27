@@ -15,7 +15,7 @@ REQ-69.
 - [Document storage](#document-storage)
 - [Retention](#retention)
 - [Scan application](#scan-application)
-- [Concurrent scans of one target](#concurrent-scans-of-one-target)
+- [Concurrent scans of one build](#concurrent-scans-of-one-build)
 - [Parsing](#parsing)
 - [The formats read](#the-formats-read)
 - [Format spellings](#format-spellings)
@@ -115,8 +115,8 @@ refuse it.
 
 | Order | Step | Placement reason |
 |---|---|---|
-| 0 | Admission, before the form is read | The form streams to a temporary file as it is read, so the sender is authorized for the target, a declared length past the request bound is refused, and a place is held among the uploads this server reads at once, all before the first byte of it. Step 1 is asked again by the handler, which is the second statement of the rule rather than the only one |
-| 1 | Is the target declared, and may this sender file against it? | One query, naming which of product, stream or variant is missing. First, because how far behind the deployment is is not something an unauthorized sender may measure |
+| 0 | Admission, before the form is read | The form streams to a temporary file as it is read, so the sender is authorized for the build, a declared length past the request bound is refused, and a place is held among the uploads this server reads at once, all before the first byte of it. Step 1 is asked again by the handler, which is the second statement of the rule rather than the only one |
+| 1 | Is the build declared, and may this sender file against it? | One query, naming which of product, branch or tag, or variant is missing. First, because how far behind the deployment is is not something an unauthorized sender may measure |
 | 2 | Is the backlog too deep? | The cheapest refusal once the sender is known. Deciding afterwards means storing tens of megabytes and discarding them, on a deployment already behind |
 | 3 | What does the inventory say about itself, and what does the submission hash to? | One pass over the inventory answers what it says about itself and hashes it; the claim documents are hashed beside it. Every hash covers the bytes that arrived, not a value the sender supplied |
 | 4 | The arrival decision | Below |
@@ -124,9 +124,9 @@ refuse it.
 
 | Refused with | Condition |
 |---|---|
-| Not found | The product, stream or variant is not declared. The message names which |
+| Not found | The product, branch or tag, or variant is not declared. The message names which |
 | Bad request | The build time is ahead of this deployment's clock |
-| Conflict | Something newer, or something with the same build time, is already held; or the product, stream or variant is retired |
+| Conflict | Something newer, or something with the same build time, is already held; or the product, branch or tag, or variant is retired |
 | Unprocessable | The inventory could not be read at all, or more suppression documents arrived than one scan may carry |
 | Payload too large | The request is larger than twice the document bound, refused unread where it declares its length |
 | Service unavailable | Too much is already waiting to be read, or this server is already reading as many uploads as `upload.max-concurrent` allows. The second carries a time to retry after |
@@ -221,7 +221,7 @@ The suppression documents are read here even though applying them waits on the
 scan itself. A document that cannot be read is a fault in what the build sent,
 and finding that out while the producer still has the build in front of them is
 worth more than finding out later. What the build argued is stored against the
-target rather than the scan, because it is what the next vulnerability scan
+build rather than the scan, because it is what the next vulnerability scan
 has to apply, and by then the documents may be gone.
 
 The scan job is queued in the transaction that applies the scan, so the graph
@@ -243,7 +243,7 @@ and nothing portable replaces it, so an idle reader asks again after a few
 seconds. A queue that is not empty drains at the speed of the work rather than
 the speed of the poll.
 
-## Concurrent scans of one target
+## Concurrent scans of one build
 
 Uploads are accepted in arrival order and read in whatever order workers pick
 them up.
@@ -253,10 +253,10 @@ them up.
 | A scan reaches the reader after a newer one has been applied | An overtaken scan is not applied, and that is recorded rather than treated as a failure. Applying it would replace today's picture with yesterday's and reopen everything the newer one closed |
 | Newer means the later build time, and at one build time the later arrival | The reader asks in the order the newest scan is chosen in. A build re-sent at one build time with different judgments, whose first read failed, is applied on its retry |
 | Scan identifiers are read as time | The graph stamps every interval with the identifier of the scan that opened or closed it, so scans are applied in identifier order. A scan with a lower identifier than the one the build last applied is set aside as overtaken, and a failed submission sent again gets a new identifier. A job still waiting to read a scan that was replaced this way is set aside the same way |
-| A newer scan arrives while an older one is parsed | Asked again in the transaction that applies, after the target row is taken, as well as before the parse. A parse takes minutes, and the answer read before it describes a build that has moved |
+| A newer scan arrives while an older one is parsed | Asked again in the transaction that applies, after the build row is taken, as well as before the parse. A parse takes minutes, and the answer read before it describes a build that has moved |
 | The newer one may not have been read yet, and may then fail | Once a scan has failed for the last time, the newest that still stands is read again, where the build does not already show it and nothing is on its way to reading it. A scan can be read more than once, and the latest reading is what its receipt reports |
 | A read fails and its retry succeeds | The failed attempt marks the scan failed, so its receipt says so while the retry waits. The attempt that applies it makes it accepted again, clears the failure, and makes it the newest the build holds, in the transaction that applies it. The scan it overtook is not read again while a retry is to come: it would be applied first and reopen what the newer one closes |
-| Two applies for one target interleaving | Applying takes the target row first — an ordinary update, so every engine takes the lock and the second worker waits. Both would otherwise read the same open rows, compute the same difference and write it |
+| Two applies for one build interleaving | Applying takes the build row first — an ordinary update, so every engine takes the lock and the second worker waits. Both would otherwise read the same open rows, compute the same difference and write it |
 
 ## Parsing
 

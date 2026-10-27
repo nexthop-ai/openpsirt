@@ -132,13 +132,13 @@ func TestABuildWithNoInventoryIsNotComparedAgainst(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target, err := names.TargetFor(ctx, located.StreamID, variant.ID)
+		build, err := names.BuildFor(ctx, located.BranchOrTagID, variant.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		// Uploaded, and not read yet.
 		if _, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "waiting", BuiltAt: time.Now().UTC(),
+			BuildID: build.ID, ContentHash: "waiting", BuiltAt: time.Now().UTC(),
 			ParserVersion: "test",
 		}); err != nil || outcome != ingest.Accept {
 			t.Fatalf("record scan: %v %v", outcome, err)

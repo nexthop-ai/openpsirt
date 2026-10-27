@@ -21,7 +21,7 @@ const ROW = {
   occurrence: { vulnerability: "CVE-2026-1", product: "sonic" },
   finding: {
     product: "sonic",
-    stream: "master",
+    branch_or_tag: "master",
     variant: "arm",
     vulnerability: "CVE-2026-1",
     component: "zlib",

@@ -17,7 +17,7 @@ const HELD = {
   component: "frr",
   version: "8.5",
   product: "sonic",
-  stream: "master",
+  branch_or_tag: "master",
   variant: "broadcom",
   occurrences: 1,
   builds: 1,
@@ -37,7 +37,7 @@ async function drawn(row: Record<string, unknown>) {
 describe("a code finding in the work somebody holds", () => {
   it("opens the code finding's page and says it is a code finding", async () => {
     const to = await drawn({ ...HELD, occurrence: "abc" });
-    expect(to).toBe("/products/sonic/streams/master/variants/broadcom/code-findings/abc");
+    expect(to).toBe("/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc");
     expect(mount.host().textContent).toContain("code finding");
   });
 

@@ -39,7 +39,7 @@ type AtComponentBody struct {
 func registerBulk(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-issues-at-component", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/components/{component}/issues",
 		Summary: "List the issues open against one component",
 		Description: "Returns the distinct issues open against this component in this build, " +
@@ -52,10 +52,10 @@ func registerBulk(api huma.API, in core.Deps) {
 			"decision made afterwards.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product   string `path:"product"`
-		Stream    string `path:"stream"`
-		Variant   string `path:"variant"`
-		Component string `path:"component"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Component   string `path:"component"`
 		core.ComponentQuery
 		Contains string `query:"contains" maxLength:"200" doc:"Match the text of the report"`
 		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"500"`
@@ -77,11 +77,11 @@ func registerBulk(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		_, target, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		_, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
+		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, build, input.Component,
 			input.Choice())
 		if err != nil {
 			return nil, core.AmbiguousOrMissing(in.Logger, err)
@@ -90,7 +90,7 @@ func registerBulk(api huma.API, in core.Deps) {
 		// One call, which counts both. Two calls run the whole narrowing again
 		// for a number the first has in hand.
 		at, total, reaching, err := finding.NewStore(in.DB.DB).AtComponent(ctx, subject,
-			target, component, input.Contains, input.Limit, input.Offset)
+			build, component, input.Contains, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
@@ -160,7 +160,7 @@ func registerBulk(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide-in-bulk", Method: http.MethodPost,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/components/{component}/bulk-decision",
 		Summary: "Record a bulk decision",
 		Description: "Records the same decision against every issue you name: one outcome, one " +
@@ -185,10 +185,10 @@ func registerBulk(api huma.API, in core.Deps) {
 			"set under `triage.write-ceiling`. At most 2000 names per request.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product   string `path:"product"`
-		Stream    string `path:"stream"`
-		Variant   string `path:"variant"`
-		Component string `path:"component"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Component   string `path:"component"`
 		core.ComponentQuery
 		Body struct {
 			Vulnerabilities []string           `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this decision covers, by name"`
@@ -213,11 +213,11 @@ func registerBulk(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		_, target, err := core.Browsing(ctx, in, input.Product, input.Stream, input.Variant)
+		_, build, err := core.Browsing(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
+		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, build, input.Component,
 			input.Choice())
 		if err != nil {
 			return nil, core.AmbiguousOrMissing(in.Logger, err)
@@ -232,7 +232,7 @@ func registerBulk(api huma.API, in core.Deps) {
 		// three names and is two thousand round trips for the case this
 		// exists for. A name filed only where this person may not look is
 		// answered as a name nobody filed.
-		productID, err := catalog.NewStore(in.DB.DB).ProductOf(ctx, target)
+		productID, err := catalog.NewStore(in.DB.DB).ProductOf(ctx, build)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "which product this is could not be read", err)
 		}
@@ -267,7 +267,7 @@ func registerBulk(api huma.API, in core.Deps) {
 		// rows as they stood before the transaction, and would let a
 		// caller's selection decide which occurrences a decision lands on.
 		decisionID, recorded, skipped, err := store.BulkDecision(ctx, subject, triage.BulkDecisionAt{
-			TargetID: target, ComponentID: component, VulnerabilityIDs: issues,
+			BuildID: build, ComponentID: component, VulnerabilityIDs: issues,
 			Contains: input.Body.Contains, SkipDecided: input.Body.SkipDecided,
 		}, triage.Proposal{
 			Outcome:       triage.Outcome(input.Body.Outcome),

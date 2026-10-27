@@ -32,11 +32,11 @@ func TestAnotherBuildReachedFromTwoOccurrencesIsOneEntry(t *testing.T) {
 			Issue:     finding.Named{Identifier: "CVE-2026-4", Severity: "high"},
 			Component: libnl, FixState: finding.NoFix,
 		}}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), reported); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), reported); err != nil {
 			t.Fatal(err)
 		}
 		there, err := f.store.Begin(ctx, finding.Run{
-			TargetID: elsewhere, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: elsewhere, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
@@ -51,7 +51,7 @@ func TestAnotherBuildReachedFromTwoOccurrencesIsOneEntry(t *testing.T) {
 			t.Fatalf("%d findings opened here, want an occurrence per consumer", len(open))
 		}
 		who := f.planner(t, access.PublicRead, access.PublicTriage)
-		occurrences, err := f.store.OccurrencesFor(ctx, who, f.target,
+		occurrences, err := f.store.OccurrencesFor(ctx, who, f.build,
 			open[0].VulnerabilityID, open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
@@ -60,7 +60,7 @@ func TestAnotherBuildReachedFromTwoOccurrencesIsOneEntry(t *testing.T) {
 			t.Fatalf("the finding resolves to %d occurrences, want one per consumer", len(occurrences))
 		}
 
-		reach, err := f.store.ReachingAcross(ctx, who, occurrences, f.target)
+		reach, err := f.store.ReachingAcross(ctx, who, occurrences, f.build)
 		if err != nil {
 			t.Fatal(err)
 		}

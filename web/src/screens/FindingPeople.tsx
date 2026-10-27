@@ -227,7 +227,7 @@ export function Assignee({
     mutationFn: async (held: Held | null) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/assignment",
           {
             params: whereOf(at),
             body:
@@ -285,7 +285,7 @@ export function Resolve({
   vulnerability,
   prefill = "",
 }: {
-  at: { product: string; stream: string; variant: string };
+  at: { product: string; branch_or_tag: string; variant: string };
   vulnerability: string;
   // What the fix is first written as, where something here already says it.
   prefill?: string;
@@ -298,7 +298,7 @@ export function Resolve({
     mutationFn: async () =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/resolve",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/resolve",
           {
             params: { path: { ...at, issue: vulnerability } },
             body: { because: because.trim() },
@@ -516,7 +516,7 @@ export function Marks({
     mutationFn: async (label: string) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
           { params: { path: path(label), query: where.query } },
         ),
       ),
@@ -530,7 +530,7 @@ export function Marks({
     mutationFn: async (label: string) =>
       unwrap(
         await api.DELETE(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}",
           { params: { path: path(label), query: where.query } },
         ),
       ),

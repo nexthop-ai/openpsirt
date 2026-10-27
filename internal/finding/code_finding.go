@@ -26,23 +26,23 @@ import (
 // CodeFindingAt is the finding a code finding is on one build, where the subject may read
 // it: the open one, or the newest where none is open. A code finding nobody may read
 // here and a code finding that is not here are both ErrNoOpenFinding.
-func (s *Store) CodeFindingAt(ctx context.Context, subject access.Subject, targetID int64, occurrenceIdentity string) (*Finding, error) {
-	productID, err := productOf(ctx, s.db, targetID)
+func (s *Store) CodeFindingAt(ctx context.Context, subject access.Subject, buildID int64, occurrenceIdentity string) (*Finding, error) {
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
 	reach := CodeFindingReach(subject, productID)
-	return s.codeFindingWhere(ctx, targetID, occurrenceIdentity, reach.Full, reach.FullArgs)
+	return s.codeFindingWhere(ctx, buildID, occurrenceIdentity, reach.Full, reach.FullArgs)
 }
 
 // codeFindingWhere is the code finding at an occurrence on one build that a condition admits.
-func (s *Store) codeFindingWhere(ctx context.Context, targetID int64, occurrenceIdentity string,
+func (s *Store) codeFindingWhere(ctx context.Context, buildID int64, occurrenceIdentity string,
 	reads string, readArgs []any) (*Finding, error) {
 
 	kinds, kindArgs := kind.Evidence.Where(`"f"."kind"`)
 	var codeFinding Finding
 	err := s.db.NewSelect().Model(&codeFinding).
-		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(reads, readArgs...).
 		Where(kinds, kindArgs...).
@@ -72,7 +72,7 @@ var ErrNotAFixingRun = refusal.New("name the run whose build fixed it: a compara
 // found. The run named is one of the code finding's series on the build, applied and
 // comparable, built at or after the first run that did not see it. A code finding seen
 // again opens anew at the same occurrence.
-func (s *Store) FixCodeFinding(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) FixCodeFinding(ctx context.Context, subject access.Subject, buildID int64,
 	occurrenceIdentity, because string, fixedIn int64) (*Resolved, error) {
 
 	because = strings.TrimSpace(because)
@@ -82,7 +82,7 @@ func (s *Store) FixCodeFinding(ctx context.Context, subject access.Subject, targ
 	if err := markdown.Check(because); err != nil {
 		return nil, err
 	}
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *Store) FixCodeFinding(ctx context.Context, subject access.Subject, targ
 		err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 			ColumnExpr(`"f"."id", "f"."visibility", "si"."absent_run_id", "si"."series_id"`).
-			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(kinds, kindArgs...).
@@ -125,7 +125,7 @@ func (s *Store) FixCodeFinding(ctx context.Context, subject access.Subject, targ
 			Join(`JOIN "series_run" AS "ab" ON "ab"."id" = ?`, *codeFinding.Absent).
 			Where(`"sr"."id" = ?`, fixedIn).
 			Where(`"sr"."series_id" = ?`, codeFinding.Series).
-			Where(`"sr"."target_id" = ?`, targetID).
+			Where(`"sr"."build_id" = ?`, buildID).
 			Where(`"sr"."status" = ?`, series.Applied).
 			Where(`"sr"."comparable" = ?`, true).
 			Where(`"sr"."built_at" >= "ab"."built_at"`).
@@ -182,8 +182,8 @@ func CodeFindingInSupport(product, occurrence string, at time.Time) (string, []a
 	kinds, kindArgs := kind.CodeFindings.Where(`"lsf"."kind"`)
 	past, pastArgs := catalog.PastEndOfLife("lss", "lsp", at)
 	seen := `SELECT 1 FROM "finding" AS "lsf"
-		JOIN "target" AS "lst" ON "lst"."id" = "lsf"."target_id"
-		JOIN "stream" AS "lss" ON "lss"."id" = "lst"."stream_id"
+		JOIN "build" AS "lst" ON "lst"."id" = "lsf"."build_id"
+		JOIN "branch_or_tag" AS "lss" ON "lss"."id" = "lst"."branch_or_tag_id"
 		JOIN "product" AS "lsp" ON "lsp"."id" = "lss"."product_id"
 		WHERE "lss"."product_id" = ` + product + ` AND "lsf"."occurrence_identity" = ` + occurrence + ` AND ` + kinds
 	args := append(slices.Clone(kindArgs), kindArgs...)
@@ -196,25 +196,25 @@ func CodeFindingInSupport(product, occurrence string, at time.Time) (string, []a
 // life at now. A code finding seen nowhere is left to the caller's own answer.
 func CodeFindingEnded(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity string, now time.Time) error {
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
-	var streams []int64
+	var branchesAndTags []int64
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
-		ColumnExpr(`DISTINCT "t"."stream_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		ColumnExpr(`DISTINCT "t"."branch_or_tag_id"`).
 		Where(`"s"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(kinds, kindArgs...).
-		Scan(ctx, &streams); err != nil {
+		Scan(ctx, &branchesAndTags); err != nil {
 		return fmt.Errorf("read the releases a code finding was seen in: %w", err)
 	}
-	if len(streams) == 0 {
+	if len(branchesAndTags) == 0 {
 		return nil
 	}
-	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, now)
+	ended, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, now)
 	if err != nil {
 		return err
 	}
-	for _, id := range streams {
+	for _, id := range branchesAndTags {
 		if !slices.Contains(ended, id) {
 			return nil
 		}
@@ -232,7 +232,7 @@ var ErrCodeFindingRecordedAsFlaw = refusal.New("that code finding was recorded a
 // code finding, in the transaction that moves it. Nil admits any party.
 //
 // The grain is the code finding, which is its occurrence in the product: a decision
-// about it covers every stream and variant it is seen on, and so does whoever
+// about it covers every branch or tag and variant it is seen on, and so does whoever
 // works it. The write is the one every finding is handed over through, under
 // the same rule about who may move what: taking a code finding nobody holds and handing
 // back your own is triage at the code finding's visibility, and giving it to somebody
@@ -240,24 +240,24 @@ var ErrCodeFindingRecordedAsFlaw = refusal.New("that code finding was recorded a
 //
 // The visibilities other than public among what moved come back, each once,
 // which decides what may be said about the act outside the application.
-func (s *Store) AssignCodeFinding(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) AssignCodeFinding(ctx context.Context, subject access.Subject, buildID int64,
 	occurrenceIdentity string, to *int64, admits Admits) (moved int64, withheld []access.Visibility, err error) {
 
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		moved, withheld = 0, nil
 		inner := &Store{db: tx, now: s.now, reach: s.reach}
 		var err error
-		moved, withheld, err = inner.assignCodeFinding(ctx, subject, targetID, occurrenceIdentity, to, admits)
+		moved, withheld, err = inner.assignCodeFinding(ctx, subject, buildID, occurrenceIdentity, to, admits)
 		return err
 	})
 	return moved, withheld, err
 }
 
 // assignCodeFinding is AssignCodeFinding inside the transaction it opened.
-func (s *Store) assignCodeFinding(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) assignCodeFinding(ctx context.Context, subject access.Subject, buildID int64,
 	occurrenceIdentity string, to *int64, admits Admits) (int64, []access.Visibility, error) {
 
-	productID, err := productOf(ctx, s.db, targetID)
+	productID, err := productOf(ctx, s.db, buildID)
 	if err != nil {
 		return 0, nil, err
 	}

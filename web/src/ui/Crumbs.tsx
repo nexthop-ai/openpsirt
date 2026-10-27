@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Link } from "react-router-dom";
-import { streamAt, streamsAt } from "../app/routes";
+import { branchOrTagAt, branchesAndTagsAt } from "../app/routes";
 
 // The place you are in, and the way back up. A screen bound to one build says
 // which build that is on the screen rather than only in the address bar.
 export function Crumbs({
   product,
-  stream,
+  branch_or_tag: branchOrTag,
   variant,
 }: {
   product: string;
-  stream?: string;
+  branch_or_tag?: string;
   variant?: string;
 }) {
   return (
@@ -24,22 +24,22 @@ export function Crumbs({
         Products
       </Link>
       <span aria-hidden>/</span>
-      {stream ? (
-        <Link to={streamsAt(product)} className="hover:text-[var(--ink)]">
+      {branchOrTag ? (
+        <Link to={branchesAndTagsAt(product)} className="hover:text-[var(--ink)]">
           {product}
         </Link>
       ) : (
         <span className="text-[var(--ink)]">{product}</span>
       )}
-      {stream && (
+      {branchOrTag && (
         <>
           <span aria-hidden>/</span>
           {variant ? (
-            <Link to={streamAt(product, stream)} className="hover:text-[var(--ink)]">
-              {stream}
+            <Link to={branchOrTagAt(product, branchOrTag)} className="hover:text-[var(--ink)]">
+              {branchOrTag}
             </Link>
           ) : (
-            <span className="text-[var(--ink)]">{stream}</span>
+            <span className="text-[var(--ink)]">{branchOrTag}</span>
           )}
         </>
       )}

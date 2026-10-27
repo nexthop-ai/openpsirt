@@ -112,11 +112,11 @@ func VulnerabilityReport(product, reference string) string {
 // Finding is one finding: an issue at one component of one build. A version,
 // where one is given, picks the component among several of that name in the
 // build; empty, the address carries none.
-func Finding(product, stream, variant, vulnerability, component, version string) string {
-	if climbs(product, stream, variant, vulnerability, component) {
+func Finding(product, branchOrTag, variant, vulnerability, component, version string) string {
+	if climbs(product, branchOrTag, variant, vulnerability, component) {
 		return Home()
 	}
-	address := build(product, stream, variant) +
+	address := build(product, branchOrTag, variant) +
 		"/findings/" + url.PathEscape(vulnerability) +
 		"/components/" + url.PathEscape(component)
 	if version != "" {
@@ -126,20 +126,20 @@ func Finding(product, stream, variant, vulnerability, component, version string)
 }
 
 // CodeFinding is one static analysis code finding's evidence on one build.
-func CodeFinding(product, stream, variant, occurrence string) string {
-	if climbs(product, stream, variant, occurrence) {
+func CodeFinding(product, branchOrTag, variant, occurrence string) string {
+	if climbs(product, branchOrTag, variant, occurrence) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/code-findings/" + url.PathEscape(occurrence)
+	return build(product, branchOrTag, variant) + "/code-findings/" + url.PathEscape(occurrence)
 }
 
 // CodeFindings is a product's code findings in one state on one build, and of one series
 // where one is named.
-func CodeFindings(product, stream, variant, state, series string) string {
+func CodeFindings(product, branchOrTag, variant, state, series string) string {
 	if climbs(product) {
 		return Home()
 	}
-	query := url.Values{"state": {state}, "stream": {stream}, "variant": {variant}}
+	query := url.Values{"state": {state}, "branch_or_tag": {branchOrTag}, "variant": {variant}}
 	if series != "" {
 		query.Set("series", series)
 	}
@@ -155,19 +155,19 @@ func SuppressionRules(product string) string {
 }
 
 // Uploads is the list of what one build was sent.
-func Uploads(product, stream, variant string) string {
-	if climbs(product, stream, variant) {
+func Uploads(product, branchOrTag, variant string) string {
+	if climbs(product, branchOrTag, variant) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/uploads"
+	return build(product, branchOrTag, variant) + "/uploads"
 }
 
 // InventoryChanges is what one upload moved in a build's inventory.
-func InventoryChanges(product, stream, variant string, scan int64) string {
-	if climbs(product, stream, variant) {
+func InventoryChanges(product, branchOrTag, variant string, scan int64) string {
+	if climbs(product, branchOrTag, variant) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/uploads/" + strconv.FormatInt(scan, 10) + "/changes"
+	return build(product, branchOrTag, variant) + "/uploads/" + strconv.FormatInt(scan, 10) + "/changes"
 }
 
 // AnalyticsReport is one report under Analytics, opened on a window of days.
@@ -180,9 +180,9 @@ func AnalyticsReport(slug, days string) string {
 
 // build is the prefix every address under one build shares. It is not an
 // address by itself: the web application answers only the screens below it.
-func build(product, stream, variant string) string {
+func build(product, branchOrTag, variant string) string {
 	return "/products/" + url.PathEscape(product) +
-		"/streams/" + url.PathEscape(stream) +
+		"/branches-and-tags/" + url.PathEscape(branchOrTag) +
 		"/variants/" + url.PathEscape(variant)
 }
 

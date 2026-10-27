@@ -50,7 +50,7 @@ func TestWhatSomebodyHoldsIsReadableInABuildTheyCannotRead(t *testing.T) {
 			Total int `json:"total"`
 		}
 		httpapitest.Read(t, r, "approver", "/v1/people/me/assignments"+
-			"?product=mine&stream=master&variant=broadcom", &here)
+			"?product=mine&branch_or_tag=master&variant=broadcom", &here)
 		if here.Total != 1 {
 			t.Errorf("narrowed to the build they hold it in, they hold %d", here.Total)
 		}

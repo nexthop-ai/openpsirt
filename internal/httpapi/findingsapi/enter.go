@@ -44,10 +44,10 @@ type EmbargoedBody struct {
 
 // EmbargoedBuildBody is one build an embargoed issue sits in.
 type EmbargoedBuildBody struct {
-	Stream      string `json:"stream"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant     string `json:"variant"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	BranchOrTag     string `json:"branch_or_tag"`
+	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant         string `json:"variant"`
+	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 }
 
 // EnteredBody is the record of a flaw entered.
@@ -118,8 +118,8 @@ func registerEntry(api huma.API, in core.Deps) {
 			// this is recorded at and the builds are what it
 			// names.
 			Builds []struct {
-				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
-				Variant string `json:"variant" minLength:"1" doc:"The way that line is built"`
+				BranchOrTag string `json:"branch_or_tag" minLength:"1" doc:"A branch or a tag"`
+				Variant     string `json:"variant" minLength:"1" doc:"The way that line is built"`
 			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take"`
 			FlawFields
 			Component string `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
@@ -147,21 +147,21 @@ func registerEntry(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		names := catalog.NewStore(in.DB.DB)
-		targets := make([]int64, 0, len(input.Body.Builds))
+		buildIDs := make([]int64, 0, len(input.Body.Builds))
 		for _, build := range input.Body.Builds {
-			at, err := names.LocateVisible(ctx, subject, input.Product, build.Stream, build.Variant)
+			at, err := names.LocateVisible(ctx, subject, input.Product, build.BranchOrTag, build.Variant)
 			if err != nil {
 				return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
 			}
-			target, err := core.TargetRow(ctx, in, at.StreamID, at.VariantID)
+			build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
 			if err != nil {
 				return nil, err
 			}
-			targets = append(targets, target.ID)
+			buildIDs = append(buildIDs, build.ID)
 		}
 
 		rows, identifier, err := finding.NewStore(in.DB.DB).Enter(ctx, subject, finding.Entering{
-			TargetIDs: targets, Component: input.Body.Component,
+			BuildIDs: buildIDs, Component: input.Body.Component,
 			Version: input.Body.Version, Ecosystem: input.Body.Ecosystem,
 			Namespace: input.Body.Namespace,
 			Summary:   input.Body.Summary, Severity: string(input.Body.Severity),
@@ -190,7 +190,7 @@ func registerEntry(api huma.API, in core.Deps) {
 		// that two things pull in is two findings in one build.
 		builds := map[int64]bool{}
 		for _, row := range rows {
-			builds[row.TargetID] = true
+			builds[row.BuildID] = true
 		}
 		out.Body = EnteredBody{
 			Identifier: identifier, Component: component,
@@ -256,7 +256,7 @@ type ResolvedBody struct {
 func registerResolution(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "resolve-finding", Method: http.MethodPost,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/findings/{issue}/resolve",
 		Summary: "Close a recorded flaw as fixed in this build",
 		Description: "Closes a flaw somebody recorded here, in one build, because it has been " +
@@ -273,7 +273,7 @@ func registerResolution(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Stream        string `path:"stream"`
+		BranchOrTag   string `path:"branch_or_tag"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue"`
 		Body          struct {
@@ -284,11 +284,11 @@ func registerResolution(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, err
 		}
@@ -298,7 +298,7 @@ func registerResolution(api huma.API, in core.Deps) {
 		}
 
 		done, err := finding.NewStore(in.DB.DB).Resolve(ctx, subject,
-			target.ID, issueID, input.Body.Because)
+			build.ID, issueID, input.Body.Because)
 		if err != nil {
 			switch {
 			case errors.Is(err, finding.ErrNotOursToClose):
@@ -332,7 +332,7 @@ func registerDisclosure(api huma.API, in core.Deps) {
 			"A product you may not read undisclosed work in contributes nothing to it, not " +
 			"even a count.\n\n" +
 			"`within` is how many days ahead to look. Left off, it is this deployment's own " +
-			"embargo length. `product`, `stream` and `variant` narrow it to a scope, and " +
+			"embargo length. `product`, `branch_or_tag` and `variant` narrow it to a scope, and " +
 			"the builds an item lists are the ones inside that scope.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "A product you may not read undisclosed work in contributes "+
@@ -381,7 +381,7 @@ func registerDisclosure(api huma.API, in core.Deps) {
 			builds := make([]EmbargoedBuildBody, 0, len(row.Builds))
 			for _, b := range row.Builds {
 				builds = append(builds, EmbargoedBuildBody{
-					Stream: b.Stream, StreamName: b.StreamName,
+					BranchOrTag: b.BranchOrTag, BranchOrTagName: b.BranchOrTagName,
 					Variant: b.Variant, VariantName: b.VariantName,
 				})
 			}
@@ -873,8 +873,8 @@ func registerAffects(api huma.API, in core.Deps) {
 		Vulnerability string `path:"issue" doc:"The identifier it was filed under"`
 		Body          struct {
 			Builds []struct {
-				Stream  string `json:"stream" minLength:"1"`
-				Variant string `json:"variant" minLength:"1"`
+				BranchOrTag string `json:"branch_or_tag" minLength:"1"`
+				Variant     string `json:"variant" minLength:"1"`
 			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding"`
 			Reason string `json:"reason,omitempty" doc:"The reason any build is being taken out. Required whenever one is"`
 		}
@@ -899,21 +899,21 @@ func registerAffects(api huma.API, in core.Deps) {
 			return nil, err
 		}
 
-		targets := make([]int64, 0, len(input.Body.Builds))
+		buildIDs := make([]int64, 0, len(input.Body.Builds))
 		for _, build := range input.Body.Builds {
-			at, err := core.LocatedVisibly(ctx, in, subject, input.Product, build.Stream, build.Variant)
+			at, err := core.LocatedVisibly(ctx, in, subject, input.Product, build.BranchOrTag, build.Variant)
 			if err != nil {
 				return nil, err
 			}
-			target, err := core.TargetRow(ctx, in, at.StreamID, at.VariantID)
+			build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
 			if err != nil {
 				return nil, err
 			}
-			targets = append(targets, target.ID)
+			buildIDs = append(buildIDs, build.ID)
 		}
 
 		changed, err := finding.NewStore(in.DB.DB).Affects(ctx, subject,
-			product.ID, issue, targets, input.Body.Reason)
+			product.ID, issue, buildIDs, input.Body.Reason)
 		if err != nil {
 			var several *graph.Ambiguous
 			switch {

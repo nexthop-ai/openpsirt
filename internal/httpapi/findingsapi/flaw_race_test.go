@@ -33,7 +33,7 @@ func confirmedCodeFinding(t *testing.T, r *httpapitest.Reach) (string, int64, in
 		Where(`"de"."occurrence_identity" = ?`, occurrence).Limit(1).Scan(t.Context(), &decision); err != nil {
 		t.Fatal(err)
 	}
-	return occurrence, decision, r.TargetOf(t, httpapitest.SeededBuild)
+	return occurrence, decision, r.BuildOf(t, httpapitest.SeededBuild)
 }
 
 // decisionStamp is the stamp a decision holds, zero where it has no row.
@@ -59,14 +59,14 @@ func recordedAsFlaw(t *testing.T, r *httpapitest.Reach, occurrence string) bool 
 }
 
 // handing is a flaw record of the seeded code finding against the seeded build.
-func handing(t *testing.T, r *httpapitest.Reach, occurrence string, target int64) analysis.Recording {
+func handing(t *testing.T, r *httpapitest.Reach, occurrence string, build int64) analysis.Recording {
 	t.Helper()
 	located, err := catalog.NewStore(r.DB.DB).Locate(t.Context(), "mine", "master", "broadcom")
 	if err != nil {
 		t.Fatal(err)
 	}
 	return analysis.Recording{ProductID: located.ProductID, OccurrenceIdentity: occurrence,
-		Flaw: finding.Entering{TargetIDs: []int64{target}, Summary: "p leaks"}}
+		Flaw: finding.Entering{BuildIDs: []int64{build}, Summary: "p leaks"}}
 }
 
 // A flaw record changes the stamp of the decision it rests on, as every write
@@ -76,7 +76,7 @@ func TestARecordAsFlawRestampsTheDecisionItRestsOn(t *testing.T) {
 		occurrence, decision, _ := confirmedCodeFinding(t, r)
 		before := decisionStamp(t, r, decision)
 		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
 		if got := decisionStamp(t, r, decision); got == before {
@@ -90,7 +90,7 @@ func TestARecordAsFlawRestampsTheDecisionItRestsOn(t *testing.T) {
 // is asked again, finds the code finding unconfirmed, and is refused.
 func TestARecordAsFlawLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		occurrence, decision, target := confirmedCodeFinding(t, r)
+		occurrence, decision, build := confirmedCodeFinding(t, r)
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "decision", "decision_stamp", 3*time.Second, func() error {
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete,
 				fmt.Sprintf("/v1/decisions/%d", decision), ""); got.Code != http.StatusNoContent {
@@ -102,7 +102,7 @@ func TestARecordAsFlawLosingToAWithdrawalOfItsConfirmationIsRefused(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = analysis.RecordAsFlaw(t.Context(), hooked, subject, handing(t, r, occurrence, target))
+		_, err = analysis.RecordAsFlaw(t.Context(), hooked, subject, handing(t, r, occurrence, build))
 		if rivalErr := rival(); rivalErr != nil {
 			t.Fatal(rivalErr)
 		}
@@ -123,7 +123,7 @@ func TestAWithdrawalLosingToARecordAsFlawIsRefused(t *testing.T) {
 		occurrence, decision, _ := confirmedCodeFinding(t, r)
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "code_finding_flaw", "decision_stamp", 3*time.Second, func() error {
 			if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
-				`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
+				`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 				return fmt.Errorf("the flaw record answered %d: %s", got.Code, got.Body)
 			}
 			return nil

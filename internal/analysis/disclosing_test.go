@@ -14,9 +14,9 @@ import (
 func TestWhatAnInclusionDisclosesIsReadThroughTheCallersVisibility(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		ctx := t.Context()
-		w.inventory(t, w.Target.ID)
-		w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
-		codeFinding := w.codeFindings(t, w.Target.ID)[0]
+		w.inventory(t, w.Build.ID)
+		w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		codeFinding := w.codeFindings(t, w.Build.ID)[0]
 		decided := w.dismissed(t, codeFinding, time.Now().UTC())
 		const said = "the attribute is bounded by its caller"
 		if _, err := w.DB.DB.NewInsert().Model(&triage.Revision{DecisionID: decided.DecisionID, Ordinal: 1, Body: said,

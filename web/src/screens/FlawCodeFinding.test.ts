@@ -6,18 +6,18 @@ import { fixedFromCodeFinding, type FlawCodeFinding } from "./FlawCodeFinding";
 
 const CODE_FINDING = {
   occurrence: "abc",
-  stream: "master",
+  branch_or_tag: "master",
   variant: "broadcom",
   rule: "clang/unix.Malloc",
   path: "src/a.c",
   state: "recorded-as-flaw",
   suggested: { from: "build", lacking: [], unanalyzed: [] },
-  proposed: [{ stream: "master", variant: "broadcom", seen: true }],
+  proposed: [{ branch_or_tag: "master", variant: "broadcom", seen: true }],
   recorded_by: "ana",
   recorded_at: "2026-10-01T00:00:00Z",
   fixed_in: [
     {
-      stream: "master",
+      branch_or_tag: "master",
       variant: "broadcom",
       not_seen: { run: 9, built: "2026-10-02T00:00:00Z", commit: "0123456789abcdef" },
     },

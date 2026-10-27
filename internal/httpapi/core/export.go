@@ -52,9 +52,9 @@ type Exporting struct {
 	// Rows reads a page at a time, for a list assembled by grouping: the page
 	// is the unit its statement answers in.
 	//
-	// Exactly one of Rows and Stream is set.
+	// Exactly one of Rows and Branch or tag is set.
 	Rows Paged
-	// Stream hands over every row as it arrives, for a reader that can open a
+	// Branch or tag hands over every row as it arrives, for a reader that can open a
 	// cursor over the whole answer.
 	//
 	// Paging is what a large export cannot afford. Each page re-runs the
@@ -73,9 +73,9 @@ type Exporting struct {
 	// stopped reading loses the connection after exportStall. The cursor is
 	// closed at exportCeiling however steadily the file is being read, so a
 	// reader draining just fast enough to keep the deadline moving gives the
-	// connection back all the same. And only so many streams run at once,
+	// connection back all the same. And only so many branches and tags run at once,
 	// which streamSlots decides from the size of the pool.
-	Stream func(ctx context.Context, each func([]string) error) error
+	BranchOrTag func(ctx context.Context, each func([]string) error) error
 }
 
 // Paged reads one page of a file's rows.
@@ -361,7 +361,7 @@ var asJSON = exportFormat{
 func eachPage(ctx context.Context, out Exporting,
 	page func(rows [][]string), between func()) error {
 
-	if out.Stream != nil {
+	if out.BranchOrTag != nil {
 		return streamed(ctx, out, page, between, exportCeiling)
 	}
 	for offset := 0; ; {
@@ -393,7 +393,7 @@ func streamed(ctx context.Context, out Exporting,
 	ctx, cancel := context.WithTimeout(ctx, ceiling)
 	defer cancel()
 	written := 0
-	err := out.Stream(ctx, func(row []string) error {
+	err := out.BranchOrTag(ctx, func(row []string) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}

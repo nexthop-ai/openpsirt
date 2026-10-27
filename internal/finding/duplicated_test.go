@@ -19,7 +19,7 @@ func (f *fixture) flaw(t *testing.T, who access.Subject, told finding.Told) int6
 	t.Helper()
 	f.shipped(t, twoConsumers())
 	rows, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-		TargetIDs: []int64{f.target}, Severity: "high",
+		BuildIDs: []int64{f.build}, Severity: "high",
 		Summary: "The management socket answers before anyone authenticated.",
 		Told:    told,
 	})

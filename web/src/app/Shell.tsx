@@ -15,7 +15,7 @@ import {
   uploadsAt,
   codeFindingsAt,
   issueAt,
-  streamsAt,
+  branchesAndTagsAt,
   dependenciesAt,
   plannedUpgradesAt,
   variantsAt,
@@ -64,16 +64,16 @@ const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 // bound to one build while the queue is not: the findings list is scoped to a
 // product, and home summarizes across them.
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
-  const { product, stream, variant } = useScope();
-  const whole = !!(product && stream && variant);
+  const { product, branch_or_tag: branchOrTag, variant } = useScope();
+  const whole = !!(product && branchOrTag && variant);
   // Reading reports takes reading undisclosed work, which is what reads_private says.
   const reportsAnywhere = (who.reach ?? []).some((each) => each.reads_private);
   const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
   // A code finding is internal, so the Security testing entry follows reading internal material.
   const codeFindingsAnywhere = (who.reach ?? []).some((each) => each.reads_internal);
   const codeFindingsHere = !!product && !!mayOf(who, product)?.reads_internal;
-  const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
-  const build = whole ? { product, stream, variant } : undefined;
+  const scope = [product ?? "all products", branchOrTag, variant].filter(Boolean).join(" · ");
+  const build = whole ? { product, branch_or_tag: branchOrTag, variant } : undefined;
   const [uploading, setUploading] = useState(false);
   // On a narrow screen the rail is a panel that opens from a menu control. The
   // tab bar carries the three places somebody reviews and responds from , and
@@ -124,7 +124,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // goes quiet the moment somebody widens the scope is one that looks broken
   // rather than one that declines.
   const open = useQuery({
-    queryKey: ["findings", "count", product, stream, variant],
+    queryKey: ["findings", "count", product, branchOrTag, variant],
     enabled: !!product,
     queryFn: async () =>
       unwrap(
@@ -134,7 +134,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             query: {
               ...OPEN_QUERY,
               limit: 1,
-              ...(stream ? { stream } : {}),
+              ...(branchOrTag ? { branch_or_tag: branchOrTag } : {}),
               ...(variant ? { variant } : {}),
             },
           },
@@ -158,7 +158,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         </button>
         <Scope />
         <span className="spacer" />
-        <Search at={{ product, stream, variant }} />
+        <Search at={{ product, branch_or_tag: branchOrTag, variant }} />
         <button
           type="button"
           className="topact"
@@ -242,7 +242,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               selected, and for every product a reader can see when nothing
               is. */}
             <Rail
-              to={findingsPath({ product, stream, variant })}
+              to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}
               icon="bug"
               label="Findings"
               count={open.data?.total}
@@ -287,7 +287,14 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               variant picked where both are. */}
             {codeFindingsAnywhere && (
               <Rail
-                to={product ? codeFindingsAt(product, whole ? { stream, variant } : undefined) : ""}
+                to={
+                  product
+                    ? codeFindingsAt(
+                        product,
+                        whole ? { branch_or_tag: branchOrTag, variant } : undefined,
+                      )
+                    : ""
+                }
                 icon="triage"
                 label="Security testing"
                 needs={codeFindingsHere}
@@ -327,7 +334,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               above, which is what that control is for. */}
             <Rail to="/products" end icon="box" label="Products" />
             <Rail
-              to={streamsAt(product ?? "")}
+              to={branchesAndTagsAt(product ?? "")}
               end
               icon="branch"
               label="Branches and tags"
@@ -394,7 +401,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         <NavLink to="/" end>
           Home
         </NavLink>
-        <NavLink to={findingsPath({ product, stream, variant })}>Findings</NavLink>
+        <NavLink to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}>
+          Findings
+        </NavLink>
         <NavLink to="/review-queue">Queue</NavLink>
         <button type="button" aria-expanded={menu} onClick={() => setMenu(!menu)}>
           Menu

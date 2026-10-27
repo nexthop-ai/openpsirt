@@ -173,9 +173,9 @@ func (q ComponentQuery) Choice() graph.Choice {
 // Where one carries it, that one is taken: one choice is not a choice. none
 // answers where none does.
 func ComponentCarrying(ctx context.Context, in Deps, subject access.Subject,
-	targetID, issue int64, name string, which graph.Choice, none func(error) error) (int64, error) {
+	buildID, issue int64, name string, which graph.Choice, none func(error) error) (int64, error) {
 
-	id, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, which)
+	id, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, buildID, name, which)
 	// A part left out after one was named may have been read as "none" by
 	// the lookup, which picks the component with nothing there. What carries
 	// the issue has its say first: a link naming a version alone means the
@@ -188,7 +188,7 @@ func ComponentCarrying(ctx context.Context, in Deps, subject access.Subject,
 	if err != nil && !errors.Is(err, graph.ErrAmbiguous) {
 		return 0, none(err)
 	}
-	all, second := finding.NewStore(in.DB.DB).VersionsWithIssue(ctx, subject, targetID, issue, name)
+	all, second := finding.NewStore(in.DB.DB).VersionsWithIssue(ctx, subject, buildID, issue, name)
 	if second != nil {
 		// Logged rather than discarded. Silently falling through makes a
 		// database failure indistinguishable from "the issue is at none of
@@ -204,7 +204,7 @@ func ComponentCarrying(ctx context.Context, in Deps, subject access.Subject,
 	}
 	switch {
 	case len(carrying) == 1:
-		id, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, carrying[0])
+		id, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, buildID, name, carrying[0])
 		if err != nil {
 			return 0, none(err)
 		}
@@ -414,7 +414,7 @@ func AdministeredProduct(ctx context.Context, in Deps, db bun.IDB,
 // reads as one that was never declared, and a pipeline key is refused a build
 // it may not send to.
 func ReadableBuild(ctx context.Context, in Deps,
-	product, stream, variant string) (access.Subject, *catalog.Named, error) {
+	product, branchOrTag, variant string) (access.Subject, *catalog.Named, error) {
 
 	subject, err := Requester(ctx)
 	if err != nil {
@@ -423,7 +423,7 @@ func ReadableBuild(ctx context.Context, in Deps,
 	if _, err := ProductNamedVisibly(ctx, in, subject, product); err != nil {
 		return access.Subject{}, nil, err
 	}
-	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, stream, variant)
+	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return access.Subject{}, nil, Undeclared(in.Logger, err, "that build could not be looked up")
 	}
@@ -437,7 +437,7 @@ func ReadableBuild(ctx context.Context, in Deps,
 // reads what was filed on a build it may upload to and nothing wider.
 func PipelineReaches(subject access.Subject, named *catalog.Named) error {
 	if subject.Kind == access.Pipeline &&
-		!subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
+		!subject.MaySend(named.ProductID, named.BranchOrTagID, named.VariantID) {
 		return huma.Error403Forbidden("not authorized")
 	}
 	return nil
@@ -497,9 +497,9 @@ func ProductForIssue(ctx context.Context, in Deps, subject access.Subject,
 // part of an address is wrong is a statement about what exists under the
 // other two, and answering it turns the route into a way to walk the catalog.
 func LocatedVisibly(ctx context.Context, in Deps, subject access.Subject,
-	product, stream, variant string) (*catalog.Named, error) {
+	product, branchOrTag, variant string) (*catalog.Named, error) {
 
-	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, stream, variant)
+	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, Absent(in.Logger, err, "that build could not be looked up", NoSuchProduct)
 	}
@@ -509,9 +509,9 @@ func LocatedVisibly(ctx context.Context, in Deps, subject access.Subject,
 // LocatedForCodeFinding resolves the three names a build is addressed by, for a route
 // reading one code finding on it.
 func LocatedForCodeFinding(ctx context.Context, in Deps, subject access.Subject,
-	product, stream, variant string) (*catalog.Named, error) {
+	product, branchOrTag, variant string) (*catalog.Named, error) {
 
-	named, err := catalog.NewStore(in.DB.DB).LocateForCodeFinding(ctx, subject, product, stream, variant)
+	named, err := catalog.NewStore(in.DB.DB).LocateForCodeFinding(ctx, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, Absent(in.Logger, err, "that build could not be looked up", NoSuchProduct)
 	}
@@ -520,19 +520,19 @@ func LocatedForCodeFinding(ctx context.Context, in Deps, subject access.Subject,
 
 // VisibleBuild is the reader and the build a route is about: the build
 // resolved as the reader may see it and required to have been scanned.
-func VisibleBuild(ctx context.Context, in Deps, product, stream, variant string) (access.Subject, int64, error) {
+func VisibleBuild(ctx context.Context, in Deps, product, branchOrTag, variant string) (access.Subject, int64, error) {
 	subject, err := Reading(ctx)
 	if err != nil {
 		return access.Subject{}, 0, err
 	}
-	target, err := TargetIDOf(ctx, in, subject, product, stream, variant)
+	build, err := BuildIDOf(ctx, in, subject, product, branchOrTag, variant)
 	if err != nil {
 		return access.Subject{}, 0, err
 	}
-	return subject, target, nil
+	return subject, build, nil
 }
 
-// TargetIDOf is the build a route is about, resolved and required to have been
+// BuildIDOf is the build a route is about, resolved and required to have been
 // scanned.
 //
 // One function rather than a closure copied into three report routes, so that
@@ -543,35 +543,35 @@ func VisibleBuild(ctx context.Context, in Deps, product, stream, variant string)
 // Both answers are for somebody who sees the product. Somebody brought into a
 // case resolves its names and reads nothing these routes answer with, so told
 // apart, the two would tell them which builds were ever scanned.
-func TargetIDOf(ctx context.Context, in Deps, subject access.Subject,
-	product, stream, variant string) (int64, error) {
+func BuildIDOf(ctx context.Context, in Deps, subject access.Subject,
+	product, branchOrTag, variant string) (int64, error) {
 
-	named, err := LocatedVisibly(ctx, in, subject, product, stream, variant)
+	named, err := LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 	if err != nil {
 		return 0, err
 	}
 	if !subject.Sees(named.ProductID) {
 		return 0, NoSuchProduct()
 	}
-	target, err := TargetRow(ctx, in, named.StreamID, named.VariantID)
+	build, err := BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 	if err != nil {
 		return 0, err
 	}
-	return target.ID, nil
+	return build.ID, nil
 }
 
-// TargetRow is the build a pair of names was already resolved to, required to
+// BuildRow is the build a pair of names was already resolved to, required to
 // have been scanned.
 //
 // "Nothing has been scanned there" is an answer about the build. A read that
 // could not be made does not support it, and this is the reader with the most
 // callers in the tree — nearly all of which answer 404.
-func TargetRow(ctx context.Context, in Deps, streamID, variantID int64) (*catalog.Target, error) {
-	target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, streamID, variantID)
+func BuildRow(ctx context.Context, in Deps, branchOrTagID, variantID int64) (*catalog.Build, error) {
+	build, err := catalog.NewStore(in.DB.DB).ExistingBuild(ctx, branchOrTagID, variantID)
 	if err != nil {
 		return nil, Absent(in.Logger, err, "that build could not be looked up", NothingScannedThere)
 	}
-	return target, nil
+	return build, nil
 }
 
 // IssueHere resolves an issue named in a path about an occurrence, and answers

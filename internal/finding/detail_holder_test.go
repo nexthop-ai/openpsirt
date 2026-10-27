@@ -17,7 +17,7 @@ func TestAFindingsHolderIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +47,7 @@ func TestAFindingsHolderIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicTriage)
-		evidence, err := f.store.Detail(ctx, who, f.target, open[0].VulnerabilityID, open[0].ComponentID)
+		evidence, err := f.store.Detail(ctx, who, f.build, open[0].VulnerabilityID, open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,7 +64,7 @@ func TestAFindingsAssignmentRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testi
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func TestAFindingsAssignmentRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testi
 		}
 
 		who := f.holding(t, access.PublicTriage)
-		evidence, err := f.store.Detail(ctx, who, f.target, open[0].VulnerabilityID, open[0].ComponentID)
+		evidence, err := f.store.Detail(ctx, who, f.build, open[0].VulnerabilityID, open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
 		}

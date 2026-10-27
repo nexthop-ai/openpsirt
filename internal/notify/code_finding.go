@@ -42,7 +42,7 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 		return nil
 	}
 	what := fmt.Sprintf("A code finding of %s at %s in %s %s %s", codeFinding.Rule, codeFinding.Path,
-		codeFinding.Product, codeFinding.Stream, codeFinding.Variant)
+		codeFinding.Product, codeFinding.BranchOrTag, codeFinding.Variant)
 	var body string
 	switch act.Kind {
 	case CodeFindingRecordedAsFlaw:
@@ -61,7 +61,7 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 	if err != nil {
 		return err
 	}
-	link := weblink.CodeFinding(codeFinding.ProductName, codeFinding.StreamName, codeFinding.VariantName, act.Occurrence)
+	link := weblink.CodeFinding(codeFinding.ProductName, codeFinding.BranchOrTagName, codeFinding.VariantName, act.Occurrence)
 	productID := act.ProductID
 	var failed error
 	for personID, per := range reach {
@@ -83,15 +83,15 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 
 // namedCodeFinding is what a line about a code finding names.
 type namedCodeFinding struct {
-	Rule    string `bun:"rule"`
-	Path    string `bun:"path"`
-	Product string `bun:"product"`
-	Stream  string `bun:"stream"`
-	Variant string `bun:"variant"`
+	Rule        string `bun:"rule"`
+	Path        string `bun:"path"`
+	Product     string `bun:"product"`
+	BranchOrTag string `bun:"branch_or_tag"`
+	Variant     string `bun:"variant"`
 	// The same three as an address names them.
-	ProductName string `bun:"product_name"`
-	StreamName  string `bun:"stream_name"`
-	VariantName string `bun:"variant_name"`
+	ProductName     string `bun:"product_name"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	VariantName     string `bun:"variant_name"`
 }
 
 // codeFindingNamed is the code finding at an occurrence in a product as its newest open finding
@@ -103,17 +103,17 @@ func codeFindingNamed(ctx context.Context, db bun.IDB, productID int64, occurren
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(`"v"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path" AS "path"`).
 		ColumnExpr(`"p"."display_name" AS "product"`).
-		ColumnExpr(`"st"."display_name" AS "stream"`).
+		ColumnExpr(`"st"."display_name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."display_name" AS "variant"`).
 		ColumnExpr(`"p"."name" AS "product_name"`).
-		ColumnExpr(`"st"."name" AS "stream_name"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant_name"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrence).

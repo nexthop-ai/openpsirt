@@ -42,13 +42,13 @@ func TestAFlawRecordsTheCodeFindingItWasRecordedFromWithItsOffer(t *testing.T) {
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)
 		got := flawCodeFindingAs(t, r, "code-finding-handler", flaw)
 		if got.Occurrence != occurrence || got.Rule == "" || got.Path != "src/a.c" || got.State != "recorded-as-flaw" ||
-			got.Stream != "master" || got.Variant != "broadcom" {
+			got.BranchOrTag != "master" || got.Variant != "broadcom" {
 			t.Errorf("the flaw names its code finding as %+v; want the code finding recorded as a flaw at %s", got, occurrence)
 		}
 		if got.Suggested.From == "" || got.RecordedBy != "code-finding-handler" || got.RecordedAt == "" || got.UndoneAt != "" {
 			t.Errorf("the flaw records its offer as %+v; want the first suggestion and who handed it off", got)
 		}
-		if len(got.Proposed) != 1 || got.Proposed[0].Stream != "master" || !got.Proposed[0].Seen {
+		if len(got.Proposed) != 1 || got.Proposed[0].BranchOrTag != "master" || !got.Proposed[0].Seen {
 			t.Errorf("the flaw was proposed against %+v; want the one build the code finding was seen in", got.Proposed)
 		}
 		if len(got.FixedIn) != 0 {
@@ -78,7 +78,7 @@ func TestAFlawIsOfferedFixedWhereItsCodeFindingIsNoLongerDetected(t *testing.T) 
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.CodeFindingRun(false))
 		got := flawCodeFindingAs(t, r, "code-finding-handler", flaw)
 		evidence := evidenceAs(t, r, "code-finding-handler", occurrence)
-		if len(got.FixedIn) != 1 || got.FixedIn[0].Stream != "master" ||
+		if len(got.FixedIn) != 1 || got.FixedIn[0].BranchOrTag != "master" ||
 			got.FixedIn[0].NotSeen.Run != evidence.NotSeenRun ||
 			got.FixedIn[0].Fixed != nil {
 			t.Fatalf("a flaw whose code finding is no longer detected is offered fixed in %+v; want the build, at run %d",
@@ -138,7 +138,7 @@ func TestAnUndoneRecordAsFlawConfirmsTheCodeFindingAgainAndTakesTheFlawBack(t *t
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, undo,
 			`{"because":"again"}`), http.StatusConflict)
 		again := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks on the early return"}`)
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"p leaks on the early return"}`)
 		if again.Code != http.StatusCreated {
 			t.Fatalf("handing the code finding off again answered %d: %s", again.Code, again.Body)
 		}

@@ -11,15 +11,15 @@ import { app, mountedIn, table, unrouted } from "../../scripts/addresses.mjs";
 // left unescaped moves a segment or starts a query and fails the match.
 // The fragment mark comes last, because everything after it is not checked.
 const odd = "a/b c?d&f=g%#e";
-const build = { product: odd, stream: odd, variant: odd };
+const build = { product: odd, branch_or_tag: odd, variant: odd };
 
 // One call of every builder, with every part it takes. The set of names is
 // held against what the module exports, so a builder added without a sample
 // fails here rather than going unchecked.
 const SAMPLES: Record<string, () => string[]> = {
   productAt: () => [routes.productAt(odd)],
-  streamsAt: () => [routes.streamsAt(odd)],
-  streamAt: () => [routes.streamAt(odd, odd)],
+  branchesAndTagsAt: () => [routes.branchesAndTagsAt(odd)],
+  branchOrTagAt: () => [routes.branchOrTagAt(odd, odd)],
   variantsAt: () => [routes.variantsAt(odd)],
   comparisonAt: () => [routes.comparisonAt(odd), routes.comparisonAt(odd, { from: odd, to: odd })],
   inventoryComparisonAt: () => [routes.inventoryComparisonAt(odd, { from: odd, to: odd })],
@@ -30,7 +30,7 @@ const SAMPLES: Record<string, () => string[]> = {
   vulnerabilityReportAt: () => [routes.vulnerabilityReportAt(odd, odd)],
   codeFindingsAt: () => [
     routes.codeFindingsAt(odd),
-    routes.codeFindingsAt(odd, { state: "no-longer-detected", stream: odd, variant: odd }),
+    routes.codeFindingsAt(odd, { state: "no-longer-detected", branch_or_tag: odd, variant: odd }),
   ],
   codeFindingAt: () => [routes.codeFindingAt(build, odd)],
   suppressionRulesAt: () => [routes.suppressionRulesAt(odd)],
@@ -80,6 +80,10 @@ const SAMPLES: Record<string, () => string[]> = {
   decisionAt: () => [routes.decisionAt(7)],
   decisionOccurrenceAt: () => [routes.decisionOccurrenceAt(7)],
   issueAt: () => [routes.issueAt(odd)],
+  fromStreamsAt: () => [
+    routes.fromStreamsAt(odd, ""),
+    routes.fromStreamsAt(odd, "main/variants/v/findings"),
+  ],
   personAt: () => [routes.personAt(odd)],
   advisoryAt: () => [routes.advisoryAt(odd)],
   analyticsReportAt: () => [routes.analyticsReportAt(odd)],
@@ -103,18 +107,18 @@ const SAMPLES: Record<string, () => string[]> = {
 describe("an address refiled under another name", () => {
   it("renames the finding and leaves a branch that begins with the name alone", () => {
     const at = routes.findingAt(
-      { product: "sonic", stream: "CVE-2024-6387-fix", variant: "x" },
+      { product: "sonic", branch_or_tag: "CVE-2024-6387-fix", variant: "x" },
       { vulnerability: "CVE-2024-6387", component: "github.com/a/b" },
     );
     const out = routes.refiled(at, "CVE-2024-6387", "CVE-2024-9999");
-    expect(out).toContain("/streams/CVE-2024-6387-fix/");
+    expect(out).toContain("/branches-and-tags/CVE-2024-6387-fix/");
     expect(out).toContain("/findings/CVE-2024-9999/");
     expect(out).toContain("github.com%2Fa%2Fb");
   });
 
   it("escapes a component's name once, whatever characters it holds", () => {
     for (const component of ["libstdc++6", "@scope/x", "50%/y"]) {
-      const before = { product: "sonic", stream: "main", variant: "x" };
+      const before = { product: "sonic", branch_or_tag: "main", variant: "x" };
       const at = routes.findingAt(before, { vulnerability: "CVE-1", component });
       expect(routes.refiled(at, "CVE-1", "CVE-2")).toBe(
         routes.findingAt(before, { vulnerability: "CVE-2", component }),
@@ -173,7 +177,7 @@ describe("where a row opens", () => {
   it("carries the version, because a component name is not unique in a build", () => {
     expect(
       findingAt(
-        { product: "sonic", stream: "main", variant: "broadcom" },
+        { product: "sonic", branch_or_tag: "main", variant: "broadcom" },
         {
           vulnerability: "CVE-2024-1",
           component: "zlib",
@@ -181,13 +185,13 @@ describe("where a row opens", () => {
         },
       ),
     ).toBe(
-      "/products/sonic/streams/main/variants/broadcom/findings/CVE-2024-1/components/zlib?version=1.2.11",
+      "/products/sonic/branches-and-tags/main/variants/broadcom/findings/CVE-2024-1/components/zlib?version=1.2.11",
     );
   });
 
   it("carries the list as one value, so a filter added to the list needs nothing here", () => {
     const at = findingAt(
-      { product: "sonic", stream: "main", variant: "broadcom" },
+      { product: "sonic", branch_or_tag: "main", variant: "broadcom" },
       { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
       "state=undecided&offset=50",
     );
@@ -202,7 +206,7 @@ describe("where a row opens", () => {
   // moment somebody saved over the name.
   it("names the saved filter a prepared decision comes from", () => {
     const at = findingAt(
-      { product: "sonic", stream: "main", variant: "broadcom" },
+      { product: "sonic", branch_or_tag: "main", variant: "broadcom" },
       { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
       "state=undecided",
       "overdue kernel",
@@ -212,7 +216,7 @@ describe("where a row opens", () => {
 
   it("says nothing about a rule where no filter prepares one", () => {
     const at = findingAt(
-      { product: "sonic", stream: "main", variant: "broadcom" },
+      { product: "sonic", branch_or_tag: "main", variant: "broadcom" },
       { vulnerability: "CVE-2024-1", component: "zlib", version: "" },
       "",
     );

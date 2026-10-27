@@ -43,10 +43,10 @@ const PAGE = 200;
 export function Register() {
   const at = useScope();
   const [offset, setOffset] = useState(0);
-  const whole = Boolean(at.product && at.stream && at.variant);
+  const whole = Boolean(at.product && at.branch_or_tag && at.variant);
   const where = {
     product: at.product ?? "",
-    stream: at.stream ?? "",
+    branch_or_tag: at.branch_or_tag ?? "",
     variant: at.variant ?? "",
   };
   // Back to the first page whenever the build changes. The offset is in the
@@ -71,7 +71,7 @@ export function Register() {
     ...(standing ? { standing: "open" as const } : {}),
     ...(closedBy.length > 0 ? { closed_because: closedBy } : {}),
   };
-  const showing = `${where.product}\u0000${where.stream}\u0000${where.variant}\u0000${params.toString()}`;
+  const showing = `${where.product}\u0000${where.branch_or_tag}\u0000${where.variant}\u0000${params.toString()}`;
   const [shown, setShown] = useState(showing);
   if (shown !== showing) {
     setShown(showing);
@@ -84,7 +84,7 @@ export function Register() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register",
           {
             params: {
               path: where,
@@ -478,12 +478,12 @@ function RegisterState({ state }: { state?: string }) {
 // request this page makes, so the browser fetches it with the session it
 // already has.
 function fileAt(
-  at: { product: string; stream: string; variant: string },
+  at: { product: string; branch_or_tag: string; variant: string },
   format: "csv" | "json",
   asked: URLSearchParams,
 ): string {
   return linkedFile(
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register.{format}",
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register.{format}",
     format,
     { path: at, query: asked },
   );

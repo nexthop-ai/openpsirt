@@ -17,7 +17,7 @@ import (
 // back once, and refused when it has not failed.
 func TestAFailedJobIsListedAndPutBackOnce(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		id := r.FailJob(t, queue.Scan, "target:1")
+		id := r.FailJob(t, queue.Scan, "build:1")
 		if _, err := queue.New(r.DB, queue.DefaultOptions()).Add(t.Context(), queue.Parse, "scan:1"); err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +37,7 @@ func TestAFailedJobIsListedAndPutBackOnce(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "admin", "/v1/failed-jobs", &listed)
 		if listed.Total != 1 || len(listed.Items) != 1 || listed.Items[0].ID != id ||
-			listed.Items[0].Kind != queue.Scan || listed.Items[0].Reference != "target:1" {
+			listed.Items[0].Kind != queue.Scan || listed.Items[0].Reference != "build:1" {
 			t.Errorf("the failed jobs list reads as %+v", listed)
 		}
 		if len(listed.Waiting) != len(queue.Kinds()) {

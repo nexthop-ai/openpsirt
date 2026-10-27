@@ -46,7 +46,7 @@ type UploadsOutput struct {
 func registerUploads(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-uploads", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/uploads",
 		Summary: "List upload types and their status",
 		Description: "Returns each kind of upload a build takes, with how many are held and what " +
 			"became of the newest: SBOMs and static analysis runs sent to this build, and VEX " +
@@ -57,18 +57,18 @@ func registerUploads(api huma.API, in core.Deps) {
 			"runs where they read internal findings in the product.",
 		Tags: []string{"Ingest"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
 	}) (*UploadsOutput, error) {
-		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 		out := &UploadsOutput{}
 		out.Body.Items = []UploadKindBody{}
 
-		target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, named.StreamID, named.VariantID)
+		build, err := catalog.NewStore(in.DB.DB).ExistingBuild(ctx, named.BranchOrTagID, named.VariantID)
 		switch {
 		case errors.Is(err, catalog.ErrNotFound):
 			// Declared, and nothing has ever been sent to it.
@@ -79,7 +79,7 @@ func registerUploads(api huma.API, in core.Deps) {
 		case err != nil:
 			return nil, core.WentWrong(in.Logger, "that build could not be looked up", err)
 		default:
-			sbom, err := sbomUploads(ctx, in, subject, target.ID)
+			sbom, err := sbomUploads(ctx, in, subject, build.ID)
 			if errors.Is(err, access.ErrDenied) {
 				return nil, core.NothingScannedThere()
 			}
@@ -87,7 +87,7 @@ func registerUploads(api huma.API, in core.Deps) {
 				return nil, core.WentWrong(in.Logger, "the SBOMs could not be read", err)
 			}
 			out.Body.Items = append(out.Body.Items, sbom)
-			sarif, err := sarifUploads(ctx, in, subject, named.ProductID, target.ID)
+			sarif, err := sarifUploads(ctx, in, subject, named.ProductID, build.ID)
 			switch {
 			case errors.Is(err, access.ErrDenied):
 			case err != nil:
@@ -140,10 +140,10 @@ func latestOf(at time.Time, status ingest.UploadStatus, reason string) *UploadLa
 // sbomUploads is the SBOMs sent to a build, with the newest of them: the
 // newest receipt, or the upload turned away after it.
 func sbomUploads(ctx context.Context, in core.Deps, subject access.Subject,
-	targetID int64) (UploadKindBody, error) {
+	buildID int64) (UploadKindBody, error) {
 
 	store := ingest.NewStore(in.DB.DB)
-	receipts, total, err := store.Receipts(ctx, subject, targetID, 1, 0)
+	receipts, total, err := store.Receipts(ctx, subject, buildID, 1, 0)
 	if err != nil {
 		return UploadKindBody{}, err
 	}
@@ -157,7 +157,7 @@ func sbomUploads(ctx context.Context, in core.Deps, subject access.Subject,
 			ingest.Scanned: ingest.UploadCompleted, ingest.Refused: ingest.UploadFailed,
 		}[r.State], r.Failure)
 	}
-	refused, err := store.LastRefusal(ctx, subject, targetID)
+	refused, err := store.LastRefusal(ctx, subject, buildID)
 	if err != nil {
 		return UploadKindBody{}, err
 	}
@@ -170,10 +170,10 @@ func sbomUploads(ctx context.Context, in core.Deps, subject access.Subject,
 // sarifUploads is the static analysis runs sent to a build, with the newest of
 // them: the newest run, or the upload turned away after it.
 func sarifUploads(ctx context.Context, in core.Deps, subject access.Subject,
-	productID, targetID int64) (UploadKindBody, error) {
+	productID, buildID int64) (UploadKindBody, error) {
 
 	store := series.NewStore(in.DB.DB)
-	sent, total, err := store.Receipts(ctx, subject, productID, targetID,
+	sent, total, err := store.Receipts(ctx, subject, productID, buildID,
 		kind.Analysis, analysis.OpensAt, 1, 0)
 	if err != nil {
 		return UploadKindBody{}, err
@@ -189,7 +189,7 @@ func sarifUploads(ctx context.Context, in core.Deps, subject access.Subject,
 			series.Failed: ingest.UploadFailed,
 		}[series.Status(s.Status)], s.Failure)
 	}
-	refusals, err := store.RefusalsOf(ctx, targetID, kind.Analysis)
+	refusals, err := store.RefusalsOf(ctx, buildID, kind.Analysis)
 	if err != nil {
 		return UploadKindBody{}, err
 	}

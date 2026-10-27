@@ -45,16 +45,16 @@ func registerKeys(api huma.API, a core.Administering) {
 		if err != nil {
 			return nil, err
 		}
-		var streamIDs, variantIDs []int64
+		var branchOrTagIDs, variantIDs []int64
 		for _, key := range keys {
-			if key.StreamID != nil {
-				streamIDs = append(streamIDs, *key.StreamID)
+			if key.BranchOrTagID != nil {
+				branchOrTagIDs = append(branchOrTagIDs, *key.BranchOrTagID)
 			}
 			if key.VariantID != nil {
 				variantIDs = append(variantIDs, *key.VariantID)
 			}
 		}
-		streams, err := names.StreamsByID(ctx, streamIDs)
+		branchesAndTags, err := names.BranchesAndTagsByID(ctx, branchOrTagIDs)
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot list credentials", err)
 		}
@@ -71,7 +71,7 @@ func registerKeys(api huma.API, a core.Administering) {
 				CreatedAt: core.Stamp(key.CreatedAt),
 			}
 			// The address, because create-key resolves this field through
-			// ProductByName — and the Stream and Variant fields beside it
+			// ProductByName — and the Branch or tag and Variant fields beside it
 			// already answer the address. A listing that cannot be used to
 			// remake what it lists is a listing of something else.
 			//
@@ -90,13 +90,13 @@ func registerKeys(api huma.API, a core.Administering) {
 			if product.Display != product.Address {
 				body.ProductDisplayName = product.Display
 			}
-			if key.StreamID != nil {
-				stream, found := streams[*key.StreamID]
+			if key.BranchOrTagID != nil {
+				branchOrTag, found := branchesAndTags[*key.BranchOrTagID]
 				if !found {
 					return nil, core.WentWrong(a.Logger, "cannot list credentials",
-						fmt.Errorf("key %q names stream %d, which is not there", key.Name, *key.StreamID))
+						fmt.Errorf("key %q names branch or tag %d, which is not there", key.Name, *key.BranchOrTagID))
 				}
-				body.Stream = stream.Name
+				body.BranchOrTag = branchOrTag.Name
 			}
 			if key.VariantID != nil {
 				variant, found := variants[*key.VariantID]
@@ -148,13 +148,13 @@ func registerKeys(api huma.API, a core.Administering) {
 			// product. A name that is simply not declared never reaches this
 			// string: undeclared answers those from the error, which already
 			// carries the name and what it was.
-			if in.Body.Stream != "" {
-				stream, err := names.StreamByName(ctx, product.ID, in.Body.Stream)
+			if in.Body.BranchOrTag != "" {
+				branchOrTag, err := names.BranchOrTagByName(ctx, product.ID, in.Body.BranchOrTag)
 				if err != nil {
 					return core.Undeclared(a.Logger, err, "that branch or tag could not be looked up")
 				}
-				scope.StreamID = &stream.ID
-				resolved.Stream = stream.Name
+				scope.BranchOrTagID = &branchOrTag.ID
+				resolved.BranchOrTag = branchOrTag.Name
 			}
 			if in.Body.Variant != "" {
 				variant, err := names.VariantByName(ctx, product.ID, in.Body.Variant)
@@ -188,7 +188,7 @@ func registerKeys(api huma.API, a core.Administering) {
 			return nil, err
 		}
 		return core.Answer(true, KeyBody{
-			Name: name, Product: resolved.Product, Stream: resolved.Stream,
+			Name: name, Product: resolved.Product, BranchOrTag: resolved.BranchOrTag,
 			Variant: resolved.Variant, Secret: secret,
 		}), nil
 	})
@@ -244,8 +244,8 @@ func registerKeys(api huma.API, a core.Administering) {
 // the one that was meant.
 func keyScope(key KeyBody) string {
 	scope := key.Product
-	if key.Stream != "" {
-		scope += " · " + key.Stream
+	if key.BranchOrTag != "" {
+		scope += " · " + key.BranchOrTag
 	}
 	if key.Variant != "" {
 		scope += " · " + key.Variant

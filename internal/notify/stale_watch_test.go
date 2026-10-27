@@ -38,7 +38,7 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, w)
+		build := aScannedBuild(t, w)
 		watch := notify.NewWatch(db.DB, quiet)
 
 		// A month of runs, every one of them against the same data. Nothing
@@ -47,7 +47,7 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 			t.Helper()
 			finished := when.Add(time.Minute)
 			if _, err := db.DB.NewInsert().Model(&finding.Run{
-				TargetID: target, Scanner: "grype", ScannerVersion: "0.112.0",
+				BuildID: build, Scanner: "grype", ScannerVersion: "0.112.0",
 				DatabaseVersion: version, RanHere: true,
 				StartedAt: when, FinishedAt: &finished,
 			}).Exec(ctx); err != nil {
@@ -93,12 +93,12 @@ func TestDataThatMovedRecentlyIsNotReportedAsStale(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, w)
+		build := aScannedBuild(t, w)
 		for day, version := range map[int]string{3: "2026-09-15", 1: "2026-09-17"} {
 			at := time.Now().UTC().Add(-time.Duration(day) * 24 * time.Hour)
 			finished := at.Add(time.Minute)
 			if _, err := db.DB.NewInsert().Model(&finding.Run{
-				TargetID: target, Scanner: "grype", DatabaseVersion: version,
+				BuildID: build, Scanner: "grype", DatabaseVersion: version,
 				RanHere: true, StartedAt: at, FinishedAt: &finished,
 			}).Exec(ctx); err != nil {
 				t.Fatal(err)
@@ -118,20 +118,20 @@ func TestDataThatMovedRecentlyIsNotReportedAsStale(t *testing.T) {
 	})
 }
 
-// aScannedTarget files a scan against the world's build, so that the deployment
+// aScannedBuild files a scan against the world's build, so that the deployment
 // is not also reported as having gone quiet.
-func aScannedTarget(t *testing.T, w *fixture.World) int64 {
+func aScannedBuild(t *testing.T, w *fixture.World) int64 {
 	t.Helper()
 	db := w.DB
 	ctx := t.Context()
-	target := w.Target
+	build := w.Build
 	if _, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "scanned",
+		BuildID: build.ID, ContentHash: "scanned",
 		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	return target.ID
+	return build.ID
 }
 
 func TestAStaleAlertNamesTheDataInForceRatherThanTheDataItWasRaisedFor(t *testing.T) {
@@ -149,13 +149,13 @@ func TestAStaleAlertNamesTheDataInForceRatherThanTheDataItWasRaisedFor(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, w)
+		build := aScannedBuild(t, w)
 		ranAt := func(daysAgo int, version string) {
 			t.Helper()
 			at := time.Now().UTC().Add(-time.Duration(daysAgo) * 24 * time.Hour)
 			finished := at.Add(time.Minute)
 			if _, err := db.DB.NewInsert().Model(&finding.Run{
-				TargetID: target, Scanner: "grype", DatabaseVersion: version,
+				BuildID: build, Scanner: "grype", DatabaseVersion: version,
 				RanHere: true, StartedAt: at, FinishedAt: &finished,
 			}).Exec(ctx); err != nil {
 				t.Fatal(err)
@@ -233,8 +233,8 @@ func TestAVersionComingBackIsNotTheDataStandingStill(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, w)
-		ran := ranOn(t, db, target)
+		build := aScannedBuild(t, w)
+		ran := ranOn(t, db, build)
 
 		// Last quarter's bundle, then a fetch two days ago, then the old
 		// bundle restored today. The data moved two days ago, so under the
@@ -271,8 +271,8 @@ func TestTwoReplicasADataFetchApartDoNotAlternate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, w)
-		ran := ranOn(t, db, target)
+		build := aScannedBuild(t, w)
+		ran := ranOn(t, db, build)
 
 		// One replica has been on the same data for two months; the other
 		// fetched two days ago. Both keep scanning, and which of them finished
@@ -318,10 +318,10 @@ func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		target := aScannedTarget(t, w)
+		build := aScannedBuild(t, w)
 		finished := time.Now().UTC().Add(-18*time.Hour + time.Minute)
 		if _, err := db.DB.NewInsert().Model(&finding.Run{
-			TargetID: target, Scanner: "grype", DatabaseVersion: "2026-09-18",
+			BuildID: build, Scanner: "grype", DatabaseVersion: "2026-09-18",
 			RanHere: true, StartedAt: time.Now().UTC().Add(-18 * time.Hour),
 			FinishedAt: &finished,
 		}).Exec(ctx); err != nil {
@@ -372,7 +372,7 @@ func TestTheDataInForceIsTheNewestVersionDatedFromWhenItFirstArrived(t *testing.
 			t.Fatalf("with nothing run the data reads %+v", none)
 		}
 
-		ran := ranOn(t, db, aScannedTarget(t, w))
+		ran := ranOn(t, db, aScannedBuild(t, w))
 		ran(9, "v5:2026-01-01")
 		ran(5, "v5:2026-01-05")
 		ran(2, "v5:2026-01-05")
@@ -390,14 +390,14 @@ func TestTheDataInForceIsTheNewestVersionDatedFromWhenItFirstArrived(t *testing.
 	})
 }
 
-func ranOn(t *testing.T, db *database.DB, target int64) func(daysAgo int, version string) {
+func ranOn(t *testing.T, db *database.DB, build int64) func(daysAgo int, version string) {
 	t.Helper()
 	return func(daysAgo int, version string) {
 		t.Helper()
 		at := time.Now().UTC().Add(-time.Duration(daysAgo) * 24 * time.Hour)
 		finished := at.Add(time.Minute)
 		if _, err := db.DB.NewInsert().Model(&finding.Run{
-			TargetID: target, Scanner: "grype", DatabaseVersion: version,
+			BuildID: build, Scanner: "grype", DatabaseVersion: version,
 			RanHere: true, StartedAt: at, FinishedAt: &finished,
 		}).Exec(t.Context()); err != nil {
 			t.Fatal(err)

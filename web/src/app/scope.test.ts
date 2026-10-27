@@ -13,7 +13,7 @@ import {
   scopeQuery,
 } from "./scope";
 
-const BUILD = "/products/sonic/streams/master/variants/broadcom";
+const BUILD = "/products/sonic/branches-and-tags/master/variants/broadcom";
 
 describe("which screens need a whole build", () => {
   it("keeps the screens that are about a way down", () => {
@@ -40,15 +40,15 @@ describe("which screens need a whole build", () => {
 
 describe("where a selection's findings live", () => {
   it("keeps a whole build on the address its other screens share", () => {
-    expect(findingsPath({ product: "sonic", stream: "master", variant: "broadcom" })).toBe(
+    expect(findingsPath({ product: "sonic", branch_or_tag: "master", variant: "broadcom" })).toBe(
       `${BUILD}/findings`,
     );
   });
 
   it("carries the levels that are set, and only those", () => {
     expect(findingsPath({ product: "sonic" })).toBe("/products/sonic/findings");
-    expect(findingsPath({ product: "sonic", stream: "master" })).toBe(
-      "/products/sonic/findings?stream=master",
+    expect(findingsPath({ product: "sonic", branch_or_tag: "master" })).toBe(
+      "/products/sonic/findings?branch_or_tag=master",
     );
     // The levels are independent: a variant across every branch is a real
     // question rather than a mistake.
@@ -58,8 +58,8 @@ describe("where a selection's findings live", () => {
   });
 
   it("escapes what somebody named", () => {
-    expect(findingsPath({ product: "a/b", stream: "release 1.0" })).toBe(
-      "/products/a%2Fb/findings?stream=release+1.0",
+    expect(findingsPath({ product: "a/b", branch_or_tag: "release 1.0" })).toBe(
+      "/products/a%2Fb/findings?branch_or_tag=release+1.0",
     );
   });
 
@@ -69,14 +69,18 @@ describe("where a selection's findings live", () => {
 
   it("keeps a filter apart from the levels the address already carries", () => {
     const overdue = { running: "overdue" };
-    expect(findingsPath({ product: "sonic", stream: "master" }, false, overdue)).toBe(
-      "/products/sonic/findings?stream=master&running=overdue",
+    expect(findingsPath({ product: "sonic", branch_or_tag: "master" }, false, overdue)).toBe(
+      "/products/sonic/findings?branch_or_tag=master&running=overdue",
     );
     expect(findingsPath({ product: "sonic" }, false, overdue)).toBe(
       "/products/sonic/findings?running=overdue",
     );
     expect(
-      findingsPath({ product: "sonic", stream: "master", variant: "broadcom" }, false, overdue),
+      findingsPath(
+        { product: "sonic", branch_or_tag: "master", variant: "broadcom" },
+        false,
+        overdue,
+      ),
     ).toBe(`${BUILD}/findings?running=overdue`);
     expect(findingsPath({}, false, overdue)).toBe("/findings?running=overdue");
   });
@@ -91,8 +95,10 @@ describe("where a selection's findings live", () => {
 });
 
 // Every address the router answers under one product, with that product in it.
+// A pattern ending in a wildcard forwards whatever it matches, so it names no
+// one address.
 const UNDER = Object.values(ROUTES)
-  .filter((pattern) => pattern.startsWith("/products/:product"))
+  .filter((pattern) => pattern.startsWith("/products/:product") && !pattern.endsWith("*"))
   .map((pattern) =>
     pattern.replace(/:([a-z]+)/g, (_, name) => (name === "product" ? "sonic" : name)),
   );
@@ -106,21 +112,21 @@ describe("an address that names a product", () => {
   });
 
   it("keeps the branch and variant remembered for the same product where it names none", () => {
-    const kept = { product: "sonic", stream: "master", variant: "broadcom" };
+    const kept = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
     expect(scopeAt("/products/sonic/components/openssl", "", kept)).toEqual(kept);
     expect(scopeAt("/products/sonic/vulnerability-reports", "", kept)).toEqual(kept);
     // Another product's branch is not this one's.
     expect(scopeAt("/products/gnmi/components/openssl", "", kept)).toEqual({ product: "gnmi" });
     // An address that names its own levels is the authority for them.
-    expect(scopeAt("/products/sonic/streams/release", "", kept)).toEqual({
+    expect(scopeAt("/products/sonic/branches-and-tags/release", "", kept)).toEqual({
       product: "sonic",
-      stream: "release",
+      branch_or_tag: "release",
     });
   });
 
   it("moves to the product picked in its place", () => {
     for (const path of UNDER) {
-      const to = { product: "gnmi", stream: "master", variant: "broadcom" };
+      const to = { product: "gnmi", branch_or_tag: "master", variant: "broadcom" };
       const next = rescoped(path, to);
       expect(next, path).not.toBeNull();
       expect(next?.startsWith("/products/gnmi"), `${path} went to ${next}`).toBe(true);
@@ -133,15 +139,15 @@ describe("changing scope stays on the screen", () => {
     expect(
       rescoped(`${BUILD}/dependencies`, {
         product: "sonic",
-        stream: "202411",
+        branch_or_tag: "202411",
         variant: "mellanox",
       }),
-    ).toBe("/products/sonic/streams/202411/variants/mellanox/dependencies");
+    ).toBe("/products/sonic/branches-and-tags/202411/variants/mellanox/dependencies");
   });
 
   it("lands a run or an inventory's changes on the new build's uploads", () => {
-    const to = { product: "sonic", stream: "master", variant: "mellanox" };
-    const there = "/products/sonic/streams/master/variants/mellanox/uploads";
+    const to = { product: "sonic", branch_or_tag: "master", variant: "mellanox" };
+    const there = "/products/sonic/branches-and-tags/master/variants/mellanox/uploads";
     expect(rescoped(`${BUILD}/runs/7`, to)).toBe(there);
     expect(rescoped(`${BUILD}/uploads/9/changes`, to)).toBe(there);
   });
@@ -149,19 +155,19 @@ describe("changing scope stays on the screen", () => {
   it("keeps a segment that carries an escaped slash as one segment", () => {
     const tail = "/findings/CVE-1/components/github.com%2Fsirupsen%2Flogrus";
     expect(
-      rescoped(`/products/sonic/streams/master/variants/broadcom${tail}`, {
+      rescoped(`/products/sonic/branches-and-tags/master/variants/broadcom${tail}`, {
         product: "sonic",
-        stream: "202411",
+        branch_or_tag: "202411",
         variant: "mellanox",
       }),
-    ).toBe(`/products/sonic/streams/202411/variants/mellanox${tail}`);
+    ).toBe(`/products/sonic/branches-and-tags/202411/variants/mellanox${tail}`);
   });
 
   it("narrows the wider list onto the build it was given", () => {
     expect(
       rescoped("/products/sonic/findings", {
         product: "sonic",
-        stream: "master",
+        branch_or_tag: "master",
         variant: "broadcom",
       }),
     ).toBe(`${BUILD}/findings`);
@@ -169,7 +175,7 @@ describe("changing scope stays on the screen", () => {
 
   it("leaves anything else where it is", () => {
     expect(
-      rescoped("/review-queue", { product: "sonic", stream: "master", variant: "broadcom" }),
+      rescoped("/review-queue", { product: "sonic", branch_or_tag: "master", variant: "broadcom" }),
     ).toBe(null);
   });
 
@@ -177,7 +183,9 @@ describe("changing scope stays on the screen", () => {
     // Staying put on these is not staying put: the path re-supplies the old
     // product, which overwrites the choice that was just made.
     expect(rescoped("/products/sonic", { product: "gnmi" })).toBe("/products/gnmi");
-    expect(rescoped("/products/sonic/streams", { product: "gnmi" })).toBe("/products/gnmi/streams");
+    expect(rescoped("/products/sonic/branches-and-tags", { product: "gnmi" })).toBe(
+      "/products/gnmi/branches-and-tags",
+    );
     expect(rescoped("/products/sonic/variants", { product: "gnmi" })).toBe(
       "/products/gnmi/variants",
     );
@@ -189,29 +197,35 @@ describe("changing scope stays on the screen", () => {
   it("drops what belonged to the product that was there", () => {
     // A branch is one product's, so it cannot carry across to another; the
     // address falls back to the new product's branch list.
-    expect(rescoped("/products/sonic/streams/master", { product: "gnmi" })).toBe(
-      "/products/gnmi/streams",
+    expect(rescoped("/products/sonic/branches-and-tags/master", { product: "gnmi" })).toBe(
+      "/products/gnmi/branches-and-tags",
     );
     // A component is the same: it exists in one product's builds.
     expect(rescoped("/products/sonic/components/libnl-3-200", { product: "gnmi" })).toBe(
       "/products/gnmi",
     );
     // A branch that is part of the new selection is kept.
-    expect(rescoped("/products/sonic/streams/master", { product: "gnmi", stream: "202411" })).toBe(
-      "/products/gnmi/streams/202411",
-    );
+    expect(
+      rescoped("/products/sonic/branches-and-tags/master", {
+        product: "gnmi",
+        branch_or_tag: "202411",
+      }),
+    ).toBe("/products/gnmi/branches-and-tags/202411");
   });
 
   it("sends every product to the catalog", () => {
     expect(rescoped("/products/sonic", {})).toBe("/products");
-    expect(rescoped("/products/sonic/streams/master", {})).toBe("/products");
+    expect(rescoped("/products/sonic/branches-and-tags/master", {})).toBe("/products");
   });
 
   it("stays put where the address already names what was chosen", () => {
     expect(rescoped("/products/sonic", { product: "sonic" })).toBe(null);
-    expect(rescoped("/products/sonic/streams/master", { product: "sonic", stream: "master" })).toBe(
-      null,
-    );
+    expect(
+      rescoped("/products/sonic/branches-and-tags/master", {
+        product: "sonic",
+        branch_or_tag: "master",
+      }),
+    ).toBe(null);
   });
 
   it("escapes a product somebody named with a slash in it", () => {
@@ -237,9 +251,9 @@ describe("the selection as a request", () => {
     // A branch or a variant without a product is refused by the server rather
     // than guessed at, so sending one turns a selection nobody can make into
     // an error somebody has to read.
-    expect(scopeQuery({ stream: "master" })).toEqual({});
+    expect(scopeQuery({ branch_or_tag: "master" })).toEqual({});
     expect(scopeQuery({ variant: "broadcom" })).toEqual({});
-    expect(scopeQuery({ stream: "master", variant: "broadcom" })).toEqual({});
+    expect(scopeQuery({ branch_or_tag: "master", variant: "broadcom" })).toEqual({});
   });
 
   it("sends each level that is selected, and no level that is not", () => {
@@ -250,9 +264,9 @@ describe("the selection as a request", () => {
       product: "sonic",
       variant: "broadcom",
     });
-    expect(scopeQuery({ product: "sonic", stream: "master", variant: "broadcom" })).toEqual({
+    expect(scopeQuery({ product: "sonic", branch_or_tag: "master", variant: "broadcom" })).toEqual({
       product: "sonic",
-      stream: "master",
+      branch_or_tag: "master",
       variant: "broadcom",
     });
   });
@@ -267,11 +281,11 @@ describe("what is remembered about where somebody is working", () => {
     // The session store, not the local one: it is where somebody is working
     // right now rather than a preference, and a second tab looking at another
     // product must not drag the first one with it.
-    remember({ product: "sonic", stream: "master" });
+    remember({ product: "sonic", branch_or_tag: "master" });
     expect(window.localStorage.getItem("openpsirt.scope")).toBeNull();
     expect(JSON.parse(window.sessionStorage.getItem("openpsirt.scope") ?? "null")).toEqual({
       product: "sonic",
-      stream: "master",
+      branch_or_tag: "master",
     });
   });
 

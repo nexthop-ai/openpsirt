@@ -44,7 +44,7 @@ type ListedInventoryChanges = core.ListOutput[InventoryChangeBody]
 func registerInventoryChanges(api huma.API, in core.Deps) {
 	core.RegisterWithFormer(api, core.Requiring(huma.Operation{
 		OperationID: "list-inventory-changes", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/changes",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms/{sbom}/changes",
 		Summary: "List what an upload changed about a build's inventory",
 		Description: "Returns the component names this upload added, removed and moved to " +
 			"different versions, against the upload read before it. Removals first, then " +
@@ -56,22 +56,22 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 			"rather than a change to one, and for an upload nothing has read yet.",
 		Tags: []string{"Scans"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string          `path:"product"`
-		Stream  string          `path:"stream"`
-		Variant string          `path:"variant"`
-		Scan    int64           `path:"sbom" doc:"The upload, as a receipt names it"`
-		Change  core.ChangeKind `query:"change" doc:"One kind of change alone"`
-		Limit   int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
-		Offset  int             `query:"offset" minimum:"0" doc:"The number skipped"`
+		Product     string          `path:"product"`
+		BranchOrTag string          `path:"branch_or_tag"`
+		Variant     string          `path:"variant"`
+		Scan        int64           `path:"sbom" doc:"The upload, as a receipt names it"`
+		Change      core.ChangeKind `query:"change" doc:"One kind of change alone"`
+		Limit       int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
+		Offset      int             `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ListedInventoryChanges, error) {
-		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 
 		out := &ListedInventoryChanges{}
 		out.Body.Items = []InventoryChangeBody{}
-		target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, named.StreamID, named.VariantID)
+		build, err := catalog.NewStore(in.DB.DB).ExistingBuild(ctx, named.BranchOrTagID, named.VariantID)
 		switch {
 		case errors.Is(err, catalog.ErrNotFound):
 			// Declared, and nothing has ever been filed against it.
@@ -80,7 +80,7 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "what the upload changed could not be read", err)
 		}
 
-		changes, total, err := graph.NewStore(in.DB.DB).Changes(ctx, subject, target.ID,
+		changes, total, err := graph.NewStore(in.DB.DB).Changes(ctx, subject, build.ID,
 			input.Scan, graph.ChangeKind(input.Change), input.Limit, input.Offset)
 		switch {
 		case errors.Is(err, access.ErrDenied):
@@ -120,7 +120,7 @@ type ListedInventoryDifferences = core.ListOutput[InventoryDifferenceBody]
 func (pair TwoBuilds) differences(ctx context.Context, in core.Deps, subject access.Subject,
 	product string, only string, limit, offset int) ([]graph.Change, int, error) {
 
-	from, to, err := pair.targets(ctx, in, subject, product)
+	from, to, err := pair.buildIDs(ctx, in, subject, product)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -150,7 +150,7 @@ func registerInventoryComparison(api huma.API, in core.Deps) {
 		Description: "Returns the component names the later build added, removed and holds at " +
 			"different versions, against the earlier build. Removals first, then " +
 			"arrivals, then the names at different versions.\n\n" +
-			"Any two builds of one product, across streams and variants. Each is compared " +
+			"Any two builds of one product, across branches and tags and variants. Each is compared " +
 			"as its most recent inventory stands.\n\n" +
 			"Counted by name, as the listing of one upload is. A name either build holds " +
 			"at several versions carries all of them on each side.\n\n" +

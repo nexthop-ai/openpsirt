@@ -23,17 +23,17 @@ func TestAScanInAnUnseenProductAnswersAsNoScan(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
 		db := w.DB
-		product, target := w.Product, w.Target
+		product, build := w.Product, w.Build
 		other := w.DeclareProduct("onie", "Open Network Install Environment")
 		s := ingest.NewStore(db.DB)
-		scan, _, err := s.Record(ctx, arriving(target.ID, "held", time.Now().UTC().Add(-time.Hour)))
+		scan, _, err := s.Record(ctx, arriving(build.ID, "held", time.Now().UTC().Add(-time.Hour)))
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		reader := access.NewPerson(1, "reader", false,
 			map[int64][]access.Role{product.ID: {access.PublicRead}}, 0)
-		if _, err := s.Of(ctx, reader, target.ID, scan.ID); err != nil {
+		if _, err := s.Of(ctx, reader, build.ID, scan.ID); err != nil {
 			t.Fatalf("somebody who reads the product could not read its scan: %v", err)
 		}
 
@@ -43,7 +43,7 @@ func TestAScanInAnUnseenProductAnswersAsNoScan(t *testing.T) {
 			"a pipeline scoped to another product": access.NewPipeline(3, "key-1",
 				access.Scope{ProductID: other.ID}),
 		} {
-			if got, err := s.Of(ctx, subject, target.ID, scan.ID); !errors.Is(err, ingest.ErrNoScan) {
+			if got, err := s.Of(ctx, subject, build.ID, scan.ID); !errors.Is(err, ingest.ErrNoScan) {
 				t.Errorf("%s got %+v and %v, want no scan", name, got, err)
 			}
 		}

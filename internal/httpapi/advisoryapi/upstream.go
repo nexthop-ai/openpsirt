@@ -40,7 +40,7 @@ type OfferBody struct {
 	Statement     int64  `json:"statement" doc:"The statement, by its identifier. Pass as from_statement when proposing a decision from it"`
 	Finding       int64  `json:"finding" doc:"The open finding it speaks about"`
 	Product       string `json:"product" doc:"The product the finding is in, by name"`
-	Stream        string `json:"stream" doc:"The branch or tag of the build the finding is in"`
+	BranchOrTag   string `json:"branch_or_tag" doc:"The branch or tag of the build the finding is in"`
 	Variant       string `json:"variant" doc:"The variant of the build the finding is in"`
 	Publisher     string `json:"publisher" doc:"The upstream that published it"`
 	Issue         string `json:"issue" doc:"The issue"`
@@ -281,7 +281,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 		for _, one := range offers {
 			out.Body.Items = append(out.Body.Items, OfferBody{
 				Statement: one.Statement, Finding: one.Finding, Product: named[one.Product],
-				Stream: one.Stream, Variant: one.Variant,
+				BranchOrTag: one.BranchOrTag, Variant: one.Variant,
 				Publisher: one.Publisher, Issue: one.Issue, Component: one.Component,
 				Version: one.Version, Status: one.Status, Justification: one.Justified,
 				Reasoning: one.Reasoning, Within: one.Within, Document: one.Document,

@@ -31,9 +31,9 @@ func TestADocumentComesBackExactlyAsItArrived(t *testing.T) {
 	// It is read back to be parsed and, for a tagged release, years later to
 	// be re-scanned. A document that does not survive the round trip is a
 	// release nobody can answer questions about.
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
-		rec, outcome, err := s.Record(ctx, arriving(targetID, "hash-1", time.Now().UTC().Add(-time.Hour)))
+		rec, outcome, err := s.Record(ctx, arriving(buildID, "hash-1", time.Now().UTC().Add(-time.Hour)))
 		if err != nil || outcome != ingest.Accept {
 			t.Fatalf("record: %v %v", outcome, err)
 		}
@@ -66,9 +66,9 @@ func TestADocumentComesBackExactlyAsItArrived(t *testing.T) {
 func TestAnEmptyDocumentIsStillADocument(t *testing.T) {
 	// A build sending an empty part is sending something we should refuse for
 	// a reason we can name, not something that reads back as content.
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
-		rec, _, err := s.Record(ctx, arriving(targetID, "hash-1", time.Now().UTC().Add(-time.Hour)))
+		rec, _, err := s.Record(ctx, arriving(buildID, "hash-1", time.Now().UTC().Add(-time.Hour)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,9 +90,9 @@ func TestAnEmptyDocumentIsStillADocument(t *testing.T) {
 func TestASuppressionSetIsSeveralDocuments(t *testing.T) {
 	// A build's suppressions are a directory rather than a file, so more than
 	// one document of the same kind belongs to one scan.
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
-		rec, _, err := s.Record(ctx, arriving(targetID, "hash-1", time.Now().UTC().Add(-time.Hour)))
+		rec, _, err := s.Record(ctx, arriving(buildID, "hash-1", time.Now().UTC().Add(-time.Hour)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,9 +133,9 @@ func TestDiscardingLetsGoOfTheContentsAndKeepsTheRecord(t *testing.T) {
 	// tens of megabytes, and it carries the hash — which is what a
 	// re-parse needs, because a re-parse means asking the build to send
 	// the file again and the second copy is otherwise taken on trust.
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
-		rec, _, err := s.Record(ctx, arriving(targetID, "hash-1", time.Now().UTC().Add(-time.Hour)))
+		rec, _, err := s.Record(ctx, arriving(buildID, "hash-1", time.Now().UTC().Add(-time.Hour)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -183,12 +183,12 @@ func TestDiscardingLetsGoOfTheContentsAndKeepsTheRecord(t *testing.T) {
 }
 
 // A document let go while it is read runs out of parts before its size. The
-// stream ends in an error rather than cleanly, so a reader does not take the
+// branch or tag ends in an error rather than cleanly, so a reader does not take the
 // bytes it got for the whole document.
 func TestADocumentLetGoWhileItIsReadEndsShortWithAnError(t *testing.T) {
-	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {
 		ctx := t.Context()
-		rec, _, err := s.Record(ctx, arriving(targetID, "hash-1", time.Now().UTC().Add(-time.Hour)))
+		rec, _, err := s.Record(ctx, arriving(buildID, "hash-1", time.Now().UTC().Add(-time.Hour)))
 		if err != nil {
 			t.Fatal(err)
 		}

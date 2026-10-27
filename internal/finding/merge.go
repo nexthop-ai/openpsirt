@@ -414,12 +414,12 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 		return fmt.Errorf("read what is open against %s: %w", gone.Identifier, err)
 	}
 	type spot struct {
-		target, component, consumer int64
+		build, component, consumer int64
 	}
 	first := map[spot]Finding{}
 	var twice []int64
 	for _, f := range open {
-		at := spot{f.TargetID, f.ComponentID, value(f.ConsumerID)}
+		at := spot{f.BuildID, f.ComponentID, value(f.ConsumerID)}
 		stays, held := first[at]
 		if !held {
 			first[at] = f

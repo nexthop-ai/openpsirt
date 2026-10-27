@@ -69,7 +69,7 @@ func TestWhatIsOutOfSupportIsListedBecauseNothingElseCountsIt(t *testing.T) {
 				after.Total, after.Items)
 		}
 		row := after.Items[0]
-		if row.Product != "mine" || row.Stream != "master" {
+		if row.Product != "mine" || row.BranchOrTag != "master" {
 			t.Errorf("the wrong release is out of support: %+v", row)
 		}
 		if row.EndedOn != "2020-01-01" {
@@ -148,24 +148,24 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 
 		asked := func(t *testing.T, query string) struct {
 			Items []struct {
-				Stream string `json:"stream"`
+				BranchOrTag string `json:"branch_or_tag"`
 			} `json:"items"`
 			Ending []struct {
-				Stream    string `json:"stream"`
-				EndedDays int    `json:"ended_days"`
-				Ended     bool   `json:"ended"`
+				BranchOrTag string `json:"branch_or_tag"`
+				EndedDays   int    `json:"ended_days"`
+				Ended       bool   `json:"ended"`
 			} `json:"ending"`
 			EndingOpen int `json:"ending_open"`
 		} {
 			t.Helper()
 			var out struct {
 				Items []struct {
-					Stream string `json:"stream"`
+					BranchOrTag string `json:"branch_or_tag"`
 				} `json:"items"`
 				Ending []struct {
-					Stream    string `json:"stream"`
-					EndedDays int    `json:"ended_days"`
-					Ended     bool   `json:"ended"`
+					BranchOrTag string `json:"branch_or_tag"`
+					EndedDays   int    `json:"ended_days"`
+					Ended       bool   `json:"ended"`
 				} `json:"ending"`
 				EndingOpen int `json:"ending_open"`
 			}
@@ -185,7 +185,7 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		if len(ahead.Items) != 0 {
 			t.Errorf("a release that has not ended is listed as out of support: %+v", ahead.Items)
 		}
-		if len(ahead.Ending) != 1 || ahead.Ending[0].Stream != "master" {
+		if len(ahead.Ending) != 1 || ahead.Ending[0].BranchOrTag != "master" {
 			t.Fatalf("the release about to go is not in the warning: %+v", ahead.Ending)
 		}
 		if ahead.Ending[0].Ended {
@@ -220,7 +220,7 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		if len(ordered.Ending) != 2 {
 			t.Fatalf("two releases are about to go and %d came back", len(ordered.Ending))
 		}
-		if ordered.Ending[0].Stream != "v1.0" || ordered.Ending[0].EndedDays != -3 {
+		if ordered.Ending[0].BranchOrTag != "v1.0" || ordered.Ending[0].EndedDays != -3 {
 			t.Errorf("the soonest is not first: %+v", ordered.Ending)
 		}
 

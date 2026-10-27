@@ -268,7 +268,7 @@ func TestACodeFindingPastItsEndOfLifeIsNotAssigned(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := httpapitest.SeededCodeFinding(t, r)
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
-		if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"branch_or_tag"`).Set(`"eol_on" = ?`, ended).
 			Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -289,7 +289,7 @@ func TestTheUnassignedListLeavesOutACodeFindingPastItsEndOfLife(t *testing.T) {
 			t.Fatalf("the unassigned list holds code findings %v; want the seeded code finding, or this checks nothing", got)
 		}
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
-		if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"branch_or_tag"`).Set(`"eol_on" = ?`, ended).
 			Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

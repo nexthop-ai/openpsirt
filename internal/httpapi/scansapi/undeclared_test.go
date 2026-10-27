@@ -15,11 +15,11 @@ func TestAScanDocumentNamesTheMissingPartAsTheReceiptsDo(t *testing.T) {
 	// A branch or a variant the product does not declare is answered in the
 	// words the receipts list answers it in, naming the part that is missing.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		for _, build := range []struct{ stream, variant, missing string }{
+		for _, build := range []struct{ branchOrTag, variant, missing string }{
 			{"no-such-branch", "broadcom", "no-such-branch"},
 			{"master", "no-such-variant", "no-such-variant"},
 		} {
-			at := "/v1/products/mine/branches-and-tags/" + build.stream + "/variants/" + build.variant + "/sboms"
+			at := "/v1/products/mine/branches-and-tags/" + build.branchOrTag + "/variants/" + build.variant + "/sboms"
 			receipts := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, "")
 			document := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at+"/1/documents/1", "")
 			if document.Code != http.StatusNotFound || receipts.Code != http.StatusNotFound {

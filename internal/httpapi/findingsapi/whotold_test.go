@@ -25,7 +25,7 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 		// clock rule exists for.
 		arrived := time.Now().UTC().AddDate(0, 0, -14).Format(time.DateOnly)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200",`+
 				`"reported_by":"A. Researcher","contact":"a@example.org",`+
@@ -172,7 +172,7 @@ func TestWhoToldUsNeedsTheRightItSaysItNeeds(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200",`+
 				`"reported_by":"A. Researcher","contact":"a@example.org"}`)

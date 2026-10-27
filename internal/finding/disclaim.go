@@ -36,7 +36,7 @@ const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)
 // and records the row after at one moment. Held to the kind of `f`, so the
 // later rows are of a kind the outer query already reads.
 const LatestAtItsOccurrence = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
-	WHERE "lt"."target_id" = "f"."target_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
+	WHERE "lt"."build_id" = "f"."build_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
 	  AND "lt"."occurrence_identity" = "f"."occurrence_identity" AND "lt"."kind" = "f"."kind"
 	  AND "lt"."id" > "f"."id")`
 
@@ -88,7 +88,7 @@ type placer struct {
 }
 
 // placing reads the build's root and turns its places into a placer.
-func placing(ctx context.Context, db bun.IDB, targetID int64, inv inventory,
+func placing(ctx context.Context, db bun.IDB, buildID int64, inv inventory,
 	places consumers) (*placer, error) {
 
 	p := &placer{inv: inv, children: map[int64][]int64{}, placed: map[string]*placement{},
@@ -104,7 +104,7 @@ func placing(ctx context.Context, db bun.IDB, targetID int64, inv inventory,
 	if err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).
 		Scan(ctx, &roots); err != nil {
@@ -113,7 +113,7 @@ func placing(ctx context.Context, db bun.IDB, targetID int64, inv inventory,
 	if len(roots) > 0 {
 		p.root = roots[0]
 	}
-	images, err := graph.StatedImages(ctx, db, targetID)
+	images, err := graph.StatedImages(ctx, db, buildID)
 	if err != nil {
 		return nil, err
 	}

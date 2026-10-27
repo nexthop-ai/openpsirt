@@ -65,7 +65,7 @@ func deployment(t *testing.T) (*httptest.Server, *[]*http.Request) {
 }
 
 func upload(url string, rest ...string) []string {
-	return append([]string{"upload", "--url", url, "--product", "p", "--stream", "s", "--variant", "v", "--series", "lint"}, rest...)
+	return append([]string{"upload", "--url", url, "--product", "p", "--branch-or-tag", "s", "--variant", "v", "--series", "lint"}, rest...)
 }
 
 func TestTheKeyIsReadFromTheEnvironmentAlone(t *testing.T) {
@@ -141,7 +141,7 @@ func TestTheOutputOfTwoAnalyzersIsAnUploadOfEach(t *testing.T) {
 	_, sarif := checkout(t)
 	srv, got := deployment(t)
 	t.Setenv("OPENPSIRT_KEY", "secret")
-	args := []string{"upload", "--url", srv.URL, "--product", "p", "--stream", "s", "--variant", "v",
+	args := []string{"upload", "--url", srv.URL, "--product", "p", "--branch-or-tag", "s", "--variant", "v",
 		"--series", "lint=lint/all", "--series", "check=check/all", sarif, second(t)}
 	if err := run(context.Background(), args, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
@@ -170,7 +170,7 @@ func TestOneAnalyzersRulesAreRefusedForTheOutputOfTwo(t *testing.T) {
 	_, sarif := checkout(t)
 	srv, got := deployment(t)
 	t.Setenv("OPENPSIRT_KEY", "secret")
-	args := []string{"upload", "--url", srv.URL, "--product", "p", "--stream", "s", "--variant", "v",
+	args := []string{"upload", "--url", srv.URL, "--product", "p", "--branch-or-tag", "s", "--variant", "v",
 		"--series", "lint=lint/all", "--series", "check=check/all", "--rule", "r1", sarif, second(t)}
 	if err := run(context.Background(), args, &bytes.Buffer{}, &bytes.Buffer{}); err == nil || len(*got) != 0 {
 		t.Errorf("err %v, %d sent; want the rules refused before anything is sent", err, len(*got))
@@ -193,7 +193,7 @@ func TestOneUploadRefusedDoesNotKeepTheOthersFromBeingSent(t *testing.T) {
 	t.Cleanup(srv.Close)
 	t.Setenv("OPENPSIRT_KEY", "secret")
 	var stdout bytes.Buffer
-	args := []string{"upload", "--url", srv.URL, "--product", "p", "--stream", "s", "--variant", "v",
+	args := []string{"upload", "--url", srv.URL, "--product", "p", "--branch-or-tag", "s", "--variant", "v",
 		"--series", "lint=lint/all", "--series", "check=check/all", sarif, second(t)}
 	err := run(context.Background(), args, &stdout, &bytes.Buffer{})
 	if len(got) != 2 {

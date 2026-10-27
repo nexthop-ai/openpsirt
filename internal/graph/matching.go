@@ -104,11 +104,11 @@ type Unmatched struct {
 // Worked out when asked, from the same rows the scanner is given. A build
 // holds thousands of components rather than millions, and the reasons are read
 // from an identifier's qualifiers, which no engine parses alike.
-func (s *Store) Unmatched(ctx context.Context, subject access.Subject, targetID int64) ([]Unmatched, int, error) {
-	if _, _, err := s.visibleIn(ctx, subject, targetID); err != nil {
+func (s *Store) Unmatched(ctx context.Context, subject access.Subject, buildID int64) ([]Unmatched, int, error) {
+	if _, _, err := s.visibleIn(ctx, subject, buildID); err != nil {
 		return nil, 0, err
 	}
-	held, err := s.CurrentComponents(ctx, targetID)
+	held, err := s.CurrentComponents(ctx, buildID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -137,8 +137,8 @@ func (s *Store) Unmatched(ctx context.Context, subject access.Subject, targetID 
 
 // unmatchedCount is how many of a build's current components the scanner has
 // no way to match.
-func (s *Store) unmatchedCount(ctx context.Context, targetID int64) (int, error) {
-	held, err := s.CurrentComponents(ctx, targetID)
+func (s *Store) unmatchedCount(ctx context.Context, buildID int64) (int, error) {
+	held, err := s.CurrentComponents(ctx, buildID)
 	if err != nil {
 		return 0, fmt.Errorf("read what this build holds: %w", err)
 	}

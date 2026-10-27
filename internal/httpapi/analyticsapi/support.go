@@ -20,9 +20,9 @@ import (
 // RetiredBody is one release that has gone out of support, and what is still
 // open against it.
 type RetiredBody struct {
-	Product string        `json:"product"`
-	Stream  string        `json:"stream"`
-	Kind    core.LineKind `json:"kind" doc:"Whether this line moves"`
+	Product     string        `json:"product"`
+	BranchOrTag string        `json:"branch_or_tag"`
+	Kind        core.LineKind `json:"kind" doc:"Whether this line moves"`
 	// EndedOn is the date support ended: the release's own where it stated
 	// one, its product's otherwise.
 	EndedOn string `json:"ended_on" doc:"The date support ended, as YYYY-MM-DD"`
@@ -129,7 +129,7 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "releases out of support",
 			Header: []string{
-				"product", "stream", "kind", "state", "ended_on", "inherited",
+				"product", "branch_or_tag", "kind", "state", "ended_on", "inherited",
 				"ended_days", "open",
 			},
 			// Read whole above, so a page is a slice of what is already in
@@ -150,7 +150,7 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 						state = "ended"
 					}
 					written = append(written, []string{
-						row.Product, row.Stream, string(row.Kind), state, row.EndedOn,
+						row.Product, row.BranchOrTag, string(row.Kind), state, row.EndedOn,
 						strconv.FormatBool(row.Inherited),
 						strconv.Itoa(row.EndedDays), strconv.Itoa(row.Open),
 					})
@@ -208,7 +208,7 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 	// The findings list can show slightly fewer rows than this, because it
 	// folds sibling packages cut from one source together, and that is a
 	// property of the list rather than a disagreement about the unit.
-	open, err := finding.NewStore(in.DB.DB).OpenBy(ctx, subject, scope, finding.ByStream)
+	open, err := finding.NewStore(in.DB.DB).OpenBy(ctx, subject, scope, finding.ByBranchOrTag)
 	if err != nil {
 		return nil, core.WentWrong(in.Logger, "what is open could not be counted", err)
 	}
@@ -218,7 +218,7 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 		if scope.ProductID != nil && *scope.ProductID != release.ProductID {
 			continue
 		}
-		if scope.StreamID != nil && *scope.StreamID != release.StreamID {
+		if scope.BranchOrTagID != nil && *scope.BranchOrTagID != release.BranchOrTagID {
 			continue
 		}
 		// Whole days from today, which is the day the store's own predicate
@@ -229,12 +229,12 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 		today := now.Truncate(24 * time.Hour)
 		since := int(today.Sub(release.EndedOn).Hours() / 24)
 		rows = append(rows, RetiredBody{
-			Product: release.Product, Stream: release.Stream,
+			Product: release.Product, BranchOrTag: release.BranchOrTag,
 			Kind: core.LineKind(release.Kind), EndedOn: release.EndedOn.UTC().Format(time.DateOnly),
 			Inherited: release.Inherited,
 			EndedDays: since,
 			Ended:     !release.EndedOn.After(now),
-			Open:      open[release.StreamID],
+			Open:      open[release.BranchOrTagID],
 		})
 	}
 	// Most exposed first, then longest out of support, then by name so the
@@ -258,7 +258,7 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 		case rows[i].Product != rows[j].Product:
 			return rows[i].Product < rows[j].Product
 		}
-		return rows[i].Stream < rows[j].Stream
+		return rows[i].BranchOrTag < rows[j].BranchOrTag
 	})
 	return rows, nil
 }

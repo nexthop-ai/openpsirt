@@ -780,7 +780,7 @@ func (r *run) open(ctx context.Context, builds Totals) (Totals, error) {
 	out := Totals{}
 	for build := range builds {
 		parts := strings.SplitN(build, "/", 3)
-		q := url.Values{"stream": {parts[1]}, "variant": {parts[2]}, "limit": {"1"}}
+		q := url.Values{"branch_or_tag": {parts[1]}, "variant": {parts[2]}, "limit": {"1"}}
 		status, body, err := r.get(ctx, "/v1/products/"+url.PathEscape(parts[0])+"/findings?"+q.Encode())
 		if err != nil {
 			return nil, err
@@ -814,11 +814,11 @@ func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return nil, err
 	}
-	product, stream, variant, ok := firstBuild(builds)
+	product, branchOrTag, variant, ok := firstBuild(builds)
 	if !ok {
 		return nil, errors.New("the release reported no build, so the sweep has no names to ask with")
 	}
-	names := map[string]string{"product": product, "stream": stream, "variant": variant,
+	names := map[string]string{"product": product, "branch_or_tag": branchOrTag, "variant": variant,
 		"team": "platform", "identity": admin, "format": "csv"}
 	paths := make([]string, 0, len(doc.Paths))
 	for path, ops := range doc.Paths {

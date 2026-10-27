@@ -23,7 +23,7 @@ const codeFindingsAtMaster = "/v1/products/mine/branches-and-tags/master/variant
 func endMaster(t *testing.T, r *httpapitest.Reach) {
 	t.Helper()
 	ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
-	if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
+	if _, err := r.DB.DB.NewUpdate().TableExpr(`"branch_or_tag"`).Set(`"eol_on" = ?`, ended).
 		Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -39,16 +39,16 @@ func alsoOnV1(t *testing.T, r *httpapitest.Reach, occurrence string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := names.DeclareStream(ctx, mine.ID, "v1", catalog.Branch, nil); err != nil {
+	if _, err := names.DeclareBranchOrTag(ctx, mine.ID, "v1", catalog.Branch, nil); err != nil {
 		t.Fatal(err)
 	}
-	other := r.TargetOf(t, httpapitest.Build{Product: "mine", Stream: "v1", Variant: "broadcom"})
+	other := r.BuildOf(t, httpapitest.Build{Product: "mine", BranchOrTag: "v1", Variant: "broadcom"})
 	var codeFinding finding.Finding
 	if err := r.DB.DB.NewSelect().Model(&codeFinding).Where(`"f"."occurrence_identity" = ?`, occurrence).
 		Where(`"f"."closed_at" IS NULL`).Limit(1).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	codeFinding.ID, codeFinding.TargetID = 0, other
+	codeFinding.ID, codeFinding.BuildID = 0, other
 	if _, err := r.DB.DB.NewInsert().Model(&codeFinding).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestACodeFindingPastItsEndOfLifeRefusesEveryChangeButAnAgreementAndAMove(t 
 			httpapitest.FixedBody(t, r, codeFindingsAtMaster+overflow, "the bounds check landed")))
 		refusedAsEnded(t, "a flaw record", httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost,
 			codeFindingsAtMaster+overflow+"/flaw",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows","include_in_disclosure":false}`))
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"n overflows","include_in_disclosure":false}`))
 
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", waiting.DecisionID), `{}`); got.Code != http.StatusOK {

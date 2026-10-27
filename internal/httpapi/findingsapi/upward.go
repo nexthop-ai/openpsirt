@@ -42,7 +42,7 @@ type OursOutput struct {
 func registerUpward(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-my-components", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/components/mine",
 		Summary: "Show the chains your own findings sit on",
 		Description: "The build's dependency graph, seen upward from your own work: from each " +
@@ -61,9 +61,9 @@ func registerUpward(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers what you hold, whether or not you read the product."),
 		func(ctx context.Context, input *struct {
-			Product string `path:"product"`
-			Stream  string `path:"stream"`
-			Variant string `path:"variant"`
+			Product     string `path:"product"`
+			BranchOrTag string `path:"branch_or_tag"`
+			Variant     string `path:"variant"`
 		}) (*OursOutput, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
@@ -75,11 +75,11 @@ func registerUpward(api huma.API, in core.Deps) {
 			// product that does not exist unless they hold work here. A reader
 			// keeps the ordinary answer: for them an empty tree means they
 			// hold nothing, which is not the same sentence.
-			named, err := names.Locate(ctx, input.Product, input.Stream, input.Variant)
+			named, err := names.Locate(ctx, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, core.Absent(in.Logger, err, "that build could not be looked up", core.NoSuchProduct)
 			}
-			target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+			build, err := names.ExistingBuild(ctx, named.BranchOrTagID, named.VariantID)
 			if err != nil {
 				if !errors.Is(err, catalog.ErrNotFound) {
 					return nil, core.WentWrong(in.Logger, "that build could not be looked up", err)
@@ -89,7 +89,7 @@ func registerUpward(api huma.API, in core.Deps) {
 				}
 				return nil, core.NoSuchProduct()
 			}
-			rows, complete, err := graph.NewStore(in.DB.DB).Ours(ctx, subject, target.ID)
+			rows, complete, err := graph.NewStore(in.DB.DB).Ours(ctx, subject, build.ID)
 			if err != nil {
 				return nil, core.WentWrong(in.Logger, "your own work here could not be read", err)
 			}

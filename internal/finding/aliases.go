@@ -263,8 +263,8 @@ func triagesEverywhere(ctx context.Context, db bun.IDB, subject access.Subject,
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		Where(kinds, kindArgs...).

@@ -137,8 +137,8 @@ type Auditing struct {
 	// build — it is keyed on the product, the issue and the occurrence, so
 	// that it carries across releases sharing the code — so this asks which
 	// decisions are about something one build actually ships.
-	Stream  string `query:"stream" doc:"Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant"`
-	Variant string `query:"variant" doc:"The build of that stream. Needs exactly one product and a stream"`
+	BranchOrTag string `query:"branch_or_tag" doc:"Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant"`
+	Variant     string `query:"variant" doc:"The build of that branch or tag. Needs exactly one product and a branch or tag"`
 }
 
 // narrow turns the request's parameters into the store's filter, resolving the
@@ -179,28 +179,28 @@ func (a Auditing) narrow(ctx context.Context, in core.Deps,
 		}
 		filter.ProductIDs = append(filter.ProductIDs, named.ID)
 	}
-	// A build is a product, a stream and a variant together. Named without
-	// the other two it would narrow to a stream of some other product that
+	// A build is a product, a branch or tag and a variant together. Named without
+	// the other two it would narrow to a branch or tag of some other product that
 	// happens to share the name, which is a report about somebody else's
 	// releases under this one's heading.
-	if (a.Stream != "") != (a.Variant != "") {
+	if (a.BranchOrTag != "") != (a.Variant != "") {
 		return filter, since, until, huma.Error422UnprocessableEntity(
-			"a build is a stream and a variant together: name both, or neither")
+			"a build is a branch or tag and a variant together: name both, or neither")
 	}
-	if a.Stream != "" {
+	if a.BranchOrTag != "" {
 		if len(filter.ProductIDs) != 1 {
 			return filter, since, until, huma.Error422UnprocessableEntity(
-				"name exactly one product with a build: a stream belongs to one")
+				"name exactly one product with a build: a branch or tag belongs to one")
 		}
-		located, err := core.LocatedVisibly(ctx, in, subject, a.Product[0], a.Stream, a.Variant)
+		located, err := core.LocatedVisibly(ctx, in, subject, a.Product[0], a.BranchOrTag, a.Variant)
 		if err != nil {
 			return filter, since, until, err
 		}
-		target, err := core.TargetRow(ctx, in, located.StreamID, located.VariantID)
+		build, err := core.BuildRow(ctx, in, located.BranchOrTagID, located.VariantID)
 		if err != nil {
 			return filter, since, until, err
 		}
-		filter.TargetID = target.ID
+		filter.BuildID = build.ID
 	}
 	from, err := core.CalendarDate(a.From)
 	if err != nil {

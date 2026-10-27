@@ -10,8 +10,9 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const AT = "/products/sonic/streams/master/variants/broadcom/code-findings/abc";
-const PATTERN = "/products/:product/streams/:stream/variants/:variant/code-findings/:occurrence";
+const AT = "/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc";
+const PATTERN =
+  "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/code-findings/:occurrence";
 
 const EVIDENCE = {
   rule: "clang/unix.Malloc",
@@ -50,7 +51,7 @@ async function drawn(triages: boolean, evidence: object = EVIDENCE, hides = fals
       };
     if (
       path ===
-      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}"
+      "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}"
     )
       return { data: evidence };
     if (path === "/v1/products/{product}/holders")
@@ -170,7 +171,7 @@ describe("a code finding", () => {
     await settle();
     const [path, init] = sent()[0] ?? [];
     expect(path).toBe(
-      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision",
+      "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision",
     );
     expect((init as { body: unknown }).body).toEqual({
       outcome: "dismissed",
@@ -204,7 +205,7 @@ describe("a code finding", () => {
     expect(searched()[0]).toBe("internal");
     const [path, init] = sent()[0] ?? [];
     expect(path).toBe(
-      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment",
+      "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment",
     );
     expect((init as { body: unknown }).body).toEqual({ team: "kernel" });
   });

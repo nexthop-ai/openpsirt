@@ -54,7 +54,7 @@ func TestEachBuildHandsTheScannerTheIdentifiersItStated(t *testing.T) {
 	// build does not state is taken from the shared row.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		other := f.world.TargetFor(f.world.Branch, f.world.Internal).ID
+		other := f.world.BuildFor(f.world.Branch, f.world.Internal).ID
 		stating := func(distro, cpe string) graph.Snapshot {
 			busybox := graph.Described{
 				Purl: "pkg:apk/alpine/busybox@1.37.0-r31?distro=" + distro,
@@ -66,16 +66,16 @@ func TestEachBuildHandsTheScannerTheIdentifiersItStated(t *testing.T) {
 				Dependencies: []graph.Dependency{{Parent: root, Child: busybox}},
 			}
 		}
-		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t),
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t),
 			stating("alpine-3.24.1", "cpe:2.3:a:busybox:busybox:1.37.0")); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := fixtures.ApplyGraph(ctx, f.db, other, f.scanOf(t, other), stating("alpine-3.23.4", "")); err != nil {
 			t.Fatal(err)
 		}
-		said := func(target int64) graph.Described {
+		said := func(build int64) graph.Described {
 			t.Helper()
-			held, err := f.store.CurrentComponents(ctx, target)
+			held, err := f.store.CurrentComponents(ctx, build)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -91,13 +91,13 @@ func TestEachBuildHandsTheScannerTheIdentifiersItStated(t *testing.T) {
 			t.Errorf("the second build hands the scanner %q and %q, want its own distribution"+
 				" and the enumeration the first stated", got.Purl, got.CPE)
 		}
-		if got := said(f.targetID); got.CPE == "" {
+		if got := said(f.buildID); got.CPE == "" {
 			t.Errorf("the first build hands the scanner no enumeration, and it stated one")
 		}
 
 		// A distribution release moving under an unchanged version is written
 		// on the node, and opens and closes nothing.
-		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t),
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t),
 			stating("alpine-3.24.2", "cpe:2.3:a:busybox:busybox:1.37.0"))
 		if err != nil {
 			t.Fatal(err)
@@ -105,7 +105,7 @@ func TestEachBuildHandsTheScannerTheIdentifiersItStated(t *testing.T) {
 		if applied != (graph.Applied{}) {
 			t.Errorf("restating an identifier opened or closed something: %+v", applied)
 		}
-		if got := said(f.targetID); got.Purl != "pkg:apk/alpine/busybox@1.37.0-r31?distro=alpine-3.24.2" {
+		if got := said(f.buildID); got.Purl != "pkg:apk/alpine/busybox@1.37.0-r31?distro=alpine-3.24.2" {
 			t.Errorf("after the build restated it, the scanner is handed %q", got.Purl)
 		}
 	})

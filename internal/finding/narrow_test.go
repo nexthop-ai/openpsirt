@@ -25,7 +25,7 @@ import (
 func TestNarrowingByPackageKind(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss), found("CVE-2026-3", teamd),
 		}); err != nil {
 			t.Fatal(err)
@@ -73,7 +73,7 @@ func TestNarrowingByWhatHoldsIt(t *testing.T) {
 	// occurrence, which is what makes them worth asserting against each other.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss), found("CVE-2026-3", teamd),
 		}); err != nil {
 			t.Fatal(err)
@@ -219,7 +219,7 @@ func TestADecisionInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 		// each occurrence, names nothing: it showed the other product's
 		// decision as standing here, an identifier the reader could not open.
 		open := f.open(t)
-		evidence, err := f.store.Detail(ctx, who, f.target, open[0].VulnerabilityID, open[0].ComponentID)
+		evidence, err := f.store.Detail(ctx, who, f.build, open[0].VulnerabilityID, open[0].ComponentID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -302,36 +302,36 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
 			finding.OccurrenceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
 
-		reads := func(target int64, want string) {
+		reads := func(build int64, want string) {
 			t.Helper()
-			groups, _, err := f.store.Groups(ctx, who, f.scopeOf(t, target), 50, 0, finding.Filter{})
+			groups, _, err := f.store.Groups(ctx, who, f.scopeOf(t, build), 50, 0, finding.Filter{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(groups) != 1 || string(groups[0].State) != want {
-				t.Errorf("build %d reads as %+v, want one row %q", target, groups, want)
+				t.Errorf("build %d reads as %+v, want one row %q", build, groups, want)
 			}
-			_, agreed, err := f.store.Groups(ctx, who, f.scopeOf(t, target), 50, 0, finding.Filter{States: []finding.DecisionStanding{"agreed"}})
+			_, agreed, err := f.store.Groups(ctx, who, f.scopeOf(t, build), 50, 0, finding.Filter{States: []finding.DecisionStanding{"agreed"}})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if kept := want == "agreed"; (agreed == 1) != kept {
-				t.Errorf("build %d: agreed kept %d rows, want %v", target, agreed, kept)
+				t.Errorf("build %d: agreed kept %d rows, want %v", build, agreed, kept)
 			}
 		}
-		decided := func(target int64) int {
+		decided := func(build int64) int {
 			t.Helper()
 			var open []finding.Finding
 			if err := f.db.DB.NewSelect().Model(&open).
-				Where(`"target_id" = ?`, target).Where(`"closed_at" IS NULL`).Scan(ctx); err != nil {
+				Where(`"build_id" = ?`, build).Where(`"closed_at" IS NULL`).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
-			evidence, err := f.store.Detail(ctx, who, target, open[0].VulnerabilityID, open[0].ComponentID)
+			evidence, err := f.store.Detail(ctx, who, build, open[0].VulnerabilityID, open[0].ComponentID)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(evidence.Occurrences) != 1 {
-				t.Fatalf("build %d sits at %d occurrences, want 1", target, len(evidence.Occurrences))
+				t.Fatalf("build %d sits at %d occurrences, want 1", build, len(evidence.Occurrences))
 			}
 			n := 0
 			for _, sitting := range evidence.Occurrences {
@@ -342,8 +342,8 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			return n
 		}
 
-		reads(f.target, "agreed")
-		if n := decided(f.target); n != 1 {
+		reads(f.build, "agreed")
+		if n := decided(f.build); n != 1 {
 			t.Errorf("the build the decision was made against shows %d of 1 occurrences decided", n)
 		}
 		reads(other, "undecided")
@@ -499,7 +499,7 @@ func TestNarrowingByHowFarDecided(t *testing.T) {
 	// decision, not that one of them does not.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)
@@ -581,7 +581,7 @@ func TestSearchingFindsAnIssueByNameAndByAlias(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		reported := found("CVE-2026-8899", libnl)
 		reported.Issue.Aliases = []string{"GHSA-aaaa-bbbb-cccc"}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{reported, found("CVE-2026-7000", swss)}); err != nil {
 			t.Fatal(err)
 		}
@@ -642,7 +642,7 @@ func TestARowNamesWhatPullsItInEvenWhereTheRouteUpIsUnknown(t *testing.T) {
 				{Parent: stray, Child: libnl},
 			},
 		})
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-STRAY", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -683,14 +683,14 @@ func TestARowNamesWhatPullsItInEvenWhereTheRouteUpIsUnknown(t *testing.T) {
 func TestNarrowingToWhatSomebodyRecordedHere(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
 		}); err != nil {
 			t.Fatal(err)
 		}
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		if _, _, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		}); err != nil {
 			t.Fatal(err)
@@ -801,7 +801,7 @@ func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		mild := found("CVE-2026-1", libnl)
 		mild.Issue.Severity = "low"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}
@@ -855,7 +855,7 @@ func TestThePlannedUpgradeAndComponentListsFilterOnTheirOwnProductsRating(t *tes
 		mild := found("CVE-2026-EVERY", libnl)
 		mild.Issue.Severity = "medium"
 		mild.FixState, mild.FixedIn = finding.FixedUpstream, "3.9.0"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{mild}); err != nil {
 			t.Fatal(err)
 		}

@@ -84,7 +84,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 			About: []core.Stated{{Label: "looking ahead days", Value: strconv.Itoa(input.Days)}},
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
-				"product", "product name", "stream", "stream name", "variant", "variant name",
+				"product", "product name", "branch_or_tag", "branch or tag name", "variant", "variant name",
 				"occurrences", "held by", "held by name", "due", "days left",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -106,7 +106,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 						strconv.FormatBool(body.Exploited),
 						body.Component, body.Version,
 						body.Product, body.ProductName,
-						body.Stream, body.StreamName,
+						body.BranchOrTag, body.BranchOrTagName,
 						body.Variant, body.VariantName,
 						strconv.Itoa(body.Occurrences), body.AssignedTo, body.AssignedName,
 						body.Due, strconv.Itoa(body.DaysLeft),
@@ -156,7 +156,7 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		from, to, err := input.targets(ctx, in, subject, input.Product)
+		from, to, err := input.buildIDs(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -458,15 +458,15 @@ func registerComponentExport(api huma.API, in core.Deps) {
 			"triages at is stated in the file.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Format  string `path:"format" enum:"csv,json"`
-		Stream  string `query:"stream"`
-		Variant string `query:"variant"`
+		Product     string `path:"product"`
+		Format      string `path:"format" enum:"csv,json"`
+		BranchOrTag string `query:"branch_or_tag"`
+		Variant     string `query:"variant"`
 		core.AtOneBuild
 		core.Narrowing
 	}) (*huma.StreamResponse, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "the minimum severity could not be read")
 		if err != nil {
 			return nil, err

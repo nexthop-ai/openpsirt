@@ -7,7 +7,7 @@ import { plainlyLate } from "./Compliance";
 
 describe("the link under what is plainly late", () => {
   it("asks the list for what is overdue, in a word the list reads", () => {
-    const path = plainlyLate({ product: "sonic", stream: "master" });
+    const path = plainlyLate({ product: "sonic", branch_or_tag: "master" });
     const asked = listQuery(new URLSearchParams(path.slice(path.indexOf("?"))));
     expect(asked).toMatchObject({ overdue: true });
   });

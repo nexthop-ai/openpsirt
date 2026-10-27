@@ -70,7 +70,7 @@ export function Home({ who }: { who: Who }) {
   const at = useScope();
   const scope = scopeQuery(at);
   const counting = at.product
-    ? [at.product, at.stream, at.variant].filter(Boolean).join(" · ")
+    ? [at.product, at.branch_or_tag, at.variant].filter(Boolean).join(" · ")
     : "all products";
 
   const trend = useQuery({
@@ -202,19 +202,19 @@ export function Home({ who }: { who: Who }) {
 // than drawing zeroes — a release that shipped clean and a release nobody
 // scanned are not the same answer.
 function Readiness({ at }: { at: Scoped }) {
-  const whole = !!at.product && !!at.stream && !!at.variant;
+  const whole = !!at.product && !!at.branch_or_tag && !!at.variant;
   const ready = useQuery({
     queryKey: ["readiness", at],
     enabled: whole,
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/readiness",
           {
             params: {
               path: {
                 product: at.product ?? "",
-                stream: at.stream ?? "",
+                branch_or_tag: at.branch_or_tag ?? "",
                 variant: at.variant ?? "",
               },
             },
@@ -258,7 +258,7 @@ function Readiness({ at }: { at: Scoped }) {
       <header>
         <h3>Release readiness</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {at.stream} · {at.variant}
+          {at.branch_or_tag} · {at.variant}
         </span>
       </header>
       {shipped ? (
@@ -271,7 +271,7 @@ function Readiness({ at }: { at: Scoped }) {
                 <tr>
                   <th />
                   <th className="num">Now</th>
-                  <th className="num">{shipped.stream_name || shipped.stream}</th>
+                  <th className="num">{shipped.branch_or_tag_name || shipped.branch_or_tag}</th>
                   <th className="num">Change</th>
                 </tr>
               </thead>
@@ -293,7 +293,7 @@ function Readiness({ at }: { at: Scoped }) {
             {reading(
               now?.critical ?? 0,
               shipped.critical ?? 0,
-              shipped.stream_name || shipped.stream || "",
+              shipped.branch_or_tag_name || shipped.branch_or_tag || "",
             )}
             {minimum ? ` Counted at ${minimum} and above.` : ""}
           </p>
@@ -339,7 +339,11 @@ function Readiness({ at }: { at: Scoped }) {
       {at.product && (
         <footer>
           <Link
-            to={blockingPath({ product: at.product, stream: at.stream, variant: at.variant })}
+            to={blockingPath({
+              product: at.product,
+              branch_or_tag: at.branch_or_tag,
+              variant: at.variant,
+            })}
             className="linkish"
           >
             Work what is blocking →
@@ -414,7 +418,7 @@ function Figures({
             query: {
               limit: 1,
               exploited: true,
-              ...(at.stream ? { stream: at.stream } : {}),
+              ...(at.branch_or_tag ? { branch_or_tag: at.branch_or_tag } : {}),
               ...(at.variant ? { variant: at.variant } : {}),
             },
           },
@@ -602,7 +606,7 @@ function Figures({
             <Count of={shelf}>{() => attacked.toLocaleString()}</Count>
           </span>
           <span className="d">
-            {at.stream || at.variant ? `all of ${at.product}` : "recorded attacks"}
+            {at.branch_or_tag || at.variant ? `all of ${at.product}` : "recorded attacks"}
           </span>
         </button>
       )}
@@ -650,7 +654,7 @@ function Figures({
             className="d"
             title="A decision is made in a product and no finer, so this counts the whole product"
           >
-            {at.stream || at.variant ? `all of ${at.product}` : "waiting on a second person"}
+            {at.branch_or_tag || at.variant ? `all of ${at.product}` : "waiting on a second person"}
           </span>
         )}
       </button>
@@ -749,7 +753,7 @@ function Pending() {
           className="eyebrow"
           style={{ marginLeft: "auto" }}
           title={
-            at.stream || at.variant
+            at.branch_or_tag || at.variant
               ? "A decision is made in a product and no finer, so this counts the whole product"
               : undefined
           }
@@ -844,7 +848,7 @@ function InProgress({ me }: { me: string }) {
           className="eyebrow"
           style={{ marginLeft: "auto" }}
           title={
-            at.stream || at.variant
+            at.branch_or_tag || at.variant
               ? "Work is held per product and no finer, so this counts the whole product"
               : undefined
           }
@@ -945,7 +949,7 @@ function Lapsed() {
   });
 
   // The same question with the scope taken off, so the panel can say what the
-  // product costs. Decisions narrow by product and no finer, so a stream or a
+  // product costs. Decisions narrow by product and no finer, so a branch or tag or a
   // variant in the scope changes nothing here.
   const everywhere = useQuery({
     queryKey: ["home", "stopped", "all"],
@@ -1067,7 +1071,7 @@ function Status() {
       build.last_received_at && build.last_received_at > newest ? build.last_received_at : newest,
     "",
   );
-  const whole = !!(at.product && at.stream && at.variant);
+  const whole = !!(at.product && at.branch_or_tag && at.variant);
 
   return (
     <div className="panel">
@@ -1078,9 +1082,12 @@ function Status() {
         <Failed error={scanning.error} what="The last upload per build could not be read." />
       )}
       {quiet.slice(0, 3).map((build) => (
-        <div className="alert" key={`${build.product}\u0000${build.stream}\u0000${build.variant}`}>
+        <div
+          className="alert"
+          key={`${build.product}\u0000${build.branch_or_tag}\u0000${build.variant}`}
+        >
           <strong>
-            {build.product} · {build.stream} · {build.variant}: no inventory
+            {build.product} · {build.branch_or_tag} · {build.variant}: no inventory
             {build.last_received_at ? ` for ${build.quiet_days} days` : " ever"}
           </strong>
           <span>
@@ -1118,7 +1125,7 @@ function Status() {
           <Link
             to={uploadsAt({
               product: at.product ?? "",
-              stream: at.stream ?? "",
+              branch_or_tag: at.branch_or_tag ?? "",
               variant: at.variant ?? "",
             })}
             className="linkish"

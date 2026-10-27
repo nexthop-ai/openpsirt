@@ -202,7 +202,7 @@ func permitted(subject access.Subject, proposals []Proposal, now time.Time) erro
 // four packages at sixty-one occurrences, and keyed on one binary it took four
 // decisions and four approvals to answer what reads as one thing.
 type BulkDecisionAt struct {
-	TargetID         int64
+	BuildID          int64
 	ComponentID      int64
 	VulnerabilityIDs []int64
 	// Contains is the text the candidate list was narrowed by, empty where it
@@ -323,7 +323,7 @@ func (s *Store) BulkDecision(ctx context.Context, subject access.Subject, at Bul
 
 		// The narrowing as something other than the proposer's word for it,
 		// re-run against the same rows the write is about to land on.
-		narrowing, err := finding.NarrowedWithin(ctx, tx, subject, at.TargetID, fold,
+		narrowing, err := finding.NarrowedWithin(ctx, tx, subject, at.BuildID, fold,
 			at.Contains, len(at.VulnerabilityIDs))
 		if err != nil {
 			return err
@@ -331,7 +331,7 @@ func (s *Store) BulkDecision(ctx context.Context, subject access.Subject, at Bul
 
 		// Made on the build the selection was made in.
 		claimed := p
-		claimed.MadeOn = []int64{at.TargetID}
+		claimed.MadeOn = []int64{at.BuildID}
 		decision, err := within.newDecisionNarrowed(ctx, BulkDecision, subject.ID, nil,
 			p.SelectedBy, &narrowing, claimed)
 		if err != nil {
@@ -474,14 +474,14 @@ func occurrencesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 	}
 	query := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// This product's rating of the issue, which is the rating in force
-		// here. The read spans products, so each row reads its own stream's.
-		Join(rating.For(rating.OnStream)).
+		// here. The read spans products, so each row reads its own branch or tag's.
+		Join(rating.For(rating.OnBranchOrTag)).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
@@ -500,7 +500,7 @@ func occurrencesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		// about it. As an integer rather than a boolean: the four engines
 		// spell a boolean three ways.
 		ColumnExpr(`MAX(CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
-		Where(`"f"."target_id" = ?`, at.TargetID).
+		Where(`"f"."build_id" = ?`, at.BuildID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Triage, "f")).

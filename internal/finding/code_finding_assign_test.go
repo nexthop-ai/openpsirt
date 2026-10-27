@@ -25,7 +25,7 @@ func TestACodeFindingOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 		f.applied(t, found("CVE-2026-1", libnl))
 		var ids []int64
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).Column("id").
-			Where(`"target_id" = ?`, f.target).Order("id").Scan(ctx, &ids); err != nil {
+			Where(`"build_id" = ?`, f.build).Order("id").Scan(ctx, &ids); err != nil {
 			t.Fatal(err)
 		}
 		if len(ids) < 2 {
@@ -53,7 +53,7 @@ func TestACodeFindingOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 			asked = withheld
 			return nil
 		}
-		moved, withheld, err := f.store.AssignCodeFinding(ctx, who, f.target, "code-finding-1", &colleague.PartyID, admits)
+		moved, withheld, err := f.store.AssignCodeFinding(ctx, who, f.build, "code-finding-1", &colleague.PartyID, admits)
 		if err != nil {
 			t.Fatal(err)
 		}

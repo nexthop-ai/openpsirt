@@ -36,7 +36,7 @@ func (f *fixture) curlFold(t *testing.T) (lib, tool graph.Described) {
 			Component: component, FixState: finding.FixedUpstream, FixedIn: "8.6.0",
 		}
 	}
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 		[]finding.Reported{fixed(lib), fixed(tool)}); err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestAPlannedUpgradeNamesEachPackageAndBuildOnceInNameOrder(t *testing.T) {
 			fixed("CVE-2026-CURL-2", lib, "8.6.0"), fixed("CVE-2026-CURL-2", tool, "8.6.0"),
 		}
 		f.shipped(t, snapshot)
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			append(curl, fixed("CVE-2026-ZLIB", zlib, "1.3.1"))); err != nil {
 			t.Fatal(err)
 		}
@@ -230,7 +230,7 @@ func TestAPlannedUpgradeNamesEachPackageAndBuildOnceInNameOrder(t *testing.T) {
 		}
 		builds := named["8.6.0"].In
 		if len(builds) != 2 || builds[0] == builds[1] ||
-			builds[0].Stream > builds[1].Stream {
+			builds[0].BranchOrTag > builds[1].BranchOrTag {
 			t.Errorf("the curl upgrade is in %v, want its two builds once each, in name order", builds)
 		}
 		if got := named["1.3.1"]; len(got.Components) != 1 || got.Components[0] != "zlib1g" ||

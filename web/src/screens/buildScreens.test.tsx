@@ -14,8 +14,8 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 const text = () => mount.host().textContent ?? "";
-const BUILD = "/products/sonic/streams/master/variants/arm";
-const BUILT = "/products/:product/streams/:stream/variants/:variant";
+const BUILD = "/products/sonic/branches-and-tags/master/variants/arm";
+const BUILT = "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant";
 
 describe("an occurrence row's address", () => {
   it("forwards to the decision the row belongs to", async () => {
@@ -119,7 +119,7 @@ describe("what one upload changed", () => {
         : undefined,
     );
     mount.render(
-      screen(<InventoryChanges />, `${BUILD}/scans/3/changes`, `${BUILT}/scans/:scan/changes`),
+      screen(<InventoryChanges />, `${BUILD}/scans/3/changes`, `${BUILT}/scans/:sbom/changes`),
     );
     await settle();
     await press(mount.host(), "Next");

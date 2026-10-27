@@ -125,7 +125,7 @@ export function Assignments() {
         <h2>Assignments</h2>
         <p>
           {scope.product
-            ? [scope.product, scope.stream, scope.variant].filter(Boolean).join(" · ")
+            ? [scope.product, scope.branch_or_tag, scope.variant].filter(Boolean).join(" · ")
             : "Across every product you can see"}
         </p>
       </div>
@@ -152,7 +152,7 @@ export function Assignments() {
       {/* Said rather than discovered. Who holds what is answered per product,
           so a branch or a variant in the picker narrows the other two tabs and
           not this one. */}
-      {tab === "people" && (scope.stream || scope.variant) && (
+      {tab === "people" && (scope.branch_or_tag || scope.variant) && (
         <p className="hint">
           Across every build of {scope.product}. The branch and the variant do not narrow who holds
           what.
@@ -477,7 +477,11 @@ function Held({
             {rows.map((row) => {
               const to = row.occurrence
                 ? codeFindingAt(
-                    { product: row.product, stream: row.stream, variant: row.variant },
+                    {
+                      product: row.product,
+                      branch_or_tag: row.branch_or_tag,
+                      variant: row.variant,
+                    },
                     row.occurrence,
                   )
                 : findingOf(row);
@@ -510,7 +514,8 @@ function Held({
                     ) : (
                       <>
                         {" "}
-                        · {row.stream_name || row.stream} · {row.variant_name || row.variant}
+                        · {row.branch_or_tag_name || row.branch_or_tag} ·{" "}
+                        {row.variant_name || row.variant}
                       </>
                     )}
                   </td>

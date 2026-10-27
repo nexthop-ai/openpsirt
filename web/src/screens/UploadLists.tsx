@@ -45,16 +45,19 @@ const RUN_STATES: Record<RunStatus, { cls: string; label: string; means: string 
 // The static analysis runs one build was sent, newest first, and the last
 // upload of each series that was turned away.
 export function AnalysisRuns({ build }: { build: Build }) {
-  const { product, stream, variant } = build;
+  const { product, branch_or_tag: branchOrTag, variant } = build;
   const [offset, setOffset] = useState(0);
   const runs = useQuery({
-    queryKey: ["analyses", product, stream, variant, offset],
+    queryKey: ["analyses", product, branchOrTag, variant, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses",
           {
-            params: { path: { product, stream, variant }, query: { limit: PAGE, offset } },
+            params: {
+              path: { product, branch_or_tag: branchOrTag, variant },
+              query: { limit: PAGE, offset },
+            },
           },
         ),
       ),

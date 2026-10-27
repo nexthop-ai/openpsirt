@@ -207,8 +207,8 @@ func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {
 	t.Helper()
 	ctx := t.Context()
 
-	target := r.TargetOf(t, SeededBuild)
-	scan := r.Recorded(t, target, "beneath-a-product")
+	build := r.BuildOf(t, SeededBuild)
+	scan := r.Recorded(t, build, "beneath-a-product")
 	if root != "" {
 		if _, err := r.DB.DB.NewUpdate().Table("scan").Set(`"root_identifier" = ?`, root).
 			Where(`"id" = ?`, scan).Exec(ctx); err != nil {
@@ -220,7 +220,7 @@ func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {
 	libssh := graph.Described{Purl: "pkg:deb/debian/libssh@0.10.6", Name: "libssh", Version: "0.10.6"}
 	app := graph.Described{Purl: "pkg:deb/debian/app@1.0", Name: "app", Version: "1.0"}
 	library := SeededLib
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target, scan, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, build, scan, graph.Snapshot{
 		Root:       SeededRoot,
 		Components: []graph.Described{curl, libssh, app, library},
 		Dependencies: []graph.Dependency{
@@ -232,7 +232,7 @@ func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	r.Ran(t, target, []finding.Reported{{
+	r.Ran(t, build, []finding.Reported{{
 		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
 		Component: library, FixState: finding.NoFix,
 	}})

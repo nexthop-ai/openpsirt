@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useAfterDecision } from "../api/decisions";
-import { useStreams } from "../api/catalog";
+import { useBranchesAndTags } from "../api/catalog";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -17,14 +17,18 @@ import { Wide } from "./Wide";
 // The reach is computed either way; what this adds is the choosing. A carry
 // that happened silently would be one nobody reviewed, and the four groups are
 // four different things — only two of them are questions.
-export function Carried({ at }: { at: { product: string; stream: string; variant: string } }) {
+export function Carried({
+  at,
+}: {
+  at: { product: string; branch_or_tag: string; variant: string };
+}) {
   const [from, setFrom] = useState("");
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const queries = useQueryClient();
   const after = useAfterDecision();
 
   // The other lines of this product, to carry from.
-  const streams = useStreams(at.product);
+  const branchesAndTags = useBranchesAndTags(at.product);
 
   const preview = useQuery({
     queryKey: ["carried", at, from],
@@ -32,7 +36,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried",
           {
             params: { path: at, query: { from, from_variant: at.variant } },
           },
@@ -44,7 +48,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
     mutationFn: async (rows: number[]) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried",
           {
             params: { path: at, query: { from, from_variant: at.variant } },
             body: { decision_occurrences: rows },
@@ -58,7 +62,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
     },
   });
 
-  const others = (streams.data?.items ?? []).filter((s) => s.name !== at.stream);
+  const others = (branchesAndTags.data?.items ?? []).filter((s) => s.name !== at.branch_or_tag);
   const moved = preview.data?.moved ?? [];
   const postponed = preview.data?.postponed ?? [];
 
@@ -92,7 +96,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
           ))}
         </select>
       </div>
-      <Unread of={streams} what="The other release lines could not be read." />
+      <Unread of={branchesAndTags} what="The other release lines could not be read." />
 
       {preview.isError && (
         <Failed

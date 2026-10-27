@@ -30,7 +30,7 @@ type Node struct {
 	bun.BaseModel `bun:"table:graph_node,alias:n"`
 
 	ID           int64  `bun:"id,pk,autoincrement"`
-	TargetID     int64  `bun:"target_id,notnull"`
+	BuildID      int64  `bun:"build_id,notnull"`
 	ComponentID  int64  `bun:"component_id,notnull"`
 	IsRoot       bool   `bun:"is_root,notnull"`
 	OpenedScanID int64  `bun:"opened_scan_id,notnull"`
@@ -60,7 +60,7 @@ type Edge struct {
 	bun.BaseModel `bun:"table:graph_edge,alias:e"`
 
 	ID       int64 `bun:"id,pk,autoincrement"`
-	TargetID int64 `bun:"target_id,notnull"`
+	BuildID  int64 `bun:"build_id,notnull"`
 	ParentID int64 `bun:"parent_id,notnull"`
 	ChildID  int64 `bun:"child_id,notnull"`
 	// Kind is the scope the producer declared for this dependency, in the
@@ -130,22 +130,22 @@ func NewStore(db bun.IDB) *Store {
 // the inventory was made of, and those three are one act: a graph applied
 // beside claims that were not recorded reads as a build that withdrew every
 // patch it carries, and reopens every finding they suppressed.
-func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
+func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	snap Snapshot) (Applied, error) {
 
 	var applied Applied
 	err := func() error {
-		// Taken first, before anything is read. Two scans of one target can be
+		// Taken first, before anything is read. Two scans of one build can be
 		// in flight at once — the queue hands different jobs to different
 		// workers by design — and without this both would read the same open
 		// rows, both compute the same difference, and both write it, leaving
 		// two open rows where everything downstream assumes one. This is an
 		// ordinary row update, so every engine takes the lock and the second
 		// worker waits rather than racing.
-		if _, err := tx.NewUpdate().Table("target").
+		if _, err := tx.NewUpdate().Table("build").
 			Set(`"last_scan_id" = ?`, scanID).
-			Where(`"id" = ?`, targetID).Exec(ctx); err != nil {
-			return fmt.Errorf("take the target: %w", err)
+			Where(`"id" = ?`, buildID).Exec(ctx); err != nil {
+			return fmt.Errorf("take the build: %w", err)
 		}
 
 		components := NewComponents(tx)
@@ -196,7 +196,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			}
 		}
 
-		nodeIDs, opened, closed, err := reconcileNodes(ctx, tx, targetID, scanID, wanted)
+		nodeIDs, opened, closed, err := reconcileNodes(ctx, tx, buildID, scanID, wanted)
 		if err != nil {
 			return err
 		}
@@ -214,7 +214,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			}
 		}
 		applied.VersionsOpened, applied.VersionsClosed, err = reconcileImageVersions(ctx, tx,
-			targetID, scanID, statedImages)
+			buildID, scanID, statedImages)
 		if err != nil {
 			return err
 		}
@@ -230,13 +230,13 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			wantedEdges[edgeAt{Parent: parent, Child: child, Kind: dep.Kind}] = true
 		}
 
-		applied.EdgesOpened, applied.EdgesClosed, err = reconcileEdges(ctx, tx, targetID, scanID, wantedEdges)
+		applied.EdgesOpened, applied.EdgesClosed, err = reconcileEdges(ctx, tx, buildID, scanID, wantedEdges)
 		return err
 	}()
 	return applied, err
 }
 
-// CurrentComponents returns what a target contains now, as the scanner needs
+// CurrentComponents returns what a build contains now, as the scanner needs
 // to be given it.
 //
 // The scanner is fed from here rather than from the file a build sent, because
@@ -251,7 +251,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 // scoped to one product would otherwise decide which advisories another
 // product's scanner matches. The component row is not read for them at all,
 // because it holds whichever report first described the component.
-func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Described, error) {
+func (s *Store) CurrentComponents(ctx context.Context, buildID int64) ([]Described, error) {
 	var rows []struct {
 		ComponentID     int64  `bun:"component_id"`
 		Name            string `bun:"name"`
@@ -271,18 +271,18 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 		ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
 		ColumnExpr(`"n"."purl" AS "purl"`).
 		ColumnExpr(`"n"."cpe" AS "cpe"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what a target contains: %w", err)
+		return nil, fmt.Errorf("read what a build contains: %w", err)
 	}
 	ids := make([]int64, 0, len(rows))
 	for _, row := range rows {
 		ids = append(ids, row.ComponentID)
 	}
-	others, err := s.statedInProduct(ctx, targetID, ids)
+	others, err := s.statedInProduct(ctx, buildID, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 // Claim matching and a closing finding's explanation read this, so a claim is
 // matched against what the scanner was given and never against the component
 // row, which holds whichever report first described the component.
-func (s *Store) Stated(ctx context.Context, targetID int64, componentIDs []int64) (map[int64]Described, error) {
+func (s *Store) Stated(ctx context.Context, buildID int64, componentIDs []int64) (map[int64]Described, error) {
 	out := make(map[int64]Described, len(componentIDs))
 	if len(componentIDs) == 0 {
 		return out, nil
@@ -330,7 +330,7 @@ func (s *Store) Stated(ctx context.Context, targetID int64, componentIDs []int64
 			ColumnExpr(`"n"."cpe" AS "cpe"`).
 			ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
 			ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
-			Where(`"n"."target_id" = ?`, targetID).
+			Where(`"n"."build_id" = ?`, buildID).
 			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
 			OrderExpr(`"n"."opened_scan_id", "n"."id"`).
 			Scan(ctx, &rows)
@@ -353,7 +353,7 @@ func (s *Store) Stated(ctx context.Context, targetID int64, componentIDs []int64
 	for id := range out {
 		held = append(held, id)
 	}
-	others, err := s.statedInProduct(ctx, targetID, held)
+	others, err := s.statedInProduct(ctx, buildID, held)
 	if err != nil {
 		return nil, err
 	}
@@ -366,17 +366,17 @@ func (s *Store) Stated(ctx context.Context, targetID int64, componentIDs []int64
 	return out, nil
 }
 
-// statedInProduct is what the other builds of a target's product stated for
+// statedInProduct is what the other builds of a build's product stated for
 // each of these components, earliest statement first. Only nodes that state
 // something are read.
-func (s *Store) statedInProduct(ctx context.Context, targetID int64,
+func (s *Store) statedInProduct(ctx context.Context, buildID int64,
 	componentIDs []int64) (map[int64][]Described, error) {
 
 	out := make(map[int64][]Described, len(componentIDs))
 	if len(componentIDs) == 0 {
 		return out, nil
 	}
-	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -398,9 +398,9 @@ func (s *Store) statedInProduct(ctx context.Context, targetID int64,
 			// By build first, which the node index leads with: a product
 			// has a handful of builds and the node table holds every
 			// product's history.
-			Where(`"n"."target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
-				JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
-				WHERE "st"."product_id" = ? AND "tg"."id" <> ?)`, productID, targetID).
+			Where(`"n"."build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
+				JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
+				WHERE "st"."product_id" = ? AND "tg"."id" <> ?)`, productID, buildID).
 			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.Where(`"n"."purl" IS NOT NULL`).
@@ -540,16 +540,16 @@ func (a *Ambiguous) Refused() {}
 // ships three vendored versions of one library. An ambiguous name the choice
 // does not narrow is refused rather than resolved to the lowest identifier,
 // which answers about a version nobody asked about.
-func (s *Store) ComponentAs(ctx context.Context, targetID int64,
+func (s *Store) ComponentAs(ctx context.Context, buildID int64,
 	name string, which Choice) (int64, error) {
 
-	return ComponentAsIn(ctx, s.db, targetID, name, which)
+	return ComponentAsIn(ctx, s.db, buildID, name, which)
 }
 
 // ComponentAsIn is ComponentAs over any handle, so a caller that has to
 // resolve a component inside its own transaction can rather than reading it
 // beforehand and writing against an answer the database has since moved past.
-func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
+func ComponentAsIn(ctx context.Context, db bun.IDB, buildID int64,
 	name string, which Choice) (int64, error) {
 
 	version, ecosystem := which.Version, which.Ecosystem
@@ -561,7 +561,7 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 		ColumnExpr(`"c"."version" AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
 		ColumnExpr(`"c"."name" AS "name"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		// A name somebody types is matched without regard to capitals,
 		// through the fold stored beside the name.
@@ -711,31 +711,31 @@ type Neighbor struct {
 // The choice says which component, where the build ships the name as more
 // than one: a name alone is refused as ambiguous, naming the choices, the way
 // a finding is.
-func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) Around(ctx context.Context, subject access.Subject, buildID int64,
 	name string, which Choice) ([]Neighbor, []Neighbor, error) {
 
 	// Authorized before the name is resolved. Resolved first, the refusal is
 	// informative: an absent name, a name held twice and a name held once
 	// answer differently, and a subject who may not read findings here reads
 	// the build's inventory back one name at a time.
-	productID, readable, err := s.visibleIn(ctx, subject, targetID)
+	productID, readable, err := s.visibleIn(ctx, subject, buildID)
 	if err != nil {
 		return nil, nil, err
 	}
-	componentID, err := s.ComponentAs(ctx, targetID, name, which)
+	componentID, err := s.ComponentAs(ctx, buildID, name, which)
 	if err != nil {
 		return nil, nil, err
 	}
-	below, err := s.step(ctx, readable, targetID, componentID, true)
+	below, err := s.step(ctx, readable, buildID, componentID, true)
 	if err != nil {
 		return nil, nil, err
 	}
-	above, err := s.step(ctx, readable, targetID, componentID, false)
+	above, err := s.step(ctx, readable, buildID, componentID, false)
 	if err != nil {
 		return nil, nil, err
 	}
 	// Everything beneath each neighbor, both directions in one statement.
-	if err := s.filled(ctx, productID, targetID, readable, above, below); err != nil {
+	if err := s.filled(ctx, productID, buildID, readable, above, below); err != nil {
 		return nil, nil, err
 	}
 	// Ordered after that, not before: what a branch is ranked on is what is
@@ -752,15 +752,15 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 // findings of its own, so without this every one of them reads zero while
 // the packages inside hold thousands — and a tree whose counts cannot tell a
 // full branch from an empty one is not something anybody can descend by.
-func (s *Store) filled(ctx context.Context, productID, targetID int64,
+func (s *Store) filled(ctx context.Context, productID, buildID int64,
 	readable []access.Visibility, lists ...[]Neighbor) error {
 
-	return s.filledWith(ctx, productID, targetID, readable, adoption{}, lists...)
+	return s.filledWith(ctx, productID, buildID, readable, adoption{}, lists...)
 }
 
 // filledWith is filled with an adoption: the adopter's number covers what it
 // adopts as well as what is under it.
-func (s *Store) filledWith(ctx context.Context, productID, targetID int64,
+func (s *Store) filledWith(ctx context.Context, productID, buildID int64,
 	readable []access.Visibility, adopt adoption, lists ...[]Neighbor) error {
 
 	var ids []int64
@@ -769,7 +769,7 @@ func (s *Store) filledWith(ctx context.Context, productID, targetID int64,
 			ids = append(ids, row.ComponentID)
 		}
 	}
-	totals, err := s.beneath(ctx, productID, targetID, readable, ids, adopt)
+	totals, err := s.beneath(ctx, productID, buildID, readable, ids, adopt)
 	if err != nil {
 		return err
 	}
@@ -799,10 +799,10 @@ func (s *Store) filledWith(ctx context.Context, productID, targetID int64,
 // What the root pulls in directly includes every component nothing else in
 // the build pulls in. The build contains them, and with nothing above them the
 // build is what holds them.
-func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int64) (
+func (s *Store) Roots(ctx context.Context, subject access.Subject, buildID int64) (
 	*Neighbor, []Neighbor, error) {
 
-	productID, readable, err := s.visibleIn(ctx, subject, targetID)
+	productID, readable, err := s.visibleIn(ctx, subject, buildID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -810,7 +810,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	err = s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr(`"n"."component_id"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).
 		Limit(1).Scan(ctx, &rootID)
@@ -824,7 +824,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	}
 	loose, err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "fn"`).
-		Where(`"fn"."target_id" = ?`, targetID).
+		Where(`"fn"."build_id" = ?`, buildID).
 		Where(`"fn"."closed_scan_id" IS NULL`).
 		Where(`"fn"."is_root" = ?`, false).
 		Where(orphaned).
@@ -835,14 +835,14 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 
 	var kids []Neighbor
 	if !loose {
-		kids, err = s.step(ctx, readable, targetID, rootID, true)
+		kids, err = s.step(ctx, readable, buildID, rootID, true)
 	} else {
-		kids, err = s.topLevel(ctx, readable, targetID)
+		kids, err = s.topLevel(ctx, readable, buildID)
 	}
 	if err != nil {
 		return nil, nil, err
 	}
-	root, err := s.describe(ctx, readable, targetID, rootID, len(kids))
+	root, err := s.describe(ctx, readable, buildID, rootID, len(kids))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -862,7 +862,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 		}
 	}
 	top := []Neighbor{*root}
-	if err := s.filledWith(ctx, productID, targetID, readable, adopt, top, kids); err != nil {
+	if err := s.filledWith(ctx, productID, buildID, readable, adopt, top, kids); err != nil {
 		return nil, nil, err
 	}
 	root.Beneath = top[0].Beneath
@@ -876,7 +876,7 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 // The child count is passed in rather than counted again: the caller has just
 // walked that edge and holds the answer, and asking the database a second time
 // for a number already in hand is how the same walk ends up costing twice.
-func (s *Store) describe(ctx context.Context, readable []access.Visibility, targetID, componentID int64,
+func (s *Store) describe(ctx context.Context, readable []access.Visibility, buildID, componentID int64,
 	children int) (*Neighbor, error) {
 
 	row := &Neighbor{Children: children, ComponentID: componentID}
@@ -884,7 +884,7 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 	// that is not narrowed the same way is still a count of what the reader
 	// may not see.
 	err := openIssuesJoin(s.db.NewSelect().
-		TableExpr(`"component" AS "c"`), readable, targetID, nil).
+		TableExpr(`"component" AS "c"`), readable, buildID, nil).
 		ColumnExpr(`"c"."name" AS "name"`).
 		ColumnExpr(`"c"."version" AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
@@ -904,7 +904,7 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 // in one build — so both ends go through the node table. Reading the edge
 // columns as component identifiers is the mistake this comment exists to stop
 // somebody making twice.
-func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID, componentID int64,
+func (s *Store) step(ctx context.Context, readable []access.Visibility, buildID, componentID int64,
 	down bool) ([]Neighbor, error) {
 	near, far := "parent_id", "child_id"
 	if !down {
@@ -916,7 +916,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 			TableExpr(`"graph_edge" AS "e"`).
 			Join(`JOIN "graph_node" AS "nn" ON "nn"."id" = "e"."`+near+`"`).
 			Join(`JOIN "graph_node" AS "fn" ON "fn"."id" = "e"."`+far+`"`).
-			Where(`"e"."target_id" = ?`, targetID).
+			Where(`"e"."build_id" = ?`, buildID).
 			Where(`"nn"."component_id" = ?`, componentID).
 			Where(`"e"."closed_scan_id" IS NULL`)
 	}
@@ -932,7 +932,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		return nil, nil
 	}
 	var rows []Neighbor
-	if err := neighborsAt(edges(), readable, targetID, ids).Scan(ctx, &rows); err != nil {
+	if err := neighborsAt(edges(), readable, buildID, ids).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("walk the graph: %w", err)
 	}
 
@@ -946,10 +946,10 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 // order a reader descends by. Only is the components the query can reach,
 // where they are known, and nil where it may reach any in the build.
 func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
-	targetID int64, only []int64) *bun.SelectQuery {
+	buildID int64, only []int64) *bun.SelectQuery {
 
 	query = query.Join(`JOIN "component" AS "c" ON "c"."id" = "fn"."component_id"`)
-	return childrenJoin(openIssuesJoin(query, readable, targetID, only), targetID, only).
+	return childrenJoin(openIssuesJoin(query, readable, buildID, only), buildID, only).
 		ColumnExpr(`"c"."id" AS "component_id"`).
 		ColumnExpr(`"c"."name" AS "name"`).
 		ColumnExpr(`"c"."version" AS "version"`).
@@ -982,10 +982,10 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 // bisect down to which one holds them — a leak that needs no row to be shown.
 //
 // Counted in one grouped pass over the build's open findings and joined,
-// rather than asked per row. The covering index over target, closure,
+// rather than asked per row. The covering index over build, closure,
 // visibility, issue and component answers the pass without reading a row. As
-// a correlated subquery this has two indexes to choose from — the target and
-// the component, or the target, open and visibility — and SQLite without
+// a correlated subquery this has two indexes to choose from — the build and
+// the component, or the build, open and visibility — and SQLite without
 // statistics takes the second, which matches every open row in the build once
 // per row: 0.30 s for the root's thirty children against 0.09 s as one grouped
 // pass, and 17.1 s for a search for "li" on a switch image of 297,881 open
@@ -999,10 +999,10 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 // Where the components the query reaches are known, the pass is over theirs
 // alone.
 func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
-	targetID int64, only []int64) *bun.SelectQuery {
+	buildID int64, only []int64) *bun.SelectQuery {
 
 	kinds, kindArgs := kind.Inventory.Where(`"f"."kind"`)
-	within, args := "", append([]any{targetID, bun.List(readable)}, kindArgs...)
+	within, args := "", append([]any{buildID, bun.List(readable)}, kindArgs...)
 	if only != nil {
 		within, args = ` AND "f"."component_id" IN (?)`, append(args, bun.List(only))
 	}
@@ -1010,7 +1010,7 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 		Join(`LEFT JOIN (SELECT "g"."cid" AS "cid", COUNT(*) AS "n"
 			FROM (SELECT "f"."component_id" AS "cid", "f"."vulnerability_id" AS "vid"
 			      FROM "finding" AS "f"
-			      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)
+			      WHERE "f"."build_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)
 			        AND `+kinds+within+`
 			      GROUP BY "f"."component_id", "f"."vulnerability_id") AS "g"
 			GROUP BY "g"."cid") AS "open" ON "open"."cid" = "c"."id"`, args...).
@@ -1023,7 +1023,7 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 //
 // Counted once for the whole build and joined, rather than asked per row. As a
 // correlated subquery this has no index to take: it is bound on the child's
-// component, while the only way into the edge table is the target, so each
+// component, while the only way into the edge table is the build, so each
 // row scans every edge in the build. Measured on a switch operating-system
 // image — 19,192 edges, 5,270 components directly under the root — that column
 // alone cost 5.06 s against 0.106 s for one pass. An index on the node's
@@ -1032,8 +1032,8 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 //
 // Where the components the query reaches are known, the pass is over theirs
 // alone.
-func childrenJoin(query *bun.SelectQuery, targetID int64, only []int64) *bun.SelectQuery {
-	within, args := "", []any{targetID}
+func childrenJoin(query *bun.SelectQuery, buildID int64, only []int64) *bun.SelectQuery {
+	within, args := "", []any{buildID}
 	if only != nil {
 		within, args = ` AND "dp"."component_id" IN (?)`, append(args, bun.List(only))
 	}
@@ -1041,7 +1041,7 @@ func childrenJoin(query *bun.SelectQuery, targetID int64, only []int64) *bun.Sel
 		Join(`LEFT JOIN (SELECT "dp"."component_id" AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON "dp"."id" = "d"."parent_id"
-			WHERE "d"."target_id" = ? AND "d"."closed_scan_id" IS NULL`+within+`
+			WHERE "d"."build_id" = ? AND "d"."closed_scan_id" IS NULL`+within+`
 			GROUP BY "dp"."component_id") AS "kids" ON "kids"."cid" = "c"."id"`, args...).
 		ColumnExpr(`COALESCE("kids"."n", 0) AS "children"`)
 }
@@ -1066,11 +1066,11 @@ const orphaned = `NOT EXISTS (SELECT 1 FROM "graph_edge" AS "pe"
 // real switch image arrived with 60,935 components, 1,358 edges and none of
 // them from the root, and drawn from the root alone its tree was empty.
 func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
-	targetID int64) ([]Neighbor, error) {
+	buildID int64) ([]Neighbor, error) {
 
 	var rows []Neighbor
-	err := neighborsAt(s.db.NewSelect().TableExpr(`"graph_node" AS "fn"`), readable, targetID, nil).
-		Where(`"fn"."target_id" = ?`, targetID).
+	err := neighborsAt(s.db.NewSelect().TableExpr(`"graph_node" AS "fn"`), readable, buildID, nil).
+		Where(`"fn"."build_id" = ?`, buildID).
 		Where(`"fn"."closed_scan_id" IS NULL`).
 		Where(`"fn"."is_root" = ?`, false).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -1139,8 +1139,8 @@ func ranks(n Neighbor) int {
 // visibleIn is the other question and stays where counts are answered. A count
 // of findings narrowed by a case grant would be a count of the product's work,
 // and that is what a collaborator may not have.
-func (s *Store) knowsBuild(ctx context.Context, subject access.Subject, targetID int64) error {
-	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+func (s *Store) knowsBuild(ctx context.Context, subject access.Subject, buildID int64) error {
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, buildID)
 	if err != nil {
 		return err
 	}
@@ -1156,8 +1156,8 @@ func (s *Store) knowsBuild(ctx context.Context, subject access.Subject, targetID
 // The graph is browsed beside a findings list that is narrowed correctly, so a
 // count here that is not narrowed the same way is the more dangerous of the
 // two: nobody looking at it expects it to be a disclosure.
-func (s *Store) visibleIn(ctx context.Context, subject access.Subject, targetID int64) (int64, []access.Visibility, error) {
-	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+func (s *Store) visibleIn(ctx context.Context, subject access.Subject, buildID int64) (int64, []access.Visibility, error) {
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, buildID)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1188,13 +1188,13 @@ type Step struct {
 // much was inventoried, and how much of it was placed. A build with many
 // components and few edges is a document that listed everything and said
 // where almost nothing went.
-func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int64) (Tally, error) {
-	if _, _, err := s.visibleIn(ctx, subject, targetID); err != nil {
+func (s *Store) Counts(ctx context.Context, subject access.Subject, buildID int64) (Tally, error) {
+	if _, _, err := s.visibleIn(ctx, subject, buildID); err != nil {
 		return Tally{}, err
 	}
 	components, err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		// The build's own root is not one of its components, which is what the
 		// list beside this number says.
@@ -1205,7 +1205,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 	}
 	edges, err := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Where(`"e"."target_id" = ?`, targetID).
+		Where(`"e"."build_id" = ?`, buildID).
 		Where(`"e"."closed_scan_id" IS NULL`).
 		Count(ctx)
 	if err != nil {
@@ -1214,7 +1214,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 	// What the scanner has no way to match. It ships and is tracked, and no
 	// scan can say anything about it, so a build of nothing else reports no
 	// findings and reads as clean.
-	unmatched, err := s.unmatchedCount(ctx, targetID)
+	unmatched, err := s.unmatchedCount(ctx, buildID)
 	if err != nil {
 		return Tally{}, err
 	}
@@ -1242,10 +1242,10 @@ type Tally struct {
 // for openssl types "ssl" and should not have to know whether the package is
 // called openssl, libssl3t64 or symcrypt-openssl. Ordered by findings so the
 // first answer is the one worth opening.
-func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int64,
+func (s *Store) Search(ctx context.Context, subject access.Subject, buildID int64,
 	term string, limit int) ([]Neighbor, error) {
 
-	productID, readable, err := s.visibleIn(ctx, subject, targetID)
+	productID, readable, err := s.visibleIn(ctx, subject, buildID)
 	if err != nil {
 		return nil, err
 	}
@@ -1264,14 +1264,14 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	matched := `(SELECT DISTINCT "n"."component_id" AS "cid"
 		FROM "graph_node" AS "n"
 		JOIN "component" AS "m" ON "m"."id" = "n"."component_id"
-		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."is_root" = ?
+		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."is_root" = ?
 		  AND "m"."name_folded" LIKE ?` + database.LikeClause + `) AS "matched"`
 
 	var rows []Neighbor
 	query := s.db.NewSelect().
-		TableExpr(matched, targetID, false, "%"+database.LikeEscaped(Folded(term))+"%").
+		TableExpr(matched, buildID, false, "%"+database.LikeEscaped(Folded(term))+"%").
 		Join(`JOIN "component" AS "c" ON "c"."id" = "matched"."cid"`)
-	err = childrenJoin(openIssuesJoin(query, readable, targetID, nil), targetID, nil).
+	err = childrenJoin(openIssuesJoin(query, readable, buildID, nil), buildID, nil).
 		ColumnExpr(`"c"."id" AS "component_id"`).
 		ColumnExpr(`"c"."name" AS "name"`).
 		ColumnExpr(`"c"."version" AS "version"`).
@@ -1287,7 +1287,7 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	// What is beneath each hit, by the statement the tree uses, so a hit and
 	// the same component browsed to carry one number. The page stays ranked
 	// on each hit's own findings, which is what the limit above cuts by.
-	if err := s.filled(ctx, productID, targetID, readable, rows); err != nil {
+	if err := s.filled(ctx, productID, buildID, readable, rows); err != nil {
 		return nil, err
 	}
 	return rows, nil
@@ -1303,7 +1303,7 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 //
 // A word is present only where the producer stated one, and most inventories
 // state none at all.
-func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
+func (s *Store) DeclaredScopes(ctx context.Context, buildID int64,
 	componentIDs []int64) (map[[2]int64]string, error) {
 
 	if len(componentIDs) == 0 {
@@ -1323,7 +1323,7 @@ func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
 		ColumnExpr(`"parent"."component_id" AS "parent_component_id"`).
 		ColumnExpr(`"parent"."is_root" AS "parent_is_root"`).
 		ColumnExpr(`"e"."kind" AS "kind"`).
-		Where(`"e"."target_id" = ?`, targetID).
+		Where(`"e"."build_id" = ?`, buildID).
 		Where(`"e"."closed_scan_id" IS NULL`).
 		Where(`"e"."kind" <> ?`, "").
 		Where(`"child"."component_id" IN (?)`, bun.List(componentIDs)).

@@ -16,13 +16,13 @@ import (
 
 // ApplyGraph records a scan's graph against a build in a transaction of its
 // own, as ingest does inside the one it opens for the whole scan.
-func ApplyGraph(ctx context.Context, db bun.IDB, targetID, scanID int64,
+func ApplyGraph(ctx context.Context, db bun.IDB, buildID, scanID int64,
 	snap graph.Snapshot) (graph.Applied, error) {
 
 	var applied graph.Applied
 	err := database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
 		var err error
-		applied, err = graph.ApplyWithin(ctx, tx, targetID, scanID, snap)
+		applied, err = graph.ApplyWithin(ctx, tx, buildID, scanID, snap)
 		return err
 	})
 	return applied, err
@@ -30,13 +30,13 @@ func ApplyGraph(ctx context.Context, db bun.IDB, targetID, scanID int64,
 
 // RecordClaims stores what a build argued in a transaction of its own, as
 // ingest does inside the one it opens for the whole scan.
-func RecordClaims(ctx context.Context, db bun.IDB, targetID, scanID int64,
+func RecordClaims(ctx context.Context, db bun.IDB, buildID, scanID int64,
 	claims []sbom.Suppression, stated map[sbom.Origin]bool) (finding.ClaimsApplied, error) {
 
 	var applied finding.ClaimsApplied
 	err := database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
 		var err error
-		applied, err = finding.RecordClaimsWithin(ctx, tx, targetID, scanID, claims, stated)
+		applied, err = finding.RecordClaimsWithin(ctx, tx, buildID, scanID, claims, stated)
 		return err
 	})
 	return applied, err

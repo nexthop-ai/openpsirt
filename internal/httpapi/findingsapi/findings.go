@@ -68,11 +68,11 @@ type FindingBody struct {
 	// Builds is where the selection is more than one build, the four above
 	// are absent — a chain belongs to one build's graph — and these three
 	// take their place.
-	Builds      int    `json:"builds,omitempty" doc:"The number of builds in the selection holding this. Absent where the selection is one build"`
-	Stream      string `json:"stream,omitempty" doc:"A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"`
-	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant     string `json:"variant,omitempty" doc:"The variant of that build"`
-	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	Builds          int    `json:"builds,omitempty" doc:"The number of builds in the selection holding this. Absent where the selection is one build"`
+	BranchOrTag     string `json:"branch_or_tag,omitempty" doc:"A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"`
+	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
+	Variant         string `json:"variant,omitempty" doc:"The variant of that build"`
+	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 
 	// Labels are the words people put on this, as they were typed. On the
 	// row because the point of marking work is finding it again in a list,
@@ -202,25 +202,25 @@ func registerFindings(api huma.API, in core.Deps) {
 			"count counts. The tree counts distinct issues and this list is one row per issue " +
 			"and component, so a subtree holding one issue at two components is two rows here " +
 			"and one there.\n\n" +
-			"`stream` and `variant` are optional and independent. With both named the list is " +
+			"`branch_or_tag` and `variant` are optional and independent. With both named the list is " +
 			"one build. With either left out it answers for every build under the product " +
 			"that matches the rest: a row is still one issue in one component, its occurrence " +
 			"count is across every build it is in, and `builds` says how many those are. " +
-			"Across more than one build a row carries `stream` and `variant` naming one of " +
+			"Across more than one build a row carries `branch_or_tag` and `variant` naming one of " +
 			"them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a " +
 			"chain belongs to one build's graph. `beneath` is a walk over one build's edges " +
 			"and is refused unless both are named.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+		Product     string `path:"product"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 		core.AtOneBuild
 		core.Narrowing
 		core.Paging
 	}) (*FindingsOutput, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
@@ -269,11 +269,11 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Matched: core.MatchRoute(group.Matched),
 		Owner:   group.Owner, Parent: group.Parent,
 		Middle: group.Middle, Chains: group.Chains,
-		Builds: group.Builds, Stream: group.Stream, Variant: group.Variant,
-		StreamName:  group.StreamName,
-		VariantName: group.VariantName,
-		Labels:      group.Labels,
-		Fold:        group.Fold, Packages: group.Packages, Consumers: group.Consumers,
+		Builds: group.Builds, BranchOrTag: group.BranchOrTag, Variant: group.Variant,
+		BranchOrTagName: group.BranchOrTagName,
+		VariantName:     group.VariantName,
+		Labels:          group.Labels,
+		Fold:            group.Fold, Packages: group.Packages, Consumers: group.Consumers,
 		Occurrences: group.Occurrences, Answered: group.Answered,
 		State: core.Standing(group.State), SentBack: group.SentBack,
 		Exploited: group.Exploited, Incident: group.Incident,
@@ -323,22 +323,22 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 			"finding — the worst of what is open against it (`severity`, `urgency`, `epss`), " +
 			"the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how " +
 			"far it reaches (`occurrences`) — and `asc` orders the other way.\n\n" +
-			"`stream` and `variant` are optional and independent, as they are on the findings " +
+			"`branch_or_tag` and `variant` are optional and independent, as they are on the findings " +
 			"list: with either left out this counts across every build under the product that " +
 			"matches the rest. `beneath` is a walk over one build's edges and is refused " +
 			"unless both are named.\n\n" +
 			"`limit=0` returns `total` alone, with no rows.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
-		Variant string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+		Product     string `path:"product"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
 		core.AtOneBuild
 		core.Narrowing
 		core.CountedPaging
 	}) (*ComponentFindingsOutput, error) {
 		at, err := core.ListNarrowed(ctx, in, core.ScopeQuery{
-			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant,
 		}, input.AtOneBuild, input.Narrowing, "cannot tell what is worth triaging here")
 		if err != nil {
 			return nil, err
@@ -637,7 +637,7 @@ type EvidenceBody struct {
 func registerFindingDetail(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-finding", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/findings/{issue}/components/{component}",
 		Summary: "Get everything known about one finding",
 		Description: "Returns the full record for one issue in one component of a build: the " +
@@ -655,7 +655,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Stream        string `path:"stream"`
+		BranchOrTag   string `path:"branch_or_tag"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component's name, as the findings list gives it"`
@@ -665,11 +665,11 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, err
 		}
@@ -682,13 +682,13 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// real image ships three vendored versions of one library, and
 		// resolving the name on its own answers about whichever was interned
 		// first — for two of the three rows, an issue it does not carry.
-		component, err := core.ComponentCarrying(ctx, in, subject, target.ID, issue,
+		component, err := core.ComponentCarrying(ctx, in, subject, build.ID, issue,
 			input.Component, input.Choice(), func(err error) error { return core.AmbiguousOrMissing(in.Logger, err) })
 		if err != nil {
 			return nil, err
 		}
 
-		evidence, err := finding.NewStore(in.DB.DB).Detail(ctx, subject, target.ID, issue, component)
+		evidence, err := finding.NewStore(in.DB.DB).Detail(ctx, subject, build.ID, issue, component)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that finding could not be read", core.NoSuchFinding)
 		}
@@ -713,7 +713,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// The build's own occurrences, with the versions it ships at each:
 		// what stands is matched by key, and a key carries versions an
 		// occurrence's name alone does not.
-		keyed, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, target.ID, issue, component)
+		keyed, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, build.ID, issue, component)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "where this sits could not be read", err)
 		}
@@ -728,7 +728,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		// database they consulted rather than a property of the issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
 			issue, append([]string{body.Vulnerability}, body.Aliases...),
-			body.Component, evidence.Purl, target.ID, component)
+			body.Component, evidence.Purl, build.ID, component)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what publishers say could not be read", err)
 		}

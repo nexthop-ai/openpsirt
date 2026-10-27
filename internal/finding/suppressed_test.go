@@ -27,12 +27,12 @@ func TestAFindingTheBuildArguesDoesNotApplyIsMarkedNotDropped(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		scanID := f.lastScan
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, scanID,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, scanID,
 			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)})
 		if err != nil {
 			t.Fatal(err)
@@ -54,7 +54,7 @@ func TestAFindingTheBuildArguesDoesNotApplyIsMarkedNotDropped(t *testing.T) {
 func TestAClaimAboutSomethingElseLeavesAFindingAlone(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{
 				// Right component, different issue.
 				aClaim("CVE-2026-9", sbom.NotAffected, libnl, sbom.FromStatement),
@@ -63,7 +63,7 @@ func TestAClaimAboutSomethingElseLeavesAFindingAlone(t *testing.T) {
 			}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)})
 		if err != nil {
 			t.Fatal(err)
@@ -79,11 +79,11 @@ func TestSayingItIsAffectedSuppressesNothing(t *testing.T) {
 	// it looked. That is information, not an answer.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.Affected, libnl, sbom.FromStatement)}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)})
 		if err != nil {
 			t.Fatal(err)
@@ -100,11 +100,11 @@ func TestArguingTheSameThingAgainWritesNothing(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		claims := []sbom.Suppression{aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)}
 
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, claims, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
-		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, claims, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +114,7 @@ func TestArguingTheSameThingAgainWritesNothing(t *testing.T) {
 
 		// Withdrawing one closes it rather than deleting it: what a release
 		// argued is a question asked years later.
-		applied, err = world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin)
+		applied, err = world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, nil, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,16 +139,16 @@ func TestAClaimAttachedToItsComponentWinsOverOneThatNamedIt(t *testing.T) {
 		// or fail depending on what a map felt like doing.
 		vague := aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)
 		precise := aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{vague}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{vague, precise}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -186,7 +186,7 @@ func TestEveryStatusTheFormatDefinesCanBeStored(t *testing.T) {
 			claim.Justification = "vulnerable_code_cannot_be_controlled_by_adversary"
 			claims = append(claims, claim)
 		}
-		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, claims, everyOrigin)
 		if err != nil {
 			t.Fatalf("recording every status the format defines: %v", err)
 		}
@@ -208,11 +208,11 @@ func TestAClaimThatReachedNothingIsCounted(t *testing.T) {
 		misses := aClaim("CVE-2026-2", sbom.NotAffected,
 			graph.Described{Purl: "pkg:generic/libnl3", Name: "libnl3"}, sbom.FromStatement)
 
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{reaches, misses}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)})
 		if err != nil {
 			t.Fatal(err)
@@ -246,13 +246,13 @@ func TestAFormatThatCannotStateAClaimDoesNotWithdrawOne(t *testing.T) {
 		carried := []sbom.Suppression{
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
 		}
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, carried, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, carried, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 
 		// The next scan arrives in a format with nowhere to say it.
 		stated := map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: false}
-		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, stated)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, nil, stated)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -269,10 +269,10 @@ func TestAFormatThatCannotStateAClaimDoesNotWithdrawOne(t *testing.T) {
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
 			aClaim("CVE-2026-2", sbom.NotAffected, libnl, sbom.FromStatement),
 		}
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, spoken, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, spoken, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		applied, err = world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, stated)
+		applied, err = world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, nil, stated)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -304,11 +304,11 @@ func TestABuildsSourceTreeClaimCoversABinaryAnotherProductDescribedFirst(t *test
 
 		claim := aClaim("CVE-2026-1", sbom.NotAffected, stated, sbom.FromStatement)
 		claim.Targets = []sbom.Target{{Name: "openssl"}}
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{claim}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", stated)}); err != nil {
 			t.Fatal(err)
 		}

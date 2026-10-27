@@ -62,54 +62,54 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "declare-stream", Method: http.MethodPost, Path: "/v1/products/{product}/branches-and-tags",
+		OperationID: "declare-branch-or-tag", Method: http.MethodPost, Path: "/v1/products/{product}/branches-and-tags",
 		Summary: "Create a branch or tag",
 		Description: "Records a line of a product. A branch moves and is rebuilt; a tag never " +
 			"changes and is what somebody received.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusCreated,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
-		Body    core.StreamBody
-	}) (*core.DeclaredOutput[core.StreamBody], error) {
+		Body    core.BranchOrTagBody
+	}) (*core.DeclaredOutput[core.BranchOrTagBody], error) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
-		var out *core.DeclaredOutput[core.StreamBody]
+		var out *core.DeclaredOutput[core.BranchOrTagBody]
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
 			}
 
-			var parent *catalog.Stream
+			var parent *catalog.BranchOrTag
 			var parentID *int64
 			if in.Body.Parent != "" {
-				parent, err = store.StreamByName(ctx, product.ID, in.Body.Parent)
+				parent, err = store.BranchOrTagByName(ctx, product.ID, in.Body.Parent)
 				if err != nil {
 					return core.Undeclared(d.Logger, err, "the release it was cut from could not be looked up")
 				}
 				parentID = &parent.ID
 			}
 
-			stream, did, err := store.EnsureStream(ctx, product.ID, in.Body.Name,
+			branchOrTag, did, err := store.EnsureBranchOrTag(ctx, product.ID, in.Body.Name,
 				catalog.Kind(in.Body.Kind), parentID)
 			if err != nil {
 				return core.DeclineDeclaration(d.Logger, err)
 			}
 			if did.Restored {
-				if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+stream.Name,
+				if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+branchOrTag.Name,
 					nil, trail.Said("in use", true)); err != nil {
 					return core.NotRecorded(d.Logger, err)
 				}
 			}
 			if did.FilledIn {
-				if err := core.Noted(ctx, tx, trail.Release, product.Name+" "+stream.Name+" cut from",
+				if err := core.Noted(ctx, tx, trail.Release, product.Name+" "+branchOrTag.Name+" cut from",
 					nil, trail.Said(parent.Name, true)); err != nil {
 					return core.NotRecorded(d.Logger, err)
 				}
 			}
-			out = core.Answer(did.Changed(), core.StreamBody{
-				Name: stream.DisplayName, Kind: core.LineKind(stream.Kind), Parent: in.Body.Parent,
+			out = core.Answer(did.Changed(), core.BranchOrTagBody{
+				Name: branchOrTag.DisplayName, Kind: core.LineKind(branchOrTag.Kind), Parent: in.Body.Parent,
 			})
 			return nil
 		}); err != nil {

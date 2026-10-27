@@ -238,8 +238,8 @@ func (s *Store) movedUnder(ctx context.Context, rows []DecisionOccurrence) (map[
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "f"`+
 			` JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`+
 			` LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`+
-			` JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`+
-			` JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`+
+			` JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`+
+			` JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`+
 			` WHERE "st"."product_id" = "de"."product_id" AND "f"."closed_at" IS NULL`+
 			` AND `+kinds+
 			` AND `+finding.DecisionOccurrenceFiledAt("de", "f")+` AND `+finding.VersionsMatch+`)`, args...).

@@ -1446,6 +1446,10 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | The administrative trail's kind for an assignment rule is `assignment-rule`, which v0.10.2 named `routing`, in each change and in `GET /v1/administration/changes` | Ask for `kind=assignment-rule`. The upgrade rewrites every stored change |
 | The setting `assignment.batch` is how many findings one pass of the assignment rules places, which v0.10.2 named `routing.batch` | Nothing. The upgrade moves the value to the new name, and a value under the former name is read as one under `triage.together-cap` is |
 | The background job applying the assignment rules is `assignment.sweep`, which v0.10.2 named `routing.sweep` | A monitor matching on the job's kind matches the new one. The upgrade rewrites every stored job |
+| Every read narrowing by a branch or tag, the findings lists and the code findings among them, takes `branch_or_tag` in place of `stream`. The review queue takes `branch_or_tag` in place of `release` | Rename the parameter in the request. A former name is refused with 400, naming it |
+| A branch or tag is `branch_or_tag` in every response and request, its label `branch_or_tag_name` and its kind `branch_or_tag_kind`, which v0.10.2 named `stream`, `stream_name` and `stream_kind` | Rename the fields a client reads or sends, as [Renamed API fields](#renamed-api-fields) lists |
+| The downloads name the column `branch_or_tag` and its label `branch or tag name`, which v0.10.2 named `stream` and `stream name` | Rename the columns a script reads |
+| The interface's addresses under `/products/{product}/streams` are under `/products/{product}/branches-and-tags`, and the former ones forward there. The findings screen and the review queue narrow by `branch_or_tag`, and a kept link narrowing by `stream` or `release` opens the list without that narrowing | Nothing |
 | The upgrade renames tables and columns, then rewrites the stored values above. Each rename waits up to three seconds for a table another session holds, then waits again, logging `a rename is waiting for a table something else holds` with what holds it | Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end |
 
 #### Renamed API fields
@@ -1472,6 +1476,9 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | `floor`, setting a product's minimum severity, on the findings list and on a build's readiness | `minimum_severity` |
 | `routed_by`, the rule that placed a finding | `assigned_by_rule` |
 | `tags`, the labels on a finding | `labels` |
+| `stream` | `branch_or_tag` |
+| `stream_name` | `branch_or_tag_name` |
+| `stream_kind` | `branch_or_tag_kind` |
 
 A notice's `places`, the places it named, keeps its name.
 
@@ -1479,7 +1486,7 @@ A notice's `places`, the places it named, keeps its name.
 
 Every path below `/v1/products/{product}/streams` moves below
 `/v1/products/{product}/branches-and-tags`, and `…` below is a build's address,
-`/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}`. A path
+`/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}`. A path
 under it absent from the table keeps the rest of its address.
 
 | Former path | Path |

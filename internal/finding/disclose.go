@@ -49,10 +49,10 @@ type Embargoed struct {
 
 // EmbargoedBuild is one build an embargoed issue sits in.
 type EmbargoedBuild struct {
-	Stream      string `bun:"stream"`
-	StreamName  string `bun:"stream_name"`
-	Variant     string `bun:"variant"`
-	VariantName string `bun:"variant_name"`
+	BranchOrTag     string `bun:"branch_or_tag"`
+	BranchOrTagName string `bun:"branch_or_tag_name"`
+	Variant         string `bun:"variant"`
+	VariantName     string `bun:"variant_name"`
 }
 
 // Passed says the date has arrived and nothing has been decided about it.
@@ -128,8 +128,8 @@ func (s *Store) DisclosureDeadlinesPage(ctx context.Context, subject access.Subj
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	approaching := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Where(kinds, kindArgs...).
@@ -145,7 +145,7 @@ func (s *Store) DisclosureDeadlinesPage(ctx context.Context, subject access.Subj
 
 	// The rating is the product's own, so it is one value for the group.
 	query := approaching(s.db.NewSelect()).
-		Join(rating.For(rating.OnStream)).
+		Join(rating.For(rating.OnBranchOrTag)).
 		ColumnExpr(`"p"."id" AS "product_id"`).
 		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
@@ -239,8 +239,8 @@ func (s *Store) whereEmbargoed(ctx context.Context,
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
-		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
 		Where(`"st"."product_id" IN (?)`, bun.List(productIDs)).
@@ -250,7 +250,7 @@ func (s *Store) whereEmbargoed(ctx context.Context,
 		return fmt.Errorf("read where what is approaching disclosure sits: %w", err)
 	}
 
-	type build struct{ stream, variant string }
+	type build struct{ branchOrTag, variant string }
 	builds := make([]map[build]bool, len(rows))
 	components := make([]map[string]bool, len(rows))
 	for _, p := range placed {
@@ -261,7 +261,7 @@ func (s *Store) whereEmbargoed(ctx context.Context,
 		if builds[i] == nil {
 			builds[i], components[i] = map[build]bool{}, map[string]bool{}
 		}
-		if b := (build{p.Stream, p.Variant}); !builds[i][b] {
+		if b := (build{p.BranchOrTag, p.Variant}); !builds[i][b] {
 			builds[i][b] = true
 			rows[i].Builds = append(rows[i].Builds, p.EmbargoedBuild)
 		}
@@ -276,8 +276,8 @@ func (s *Store) whereEmbargoed(ctx context.Context,
 		sort.Strings(rows[i].Components)
 		sort.Slice(rows[i].Builds, func(a, b int) bool {
 			x, y := rows[i].Builds[a], rows[i].Builds[b]
-			if x.Stream != y.Stream {
-				return x.Stream < y.Stream
+			if x.BranchOrTag != y.BranchOrTag {
+				return x.BranchOrTag < y.BranchOrTag
 			}
 			return x.Variant < y.Variant
 		})
@@ -576,8 +576,8 @@ func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		ColumnExpr(`MAX("f"."disclose_at")`).
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = ?`, productID).
@@ -913,8 +913,8 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 		// and a queue entry nobody can act on is noise on the one list whose
 		// point is that everything on it is a question.
 		Where(`EXISTS (SELECT 1 FROM `+IssueFindings("fu")+`
-			JOIN "target" AS "tu" ON "tu"."id" = "fu"."target_id"
-			JOIN "stream" AS "su" ON "su"."id" = "tu"."stream_id"
+			JOIN "build" AS "tu" ON "tu"."id" = "fu"."build_id"
+			JOIN "branch_or_tag" AS "su" ON "su"."id" = "tu"."branch_or_tag_id"
 			WHERE "si"."id" = "dx"."vulnerability_id"
 			AND "su"."product_id" = "dx"."product_id"
 			AND "fu"."visibility" = ?

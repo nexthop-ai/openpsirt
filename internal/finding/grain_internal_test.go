@@ -40,7 +40,7 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 		return f.narrow(db.NewSelect().TableExpr(`"finding" AS "f"`).
 			Column("f.vulnerability_id").GroupExpr(`"f"."vulnerability_id"`)).String()
 	}
-	base := Filter{ProductID: 1, Builds: 2, HeldBy: []int64{1}, TargetID: 1}
+	base := Filter{ProductID: 1, Builds: 2, HeldBy: []int64{1}, BuildID: 1}
 	if strings.Contains(written(base), "HAVING") || base.asksOfGroups() {
 		t.Fatal("the base filter asks something of a group, so this checks nothing")
 	}

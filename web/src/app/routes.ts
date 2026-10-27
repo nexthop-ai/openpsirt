@@ -27,9 +27,9 @@ export const ROUTES = Object.fromEntries(
 
 // The prefix every screen of one build shares. Not an address by itself: the
 // router answers only the screens below it.
-export const BUILD = "/products/:product/streams/:stream/variants/:variant";
+export const BUILD = "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant";
 
-export type Build = { product: string; stream: string; variant: string };
+export type Build = { product: string; branch_or_tag: string; variant: string };
 
 // The kinds of upload a build's Uploads screen has a tab for, in the server's
 // own words.
@@ -71,8 +71,13 @@ const at = (
 
 // One product and what hangs off it.
 export const productAt = (product: string) => at("product", { product });
-export const streamsAt = (product: string) => at("streams", { product });
-export const streamAt = (product: string, stream: string) => at("stream", { product, stream });
+export const branchesAndTagsAt = (product: string) => at("branchesAndTags", { product });
+export const branchOrTagAt = (product: string, branchOrTag: string) =>
+  at("branchOrTag", { product, branch_or_tag: branchOrTag });
+// The place under a product's branches and tags that an address under its
+// former streams prefix names. The rest arrives escaped, as the address had it.
+export const fromStreamsAt = (product: string, rest: string) =>
+  rest ? `${branchesAndTagsAt(product)}/${rest}` : branchesAndTagsAt(product);
 export const variantsAt = (product: string) => at("variants", { product });
 export const comparisonAt = (product: string, query?: Query) =>
   at("comparison", { product }, query);
@@ -90,7 +95,7 @@ export const codeFindingsAt = (
   product: string,
   query?: {
     state?: string;
-    stream?: string;
+    branch_or_tag?: string;
     variant?: string;
     series?: string;
     assigned?: "nobody";
@@ -111,14 +116,14 @@ export function componentAt(
   product: string,
   component: string,
   version?: string | null,
-  from?: { stream?: string; variant?: string },
+  from?: { branch_or_tag?: string; variant?: string },
 ): string {
   return at(
     "productComponent",
     { product, component },
     {
       version: version || undefined,
-      stream: from?.stream || undefined,
+      branch_or_tag: from?.branch_or_tag || undefined,
       variant: from?.variant || undefined,
     },
   );
@@ -156,7 +161,7 @@ export function findingAt(
 ): string {
   return at(
     "finding",
-    { ...build, vulnerability: row.vulnerability ?? "", component: row.component ?? "" },
+    { ...build, issue: row.vulnerability ?? "", component: row.component ?? "" },
     {
       version: row.version || undefined,
       // A name at a version can be two components in one build, so the
@@ -176,7 +181,7 @@ export function findingAt(
 // queue's rows do: one record holding all of it, each part possibly absent.
 export function findingOf(row: {
   product?: string | null;
-  stream?: string | null;
+  branch_or_tag?: string | null;
   variant?: string | null;
   vulnerability?: string | null;
   component?: string | null;
@@ -185,7 +190,11 @@ export function findingOf(row: {
   namespace?: string | null;
 }): string {
   return findingAt(
-    { product: row.product ?? "", stream: row.stream ?? "", variant: row.variant ?? "" },
+    {
+      product: row.product ?? "",
+      branch_or_tag: row.branch_or_tag ?? "",
+      variant: row.variant ?? "",
+    },
     row,
   );
 }
@@ -206,7 +215,7 @@ export const bulkDecisionAt = (build: Build, component: string, which: Which = {
 export const uploadsAt = (build: Build, type?: UploadType) =>
   type && type !== "sbom" ? at("uploadsOf", { ...build, type }) : at("uploads", build);
 export const inventoryChangesAt = (build: Build, scan: number) =>
-  at("inventoryChanges", { ...build, scan });
+  at("inventoryChanges", { ...build, sbom: scan });
 export const runAt = (build: Build, run: number) => at("run", { ...build, run });
 export const plannedUpgradesAt = (build: Build) => at("plannedUpgrades", build);
 export const unmatchedComponentsAt = (build: Build) => at("unmatchedComponents", build);
@@ -227,7 +236,7 @@ export const sameProductScreenAt = (product: string, rest: string) => productAt(
 // One thing, by what names it.
 export const decisionAt = (id: number) => at("decision", { id });
 export const decisionOccurrenceAt = (id: number) => at("decisionOccurrence", { id });
-export const issueAt = (vulnerability: string) => at("issue", { vulnerability });
+export const issueAt = (issue: string) => at("issue", { issue });
 export const personAt = (identity: string) => at("person", { identity });
 export const advisoryAt = (advisory: string | number) => at("advisory", { advisory });
 export const analyticsReportAt = (report: string) => at("analyticsReport", { report });
@@ -288,8 +297,8 @@ export function refiled(pathname: string, from: string, to: string): string {
     const parts = Object.fromEntries(
       Object.entries(hit.params).map(([key, value]) => [key, decoded(value ?? "")]),
     );
-    if (parts.vulnerability === from) {
-      return fill(ROUTES[name], { ...parts, vulnerability: to });
+    if (parts.issue === from) {
+      return fill(ROUTES[name], { ...parts, issue: to });
     }
   }
   return pathname;

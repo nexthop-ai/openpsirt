@@ -25,7 +25,7 @@ const issue = { product: "sonic", vulnerability: "OPENPSIRT-2026-1" };
 const issuePath = { product: "sonic", issue: "OPENPSIRT-2026-1" };
 const at = {
   product: "sonic",
-  stream: "master",
+  branch_or_tag: "master",
   variant: "broadcom",
   vulnerability: "OPENPSIRT-2026-1",
   component: "libnl",
@@ -91,7 +91,7 @@ describe("closing a recorded flaw by hand", () => {
     mount.render(
       screen(
         <Resolve
-          at={{ product: "sonic", stream: "master", variant: "broadcom" }}
+          at={{ product: "sonic", branch_or_tag: "master", variant: "broadcom" }}
           vulnerability="OPENPSIRT-2026-1"
         />,
       ),
@@ -156,7 +156,7 @@ describe("the labels on a finding", () => {
     expect(put().map(pathOf)).toEqual([
       {
         product: "sonic",
-        stream: "master",
+        branch_or_tag: "master",
         variant: "broadcom",
         issue: "OPENPSIRT-2026-1",
         component: "libnl",

@@ -299,7 +299,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 		holder := access.NewPerson(owner.ID, "somebody@example.com", false,
 			map[int64][]access.Role{elsewhere.ID: {access.PrivateTriage}}, 0)
 		_, name, err := f.store.Enter(t.Context(), holder, finding.Entering{
-			TargetIDs: []int64{theirs}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{theirs}, Component: swss.Name, Severity: "high",
 			Summary: "A flaw in a product this judge holds nothing on.",
 		})
 		if err != nil {
@@ -435,7 +435,7 @@ func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *tes
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told: finding.Told{
 				ReportedBy: "A Researcher", Contact: "them@example.org",
@@ -518,7 +518,7 @@ func (f *fixture) anIssueHere(t *testing.T, who access.Subject, summary string) 
 	one := found(identifier, swss)
 	one.Issue.Description = summary
 	f.issues = append(f.issues, one)
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), f.issues); err != nil {
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t), f.issues); err != nil {
 		t.Fatal(err)
 	}
 	return f.issueID(t, identifier)
@@ -562,7 +562,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 			t.Fatal(err)
 		}
 		entering := finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary:    "The management socket accepts a request nobody authenticated.",
 			FromReport: strings.ToLower(report.Reference),
 		}
@@ -628,7 +628,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, identifier, err = f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary:    "The console accepts any password.",
 			FromReport: undated.Reference,
 		})
@@ -661,7 +661,7 @@ func TestAFlawRecordedFromAReportIsRefusedWhatTheReportAlreadySays(t *testing.T)
 			t.Fatal(err)
 		}
 		base := finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			BuildIDs: []int64{f.build}, Component: swss.Name, Severity: "high",
 			Summary: "A flaw.", FromReport: report.Reference,
 		}
 		twice := base

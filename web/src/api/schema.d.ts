@@ -1165,7 +1165,7 @@ export interface paths {
          *
          *     A product you may not read undisclosed work in contributes nothing to it, not even a count.
          *
-         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length. `product`, `stream` and `variant` narrow it to a scope, and the builds an item lists are the ones inside that scope.
+         *     `within` is how many days ahead to look. Left off, it is this deployment's own embargo length. `product`, `branch_or_tag` and `variant` narrow it to a scope, and the builds an item lists are the ones inside that scope.
          *
          *     Requires: private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read undisclosed work in contributes nothing, not even a count.
          */
@@ -2465,17 +2465,17 @@ export interface paths {
         };
         /**
          * List a product's branches and tags
-         * @description Every stream declared under this product, with how many variants each has and how much is open in it.
+         * @description Every branch or tag declared under this product, with how many variants each has and how much is open in it.
          *
-         *     A stream is a branch or a tag: a branch is scanned nightly and superseded, a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
+         *     A branch or tag is a branch or a tag: a branch is scanned nightly and superseded, a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
          *
-         *     A stream past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
+         *     A branch or tag past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
          *
-         *     A retired stream is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
+         *     A retired branch or tag is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
-        get: operations["list-streams"];
+        get: operations["list-branches-and-tags"];
         put?: never;
         /**
          * Create a branch or tag
@@ -2483,14 +2483,14 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        post: operations["declare-stream"];
+        post: operations["declare-branch-or-tag"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2508,7 +2508,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        delete: operations["retire-stream"];
+        delete: operations["retire-branch-or-tag"];
         options?: never;
         head?: never;
         /**
@@ -2521,10 +2521,10 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        patch: operations["amend-stream"];
+        patch: operations["amend-branch-or-tag"];
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/end-of-life": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/end-of-life": {
         parameters: {
             query?: never;
             header?: never;
@@ -2540,7 +2540,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        put: operations["set-stream-end-of-life"];
+        put: operations["set-branch-or-tag-end-of-life"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2548,7 +2548,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/release": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/release": {
         parameters: {
             query?: never;
             header?: never;
@@ -2578,7 +2578,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants": {
         parameters: {
             query?: never;
             header?: never;
@@ -2602,7 +2602,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses": {
         parameters: {
             query?: never;
             header?: never;
@@ -2638,7 +2638,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried": {
         parameters: {
             query?: never;
             header?: never;
@@ -2686,7 +2686,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried-patches": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried-patches": {
         parameters: {
             query?: never;
             header?: never;
@@ -2716,7 +2716,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2740,7 +2740,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment": {
         parameters: {
             query?: never;
             header?: never;
@@ -2770,7 +2770,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/collaborators": {
         parameters: {
             query?: never;
             header?: never;
@@ -2794,7 +2794,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2828,7 +2828,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -2843,7 +2843,7 @@ export interface paths {
          *
          *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
          *
-         *     The decision covers the code finding on every stream and variant it is seen on, and every code finding another analyzer reports as the same flaw on the build that nothing answers yet, as one decision agreed to once. A code finding that is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw is refused with 409, because its flaw is judged instead.
+         *     The decision covers the code finding on every branch or tag and variant it is seen on, and every code finding another analyzer reports as the same flaw on the build that nothing answers yet, as one decision agreed to once. A code finding that is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw is refused with 409, because its flaw is judged instead.
          *
          *     Requires: internal-triage on the product
          */
@@ -2854,7 +2854,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/fixed": {
         parameters: {
             query?: never;
             header?: never;
@@ -2880,7 +2880,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw": {
         parameters: {
             query?: never;
             header?: never;
@@ -2916,7 +2916,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure": {
         parameters: {
             query?: never;
             header?: never;
@@ -2948,7 +2948,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal": {
         parameters: {
             query?: never;
             header?: never;
@@ -2972,7 +2972,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components": {
         parameters: {
             query?: never;
             header?: never;
@@ -3002,7 +3002,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/mine": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/mine": {
         parameters: {
             query?: never;
             header?: never;
@@ -3030,7 +3030,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/around": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/around": {
         parameters: {
             query?: never;
             header?: never;
@@ -3058,7 +3058,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/bulk-decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -3090,7 +3090,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues": {
         parameters: {
             query?: never;
             header?: never;
@@ -3114,7 +3114,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3140,7 +3140,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/assignment": {
         parameters: {
             query?: never;
             header?: never;
@@ -3170,7 +3170,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/decision": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -3204,7 +3204,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3240,7 +3240,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/reach": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/reach": {
         parameters: {
             query?: never;
             header?: never;
@@ -3266,7 +3266,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision": {
         parameters: {
             query?: never;
             header?: never;
@@ -3312,7 +3312,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation": {
         parameters: {
             query?: never;
             header?: never;
@@ -3342,7 +3342,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/reach": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/reach": {
         parameters: {
             query?: never;
             header?: never;
@@ -3368,7 +3368,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/resolve": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/resolve": {
         parameters: {
             query?: never;
             header?: never;
@@ -3396,7 +3396,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades": {
         parameters: {
             query?: never;
             header?: never;
@@ -3428,7 +3428,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades.{format}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades.{format}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3452,7 +3452,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/readiness": {
         parameters: {
             query?: never;
             header?: never;
@@ -3482,7 +3482,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -3508,7 +3508,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register.{format}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register.{format}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3530,7 +3530,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/runs/{run}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/runs/{run}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3558,7 +3558,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms": {
         parameters: {
             query?: never;
             header?: never;
@@ -3594,7 +3594,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/changes": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms/{sbom}/changes": {
         parameters: {
             query?: never;
             header?: never;
@@ -3620,7 +3620,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/documents/{document}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms/{sbom}/documents/{document}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3646,7 +3646,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components": {
         parameters: {
             query?: never;
             header?: never;
@@ -3670,7 +3670,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components.{format}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3692,7 +3692,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/uploads": {
         parameters: {
             query?: never;
             header?: never;
@@ -3716,7 +3716,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex": {
         parameters: {
             query?: never;
             header?: never;
@@ -3746,7 +3746,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance": {
         parameters: {
             query?: never;
             header?: never;
@@ -3786,7 +3786,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}": {
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance/{version}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3849,7 +3849,7 @@ export interface paths {
          *
          *     With no `state` it is the queue: open code findings with no decision waiting for a second person. `state` lists the code findings in one state instead. `fixed` lists the code findings closed on a build and not opened anew there.
          *
-         *     `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
+         *     `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `branch_or_tag`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3957,7 +3957,7 @@ export interface paths {
          * Compare the inventories of two builds
          * @description Returns the component names the later build added, removed and holds at different versions, against the earlier build. Removals first, then arrivals, then the names at different versions.
          *
-         *     Any two builds of one product, across streams and variants. Each is compared as its most recent inventory stands.
+         *     Any two builds of one product, across branches and tags and variants. Each is compared as its most recent inventory stands.
          *
          *     Counted by name, as the listing of one upload is. A name either build holds at several versions carries all of them on each side.
          *
@@ -4043,7 +4043,7 @@ export interface paths {
          *
          *     `component` is a binary name or a source package name, matched without regard to capitals. A binary name answers for the source package it was built from, so `libcurl4t64` and `curl` answer alike. A binary whose inventory names no source package is its own source. A source shipped at two versions in one build is two entries: two pieces of code, decided about separately.
          *
-         *     Answered per build, because the answer differs by build. A stream staying on a maintained older line and a stream that has moved on are different work.
+         *     Answered per build, because the answer differs by build. A branch or tag staying on a maintained older line and a branch or tag that has moved on are different work.
          *
          *     Counts cover the source package: an issue open on three of its binaries is one issue. Each entry in `packages` carries its own counts.
          *
@@ -4159,7 +4159,7 @@ export interface paths {
          *
          *     `under` keeps what one container holds directly; `beneath` keeps what sits at a component or anywhere under it, which is what the dependency tree's cumulative count counts. The tree counts distinct issues and this list is one row per issue and component, so a subtree holding one issue at two components is two rows here and one there.
          *
-         *     `stream` and `variant` are optional and independent. With both named the list is one build. With either left out it answers for every build under the product that matches the rest: a row is still one issue in one component, its occurrence count is across every build it is in, and `builds` says how many those are. Across more than one build a row carries `stream` and `variant` naming one of them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a chain belongs to one build's graph. `beneath` is a walk over one build's edges and is refused unless both are named.
+         *     `branch_or_tag` and `variant` are optional and independent. With both named the list is one build. With either left out it answers for every build under the product that matches the rest: a row is still one issue in one component, its occurrence count is across every build it is in, and `builds` says how many those are. Across more than one build a row carries `branch_or_tag` and `variant` naming one of them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a chain belongs to one build's graph. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -4267,7 +4267,7 @@ export interface paths {
          *
          *     Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. `sort` takes every key the findings list takes, read of the package rather than of one finding — the worst of what is open against it (`severity`, `urgency`, `epss`), the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how far it reaches (`occurrences`) — and `asc` orders the other way.
          *
-         *     `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
+         *     `branch_or_tag` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
          *
          *     `limit=0` returns `total` alone, with no rows.
          *
@@ -4321,7 +4321,7 @@ export interface paths {
          *
          *     Counted over every open finding in the selection you may read. The findings list's other filters and the minimum severity do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
          *
-         *     `stream` and `variant` are optional and independent, as they are on the findings list.
+         *     `branch_or_tag` and `variant` are optional and independent, as they are on the findings list.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -5819,7 +5819,7 @@ export interface paths {
          * List a product's build variants
          * @description Every variant declared under this product, with how much is open in each.
          *
-         *     A variant is a way one release is built — a hardware platform, a flavor — and it is independent of the branch: every stream may be built as any of them. One variant is the ordinary case, and the interface hides the dimension where there is only one.
+         *     A variant is a way one release is built — a hardware platform, a flavor — and it is independent of the branch: every branch or tag may be built as any of them. One variant is the ordinary case, and the interface hides the dimension where there is only one.
          *
          *     Each says whether it is customer-facing, which feeds how urgent a finding in it is, and defaults to customer-facing where nobody has said.
          *
@@ -6462,7 +6462,7 @@ export interface paths {
          * Keep a filter under a name
          * @description Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
          *
-         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `stream`, `variant`, `beneath`, `beneath_version`, `beneath_ecosystem`, `beneath_namespace`, `differs`, `variants`, `opened_by_run`, `view`. Every other parameter is kept as sent.
+         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `branch_or_tag`, `variant`, `beneath`, `beneath_version`, `beneath_ecosystem`, `beneath_namespace`, `differs`, `variants`, `opened_by_run`, `view`. Every other parameter is kept as sent.
          *
          *     Refused with 422 where adding the name would take you past the per-person limit.
          *
@@ -7253,6 +7253,7 @@ export interface components {
             title?: string;
         };
         AdvisoryReleaseBody: {
+            branch_or_tag: string;
             /** @description Whether the status differs from what an agreement standing on what the advisory says now saw. The agreement stands */
             changed: boolean;
             /** @description The decision every open occurrence of the issue in the release stands under. Absent where no one outcome covers them all */
@@ -7274,7 +7275,6 @@ export interface components {
              * @enum {string}
              */
             status: "known_affected" | "known_not_affected" | "fixed";
-            stream: string;
             variant: string;
             vulnerability: string;
         };
@@ -7362,10 +7362,20 @@ export interface components {
             filed_under: string;
         };
         AlsoBuild: {
-            stream: string;
+            branch_or_tag: string;
             variant: string;
             /** @description The version that build ships under this name, where it ships more than one */
             version?: string;
+        };
+        "Amend-branch-or-tagRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Amend-branch-or-tagRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to call it instead */
+            name: string;
         };
         "Amend-productRequest": {
             /**
@@ -7378,16 +7388,6 @@ export interface components {
             display_name?: string;
             /** @description What scans and paths should call it instead. Omitted leaves it alone */
             name?: string;
-        };
-        "Amend-streamRequest": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Amend-streamRequest.json
-             */
-            readonly $schema?: string;
-            /** @description What to call it instead */
-            name: string;
         };
         "Amend-variantRequest": {
             /**
@@ -7948,6 +7948,40 @@ export interface components {
             name: string;
             product?: components["schemas"]["Named"];
         };
+        BranchOrTagBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/BranchOrTagBody.json
+             */
+            readonly $schema?: string;
+            /** @description The same name as it was spelled. Absent where it is the name itself */
+            display_name?: string;
+            /** @description The date support ends, as YYYY-MM-DD */
+            end_of_life?: string;
+            /** @description The date shown is the product's, not this release's own */
+            end_of_life_inherited?: boolean;
+            /**
+             * @description Whether this line moves. A branch is rebuilt; a tag never changes
+             * @enum {string}
+             */
+            kind: "branch" | "tag";
+            /** @description The moment a scan last arrived for any build of it */
+            last_scan_at?: string;
+            /** @description The name scans use for this branch or tag */
+            name: string;
+            /**
+             * Format: int64
+             * @description Issues open against it, counted at components rather than at every occurrence. Absent unless counts were asked for
+             */
+            open?: number;
+            /** @description For a tag, the branch it was cut from */
+            parent?: string;
+            /** @description For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in */
+            released_on?: string;
+            /** @description Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
+            retired?: boolean;
+        };
         BucketBody: {
             /** @description The same count by how the issues were rated. 'unrated' is what nobody scored */
             by_severity?: {
@@ -7995,6 +8029,9 @@ export interface components {
             within_version?: string;
         };
         BuildCountsBody: {
+            branch_or_tag: string;
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
+            branch_or_tag_name?: string;
             /** Format: int64 */
             critical: number;
             /** Format: int64 */
@@ -8006,9 +8043,6 @@ export interface components {
             low: number;
             /** Format: int64 */
             medium: number;
-            stream: string;
-            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
             /** Format: int64 */
             total: number;
             variant: string;
@@ -8016,7 +8050,7 @@ export interface components {
             variant_name?: string;
         };
         BuildName: {
-            stream: string;
+            branch_or_tag: string;
             variant: string;
         };
         BuildStandingBody: {
@@ -8025,6 +8059,12 @@ export interface components {
              * @description The number answered at every occurrence by a standing decision
              */
             agreed?: number;
+            branch_or_tag: string;
+            /**
+             * @description Whether the line moves or is fixed
+             * @enum {string}
+             */
+            branch_or_tag_kind?: "branch" | "tag";
             /**
              * Format: int64
              * @description The number somebody is known to be exploiting
@@ -8044,12 +8084,6 @@ export interface components {
              * @description The number past a deadline
              */
             overdue?: number;
-            stream: string;
-            /**
-             * @description Whether the line moves or is fixed
-             * @enum {string}
-             */
-            stream_kind?: "branch" | "tag";
             /**
              * Format: int64
              * @description The number nobody has proposed anything about
@@ -8293,7 +8327,7 @@ export interface components {
         };
         CodeFindingBuild: {
             /** @description A branch or a tag */
-            stream: string;
+            branch_or_tag: string;
             /** @description The way that line is built */
             variant: string;
         };
@@ -8472,6 +8506,8 @@ export interface components {
             assigned_to?: string;
             /** @description Their display name, where it differs from the name above */
             assigned_to_name?: string;
+            /** @description The branch or tag of the newest build the code finding is listed on, to link to */
+            branch_or_tag: string;
             /**
              * Format: int64
              * @description The number of builds in the list's scope the code finding is listed on, in the state the list asks for
@@ -8502,8 +8538,6 @@ export interface components {
              * @enum {string}
              */
             state: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
-            /** @description The branch or tag of the newest build the code finding is listed on, to link to */
-            stream: string;
             /** @description Whether the code finding is in code the newest run that saw it declared third-party */
             third_party?: boolean;
             /** @description The variant of that build */
@@ -8748,6 +8782,7 @@ export interface components {
             vulnerability: string;
         };
         CoveredBuild: {
+            branch_or_tag: string;
             /**
              * Format: int64
              * @description The number of findings those occurrences hold
@@ -8758,7 +8793,6 @@ export interface components {
              * @description The number of occurrences it covers there
              */
             recorded: number;
-            stream: string;
             variant: string;
             version?: string;
         };
@@ -8931,7 +8965,7 @@ export interface components {
             age_days: number;
             /** @description The decision's contents: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands */
             argument: components["schemas"]["DecisionOccurrenceBody"];
-            /** @description Every build the decision currently covers, as stream and variant */
+            /** @description Every build the decision currently covers, as branch or tag and variant */
             builds: string[] | null;
             /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
@@ -9114,6 +9148,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        DeclaredBranchOrTagBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DeclaredBranchOrTagBody.json
+             */
+            readonly $schema?: string;
+            created: boolean;
+            item: components["schemas"]["BranchOrTagBody"];
+        };
         DeclaredKeyBody: {
             /**
              * Format: uri
@@ -9143,16 +9187,6 @@ export interface components {
             readonly $schema?: string;
             created: boolean;
             item: components["schemas"]["ProductBody"];
-        };
-        DeclaredStreamBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/DeclaredStreamBody.json
-             */
-            readonly $schema?: string;
-            created: boolean;
-            item: components["schemas"]["StreamBody"];
         };
         DeclaredTeamBody: {
             /**
@@ -9451,9 +9485,9 @@ export interface components {
             vulnerability: string;
         };
         EmbargoedBuildBody: {
-            stream: string;
+            branch_or_tag: string;
             /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
+            branch_or_tag_name?: string;
             variant: string;
             /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
@@ -9471,7 +9505,7 @@ export interface components {
         EndedReachBody: {
             /** @description The latest moment one of them stopped. Absent where none of them says when */
             at?: string;
-            /** @description Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as stream and variant */
+            /** @description Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as branch or tag and variant */
             builds: string[] | null;
             /**
              * Format: int64
@@ -9729,6 +9763,10 @@ export interface components {
              * @description The number of those the build has already argued do not apply
              */
             answered?: number;
+            /** @description A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build */
+            branch_or_tag?: string;
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
+            branch_or_tag_name?: string;
             /**
              * Format: int64
              * @description The number of builds in the selection holding this. Absent where the selection is one build
@@ -9832,10 +9870,6 @@ export interface components {
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
-            /** @description A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build */
-            stream?: string;
-            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
             /** @description The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding */
             summary?: string;
             /** @description Nothing here has been announced. Anything said about it outside this deployment discloses it */
@@ -9898,6 +9932,9 @@ export interface components {
             scope?: "portable" | "build";
         };
         FindingRefBody: {
+            branch_or_tag: string;
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
+            branch_or_tag_name?: string;
             component: string;
             /**
              * Format: int64
@@ -9933,9 +9970,6 @@ export interface components {
             score_version?: string;
             /** @description Our rating where one stands, else as published */
             severity?: string;
-            stream: string;
-            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
             variant: string;
             /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
@@ -10031,6 +10065,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Why the flaw record was undone, in markdown */
             because?: string;
+            /** @description The branch or tag of the build its newest finding you read is on */
+            branch_or_tag: string;
             /** @description Each build the flaw is still open on whose code finding a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the flaw record is undone */
             fixed_in: components["schemas"]["FlawUnseenBody"][] | null;
             /**
@@ -10055,8 +10091,6 @@ export interface components {
              * @enum {string}
              */
             state: "open" | "no-longer-detected" | "fixed" | "dismissed" | "not-security" | "confirmed" | "recorded-as-flaw";
-            /** @description The branch or tag of the build its newest finding you read is on */
-            stream: string;
             /** @description The component the flaw record's offer ranked first, which the person may have turned down */
             suggested: components["schemas"]["FlawSuggestedBody"];
             /**
@@ -10070,9 +10104,9 @@ export interface components {
             variant: string;
         };
         FlawCodeFindingBuild: {
+            branch_or_tag: string;
             /** @description Whether the code finding was seen in it. Otherwise it holds the chosen component and the code finding's series never analyzed it */
             seen: boolean;
-            stream: string;
             variant: string;
         };
         FlawOfferBody: {
@@ -10114,11 +10148,11 @@ export interface components {
             namespace?: string;
         };
         FlawUnseenBody: {
+            branch_or_tag: string;
             /** @description The build a person stated fixed the code finding, where they closed it as fixed */
             fixed?: components["schemas"]["CodeFindingRunBody"];
             /** @description The first run on the build that did not see the code finding */
             not_seen: components["schemas"]["CodeFindingRunBody"];
-            stream: string;
             variant: string;
         };
         FoldPackageBody: {
@@ -10562,12 +10596,12 @@ export interface components {
         };
         Item: {
             /** @description A branch or a tag */
-            stream: string;
+            branch_or_tag: string;
             /** @description The way that line is built */
             variant: string;
         };
         Item1: {
-            stream: string;
+            branch_or_tag: string;
             variant: string;
         };
         KeyBody: {
@@ -10577,6 +10611,8 @@ export interface components {
              * @example https://example.com/schemas/KeyBody.json
              */
             readonly $schema?: string;
+            /** @description Optionally, the one release it may send for */
+            branch_or_tag?: string;
             /** @description The date it was issued. A pipeline key does not expire, so this is the only thing that dates it */
             created_at?: string;
             /** @description When it last sent something, to the hour */
@@ -10589,8 +10625,6 @@ export interface components {
             product_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
-            /** @description Optionally, the one release it may send for */
-            stream?: string;
             /** @description Optionally, the one variant it may send for */
             variant?: string;
             /** @description Whether it has been withdrawn */
@@ -10608,6 +10642,12 @@ export interface components {
             rows: number;
         };
         LastUploadBody: {
+            branch_or_tag: string;
+            /**
+             * @description Whether this line moves
+             * @enum {string}
+             */
+            branch_or_tag_kind: "branch" | "tag";
             /** @description The moment a scan last arrived. Absent where none ever has */
             last_received_at?: string;
             /** @description The moment an upload against this build was last turned away. Absent where none has been */
@@ -10626,12 +10666,6 @@ export interface components {
             refused_because?: string;
             /** @description Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet */
             retired?: boolean;
-            stream: string;
-            /**
-             * @description Whether this line moves
-             * @enum {string}
-             */
-            stream_kind: "branch" | "tag";
             variant: string;
         };
         LastUploadsOutputBody: {
@@ -10683,6 +10717,9 @@ export interface components {
             assigned_to?: string;
             /** @description Their display name, where it differs from their identity */
             assigned_to_name?: string;
+            branch_or_tag: string;
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
+            branch_or_tag_name?: string;
             component: string;
             /**
              * Format: int64
@@ -10706,9 +10743,6 @@ export interface components {
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
             severity?: string;
-            stream: string;
-            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
             variant: string;
             /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
@@ -10839,6 +10873,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["BindingBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyBranchOrTagBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyBranchOrTagBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["BranchOrTagBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -11205,17 +11250,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyStreamBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyStreamBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["StreamBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyString: {
             /**
              * Format: uri
@@ -11305,7 +11339,7 @@ export interface components {
             total?: number;
         };
         MadeOnBody: {
-            stream: string;
+            branch_or_tag: string;
             variant: string;
         };
         "Mark-advisory-releaseRequest": {
@@ -11317,13 +11351,16 @@ export interface components {
             readonly $schema?: string;
             /** @description True marks the release affected, false clears the mark */
             affected: boolean;
+            branch_or_tag: string;
             product: string;
-            stream: string;
             variant: string;
             /** @description The identifier the issue is filed under */
             vulnerability: string;
         };
         MatchBody: {
+            branch_or_tag: string;
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
+            branch_or_tag_name?: string;
             /** @description This is another version in the same build, not another build */
             here?: boolean;
             /**
@@ -11331,9 +11368,6 @@ export interface components {
              * @description The number of occurrences it sits at there
              */
             occurrences: number;
-            stream: string;
-            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
             variant: string;
             /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
@@ -11778,6 +11812,8 @@ export interface components {
             vulnerability: string;
         };
         OfferBody: {
+            /** @description The branch or tag of the build the finding is in */
+            branch_or_tag: string;
             /** @description The component */
             component: string;
             /** @description The address of the document it is in */
@@ -11806,8 +11842,6 @@ export interface components {
             statement: number;
             /** @description What the upstream says, in the VEX format's own words */
             status: string;
-            /** @description The branch or tag of the build the finding is in */
-            stream: string;
             /** @description The variant of the build the finding is in */
             variant: string;
             /** @description The version the upstream and this product both ship */
@@ -12181,6 +12215,7 @@ export interface components {
             was: string;
         };
         PerBuildBody: {
+            branch_or_tag: string;
             /** @description Everything open across the source package here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count */
             by_severity?: {
                 [key: string]: number;
@@ -12219,10 +12254,9 @@ export interface components {
             packages: components["schemas"]["FoldPackageBody"][] | null;
             /** @description The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing */
             source: string;
-            stream: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;
-            /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets */
+            /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and a branch or tag that has moved on have different builds */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
             variant: string;
             /** @description The version the source package was built at */
@@ -12287,7 +12321,7 @@ export interface components {
              * @example https://example.com/schemas/PlanUpgradeBody.json
              */
             readonly $schema?: string;
-            /** @description The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version */
+            /** @description The releases this is promised for. A branch or tag staying on a maintained older line takes its own promise with its own version */
             builds: components["schemas"]["BuildName"][] | null;
             /** @description The date the work lands, as 2026-03-31. A missed target is measured against it */
             by: string;
@@ -12790,7 +12824,7 @@ export interface components {
             dropped?: {
                 [key: string]: number;
             };
-            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build */
+            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another branch or tag, from the last run on that branch or tag's build */
             fingerprints_changed?: boolean;
             /**
              * Format: int64
@@ -13096,19 +13130,19 @@ export interface components {
             relates_to_product_reference: string;
         };
         ReleaseBody: {
+            /** @description The branch or tag */
+            branch_or_tag: string;
             /** @description That total split by the rating in force */
             by_severity?: {
                 [key: string]: number;
             };
-            /** @description The kind of stream: a branch or a tag */
+            /** @description The kind of branch or tag: a branch or a tag */
             kind: string;
             /**
              * Format: int64
              * @description Every open finding at this build
              */
             open: number;
-            /** @description The branch or tag */
-            stream: string;
             variant: string;
         };
         ReleaseCoveringBody: {
@@ -13127,6 +13161,9 @@ export interface components {
             reason?: string;
         };
         ReleasePointBody: {
+            branch_or_tag: string;
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
+            branch_or_tag_name?: string;
             by_severity?: {
                 [key: string]: number;
             };
@@ -13137,9 +13174,6 @@ export interface components {
              * @description Distinct issues open against it now, against today's vulnerability data rather than the day it was cut
              */
             open: number;
-            stream: string;
-            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
         };
         Remediation: {
             category: string;
@@ -13451,6 +13485,7 @@ export interface components {
             closed: number;
         };
         RetiredBody: {
+            branch_or_tag: string;
             /** @description The date has passed. False is a release that is about to go out of support */
             ended: boolean;
             /**
@@ -13473,7 +13508,6 @@ export interface components {
              */
             open: number;
             product: string;
-            stream: string;
         };
         RetiredOutputBody: {
             /**
@@ -13978,6 +14012,7 @@ export interface components {
             until: string;
         };
         SightingBody: {
+            branch_or_tag: string;
             component: string;
             /** @description The earliest deadline among its occurrences */
             due?: string;
@@ -13998,7 +14033,6 @@ export interface components {
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
-            stream: string;
             undisclosed?: boolean;
             variant: string;
             version: string;
@@ -14181,7 +14215,7 @@ export interface components {
             approved_by?: string;
             /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
-            /** @description Every build the decision currently covers, as stream and variant */
+            /** @description Every build the decision currently covers, as branch or tag and variant */
             builds: string[] | null;
             /** Format: int64 */
             decision_id: number;
@@ -14372,40 +14406,6 @@ export interface components {
             /** @description The namespace its package identifier names, where it names one */
             namespace?: string;
             version?: string;
-        };
-        StreamBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/StreamBody.json
-             */
-            readonly $schema?: string;
-            /** @description The same name as it was spelled. Absent where it is the name itself */
-            display_name?: string;
-            /** @description The date support ends, as YYYY-MM-DD */
-            end_of_life?: string;
-            /** @description The date shown is the product's, not this release's own */
-            end_of_life_inherited?: boolean;
-            /**
-             * @description Whether this line moves. A branch is rebuilt; a tag never changes
-             * @enum {string}
-             */
-            kind: "branch" | "tag";
-            /** @description The moment a scan last arrived for any build of it */
-            last_scan_at?: string;
-            /** @description The name scans use for this branch or tag */
-            name: string;
-            /**
-             * Format: int64
-             * @description Issues open against it, counted at components rather than at every occurrence. Absent unless counts were asked for
-             */
-            open?: number;
-            /** @description For a tag, the branch it was cut from */
-            parent?: string;
-            /** @description For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in */
-            released_on?: string;
-            /** @description Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
-            retired?: boolean;
         };
         SuggestionBody: {
             /** @description The component, as the builds name it. Absent for the build itself */
@@ -14683,6 +14683,10 @@ export interface components {
             whole: boolean;
         };
         UnassignedBody: {
+            /** @description A branch or tag holding it. Where builds is more than one, any of them */
+            branch_or_tag: string;
+            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
+            branch_or_tag_name?: string;
             /**
              * Format: int64
              * @description The number of builds holding it. More than one means the same code built more than one way, which one decision answers
@@ -14696,7 +14700,7 @@ export interface components {
             incident?: boolean;
             /** @description The namespace its package identifier names, where it names one */
             namespace?: string;
-            /** @description The occurrence of a static analysis code finding, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built */
+            /** @description The occurrence of a static analysis code finding, which addresses its page with the branch or tag and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built */
             occurrence?: string;
             /**
              * Format: int64
@@ -14708,10 +14712,6 @@ export interface components {
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
             severity?: string;
-            /** @description A branch or tag holding it. Where builds is more than one, any of them */
-            stream: string;
-            /** @description The branch or tag as it was spelled, or its name where no spelling was recorded */
-            stream_name?: string;
             /** @description A build variant holding it. Where builds is more than one, any of them */
             variant: string;
             /** @description The variant as it was spelled, or its name where no spelling was recorded */
@@ -14979,7 +14979,7 @@ export interface components {
             customer_facing?: boolean;
             /** @description The same name as it was spelled. Absent where it is the name itself */
             display_name?: string;
-            /** @description The name scans use for this build of the stream */
+            /** @description The name scans use for this build of the branch or tag */
             name: string;
             /**
              * Format: int64
@@ -15027,7 +15027,7 @@ export interface components {
              * @description The age of the decision. An old decision should look like one
              */
             age_days: number;
-            /** @description Every build the decision currently covers, as stream and variant */
+            /** @description Every build the decision currently covers, as branch or tag and variant */
             builds: string[] | null;
             /** @description The context a careful reader looks up: what was decided about this issue elsewhere, and how much else at the same occurrence nobody has answered */
             counter?: components["schemas"]["CounterBody"];
@@ -16137,8 +16137,8 @@ export interface operations {
                 /** @description Only decisions about this component, by name */
                 component?: string;
                 /** @description Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant */
-                stream?: string;
-                /** @description The build of that stream. Needs exactly one product and a stream */
+                branch_or_tag?: string;
+                /** @description The build of that branch or tag. Needs exactly one product and a branch or tag */
                 variant?: string;
                 limit?: number;
                 offset?: number;
@@ -16195,8 +16195,8 @@ export interface operations {
                 /** @description Only decisions about this component, by name */
                 component?: string;
                 /** @description Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant */
-                stream?: string;
-                /** @description The build of that stream. Needs exactly one product and a stream */
+                branch_or_tag?: string;
+                /** @description The build of that branch or tag. Needs exactly one product and a branch or tag */
                 variant?: string;
             };
             header?: never;
@@ -16251,8 +16251,8 @@ export interface operations {
                 /** @description Only decisions about this component, by name */
                 component?: string;
                 /** @description Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant */
-                stream?: string;
-                /** @description The build of that stream. Needs exactly one product and a stream */
+                branch_or_tag?: string;
+                /** @description The build of that branch or tag. Needs exactly one product and a branch or tag */
                 variant?: string;
                 limit?: number;
                 offset?: number;
@@ -16355,7 +16355,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
@@ -16968,7 +16968,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description The number of days ahead to look. Left off, this deployment's own embargo length */
@@ -17748,7 +17748,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand */
@@ -17788,7 +17788,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
             };
@@ -18339,7 +18339,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 limit?: number;
@@ -18920,10 +18920,10 @@ export interface operations {
             };
         };
     };
-    "list-streams": {
+    "list-branches-and-tags": {
         parameters: {
             query?: {
-                /** @description Include streams that have been retired. They say so, and no scan may be filed against one */
+                /** @description Include branches and tags that have been retired. They say so, and no scan may be filed against one */
                 retired?: boolean;
                 /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
                 counts?: boolean;
@@ -18942,7 +18942,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyStreamBody"];
+                    "application/json": components["schemas"]["ListBodyBranchOrTagBody"];
                 };
             };
             /** @description Error */
@@ -18956,7 +18956,7 @@ export interface operations {
             };
         };
     };
-    "declare-stream": {
+    "declare-branch-or-tag": {
         parameters: {
             query?: never;
             header?: never;
@@ -18967,7 +18967,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StreamBody"];
+                "application/json": components["schemas"]["BranchOrTagBody"];
             };
         };
         responses: {
@@ -18977,7 +18977,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeclaredStreamBody"];
+                    "application/json": components["schemas"]["DeclaredBranchOrTagBody"];
                 };
             };
             /** @description Error */
@@ -18991,13 +18991,13 @@ export interface operations {
             };
         };
     };
-    "retire-stream": {
+    "retire-branch-or-tag": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
             };
             cookie?: never;
         };
@@ -19021,19 +19021,19 @@ export interface operations {
             };
         };
     };
-    "amend-stream": {
+    "amend-branch-or-tag": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Amend-streamRequest"];
+                "application/json": components["schemas"]["Amend-branch-or-tagRequest"];
             };
         };
         responses: {
@@ -19055,13 +19055,13 @@ export interface operations {
             };
         };
     };
-    "set-stream-end-of-life": {
+    "set-branch-or-tag-end-of-life": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
             };
             cookie?: never;
         };
@@ -19095,7 +19095,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
             };
             cookie?: never;
         };
@@ -19132,7 +19132,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
             };
             cookie?: never;
         };
@@ -19169,7 +19169,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -19204,8 +19204,8 @@ export interface operations {
                 /** @description The declared product this build is of */
                 product: string;
                 /** @description The declared branch or tag */
-                stream: string;
-                /** @description The declared way that stream is built */
+                branch_or_tag: string;
+                /** @description The declared way that branch or tag is built */
                 variant: string;
             };
             cookie?: never;
@@ -19261,15 +19261,15 @@ export interface operations {
     "preview-carried-decisions": {
         parameters: {
             query: {
-                /** @description The stream to inherit from */
+                /** @description The branch or tag to inherit from */
                 from: string;
-                /** @description That stream's variant */
+                /** @description That branch or tag's variant */
                 from_variant: string;
             };
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -19307,7 +19307,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -19351,7 +19351,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -19384,7 +19384,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19419,7 +19419,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19456,7 +19456,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19491,7 +19491,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19525,7 +19525,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19559,7 +19559,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19598,7 +19598,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19637,7 +19637,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19672,7 +19672,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19711,7 +19711,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19744,7 +19744,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19777,7 +19777,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The code finding's occurrence identity */
                 occurrence: string;
@@ -19819,7 +19819,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -19852,7 +19852,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -19892,7 +19892,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The component's name, as the findings list gives it */
                 component: string;
@@ -19934,7 +19934,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 component: string;
             };
@@ -19983,7 +19983,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 component: string;
             };
@@ -20024,7 +20024,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 issue: string;
@@ -20068,7 +20068,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 issue: string;
                 component: string;
@@ -20112,7 +20112,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 issue: string;
@@ -20160,7 +20160,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 issue: string;
                 component: string;
@@ -20202,7 +20202,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 issue: string;
                 component: string;
@@ -20244,7 +20244,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 issue: string;
                 component: string;
@@ -20279,7 +20279,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 issue: string;
@@ -20316,7 +20316,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 issue: string;
@@ -20357,7 +20357,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 issue: string;
@@ -20398,7 +20398,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 issue: string;
@@ -20435,7 +20435,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 issue: string;
             };
@@ -20473,7 +20473,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -20506,7 +20506,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 format: "csv" | "json";
             };
@@ -20538,7 +20538,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -20586,7 +20586,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -20632,7 +20632,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 format: "csv" | "json";
             };
@@ -20664,7 +20664,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The run, as a receipt or a finding names it */
                 run: number;
@@ -20704,7 +20704,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -20739,8 +20739,8 @@ export interface operations {
                 /** @description The declared product this build is of */
                 product: string;
                 /** @description The declared branch or tag */
-                stream: string;
-                /** @description The declared way that stream is built */
+                branch_or_tag: string;
+                /** @description The declared way that branch or tag is built */
                 variant: string;
             };
             cookie?: never;
@@ -20788,7 +20788,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The upload, as a receipt names it */
                 sbom: number;
@@ -20823,7 +20823,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description The upload, as the receipt names it */
                 sbom: number;
@@ -20865,7 +20865,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -20901,7 +20901,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 format: "csv" | "json";
             };
@@ -20933,7 +20933,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -20971,7 +20971,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -21007,7 +21007,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -21043,7 +21043,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
             };
             cookie?: never;
@@ -21079,7 +21079,7 @@ export interface operations {
             header?: never;
             path: {
                 product: string;
-                stream: string;
+                branch_or_tag: string;
                 variant: string;
                 /** @description Which revision, counting from one */
                 version: number;
@@ -21143,7 +21143,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
                 /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
@@ -21189,7 +21189,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
                 /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
@@ -21229,11 +21229,11 @@ export interface operations {
     "compare-releases": {
         parameters: {
             query: {
-                /** @description The earlier build's stream — a branch or a tag */
+                /** @description The earlier build's branch or tag — a branch or a tag */
                 from: string;
                 /** @description The earlier build's variant */
                 from_variant: string;
-                /** @description The later build's stream */
+                /** @description The later build's branch or tag */
                 to: string;
                 /** @description The later build's variant */
                 to_variant: string;
@@ -21271,11 +21271,11 @@ export interface operations {
     "export-comparison": {
         parameters: {
             query: {
-                /** @description The earlier build's stream — a branch or a tag */
+                /** @description The earlier build's branch or tag — a branch or a tag */
                 from: string;
                 /** @description The earlier build's variant */
                 from_variant: string;
-                /** @description The later build's stream */
+                /** @description The later build's branch or tag */
                 to: string;
                 /** @description The later build's variant */
                 to_variant: string;
@@ -21312,11 +21312,11 @@ export interface operations {
     "compare-inventories": {
         parameters: {
             query: {
-                /** @description The earlier build's stream — a branch or a tag */
+                /** @description The earlier build's branch or tag — a branch or a tag */
                 from: string;
                 /** @description The earlier build's variant */
                 from_variant: string;
-                /** @description The later build's stream */
+                /** @description The later build's branch or tag */
                 to: string;
                 /** @description The later build's variant */
                 to_variant: string;
@@ -21358,11 +21358,11 @@ export interface operations {
     "export-inventory-comparison": {
         parameters: {
             query: {
-                /** @description The earlier build's stream — a branch or a tag */
+                /** @description The earlier build's branch or tag — a branch or a tag */
                 from: string;
                 /** @description The earlier build's variant */
                 from_variant: string;
-                /** @description The later build's stream */
+                /** @description The later build's branch or tag */
                 to: string;
                 /** @description The later build's variant */
                 to_variant: string;
@@ -21399,11 +21399,11 @@ export interface operations {
     "get-release-notes": {
         parameters: {
             query: {
-                /** @description The earlier build's stream — a branch or a tag */
+                /** @description The earlier build's branch or tag — a branch or a tag */
                 from: string;
                 /** @description The earlier build's variant */
                 from_variant: string;
-                /** @description The later build's stream */
+                /** @description The later build's branch or tag */
                 to: string;
                 /** @description The later build's variant */
                 to_variant: string;
@@ -21442,7 +21442,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
             };
@@ -21580,7 +21580,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
                 /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
@@ -21748,7 +21748,7 @@ export interface operations {
     "export-findings": {
         parameters: {
             query?: {
-                stream?: string;
+                branch_or_tag?: string;
                 variant?: string;
                 /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
                 beneath?: string;
@@ -21876,7 +21876,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product */
                 variant?: string;
                 /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
@@ -22010,7 +22010,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
                 /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
@@ -22143,7 +22143,7 @@ export interface operations {
     "export-finding-components": {
         parameters: {
             query?: {
-                stream?: string;
+                branch_or_tag?: string;
                 variant?: string;
                 /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
                 beneath?: string;
@@ -22271,7 +22271,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
             };
@@ -23226,7 +23226,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant */
                 variant?: string;
                 /** @description Keep only issues rated this badly or worse */
@@ -23282,7 +23282,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant */
                 variant?: string;
                 /** @description Keep only issues rated this badly or worse */
@@ -24850,7 +24850,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description Also list releases whose date falls inside this many days ahead. They come back under ending, never mixed into what has already gone */
@@ -24888,7 +24888,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description Also write out releases whose date falls inside this many days ahead, marked as not yet ended */
@@ -24926,7 +24926,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
@@ -25148,7 +25148,7 @@ export interface operations {
                 /** @description Keep only decisions of these outcomes. Any of them, not all */
                 outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
-                release?: string;
+                branch_or_tag?: string;
                 /** @description The number returned. Zero returns the total alone */
                 limit?: number;
                 /** @description The number skipped */
@@ -25198,7 +25198,7 @@ export interface operations {
                 /** @description Keep only decisions of these outcomes. Any of them, not all */
                 outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
-                release?: string;
+                branch_or_tag?: string;
             };
             header?: never;
             path: {
@@ -25290,7 +25290,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description The distance ahead to look */
@@ -25331,7 +25331,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description The distance ahead to look */
@@ -25851,7 +25851,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 limit?: number;
@@ -26114,7 +26114,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 weeks?: number;
@@ -26161,7 +26161,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 weeks?: number;
@@ -26208,7 +26208,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 /** @description The number of releases, most recent kept */
@@ -26246,7 +26246,7 @@ export interface operations {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
                 /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
+                branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
                 limit?: number;

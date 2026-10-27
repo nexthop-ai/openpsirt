@@ -86,31 +86,31 @@ func TestMeasureAForkReadingARealImagesDocuments(t *testing.T) {
 				Component: component,
 			})
 		}
-		shipped := func(target *catalog.Target, hash string) {
+		shipped := func(build *catalog.Build, hash string) {
 			scan, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-				TargetID: target.ID, ContentHash: hash,
+				BuildID: build.ID, ContentHash: hash,
 				BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "measure",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := fixture.ApplyGraph(ctx, db.DB, target.ID, scan.ID, doc.Snapshot(root)); err != nil {
+			if _, err := fixture.ApplyGraph(ctx, db.DB, build.ID, scan.ID, doc.Snapshot(root)); err != nil {
 				t.Fatal(err)
 			}
 		}
-		run := func(target *catalog.Target) time.Duration {
+		run := func(build *catalog.Build) time.Duration {
 			start := time.Now()
-			ran, err := w.findings.Begin(ctx, finding.Run{TargetID: target.ID, Scanner: "measure", RanHere: true})
+			ran, err := w.findings.Begin(ctx, finding.Run{BuildID: build.ID, Scanner: "measure", RanHere: true})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := w.findings.Apply(ctx, target.ID, ran.ID, reported); err != nil {
+			if _, err := w.findings.Apply(ctx, build.ID, ran.ID, reported); err != nil {
 				t.Fatal(err)
 			}
 			return time.Since(start)
 		}
-		shipped(w.Target, "upstream")
-		run(w.Target)
+		shipped(w.Build, "upstream")
+		run(w.Build)
 		decided := 0
 		seen := map[string]bool{}
 		for i, one := range reported {
@@ -119,7 +119,7 @@ func TestMeasureAForkReadingARealImagesDocuments(t *testing.T) {
 				continue
 			}
 			seen[one.Issue.Identifier+" "+one.Component.Name] = true
-			w.decide(w.Target, one.Issue.Identifier, one.Component.Name, triage.CodeNotPresent)
+			w.decide(w.Build, one.Issue.Identifier, one.Component.Name, triage.CodeNotPresent)
 			decided++
 		}
 		if err := w.Catalog.SetPublishes(ctx, w.Product.ID, true); err != nil {
@@ -143,7 +143,7 @@ func TestMeasureAForkReadingARealImagesDocuments(t *testing.T) {
 
 		var closed int
 		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr("COUNT(*)").
-			Where(`"f"."target_id" = ?`, w.forkBuild.ID).
+			Where(`"f"."build_id" = ?`, w.forkBuild.ID).
 			Where(`"f"."closed_because" = ?`, string(finding.Disclaimed)).
 			Scan(ctx, &closed); err != nil {
 			t.Fatal(err)

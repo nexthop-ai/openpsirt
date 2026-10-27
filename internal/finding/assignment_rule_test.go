@@ -60,7 +60,7 @@ func TestARuleIsWrittenReadAndAppliedOnEveryEngine(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -153,7 +153,7 @@ func TestAPreviewShowsOnlyWhatTheAskerMayRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -202,7 +202,7 @@ func TestAComponentNamedOutsideASCIIMatchesTheSameOnEveryEngine(t *testing.T) {
 			Components:   []graph.Described{swss, odd},
 			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: swss, Child: odd}},
 		})
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-2", odd)}); err != nil {
 			t.Fatal(err)
 		}
@@ -276,7 +276,7 @@ func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
 		// is that the fold does not agree.
 		issue := f.issue(t, "CVE-2026-CURL")
 		for _, named := range []string{"libcurl4t64", "curl"} {
-			seen, err := f.store.Detail(ctx, who, f.target, issue, f.componentID(t, named))
+			seen, err := f.store.Detail(ctx, who, f.build, issue, f.componentID(t, named))
 			if err != nil {
 				t.Fatalf("read the finding named %q: %v", named, err)
 			}
@@ -305,7 +305,7 @@ func TestARuleNamingMostOfABuildIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -397,7 +397,7 @@ func (f *fixture) flat(t *testing.T, names ...string) {
 		reported = append(reported, found(fmt.Sprintf("CVE-2026-%d", i+1), library))
 	}
 	f.shipped(t, snap)
-	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+	if _, err := f.store.Apply(t.Context(), f.build, f.run(t), reported); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -525,7 +525,7 @@ func codeFindingsAt(t *testing.T, f *fixture) {
 	t.Helper()
 	ctx := t.Context()
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+	if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{
 		found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl),
 	}); err != nil {
 		t.Fatal(err)
@@ -562,7 +562,7 @@ func placedWith(t *testing.T, f *fixture, team int64) (codeFindings map[access.V
 		t.Fatal(err)
 	}
 	var rows []finding.Finding
-	if err := f.db.DB.NewSelect().Model(&rows).Where(`"f"."target_id" = ?`, f.target).Scan(ctx); err != nil {
+	if err := f.db.DB.NewSelect().Model(&rows).Where(`"f"."build_id" = ?`, f.build).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if len(rows) == 0 {
@@ -605,8 +605,8 @@ func TestAnAssignmentRulePlacesNoCodeFindingPastItsEndOfLife(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		codeFindingsAt(t, f)
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
-		if _, err := f.db.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
-			Where(`"id" IN (SELECT "stream_id" FROM "target" WHERE "id" = ?)`, f.target).
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"branch_or_tag"`).Set(`"eol_on" = ?`, ended).
+			Where(`"id" IN (SELECT "branch_or_tag_id" FROM "build" WHERE "id" = ?)`, f.build).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

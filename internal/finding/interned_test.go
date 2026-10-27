@@ -384,7 +384,7 @@ func TestAnIssueReportedAtManyPackagesCostsWhatOnePackageDoes(t *testing.T) {
 			}
 			asked := &matchedStatements{}
 			f.hook(asked)
-			if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t), reported); err != nil {
 				t.Fatal(err)
 			}
 			n, _ := asked.matching(`SELECT "va"."id"`)
@@ -419,13 +419,13 @@ func TestRescanningAnUnchangedIssueWritesNothingAboutIt(t *testing.T) {
 		r.Issue.Weaknesses, r.Issue.PrimaryWeakness = []string{"CWE-79", "CWE-89"}, "CWE-79"
 		r.Issue.References = []finding.Reference{{URL: "https://example.com/fix"}}
 		for range 2 {
-			if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{r}); err != nil {
+			if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{r}); err != nil {
 				t.Fatal(err)
 			}
 		}
 		asked := &matchedStatements{}
 		f.hook(asked)
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{r}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{r}); err != nil {
 			t.Fatal(err)
 		}
 		for _, prefix := range []string{`UPDATE "vulnerability`, `INSERT INTO "vulnerability`} {
@@ -450,14 +450,14 @@ func TestADescriptionAlreadyHeldIsNotWrittenAgain(t *testing.T) {
 		described := found("CVE-2026-DESCRIBED", libnl)
 		described.Issue.Description = "What the flaw is."
 		described.Issue.Advisory = "https://example.com/advisory"
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{described}); err != nil {
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{described}); err != nil {
 			t.Fatal(err)
 		}
 		pointing := found("CVE-2026-DESCRIBED", swss)
 		pointing.Issue.References = []finding.Reference{{URL: "https://example.com/fix"}}
 		asked := &matchedStatements{}
 		f.hook(asked)
-		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{pointing, described}); err != nil {
 			t.Fatal(err)
 		}

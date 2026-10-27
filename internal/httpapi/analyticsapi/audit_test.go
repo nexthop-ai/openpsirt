@@ -45,7 +45,7 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 			Total int `json:"total"`
 		}
 		httpapitest.Read(t, r, "private-triage",
-			"/v1/audit?product=mine&stream=master&variant=broadcom", &about)
+			"/v1/audit?product=mine&branch_or_tag=master&variant=broadcom", &about)
 		if about.Total != 1 {
 			t.Errorf("the record narrowed to the build it was decided in holds %d", about.Total)
 		}
@@ -59,21 +59,21 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 			Total int `json:"total"`
 		}
 		httpapitest.Read(t, r, "private-triage",
-			"/v1/audit?product=mine&stream=master&variant=mellanox", &elsewhere)
+			"/v1/audit?product=mine&branch_or_tag=master&variant=mellanox", &elsewhere)
 		if elsewhere.Total != 0 {
 			t.Errorf("a build holding none of it answers with %d decisions", elsewhere.Total)
 		}
 
 		// A build of the same product that holds none of it.
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/audit?product=mine&stream=master&variant=nothing-is-built-this-way", ""); got.Code != http.StatusNotFound {
+			"/v1/audit?product=mine&branch_or_tag=master&variant=nothing-is-built-this-way", ""); got.Code != http.StatusNotFound {
 			t.Errorf("a variant nobody declared answered %d", got.Code)
 		}
-		// Half a build is refused rather than narrowing to a stream of
+		// Half a build is refused rather than narrowing to a branch or tag of
 		// whichever product happens to share the name.
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/audit?product=mine&stream=master", ""); got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("a stream with no variant answered %d", got.Code)
+			"/v1/audit?product=mine&branch_or_tag=master", ""); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a branch or tag with no variant answered %d", got.Code)
 		}
 
 		// And the file carries the whole of the agreement record.

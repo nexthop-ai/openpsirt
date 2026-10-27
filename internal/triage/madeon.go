@@ -26,7 +26,7 @@ type MadeOn struct {
 
 	ID         int64 `bun:"id,pk,autoincrement"`
 	DecisionID int64 `bun:"decision_id,notnull"`
-	TargetID   int64 `bun:"target_id,notnull"`
+	BuildID    int64 `bun:"build_id,notnull"`
 }
 
 // recordMadeOn writes the builds a new decision was made on, inside the
@@ -36,22 +36,22 @@ type MadeOn struct {
 // names one: a decision re-made after its code moved, or the rows an approver set
 // aside, is the same decision, made on the same builds.
 func (s *Store) recordMadeOn(ctx context.Context, decisionID int64, p Proposal) error {
-	targets := append([]int64(nil), p.MadeOn...)
+	buildIDs := append([]int64(nil), p.MadeOn...)
 	if p.MadeAs != 0 {
 		held, err := madeOnOf(ctx, s.db, []int64{p.MadeAs})
 		if err != nil {
 			return err
 		}
-		targets = append(targets, held[p.MadeAs]...)
+		buildIDs = append(buildIDs, held[p.MadeAs]...)
 	}
 	seen := map[int64]bool{}
-	rows := make([]MadeOn, 0, len(targets))
-	for _, target := range targets {
-		if target == 0 || seen[target] {
+	rows := make([]MadeOn, 0, len(buildIDs))
+	for _, build := range buildIDs {
+		if build == 0 || seen[build] {
 			continue
 		}
-		seen[target] = true
-		rows = append(rows, MadeOn{DecisionID: decisionID, TargetID: target})
+		seen[build] = true
+		rows = append(rows, MadeOn{DecisionID: decisionID, BuildID: build})
 	}
 	if len(rows) == 0 {
 		return nil
@@ -75,7 +75,7 @@ func madeOnOf(ctx context.Context, db bun.IDB, decisions []int64) (map[int64][]i
 		return nil, fmt.Errorf("read the builds a decision was made on: %w", err)
 	}
 	for _, row := range rows {
-		out[row.DecisionID] = append(out[row.DecisionID], row.TargetID)
+		out[row.DecisionID] = append(out[row.DecisionID], row.BuildID)
 	}
 	for id := range out {
 		sort.Slice(out[id], func(i, j int) bool { return out[id][i] < out[id][j] })

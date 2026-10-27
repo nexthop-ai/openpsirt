@@ -43,7 +43,7 @@ function useAfterCodeFinding() {
 // `assigned` reads as the findings list's does: "nobody" keeps the code findings
 // nobody holds.
 type CodeFindingsAsked = {
-  stream?: string;
+  branch_or_tag?: string;
   variant?: string;
   series?: string;
   state?: CodeFindingState;
@@ -71,7 +71,7 @@ export function useCodeFindings(
             query: {
               limit: PAGE,
               offset: asked.offset ?? 0,
-              ...(asked.stream ? { stream: asked.stream } : {}),
+              ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
               ...(asked.variant ? { variant: asked.variant } : {}),
               ...(asked.series ? { series: asked.series } : {}),
               ...(asked.state ? { state: asked.state } : {}),
@@ -103,11 +103,11 @@ export function useCodeFindingSeries(product: string): UseQueryResult<CodeFindin
 
 export function useCodeFinding(build: Build, occurrence: string): UseQueryResult<Evidence> {
   return useQuery({
-    queryKey: ["code-finding", build.product, build.stream, build.variant, occurrence],
+    queryKey: ["code-finding", build.product, build.branch_or_tag, build.variant, occurrence],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}",
           {
             params: { path: { ...build, occurrence } },
           },
@@ -123,7 +123,7 @@ export function useDecideCodeFinding(build: Build, occurrence: string) {
     mutationFn: async (body: Body<"CodeFindingDecisionBody">) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision",
           { params: { path: { ...build, occurrence } }, body },
         ),
       ),
@@ -137,7 +137,7 @@ export function useFixCodeFinding(build: Build, occurrence: string) {
     mutationFn: async ({ because, fixedIn }: { because: string; fixedIn: number }) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/fixed",
           {
             params: { path: { ...build, occurrence } },
             body: { because, fixed_in: fixedIn },
@@ -156,7 +156,7 @@ export function useAssignCodeFinding(build: Build, occurrence: string) {
     mutationFn: async (held: { kind: "person" | "team"; identity: string } | null) =>
       unwrap(
         await api.PUT(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment",
           {
             params: { path: { ...build, occurrence } },
             body:
@@ -232,11 +232,11 @@ type Recording = Body<"Record-code-finding-as-flawRequest">;
 // asks before it reads this.
 export function useFlawOffer(build: Build, occurrence: string, wanted: boolean) {
   return useQuery({
-    queryKey: ["code-finding-flaw", build.product, build.stream, build.variant, occurrence],
+    queryKey: ["code-finding-flaw", build.product, build.branch_or_tag, build.variant, occurrence],
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw",
           { params: { path: { ...build, occurrence } } },
         ),
       ),
@@ -264,7 +264,7 @@ export function useRecordAsFlaw(build: Build, occurrence: string) {
     mutationFn: async (body: Recording) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw",
           { params: { path: { ...build, occurrence } }, body },
         ),
       ),
@@ -280,7 +280,7 @@ export function useUndoRecordAsFlaw(build: Build, occurrence: string) {
     mutationFn: async (because: string) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal",
+          "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal",
           { params: { path: { ...build, occurrence } }, body: { because } },
         ),
       ),
@@ -293,7 +293,7 @@ export function useUndoRecordAsFlaw(build: Build, occurrence: string) {
 export function useIncludeCodeFinding(build: Build, occurrence: string) {
   const after = useAfterRecordAsFlaw();
   const path =
-    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure" as const;
+    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure" as const;
   return useMutation({
     mutationFn: async (include: boolean) =>
       unwrap(

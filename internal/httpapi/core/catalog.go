@@ -132,8 +132,8 @@ type MinimumSeverityBody struct {
 	MinimumSeverity minimumSeverityOrClear `json:"minimum_severity" doc:"The least severity worth triaging here, \"everything\" to hide nothing, or empty to follow the deployment"`
 }
 
-// StreamBody is a branch or a tag.
-type StreamBody struct {
+// BranchOrTagBody is a branch or a tag.
+type BranchOrTagBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this branch or tag"`
 	// DisplayName is the same name as it was typed. It is stored beside the
 	// matched one at every level, and absent here a correction that moved only
@@ -165,10 +165,10 @@ type StreamBody struct {
 	EndOfLifeInherited bool `json:"end_of_life_inherited,omitempty" doc:"The date shown is the product's, not this release's own"`
 }
 
-// VariantBody is one of the ways a stream is built.
+// VariantBody is one of the ways a branch or tag is built.
 type VariantBody struct {
-	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this build of the stream"`
-	// DisplayName is the same name as it was typed, for the reason the stream
+	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this build of the branch or tag"`
+	// DisplayName is the same name as it was typed, for the reason the branch or tag
 	// body carries one.
 	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
 	// CustomerFacing is a pointer so that leaving it out is not the same as
@@ -282,16 +282,16 @@ func ProductIn(ctx context.Context, d Declaring, db bun.IDB,
 	return store, found, nil
 }
 
-// StreamIn is ProductIn, then one of the product's releases by name. A fault
+// BranchOrTagIn is ProductIn, then one of the product's releases by name. A fault
 // on the second read is logged as the release's.
-func StreamIn(ctx context.Context, d Declaring, db bun.IDB,
-	product, stream string) (*catalog.Store, *catalog.Product, *catalog.Stream, error) {
+func BranchOrTagIn(ctx context.Context, d Declaring, db bun.IDB,
+	product, branchOrTag string) (*catalog.Store, *catalog.Product, *catalog.BranchOrTag, error) {
 
 	store, found, err := ProductIn(ctx, d, db, product)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	release, err := store.StreamByName(ctx, found.ID, stream)
+	release, err := store.BranchOrTagByName(ctx, found.ID, branchOrTag)
 	if err != nil {
 		return nil, nil, nil, Undeclared(d.Logger, err, "that release could not be looked up")
 	}

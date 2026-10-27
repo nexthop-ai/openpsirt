@@ -24,8 +24,8 @@ import (
 
 // CodeFindingBuild is one build a flaw record names.
 type CodeFindingBuild struct {
-	Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
-	Variant string `json:"variant" minLength:"1" doc:"The way that line is built"`
+	BranchOrTag string `json:"branch_or_tag" minLength:"1" doc:"A branch or a tag"`
+	Variant     string `json:"variant" minLength:"1" doc:"The way that line is built"`
 }
 
 // FlawOfferSource is where a suggested component came from.
@@ -102,31 +102,31 @@ type RecordedAsFlawBody struct {
 }
 
 // codeFindingPath is one code finding, addressed by its occurrence on one build.
-const codeFindingPath = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}"
+const codeFindingPath = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}"
 
 // codeFindingAt is the reader, the build and the product a route about one code finding
 // names.
 type codeFindingAt struct {
 	subject access.Subject
 	named   *catalog.Named
-	target  int64
+	build   int64
 }
 
 // locateCodeFinding resolves the build a code finding route names.
-func locateCodeFinding(ctx context.Context, in core.Deps, product, stream, variant string) (*codeFindingAt, error) {
+func locateCodeFinding(ctx context.Context, in core.Deps, product, branchOrTag, variant string) (*codeFindingAt, error) {
 	subject, err := core.Reading(ctx)
 	if err != nil {
 		return nil, err
 	}
-	named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+	named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 	if err != nil {
 		return nil, err
 	}
-	target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+	build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 	if err != nil {
 		return nil, err
 	}
-	return &codeFindingAt{subject: subject, named: named, target: target.ID}, nil
+	return &codeFindingAt{subject: subject, named: named, build: build.ID}, nil
 }
 
 // refusedFlawRecord is the answer to recording a flaw, an inclusion in disclosure
@@ -159,12 +159,12 @@ func registerFlaw(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
 		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 	}) (*struct{ Body FlawOfferBody }, error) {
-		at, err := locateCodeFinding(ctx, in, input.Product, input.Stream, input.Variant)
+		at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -206,11 +206,11 @@ func registerFlaw(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
 		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body       struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Body        struct {
 			Builds    []CodeFindingBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
 			Component string             `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Ecosystem string             `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
@@ -222,7 +222,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 		Status int
 		Body   RecordedAsFlawBody
 	}, error) {
-		at, err := locateCodeFinding(ctx, in, input.Product, input.Stream, input.Variant)
+		at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -233,22 +233,22 @@ func registerFlaw(api huma.API, in core.Deps) {
 			return nil, refusedFlawRecord(in, err)
 		}
 		names := catalog.NewStore(in.DB.DB)
-		targets := make([]int64, 0, len(input.Body.Builds))
+		buildIDs := make([]int64, 0, len(input.Body.Builds))
 		for _, b := range input.Body.Builds {
-			located, err := names.LocateVisible(ctx, subject, input.Product, b.Stream, b.Variant)
+			located, err := names.LocateVisible(ctx, subject, input.Product, b.BranchOrTag, b.Variant)
 			if err != nil {
 				return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
 			}
-			target, err := core.TargetRow(ctx, in, located.StreamID, located.VariantID)
+			build, err := core.BuildRow(ctx, in, located.BranchOrTagID, located.VariantID)
 			if err != nil {
 				return nil, err
 			}
-			targets = append(targets, target.ID)
+			buildIDs = append(buildIDs, build.ID)
 		}
 		done, err := analysis.RecordAsFlaw(ctx, in.DB.DB, subject, analysis.Recording{
 			ProductID: at.named.ProductID, OccurrenceIdentity: input.Occurrence, IncludeInDisclosure: input.Body.IncludeInDisclosure,
 			Flaw: finding.Entering{
-				TargetIDs: targets, Component: input.Body.Component,
+				BuildIDs: buildIDs, Component: input.Body.Component,
 				Ecosystem: input.Body.Ecosystem, Namespace: input.Body.Namespace,
 				Summary: input.Body.Summary, Severity: string(input.Body.Severity),
 				Vector: input.Body.Vector, Weaknesses: input.Body.Weaknesses,
@@ -271,18 +271,18 @@ func registerFlaw(api huma.API, in core.Deps) {
 	})
 
 	including := func(include bool) func(context.Context, *struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 	}) (*struct{}, error) {
 		return func(ctx context.Context, input *struct {
-			Product    string `path:"product"`
-			Stream     string `path:"stream"`
-			Variant    string `path:"variant"`
-			Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
+			Product     string `path:"product"`
+			BranchOrTag string `path:"branch_or_tag"`
+			Variant     string `path:"variant"`
+			Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 		}) (*struct{}, error) {
-			at, err := locateCodeFinding(ctx, in, input.Product, input.Stream, input.Variant)
+			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err
 			}
@@ -330,7 +330,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 func codeFindingBuilds(builds []analysis.BuildName) []CodeFindingBuild {
 	out := make([]CodeFindingBuild, 0, len(builds))
 	for _, b := range builds {
-		out = append(out, CodeFindingBuild{Stream: b.Stream, Variant: b.Variant})
+		out = append(out, CodeFindingBuild{BranchOrTag: b.BranchOrTag, Variant: b.Variant})
 	}
 	return out
 }
@@ -372,23 +372,23 @@ type CodeFindingCollaboratorBody = CollaboratorBody
 func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Administering) {
 	const path = codeFindingPath + "/collaborators"
 	type codeFindingInput = struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
 	}
 	type personInput = struct {
-		Product    string `path:"product"`
-		Stream     string `path:"stream"`
-		Variant    string `path:"variant"`
-		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Identity   string `path:"identity"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
+		Identity    string `path:"identity"`
 	}
 	// recorded is the flaw record of the code finding a route names, where the reader
 	// reads internal work in the product: who is on a code finding is managed by its
 	// internal readers, whether or not it is included in disclosure.
 	recorded := func(ctx context.Context, db bun.IDB, at *codeFindingAt, occurrence string) (*finding.CodeFindingFlaw, error) {
-		if _, err := finding.NewStore(db).CodeFindingAt(ctx, at.subject, at.target, occurrence); err != nil {
+		if _, err := finding.NewStore(db).CodeFindingAt(ctx, at.subject, at.build, occurrence); err != nil {
 			return nil, core.Absent(in.Logger, err, "that code finding could not be looked up", core.NoSuchFinding)
 		}
 		h, err := finding.CodeFindingFlawAt(ctx, db, at.named.ProductID, occurrence)
@@ -429,7 +429,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Where you read internal work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *codeFindingInput) (*core.ListOutput[CodeFindingCollaboratorBody], error) {
-			at, err := locateCodeFinding(ctx, in, input.Product, input.Stream, input.Variant)
+			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err
 			}
@@ -462,7 +462,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Where you read internal work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
-			at, err := locateCodeFinding(ctx, in, input.Product, input.Stream, input.Variant)
+			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err
 			}
@@ -505,7 +505,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 				PersonID: person.ID, Kind: notify.BroughtIn,
 				Body: "You have been granted the static analysis code finding behind " + flaw[h.VulnerabilityID] +
 					" in " + at.named.Product + ". You can read its evidence, and nothing else of that product.",
-				Link:    weblink.CodeFinding(at.named.Product, at.named.Stream, at.named.Variant, h.OccurrenceIdentity),
+				Link:    weblink.CodeFinding(at.named.Product, at.named.BranchOrTag, at.named.Variant, h.OccurrenceIdentity),
 				Private: true,
 				// The flaw, so somebody on its case reads the line as well as
 				// somebody reading the product's undisclosed work, and the
@@ -526,7 +526,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Where you read internal work in the product, whether or not the code finding is included in disclosure.", codeFindingReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
-			at, err := locateCodeFinding(ctx, in, input.Product, input.Stream, input.Variant)
+			at, err := locateCodeFinding(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 			if err != nil {
 				return nil, err
 			}

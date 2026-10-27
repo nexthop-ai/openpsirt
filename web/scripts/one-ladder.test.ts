@@ -185,7 +185,7 @@ describe("text the bracket matcher cannot read", () => {
     expect(
       found(`const FIELDS = [
         { name: "product" },
-        { name: "stream" },
+        { name: "branch_or_tag" },
         { name: "variant" },
         { name: "severity", options: [
             ["critical", "C"],

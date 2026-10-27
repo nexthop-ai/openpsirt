@@ -7,7 +7,7 @@ import { unwrap } from "./queries";
 // What sits above and below one component in one build, read under one key by
 // the component screen and the dependency tree, so a node either opened is
 // the other's cached answer.
-type Build = { product: string; stream: string; variant: string };
+type Build = { product: string; branch_or_tag: string; variant: string };
 
 export const aroundKey = (
   at: Build,
@@ -25,7 +25,7 @@ export const fetchAround =
   async () =>
     unwrap(
       await api.GET(
-        "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/around",
+        "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/around",
         {
           params: {
             path: { ...at, component },

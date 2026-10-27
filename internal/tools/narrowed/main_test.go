@@ -48,7 +48,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// statement reads the whole build.
 			"a question about the subject that one branch reaches",
 			`func f() {
-				named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+				named, err := names.LocateVisible(ctx, subject, product, branchOrTag, variant)
 				_ = err
 				if undisclosed {
 					if !subject.Reads(access.Private, named.ProductID) {
@@ -67,7 +67,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// never asks.
 			"a question whose answer widens what follows",
 			`func f() {
-				named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+				named, err := names.LocateVisible(ctx, subject, product, branchOrTag, variant)
 				_ = err
 				if subject.Reads(access.Private, named.ProductID) {
 					visible = append(visible, access.Private)
@@ -80,7 +80,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			"the same, refused for everybody before anything is read",
 			`func f() {
-				named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+				named, err := names.LocateVisible(ctx, subject, product, branchOrTag, variant)
 				_ = err
 				if !subject.Reads(access.Public, named.ProductID) {
 					return nil, access.Denied("read findings here")
@@ -95,7 +95,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// already answered whoever asked.
 			"read before the refusal",
 			`func f() {
-				named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+				named, err := names.LocateVisible(ctx, subject, product, branchOrTag, variant)
 				_ = err
 				rows := store.Unnarrowed(ctx, named.ProductID)
 				if !subject.Reads(access.Public, named.ProductID) {
@@ -110,9 +110,9 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// layer, which is what carrying the subject into it means.
 			"handed to something that carries the subject",
 			`func f() {
-				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 				_ = err
-				ready, err := store.ReadyFor(ctx, subject, named.ProductID, named.StreamID)
+				ready, err := store.ReadyFor(ctx, subject, named.ProductID, named.BranchOrTagID)
 				_ = ready
 			}`,
 			false,
@@ -124,11 +124,11 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// checking the exempt call and nothing else.
 			"read through the build a resolver handed back",
 			`func f() {
-				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 				_ = err
-				target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+				build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 				_ = err
-				planned, err := store.PlannedUpgradesFor(ctx, target.ID)
+				planned, err := store.PlannedUpgradesFor(ctx, build.ID)
 				_ = planned
 			}`,
 			true,
@@ -136,11 +136,11 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			"the same, with the subject carried into the read",
 			`func f() {
-				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 				_ = err
-				target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+				build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 				_ = err
-				planned, err := store.PlannedUpgradesFor(ctx, subject, target.ID)
+				planned, err := store.PlannedUpgradesFor(ctx, subject, build.ID)
 				_ = planned
 			}`,
 			false,
@@ -154,7 +154,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 				for _, build := range input.Body.Builds {
 					at, err := names.LocateVisible(ctx, subject, product, build.Stream, build.Variant)
 					_ = err
-					rows := db.NewSelect().Where("target_id = ?", at.StreamID).Scan(ctx)
+					rows := db.NewSelect().Where("build_id = ?", at.BranchOrTagID).Scan(ctx)
 					_ = rows
 				}
 			}`,
@@ -163,7 +163,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			"resolved and bound with var rather than assigned",
 			`func f() {
-				var named, err = names.LocateVisible(ctx, subject, product, stream, variant)
+				var named, err = names.LocateVisible(ctx, subject, product, branchOrTag, variant)
 				_ = err
 				rows := db.NewSelect().Where("product_id = ?", named.ProductID).Scan(ctx)
 				_ = rows
@@ -173,10 +173,10 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			"read through the build a resolver handed back, bound with var",
 			`func f() {
-				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
+				named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
 				_ = err
-				var target, _ = core.TargetRow(ctx, in, named.StreamID, named.VariantID)
-				planned, err := store.PlannedUpgradesFor(ctx, target.ID)
+				var build, _ = core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
+				planned, err := store.PlannedUpgradesFor(ctx, build.ID)
 				_ = planned
 			}`,
 			true,
@@ -184,7 +184,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			"resolved and handed back, which is what a resolver does",
 			`func f() *catalog.Named {
-				named, err := catalog.NewStore(db).LocateVisible(ctx, subject, product, stream, variant)
+				named, err := catalog.NewStore(db).LocateVisible(ctx, subject, product, branchOrTag, variant)
 				if err != nil {
 					return nil
 				}
@@ -261,15 +261,15 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			// carries the subject, the shape recording a flaw takes.
 			"collected into a list handed to a read with the subject",
 			`func f() {
-				var targets []int64
+				var builds []int64
 				for _, build := range input.Body.Builds {
 					at, err := names.LocateVisible(ctx, subject, p, build.Stream, build.Variant)
 					_ = err
-					target, err := core.TargetRow(ctx, in, at.StreamID, at.VariantID)
+					build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
 					_ = err
-					targets = append(targets, target.ID)
+					builds = append(builds, build.ID)
 				}
-				store.Enter(ctx, subject, finding.Entering{TargetIDs: targets})
+				store.Enter(ctx, subject, finding.Entering{BuildIDs: builds})
 			}`,
 			false,
 		},

@@ -35,7 +35,7 @@ func TestHowAMatchWasMadeIsKeptAndCanBeAskedFor(t *testing.T) {
 		// everything nobody has classified is a list nobody can work down.
 		saidNothing := found("CVE-2026-UNKNOWN", libnl)
 
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{byAdvisory, byIdentifier, saidNothing}); err != nil {
 			t.Fatal(err)
 		}
@@ -79,7 +79,7 @@ func TestHowAMatchWasMadeIsKeptAndCanBeAskedFor(t *testing.T) {
 
 		// The occurrence carries where its own match came from, which the issue
 		// cannot: one issue reached through two ecosystems has two answers.
-		at, err := f.store.Detail(t.Context(), who, f.target,
+		at, err := f.store.Detail(t.Context(), who, f.build,
 			f.issue(t, "CVE-2026-UNCONFIRMED"), f.componentID(t, swss.Name))
 		if err != nil {
 			t.Fatal(err)

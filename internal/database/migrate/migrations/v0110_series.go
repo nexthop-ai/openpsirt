@@ -41,7 +41,7 @@ func seriesV0110(t *columnTypes) []string {
 		`CREATE TABLE "series_run" (
 			"id"             ` + t.id + `,
 			"series_id"      ` + t.ref + ` NOT NULL,
-			"target_id"      ` + t.ref + ` NOT NULL,
+			"build_id"      ` + t.ref + ` NOT NULL,
 			-- Over every document as it arrived, sorted, so a repeat is
 			-- answered as the run it repeats.
 			"content_hash"   ` + t.hash + ` NOT NULL,
@@ -92,17 +92,17 @@ func seriesV0110(t *columnTypes) []string {
 			-- JSON. It names no result.
 			"receipt"        ` + t.text + ` NULL,
 			"applied_at"     ` + t.timestamp + ` NULL,
-			CONSTRAINT "series_run_content_unique" UNIQUE ("series_id", "target_id", "content_hash"),
+			CONSTRAINT "series_run_content_unique" UNIQUE ("series_id", "build_id", "content_hash"),
 			CONSTRAINT "series_run_series_fk" FOREIGN KEY ("series_id") REFERENCES "series"("id"),
-			CONSTRAINT "series_run_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			CONSTRAINT "series_run_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "series_run_scan_fk" FOREIGN KEY ("scan_id") REFERENCES "scan"("id")
 		)` + t.suffix,
 
 		// The newest applied run of a series against a build, which every
 		// arriving run is ordered against and matched against.
-		`CREATE INDEX "series_run_newest_idx" ON "series_run" ("series_id", "target_id", "status", "built_at")`,
+		`CREATE INDEX "series_run_newest_idx" ON "series_run" ("series_id", "build_id", "status", "built_at")`,
 		// A build's runs, newest first, which the receipts read.
-		`CREATE INDEX "series_run_target_idx" ON "series_run" ("target_id", "received_at")`,
+		`CREATE INDEX "series_run_build_idx" ON "series_run" ("build_id", "received_at")`,
 
 		`CREATE TABLE "series_document" (
 			"id"           ` + t.id + `,
@@ -178,7 +178,7 @@ func seriesV0110(t *columnTypes) []string {
 		// minute.
 		`CREATE TABLE "series_refusal" (
 			"id"           ` + t.id + `,
-			"target_id"    ` + t.ref + ` NOT NULL,
+			"build_id"    ` + t.ref + ` NOT NULL,
 			-- As the upload named it, and folded. Empty where the upload was
 			-- turned away before it named one.
 			"series"       ` + t.name + ` NOT NULL,
@@ -188,8 +188,8 @@ func seriesV0110(t *columnTypes) []string {
 			-- What the sender was told.
 			"reason"       ` + t.text + ` NOT NULL,
 			"credential"   ` + t.name + ` NULL,
-			CONSTRAINT "series_refusal_unique" UNIQUE ("target_id", "kind", "series_folded"),
-			CONSTRAINT "series_refusal_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+			CONSTRAINT "series_refusal_unique" UNIQUE ("build_id", "kind", "series_folded"),
+			CONSTRAINT "series_refusal_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id")
 		)` + t.suffix,
 	}
 }

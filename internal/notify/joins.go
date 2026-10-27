@@ -28,8 +28,8 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	q = q.TableExpr(`"finding" AS "f"`).
 		Where(kinds, kindArgs...).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -37,13 +37,13 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 		// And whatever the row's own product rates the issue. Every watch
 		// spans products, and a rating belongs to one — so what an alert
 		// calls critical is what the product it is about calls critical.
-		Join(rating.For(rating.OnStream))
+		Join(rating.For(rating.OnBranchOrTag))
 	if consumer {
 		q = q.Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`)
 	}
 	return q.
 		ColumnExpr(`"p"."name" AS "product"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).

@@ -21,13 +21,13 @@ func TestAFindingSaysWhatProducedIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		first, err := f.store.Begin(t.Context(), finding.Run{
-			TargetID: f.target, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.build, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-03-01", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, first.ID,
+		if _, err := f.store.Apply(t.Context(), f.build, first.ID,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -40,13 +40,13 @@ func TestAFindingSaysWhatProducedIt(t *testing.T) {
 		// that first said it — which is the whole point: the run that answers
 		// now is not the run that answered.
 		second, err := f.store.Begin(t.Context(), finding.Run{
-			TargetID: f.target, Scanner: "grype", ScannerVersion: "0.101.0",
+			BuildID: f.build, Scanner: "grype", ScannerVersion: "0.101.0",
 			DatabaseVersion: "2026-09-01", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, second.ID,
+		if _, err := f.store.Apply(t.Context(), f.build, second.ID,
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
@@ -55,7 +55,7 @@ func TestAFindingSaysWhatProducedIt(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicRead)
-		evidence, err := f.store.Detail(t.Context(), who, f.target,
+		evidence, err := f.store.Detail(t.Context(), who, f.build,
 			f.issueID(t, "CVE-2026-1"), f.componentID(t, libnl.Name))
 		if err != nil {
 			t.Fatal(err)

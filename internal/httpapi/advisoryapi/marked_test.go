@@ -17,14 +17,14 @@ func TestAReleaseIsMarkedAffectedBySomebodyWhoTriagesIt(t *testing.T) {
 		named := httpapitest.AdvisoryOver(t, r, "private-triage", "mine", flaw)
 		releases := "/v1/advisories/" + named + "/releases"
 		marked := "/v1/advisories/" + named + "/marked"
-		mark := func(stream string) string {
-			return `{"product":"mine","vulnerability":"` + flaw + `","stream":"` + stream +
+		mark := func(branchOrTag string) string {
+			return `{"product":"mine","vulnerability":"` + flaw + `","branch_or_tag":"` + branchOrTag +
 				`","variant":"broadcom","affected":true}`
 		}
 		type listing struct {
 			Items []struct {
-				Stream string `json:"stream"`
-				Marked bool   `json:"marked"`
+				BranchOrTag string `json:"branch_or_tag"`
+				Marked      bool   `json:"marked"`
 			} `json:"items"`
 		}
 

@@ -28,7 +28,7 @@ type triageV0100 struct{ claim, decision, revision int64 }
 
 func seedTriageV0100(t *testing.T, ctx context.Context, db *database.DB) triageV0100 {
 	t.Helper()
-	declared, err := world.Declare(ctx, db)
+	declared, err := declareBeforeV0110(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,10 +71,10 @@ func seedTriageV0100(t *testing.T, ctx context.Context, db *database.DB) triageV
 	comment := id(`SELECT MAX("id") FROM "claim_comment"`)
 	exec(`INSERT INTO "claim_comment_revision" ("comment_id", "ordinal", "body", "replaced_at")
 		VALUES (?, ?, ?, ?)`, comment, 1, "Checked once.", at)
-	exec(`INSERT INTO "claim_build" ("claim_id", "target_id") VALUES (?, ?)`, out.claim, declared.Target.ID)
+	exec(`INSERT INTO "claim_build" ("claim_id", "target_id") VALUES (?, ?)`, out.claim, declared.Build.ID)
 	exec(`INSERT INTO "upgrade" ("target_id", "fold_key", "from_version", "to_version", "claim_id",
 		"declared_by", "declared_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		declared.Target.ID, "fold-libfoo", "1.0", "1.1", out.claim, person, at)
+		declared.Build.ID, "fold-libfoo", "1.0", "1.1", out.claim, person, at)
 	exec(`UPDATE "product" SET "triage_floor" = ? WHERE "id" = ?`, "high", product)
 	return out
 }
@@ -136,7 +136,7 @@ func seedIncidentsV0100(t *testing.T, ctx context.Context, db *database.DB) inci
 		t.Fatal(err)
 	}
 	if products == 0 {
-		if _, err := world.Declare(ctx, db); err != nil {
+		if _, err := declareBeforeV0110(ctx, db); err != nil {
 			t.Fatal(err)
 		}
 	}

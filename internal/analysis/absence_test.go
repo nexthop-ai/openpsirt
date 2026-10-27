@@ -27,17 +27,17 @@ func atCommits(doc, top, frr string) string {
 
 func TestACodeFindingLastSeenByAnotherToolVersionIsNotMarkedNoLongerDetected(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-4 * time.Hour)
-		w.send(t, w.Target.ID, start, document([]sent{inFRR, inSWSS}, 10))
+		w.send(t, w.Build.ID, start, document([]sent{inFRR, inSWSS}, 10))
 		// An upgraded analyzer is not comparable to the run before it.
-		upgraded, _ := w.send(t, w.Target.ID, start.Add(time.Hour), atVersion(document([]sent{inSWSS}, 10), "19.1.0"))
+		upgraded, _ := w.send(t, w.Build.ID, start.Add(time.Hour), atVersion(document([]sent{inSWSS}, 10), "19.1.0"))
 		if upgraded.Reason != series.ToolChanged {
 			t.Fatalf("the upgraded run is %q; want tool-changed", upgraded.Reason)
 		}
 		// The next run is comparable to the upgraded one, and not to the run
 		// that last saw the FRR code finding.
-		run, _ := w.send(t, w.Target.ID, start.Add(2*time.Hour), atVersion(document([]sent{inSWSS}, 10), "19.1.0"))
+		run, _ := w.send(t, w.Build.ID, start.Add(2*time.Hour), atVersion(document([]sent{inSWSS}, 10), "19.1.0"))
 		if run.Comparable == nil || !*run.Comparable {
 			t.Fatalf("comparable %v (%q); want comparable", run.Comparable, run.Reason)
 		}
@@ -57,12 +57,12 @@ func TestACodeFindingLastSeenByAnotherToolVersionIsNotMarkedNoLongerDetected(t *
 
 func TestTheFirstRunOnABranchFingerprintedAnewTakesItsParentsCodeFindingOnTheUnprintedKey(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		tag := w.TargetFor(w.Tag, w.Customer)
-		w.inventory(t, w.Target.ID)
+		tag := w.BuildFor(w.Tag, w.Customer)
+		w.inventory(t, w.Build.ID)
 		w.inventory(t, tag.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		printed := inside{inFRR, "", "a1"}
-		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{printed}, 10, "0123456789abcdef"))
+		w.send(t, w.Build.ID, start, documentOf([]interface{ json() string }{printed}, 10, "0123456789abcdef"))
 
 		// The salt rotated before the branch's first run: the fingerprint
 		// changed and nothing else, and the line moved.
@@ -73,7 +73,7 @@ func TestTheFirstRunOnABranchFingerprintedAnewTakesItsParentsCodeFindingOnTheUnp
 		if r := receiptOf(t, run); !r.FingerprintsChanged || r.Inherited != 1 || r.Probable != 0 {
 			t.Errorf("receipt %+v; want a fingerprint change inheriting the code finding strongly", r)
 		}
-		branch, cut := w.codeFindings(t, w.Target.ID), w.codeFindings(t, tag.ID)
+		branch, cut := w.codeFindings(t, w.Build.ID), w.codeFindings(t, tag.ID)
 		if len(branch) != 1 || len(cut) != 1 || branch[0].OccurrenceIdentity != cut[0].OccurrenceIdentity {
 			t.Errorf("branch %+v, tag %+v; want one code finding each at one occurrence", branch, cut)
 		}
@@ -82,13 +82,13 @@ func TestTheFirstRunOnABranchFingerprintedAnewTakesItsParentsCodeFindingOnTheUnp
 
 func TestAResultIsPlacedOnTheComponentWhosePlatformEnumerationNamesItsRepository(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventoryWith(t, w.Target.ID, graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr",
+		w.inventoryWith(t, w.Build.ID, graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr",
 			Version: "10.2", CPE: "cpe:2.3:a:frrouting:frr:10.2:*:*:*:*:*:*:*"})
-		if _, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour),
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
 			document([]sent{inFRR}, 10)); status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
-		if codeFindings := w.codeFindings(t, w.Target.ID); len(codeFindings) != 1 || codeFindings[0].ComponentID != w.frr {
+		if codeFindings := w.codeFindings(t, w.Build.ID); len(codeFindings) != 1 || codeFindings[0].ComponentID != w.frr {
 			t.Errorf("findings %+v; want one on FRR (%d)", codeFindings, w.frr)
 		}
 	})
@@ -96,10 +96,10 @@ func TestAResultIsPlacedOnTheComponentWhosePlatformEnumerationNamesItsRepository
 
 func TestAPlatformEnumerationNamingAnotherOwnerPlacesNothing(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventoryWith(t, w.Target.ID, graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr",
+		w.inventoryWith(t, w.Build.ID, graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr",
 			Version: "10.2", CPE: "cpe:2.3:a:debian:frr:10.2:*:*:*:*:*:*:*"})
-		w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
-		if codeFindings := w.codeFindings(t, w.Target.ID); len(codeFindings) != 1 || codeFindings[0].ComponentID != w.root {
+		w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		if codeFindings := w.codeFindings(t, w.Build.ID); len(codeFindings) != 1 || codeFindings[0].ComponentID != w.root {
 			t.Errorf("findings %+v; want one on the build (%d)", codeFindings, w.root)
 		}
 	})
@@ -107,12 +107,12 @@ func TestAPlatformEnumerationNamingAnotherOwnerPlacesNothing(t *testing.T) {
 
 func TestACodeFindingNoLongerSeenNamesItsRepositorysCommitInBothBuilds(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
+		w.inventory(t, w.Build.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
-		w.send(t, w.Target.ID, start, atCommits(document([]sent{inFRR, inSWSS}, 10), "1111111", "AAAAAAA"))
-		w.send(t, w.Target.ID, start.Add(time.Hour), atCommits(document([]sent{inSWSS}, 10), "2222222", "bbbbbbb"))
+		w.send(t, w.Build.ID, start, atCommits(document([]sent{inFRR, inSWSS}, 10), "1111111", "AAAAAAA"))
+		w.send(t, w.Build.ID, start.Add(time.Hour), atCommits(document([]sent{inSWSS}, 10), "2222222", "bbbbbbb"))
 		reader := w.holding(t, "analyst", access.InternalRead)
-		for _, codeFinding := range w.codeFindings(t, w.Target.ID) {
+		for _, codeFinding := range w.codeFindings(t, w.Build.ID) {
 			got, err := EvidenceOf(t.Context(), w.DB.DB, reader, &codeFinding, w.Product.ID)
 			if err != nil {
 				t.Fatal(err)

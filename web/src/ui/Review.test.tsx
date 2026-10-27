@@ -19,7 +19,7 @@ const other = (
 ): Other => ({
   key,
   build,
-  stream: "202411",
+  branch_or_tag: "202411",
   variant: "arm",
   version,
   occurrences,

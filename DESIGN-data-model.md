@@ -8,10 +8,10 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 ## Contents
 
 - [Vocabulary](#vocabulary)
-- [Streams](#streams)
+- [Branches and tags](#branches-and-tags)
 - [Release dates](#release-dates)
 - [End of support](#end-of-support)
-- [Variants and targets](#variants-and-targets)
+- [Variants and builds](#variants-and-builds)
 - [Declaration before use](#declaration-before-use)
 - [Names](#names)
 - [Engine differences](#engine-differences)
@@ -28,15 +28,15 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 
 ## Vocabulary
 
-A scan is filed against **(product, stream, variant)**. All three are declared
-before anything may target them.
+A scan is filed against **(product, branch or tag, variant)**. All three are
+declared before anything may name them.
 
 | Word | Means |
 |---|---|
 | Product | A thing that ships |
-| Stream | A branch or a tag of that product |
+| Branch or tag | A branch or a tag of that product |
 | Variant | One of the ways the product is built |
-| Build | One stream built as one variant, and the pair a scan is filed against |
+| Build | One branch or tag built as one variant, and the pair a scan is filed against |
 | Occurrence | A component and what directly pulled it in |
 | Finding | One component at one occurrence in one build. Twelve occurrences is twelve findings (REQ-17) |
 | Group | One issue at one component across every occurrence it sits at. The row the findings list returns, and the thing somebody decides about |
@@ -50,7 +50,7 @@ other.
 
 | Term | Usage |
 |---|---|
-| Build | The word in prose, in responses and on screens. The table is called `target`, and the name stops there |
+| Build | The word in prose, in responses, on screens and in the schema |
 | Release | Not a level of the hierarchy. It is the act of shipping and the version a fix arrives in |
 | Occurrence | Spelled `occurrences` everywhere, never "locations" |
 
@@ -61,7 +61,7 @@ other.
 | Withdraw | Taking back something recorded: a decision, an approval, a role | Revoke, retract, remove, cancel. Retiring a team or a rule is the exception, being not a taking-back |
 | Hand back | Returning work to nobody | Release, which would make that word mean a third thing |
 
-## Streams
+## Branches and tags
 
 Branches and tags share one table. They differ in one respect — a branch moves
 and a tag does not — and share a product, variants, findings, an end-of-life date
@@ -76,7 +76,7 @@ decisions from.
 | The parent can be filled in afterwards (REQ-15) | A pipeline that does not know declares the tag without it, and release readiness then reports that nothing has ever been released from the branch — indistinguishable from a branch that shipped nothing. Declaring the tag again with the branch named records it |
 | Naming a different branch is refused | A tag is one frozen point |
 | Only a tag has a parent, and it is a branch of the same product | A tag under a tag, a release under itself, and a branch in another product are lines that do not exist. Declaring and filling in ask the same check |
-| A listed tag names its parent even when the parent is retired | The parent is a fact about the tag. A list leaving retired streams out still names the branch a listed tag was cut from |
+| A listed tag names its parent even when the parent is retired | The parent is a fact about the tag. A list leaving retired branches and tags out still names the branch a listed tag was cut from |
 
 ## Release dates
 
@@ -118,12 +118,12 @@ deployment, in two places:
 The comparison is spelled once, in the catalog, because the same fact decides
 both effects and what a screen says.
 
-## Variants and targets
+## Variants and builds
 
 | | Definition |
 |---|---|
 | Variant | Declared once per product, name unique within it. What a product is built as — a chip, an architecture, an operating system — is a property of the product and does not change because a new release came out |
-| Target | One release built as one variant. Recorded on first use, because nothing new is named: a scan saying this release was built as that variant reports a fact |
+| Build | One release built as one variant. Recorded on first use, because nothing new is named: a scan saying this release was built as that variant reports a fact |
 
 That pair is what a scan is filed against and what everything downstream points
 at, so one identifier runs from a scan through its graph to a finding.
@@ -133,7 +133,7 @@ eventually retype it differently, and `win`, `windows` and `win32` across three
 releases are three variants as far as everything downstream is concerned.
 
 A variant introduced later does not appear in earlier releases: those have no
-target for it.
+build of it.
 
 Each variant records whether it is customer-facing, which feeds ranking. It
 defaults to customer-facing, so an unclassified artifact ranks as though it
@@ -189,11 +189,11 @@ before.
 ## Declaration before use
 
 A scan naming something undeclared is refused, and the refusal names which part
-is missing — product, stream or variant.
+is missing — product, branch or tag, or variant.
 
 Creating whatever a scan names is the alternative. A pipeline with a typo in a
-stream name then produces a stream that looks genuine, with its own findings,
-counts and place in every report, while the real stream appears to have stopped
+branch name then produces a branch that looks genuine, with its own findings,
+counts and place in every report, while the real branch appears to have stopped
 being scanned.
 
 Declaring is idempotent, including against another writer. Declaring what
@@ -218,7 +218,7 @@ would be two histories for one thing somebody ships.
 Bounded: no leading or trailing spaces, nothing empty, and a length keeping a
 unique index inside every engine's key-length limit. The length is counted in
 characters, which is what the column holds. Uniqueness is within the
-parent — a product name globally, a stream and a variant within their product.
+parent — a product name globally, a branch or tag and a variant within their product.
 
 Capitals do not distinguish two names. These are typed by hand into build
 scripts, so a pipeline saying `sonic` against a product declared `SONiC` is the
@@ -258,10 +258,10 @@ Only column declarations differ. Everything queried is portable.
 | Booleans | One engine has no boolean type |
 | Text lengths | A unique index needs a bounded width on some engines |
 
-One behavioral difference beyond the declarations: a stream points at its parent
+One behavioral difference beyond the declarations: a tag points at its parent
 branch, and MySQL and MariaDB enforce that self-reference during a bulk delete
-where PostgreSQL and SQLite do not. Code clearing streams detaches the parent
-first.
+where PostgreSQL and SQLite do not. Code clearing branches and tags detaches the
+parent first.
 
 ## The dependency graph
 

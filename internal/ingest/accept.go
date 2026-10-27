@@ -77,7 +77,7 @@ func (o Outcome) String() string {
 
 // futureTolerance is how far ahead of us a build time may be before we refuse
 // it. Clocks disagree by seconds; a few minutes covers that without accepting
-// a date that would wedge the target.
+// a date that would wedge the build.
 const futureTolerance = 5 * time.Minute
 
 // storedPrecision is the finest resolution every supported database keeps.
@@ -101,8 +101,8 @@ var ErrNoScan = errors.New("no such scan")
 
 // Arriving describes a scan someone is trying to send us.
 type Arriving struct {
-	// TargetID is the already-resolved target.
-	TargetID int64
+	// BuildID is the already-resolved build.
+	BuildID int64
 	// ContentHash identifies the whole submission: the inventory and the
 	// suppression documents that arrived with it, folded together. Two
 	// uploads with the same hash are the same submission.
@@ -130,7 +130,7 @@ type Scan struct {
 	bun.BaseModel `bun:"table:scan,alias:sc"`
 
 	ID            int64     `bun:"id,pk,autoincrement"`
-	TargetID      int64     `bun:"target_id,notnull"`
+	BuildID       int64     `bun:"build_id,notnull"`
 	ContentHash   string    `bun:"content_hash,notnull"`
 	Serial        string    `bun:"serial"`
 	BuiltAt       time.Time `bun:"built_at,notnull"`
@@ -181,7 +181,7 @@ func NewStore(db bun.IDB) *Store {
 //
 // The order of these checks matters. A future build time is refused first,
 // because accepting one would mean nothing legitimate could ever be newer and
-// the target would take no further scans. A submission we already hold is
+// the build would take no further scans. A submission we already hold is
 // next, so a retry after a timeout that actually succeeded reports success
 // rather than failing the pipeline for work that landed. Only then does age
 // matter.
@@ -191,7 +191,7 @@ func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 		return BuiltInFuture, nil
 	}
 
-	seen, err := s.byContent(ctx, a.TargetID, a.ContentHash)
+	seen, err := s.byContent(ctx, a.BuildID, a.ContentHash)
 	if err != nil {
 		return Accept, err
 	}
@@ -199,7 +199,7 @@ func (s *Store) Decide(ctx context.Context, a Arriving) (Outcome, error) {
 		return AlreadyHave, nil
 	}
 
-	newest, err := s.Newest(ctx, a.TargetID)
+	newest, err := s.Newest(ctx, a.BuildID)
 	if err != nil {
 		return Accept, err
 	}
@@ -249,7 +249,7 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 	// as the zero time instead, the first would be older than every real
 	// build time, and every later scan of the variant refused as not newer.
 	if a.BuiltAt.IsZero() {
-		held, err := s.byContent(ctx, a.TargetID, a.ContentHash)
+		held, err := s.byContent(ctx, a.BuildID, a.ContentHash)
 		if err != nil {
 			return nil, Accept, err
 		}
@@ -266,7 +266,7 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 
 	switch outcome {
 	case AlreadyHave:
-		existing, err := s.byContent(ctx, a.TargetID, a.ContentHash)
+		existing, err := s.byContent(ctx, a.BuildID, a.ContentHash)
 		return existing, AlreadyHave, err
 
 	case Retake:
@@ -281,7 +281,7 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 		// read that failed is not "none": telling a producer their build holds
 		// no scan, in the sentence refusing the one they just sent, is the
 		// most confusing answer available.
-		newest, err := s.Newest(ctx, a.TargetID)
+		newest, err := s.Newest(ctx, a.BuildID)
 		if err != nil {
 			return nil, NotNewer, fmt.Errorf(
 				"read what this variant already holds: %w", err)
@@ -302,7 +302,7 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 	}
 
 	scan := &Scan{
-		TargetID:      a.TargetID,
+		BuildID:       a.BuildID,
 		ContentHash:   a.ContentHash,
 		Serial:        a.Serial,
 		BuiltAt:       asStored(a.BuiltAt),
@@ -329,10 +329,10 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 }
 
 // Newest returns the most recently built accepted scan for a variant, or nil.
-func (s *Store) Newest(ctx context.Context, targetID int64) (*Scan, error) {
+func (s *Store) Newest(ctx context.Context, buildID int64) (*Scan, error) {
 	scan := new(Scan)
 	err := s.db.NewSelect().Model(scan).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"status" = ?`, Accepted).
 		// The later arrival wins a tie, and a tie is possible: one build
 		// re-sent with different judgments is two submissions at one build
@@ -364,10 +364,10 @@ func passedBy(scan, newest *Scan) bool {
 	return newest.BuiltAt.After(scan.BuiltAt)
 }
 
-func (s *Store) byContent(ctx context.Context, targetID int64, hash string) (*Scan, error) {
+func (s *Store) byContent(ctx context.Context, buildID int64, hash string) (*Scan, error) {
 	scan := new(Scan)
 	err := s.db.NewSelect().Model(scan).
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"content_hash" = ?`, hash).
 		Scan(ctx)
 	if err != nil {
@@ -440,7 +440,7 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 // it. The reader refuses to apply a scan older than the one the build last
 // applied, so that row cannot invert anything either.
 func (s *Store) retake(ctx context.Context, a Arriving) (*Scan, error) {
-	scan, err := s.byContent(ctx, a.TargetID, a.ContentHash)
+	scan, err := s.byContent(ctx, a.BuildID, a.ContentHash)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +499,7 @@ func (s *Store) named(ctx context.Context, scanID int64) (bool, error) {
 		}
 	}
 	err := s.db.NewSelect().
-		TableExpr(`"target"`).
+		TableExpr(`"build"`).
 		ColumnExpr("1").
 		Where(`"last_scan_id" = ?`, scanID).
 		Limit(1).
@@ -543,15 +543,15 @@ func (s *Store) Made(ctx context.Context, scanID int64, components, placed int,
 
 // Refusal is an upload turned away before it became a scan.
 //
-// One row per target, replaced each time. What a report asks is whether this
+// One row per build, replaced each time. What a report asks is whether this
 // build is being refused now, and a producer retrying a document nothing can
 // read would otherwise write one of these a minute.
 type Refusal struct {
 	bun.BaseModel `bun:"table:scan_refusal,alias:sr"`
 
-	ID       int64     `bun:"id,pk,autoincrement"`
-	TargetID int64     `bun:"target_id,notnull"`
-	At       time.Time `bun:"at,notnull"`
+	ID      int64     `bun:"id,pk,autoincrement"`
+	BuildID int64     `bun:"build_id,notnull"`
+	At      time.Time `bun:"at,notnull"`
 	// Reason is what the producer was told, so both ends of the conversation
 	// say the same thing when somebody compares them.
 	Reason      string     `bun:"reason,notnull"`
@@ -584,7 +584,7 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	// portable spelling of one, two of the four engines want ON CONFLICT and
 	// the other two ON DUPLICATE KEY UPDATE, and engine-specific SQL is
 	// confined to migration data-definition and the queue's locking. The
-	// update first because a target being refused once is a target being
+	// update first because a build being refused once is a build being
 	// refused repeatedly, so the row is nearly always already there.
 	res, err := s.db.NewUpdate().Model((*Refusal)(nil)).
 		Set(`"at" = ?`, r.At).
@@ -592,7 +592,7 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 		Set(`"credential" = ?`, r.Credential).
 		Set(`"built_at" = ?`, r.BuiltAt).
 		Set(`"content_hash" = ?`, r.ContentHash).
-		Where(`"target_id" = ?`, r.TargetID).Exec(ctx)
+		Where(`"build_id" = ?`, r.BuildID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record that an upload was refused: %w", err)
 	}
@@ -603,7 +603,7 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	if changed > 0 {
 		return nil
 	}
-	// Two refusals for one target arriving together resolve on the unique
+	// Two refusals for one build arriving together resolve on the unique
 	// constraint: one inserts and the loser is the one this arm refuses, which
 	// is a refusal recorded by the other request rather than one lost.
 	if _, err := s.db.NewInsert().Model(&r).Exec(ctx); err != nil {
@@ -615,16 +615,16 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	return nil
 }
 
-// LastRefusal is the last upload to a target that was turned away, or nil
+// LastRefusal is the last upload to a build that was turned away, or nil
 // where none has been. Who may read it is the rule the receipts hold, because
 // it is the receipt of an upload that stored nothing else.
-func (s *Store) LastRefusal(ctx context.Context, subject access.Subject, targetID int64) (*Refusal, error) {
-	if err := s.mayRead(ctx, subject, targetID); err != nil {
+func (s *Store) LastRefusal(ctx context.Context, subject access.Subject, buildID int64) (*Refusal, error) {
+	if err := s.mayRead(ctx, subject, buildID); err != nil {
 		return nil, err
 	}
 	var held []Refusal
 	if err := s.db.NewSelect().Model(&held).
-		Where(`"sr"."target_id" = ?`, targetID).
+		Where(`"sr"."build_id" = ?`, buildID).
 		OrderExpr(`"sr"."at" DESC, "sr"."id" DESC`).Limit(1).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the last upload turned away: %w", err)

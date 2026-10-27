@@ -109,24 +109,24 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-streams", Method: http.MethodGet, Path: "/v1/products/{product}/branches-and-tags",
+		OperationID: "list-branches-and-tags", Method: http.MethodGet, Path: "/v1/products/{product}/branches-and-tags",
 		Summary: "List a product's branches and tags",
-		Description: "Every stream declared under this product, with how many variants each " +
+		Description: "Every branch or tag declared under this product, with how many variants each " +
 			"has and how much is open in it.\n\n" +
-			"A stream is a branch or a tag: a branch is scanned nightly and superseded, a " +
+			"A branch or tag is a branch or a tag: a branch is scanned nightly and superseded, a " +
 			"tag is immutable and kept. Both are declared before a scan may name one, so a " +
 			"typo in a pipeline is refused rather than quietly creating a line with findings " +
 			"and reports of its own.\n\n" +
-			"A stream past its end-of-life date is listed and says so. It stops being a " +
+			"A branch or tag past its end-of-life date is listed and says so. It stops being a " +
 			"place a fix may be declared for, and what is open against it is still counted.\n\n" +
-			"A retired stream is left out unless asked for. Ask for it to resolve a name " +
+			"A retired branch or tag is left out unless asked for. Ask for it to resolve a name " +
 			"already in hand rather than to offer a choice; each one says that it is retired.",
 		Tags: []string{"Catalog"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
-		Retired bool   `query:"retired" doc:"Include streams that have been retired. They say so, and no scan may be filed against one"`
+		Retired bool   `query:"retired" doc:"Include branches and tags that have been retired. They say so, and no scan may be filed against one"`
 		CountsQuery
-	}) (*core.ListOutput[core.StreamBody], error) {
+	}) (*core.ListOutput[core.BranchOrTagBody], error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -136,19 +136,19 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		if err != nil {
 			return nil, core.Undeclared(d.Logger, err, "that product could not be looked up")
 		}
-		rows, err := store.Streams(ctx, subject, product.ID, in.Retired)
+		rows, err := store.BranchesAndTags(ctx, subject, product.ID, in.Retired)
 		if err != nil {
-			return nil, core.Refused(d.Logger, err, "cannot list streams")
+			return nil, core.Refused(d.Logger, err, "cannot list branches and tags")
 		}
 		var open map[int64]int
 		if in.Counts {
-			open, err = d.Findings().OpenBy(ctx, subject, finding.Scope{ProductID: &product.ID}, finding.ByStream)
+			open, err = d.Findings().OpenBy(ctx, subject, finding.Scope{ProductID: &product.ID}, finding.ByBranchOrTag)
 			if err != nil {
 				return nil, core.WentWrong(d.Logger, "cannot count what is open", err)
 			}
 		}
 		seen, err := core.LastScansIn(ctx, d.Scans(), subject, product.ID, func(c ingest.LastUpload) string {
-			return c.Stream
+			return c.BranchOrTag
 		})
 		if err != nil {
 			return nil, core.Refused(d.Logger, err, "cannot read when these were last scanned")
@@ -167,7 +167,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 			named[row.ID] = row.Name
 		}
 		// A tag cut from a branch since retired names the branch whether or
-		// not retired streams were asked for: the parent is a fact about the
+		// not retired branches and tags were asked for: the parent is a fact about the
 		// tag, and leaving it out reads as cut from nothing.
 		for _, row := range rows {
 			if row.ParentID == nil {
@@ -176,9 +176,9 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 			if _, ok := named[*row.ParentID]; ok {
 				continue
 			}
-			every, err := store.Streams(ctx, subject, product.ID, true)
+			every, err := store.BranchesAndTags(ctx, subject, product.ID, true)
 			if err != nil {
-				return nil, core.Refused(d.Logger, err, "cannot list streams")
+				return nil, core.Refused(d.Logger, err, "cannot list branches and tags")
 			}
 			for _, one := range every {
 				named[one.ID] = one.Name
@@ -186,10 +186,10 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 			break
 		}
 
-		out := &core.ListOutput[core.StreamBody]{}
-		out.Body.Items = make([]core.StreamBody, 0, len(rows))
+		out := &core.ListOutput[core.BranchOrTagBody]{}
+		out.Body.Items = make([]core.BranchOrTagBody, 0, len(rows))
 		for _, row := range rows {
-			body := core.StreamBody{
+			body := core.BranchOrTagBody{
 				Name: row.Name, DisplayName: core.Spelled(row.Name, row.DisplayName),
 				Kind: core.LineKind(row.Kind),
 				Open: counted(in.Counts, open, row.ID), LastScanAt: seen[row.Name],
@@ -217,7 +217,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		Description: "Every variant declared under this product, with how much is open in " +
 			"each.\n\n" +
 			"A variant is a way one release is built — a hardware platform, a flavor — and " +
-			"it is independent of the branch: every stream may be built as any of them. One " +
+			"it is independent of the branch: every branch or tag may be built as any of them. One " +
 			"variant is the ordinary case, and the interface hides the dimension where there " +
 			"is only one.\n\n" +
 			"Each says whether it is customer-facing, which feeds how urgent a finding in it " +
@@ -256,7 +256,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-release-variants", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants",
 		Summary: "List the variants a release was built as",
 		Description: "Lists the variants one release was actually built as — a subset of what " +
 			"the product declares.\n\n" +
@@ -265,8 +265,8 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 			"years ago.",
 		Tags: []string{"Catalog"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
 		CountsQuery
 	}) (*core.ListOutput[core.VariantBody], error) {
 		subject, err := core.Reading(ctx)
@@ -274,23 +274,23 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 			return nil, err
 		}
 		store := d.Store(d.Handle())
-		_, stream, err := store.VisibleStream(ctx, subject, in.Product, in.Stream)
+		_, branchOrTag, err := store.VisibleBranchOrTag(ctx, subject, in.Product, in.BranchOrTag)
 		if err != nil {
 			return nil, core.Undeclared(d.Logger, err, "that product could not be looked up")
 		}
-		rows, err := store.BuiltAs(ctx, subject, stream.ID)
+		rows, err := store.BuiltAs(ctx, subject, branchOrTag.ID)
 		if err != nil {
 			return nil, core.Refused(d.Logger, err, "cannot list what a release is built as")
 		}
-		// Counted within this stream rather than across the product. Without
+		// Counted within this branch or tag rather than across the product. Without
 		// it every screen drawing the column draws zeroes — including for a
 		// variant holding twenty-five, which reads as a clean build rather
 		// than as a number nobody filled in.
-		productID := stream.ProductID
+		productID := branchOrTag.ProductID
 		var open map[int64]int
 		if in.Counts {
 			open, err = d.Findings().OpenBy(ctx, subject,
-				finding.Scope{ProductID: &productID, StreamID: &stream.ID}, finding.ByVariant)
+				finding.Scope{ProductID: &productID, BranchOrTagID: &branchOrTag.ID}, finding.ByVariant)
 			if err != nil {
 				return nil, core.WentWrong(d.Logger, "cannot count what is open", err)
 			}

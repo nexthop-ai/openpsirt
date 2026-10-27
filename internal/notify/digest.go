@@ -316,7 +316,7 @@ func itemOf(row finding.Owned) Item {
 	return Item{
 		Issue: row.Vulnerability, Component: row.Component, Version: row.Version,
 		Severity: row.Severity, Product: row.Product,
-		Build: row.Stream + " " + row.Variant, Exploited: row.Exploited,
+		Build: row.BranchOrTag + " " + row.Variant, Exploited: row.Exploited,
 	}
 }
 

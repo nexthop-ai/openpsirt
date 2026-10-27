@@ -23,15 +23,15 @@ import (
 type Key struct {
 	bun.BaseModel `bun:"table:api_key,alias:ak"`
 
-	ID         int64      `bun:"id,pk,autoincrement"`
-	Name       string     `bun:"name,notnull"`
-	SecretHash string     `bun:"secret_hash,notnull"`
-	ProductID  int64      `bun:"product_id,notnull"`
-	StreamID   *int64     `bun:"stream_id"`
-	VariantID  *int64     `bun:"variant_id"`
-	CreatedAt  time.Time  `bun:"created_at,notnull"`
-	LastUsedAt *time.Time `bun:"last_used_at"`
-	RevokedAt  *time.Time `bun:"revoked_at"`
+	ID            int64      `bun:"id,pk,autoincrement"`
+	Name          string     `bun:"name,notnull"`
+	SecretHash    string     `bun:"secret_hash,notnull"`
+	ProductID     int64      `bun:"product_id,notnull"`
+	BranchOrTagID *int64     `bun:"branch_or_tag_id"`
+	VariantID     *int64     `bun:"variant_id"`
+	CreatedAt     time.Time  `bun:"created_at,notnull"`
+	LastUsedAt    *time.Time `bun:"last_used_at"`
+	RevokedAt     *time.Time `bun:"revoked_at"`
 }
 
 // secretBytes is how much randomness a key carries.
@@ -76,7 +76,7 @@ func (s *Store) NewKey(ctx context.Context, name string, scope Scope) (*Key, str
 
 	key := &Key{
 		Name: name, SecretHash: hashSecret(secret),
-		ProductID: scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
+		ProductID: scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
 		CreatedAt: s.now().Truncate(time.Microsecond),
 	}
 	// The name in force is written beside the name and cleared when the key
@@ -119,7 +119,7 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 		return Subject{}, fmt.Errorf("record that a key was used: %w", err)
 	}
 	return NewPipeline(key.ID, key.Name, Scope{
-		ProductID: key.ProductID, StreamID: key.StreamID, VariantID: key.VariantID,
+		ProductID: key.ProductID, BranchOrTagID: key.BranchOrTagID, VariantID: key.VariantID,
 	}), nil
 }
 

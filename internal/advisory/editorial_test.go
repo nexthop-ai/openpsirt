@@ -524,9 +524,9 @@ func TestAnIssueTakenOffBeforeAnIssuanceIsNotNamedByIt(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		var stream int64
-		if err := f.db.DB.NewSelect().TableExpr(`"target"`).ColumnExpr(`"stream_id"`).
-			Where(`"id" = ?`, f.master).Scan(ctx, &stream); err != nil {
+		var branchOrTag int64
+		if err := f.db.DB.NewSelect().TableExpr(`"build"`).ColumnExpr(`"branch_or_tag_id"`).
+			Where(`"id" = ?`, f.master).Scan(ctx, &branchOrTag); err != nil {
 			t.Fatal(err)
 		}
 		for _, asked := range []struct {
@@ -538,7 +538,7 @@ func TestAnIssueTakenOffBeforeAnIssuanceIsNotNamedByIt(t *testing.T) {
 				return advisory.AnyIssuedForProduct(ctx, f.db.DB, f.product)
 			}, false},
 			{"the release it was taken off", func() (bool, error) {
-				return advisory.AnyIssuedForStream(ctx, f.db.DB, stream)
+				return advisory.AnyIssuedForBranchOrTag(ctx, f.db.DB, branchOrTag)
 			}, false},
 			{"the product it went out about", func() (bool, error) {
 				return advisory.AnyIssuedForProduct(ctx, f.db.DB, f.otherProduct)
@@ -566,12 +566,12 @@ func TestAnIssueWithAnUndisclosedOccurrenceIsLabelledByIt(t *testing.T) {
 		// The same issue at a second release, recorded later and undisclosed.
 		var first finding.Finding
 		if err := f.db.DB.NewSelect().Model(&first).
-			Where(`"f"."target_id" = ?`, f.master).Where(`"f"."kind" = ?`, finding.Entered).
+			Where(`"f"."build_id" = ?`, f.master).Where(`"f"."kind" = ?`, finding.Entered).
 			Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		second := first
-		second.ID, second.TargetID = 0, f.tagged
+		second.ID, second.BuildID = 0, f.tagged
 		second.Visibility = access.Private
 		second.OpenedAt = first.OpenedAt.Add(time.Hour)
 		if _, err := f.db.DB.NewInsert().Model(&second).Exec(ctx); err != nil {

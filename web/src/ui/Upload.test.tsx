@@ -19,7 +19,7 @@ function pick(select: HTMLSelectElement, value: string) {
 }
 
 describe("an upload that is already held", () => {
-  it("names the build it was sent to, whatever the target became while it was on its way", async () => {
+  it("names the build it was sent to, whatever the form was changed to while it was on its way", async () => {
     serve((path) => {
       if (path === "/v1/products") return { data: { items: [{ name: "sonic" }] } };
       if (path === "/v1/products/{product}/branches-and-tags") {
@@ -41,8 +41,8 @@ describe("an upload that is already held", () => {
     mount.render(
       screen(
         <UploadDrawer open onClose={() => undefined} />,
-        "/products/sonic/streams/master/variants/broadcom/uploads",
-        "/products/:product/streams/:stream/variants/:variant/uploads",
+        "/products/sonic/branches-and-tags/master/variants/broadcom/uploads",
+        "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads",
       ),
     );
     await settle();
@@ -84,8 +84,8 @@ describe("the inventory picker", () => {
     mount.render(
       screen(
         <UploadDrawer open onClose={() => undefined} />,
-        "/products/sonic/streams/master/variants/broadcom/uploads",
-        "/products/:product/streams/:stream/variants/:variant/uploads",
+        "/products/sonic/branches-and-tags/master/variants/broadcom/uploads",
+        "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/uploads",
       ),
     );
     await settle();

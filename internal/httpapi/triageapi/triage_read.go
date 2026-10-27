@@ -53,7 +53,7 @@ type DecisionDetail struct {
 	Packages  int      `json:"packages" doc:"The number of binaries those fold together"`
 	Consumers int      `json:"consumers" doc:"The number of things pulling them in"`
 	Findings  int      `json:"findings" doc:"The number of findings underneath, which is what the disposition register expands to"`
-	Builds    []string `json:"builds" doc:"Every build the decision currently covers, as stream and variant"`
+	Builds    []string `json:"builds" doc:"Every build the decision currently covers, as branch or tag and variant"`
 	// Ended is what the rows that stopped applying reached when they stopped,
 	// apart from the present reach above, which counts live rows alone.
 	Ended []EndedReachBody `json:"ended" doc:"The occurrences of the decision that were withdrawn or lapsed, each with what they reached when they stopped. Empty while it is live at every occurrence"`
@@ -76,7 +76,7 @@ type EndedReachBody struct {
 	At          string                  `json:"at,omitempty" doc:"The latest moment one of them stopped. Absent where none of them says when"`
 	Rows        int                     `json:"rows" doc:"The number of occurrences that stopped this way, counted once for each issue"`
 	Occurrences int                     `json:"occurrences" doc:"The number of distinct occurrences they sat at. The findings list takes decision and decision_state to list what sits there now"`
-	Builds      []string                `json:"builds" doc:"Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as stream and variant"`
+	Builds      []string                `json:"builds" doc:"Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as branch or tag and variant"`
 }
 
 // endedReach renders the parts of a decision that stopped applying.
@@ -434,7 +434,7 @@ func registerOccurrenceDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant,
 			input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err
@@ -511,7 +511,7 @@ func registerOccurrenceDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.Stream, input.Variant,
+		where, _, err := decidingAbout(ctx, in, subject, input.Product, input.BranchOrTag, input.Variant,
 			input.Vulnerability, input.Occurrence)
 		if err != nil {
 			return nil, err

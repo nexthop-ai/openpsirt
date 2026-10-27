@@ -42,7 +42,7 @@ describe("an act on an advisory, once it lands", () => {
       "marking a release",
       "PUT",
       useMarkRelease,
-      { ...flaw, stream: "master", variant: "broadcom", affected: true },
+      { ...flaw, branch_or_tag: "master", variant: "broadcom", affected: true },
     ],
   ] as const)("%s moves every advisory read", async (_, method, useHook, vars) => {
     const { sent, invalidated } = await acted(
@@ -72,7 +72,7 @@ describe("an act on an advisory, once it lands", () => {
   it("marks a release without sending the advisory twice", async () => {
     const { sent } = await acted(mount.render, mount.host, "PUT", useMarkRelease, {
       ...flaw,
-      stream: "master",
+      branch_or_tag: "master",
       variant: "broadcom",
       affected: false,
     });
@@ -81,7 +81,7 @@ describe("an act on an advisory, once it lands", () => {
       body: {
         product: "sonic",
         vulnerability: "CVE-2026-1",
-        stream: "master",
+        branch_or_tag: "master",
         variant: "broadcom",
         affected: false,
       },

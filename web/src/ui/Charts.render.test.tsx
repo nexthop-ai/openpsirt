@@ -71,8 +71,8 @@ describe("the open issues in each release", () => {
     mount.render(
       <Releases
         points={[
-          { stream: "202305", open: 4 },
-          { stream: "202411", stream_name: "November", open: 0 },
+          { branch_or_tag: "202305", open: 4 },
+          { branch_or_tag: "202411", branch_or_tag_name: "November", open: 0 },
         ]}
       />,
     );

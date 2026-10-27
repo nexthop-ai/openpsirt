@@ -211,7 +211,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, product
 			visibility = v
 		}
 		rows[i] = finding.Finding{
-			TargetID: run.TargetID, Kind: kind.Analysis, VulnerabilityID: rules[k.Rule],
+			BuildID: run.BuildID, Kind: kind.Analysis, VulnerabilityID: rules[k.Rule],
 			Visibility: visibility, ComponentID: component, OccurrenceIdentity: occurrences[i],
 			OpenedAt: now,
 		}

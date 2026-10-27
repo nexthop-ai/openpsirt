@@ -297,8 +297,8 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "amend-stream", Method: http.MethodPatch,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}",
+		OperationID: "amend-branch-or-tag", Method: http.MethodPatch,
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}",
 		Summary: "Amend a branch or tag",
 		Description: "Corrects what a release is called.\n\n" +
 			"Refused once a VEX document has gone out for any build of this release, a " +
@@ -311,9 +311,9 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			"a tag was cut from.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Body    struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Body        struct {
 			Name string `json:"name" minLength:"1" maxLength:"191" doc:"What to call it instead"`
 		}
 	}) (*struct{}, error) {
@@ -325,23 +325,23 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			return nil, huma.Error400BadRequest("say what to call it")
 		}
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, product, stream, err := core.StreamIn(ctx, d, tx, in.Product, in.Stream)
+			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
 			if err != nil {
 				return err
 			}
-			if strings.EqualFold(name, stream.Name) && name == stream.DisplayName {
+			if strings.EqualFold(name, branchOrTag.Name) && name == branchOrTag.DisplayName {
 				return nil
 			}
-			if !strings.EqualFold(name, stream.Name) {
-				if err := renameGuard(ctx, tx, d.Logger, levelRelease, stream.ID); err != nil {
+			if !strings.EqualFold(name, branchOrTag.Name) {
+				if err := renameGuard(ctx, tx, d.Logger, levelRelease, branchOrTag.ID); err != nil {
 					return err
 				}
 			}
-			if err := store.RenameStream(ctx, product.ID, stream.ID, name); err != nil {
+			if err := store.RenameBranchOrTag(ctx, product.ID, branchOrTag.ID, name); err != nil {
 				return declineRename(d.Logger, err)
 			}
-			if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+stream.Name,
-				trail.Said(stream.DisplayName, true), trail.Said(name, true)); err != nil {
+			if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+branchOrTag.Name,
+				trail.Said(branchOrTag.DisplayName, true), trail.Said(name, true)); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}
 			return nil
@@ -352,8 +352,8 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "retire-stream", Method: http.MethodDelete,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}",
+		OperationID: "retire-branch-or-tag", Method: http.MethodDelete,
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}",
 		Summary: "Retire a branch or tag",
 		Description: "Takes a release out of use. It is offered nowhere and no scan may be " +
 			"filed against it, while everything already filed against it stays. Declaring it " +
@@ -362,24 +362,24 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			"the deadline off what is open and leaves the release listed and scannable.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
 	}) (*struct{}, error) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, product, stream, err := core.StreamIn(ctx, d, tx, in.Product, in.Stream)
+			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
 			if err != nil {
 				return err
 			}
-			if err := store.RetireStream(ctx, stream.ID); err != nil {
+			if err := store.RetireBranchOrTag(ctx, branchOrTag.ID); err != nil {
 				if errors.Is(err, catalog.ErrNotFound) {
 					return huma.NewError(http.StatusConflict, "that release is already retired")
 				}
 				return core.WentWrong(d.Logger, "that release could not be retired", err)
 			}
-			if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+stream.Name,
+			if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+branchOrTag.Name,
 				trail.Said("in use", true), nil); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}
@@ -434,7 +434,7 @@ func published(ctx context.Context, db bun.IDB, level catalogLevel, id int64) (b
 		}
 	case levelRelease:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){
-			vex.AnyIssuedForStream, advisory.AnyIssuedForStream, publish.AnyPublishedForStream,
+			vex.AnyIssuedForBranchOrTag, advisory.AnyIssuedForBranchOrTag, publish.AnyPublishedForBranchOrTag,
 		}
 	case levelVariant:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){

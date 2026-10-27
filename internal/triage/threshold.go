@@ -299,15 +299,15 @@ const DefaultDeferralThreshold = 30 * 24 * time.Hour
 // critical and a medium is gated by the critical, however many mediums are in
 // it.
 func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Proposal) error {
-	var targets []int64
+	var buildIDs []int64
 	occurrences := make([]finding.At, 0, len(proposals))
 	var productID int64
 	for _, p := range proposals {
 		if len(p.BindingAcross) == 0 {
 			continue
 		}
-		if len(targets) == 0 {
-			targets, productID = p.BindingAcross, p.Occurrence.ProductID
+		if len(buildIDs) == 0 {
+			buildIDs, productID = p.BindingAcross, p.Occurrence.ProductID
 		}
 		occurrences = append(occurrences, finding.At{
 			VulnerabilityID:    p.Occurrence.VulnerabilityID,
@@ -320,7 +320,7 @@ func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Pr
 	// The store here is only a receiver: what the read runs on is this
 	// transaction, which DeadlineAt takes as its own argument for exactly this
 	// reason.
-	binding, err := (&finding.Store{}).DeadlineAt(ctx, s.db, subject, productID, targets, occurrences)
+	binding, err := (&finding.Store{}).DeadlineAt(ctx, s.db, subject, productID, buildIDs, occurrences)
 	if err != nil {
 		return err
 	}

@@ -27,7 +27,7 @@ package identifier stating a version. Otherwise, send the two together.
 
 ## The release here
 
-A release is filed against a product, a stream and a variant, declared once by
+A release is filed against a product, a branch or tag, and a variant, declared once by
 an administrator. A vendor's release is a tag: it was built once and does not
 change. [Build pipelines](pipeline.md) § Prerequisites has the three requests,
 and § The pipeline key the key an upload takes.

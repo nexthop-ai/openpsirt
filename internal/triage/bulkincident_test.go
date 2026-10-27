@@ -28,16 +28,16 @@ import (
 func (f *fixture) selection(t *testing.T) triage.BulkDecisionAt {
 	t.Helper()
 	in := f.build(t, f.product, "2026.03")
-	if _, err := f.db.DB.NewUpdate().TableExpr(`"stream"`).
+	if _, err := f.db.DB.NewUpdate().TableExpr(`"branch_or_tag"`).
 		Set(`"kind" = ?`, catalog.Branch).
-		Where(`"id" = (SELECT "tg"."stream_id" FROM "target" AS "tg" WHERE "tg"."id" = ?)`, in.target).
+		Where(`"id" = (SELECT "tg"."branch_or_tag_id" FROM "build" AS "tg" WHERE "tg"."id" = ?)`, in.build).
 		Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	libfoo := f.component(t, "libfoo", "1.2.3")
 	f.finds(t, in, libfoo, "place-of-libfoo", access.Public)
 	return triage.BulkDecisionAt{
-		TargetID: in.target, ComponentID: libfoo, VulnerabilityIDs: []int64{f.issue},
+		BuildID: in.build, ComponentID: libfoo, VulnerabilityIDs: []int64{f.issue},
 	}
 }
 
@@ -216,7 +216,7 @@ func (f *fixture) twoIssues(t *testing.T) triage.BulkDecisionAt {
 	}
 	second := interned["CVE-2026-2"]
 	if _, err := f.db.DB.NewInsert().Model(&finding.Finding{
-		TargetID: at.TargetID, Kind: finding.Vulnerable, VulnerabilityID: second,
+		BuildID: at.BuildID, Kind: finding.Vulnerable, VulnerabilityID: second,
 		Visibility: access.Public, ComponentID: at.ComponentID, OccurrenceIdentity: "place-of-libfoo",
 		OpenedAt: time.Now().Truncate(time.Microsecond),
 	}).Exec(t.Context()); err != nil {
@@ -344,7 +344,7 @@ func TestTheQueueHandsAnApproverEveryOccurrenceOfAnAttackedIssueToSetAside(t *te
 		at := f.twoIssues(t)
 		// A second occurrence for the issue that will be attacked.
 		if _, err := f.db.DB.NewInsert().Model(&finding.Finding{
-			TargetID: at.TargetID, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
+			BuildID: at.BuildID, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 			Visibility: access.Public, ComponentID: at.ComponentID,
 			OccurrenceIdentity: "place-of-libfoo-under-libbar",
 			OpenedAt:           time.Now().Truncate(time.Microsecond),

@@ -226,8 +226,8 @@ func (c Closure) Resolves() bool {
 type Run struct {
 	bun.BaseModel `bun:"table:scan_run,alias:sr"`
 
-	ID       int64 `bun:"id,pk,autoincrement"`
-	TargetID int64 `bun:"target_id,notnull"`
+	ID      int64 `bun:"id,pk,autoincrement"`
+	BuildID int64 `bun:"build_id,notnull"`
 	// Scanner, ScannerVersion and DatabaseVersion are what produced this, and
 	// RanHere says whether we ran it. Counts are only comparable between
 	// products measured the same way, so a report that mixed the two without
@@ -255,7 +255,7 @@ type Finding struct {
 	bun.BaseModel `bun:"table:finding,alias:f"`
 
 	ID              int64 `bun:"id,pk,autoincrement"`
-	TargetID        int64 `bun:"target_id,notnull"`
+	BuildID         int64 `bun:"build_id,notnull"`
 	Kind            Kind  `bun:"kind,notnull"`
 	VulnerabilityID int64 `bun:"vulnerability_id,notnull"`
 	// Visibility says whether this has been disclosed. A vulnerability a
@@ -484,7 +484,7 @@ type Applied struct {
 	// distinguishes that from a finding nobody has looked at.
 	ClaimsReaching        int
 	ClaimsReachingNothing int
-	// Unplaced counts issues reported against something the target does not
+	// Unplaced counts issues reported against something the build does not
 	// contain. A report that does not match the inventory it was produced from
 	// is worth seeing rather than quietly discarding.
 	Unplaced int
@@ -567,11 +567,11 @@ func (s *Store) Begin(ctx context.Context, run Run) (*Run, error) {
 // Any run, finished or not and failed or not: one that applied what a record
 // closed and then failed has still closed it, and a later run that read none
 // does not undo that.
-func (s *Store) LastRecordsVersion(ctx context.Context, targetID int64) (string, error) {
+func (s *Store) LastRecordsVersion(ctx context.Context, buildID int64) (string, error) {
 	var runs []Run
 	err := s.db.NewSelect().Model(&runs).
 		Column("records_version").
-		Where(`"target_id" = ?`, targetID).
+		Where(`"build_id" = ?`, buildID).
 		Where(`"records_version" <> ?`, "").
 		Order("id DESC").
 		Limit(1).

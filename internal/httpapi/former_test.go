@@ -77,11 +77,11 @@ var formerAddresses = []struct{ method, path, operation string }{
 	{http.MethodPost, "/v1/products/{product}/routing-rules", "add-assignment-rule"},
 	{http.MethodGet, "/v1/products/{product}/routing-rules/preview", "preview-assignment-rule"},
 	{http.MethodDelete, "/v1/products/{product}/routing-rules/{id}", "retire-assignment-rule"},
-	{http.MethodGet, "/v1/products/{product}/streams", "list-streams"},
-	{http.MethodPost, "/v1/products/{product}/streams", "declare-stream"},
-	{http.MethodDelete, "/v1/products/{product}/streams/{stream}", "retire-stream"},
-	{http.MethodPatch, "/v1/products/{product}/streams/{stream}", "amend-stream"},
-	{http.MethodPut, "/v1/products/{product}/streams/{stream}/end-of-life", "set-stream-end-of-life"},
+	{http.MethodGet, "/v1/products/{product}/streams", "list-branches-and-tags"},
+	{http.MethodPost, "/v1/products/{product}/streams", "declare-branch-or-tag"},
+	{http.MethodDelete, "/v1/products/{product}/streams/{stream}", "retire-branch-or-tag"},
+	{http.MethodPatch, "/v1/products/{product}/streams/{stream}", "amend-branch-or-tag"},
+	{http.MethodPut, "/v1/products/{product}/streams/{stream}/end-of-life", "set-branch-or-tag-end-of-life"},
 	{http.MethodPut, "/v1/products/{product}/streams/{stream}/release", "set-release-details"},
 	{http.MethodGet, "/v1/products/{product}/streams/{stream}/variants", "list-release-variants"},
 	{http.MethodGet, formerBuild + "/analyses", "list-analyses"},
@@ -143,7 +143,7 @@ var formerAddresses = []struct{ method, path, operation string }{
 
 // formerNames stands in a value for each parameter of a former address.
 var formerNames = strings.NewReplacer(
-	"{product}", "mine", "{stream}", "master", "{variant}", "broadcom",
+	"{product}", "mine", "{stream}", "master", "{branch_or_tag}", "master", "{variant}", "broadcom",
 	"{vulnerability}", "CVE-2026-9999", "{component}", "libnl-3-200",
 	"{place}", "1", "{id}", "1", "{scan}", "1", "{document}", "1", "{tag}", "one",
 	"{identity}", "reader", "{format}", "json", "{name}", "one", "{fix}", "1",
@@ -216,7 +216,7 @@ func TestARenamedAddressAnswersAsNoRoute(t *testing.T) {
 // formerUpload is the pipeline's former upload address for the ingest
 // fixture's build.
 func formerUpload() string {
-	return strings.NewReplacer("{product}", fixture.ProductName, "{stream}", fixture.BranchName,
+	return strings.NewReplacer("{product}", fixture.ProductName, "{branch_or_tag}", fixture.BranchName,
 		"{variant}", fixture.CustomerVariant).Replace(core.FormerUpload)
 }
 
@@ -325,7 +325,7 @@ func TestAPipelineUploadsAtTheFormerAddressAsAtTheNewOne(t *testing.T) {
 func TestWhatAnUploadChangedReadsAtTheFormerAddressAsAtTheNewOne(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		former := strings.NewReplacer("{product}", "mine", "{stream}", "master",
+		former := strings.NewReplacer("{product}", "mine", "{branch_or_tag}", "master",
 			"{variant}", "broadcom").Replace(core.FormerUploadChanges)
 		current := "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms/{sbom}/changes"
 		compared := 0

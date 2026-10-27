@@ -78,7 +78,9 @@ describe("a static analysis run", () => {
         refused: [{ series: "nightly", at: "2026-10-01T00:00:00Z", reason: "it names no commit" }],
       },
     }));
-    mount.render(screen(<AnalysisRuns build={{ product: "p", stream: "s", variant: "v" }} />));
+    mount.render(
+      screen(<AnalysisRuns build={{ product: "p", branch_or_tag: "s", variant: "v" }} />),
+    );
     await settle();
     const alert = mount.host().querySelector(".alert")?.textContent ?? "";
     expect(alert).toContain("nightly");

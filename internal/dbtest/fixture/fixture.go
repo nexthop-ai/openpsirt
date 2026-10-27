@@ -13,7 +13,7 @@
 // another. A seed written per package reaches for the value that collapses the
 // axis it seeds — a display name that is the address name recapitalized, a
 // person with no display name so every read of it falls back to their
-// identity, one variant and it reaches customers, one stream and it is a
+// identity, one variant and it reaches customers, one branch or tag and it is a
 // branch — and under any of those, code answering a display name where an
 // address name is resolved is indistinguishable from correct code.
 //
@@ -23,7 +23,7 @@
 //   - a person whose display name is neither empty nor their identity
 //   - two variants, one reaching customers and one not, carrying different
 //     root component names
-//   - two streams, a branch and a tag cut from it
+//   - two branches and tags, a branch and a tag cut from it
 //
 // A test asserting a count over the seeded world counts against the fixture
 // rather than against a literal, because the world has two of most things.
@@ -61,18 +61,18 @@ type Declared struct {
 	// name recapitalized, so a reader answering the display name where the
 	// address name is resolved fails immediately rather than passing.
 	Product *catalog.Product
-	// Branch and Tag are the two streams. The tag's parent is the branch,
+	// Branch and Tag are the two branches and tags. The tag's parent is the branch,
 	// which is how a release compares against the line it was cut from.
-	Branch *catalog.Stream
-	Tag    *catalog.Stream
+	Branch *catalog.BranchOrTag
+	Tag    *catalog.BranchOrTag
 	// Customer reaches customers and Internal does not, so every narrowing,
 	// label and disclosure rule keyed on that flag is demonstrated on both
 	// sides.
 	Customer *catalog.Variant
 	Internal *catalog.Variant
-	// Target is the branch built as the customer-facing variant: the ordinary
+	// Build is the branch built as the customer-facing variant: the ordinary
 	// place a finding sits.
-	Target *catalog.Target
+	Build *catalog.Build
 	// Person is somebody with a display name that is neither empty nor equal
 	// to their identity, so a read of one can never coincide with the other.
 	Person *access.Account
@@ -125,10 +125,10 @@ func Declare(ctx context.Context, db *database.DB) (Declared, error) {
 	if d.Product, err = cat.DeclareProduct(ctx, ProductName, ProductDisplayName); err != nil {
 		return Declared{}, fmt.Errorf("declare the product %q: %w", ProductName, err)
 	}
-	if d.Branch, err = cat.DeclareStream(ctx, d.Product.ID, BranchName, catalog.Branch, nil); err != nil {
+	if d.Branch, err = cat.DeclareBranchOrTag(ctx, d.Product.ID, BranchName, catalog.Branch, nil); err != nil {
 		return Declared{}, fmt.Errorf("declare the branch %q: %w", BranchName, err)
 	}
-	if d.Tag, err = cat.DeclareStream(ctx, d.Product.ID, TagName, catalog.Tag, &d.Branch.ID); err != nil {
+	if d.Tag, err = cat.DeclareBranchOrTag(ctx, d.Product.ID, TagName, catalog.Tag, &d.Branch.ID); err != nil {
 		return Declared{}, fmt.Errorf("declare the tag %q: %w", TagName, err)
 	}
 	if d.Customer, err = cat.DeclareVariant(ctx, d.Product.ID, CustomerVariant, true); err != nil {
@@ -137,7 +137,7 @@ func Declare(ctx context.Context, db *database.DB) (Declared, error) {
 	if d.Internal, err = cat.DeclareVariant(ctx, d.Product.ID, InternalVariant, false); err != nil {
 		return Declared{}, fmt.Errorf("declare the variant %q: %w", InternalVariant, err)
 	}
-	if d.Target, err = cat.TargetFor(ctx, d.Branch.ID, d.Customer.ID); err != nil {
+	if d.Build, err = cat.BuildFor(ctx, d.Branch.ID, d.Customer.ID); err != nil {
 		return Declared{}, fmt.Errorf("place %s as %s: %w", BranchName, CustomerVariant, err)
 	}
 	if d.Person, err = access.NewStore(db.DB).Ensure(ctx, PersonIdentity, PersonDisplayName,
@@ -158,14 +158,14 @@ func (w *World) DeclareProduct(name, displayName string) *catalog.Product {
 	return product
 }
 
-// DeclareStream adds a branch or a tag to a product.
-func (w *World) DeclareStream(p *catalog.Product, name string, kind catalog.Kind, parent *int64) *catalog.Stream {
+// DeclareBranchOrTag adds a branch or a tag to a product.
+func (w *World) DeclareBranchOrTag(p *catalog.Product, name string, kind catalog.Kind, parent *int64) *catalog.BranchOrTag {
 	w.t.Helper()
-	stream, err := w.Catalog.DeclareStream(context.Background(), p.ID, name, kind, parent)
+	branchOrTag, err := w.Catalog.DeclareBranchOrTag(context.Background(), p.ID, name, kind, parent)
 	if err != nil {
 		w.t.Fatalf("declare the %s %q: %v", kind, name, err)
 	}
-	return stream
+	return branchOrTag
 }
 
 // DeclareVariant adds a way a product is built.
@@ -178,14 +178,14 @@ func (w *World) DeclareVariant(p *catalog.Product, name string, customerFacing b
 	return variant
 }
 
-// TargetFor is the row for a stream built as a variant.
-func (w *World) TargetFor(s *catalog.Stream, v *catalog.Variant) *catalog.Target {
+// BuildFor is the row for a branch or tag built as a variant.
+func (w *World) BuildFor(s *catalog.BranchOrTag, v *catalog.Variant) *catalog.Build {
 	w.t.Helper()
-	target, err := w.Catalog.TargetFor(context.Background(), s.ID, v.ID)
+	build, err := w.Catalog.BuildFor(context.Background(), s.ID, v.ID)
 	if err != nil {
 		w.t.Fatalf("place %s as %s: %v", s.Name, v.Name, err)
 	}
-	return target
+	return build
 }
 
 // DeclarePerson adds somebody who may sign in.

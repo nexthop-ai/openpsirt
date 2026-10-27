@@ -25,7 +25,7 @@ import (
 // Per-product policy that changes what the tool reports without anything
 // being scanned. Three of these move what carries a deadline at all, so each
 // queues a rewrite away from the request: the line a product triages at, a
-// product's end of life and a stream's end of life. A release's details and a
+// product's end of life and a branch or tag's end of life. A release's details and a
 // product's pair thresholds move no deadline and queue nothing; they sit here
 // as the same kind of policy rather than beside the declarations they amend.
 func registerCatalogPolicy(api huma.API, d core.Declaring) {
@@ -243,7 +243,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "set-release-details", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/release",
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/release",
 		Summary: "Set when a release went out and what it was cut from",
 		Description: "Records the day a tag actually shipped, and the branch it was cut " +
 			"from.\n\n" +
@@ -265,9 +265,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			"An empty date clears the date. An empty parent leaves whatever stands alone.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Body    struct {
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Body        struct {
 			ReleasedOn string `json:"released_on" doc:"The day it went out, as 2026-03-31. Empty clears it, and the day it was declared here stands in"`
 			CutFrom    string `json:"cut_from,omitempty" doc:"The branch it was cut from, by name. Fills in where nothing has been said; naming a different one is refused, and empty leaves whatever stands alone"`
 		}
@@ -285,31 +285,31 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		// is what a comparison walks, so the caller's refusal describes a
 		// state the database no longer has.
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, product, stream, err := core.StreamIn(ctx, d, tx, in.Product, in.Stream)
+			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
 			if err != nil {
 				return err
 			}
 			if named := strings.TrimSpace(in.Body.CutFrom); named != "" {
-				from, err := store.StreamByName(ctx, product.ID, named)
+				from, err := store.BranchOrTagByName(ctx, product.ID, named)
 				if err != nil {
 					return core.Undeclared(d.Logger, err, "the release it was cut from could not be looked up")
 				}
-				filled, err := store.FillInParent(ctx, stream.ID, from.ID)
+				filled, err := store.FillInParent(ctx, branchOrTag.ID, from.ID)
 				if err != nil {
 					return core.Asked(d.Logger, err)
 				}
 				if filled {
-					if err := core.Noted(ctx, tx, trail.Release, product.Name+" "+stream.Name+" cut from",
+					if err := core.Noted(ctx, tx, trail.Release, product.Name+" "+branchOrTag.Name+" cut from",
 						nil, trail.Said(from.Name, true)); err != nil {
 						return core.NotRecorded(d.Logger, err)
 					}
 				}
 			}
-			if err := store.SetReleasedOn(ctx, stream.ID, on); err != nil {
+			if err := store.SetReleasedOn(ctx, branchOrTag.ID, on); err != nil {
 				return core.WentWrong(d.Logger, "that date could not be recorded", err)
 			}
-			if err := core.Noted(ctx, tx, trail.Release, product.Name+" "+stream.Name,
-				onDay(stream.ReleasedOn), onDay(on)); err != nil {
+			if err := core.Noted(ctx, tx, trail.Release, product.Name+" "+branchOrTag.Name,
+				onDay(branchOrTag.ReleasedOn), onDay(on)); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}
 			return nil
@@ -320,8 +320,8 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "set-stream-end-of-life", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/branches-and-tags/{stream}/end-of-life",
+		OperationID: "set-branch-or-tag-end-of-life", Method: http.MethodPut,
+		Path:    "/v1/products/{product}/branches-and-tags/{branch_or_tag}/end-of-life",
 		Summary: "Set when a branch or tag goes out of support",
 		Description: "Sets the date support ends for one release, overriding what its product " +
 			"says. Past it, nothing on the release carries a remediation deadline and a build " +
@@ -331,9 +331,9 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			"stated it would stop following when the product changed.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Body    core.EndOfLifeBody
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Body        core.EndOfLifeBody
 	}) (*struct{}, error) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
@@ -343,18 +343,18 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			return nil, err
 		}
 		var product *catalog.Product
-		var stream *catalog.Stream
+		var branchOrTag *catalog.BranchOrTag
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
 			var store *catalog.Store
 			var err error
-			if store, product, stream, err = core.StreamIn(ctx, d, tx, in.Product, in.Stream); err != nil {
+			if store, product, branchOrTag, err = core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag); err != nil {
 				return err
 			}
-			before := stream.EOLOn
-			if err := store.SetStreamEndOfLife(ctx, stream.ID, on); err != nil {
+			before := branchOrTag.EOLOn
+			if err := store.SetBranchOrTagEndOfLife(ctx, branchOrTag.ID, on); err != nil {
 				return core.WentWrong(d.Logger, "that date could not be recorded", err)
 			}
-			if err := core.Noted(ctx, tx, trail.Support, product.Name+" "+stream.Name,
+			if err := core.Noted(ctx, tx, trail.Support, product.Name+" "+branchOrTag.Name,
 				onDay(before), onDay(on)); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}
@@ -363,7 +363,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			return nil, err
 		}
 		if d.RewriteDeadlines != nil {
-			d.RewriteDeadlines(ctx, "end of life of "+product.Name+" "+stream.Name, in.Body.On)
+			d.RewriteDeadlines(ctx, "end of life of "+product.Name+" "+branchOrTag.Name, in.Body.On)
 		}
 		return &struct{}{}, nil
 	})

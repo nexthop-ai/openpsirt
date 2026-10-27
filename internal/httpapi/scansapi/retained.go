@@ -27,7 +27,7 @@ import (
 func registerRetained(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "fetch-scan-document", Method: http.MethodGet,
-		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}" +
 			"/sboms/{sbom}/documents/{document}",
 		Summary: "Fetch a document an SBOM upload carried",
 		Description: "Returns the bytes as they arrived, byte for byte: the hash on the receipt " +
@@ -43,21 +43,21 @@ func registerRetained(api huma.API, in core.Deps) {
 			"the receipt may read what it describes and there is one rule rather than two.",
 		Tags: []string{"Ingest"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product  string `path:"product"`
-		Stream   string `path:"stream"`
-		Variant  string `path:"variant"`
-		Scan     int64  `path:"sbom" doc:"The upload, as the receipt names it"`
-		Document int64  `path:"document" doc:"The document, as the receipt names it"`
+		Product     string `path:"product"`
+		BranchOrTag string `path:"branch_or_tag"`
+		Variant     string `path:"variant"`
+		Scan        int64  `path:"sbom" doc:"The upload, as the receipt names it"`
+		Document    int64  `path:"document" doc:"The document, as the receipt names it"`
 	}) (*huma.StreamResponse, error) {
 		// Resolved the way the receipts list resolves the build: somebody
 		// brought into a case is answered as a stranger is, and a branch or
 		// a variant the product does not declare is named as the part that
 		// is missing.
-		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.BranchOrTag, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		build, err := core.BuildRow(ctx, in, named.BranchOrTagID, named.VariantID)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +65,7 @@ func registerRetained(api huma.API, in core.Deps) {
 		// reads what was filed on a build it may upload to, which is the rule
 		// the receipts list applies. Asked of the store rather than here, so
 		// the two endpoints cannot come to differ about it.
-		if _, err := ingest.NewStore(in.DB.DB).Of(ctx, subject, target.ID,
+		if _, err := ingest.NewStore(in.DB.DB).Of(ctx, subject, build.ID,
 			input.Scan); err != nil {
 			return nil, core.Absent(in.Logger, err, "that scan could not be looked up",
 				func() error { return huma.Error404NotFound("no such scan on this build") })

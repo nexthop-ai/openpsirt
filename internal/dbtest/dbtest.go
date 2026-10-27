@@ -889,7 +889,7 @@ var tables = []string{
 	"chat_preference",
 	// Before person, which it points at.
 	"notification",
-	// Before person and target, both of which it points at.
+	// Before person and build, both of which it points at.
 	"upgrade",
 	// Before person, vulnerability and product, all of which it points at.
 	"disclosure_movement",
@@ -912,7 +912,7 @@ var tables = []string{
 	"decision_occurrence",
 	// After the rows that point at it, and before the decision it hangs off.
 	"decision_revision",
-	// Before decision and target, both of which it points at.
+	// Before decision and build, both of which it points at.
 	"decision_build",
 	// Before decision, which it points at.
 	"decision_stamp",
@@ -963,7 +963,7 @@ var tables = []string{
 	"document_upload",
 	// Before product and person, both of which it points at.
 	"supplier_advisory_feed",
-	// Before target and person, both of which it points at.
+	// Before build and person, both of which it points at.
 	"published_vex",
 	// Before person, which they point at.
 	"admin_change",
@@ -984,10 +984,10 @@ var tables = []string{
 	// Before advisory, product, vulnerability and person, all of which it
 	// points at.
 	"advisory_issue",
-	// Before advisory, product, vulnerability, stream, variant and person,
+	// Before advisory, product, vulnerability, branch or tag, variant and person,
 	// all of which it points at.
 	"advisory_override",
-	// Before advisory_approval, product, vulnerability, stream and variant,
+	// Before advisory_approval, product, vulnerability, branch or tag and variant,
 	// all of which it points at.
 	"advisory_agreed_status",
 	// Before advisory_edition, advisory and person, all of which it points
@@ -1005,7 +1005,7 @@ var tables = []string{
 	"suppression_rule",
 	// Before person, product and vulnerability, which they point at.
 	"code_finding_flaw",
-	// Before flaw_code_finding and target, which it points at.
+	// Before flaw_code_finding and build, which it points at.
 	"flaw_code_finding_build",
 	// Before person, product and vulnerability, which it points at.
 	"flaw_code_finding",
@@ -1024,13 +1024,13 @@ var tables = []string{
 	"analysis_location",
 	"analysis_result",
 	"sighting",
-	// Before target, which it points at.
+	// Before build, which it points at.
 	"series_refusal",
 	// Before series_run, which they point at.
 	"series_module",
 	"series_document_chunk",
 	"series_document",
-	// Before series, scan and target, all of which it points at.
+	// Before series, scan and build, all of which it points at.
 	"series_run",
 	// Before product, which it points at.
 	"series",
@@ -1059,9 +1059,9 @@ var tables = []string{
 	"job",
 	"scan_refusal",
 	"scan",
-	"target",
+	"build",
 	"variant",
-	"stream",
+	"branch_or_tag",
 	"product",
 	"application_setting",
 }
@@ -1140,9 +1140,9 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 		// A tag points at the branch it was cut from. MySQL and MariaDB
 		// enforce that self-reference during a bulk delete even though every
 		// row is going; PostgreSQL and SQLite happen not to.
-		if occupied["stream"] {
-			if _, err := tx.ExecContext(ctx, `UPDATE "stream" SET "parent_id" = NULL`); err != nil {
-				return fmt.Errorf("detach stream parents: %w", err)
+		if occupied["branch_or_tag"] {
+			if _, err := tx.ExecContext(ctx, `UPDATE "branch_or_tag" SET "parent_id" = NULL`); err != nil {
+				return fmt.Errorf("detach branch or tag parents: %w", err)
 			}
 		}
 		// A decision points at the decision it was derived from, which is the

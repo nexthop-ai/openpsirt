@@ -39,8 +39,8 @@ func TestTheReviewQueueTakesItsFiltersFromTheAddress(t *testing.T) {
 			{"?severity=high", 1},
 			{"?severity=critical", 0},
 			{"?older_than=3", 0},
-			{"?release=master", 1},
-			{"?release=elsewhere", 0},
+			{"?branch_or_tag=master", 1},
+			{"?branch_or_tag=elsewhere", 0},
 		} {
 			var queue struct {
 				Total int `json:"total"`

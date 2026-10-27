@@ -23,20 +23,20 @@ func TestASecondDecisionDoesNotMoveACommitmentAnotherDecisionMade(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		component, err := f.graph.ComponentAs(ctx, f.target, "libnl-3-200", graph.Choice{})
+		component, err := f.graph.ComponentAs(ctx, f.build, "libnl-3-200", graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		who := f.planner(t, access.PublicTriage)
 		commit := func(to string, decision int64) error {
 			_, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
-				to, nil, &decision, []int64{f.target}, nil)
+				to, nil, &decision, []int64{f.build}, nil)
 			return err
 		}
 		standing := func() finding.Upgrade {
 			var row finding.Upgrade
 			if err := f.db.DB.NewSelect().Model(&row).
-				Where(`"target_id" = ?`, f.target).Scan(ctx); err != nil {
+				Where(`"build_id" = ?`, f.build).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			return row
@@ -73,7 +73,7 @@ func TestASecondDecisionKeepsTheCommitmentsAnotherDecisionMade(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		component, err := f.graph.ComponentAs(ctx, f.target, "libnl-3-200", graph.Choice{})
+		component, err := f.graph.ComponentAs(ctx, f.build, "libnl-3-200", graph.Choice{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,10 +84,10 @@ func TestASecondDecisionKeepsTheCommitmentsAnotherDecisionMade(t *testing.T) {
 				to, nil, &decision, builds, nil)
 			return err
 		}
-		owner := func(target int64) *int64 {
+		owner := func(build int64) *int64 {
 			var rows []finding.Upgrade
 			if err := f.db.DB.NewSelect().Model(&rows).
-				Where(`"target_id" = ?`, target).Scan(ctx); err != nil {
+				Where(`"build_id" = ?`, build).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if len(rows) == 0 {
@@ -97,13 +97,13 @@ func TestASecondDecisionKeepsTheCommitmentsAnotherDecisionMade(t *testing.T) {
 		}
 
 		const first, second = int64(101), int64(202)
-		if err := commit("3.9.0", first, f.target); err != nil {
+		if err := commit("3.9.0", first, f.build); err != nil {
 			t.Fatalf("the first commitment: %v", err)
 		}
 		if err := commit("3.9.0", second, other); err != nil {
 			t.Fatalf("the second decision's commitment: %v", err)
 		}
-		if got := owner(f.target); got == nil || *got != first {
+		if got := owner(f.build); got == nil || *got != first {
 			t.Errorf("the first decision's commitment is now held by %v, want decision %d", got, first)
 		}
 		if got := owner(other); got == nil || *got != second {
@@ -112,10 +112,10 @@ func TestASecondDecisionKeepsTheCommitmentsAnotherDecisionMade(t *testing.T) {
 
 		// The same promise stated again by a second decision is refused: its
 		// occurrences would rest on a date only the first decision moves.
-		if err := commit("3.9.0", second, f.target, other); err == nil {
+		if err := commit("3.9.0", second, f.build, other); err == nil {
 			t.Error("a second decision restated a commitment another decision made, and was accepted")
 		}
-		if got := owner(f.target); got == nil || *got != first {
+		if got := owner(f.build); got == nil || *got != first {
 			t.Errorf("restating the promise moved the commitment to %v, want decision %d", got, first)
 		}
 

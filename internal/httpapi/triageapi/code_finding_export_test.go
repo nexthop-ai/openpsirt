@@ -78,7 +78,7 @@ func TestTheFindingsFileCarriesTheOpenCodeFindingsToInternalReadersAlone(t *test
 		const message, snippet = "p is leaked", "return;"
 		for _, path := range []string{
 			"/v1/products/mine/findings.csv",
-			"/v1/products/mine/findings.csv?stream=master&variant=broadcom",
+			"/v1/products/mine/findings.csv?branch_or_tag=master&variant=broadcom",
 			"/v1/findings.csv",
 		} {
 			for _, who := range []string{"internal-reader", "internal-triager", "code-finding-handler"} {
@@ -89,7 +89,7 @@ func TestTheFindingsFileCarriesTheOpenCodeFindingsToInternalReadersAlone(t *test
 				}
 				l := codeFindings[0]
 				if l["issue"] != "clang-tidy/leak" || l["path"] != "src/a.c" || l["line"] != "12" ||
-					l["message"] != message || l["stream"] != "master" ||
+					l["message"] != message || l["branch_or_tag"] != "master" ||
 					l["variant"] != "broadcom" || l["severity"] != "" || l["component"] != "" {
 					t.Errorf("%s: %s's file holds the code finding as %v", path, who, l)
 				}
@@ -143,7 +143,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoCodeFindingAndSaysSo(t *testing.T)
 		}
 		for _, asked := range []string{"severity=high", "q=leak", "exploited=true", "beneath=zlib", "on=tag", "planned=planned"} {
 			code, said, header, rows := findingsFile(t, r, "internal-reader",
-				"/v1/products/mine/findings.csv?stream=master&variant=broadcom&"+asked)
+				"/v1/products/mine/findings.csv?branch_or_tag=master&variant=broadcom&"+asked)
 			if code != http.StatusOK {
 				t.Fatalf("%s: exporting answered %d", asked, code)
 			}

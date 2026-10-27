@@ -25,7 +25,7 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 	// stands would not have at all.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{
 				aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
 				aClaim("CVE-2026-2", sbom.Affected, libnl, sbom.FromStatement),
@@ -34,7 +34,7 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicRead)
-		rows, total, err := f.store.CarriedPatches(t.Context(), who, f.target, "", 50, 0)
+		rows, total, err := f.store.CarriedPatches(t.Context(), who, f.build, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,11 +73,11 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 		// Narrowed on what the claim says it is about, not on a component the
 		// build still carries: a claim naming something that has gone is
 		// exactly the row somebody asking why a patch stopped working wants.
-		if got, _, err := f.store.CarriedPatches(t.Context(), who, f.target,
+		if got, _, err := f.store.CarriedPatches(t.Context(), who, f.build,
 			libnl.Name, 50, 0); err != nil || len(got) != 2 {
 			t.Errorf("narrowing to the package found %d rows (%v)", len(got), err)
 		}
-		if got, _, err := f.store.CarriedPatches(t.Context(), who, f.target,
+		if got, _, err := f.store.CarriedPatches(t.Context(), who, f.build,
 			"nothing-called-this", 50, 0); err != nil || len(got) != 0 {
 			t.Errorf("a package nothing was claimed about found %d rows (%v)", len(got), err)
 		}
@@ -86,13 +86,13 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 		// That is the whole point: what a build no longer claims is what
 		// somebody has to notice.
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{
 				aClaim("CVE-2026-2", sbom.Affected, libnl, sbom.FromStatement),
 			}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		after, _, err := f.store.CarriedPatches(t.Context(), who, f.target, "", 50, 0)
+		after, _, err := f.store.CarriedPatches(t.Context(), who, f.build, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +120,7 @@ func TestWhatABuildCarriesIsNarrowedByANameInAnyCapitals(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		eclair := at("Éclair-Lib", "1.0")
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
 			[]sbom.Suppression{
 				aClaim("CVE-2026-1", sbom.AlreadyFixed, eclair, sbom.FromPedigree),
 				aClaim("CVE-2026-2", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
@@ -129,7 +129,7 @@ func TestWhatABuildCarriesIsNarrowedByANameInAnyCapitals(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicRead)
 		for _, typed := range []string{"Éclair-Lib", "éclair-lib", " ÉCLAIR-LIB "} {
-			got, total, err := f.store.CarriedPatches(t.Context(), who, f.target, typed, 50, 0)
+			got, total, err := f.store.CarriedPatches(t.Context(), who, f.build, typed, 50, 0)
 			if err != nil {
 				t.Fatal(err)
 			}

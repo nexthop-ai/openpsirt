@@ -132,21 +132,21 @@ func (p *Pass) reaching(ctx context.Context) (bool, error) {
 // changes what closes a product's findings queues the scans in its own
 // transaction.
 func Again(ctx context.Context, db bun.IDB, q *queue.Queue, productID int64) error {
-	var targets []int64
+	var buildIDs []int64
 	if err := db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
+		TableExpr(`"build" AS "tg"`).
 		ColumnExpr(`"tg"."id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"st"."retired_at" IS NULL`).
 		Where(`"va"."retired_at" IS NULL`).
 		Where(`"tg"."last_scan_id" IS NOT NULL`).
 		OrderExpr(`"tg"."id"`).
-		Scan(ctx, &targets); err != nil {
+		Scan(ctx, &buildIDs); err != nil {
 		return fmt.Errorf("read which builds a product holds: %w", err)
 	}
-	if len(targets) == 0 {
+	if len(buildIDs) == 0 {
 		return nil
 	}
 	var references []string
@@ -160,8 +160,8 @@ func Again(ctx context.Context, db bun.IDB, q *queue.Queue, productID int64) err
 	for _, reference := range references {
 		waiting[reference] = true
 	}
-	for _, target := range targets {
-		reference := strconv.FormatInt(target, 10)
+	for _, build := range buildIDs {
+		reference := strconv.FormatInt(build, 10)
 		if waiting[reference] {
 			continue
 		}
@@ -170,7 +170,7 @@ func Again(ctx context.Context, db bun.IDB, q *queue.Queue, productID int64) err
 				// The rest wait for the schedule, which reaches them.
 				return nil
 			}
-			return fmt.Errorf("queue build %d to be scanned again: %w", target, err)
+			return fmt.Errorf("queue build %d to be scanned again: %w", build, err)
 		}
 	}
 	return nil

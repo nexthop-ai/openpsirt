@@ -17,7 +17,7 @@ describe("a release", () => {
         ? { data: { items: [{ name: "v1.2" }], total: 1 } }
         : { status: 503 },
     );
-    mount.render(screen(<Release product="sonic" stream="v1.2" />));
+    mount.render(screen(<Release product="sonic" branch_or_tag="v1.2" />));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("could not be read");
@@ -39,7 +39,7 @@ describe("a release", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<Release product="sonic" stream="202305.9" />));
+    mount.render(screen(<Release product="sonic" branch_or_tag="202305.9" />));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).not.toContain("No such release");

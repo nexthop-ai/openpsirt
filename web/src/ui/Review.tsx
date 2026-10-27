@@ -29,7 +29,7 @@ export type Other = {
   // One entry per build and version; the build alone is the label.
   key: string;
   build: string;
-  stream: string;
+  branch_or_tag: string;
   variant: string;
   version: string;
   occurrences: number;

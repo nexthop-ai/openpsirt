@@ -14,7 +14,7 @@ async function drawn(issue: Answer) {
     if (path === "/v1/issues/{issue}") return issue;
     return { data: { items: [], total: 0 } };
   });
-  mount.render(screen(<Issue />, "/issues/CVE-2026-1", "/issues/:vulnerability"));
+  mount.render(screen(<Issue />, "/issues/CVE-2026-1", "/issues/:issue"));
   await settle();
 }
 
@@ -22,7 +22,7 @@ const ROWS = [
   {
     product: "sonic",
     product_name: "SONiC",
-    stream: "master",
+    branch_or_tag: "master",
     variant: "arm",
     component: "zlib",
     version: "1.2",
@@ -33,7 +33,7 @@ const ROWS = [
   },
   {
     product: "sonic",
-    stream: "202411",
+    branch_or_tag: "202411",
     variant: "arm",
     component: "zlib",
     version: "1.1",
@@ -67,7 +67,9 @@ describe("one issue, everywhere it sits", () => {
     // What a scan said is shown as written and never rendered.
     expect(text()).toContain("<b>not markup</b>");
     const link = mount.host().querySelector("tbody a.id");
-    expect(link?.getAttribute("href")).toContain("/products/sonic/streams/master/variants/arm");
+    expect(link?.getAttribute("href")).toContain(
+      "/products/sonic/branches-and-tags/master/variants/arm",
+    );
   });
 
   it("says nothing carries it rather than drawing an empty table", async () => {

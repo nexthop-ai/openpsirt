@@ -144,7 +144,7 @@ the interface does, your automation can do too.
 
 [Evaluation](trying.md) stands one up to look at, and [Current state](built.md)
 says what is built and what is not. To put it to work, [Build pipelines](pipeline.md)
-shows a pipeline declaring its target and posting its SBOM, and
+shows a pipeline declaring its build and posting its SBOM, and
 [A vendor's release](vendor-release.md) loads a vendor's SBOM and VEX document so
 their judgments are recorded as theirs. [Configuration](configuration.md) lists
 every setting, the [API reference](reference/api.md) every operation, and

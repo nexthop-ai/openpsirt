@@ -23,7 +23,7 @@ import (
 func (f *fixture) claimed(t *testing.T, claims ...sbom.Suppression) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
-	if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
+	if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, claims, everyOrigin); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -32,7 +32,7 @@ func (f *fixture) claimed(t *testing.T, claims ...sbom.Suppression) {
 func (f *fixture) scanned(t *testing.T) (finding.Applied, int64) {
 	t.Helper()
 	runID := f.run(t)
-	applied, err := f.store.Apply(t.Context(), f.target, runID,
+	applied, err := f.store.Apply(t.Context(), f.build, runID,
 		[]finding.Reported{found("CVE-2026-1", libnl)})
 	if err != nil {
 		t.Fatal(err)
@@ -210,7 +210,7 @@ func TestABuildThatCarriesAPatchComparesAsFixedByIt(t *testing.T) {
 		f.scanned(t)
 
 		who := f.holding(t, access.PublicRead)
-		comparison, err := f.store.Compare(ctx, who, earlier, f.target, false)
+		comparison, err := f.store.Compare(ctx, who, earlier, f.build, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -241,14 +241,14 @@ func TestAFindingRecordedClosedOnArrivalIsNeitherOpenedNorFixed(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicRead)
 
-		changes, err := f.store.Changes(ctx, who, f.target, []int64{runID})
+		changes, err := f.store.Changes(ctx, who, f.build, []int64{runID})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if got := changes[runID]; got.Opened != 0 || got.Closed != 0 {
 			t.Errorf("the receipt says the run opened %d and closed %d", got.Opened, got.Closed)
 		}
-		ran, err := f.store.Ran(ctx, who, f.target, runID)
+		ran, err := f.store.Ran(ctx, who, f.build, runID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,7 +280,7 @@ func TestTwoReportsOfOneIssueAgreeOnWhetherItIsPatched(t *testing.T) {
 	// what decides the finding is the report that stands.
 	each(t, func(t *testing.T, f *fixture) {
 		f.claimed(t, aClaim("GHSA-aaaa-bbbb-cccc", sbom.AlreadyFixed, libnl, sbom.FromPedigree))
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 			found("GHSA-aaaa-bbbb-cccc", libnl, "CVE-2026-1"),
 			found("CVE-2026-1", libnl),
 		}); err != nil {
@@ -307,10 +307,10 @@ func TestAFindingWhosePatchWasDroppedInABumpSaysWhereItCameFrom(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, nil, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnlNew)}); err != nil {
 			t.Fatal(err)
 		}
@@ -334,12 +334,12 @@ func TestABumpOntoAPatchedVersionClosesAsPatched(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{
+		if _, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan, []sbom.Suppression{
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnlNew, sbom.FromPedigree),
 		}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(t.Context(), f.target, f.run(t),
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnlNew)})
 		if err != nil {
 			t.Fatal(err)
@@ -370,7 +370,7 @@ func TestAPatchReturningAfterTheComponentLeftIsRecordedAgain(t *testing.T) {
 		f.claimed(t)
 		f.scanned(t)
 		f.shipped(t, withoutLibnl())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), nil); err != nil {
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), nil); err != nil {
 			t.Fatal(err)
 		}
 

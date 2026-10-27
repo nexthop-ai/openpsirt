@@ -36,7 +36,7 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	// receipts and its uploads, what one upload changed, and a document it kept. The
 	// fixture's scan is the first the build had, so it changed nothing, and
 	// it kept no document by that name.
-	const build = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}"
+	const build = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}"
 	sent := map[string]int{
 		build + "/sboms":                             http.StatusOK,
 		build + "/analyses":                          http.StatusOK,

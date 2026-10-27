@@ -318,6 +318,8 @@ components:
     AdvisoryReleaseBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
         changed:
           description: Whether the status differs from what an agreement standing on what the advisory says now saw. The agreement stands
           type: boolean
@@ -349,8 +351,6 @@ components:
             - known_not_affected
             - fixed
           type: string
-        stream:
-          type: string
         variant:
           type: string
         vulnerability:
@@ -358,7 +358,7 @@ components:
       required:
         - product
         - vulnerability
-        - stream
+        - branch_or_tag
         - variant
         - status
         - decided
@@ -495,7 +495,7 @@ components:
     AlsoBuild:
       additionalProperties: false
       properties:
-        stream:
+        branch_or_tag:
           type: string
         variant:
           type: string
@@ -503,8 +503,26 @@ components:
           description: The version that build ships under this name, where it ships more than one
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
+      type: object
+    Amend-branch-or-tagRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Amend-branch-or-tagRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          description: What to call it instead
+          maxLength: 191
+          minLength: 1
+          type: string
+      required:
+        - name
       type: object
     Amend-productRequest:
       additionalProperties: false
@@ -524,24 +542,6 @@ components:
           description: What scans and paths should call it instead. Omitted leaves it alone
           maxLength: 191
           type: string
-      type: object
-    Amend-streamRequest:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/Amend-streamRequest.json
-          format: uri
-          readOnly: true
-          type: string
-        name:
-          description: What to call it instead
-          maxLength: 191
-          minLength: 1
-          type: string
-      required:
-        - name
       type: object
     Amend-variantRequest:
       additionalProperties: false
@@ -1521,6 +1521,56 @@ components:
         - category
         - name
       type: object
+    BranchOrTagBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/BranchOrTagBody.json
+          format: uri
+          readOnly: true
+          type: string
+        display_name:
+          description: The same name as it was spelled. Absent where it is the name itself
+          type: string
+        end_of_life:
+          description: The date support ends, as YYYY-MM-DD
+          type: string
+        end_of_life_inherited:
+          description: The date shown is the product's, not this release's own
+          type: boolean
+        kind:
+          description: Whether this line moves. A branch is rebuilt; a tag never changes
+          enum:
+            - branch
+            - tag
+          type: string
+        last_scan_at:
+          description: The moment a scan last arrived for any build of it
+          type: string
+        name:
+          description: The name scans use for this branch or tag
+          maxLength: 191
+          minLength: 1
+          type: string
+        open:
+          description: Issues open against it, counted at components rather than at every occurrence. Absent unless counts were asked for
+          format: int64
+          type: integer
+        parent:
+          description: For a tag, the branch it was cut from
+          type: string
+        released_on:
+          description: For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in
+          type: string
+        retired:
+          description: Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted
+          type: boolean
+      required:
+        - name
+        - kind
+      type: object
     BucketBody:
       additionalProperties: false
       properties:
@@ -1593,6 +1643,11 @@ components:
     BuildCountsBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
+          type: string
         critical:
           format: int64
           type: integer
@@ -1612,11 +1667,6 @@ components:
         medium:
           format: int64
           type: integer
-        stream:
-          type: string
-        stream_name:
-          description: The branch or tag as it was spelled, or its name where no spelling was recorded
-          type: string
         total:
           format: int64
           type: integer
@@ -1626,7 +1676,7 @@ components:
           description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
         - critical
         - high
@@ -1637,12 +1687,12 @@ components:
     BuildName:
       additionalProperties: false
       properties:
-        stream:
+        branch_or_tag:
           type: string
         variant:
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
       type: object
     BuildStandingBody:
@@ -1652,6 +1702,14 @@ components:
           description: The number answered at every occurrence by a standing decision
           format: int64
           type: integer
+        branch_or_tag:
+          type: string
+        branch_or_tag_kind:
+          description: Whether the line moves or is fixed
+          enum:
+            - branch
+            - tag
+          type: string
         exploited:
           description: The number somebody is known to be exploiting
           format: int64
@@ -1670,14 +1728,6 @@ components:
           description: The number past a deadline
           format: int64
           type: integer
-        stream:
-          type: string
-        stream_kind:
-          description: Whether the line moves or is fixed
-          enum:
-            - branch
-            - tag
-          type: string
         undecided:
           description: The number nobody has proposed anything about
           format: int64
@@ -1685,7 +1735,7 @@ components:
         variant:
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
         - open
       type: object
@@ -2135,7 +2185,7 @@ components:
     CodeFindingBuild:
       additionalProperties: false
       properties:
-        stream:
+        branch_or_tag:
           description: A branch or a tag
           minLength: 1
           type: string
@@ -2144,7 +2194,7 @@ components:
           minLength: 1
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
       type: object
     CodeFindingDecisionBody:
@@ -2428,6 +2478,9 @@ components:
         assigned_to_name:
           description: Their display name, where it differs from the name above
           type: string
+        branch_or_tag:
+          description: The branch or tag of the newest build the code finding is listed on, to link to
+          type: string
         builds:
           description: The number of builds in the list's scope the code finding is listed on, in the state the list asks for
           format: int64
@@ -2466,9 +2519,6 @@ components:
             - confirmed
             - recorded-as-flaw
           type: string
-        stream:
-          description: The branch or tag of the newest build the code finding is listed on, to link to
-          type: string
         third_party:
           description: Whether the code finding is in code the newest run that saw it declared third-party
           type: boolean
@@ -2480,7 +2530,7 @@ components:
         - rule
         - path
         - message
-        - stream
+        - branch_or_tag
         - variant
         - state
         - builds
@@ -2900,6 +2950,8 @@ components:
     CoveredBuild:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
         covered:
           description: The number of findings those occurrences hold
           format: int64
@@ -2908,14 +2960,12 @@ components:
           description: The number of occurrences it covers there
           format: int64
           type: integer
-        stream:
-          type: string
         variant:
           type: string
         version:
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
         - recorded
         - covered
@@ -3204,7 +3254,7 @@ components:
           $ref: "#/components/schemas/DecisionOccurrenceBody"
           description: "The decision's contents: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands"
         builds:
-          description: Every build the decision currently covers, as stream and variant
+          description: Every build the decision currently covers, as branch or tag and variant
           items:
             type: string
           type:
@@ -3483,6 +3533,24 @@ components:
         - items
         - total
       type: object
+    DeclaredBranchOrTagBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/DeclaredBranchOrTagBody.json
+          format: uri
+          readOnly: true
+          type: string
+        created:
+          type: boolean
+        item:
+          $ref: "#/components/schemas/BranchOrTagBody"
+      required:
+        - created
+        - item
+      type: object
     DeclaredKeyBody:
       additionalProperties: false
       properties:
@@ -3533,24 +3601,6 @@ components:
           type: boolean
         item:
           $ref: "#/components/schemas/ProductBody"
-      required:
-        - created
-        - item
-      type: object
-    DeclaredStreamBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/DeclaredStreamBody.json
-          format: uri
-          readOnly: true
-          type: string
-        created:
-          type: boolean
-        item:
-          $ref: "#/components/schemas/StreamBody"
       required:
         - created
         - item
@@ -4144,9 +4194,9 @@ components:
     EmbargoedBuildBody:
       additionalProperties: false
       properties:
-        stream:
+        branch_or_tag:
           type: string
-        stream_name:
+        branch_or_tag_name:
           description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         variant:
@@ -4155,7 +4205,7 @@ components:
           description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
       type: object
     EndOfLifeBody:
@@ -4182,7 +4232,7 @@ components:
           description: The latest moment one of them stopped. Absent where none of them says when
           type: string
         builds:
-          description: Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as stream and variant
+          description: Every build holding an open finding at one of those occurrences at the moment the decision stopped there, as branch or tag and variant
           items:
             type: string
           type:
@@ -4627,6 +4677,12 @@ components:
           description: The number of those the build has already argued do not apply
           format: int64
           type: integer
+        branch_or_tag:
+          description: "A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
+          type: string
         builds:
           description: The number of builds in the selection holding this. Absent where the selection is one build
           format: int64
@@ -4755,12 +4811,6 @@ components:
             - agreed
             - lapsed
           type: string
-        stream:
-          description: "A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"
-          type: string
-        stream_name:
-          description: The branch or tag as it was spelled, or its name where no spelling was recorded
-          type: string
         summary:
           description: The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding
           type: string
@@ -4878,6 +4928,11 @@ components:
     FindingRefBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
+          type: string
         component:
           type: string
         decided:
@@ -4930,11 +4985,6 @@ components:
         severity:
           description: Our rating where one stands, else as published
           type: string
-        stream:
-          type: string
-        stream_name:
-          description: The branch or tag as it was spelled, or its name where no spelling was recorded
-          type: string
         variant:
           type: string
         variant_name:
@@ -4948,7 +4998,7 @@ components:
           type: string
       required:
         - product
-        - stream
+        - branch_or_tag
         - variant
         - vulnerability
         - component
@@ -5104,6 +5154,9 @@ components:
         because:
           description: Why the flaw record was undone, in markdown
           type: string
+        branch_or_tag:
+          description: The branch or tag of the build its newest finding you read is on
+          type: string
         fixed_in:
           description: Each build the flaw is still open on whose code finding a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the flaw record is undone
           items:
@@ -5148,9 +5201,6 @@ components:
             - confirmed
             - recorded-as-flaw
           type: string
-        stream:
-          description: The branch or tag of the build its newest finding you read is on
-          type: string
         suggested:
           $ref: "#/components/schemas/FlawSuggestedBody"
           description: The component the flaw record's offer ranked first, which the person may have turned down
@@ -5166,7 +5216,7 @@ components:
           type: string
       required:
         - occurrence
-        - stream
+        - branch_or_tag
         - variant
         - rule
         - path
@@ -5180,15 +5230,15 @@ components:
     FlawCodeFindingBuild:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
         seen:
           description: Whether the code finding was seen in it. Otherwise it holds the chosen component and the code finding's series never analyzed it
           type: boolean
-        stream:
-          type: string
         variant:
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
         - seen
       type: object
@@ -5265,18 +5315,18 @@ components:
     FlawUnseenBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
         fixed:
           $ref: "#/components/schemas/CodeFindingRunBody"
           description: The build a person stated fixed the code finding, where they closed it as fixed
         not_seen:
           $ref: "#/components/schemas/CodeFindingRunBody"
           description: The first run on the build that did not see the code finding
-        stream:
-          type: string
         variant:
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
         - not_seen
       type: object
@@ -6092,7 +6142,7 @@ components:
     Item:
       additionalProperties: false
       properties:
-        stream:
+        branch_or_tag:
           description: A branch or a tag
           minLength: 1
           type: string
@@ -6101,20 +6151,20 @@ components:
           minLength: 1
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
       type: object
     Item1:
       additionalProperties: false
       properties:
-        stream:
+        branch_or_tag:
           minLength: 1
           type: string
         variant:
           minLength: 1
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
       type: object
     KeyBody:
@@ -6126,6 +6176,9 @@ components:
             - https://example.com/schemas/KeyBody.json
           format: uri
           readOnly: true
+          type: string
+        branch_or_tag:
+          description: Optionally, the one release it may send for
           type: string
         created_at:
           description: The date it was issued. A pipeline key does not expire, so this is the only thing that dates it
@@ -6147,9 +6200,6 @@ components:
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
-          type: string
-        stream:
-          description: Optionally, the one release it may send for
           type: string
         variant:
           description: Optionally, the one variant it may send for
@@ -6201,6 +6251,14 @@ components:
     LastUploadBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
+        branch_or_tag_kind:
+          description: Whether this line moves
+          enum:
+            - branch
+            - tag
+          type: string
         last_received_at:
           description: The moment a scan last arrived. Absent where none ever has
           type: string
@@ -6225,20 +6283,12 @@ components:
         retired:
           description: Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet
           type: boolean
-        stream:
-          type: string
-        stream_kind:
-          description: Whether this line moves
-          enum:
-            - branch
-            - tag
-          type: string
         variant:
           type: string
       required:
         - product
-        - stream
-        - stream_kind
+        - branch_or_tag
+        - branch_or_tag_kind
         - variant
         - quiet_days
       type: object
@@ -6305,6 +6355,11 @@ components:
         assigned_to_name:
           description: Their display name, where it differs from their identity
           type: string
+        branch_or_tag:
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
+          type: string
         component:
           type: string
         days_left:
@@ -6334,11 +6389,6 @@ components:
           type: string
         severity:
           type: string
-        stream:
-          type: string
-        stream_name:
-          description: The branch or tag as it was spelled, or its name where no spelling was recorded
-          type: string
         variant:
           type: string
         variant_name:
@@ -6353,7 +6403,7 @@ components:
         - vulnerability
         - component
         - product
-        - stream
+        - branch_or_tag
         - variant
         - occurrences
         - due
@@ -6604,6 +6654,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/BindingBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyBranchOrTagBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyBranchOrTagBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/BranchOrTagBody"
           type:
             - array
             - "null"
@@ -7339,28 +7411,6 @@ components:
       required:
         - items
       type: object
-    ListBodyStreamBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyStreamBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/StreamBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
     ListBodyString:
       additionalProperties: false
       properties:
@@ -7540,12 +7590,12 @@ components:
     MadeOnBody:
       additionalProperties: false
       properties:
-        stream:
+        branch_or_tag:
           type: string
         variant:
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
       type: object
     Mark-advisory-releaseRequest:
@@ -7561,10 +7611,10 @@ components:
         affected:
           description: True marks the release affected, false clears the mark
           type: boolean
-        product:
+        branch_or_tag:
           minLength: 1
           type: string
-        stream:
+        product:
           minLength: 1
           type: string
         variant:
@@ -7577,13 +7627,18 @@ components:
       required:
         - product
         - vulnerability
-        - stream
+        - branch_or_tag
         - variant
         - affected
       type: object
     MatchBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
+          type: string
         here:
           description: This is another version in the same build, not another build
           type: boolean
@@ -7591,11 +7646,6 @@ components:
           description: The number of occurrences it sits at there
           format: int64
           type: integer
-        stream:
-          type: string
-        stream_name:
-          description: The branch or tag as it was spelled, or its name where no spelling was recorded
-          type: string
         variant:
           type: string
         variant_name:
@@ -7605,7 +7655,7 @@ components:
           description: The version that build ships under this name — pass it as ?version= when applying a decision there
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
         - occurrences
       type: object
@@ -8413,6 +8463,9 @@ components:
     OfferBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          description: The branch or tag of the build the finding is in
+          type: string
         component:
           description: The component
           type: string
@@ -8448,9 +8501,6 @@ components:
         status:
           description: What the upstream says, in the VEX format's own words
           type: string
-        stream:
-          description: The branch or tag of the build the finding is in
-          type: string
         variant:
           description: The variant of the build the finding is in
           type: string
@@ -8464,7 +8514,7 @@ components:
         - statement
         - finding
         - product
-        - stream
+        - branch_or_tag
         - variant
         - publisher
         - issue
@@ -9114,6 +9164,8 @@ components:
     PerBuildBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
         by_severity:
           additionalProperties:
             format: int64
@@ -9161,13 +9213,11 @@ components:
         source:
           description: "The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing"
           type: string
-        stream:
-          type: string
         upgrade_to:
           description: The version somebody has committed to moving this build to
           type: string
         upgrades:
-          description: Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets
+          description: Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and a branch or tag that has moved on have different builds
           items:
             $ref: "#/components/schemas/UpgradeBody"
           type:
@@ -9179,7 +9229,7 @@ components:
           description: The version the source package was built at
           type: string
       required:
-        - stream
+        - branch_or_tag
         - variant
         - source
         - version
@@ -9294,7 +9344,7 @@ components:
           readOnly: true
           type: string
         builds:
-          description: The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version
+          description: The releases this is promised for. A branch or tag staying on a maintained older line takes its own promise with its own version
           items:
             $ref: "#/components/schemas/BuildName"
           maxItems: 2000
@@ -10116,7 +10166,7 @@ components:
           description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed-by-the-tool or absent"
           type: object
         fingerprints_changed:
-          description: Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build
+          description: Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another branch or tag, from the last run on that branch or tag's build
           type: boolean
         inherited:
           description: Results new to the build carried from a code finding of the branch it was cut from
@@ -10619,6 +10669,9 @@ components:
     ReleaseBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          description: The branch or tag
+          type: string
         by_severity:
           additionalProperties:
             format: int64
@@ -10626,19 +10679,16 @@ components:
           description: That total split by the rating in force
           type: object
         kind:
-          description: "The kind of stream: a branch or a tag"
+          description: "The kind of branch or tag: a branch or a tag"
           type: string
         open:
           description: Every open finding at this build
           format: int64
           type: integer
-        stream:
-          description: The branch or tag
-          type: string
         variant:
           type: string
       required:
-        - stream
+        - branch_or_tag
         - kind
         - variant
         - open
@@ -10685,6 +10735,11 @@ components:
     ReleasePointBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
+          type: string
         by_severity:
           additionalProperties:
             format: int64
@@ -10697,13 +10752,8 @@ components:
           description: Distinct issues open against it now, against today's vulnerability data rather than the day it was cut
           format: int64
           type: integer
-        stream:
-          type: string
-        stream_name:
-          description: The branch or tag as it was spelled, or its name where no spelling was recorded
-          type: string
       required:
-        - stream
+        - branch_or_tag
         - cut
         - open
       type: object
@@ -11225,6 +11275,8 @@ components:
     RetiredBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
         ended:
           description: The date has passed. False is a release that is about to go out of support
           type: boolean
@@ -11250,11 +11302,9 @@ components:
           type: integer
         product:
           type: string
-        stream:
-          type: string
       required:
         - product
-        - stream
+        - branch_or_tag
         - kind
         - ended_on
         - ended_days
@@ -12146,6 +12196,8 @@ components:
     SightingBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          type: string
         component:
           type: string
         due:
@@ -12174,8 +12226,6 @@ components:
             - agreed
             - lapsed
           type: string
-        stream:
-          type: string
         undisclosed:
           type: boolean
         variant:
@@ -12185,7 +12235,7 @@ components:
       required:
         - product
         - product_name
-        - stream
+        - branch_or_tag
         - variant
         - component
         - version
@@ -12466,7 +12516,7 @@ components:
           description: Their display name, where it differs from their identity
           type: string
         builds:
-          description: Every build the decision currently covers, as stream and variant
+          description: Every build the decision currently covers, as branch or tag and variant
           items:
             type: string
           type:
@@ -12849,56 +12899,6 @@ components:
           type: string
       required:
         - component
-      type: object
-    StreamBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/StreamBody.json
-          format: uri
-          readOnly: true
-          type: string
-        display_name:
-          description: The same name as it was spelled. Absent where it is the name itself
-          type: string
-        end_of_life:
-          description: The date support ends, as YYYY-MM-DD
-          type: string
-        end_of_life_inherited:
-          description: The date shown is the product's, not this release's own
-          type: boolean
-        kind:
-          description: Whether this line moves. A branch is rebuilt; a tag never changes
-          enum:
-            - branch
-            - tag
-          type: string
-        last_scan_at:
-          description: The moment a scan last arrived for any build of it
-          type: string
-        name:
-          description: The name scans use for this branch or tag
-          maxLength: 191
-          minLength: 1
-          type: string
-        open:
-          description: Issues open against it, counted at components rather than at every occurrence. Absent unless counts were asked for
-          format: int64
-          type: integer
-        parent:
-          description: For a tag, the branch it was cut from
-          type: string
-        released_on:
-          description: For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in
-          type: string
-        retired:
-          description: Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted
-          type: boolean
-      required:
-        - name
-        - kind
       type: object
     SuggestionBody:
       additionalProperties: false
@@ -13427,6 +13427,12 @@ components:
     UnassignedBody:
       additionalProperties: false
       properties:
+        branch_or_tag:
+          description: A branch or tag holding it. Where builds is more than one, any of them
+          type: string
+        branch_or_tag_name:
+          description: The branch or tag as it was spelled, or its name where no spelling was recorded
+          type: string
         builds:
           description: The number of builds holding it. More than one means the same code built more than one way, which one decision answers
           format: int64
@@ -13445,7 +13451,7 @@ components:
           description: The namespace its package identifier names, where it names one
           type: string
         occurrence:
-          description: The occurrence of a static analysis code finding, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built
+          description: The occurrence of a static analysis code finding, which addresses its page with the branch or tag and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built
           type: string
         occurrences:
           description: The number of findings a decision here would be recorded against, across every build it is in
@@ -13458,12 +13464,6 @@ components:
           description: The product's display name, or its name where it has none
           type: string
         severity:
-          type: string
-        stream:
-          description: A branch or tag holding it. Where builds is more than one, any of them
-          type: string
-        stream_name:
-          description: The branch or tag as it was spelled, or its name where no spelling was recorded
           type: string
         variant:
           description: A build variant holding it. Where builds is more than one, any of them
@@ -13480,7 +13480,7 @@ components:
         - component
         - version
         - product
-        - stream
+        - branch_or_tag
         - variant
         - occurrences
         - builds
@@ -13907,7 +13907,7 @@ components:
           description: The same name as it was spelled. Absent where it is the name itself
           type: string
         name:
-          description: The name scans use for this build of the stream
+          description: The name scans use for this build of the branch or tag
           maxLength: 191
           minLength: 1
           type: string
@@ -14017,7 +14017,7 @@ components:
           format: int64
           type: integer
         builds:
-          description: Every build the decision currently covers, as stream and variant
+          description: Every build the decision currently covers, as branch or tag and variant
           items:
             type: string
           type:
@@ -15760,16 +15760,16 @@ paths:
         - description: Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant
             type: string
-        - description: The build of that stream. Needs exactly one product and a stream
+        - description: The build of that branch or tag. Needs exactly one product and a branch or tag
           explode: false
           in: query
           name: variant
           schema:
-            description: The build of that stream. Needs exactly one product and a stream
+            description: The build of that branch or tag. Needs exactly one product and a branch or tag
             type: string
         - explode: false
           in: query
@@ -15935,16 +15935,16 @@ paths:
         - description: Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant
             type: string
-        - description: The build of that stream. Needs exactly one product and a stream
+        - description: The build of that branch or tag. Needs exactly one product and a branch or tag
           explode: false
           in: query
           name: variant
           schema:
-            description: The build of that stream. Needs exactly one product and a stream
+            description: The build of that branch or tag. Needs exactly one product and a branch or tag
             type: string
         - in: path
           name: format
@@ -16096,16 +16096,16 @@ paths:
         - description: Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Only decisions about occurrences this branch or tag holds. Needs exactly one product and a variant
             type: string
-        - description: The build of that stream. Needs exactly one product and a stream
+        - description: The build of that branch or tag. Needs exactly one product and a branch or tag
           explode: false
           in: query
           name: variant
           schema:
-            description: The build of that stream. Needs exactly one product and a stream
+            description: The build of that branch or tag. Needs exactly one product and a branch or tag
             type: string
         - explode: false
           in: query
@@ -16255,7 +16255,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -17117,7 +17117,7 @@ paths:
 
         A product you may not read undisclosed work in contributes nothing to it, not even a count.
 
-        `within` is how many days ahead to look. Left off, it is this deployment's own embargo length. `product`, `stream` and `variant` narrow it to a scope, and the builds an item lists are the ones inside that scope.
+        `within` is how many days ahead to look. Left off, it is this deployment's own embargo length. `product`, `branch_or_tag` and `variant` narrow it to a scope, and the builds an item lists are the ones inside that scope.
 
         Requires: private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read undisclosed work in contributes nothing, not even a count.
       operationId: list-approaching-disclosure
@@ -17132,7 +17132,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -18883,7 +18883,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -18965,7 +18965,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -19681,7 +19681,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -20398,28 +20398,28 @@ paths:
   /v1/products/{product}/branches-and-tags:
     get:
       description: |-
-        Every stream declared under this product, with how many variants each has and how much is open in it.
+        Every branch or tag declared under this product, with how many variants each has and how much is open in it.
 
-        A stream is a branch or a tag: a branch is scanned nightly and superseded, a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
+        A branch or tag is a branch or a tag: a branch is scanned nightly and superseded, a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
 
-        A stream past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
+        A branch or tag past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
 
-        A retired stream is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
+        A retired branch or tag is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-      operationId: list-streams
+      operationId: list-branches-and-tags
       parameters:
         - in: path
           name: product
           required: true
           schema:
             type: string
-        - description: Include streams that have been retired. They say so, and no scan may be filed against one
+        - description: Include branches and tags that have been retired. They say so, and no scan may be filed against one
           explode: false
           in: query
           name: retired
           schema:
-            description: Include streams that have been retired. They say so, and no scan may be filed against one
+            description: Include branches and tags that have been retired. They say so, and no scan may be filed against one
             type: boolean
         - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
           explode: false
@@ -20433,7 +20433,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyStreamBody"
+                $ref: "#/components/schemas/ListBodyBranchOrTagBody"
           description: OK
         default:
           content:
@@ -20452,7 +20452,7 @@ paths:
         Records a line of a product. A branch moves and is rebuilt; a tag never changes and is what somebody received.
 
         Requires: administrator
-      operationId: declare-stream
+      operationId: declare-branch-or-tag
       parameters:
         - in: path
           name: product
@@ -20463,14 +20463,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/StreamBody"
+              $ref: "#/components/schemas/BranchOrTagBody"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DeclaredStreamBody"
+                $ref: "#/components/schemas/DeclaredBranchOrTagBody"
           description: Created
         default:
           content:
@@ -20483,7 +20483,7 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
-  /v1/products/{product}/branches-and-tags/{stream}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}:
     delete:
       description: |-
         Takes a release out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays. Declaring it again brings it back.
@@ -20491,7 +20491,7 @@ paths:
         An end-of-support date is a separate setting with a separate effect: it takes the deadline off what is open and leaves the release listed and scannable.
 
         Requires: administrator
-      operationId: retire-stream
+      operationId: retire-branch-or-tag
       parameters:
         - in: path
           name: product
@@ -20499,7 +20499,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -20526,7 +20526,7 @@ paths:
         Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from.
 
         Requires: administrator
-      operationId: amend-stream
+      operationId: amend-branch-or-tag
       parameters:
         - in: path
           name: product
@@ -20534,7 +20534,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -20542,7 +20542,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Amend-streamRequest"
+              $ref: "#/components/schemas/Amend-branch-or-tagRequest"
         required: true
       responses:
         "204":
@@ -20558,7 +20558,7 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
-  /v1/products/{product}/branches-and-tags/{stream}/end-of-life:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/end-of-life:
     put:
       description: |-
         Sets the date support ends for one release, overriding what its product says. Past it, nothing on the release carries a remediation deadline and a build that stops being scanned is expected rather than a fault.
@@ -20566,7 +20566,7 @@ paths:
         An empty date clears the override, so the release follows its product again. Clearing is not the same as stating the product's current date: a release that stated it would stop following when the product changed.
 
         Requires: administrator
-      operationId: set-stream-end-of-life
+      operationId: set-branch-or-tag-end-of-life
       parameters:
         - in: path
           name: product
@@ -20574,7 +20574,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -20598,7 +20598,7 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
-  /v1/products/{product}/branches-and-tags/{stream}/release:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/release:
     put:
       description: |-
         Records the day a tag actually shipped, and the branch it was cut from.
@@ -20620,7 +20620,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -20644,7 +20644,7 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
-  /v1/products/{product}/branches-and-tags/{stream}/variants:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants:
     get:
       description: |-
         Lists the variants one release was actually built as — a subset of what the product declares.
@@ -20660,7 +20660,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -20690,7 +20690,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/analyses:
     get:
       description: |-
         Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see. `refused` is, for each series, the last upload to the build turned away once its sender was admitted, with what the sender was told.
@@ -20706,7 +20706,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -20776,17 +20776,17 @@ paths:
             type: string
         - description: The declared branch or tag
           in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             description: The declared branch or tag
             type: string
-        - description: The declared way that stream is built
+        - description: The declared way that branch or tag is built
           in: path
           name: variant
           required: true
           schema:
-            description: The declared way that stream is built
+            description: The declared way that branch or tag is built
             type: string
       requestBody:
         content:
@@ -20885,7 +20885,7 @@ paths:
         any_of:
           - internal-triage
         note: A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried:
     get:
       description: |-
         Returns what an existing line's decisions would mean for this one, without changing anything. Ask before creating a line: the answer is what somebody is agreeing to.
@@ -20913,7 +20913,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -20922,21 +20922,21 @@ paths:
           required: true
           schema:
             type: string
-        - description: The stream to inherit from
+        - description: The branch or tag to inherit from
           explode: false
           in: query
           name: from
           required: true
           schema:
-            description: The stream to inherit from
+            description: The branch or tag to inherit from
             type: string
-        - description: That stream's variant
+        - description: That branch or tag's variant
           explode: false
           in: query
           name: from_variant
           required: true
           schema:
-            description: That stream's variant
+            description: That branch or tag's variant
             type: string
       responses:
         "200":
@@ -20979,7 +20979,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21032,7 +21032,7 @@ paths:
           - public-triage
           - private-triage
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried-patches:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/carried-patches:
     get:
       description: |-
         Everything this build has argued about in its own inventories: carried patches saying what they fix, and statements it sent alongside.
@@ -21054,7 +21054,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21109,7 +21109,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}:
     get:
       description: |-
         Returns what the newest run that saw a code finding on a build said about it: where it is, the path the analyzer took to it, and the other places it names. Each place links into the repository's web view at the analyzed commit, where the product names the repository's host, and carries the source kept beside it, where the product keeps source under its path.
@@ -21125,7 +21125,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21160,7 +21160,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/assignment:
     put:
       description: |-
         Records who is dealing with this code finding.
@@ -21182,7 +21182,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21223,7 +21223,7 @@ paths:
           - private-triage
           - internal-triage
         note: At the code finding's visibility. Giving it to somebody else also needs assigner. Taking a code finding nobody holds, or handing back your own, does not.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/collaborators:
     get:
       description: |-
         Everybody granted this one code finding recorded as a flaw in this product, oldest first.
@@ -21239,7 +21239,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21277,7 +21277,7 @@ paths:
           - internal-read
           - internal-triage
         note: Where you read internal work in the product, whether or not the code finding is included in disclosure.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}:
     delete:
       description: |-
         Withdraws the grant. The record of it is kept.
@@ -21293,7 +21293,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21349,7 +21349,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21388,14 +21388,14 @@ paths:
           - internal-read
           - internal-triage
         note: Where you read internal work in the product, whether or not the code finding is included in disclosure.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision:
     post:
       description: |-
         Records what a code finding is: `dismissed`, `not-security` or `confirmed`.
 
         `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
 
-        The decision covers the code finding on every stream and variant it is seen on, and every code finding another analyzer reports as the same flaw on the build that nothing answers yet, as one decision agreed to once. A code finding that is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw is refused with 409, because its flaw is judged instead.
+        The decision covers the code finding on every branch or tag and variant it is seen on, and every code finding another analyzer reports as the same flaw on the build that nothing answers yet, as one decision agreed to once. A code finding that is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw is refused with 409, because its flaw is judged instead.
 
         Requires: internal-triage on the product
       operationId: decide-code-finding
@@ -21406,7 +21406,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21448,7 +21448,7 @@ paths:
         scope: product
         any_of:
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/fixed:
     post:
       description: |-
         Closes a code finding on one build because it is fixed there. The code finding has to be one the newest comparable run did not see: a code finding a run still sees is refused with 409. `because` says what fixed it, and is required.
@@ -21466,7 +21466,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21508,7 +21508,7 @@ paths:
         scope: product
         any_of:
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw:
     get:
       description: |-
         Returns what recording a confirmed code finding as a flaw here is offered: the components it may be recorded against, most likely first, the builds it was seen in, and what including it in the flaw's disclosure would publish with the flaw.
@@ -21524,7 +21524,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21581,7 +21581,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21625,7 +21625,7 @@ paths:
           - internal-triage
           - private-triage
         note: Both internal-triage and private-triage on the product.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure:
     delete:
       description: |-
         Takes a code finding out of its flaw's disclosure while the flaw is undisclosed, with every code finding linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
@@ -21641,7 +21641,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21690,7 +21690,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21724,7 +21724,7 @@ paths:
           - internal-triage
           - private-triage
         note: Both internal-triage and private-triage on the product.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal:
     post:
       description: |-
         Undoes recording a code finding as a flaw while its flaw is undisclosed, with every code finding linked to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the code finding it was recorded from, marked undone.
@@ -21740,7 +21740,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21780,7 +21780,7 @@ paths:
           - internal-triage
           - private-triage
         note: Both internal-triage and private-triage on the product.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components:
     get:
       description: |-
         Returns the build's own component and what it depends on, most findings first. The root is named separately from the list because it is what the list hangs from rather than a member of it.
@@ -21802,7 +21802,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21849,7 +21849,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/mine:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/mine:
     get:
       description: |-
         The build's dependency graph, seen upward from your own work: from each component you hold a finding on, up to the build's root.
@@ -21869,7 +21869,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21897,7 +21897,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers what you hold, whether or not you read the product.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/around:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/around:
     get:
       description: |-
         Returns what pulls this component in, and what it pulls in.
@@ -21917,7 +21917,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -21973,7 +21973,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/bulk-decision:
     post:
       description: |-
         Records the same decision against every issue you name: one outcome, one justification, one reasoning, applied separately at every occurrence of each issue, each keyed and expiring on its own.
@@ -21997,7 +21997,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22060,7 +22060,7 @@ paths:
           - public-triage
           - private-triage
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues:
     get:
       description: |-
         Returns the distinct issues open against this component in this build, most urgent first, with how many occurrences each has, the version that fixes it where the report names one, and what one decision about it would be made on: what the issue says about itself, whether anybody is known to be exploiting it, the published estimate, and the earliest deadline among its occurrences here.
@@ -22076,7 +22076,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22154,7 +22154,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}:
     get:
       description: |-
         Returns the full record for one issue in one component of a build: the description, the advisory, every reference the data carries with patches listed first, the score and what it assumes, whether it is known to be exploited and how likely exploitation is, the weakness classification, what upstream has done about it, and every occurrence of the component here.
@@ -22172,7 +22172,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22235,7 +22235,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/assignment:
     put:
       description: |-
         Records who is dealing with this issue in this component.
@@ -22257,7 +22257,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22322,7 +22322,7 @@ paths:
           - private-triage
           - internal-triage
         note: Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/decision:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/decision:
     post:
       description: |-
         Records the same decision against every occurrence this issue has in this component. Naming `occurrences` narrows it; leaving it out covers all of them.
@@ -22348,7 +22348,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22420,7 +22420,7 @@ paths:
           - public-triage
           - private-triage
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}:
     delete:
       description: |-
         Removes a label. Taking off one that is not there succeeds and changes nothing.
@@ -22434,7 +22434,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22521,7 +22521,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22587,7 +22587,7 @@ paths:
           - public-triage
           - private-triage
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/reach:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/reach:
     get:
       description: |-
         The same three parts the per-occurrence answer gives, for every occurrence the finding sits at, merged.
@@ -22605,7 +22605,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22664,7 +22664,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision:
     get:
       description: |-
         Returns the decision currently suppressing this finding, if any, together with everything decided here before — withdrawn decisions, and decisions that stopped applying when an upstream version changed.
@@ -22682,7 +22682,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22751,7 +22751,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22802,7 +22802,7 @@ paths:
           - public-triage
           - private-triage
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation:
     post:
       description: |-
         Re-makes a decision that stopped applying because an upstream version moved, at the versions this finding has now. `previous` is the decision being re-made, from `previously` in `GET .../decision`.
@@ -22824,7 +22824,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22875,7 +22875,7 @@ paths:
           - public-triage
           - private-triage
           - internal-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/reach:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/reach:
     get:
       description: |-
         Returns the three parts of what a decision made here covers.
@@ -22893,7 +22893,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22935,7 +22935,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/resolve:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/resolve:
     post:
       description: |-
         Closes a flaw somebody recorded here, in one build, because it has been fixed there. Every location of the issue in that build is closed together.
@@ -22955,7 +22955,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -22996,7 +22996,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades:
     get:
       description: |-
         Everything committed for this build, one row per upgrade — a source package at the version it was built at, moving to another version — with what it would still close here.
@@ -23020,7 +23020,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23048,7 +23048,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades.{format}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/planned-upgrades.{format}:
     get:
       description: |-
         The same list as a file: one row per upgrade this build is waiting on, where it stands, and what it would still close here.
@@ -23064,7 +23064,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23096,7 +23096,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/readiness:
     get:
       description: |-
         Answers the question asked before shipping: is what we are about to ship better or worse than what we last shipped. "8 criticals now, v2.4.1 shipped with 4."
@@ -23118,7 +23118,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23146,7 +23146,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register:
     get:
       description: |-
         One row per issue and occurrence in this build, with its state, what was decided, who proposed it, who agreed, when each of those happened, its deadline and whether that was met.
@@ -23164,7 +23164,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23293,7 +23293,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register.{format}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/register.{format}:
     get:
       description: |-
         The register as a file. Read with your own visibility as it streams, like every other export here.
@@ -23307,7 +23307,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23424,7 +23424,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/runs/{run}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/runs/{run}:
     get:
       description: |-
         One run, with what it was measured with and what it changed — broken down by the rating in force, and with how much of what it opened is known to be exploited.
@@ -23444,7 +23444,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23480,7 +23480,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms:
     get:
       description: |-
         Returns uploads newest first, each with its state: `reading` (accepted, not yet parsed), `scanning` (parsed, vulnerability scan pending), `scanned` (complete), or `failed` with the reason.
@@ -23496,7 +23496,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23566,17 +23566,17 @@ paths:
             type: string
         - description: The declared branch or tag
           in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             description: The declared branch or tag
             type: string
-        - description: The declared way that stream is built
+        - description: The declared way that branch or tag is built
           in: path
           name: variant
           required: true
           schema:
-            description: The declared way that stream is built
+            description: The declared way that branch or tag is built
             type: string
       requestBody:
         content:
@@ -23626,7 +23626,7 @@ paths:
           - private-triage
           - internal-triage
         note: A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/changes:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms/{sbom}/changes:
     get:
       description: |-
         Returns the component names this upload added, removed and moved to different versions, against the upload read before it. Removals first, then arrivals, then the names that moved version.
@@ -23644,7 +23644,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23711,7 +23711,7 @@ paths:
       x-openpsirt-requires:
         scope: any
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/documents/{document}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms/{sbom}/documents/{document}:
     get:
       description: |-
         Returns the bytes as they arrived, byte for byte: the hash on the receipt is over what comes back from here, so a copy can be checked against what was actually read.
@@ -23729,7 +23729,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23769,7 +23769,7 @@ paths:
       x-openpsirt-requires:
         scope: any
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components:
     get:
       description: |-
         Returns the components the build holds now that the vulnerability scanner has no way to match, with the reason for each and a count per reason. Such a component reports no findings whatever it contains.
@@ -23785,7 +23785,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23846,7 +23846,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components.{format}:
     get:
       description: |-
         Every component the unmatched components list names, as a file, in the same order, with the reason for each.
@@ -23860,7 +23860,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23905,7 +23905,7 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/uploads:
     get:
       description: |-
         Returns each kind of upload a build takes, with how many are held and what became of the newest: SBOMs and static analysis runs sent to this build, and VEX documents and supplier advisories uploaded to its product. Each kind's own list carries the uploads themselves.
@@ -23921,7 +23921,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -23949,7 +23949,7 @@ paths:
       x-openpsirt-requires:
         scope: any
         note: Answers only what you may see.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex:
     get:
       description: |-
         Returns an OpenVEX document saying what stands about the third-party components this build ships: every approved `not applicable` and `already fixed` decision, as `not_affected` and `fixed` statements with the justification and the reasoning somebody wrote.
@@ -23971,7 +23971,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -24019,7 +24019,7 @@ paths:
           - public-read
           - public-triage
         note: "Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue."
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance:
     get:
       description: |-
         What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
@@ -24039,7 +24039,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -24099,7 +24099,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -24139,7 +24139,7 @@ paths:
         any_of:
           - public-triage
         note: The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the decision was approved.
-  /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}:
+  /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance/{version}:
     get:
       description: |-
         The OpenVEX document recorded as one revision, byte for byte as it went out. It carries the version it was recorded under and the moment it was recorded.
@@ -24155,7 +24155,7 @@ paths:
           schema:
             type: string
         - in: path
-          name: stream
+          name: branch_or_tag
           required: true
           schema:
             type: string
@@ -24247,7 +24247,7 @@ paths:
 
         With no `state` it is the queue: open code findings with no decision waiting for a second person. `state` lists the code findings in one state instead. `fixed` lists the code findings closed on a build and not opened anew there.
 
-        `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
+        `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting decision, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `branch_or_tag`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-code-findings
@@ -24260,7 +24260,7 @@ paths:
         - description: Limit to one branch or tag. Left out, every one under the product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Left out, every one under the product
             type: string
@@ -24362,7 +24362,7 @@ paths:
         - description: Limit to one branch or tag. Left out, every one under the product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Left out, every one under the product
             type: string
@@ -24449,13 +24449,13 @@ paths:
           required: true
           schema:
             type: string
-        - description: The earlier build's stream — a branch or a tag
+        - description: The earlier build's branch or tag — a branch or a tag
           explode: false
           in: query
           name: from
           required: true
           schema:
-            description: The earlier build's stream — a branch or a tag
+            description: The earlier build's branch or tag — a branch or a tag
             type: string
         - description: The earlier build's variant
           explode: false
@@ -24465,13 +24465,13 @@ paths:
           schema:
             description: The earlier build's variant
             type: string
-        - description: The later build's stream
+        - description: The later build's branch or tag
           explode: false
           in: query
           name: to
           required: true
           schema:
-            description: The later build's stream
+            description: The later build's branch or tag
             type: string
         - description: The later build's variant
           explode: false
@@ -24534,13 +24534,13 @@ paths:
               - csv
               - json
             type: string
-        - description: The earlier build's stream — a branch or a tag
+        - description: The earlier build's branch or tag — a branch or a tag
           explode: false
           in: query
           name: from
           required: true
           schema:
-            description: The earlier build's stream — a branch or a tag
+            description: The earlier build's branch or tag — a branch or a tag
             type: string
         - description: The earlier build's variant
           explode: false
@@ -24550,13 +24550,13 @@ paths:
           schema:
             description: The earlier build's variant
             type: string
-        - description: The later build's stream
+        - description: The later build's branch or tag
           explode: false
           in: query
           name: to
           required: true
           schema:
-            description: The later build's stream
+            description: The later build's branch or tag
             type: string
         - description: The later build's variant
           explode: false
@@ -24593,7 +24593,7 @@ paths:
       description: |-
         Returns the component names the later build added, removed and holds at different versions, against the earlier build. Removals first, then arrivals, then the names at different versions.
 
-        Any two builds of one product, across streams and variants. Each is compared as its most recent inventory stands.
+        Any two builds of one product, across branches and tags and variants. Each is compared as its most recent inventory stands.
 
         Counted by name, as the listing of one upload is. A name either build holds at several versions carries all of them on each side.
 
@@ -24607,13 +24607,13 @@ paths:
           required: true
           schema:
             type: string
-        - description: The earlier build's stream — a branch or a tag
+        - description: The earlier build's branch or tag — a branch or a tag
           explode: false
           in: query
           name: from
           required: true
           schema:
-            description: The earlier build's stream — a branch or a tag
+            description: The earlier build's branch or tag — a branch or a tag
             type: string
         - description: The earlier build's variant
           explode: false
@@ -24623,13 +24623,13 @@ paths:
           schema:
             description: The earlier build's variant
             type: string
-        - description: The later build's stream
+        - description: The later build's branch or tag
           explode: false
           in: query
           name: to
           required: true
           schema:
-            description: The later build's stream
+            description: The later build's branch or tag
             type: string
         - description: The later build's variant
           explode: false
@@ -24714,13 +24714,13 @@ paths:
               - csv
               - json
             type: string
-        - description: The earlier build's stream — a branch or a tag
+        - description: The earlier build's branch or tag — a branch or a tag
           explode: false
           in: query
           name: from
           required: true
           schema:
-            description: The earlier build's stream — a branch or a tag
+            description: The earlier build's branch or tag — a branch or a tag
             type: string
         - description: The earlier build's variant
           explode: false
@@ -24730,13 +24730,13 @@ paths:
           schema:
             description: The earlier build's variant
             type: string
-        - description: The later build's stream
+        - description: The later build's branch or tag
           explode: false
           in: query
           name: to
           required: true
           schema:
-            description: The later build's stream
+            description: The later build's branch or tag
             type: string
         - description: The later build's variant
           explode: false
@@ -24793,13 +24793,13 @@ paths:
           required: true
           schema:
             type: string
-        - description: The earlier build's stream — a branch or a tag
+        - description: The earlier build's branch or tag — a branch or a tag
           explode: false
           in: query
           name: from
           required: true
           schema:
-            description: The earlier build's stream — a branch or a tag
+            description: The earlier build's branch or tag — a branch or a tag
             type: string
         - description: The earlier build's variant
           explode: false
@@ -24809,13 +24809,13 @@ paths:
           schema:
             description: The earlier build's variant
             type: string
-        - description: The later build's stream
+        - description: The later build's branch or tag
           explode: false
           in: query
           name: to
           required: true
           schema:
-            description: The later build's stream
+            description: The later build's branch or tag
             type: string
         - description: The later build's variant
           explode: false
@@ -24854,7 +24854,7 @@ paths:
 
         `component` is a binary name or a source package name, matched without regard to capitals. A binary name answers for the source package it was built from, so `libcurl4t64` and `curl` answer alike. A binary whose inventory names no source package is its own source. A source shipped at two versions in one build is two entries: two pieces of code, decided about separately.
 
-        Answered per build, because the answer differs by build. A stream staying on a maintained older line and a stream that has moved on are different work.
+        Answered per build, because the answer differs by build. A branch or tag staying on a maintained older line and a branch or tag that has moved on are different work.
 
         Counts cover the source package: an issue open on three of its binaries is one issue. Each entry in `packages` carries its own counts.
 
@@ -24887,7 +24887,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -25060,7 +25060,7 @@ paths:
 
         `under` keeps what one container holds directly; `beneath` keeps what sits at a component or anywhere under it, which is what the dependency tree's cumulative count counts. The tree counts distinct issues and this list is one row per issue and component, so a subtree holding one issue at two components is two rows here and one there.
 
-        `stream` and `variant` are optional and independent. With both named the list is one build. With either left out it answers for every build under the product that matches the rest: a row is still one issue in one component, its occurrence count is across every build it is in, and `builds` says how many those are. Across more than one build a row carries `stream` and `variant` naming one of them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a chain belongs to one build's graph. `beneath` is a walk over one build's edges and is refused unless both are named.
+        `branch_or_tag` and `variant` are optional and independent. With both named the list is one build. With either left out it answers for every build under the product that matches the rest: a row is still one issue in one component, its occurrence count is across every build it is in, and `builds` says how many those are. Across more than one build a row carries `branch_or_tag` and `variant` naming one of them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a chain belongs to one build's graph. `beneath` is a walk over one build's edges and is refused unless both are named.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-findings
@@ -25073,7 +25073,7 @@ paths:
         - description: Limit to one branch or tag. Left out, every one under the product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Left out, every one under the product
             type: string
@@ -25713,7 +25713,7 @@ paths:
             type: string
         - explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             type: string
         - explode: false
@@ -26265,7 +26265,7 @@ paths:
         - description: Limit to one branch or tag. Left out, every one under the product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Left out, every one under the product
             type: string
@@ -26819,7 +26819,7 @@ paths:
 
         Takes the same filters as the findings list, so the two agree about what is being counted. Ordered by how many issues, not by urgency: making urgency the default would reproduce the findings list at worse resolution. Each row says what its weight is made of — the issues by severity, and the worst among them — because ranking by count alone answers this view's own question backwards: a package with forty-four issues outranks one with three criticals. `sort` takes every key the findings list takes, read of the package rather than of one finding — the worst of what is open against it (`severity`, `urgency`, `epss`), the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how far it reaches (`occurrences`) — and `asc` orders the other way.
 
-        `stream` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
+        `branch_or_tag` and `variant` are optional and independent, as they are on the findings list: with either left out this counts across every build under the product that matches the rest. `beneath` is a walk over one build's edges and is refused unless both are named.
 
         `limit=0` returns `total` alone, with no rows.
 
@@ -26834,7 +26834,7 @@ paths:
         - description: Limit to one branch or tag. Left out, every one under the product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Left out, every one under the product
             type: string
@@ -27416,7 +27416,7 @@ paths:
             type: string
         - explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             type: string
         - explode: false
@@ -27951,7 +27951,7 @@ paths:
 
         Counted over every open finding in the selection you may read. The findings list's other filters and the minimum severity do not narrow it. A kind present only on findings you may not read is absent. A package identifier the ecosystem filter cannot find by a kind is not counted, and neither is a component with none. Ordered by the count, largest first.
 
-        `stream` and `variant` are optional and independent, as they are on the findings list.
+        `branch_or_tag` and `variant` are optional and independent, as they are on the findings list.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-package-kinds
@@ -27964,7 +27964,7 @@ paths:
         - description: Limit to one branch or tag. Left out, every one under the product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Left out, every one under the product
             type: string
@@ -29351,7 +29351,7 @@ paths:
         - description: Limit to one branch or tag
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag
             type: string
@@ -29501,7 +29501,7 @@ paths:
         - description: Limit to one branch or tag
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag
             type: string
@@ -31249,7 +31249,7 @@ paths:
       description: |-
         Every variant declared under this product, with how much is open in each.
 
-        A variant is a way one release is built — a hardware platform, a flavor — and it is independent of the branch: every stream may be built as any of them. One variant is the ordinary case, and the interface hides the dimension where there is only one.
+        A variant is a way one release is built — a hardware platform, a flavor — and it is independent of the branch: every branch or tag may be built as any of them. One variant is the ordinary case, and the interface hides the dimension where there is only one.
 
         Each says whether it is customer-facing, which feeds how urgent a finding in it is, and defaults to customer-facing where nobody has said.
 
@@ -31589,7 +31589,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -31661,7 +31661,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -31723,7 +31723,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -32098,7 +32098,7 @@ paths:
         - description: Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
           explode: false
           in: query
-          name: release
+          name: branch_or_tag
           schema:
             description: Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
             maxLength: 191
@@ -32244,7 +32244,7 @@ paths:
         - description: Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
           explode: false
           in: query
-          name: release
+          name: branch_or_tag
           schema:
             description: Keep only decisions that currently cover an open finding in a branch or tag of this name, matched without regard to capitals
             maxLength: 191
@@ -32342,7 +32342,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -32431,7 +32431,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -32694,7 +32694,7 @@ paths:
       description: |-
         Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
 
-        The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `stream`, `variant`, `beneath`, `beneath_version`, `beneath_ecosystem`, `beneath_namespace`, `differs`, `variants`, `opened_by_run`, `view`. Every other parameter is kept as sent.
+        The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `branch_or_tag`, `variant`, `beneath`, `beneath_version`, `beneath_ecosystem`, `beneath_namespace`, `differs`, `variants`, `opened_by_run`, `view`. Every other parameter is kept as sent.
 
         Refused with 422 where adding the name would take you past the per-person limit.
 
@@ -33002,7 +33002,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -33340,7 +33340,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -33444,7 +33444,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -33538,7 +33538,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string
@@ -33601,7 +33601,7 @@ paths:
         - description: Limit to one branch or tag. Only meaningful with a product
           explode: false
           in: query
-          name: stream
+          name: branch_or_tag
           schema:
             description: Limit to one branch or tag. Only meaningful with a product
             type: string

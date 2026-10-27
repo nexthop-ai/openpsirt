@@ -18,9 +18,9 @@ afterEach(() => at("/"));
 
 describe("where a sign-in comes back to", () => {
   it("carries the screen somebody was on", () => {
-    at("/products/sonic/streams/master/variants/broadcom/findings");
+    at("/products/sonic/branches-and-tags/master/variants/broadcom/findings");
     expect(returningHere()).toBe(
-      "?return=%2Fproducts%2Fsonic%2Fstreams%2Fmaster%2Fvariants%2Fbroadcom%2Ffindings",
+      "?return=%2Fproducts%2Fsonic%2Fbranches-and-tags%2Fmaster%2Fvariants%2Fbroadcom%2Ffindings",
     );
   });
 
@@ -28,7 +28,7 @@ describe("where a sign-in comes back to", () => {
     // A findings list is its filters. Coming back to the same path with none
     // of them is coming back to a different screen.
     at(
-      "/products/sonic/streams/master/variants/broadcom/findings",
+      "/products/sonic/branches-and-tags/master/variants/broadcom/findings",
       "?state=undecided&severity=high",
     );
     expect(returningHere()).toContain("%3Fstate%3Dundecided%26severity%3Dhigh");
@@ -40,10 +40,10 @@ describe("where a sign-in comes back to", () => {
   });
 
   it("escapes what it carries, so the address cannot end the parameter early", () => {
-    at("/products/a&b=c/streams");
+    at("/products/a&b=c/branches-and-tags");
     const carried = returningHere();
     expect(carried).not.toContain("&b=");
-    expect(carried).toBe("?return=%2Fproducts%2Fa%26b%3Dc%2Fstreams");
+    expect(carried).toBe("?return=%2Fproducts%2Fa%26b%3Dc%2Fbranches-and-tags");
   });
 });
 

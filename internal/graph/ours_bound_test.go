@@ -21,7 +21,7 @@ func holdEverything(t *testing.T, f *fixture, party int64) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Table("finding").
 		Set(`"assigned_to" = ?`, party).
-		Where(`"target_id" = ?`, f.targetID).
+		Where(`"build_id" = ?`, f.buildID).
 		Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -51,18 +51,18 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: lib})
 			hit(fmt.Sprintf("CVE-2026-%d", 10000+i), lib)
 		}
-		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
 		run, err := findings.Begin(t.Context(), finding.Run{
-			TargetID: f.targetID, Scanner: "grype", ScannerVersion: "0.100.0",
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
 			DatabaseVersion: "2026-08-28", RanHere: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := findings.Apply(t.Context(), f.targetID, run.ID, reported); err != nil {
+		if _, err := findings.Apply(t.Context(), f.buildID, run.ID, reported); err != nil {
 			t.Fatal(err)
 		}
 		const party = 81
@@ -70,7 +70,7 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 		holder := access.NewPerson(2, "holder", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead}}, party)
 
-		rows, complete, err := f.store.Ours(t.Context(), holder, f.targetID)
+		rows, complete, err := f.store.Ours(t.Context(), holder, f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -95,7 +95,7 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 // says so rather than refusing.
 func TestABuildWithNoInventoryHasNoRoot(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.targetID)
+		top, kids, err := f.store.Roots(t.Context(), everyone(f), f.buildID)
 		if err != nil {
 			t.Fatal(err)
 		}

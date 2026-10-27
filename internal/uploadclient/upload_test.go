@@ -43,7 +43,7 @@ func TestARunIsSentCompressedWithItsFields(t *testing.T) {
 	defer srv.Close()
 
 	answer, err := Send(t.Context(), srv.Client(),
-		Target{URL: srv.URL + "/", Key: "opk_test", Product: "sonic", Stream: "202605.1", Variant: "broad com"},
+		Target{URL: srv.URL + "/", Key: "opk_test", Product: "sonic", BranchOrTag: "202605.1", Variant: "broad com"},
 		[]byte(`{"version":"2.1.0"}`), Fields{Rules: []string{"core.DivideZero", "unix.Malloc"}, ThirdParty: []string{"src/frr"}})
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestABusyDeploymentIsAskedAgain(t *testing.T) {
 		w.WriteHeader(http.StatusAccepted)
 	}))
 	defer srv.Close()
-	answer, err := Send(t.Context(), srv.Client(), Target{URL: srv.URL, Key: "k", Product: "p", Stream: "s", Variant: "v"}, []byte("{}"), Fields{})
+	answer, err := Send(t.Context(), srv.Client(), Target{URL: srv.URL, Key: "k", Product: "p", BranchOrTag: "s", Variant: "v"}, []byte("{}"), Fields{})
 	if err != nil || answer.Status != http.StatusAccepted || calls != 3 {
 		t.Errorf("answer %d after %d calls, %v; want 202 on the third", answer.Status, calls, err)
 	}
@@ -92,7 +92,7 @@ func TestARefusalIsReturnedAsItCame(t *testing.T) {
 		_, _ = w.Write([]byte(`{"detail":"names no series"}`))
 	}))
 	defer srv.Close()
-	answer, err := Send(t.Context(), srv.Client(), Target{URL: srv.URL, Key: "k", Product: "p", Stream: "s", Variant: "v"}, []byte("{}"), Fields{})
+	answer, err := Send(t.Context(), srv.Client(), Target{URL: srv.URL, Key: "k", Product: "p", BranchOrTag: "s", Variant: "v"}, []byte("{}"), Fields{})
 	if err != nil || answer.Status != http.StatusUnprocessableEntity || calls != 1 {
 		t.Errorf("answer %d after %d calls, %v; want the 422 once", answer.Status, calls, err)
 	}
@@ -100,9 +100,9 @@ func TestARefusalIsReturnedAsItCame(t *testing.T) {
 
 func TestAnUploadNamesItsBuild(t *testing.T) {
 	for _, to := range []Target{
-		{URL: "not an address", Product: "p", Stream: "s", Variant: "v"},
-		{URL: "ftp://example.com", Product: "p", Stream: "s", Variant: "v"},
-		{URL: "https://example.com", Product: "p", Stream: "s"},
+		{URL: "not an address", Product: "p", BranchOrTag: "s", Variant: "v"},
+		{URL: "ftp://example.com", Product: "p", BranchOrTag: "s", Variant: "v"},
+		{URL: "https://example.com", Product: "p", BranchOrTag: "s"},
 	} {
 		if _, err := analysesURL(to); err == nil {
 			t.Errorf("%+v was accepted", to)

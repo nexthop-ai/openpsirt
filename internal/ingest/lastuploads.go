@@ -31,11 +31,11 @@ import (
 // declared and never pointed at anything fails silently, and this is what
 // says so.
 type LastUpload struct {
-	ProductID  int64
-	Product    string
-	Stream     string
-	StreamKind string
-	Variant    string
+	ProductID       int64
+	Product         string
+	BranchOrTag     string
+	BranchOrTagKind string
+	Variant         string
 	// LastReceivedAt is when a scan that could be read last arrived, or nil
 	// where none ever has. An upload that was taken and could not be parsed
 	// is not one of these: it is the producer being heard from and the build
@@ -105,14 +105,14 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 	}
 
 	var rows []struct {
-		ProductID  int64      `bun:"product_id"`
-		StreamID   int64      `bun:"stream_id"`
-		Product    string     `bun:"product"`
-		Stream     string     `bun:"stream"`
-		StreamKind string     `bun:"stream_kind"`
-		Variant    string     `bun:"variant"`
-		DeclaredAt time.Time  `bun:"declared_at"`
-		LastSeen   *time.Time `bun:"last_seen"`
+		ProductID       int64      `bun:"product_id"`
+		BranchOrTagID   int64      `bun:"branch_or_tag_id"`
+		Product         string     `bun:"product"`
+		BranchOrTag     string     `bun:"branch_or_tag"`
+		BranchOrTagKind string     `bun:"branch_or_tag_kind"`
+		Variant         string     `bun:"variant"`
+		DeclaredAt      time.Time  `bun:"declared_at"`
+		LastSeen        *time.Time `bun:"last_seen"`
 		// LastRefused is when an upload against this build was last turned
 		// away, which is what tells a quiet build apart from one being
 		// refused. Null where nothing has been.
@@ -127,15 +127,15 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 	// case this exists to report, and joining the scan table would drop
 	// exactly those rows.
 	query := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		TableExpr(`"build" AS "tg"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"p"."name" AS "product"`).
-		ColumnExpr(`"st"."name" AS "stream"`).
-		ColumnExpr(`"st"."kind" AS "stream_kind"`).
+		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
+		ColumnExpr(`"st"."kind" AS "branch_or_tag_kind"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(`"tg"."created_at" AS "declared_at"`).
 		// Out of use at any of the three levels. A build is a product, a
@@ -150,15 +150,15 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 		// it as perfectly quiet on the one report whose subject is that
 		// silence must not look like health.
 		ColumnExpr(`(SELECT MAX("sc"."received_at") FROM "scan" AS "sc" `+
-			`WHERE "sc"."target_id" = "tg"."id" AND "sc"."status" = ?) AS "last_seen"`, Accepted).
+			`WHERE "sc"."build_id" = "tg"."id" AND "sc"."status" = ?) AS "last_seen"`, Accepted).
 		// And whether anybody is trying. Quiet says nothing arrived; this says
 		// whether something arrived and was turned away, which is a different
 		// fault with a different person to tell — a pipeline nobody wired up,
 		// against one failing nightly and reporting success to its own log.
 		ColumnExpr(`(SELECT "sr"."at" FROM "scan_refusal" AS "sr" ` +
-			`WHERE "sr"."target_id" = "tg"."id") AS "last_refused"`).
+			`WHERE "sr"."build_id" = "tg"."id") AS "last_refused"`).
 		ColumnExpr(`(SELECT "sr"."reason" FROM "scan_refusal" AS "sr" ` +
-			`WHERE "sr"."target_id" = "tg"."id") AS "refused_why"`)
+			`WHERE "sr"."build_id" = "tg"."id") AS "refused_why"`)
 	if !all {
 		query = query.Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}
@@ -173,7 +173,7 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 	// life" is spelled in the catalog and nowhere else, because the same fact
 	// decides whether a finding carries a deadline and what this list says
 	// about a build.
-	ended, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, now)
+	ended, err := catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, now)
 	if err != nil {
 		return nil, err
 	}
@@ -196,19 +196,19 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 			since = 0
 		}
 		out = append(out, LastUpload{
-			ProductID:      r.ProductID,
-			Product:        r.Product,
-			Stream:         r.Stream,
-			StreamKind:     r.StreamKind,
-			Variant:        r.Variant,
-			LastReceivedAt: r.LastSeen,
-			LastRefusedAt:  r.LastRefused,
-			RefusedBecause: r.RefusedWhy,
-			Since:          since,
-			OutOfSupport:   past[r.StreamID],
-			RetiredFromUse: r.RetiredFromUse,
+			ProductID:       r.ProductID,
+			Product:         r.Product,
+			BranchOrTag:     r.BranchOrTag,
+			BranchOrTagKind: r.BranchOrTagKind,
+			Variant:         r.Variant,
+			LastReceivedAt:  r.LastSeen,
+			LastRefusedAt:   r.LastRefused,
+			RefusedBecause:  r.RefusedWhy,
+			Since:           since,
+			OutOfSupport:    past[r.BranchOrTagID],
+			RetiredFromUse:  r.RetiredFromUse,
 			Quiet: quietAfter > 0 && since > quietAfter &&
-				!past[r.StreamID] && !r.RetiredFromUse,
+				!past[r.BranchOrTagID] && !r.RetiredFromUse,
 		})
 	}
 
@@ -222,8 +222,8 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 			return 1
 		}
 		return strings.Compare(
-			a.Product+"\x00"+a.Stream+"\x00"+a.Variant,
-			b.Product+"\x00"+b.Stream+"\x00"+b.Variant)
+			a.Product+"\x00"+a.BranchOrTag+"\x00"+a.Variant,
+			b.Product+"\x00"+b.BranchOrTag+"\x00"+b.Variant)
 	})
 	return out, nil
 }

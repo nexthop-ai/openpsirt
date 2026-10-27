@@ -73,7 +73,7 @@ describe("recording a flaw", () => {
     const body = recorded(sent());
     expect(body).not.toHaveProperty("disclosed");
     expect(body).toMatchObject({
-      builds: [{ stream: "master", variant: "broadcom" }],
+      builds: [{ branch_or_tag: "master", variant: "broadcom" }],
       summary: "The socket answers before anyone signs in.",
       found_here: true,
     });

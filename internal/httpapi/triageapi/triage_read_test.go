@@ -764,7 +764,7 @@ func TestTheBulkBoundIsChargedAsEachBuildResolves(t *testing.T) {
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 				`"reasoning":"The parser is never reached.",`+
-				`"also":[{"stream":"never-declared","variant":"broadcom"}]}`)
+				`"also":[{"branch_or_tag":"never-declared","variant":"broadcom"}]}`)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("an act past the cap answered %d: %s", got.Code, got.Body.String())
 		}
@@ -856,7 +856,7 @@ func TestABuildNamedTwiceInAnotherSpellingIsRefused(t *testing.T) {
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 				`"reasoning":"The parser is never reached.",`+
-				`"also":[{"stream":"Master","variant":" broadcom"}]}`)
+				`"also":[{"branch_or_tag":"Master","variant":" broadcom"}]}`)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("a build named twice answered %d: %s", got.Code, got.Body.String())
 		}

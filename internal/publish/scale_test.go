@@ -101,22 +101,22 @@ func TestMeasurePublishedDocumentsOfARealImage(t *testing.T) {
 				}
 			}
 		}
-		for _, target := range []int64{w.Target.ID, w.TargetFor(w.Branch, w.Internal).ID} {
+		for _, build := range []int64{w.Build.ID, w.BuildFor(w.Branch, w.Internal).ID} {
 			scan, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
-				TargetID: target, ContentHash: fmt.Sprintf("full-size-%d", target),
+				BuildID: build, ContentHash: fmt.Sprintf("full-size-%d", build),
 				BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "measure",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := fixture.ApplyGraph(ctx, db.DB, target, scan.ID, snap); err != nil {
+			if _, err := fixture.ApplyGraph(ctx, db.DB, build, scan.ID, snap); err != nil {
 				t.Fatal(err)
 			}
-			run, err := w.findings.Begin(ctx, finding.Run{TargetID: target, Scanner: "measure", RanHere: true})
+			run, err := w.findings.Begin(ctx, finding.Run{BuildID: build, Scanner: "measure", RanHere: true})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := w.findings.Apply(ctx, target, run.ID, reported); err != nil {
+			if _, err := w.findings.Apply(ctx, build, run.ID, reported); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -131,7 +131,7 @@ func TestMeasurePublishedDocumentsOfARealImage(t *testing.T) {
 				continue
 			}
 			seen[one.Issue.Identifier+" "+one.Component.Name] = true
-			w.decide(w.Target, one.Issue.Identifier, one.Component,
+			w.decide(w.Build, one.Issue.Identifier, one.Component,
 				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 			decided++
 		}
