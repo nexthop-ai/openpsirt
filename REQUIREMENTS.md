@@ -96,7 +96,7 @@ inputs.
 | # | Requirement | Why |
 |---|---|---|
 | REQ-15 | The tracked unit is a product, a branch or tag, and a variant. A release carries a reversible end-of-life date, past which nothing is deleted or hidden | Multi-variant products are the interesting case, and auditors ask about releases long after they stop being supported |
-| REQ-16 | The dependency graph is kept as nodes and edges and walked when asked, never flattened | A flattened path restates one fact once per route: 49,170 places for one shared library against 48 direct consumers |
+| REQ-16 | The dependency graph is kept as nodes and edges and walked when asked, never flattened | A flattened path restates one fact once per route: 49,170 occurrences for one shared library against 48 direct consumers |
 | REQ-17 | A finding is one component at one place in one build. Twelve places is twelve findings, and grouping is presentation only | A dismissal that is true where a library is used one way is not true where it is used another |
 | REQ-18 | An issue is one issue across every name it goes by, and everything a report says about it is kept | The same vulnerability arrives as a CVE identifier in one report and an advisory-database identifier in another, and a later report knowing more must not erase what an earlier one knew |
 | REQ-19 | A flaw in our own product is recorded by hand, under an identifier this deployment mints, against every build that ships it | Nothing scans for it, and it is the class the disclosure process exists for |
