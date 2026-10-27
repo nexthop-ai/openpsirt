@@ -30,9 +30,9 @@ what is particular to analyzer results is in `DESIGN-analysis.md`.
 |---|---|---|---|
 | What arrives | An inventory, matched by the scanner | A person | SARIF (`DESIGN-analysis.md`) |
 | Issue | A published vulnerability, or a flaw minted here that a CVE was later recorded against | A flaw minted here | The analyzer's rule |
-| Occurrence identity | Component and consumer (`DESIGN-data-model.md` § Occurrence identity) | Component and consumer | A lead identity, minted at the first sighting and carried by matching |
+| Occurrence identity | Component and consumer (`DESIGN-data-model.md` § Occurrence identity) | Component and consumer | A code finding identity, minted at the first sighting and carried by matching |
 | Carry across builds | Version and chain match (REQ-25) | Stated by a person | Matching (`DESIGN-analysis.md`) |
-| Absence | The run closes it, with a reason | Nothing; a person closes it | Not reproduced; the finding stays open |
+| Absence | The run closes it, with a reason | Nothing; a person closes it | No longer detected; the finding stays open |
 | Visibilities | Public, private | Private, public | Internal, and public once its flaw is disclosed |
 
 The issue kinds are data the code reads: a producer's names resolve among the
@@ -77,35 +77,35 @@ and a kind it does not name never reaches it.
 | Version carry | A decision lapsing when a version it was about moved, and a decision carried to a build whose versions match (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
 | Triage | The findings lists and their counts, one finding's page, notes on an issue, and disclosure | Vulnerability, entered |
-| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, routing by a team's rules and its preview, and the lists of who holds what: unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Lead assignment) | Vulnerability, entered, analysis |
+| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, routing by a team's rules and its preview, and the lists of who holds what: unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Code finding assignment) | Vulnerability, entered, analysis |
 | Decisions | Decisions and their occurrences, the reasoning and its revisions, approvals, comments on a decision, the review queue, every read of one decision, the audit log and its file, and the notices about decisions: waiting, sent back, lapsed and an agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the occurrences it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |
-| Exports | The findings lists written out as files (REQ-50): the list's rows, then the leads of the same selection as the Leads consumer reads them | Vulnerability, entered, analysis |
+| Exports | The findings lists written out as files (REQ-50): the list's rows, then the code findings of the same selection as the Code findings consumer reads them | Vulnerability, entered, analysis |
 | Register | The disposition register: what was decided at every occurrence of one build, its screen and its file | Vulnerability, entered |
 | VEX | The documents stating what affects a build | Vulnerability, entered |
 | Advisories | The documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What is said to people about findings | Vulnerability, entered |
-| Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
-| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, the leads a standing rule covers, the queue's file, the leads a findings list's file carries, and the counts of a product's leads by analyzer series, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
+| Evidence | One code finding's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
+| Code findings | The code finding queue: a product's code findings by where they stand, with how many each list leaves out, the code findings a suppression rule covers, the queue's file, the code findings a findings list's file carries, and the counts of a product's code findings by analyzer series, and the notices about code findings and their series (`DESIGN-analysis.md` § Code finding queue, § Suppression rules; `DESIGN-notifications.md` § Analyzer alerts, § Code finding notices) | Analysis |
 
-Analysis findings are included by Evidence, Leads, Decisions, Assignment and
-Exports alone: a lead is read through the lead queue, its evidence and the
-decisions about it (`DESIGN-analysis.md` § Lead triage), held the way a finding
-is, and a findings list's file writes out the open leads of its selection
+Analysis findings are included by Evidence, Code findings, Decisions, Assignment and
+Exports alone: a code finding is read through the code finding queue, its evidence and the
+decisions about it (`DESIGN-analysis.md` § Code finding triage), held the way a finding
+is, and a findings list's file writes out the open code findings of its selection
 beside the list's rows. The audit log's file follows Decisions and includes decisions about
-leads, because it writes what the audit log shows, under the same visibility
-(REQ-50). `DESIGN-interface.md` § Static analysis leads holds the screens.
+code findings, because it writes what the audit log shows, under the same visibility
+(REQ-50). `DESIGN-interface.md` § Security testing holds the screens.
 
 | Rule | |
 |---|---|
-| Exports names the findings lists' files alone, and the disposition register is Register | The register states the decision at every occurrence of a build beside its VEX document, and reads findings rows by the consumer it names. Naming analysis on one consumer covering both would put every lead into a statement about what a build ships |
-| A findings list's file reads its leads through the Leads consumer's read, and its other rows through the list's own | A list and its file are one read (`DESIGN-analytics.md` § Exports), and a findings file holds the open leads under the queue's visibility and in its order |
-| The counts by series are part of Leads, not of Statistics | Statistics feeds the vulnerability figures, and a lead nobody has judged is not one of them |
+| Exports names the findings lists' files alone, and the disposition register is Register | The register states the decision at every occurrence of a build beside its VEX document, and reads findings rows by the consumer it names. Naming analysis on one consumer covering both would put every code finding into a statement about what a build ships |
+| A findings list's file reads its code findings through the Code findings consumer's read, and its other rows through the list's own | A list and its file are one read (`DESIGN-analytics.md` § Exports), and a findings file holds the open code findings under the queue's visibility and in its order |
+| The counts by series are part of Code findings, not of Statistics | Statistics feeds the vulnerability figures, and a code finding nobody has judged is not one of them |
 | Each is the queue's own read over the queue's own visibility | A figure, the list it opens and the file of that list count one population |
-| Assignment is a consumer of its own, not part of Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a lead nobody has judged into both. Holding work is one act whatever the work is, so a handover and a lost role move a lead with everything else |
-| The lists of who holds what are Assignment's | Holding work is one act whatever the work is, so a lead held is listed where held work is. The digest of what somebody holds is Notifications', and names no lead |
-| A lead is one piece of held work at its occurrence | A vulnerability's piece of work is an issue in a component in a product. A lead is judged at its occurrence, and its builds may name different versions of its component |
+| Assignment is a consumer of its own, not part of Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a code finding nobody has judged into both. Holding work is one act whatever the work is, so a handover and a lost role move a code finding with everything else |
+| The lists of who holds what are Assignment's | Holding work is one act whatever the work is, so a code finding held is listed where held work is. The digest of what somebody holds is Notifications', and names no code finding |
+| A code finding is one piece of held work at its occurrence | A vulnerability's piece of work is an issue in a component in a product. A code finding is judged at its occurrence, and its builds may name different versions of its component |
 
 ## Inclusion
 
@@ -115,7 +115,7 @@ leads, because it writes what the audit log shows, under the same visibility
 | Kinds are named as an inclusion, never as an exclusion | A list of exclusions is a list somebody forgets to extend |
 | A statement reading findings by identifiers a kind-narrowed statement chose names none again | The identifiers already carry the answer |
 | The finding indexes a read answers from without the table carry the kind beside the visibility | A covering index without the kind costs a table row per finding read |
-| The kind is the first boundary, and the internal visibility the second | A lead moved into a case is public once its flaw is disclosed, and only its kind keeps it out of the vulnerability documents and figures |
+| The kind is the first boundary, and the internal visibility the second | A code finding included in its flaw's disclosure is public once its flaw is disclosed, and only its kind keeps it out of the vulnerability documents and figures |
 
 ## Runs and series
 

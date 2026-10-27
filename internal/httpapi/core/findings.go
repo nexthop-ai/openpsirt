@@ -233,13 +233,13 @@ type Narrowing struct {
 	Ascending     bool                   `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest occurrences, lowest first"`
 }
 
-// OnlyOrders reports whether the narrowing asks nothing of a lead but the
+// OnlyOrders reports whether the narrowing asks nothing of a code finding but the
 // order the list is paged in. A filter added to the list is a narrowing here
 // without anything naming it.
 //
-// Three questions every lead answers the same way, so asking them narrows no
-// lead out: the floor, which a lead has none of; work no promised upgrade
-// covers, which is every lead; and the release questions at their defaults,
+// Three questions every code finding answers the same way, so asking them narrows no
+// code finding out: the floor, which a code finding has none of; work no promised upgrade
+// covers, which is every code finding; and the release questions at their defaults,
 // branches still in support, which are what a list asked nothing about them
 // reads anyway. The screen writes those defaults into every address it
 // exports.

@@ -44,14 +44,14 @@ const (
 	Account Kind = "account"
 	// Team is a team declared or retired, or somebody put on one or taken off.
 	Team Kind = "team"
-	// Routing is a standing rule that hands unheld work to a team, added or
+	// Routing is a suppression rule that hands unheld work to a team, added or
 	// retired. Not a Role: a role is granted to a person against one product,
 	// and a routing rule grants nobody anything — it decides who is asked.
 	Routing Kind = "routing"
-	// LeadRule is a standing rule that dismisses static analysis leads:
-	// proposed, approved or retired. Not a Routing: it decides what a lead
+	// SuppressionRule is a suppression rule that dismisses static analysis code findings:
+	// proposed, approved or retired. Not a Routing: it decides what a code finding
 	// is, which is a decision, where a routing rule decides who is asked.
-	LeadRule Kind = "lead-rule"
+	SuppressionRule Kind = "suppression-rule"
 	// Alias is another identifier an issue answers to. Deployment-wide and
 	// permanent: from the moment it is recorded, a scan of any product
 	// reporting that name resolves to this issue and inherits its decisions.
@@ -104,7 +104,7 @@ const (
 // which shows up as an empty screen rather than as a failure.
 func Kinds() []Kind {
 	return []Kind{
-		Setting, Role, Routing, LeadRule, Support, Release,
+		Setting, Role, Routing, SuppressionRule, Support, Release,
 		Credential, Account, Team, Case, Alias, Catalog, Incident, Merge, Upstream,
 	}
 }

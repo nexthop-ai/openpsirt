@@ -5,7 +5,7 @@ package analysis
 
 import "sort"
 
-// How a result was paired with a lead, as the lead's result records it. A
+// How a result was paired with a code finding, as the code finding's result records it. A
 // pairing on the whole key is strong; on the function or the nearest line it
 // is probable.
 const (
@@ -13,14 +13,14 @@ const (
 	onFunction = "function"
 	onLine     = "line"
 	// onUnprinted is a fingerprint change's pairing on the whole key without its
-	// fingerprint, where one result and one lead hold it.
+	// fingerprint, where one result and one code finding hold it.
 	onUnprinted = "unprinted"
 )
 
 // strong is whether a pairing on this layer is strong.
 func strong(on string) bool { return on == onKey || on == onUnprinted }
 
-// candidate is a lead a result may be paired with, as its newest sighting
+// candidate is a code finding a result may be paired with, as its newest sighting
 // described it.
 type candidate struct {
 	findingID   int64
@@ -48,14 +48,14 @@ type pairing struct {
 // layer pairing what the layers before it left: the whole key, then the
 // function, then the nearest line. Between candidates a layer cannot tell
 // apart, one the last comparable run saw comes before one it missed, and then
-// the older lead.
+// the older code finding.
 func pair(candidates []candidate, results []Keyed) []pairing {
 	return layered(candidates, results, false)
 }
 
 // pairAcross is pair for a fingerprint change. After the whole key, a result and a
-// lead holding the whole key without its fingerprint are paired strongly
-// where they are the only result and the only lead holding it; the rest fall
+// code finding holding the whole key without its fingerprint are paired strongly
+// where they are the only result and the only code finding holding it; the rest fall
 // to the probable layers. A rotated salt changes every fingerprint and nothing
 // else, so a key nothing else holds is the same result.
 func pairAcross(candidates []candidate, results []Keyed) []pairing {
@@ -177,13 +177,13 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 	return out
 }
 
-// unique pairs, strongly, each result and lead left untaken that are the only
-// result and the only lead holding their whole key without its fingerprint.
+// unique pairs, strongly, each result and code finding left untaken that are the only
+// result and the only code finding holding their whole key without its fingerprint.
 func unique(candidates []candidate, results []Keyed, takenC, takenR []bool, out *[]pairing) {
-	leads := map[string][]int{}
+	codeFindings := map[string][]int{}
 	for c, cand := range candidates {
 		if !takenC[c] && cand.unprinted != "" {
-			leads[cand.unprinted] = append(leads[cand.unprinted], c)
+			codeFindings[cand.unprinted] = append(codeFindings[cand.unprinted], c)
 		}
 	}
 	held := map[string][]int{}
@@ -193,10 +193,10 @@ func unique(candidates []candidate, results []Keyed, takenC, takenR []bool, out 
 		}
 	}
 	for k, rs := range held {
-		if len(rs) != 1 || len(leads[k]) != 1 {
+		if len(rs) != 1 || len(codeFindings[k]) != 1 {
 			continue
 		}
-		r, c := rs[0], leads[k][0]
+		r, c := rs[0], codeFindings[k][0]
 		takenC[c], takenR[r] = true, true
 		*out = append(*out, pairing{result: r, candidate: c, on: onUnprinted})
 	}

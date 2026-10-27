@@ -73,7 +73,7 @@ export function Decision({ who }: { who: Who }) {
   const about = { product: it.occurrence.product, vulnerability: it.occurrence.vulnerability };
   const again = () => void queries.invalidateQueries({ queryKey: ["decision", id] });
   // Reading a decision about internal material is not arguing it: the flaw's
-  // readers read a moved lead's decisions and take no part in them. A comment
+  // readers read an included code finding's decisions and take no part in them. A comment
   // takes triage or approval there, and a link, a revision and a withdrawal
   // take triage.
   const here = mayOf(who, it.occurrence.product ?? "");
@@ -477,7 +477,7 @@ function Answer({
   // The decision names its product by the name that addresses it, which is what
   // somebody's reach is keyed on.
   const here = mayOf(who.data, decision.occurrence.product ?? "");
-  // Asked at the decision's most careful row: a lead decision is internal, and
+  // Asked at the decision's most careful row: a code finding decision is internal, and
   // agreeing there takes the approver capability.
   const mayAgree = !!(decision.internal
     ? here?.agrees_internal

@@ -221,7 +221,7 @@ func TestADecisionWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	})
 }
 
-func TestADecisionAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
+func TestADecisionAboutACodeFindingIsToldToItsInternalAudienceAlone(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		s := aSplit(t, w)
@@ -273,7 +273,7 @@ func TestADecisionAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
 			t.Fatal(err)
 		}
 		if marked != 2 {
-			t.Errorf("%d of the lines about the lead are marked internal; want 2", marked)
+			t.Errorf("%d of the lines about the code finding are marked internal; want 2", marked)
 		}
 	})
 }

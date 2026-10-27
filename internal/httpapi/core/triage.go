@@ -32,8 +32,8 @@ type DecisionOccurrenceBody struct {
 	// Justification is required for not-applicable and meaningless elsewhere:
 	// the decision that something does not affect us names one of the recognized
 	// reasons.
-	Justification Justification `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
-	Reason        LeadReason    `json:"reason,omitempty" doc:"Why a lead was dismissed. Ignored in a request"`
+	Justification Justification     `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
+	Reason        CodeFindingReason `json:"reason,omitempty" doc:"Why a code finding was dismissed. Ignored in a request"`
 	// Mitigation is the one reason here that rests on configuration rather
 	// than on code, so it is the one thing nothing will notice going away.
 	// Naming it does not fix that; it makes the decision checkable.
@@ -188,10 +188,10 @@ func RefusedDecision(logger *slog.Logger, err error) error {
 		return noSuchDecisionOccurrence()
 	case errors.Is(err, triage.ErrSamePerson):
 		return huma.Error409Conflict("somebody who proposed any of a decision or wrote any of its reasoning may not agree to it")
-	case errors.Is(err, triage.ErrLeadHandedOff):
-		return huma.Error409Conflict(triage.ErrLeadHandedOff.Error())
-	case errors.Is(err, finding.ErrLeadPastEndOfLife):
-		return huma.Error409Conflict(finding.ErrLeadPastEndOfLife.Error())
+	case errors.Is(err, triage.ErrCodeFindingRecordedAsFlaw):
+		return huma.Error409Conflict(triage.ErrCodeFindingRecordedAsFlaw.Error())
+	case errors.Is(err, finding.ErrCodeFindingPastEndOfLife):
+		return huma.Error409Conflict(finding.ErrCodeFindingPastEndOfLife.Error())
 	}
 	// An authorization refusal is not somebody having asked for the
 	// impossible. Without this arm it falls through to the default below and
@@ -296,11 +296,11 @@ type DecisionOccurrenceDetail struct {
 // that carried either would be offering an act at the wrong grain.
 func DecisionArgument(c triage.Decision, reasoning string) DecisionOccurrenceBody {
 	body := DecisionOccurrenceBody{DecisionID: c.ID, Outcome: Outcome(c.Outcome), Reasoning: reasoning}
-	// A decision about a lead publishes nothing, so it has a reason and no
+	// A decision about a code finding publishes nothing, so it has a reason and no
 	// scope.
 	if c.Outcome.AboutALead() {
 		if c.Justification != nil {
-			body.Reason = LeadReason(*c.Justification)
+			body.Reason = CodeFindingReason(*c.Justification)
 		}
 		return body
 	}

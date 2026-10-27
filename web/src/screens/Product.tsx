@@ -16,7 +16,7 @@ import { useRulings } from "../api/intake";
 import {
   buildFindingsAt,
   vulnerabilityReportsAt,
-  leadsAt,
+  codeFindingsAt,
   uploadsAt,
   productFindingsAt,
   reviewQueueAt,
@@ -39,7 +39,7 @@ export function Product() {
   const who = useWho();
   // The vulnerability reports ask what reading a report asks: reading undisclosed work.
   const mayReadReports = !!mayOf(who.data, product)?.reads_private;
-  const mayReadLeads = !!mayOf(who.data, product)?.reads_internal;
+  const mayReadCodeFindings = !!mayOf(who.data, product)?.reads_internal;
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
   const overview = useQuery({
     queryKey: ["overview", product],
@@ -70,10 +70,10 @@ export function Product() {
             <> · minimum severity from the deployment</>
           )}
           {it.end_of_life && <> · out of support {it.end_of_life}</>}
-          {mayReadLeads && (
+          {mayReadCodeFindings && (
             <>
               {" "}
-              · <Link to={leadsAt(product)}>Leads</Link>
+              · <Link to={codeFindingsAt(product)}>Code findings</Link>
             </>
           )}
           {mayReadReports && (

@@ -84,9 +84,9 @@ export const vulnerabilityReportsAt = (product: string, waiting = false) =>
   at("vulnerabilityReports", { product }, { waiting: waiting ? "1" : undefined });
 export const vulnerabilityReportAt = (product: string, reference: string) =>
   at("vulnerabilityReport", { product, reference });
-// A product's static analysis leads: the queue, or one state's leads, on
+// A product's static analysis code findings: the queue, or one state's code findings, on
 // every build or one.
-export const leadsAt = (
+export const codeFindingsAt = (
   product: string,
   query?: {
     state?: string;
@@ -95,11 +95,12 @@ export const leadsAt = (
     series?: string;
     assigned?: "nobody";
   },
-) => at("leads", { product }, query);
-// One lead's evidence on one build.
-export const leadAt = (build: Build, place: string) => at("lead", { ...build, place });
-// The standing rules dismissing a product's leads.
-export const leadRulesAt = (product: string) => at("leadRules", { product });
+) => at("codeFindings", { product }, query);
+// One code finding's evidence on one build.
+export const codeFindingAt = (build: Build, occurrence: string) =>
+  at("codeFinding", { ...build, occurrence });
+// The suppression rules dismissing a product's code findings.
+export const suppressionRulesAt = (product: string) => at("suppressionRules", { product });
 // The hosts a product's source links open on, and what it says per path.
 export const repositoriesAt = (product: string) => at("repositories", { product });
 

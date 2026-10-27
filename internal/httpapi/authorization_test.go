@@ -24,23 +24,23 @@ func TestWhoMayReachWhat(t *testing.T) {
 	// and it is why so many rows below expect 404 where 403 would look more
 	// natural.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		// A lead handed off as a flaw and kept internal, so its collaborators
+		// A code finding recorded as a flaw and kept internal, so its collaborators
 		// are a list to reach.
-		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)
 		var (
-			lead      = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
-			flawLead  = "/v1/products/mine/issues/" + flaw + "/code-finding"
-			theirLead = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
+			codeFinding      = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
+			flawCodeFinding  = "/v1/products/mine/issues/" + flaw + "/code-finding"
+			theirCodeFinding = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 		)
 		const (
-			leads      = "/v1/products/mine/code-findings"
-			leadFile   = "/v1/products/mine/code-findings.csv"
-			leadSeries = "/v1/products/mine/code-finding-series"
-			leadRules  = "/v1/products/mine/suppression-rules"
-			theirLeads = "/v1/products/theirs/code-findings"
-			repos      = "/v1/products/mine/repositories"
-			runs       = "/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses"
-			theirRuns  = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/analyses"
+			codeFindings      = "/v1/products/mine/code-findings"
+			codeFindingFile   = "/v1/products/mine/code-findings.csv"
+			codeFindingSeries = "/v1/products/mine/code-finding-series"
+			suppressionRules  = "/v1/products/mine/suppression-rules"
+			theirCodeFindings = "/v1/products/theirs/code-findings"
+			repos             = "/v1/products/mine/repositories"
+			runs              = "/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses"
+			theirRuns         = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/analyses"
 		)
 		const (
 			products   = "/v1/products"
@@ -238,95 +238,95 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"reader", http.MethodGet, theirsUnmatched + ".csv", http.StatusNotFound},
 			{"", http.MethodGet, mineUnmatched, http.StatusUnauthorized},
 
-			// The lead queue, its file, its counts by series and the standing
+			// The code finding queue, its file, its counts by series and the standing
 			// rules are internal work. The queue and its file answer a reader
 			// of the product with what they may read of it, which for a
 			// reader of no internal work is nothing.
-			{"", http.MethodGet, leads, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, leads, http.StatusOK},
-			{"internal-triager", http.MethodGet, leads, http.StatusOK},
-			{"reader", http.MethodGet, leads, http.StatusOK},
-			{"private", http.MethodGet, leads, http.StatusOK},
-			{"approver", http.MethodGet, leads, http.StatusNotFound},
-			{"outsider", http.MethodGet, leads, http.StatusNotFound},
-			{"internal-reader", http.MethodGet, theirLeads, http.StatusNotFound},
-			{"", http.MethodGet, leadFile, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, leadFile, http.StatusOK},
-			{"approver", http.MethodGet, leadFile, http.StatusNotFound},
-			{"outsider", http.MethodGet, leadFile, http.StatusNotFound},
-			{"", http.MethodGet, leadSeries, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, leadSeries, http.StatusOK},
-			{"reader", http.MethodGet, leadSeries, http.StatusForbidden},
-			{"private-triage", http.MethodGet, leadSeries, http.StatusForbidden},
-			{"approver", http.MethodGet, leadSeries, http.StatusNotFound},
-			{"", http.MethodGet, leadRules, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, leadRules, http.StatusOK},
-			{"internal-triager", http.MethodGet, leadRules, http.StatusOK},
-			{"reader", http.MethodGet, leadRules, http.StatusForbidden},
-			{"approver", http.MethodGet, leadRules, http.StatusNotFound},
-			{"reader", http.MethodPost, leadRules, http.StatusForbidden},
-			{"internal-reader", http.MethodPost, leadRules, http.StatusForbidden},
+			{"", http.MethodGet, codeFindings, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, codeFindings, http.StatusOK},
+			{"internal-triager", http.MethodGet, codeFindings, http.StatusOK},
+			{"reader", http.MethodGet, codeFindings, http.StatusOK},
+			{"private", http.MethodGet, codeFindings, http.StatusOK},
+			{"approver", http.MethodGet, codeFindings, http.StatusNotFound},
+			{"outsider", http.MethodGet, codeFindings, http.StatusNotFound},
+			{"internal-reader", http.MethodGet, theirCodeFindings, http.StatusNotFound},
+			{"", http.MethodGet, codeFindingFile, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, codeFindingFile, http.StatusOK},
+			{"approver", http.MethodGet, codeFindingFile, http.StatusNotFound},
+			{"outsider", http.MethodGet, codeFindingFile, http.StatusNotFound},
+			{"", http.MethodGet, codeFindingSeries, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, codeFindingSeries, http.StatusOK},
+			{"reader", http.MethodGet, codeFindingSeries, http.StatusForbidden},
+			{"private-triage", http.MethodGet, codeFindingSeries, http.StatusForbidden},
+			{"approver", http.MethodGet, codeFindingSeries, http.StatusNotFound},
+			{"", http.MethodGet, suppressionRules, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, suppressionRules, http.StatusOK},
+			{"internal-triager", http.MethodGet, suppressionRules, http.StatusOK},
+			{"reader", http.MethodGet, suppressionRules, http.StatusForbidden},
+			{"approver", http.MethodGet, suppressionRules, http.StatusNotFound},
+			{"reader", http.MethodPost, suppressionRules, http.StatusForbidden},
+			{"internal-reader", http.MethodPost, suppressionRules, http.StatusForbidden},
 
-			// One lead's evidence is read where its visibility is, and a lead
+			// One code finding's evidence is read where its visibility is, and a code finding
 			// nobody may read there answers as an occurrence holding nothing.
-			{"", http.MethodGet, lead, http.StatusUnauthorized},
-			{"internal-reader", http.MethodGet, lead, http.StatusOK},
-			{"internal-triager", http.MethodGet, lead, http.StatusOK},
-			{"lead-handler", http.MethodGet, lead, http.StatusOK},
-			{"reader", http.MethodGet, lead, http.StatusNotFound},
-			{"private", http.MethodGet, lead, http.StatusNotFound},
-			{"triager", http.MethodGet, lead, http.StatusNotFound},
-			{"private-triage", http.MethodGet, lead, http.StatusNotFound},
-			{"approver", http.MethodGet, lead, http.StatusNotFound},
-			{"outsider", http.MethodGet, lead, http.StatusNotFound},
-			{"admin", http.MethodGet, lead, http.StatusNotFound},
-			{"internal-reader", http.MethodGet, theirLead, http.StatusNotFound},
-			// A lead handed off as a flaw takes no decision, which its readers
-			// are told, since its evidence says it was handed off. Closing one
+			{"", http.MethodGet, codeFinding, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, codeFinding, http.StatusOK},
+			{"internal-triager", http.MethodGet, codeFinding, http.StatusOK},
+			{"code-finding-handler", http.MethodGet, codeFinding, http.StatusOK},
+			{"reader", http.MethodGet, codeFinding, http.StatusNotFound},
+			{"private", http.MethodGet, codeFinding, http.StatusNotFound},
+			{"triager", http.MethodGet, codeFinding, http.StatusNotFound},
+			{"private-triage", http.MethodGet, codeFinding, http.StatusNotFound},
+			{"approver", http.MethodGet, codeFinding, http.StatusNotFound},
+			{"outsider", http.MethodGet, codeFinding, http.StatusNotFound},
+			{"admin", http.MethodGet, codeFinding, http.StatusNotFound},
+			{"internal-reader", http.MethodGet, theirCodeFinding, http.StatusNotFound},
+			// A code finding recorded as a flaw takes no decision, which its readers
+			// are told, since its evidence says it was recorded as a flaw. Closing one
 			// as fixed is internal triage, and a reader who does not hold it is
 			// answered as though nothing were open to close.
-			{"internal-reader", http.MethodPost, lead + "/decision", http.StatusConflict},
-			{"internal-triager", http.MethodPost, lead + "/decision", http.StatusConflict},
-			{"reader", http.MethodPost, lead + "/decision", http.StatusNotFound},
-			{"internal-reader", http.MethodPost, lead + "/fixed", http.StatusNotFound},
-			{"reader", http.MethodPost, lead + "/fixed", http.StatusNotFound},
-			// A hand-off takes triage of the internal lead and of the private
+			{"internal-reader", http.MethodPost, codeFinding + "/decision", http.StatusConflict},
+			{"internal-triager", http.MethodPost, codeFinding + "/decision", http.StatusConflict},
+			{"reader", http.MethodPost, codeFinding + "/decision", http.StatusNotFound},
+			{"internal-reader", http.MethodPost, codeFinding + "/fixed", http.StatusNotFound},
+			{"reader", http.MethodPost, codeFinding + "/fixed", http.StatusNotFound},
+			// A flaw record takes triage of the internal code finding and of the private
 			// flaw, asked before anything the request names is resolved.
-			{"lead-handler", http.MethodGet, lead + "/flaw", http.StatusOK},
-			{"internal-triager", http.MethodGet, lead + "/flaw", http.StatusForbidden},
-			{"private-triage", http.MethodGet, lead + "/flaw", http.StatusForbidden},
-			{"internal-reader", http.MethodGet, lead + "/flaw", http.StatusForbidden},
-			{"internal-triager", http.MethodPost, lead + "/flaw/withdrawal", http.StatusForbidden},
-			{"private-triage", http.MethodPost, lead + "/flaw/withdrawal", http.StatusForbidden},
-			{"internal-reader", http.MethodPost, lead + "/flaw/withdrawal", http.StatusForbidden},
-			{"", http.MethodPost, lead + "/flaw/withdrawal", http.StatusUnauthorized},
-			// The lead a flaw was recorded from is read by whoever reads both
-			// the flaw and the lead in full, and answers as no lead elsewhere.
-			{"lead-handler", http.MethodGet, flawLead, http.StatusOK},
-			{"private-triage", http.MethodGet, flawLead, http.StatusNotFound},
-			{"internal-reader", http.MethodGet, flawLead, http.StatusNotFound},
-			{"outsider", http.MethodGet, flawLead, http.StatusNotFound},
-			{"", http.MethodGet, flawLead, http.StatusUnauthorized},
-			{"internal-triager", http.MethodPut, lead + "/flaw/disclosure", http.StatusForbidden},
-			{"internal-triager", http.MethodDelete, lead + "/flaw/disclosure", http.StatusForbidden},
-			// Who is granted a kept lead is managed by whoever reads it at
+			{"code-finding-handler", http.MethodGet, codeFinding + "/flaw", http.StatusOK},
+			{"internal-triager", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
+			{"private-triage", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
+			{"internal-reader", http.MethodGet, codeFinding + "/flaw", http.StatusForbidden},
+			{"internal-triager", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
+			{"private-triage", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
+			{"internal-reader", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusForbidden},
+			{"", http.MethodPost, codeFinding + "/flaw/withdrawal", http.StatusUnauthorized},
+			// The code finding a flaw was recorded from is read by whoever reads both
+			// the flaw and the code finding in full, and answers as no code finding elsewhere.
+			{"code-finding-handler", http.MethodGet, flawCodeFinding, http.StatusOK},
+			{"private-triage", http.MethodGet, flawCodeFinding, http.StatusNotFound},
+			{"internal-reader", http.MethodGet, flawCodeFinding, http.StatusNotFound},
+			{"outsider", http.MethodGet, flawCodeFinding, http.StatusNotFound},
+			{"", http.MethodGet, flawCodeFinding, http.StatusUnauthorized},
+			{"internal-triager", http.MethodPut, codeFinding + "/flaw/disclosure", http.StatusForbidden},
+			{"internal-triager", http.MethodDelete, codeFinding + "/flaw/disclosure", http.StatusForbidden},
+			// Who is granted an internal-only code finding is managed by whoever reads it at
 			// internal visibility, and by nobody else.
-			{"internal-reader", http.MethodGet, lead + "/collaborators", http.StatusOK},
-			{"internal-triager", http.MethodGet, lead + "/collaborators", http.StatusOK},
-			{"lead-handler", http.MethodGet, lead + "/collaborators", http.StatusOK},
-			{"private", http.MethodGet, lead + "/collaborators", http.StatusNotFound},
-			{"reader", http.MethodGet, lead + "/collaborators", http.StatusNotFound},
-			{"approver", http.MethodGet, lead + "/collaborators", http.StatusNotFound},
-			{"", http.MethodGet, lead + "/collaborators", http.StatusUnauthorized},
-			{"private", http.MethodPut, lead + "/collaborators/reader", http.StatusNotFound},
-			{"private", http.MethodDelete, lead + "/collaborators/reader", http.StatusNotFound},
+			{"internal-reader", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
+			{"internal-triager", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
+			{"code-finding-handler", http.MethodGet, codeFinding + "/collaborators", http.StatusOK},
+			{"private", http.MethodGet, codeFinding + "/collaborators", http.StatusNotFound},
+			{"reader", http.MethodGet, codeFinding + "/collaborators", http.StatusNotFound},
+			{"approver", http.MethodGet, codeFinding + "/collaborators", http.StatusNotFound},
+			{"", http.MethodGet, codeFinding + "/collaborators", http.StatusUnauthorized},
+			{"private", http.MethodPut, codeFinding + "/collaborators/reader", http.StatusNotFound},
+			{"private", http.MethodDelete, codeFinding + "/collaborators/reader", http.StatusNotFound},
 
 			// A product's repository settings are administration.
 			{"", http.MethodGet, repos, http.StatusUnauthorized},
 			{"admin", http.MethodGet, repos, http.StatusOK},
 			{"reader", http.MethodGet, repos, http.StatusForbidden},
 			{"internal-triager", http.MethodGet, repos, http.StatusForbidden},
-			{"lead-handler", http.MethodGet, repos, http.StatusForbidden},
+			{"code-finding-handler", http.MethodGet, repos, http.StatusForbidden},
 			{"reader", http.MethodPut, repos, http.StatusForbidden},
 			{"internal-triager", http.MethodPut, repos, http.StatusForbidden},
 

@@ -22,7 +22,7 @@ func Register(api huma.API, in core.Deps) {
 	registerOverview(api, in)
 	registerLastUploads(api, in)
 	registerLastUploadsExport(api, in)
-	registerLeadSeries(api, in)
+	registerCodeFindingSeries(api, in)
 	registerOutOfSupport(api, in)
 	registerPublished(api, in)
 	registerAudit(api, in)

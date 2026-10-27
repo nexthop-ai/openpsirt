@@ -83,7 +83,7 @@ func Notes(about Note, c *Comparison) string {
 	} else {
 		out.WriteString("## Security fixes\n")
 	}
-	lead(&out, about)
+	codeFinding(&out, about)
 	section(&out, fixed)
 	return out.String()
 }
@@ -92,7 +92,7 @@ func Notes(about Note, c *Comparison) string {
 //
 // Every one of these is somebody else's text: the release names were given at
 // upload and the scanner and database versions are what the scanner reported.
-// Each is escaped once here, so the heading, the lead and the sentence a
+// Each is escaped once here, so the heading, the code finding and the sentence a
 // release that fixed nothing is carry them as text.
 func written(about Note) Note {
 	about.From = markdown.Literal(strings.TrimSpace(about.From))
@@ -166,12 +166,12 @@ func measuredWith(about Note) string {
 	return strings.ToUpper(line[:1]) + line[1:]
 }
 
-// lead writes the line that makes the note re-checkable: which two builds, on
+// codeFinding writes the line that makes the note re-checkable: which two builds, on
 // what day, measured against what.
 //
 // One line rather than a table, because it is prose somebody pastes into a
 // document of their own and a table there is somebody else's formatting.
-func lead(out *strings.Builder, about Note) {
+func codeFinding(out *strings.Builder, about Note) {
 	var said []string
 	if from := strings.TrimSpace(about.From); from != "" {
 		if to := strings.TrimSpace(about.To); to != "" {

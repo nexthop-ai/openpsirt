@@ -45,14 +45,14 @@ type AuditedBody struct {
 	Version   string `json:"version,omitempty"`
 	Consumer  string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 
-	Outcome       core.Outcome        `json:"outcome"`
-	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a decision about a lead, which states no justification"`
-	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
-	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the decision holds for, where the decision stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides"`
-	DeferredUntil string              `json:"deferred_until,omitempty"`
-	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the decision says the fix arrived in, where it says one has. What somebody auditing an already-fixed decision checks against the packager's own record"`
-	Reasoning     string              `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the occurrences the decision covers"`
+	Outcome       core.Outcome           `json:"outcome"`
+	Justification core.Justification     `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Reason        core.CodeFindingReason `json:"reason,omitempty" doc:"Why a code finding was dismissed, on a decision about a code finding, which states no justification"`
+	Mitigation    string                 `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
+	Scope         core.StatementScope    `json:"scope,omitempty" doc:"Whom a published statement made from the decision holds for, where the decision stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides"`
+	DeferredUntil string                 `json:"deferred_until,omitempty"`
+	FixedVersion  string                 `json:"fixed_version,omitempty" doc:"The package version the decision says the fix arrived in, where it says one has. What somebody auditing an already-fixed decision checks against the packager's own record"`
+	Reasoning     string                 `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the occurrences the decision covers"`
 
 	State    core.DecisionState `json:"state"`
 	Standing bool               `json:"standing" doc:"Whether it applies now. A decision can be approved and no longer standing — the code moved out from under it"`
@@ -93,14 +93,14 @@ type AuditedDecisionBody struct {
 	Rows        int    `json:"rows" doc:"How many of its occurrences match, counted once for each issue"`
 	Occurrences int    `json:"occurrences" doc:"How many distinct occurrences match"`
 
-	Outcome       core.Outcome        `json:"outcome"`
-	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a decision about a lead, which states no justification"`
-	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply"`
-	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the decision holds for, where the decision stated it. Absent where the reason decides"`
-	DeferredUntil string              `json:"deferred_until,omitempty"`
-	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the decision says the fix arrived in"`
-	Reasoning     string              `json:"reasoning" doc:"The words the decision currently rests on. Editing them withdraws every agreement"`
+	Outcome       core.Outcome           `json:"outcome"`
+	Justification core.Justification     `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Reason        core.CodeFindingReason `json:"reason,omitempty" doc:"Why a code finding was dismissed, on a decision about a code finding, which states no justification"`
+	Mitigation    string                 `json:"mitigation,omitempty" doc:"The mitigation a holder can apply"`
+	Scope         core.StatementScope    `json:"scope,omitempty" doc:"Whom a published statement made from the decision holds for, where the decision stated it. Absent where the reason decides"`
+	DeferredUntil string                 `json:"deferred_until,omitempty"`
+	FixedVersion  string                 `json:"fixed_version,omitempty" doc:"The package version the decision says the fix arrived in"`
+	Reasoning     string                 `json:"reasoning" doc:"The words the decision currently rests on. Editing them withdraws every agreement"`
 
 	State    core.DecisionStates `json:"state" doc:"The state the matching occurrences share, or mixed where they differ"`
 	States   StatesBody          `json:"states" doc:"How many matching occurrences are in each state"`
@@ -292,16 +292,16 @@ func auditedBody(row triage.AuditedOccurrence) AuditedBody {
 }
 
 // argued is what a decision says beyond its outcome, as the audit log writes it.
-// A decision about a lead holds its reason where a vulnerability's decision
+// A decision about a code finding holds its reason where a vulnerability's decision
 // holds its justification, and the two are drawn from different vocabularies.
-func argued(decision *triage.Decision) (justification core.Justification, reason core.LeadReason,
+func argued(decision *triage.Decision) (justification core.Justification, reason core.CodeFindingReason,
 	mitigation, deferred, fixed string) {
 	if decision == nil {
 		return "", "", "", "", ""
 	}
 	if decision.Justification != nil {
 		if decision.Outcome.AboutALead() {
-			reason = core.LeadReason(*decision.Justification)
+			reason = core.CodeFindingReason(*decision.Justification)
 		} else {
 			justification = core.Justification(*decision.Justification)
 		}

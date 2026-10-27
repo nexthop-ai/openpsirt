@@ -23,7 +23,7 @@ import {
   Reporter,
 } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
-import { FlawLeadCard, fixedFromLead, useFlawLead } from "./FlawLead";
+import { FlawCodeFindingCard, fixedFromCodeFinding, useFlawCodeFinding } from "./FlawCodeFinding";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
@@ -195,9 +195,9 @@ export function Finding() {
   const here = mayOf(who.data, product);
   const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
   const occurrences = useMemo(() => it?.occurrences ?? [], [it]);
-  // The lead a recorded flaw came from, read once for its card and the fix it
+  // The code finding a recorded flaw came from, read once for its card and the fix it
   // offers on this build.
-  const flawLead = useFlawLead(product, vulnerability, !!it?.recorded);
+  const flawCodeFinding = useFlawCodeFinding(product, vulnerability, !!it?.recorded);
   // An occurrence is the component and what pulls it in; two chains reaching the
   // same pair are one occurrence, and the head counts what a decision covers.
   const distinct = new Set(occurrences.map((occurrence) => occurrence.occurrence)).size;
@@ -1239,7 +1239,7 @@ export function Finding() {
         {it.recorded && <AffectedBuilds product={product} vulnerability={vulnerability} />}
 
         {it.recorded && (
-          <FlawLeadCard
+          <FlawCodeFindingCard
             product={product}
             vulnerability={vulnerability}
             stream={stream}
@@ -1251,7 +1251,7 @@ export function Finding() {
           <Resolve
             at={at}
             vulnerability={vulnerability}
-            prefill={fixedFromLead(flawLead.data, stream, variant)}
+            prefill={fixedFromCodeFinding(flawCodeFinding.data, stream, variant)}
           />
         )}
 

@@ -141,8 +141,8 @@ function Draft({ product, held }: { product: string; held: Settings }) {
     onSuccess: () => {
       setChanged(false);
       void queries.invalidateQueries({ queryKey: ["repositories", product] });
-      // A lead's links are built from these as it is read.
-      void queries.invalidateQueries({ queryKey: ["lead"] });
+      // A code finding's links are built from these as it is read.
+      void queries.invalidateQueries({ queryKey: ["code-finding"] });
     },
   });
 
@@ -295,7 +295,7 @@ function Draft({ product, held }: { product: string; held: Settings }) {
                   <th title="Inherited takes the longest shorter prefix that says, and none is off">
                     Snippets
                   </th>
-                  <th title="Disclosed with the flaw of a lead moved into a case. Inherited works as for snippets">
+                  <th title="Disclosed with the flaw of a code finding included in its flaw's disclosure. Inherited works as for snippets">
                     In disclosure
                   </th>
                   <th />

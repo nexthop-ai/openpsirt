@@ -183,12 +183,12 @@ describe("a product's repository settings, for an administrator", () => {
     expect(only(put)[1].body).toStrictEqual({ hosts: [], paths: [] });
   });
 
-  it("moves the settings and every lead's links once a save lands, leaving nothing to save", async () => {
+  it("moves the settings and every code finding's links once a save lands, leaving nothing to save", async () => {
     const { invalidated } = await drawn();
     change(field<HTMLInputElement>("Branch of path 2"), "main");
     await press(host(), "Save");
     await settle();
-    expect(invalidated()).toEqual(["lead", "repositories/sonic"]);
+    expect(invalidated()).toEqual(["code-finding", "repositories/sonic"]);
     expect(button(host(), "Save").disabled).toBe(true);
   });
 

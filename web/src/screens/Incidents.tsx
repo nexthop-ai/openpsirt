@@ -636,7 +636,9 @@ function WindowForm({
 }) {
   const [name, setName] = useState(window?.name ?? "");
   const [hours, setHours] = useState(window ? String(window.hours) : "");
-  const [lead, setLead] = useState(window?.lead_hours ? String(window.lead_hours) : "");
+  const [codeFinding, setCodeFinding] = useState(
+    window?.lead_hours ? String(window.lead_hours) : "",
+  );
   const [limited, setLimited] = useState<string[]>(window?.products ?? []);
   // "fix" for the release of the fix, a window's identifier for its first
   // notice, and empty for when the attack became known.
@@ -648,7 +650,7 @@ function WindowForm({
   const body = () => ({
     name,
     hours: Number(hours),
-    ...(Number(lead) > 0 ? { lead_hours: Number(lead) } : {}),
+    ...(Number(codeFinding) > 0 ? { lead_hours: Number(codeFinding) } : {}),
     ...(limited.length > 0 ? { products: limited } : {}),
     ...(from === "fix" ? { from_fix: true } : from ? { from: Number(from) } : {}),
   });
@@ -666,7 +668,7 @@ function WindowForm({
       if (!window) {
         setName("");
         setHours("");
-        setLead("");
+        setCodeFinding("");
         setLimited([]);
         setFrom("");
       }
@@ -709,8 +711,8 @@ function WindowForm({
             type="number"
             min={1}
             style={{ width: "12ch" }}
-            value={lead}
-            onChange={(event) => setLead(event.target.value)}
+            value={codeFinding}
+            onChange={(event) => setCodeFinding(event.target.value)}
           />
         </label>
         <label className="field">

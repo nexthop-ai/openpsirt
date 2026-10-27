@@ -17,7 +17,7 @@ func TestAWholeKeyPairsStrongBeforeAProbableLayerIsAsked(t *testing.T) {
 		},
 		[]Keyed{{Key: "k", FunctionKey: "f", LineKey: "l", Placed: placedAt(10)}})
 	if len(got) != 1 || got[0].candidate != 1 || got[0].on != onKey || !strong(got[0].on) {
-		t.Errorf("paired %+v; want the second lead on its whole key", got)
+		t.Errorf("paired %+v; want the second code finding on its whole key", got)
 	}
 }
 
@@ -39,7 +39,7 @@ func TestAResultNamingNoFunctionIsNeverPairedOnOne(t *testing.T) {
 	}
 }
 
-func TestAMovedResultPairsWithTheLeadNearestItsLine(t *testing.T) {
+func TestAMovedResultPairsWithTheCodeFindingNearestItsLine(t *testing.T) {
 	got := pair(
 		[]candidate{
 			{findingID: 1, key: "a", lineKey: "l", line: 10},
@@ -47,11 +47,11 @@ func TestAMovedResultPairsWithTheLeadNearestItsLine(t *testing.T) {
 		},
 		[]Keyed{{Key: "c", LineKey: "l", Placed: placedAt(48)}})
 	if len(got) != 1 || got[0].candidate != 1 || got[0].on != onLine {
-		t.Errorf("paired %+v; want the lead at line 50", got)
+		t.Errorf("paired %+v; want the code finding at line 50", got)
 	}
 }
 
-func TestEachLeadPairsWithOneResultAtMost(t *testing.T) {
+func TestEachCodeFindingPairsWithOneResultAtMost(t *testing.T) {
 	got := pair(
 		[]candidate{{findingID: 1, key: "k", lineKey: "l", line: 10}},
 		[]Keyed{{Key: "k", LineKey: "l", Placed: placedAt(10)}, {Key: "k", LineKey: "l", Placed: placedAt(10)}})
@@ -60,7 +60,7 @@ func TestEachLeadPairsWithOneResultAtMost(t *testing.T) {
 	}
 }
 
-func TestALeadTheLastRunSawComesBeforeOneItMissed(t *testing.T) {
+func TestACodeFindingTheLastRunSawComesBeforeOneItMissed(t *testing.T) {
 	got := pair(
 		[]candidate{
 			{findingID: 1, key: "k", lineKey: "l", line: 10, absent: true},
@@ -68,21 +68,21 @@ func TestALeadTheLastRunSawComesBeforeOneItMissed(t *testing.T) {
 		},
 		[]Keyed{{Key: "k", LineKey: "l", Placed: placedAt(10)}})
 	if len(got) != 1 || got[0].candidate != 1 {
-		t.Errorf("paired %+v; want the lead the last run saw", got)
+		t.Errorf("paired %+v; want the code finding the last run saw", got)
 	}
 }
 
-func TestTheLineLayerOffersAResultItsNearestEightLeads(t *testing.T) {
-	// Nine leads at lines 1 to 9 and nine results at line 1. Each result is
-	// offered lines 1 to 8, so the ninth finds them all taken and the lead at
+func TestTheLineLayerOffersAResultItsNearestEightCodeFindings(t *testing.T) {
+	// Nine code findings at lines 1 to 9 and nine results at line 1. Each result is
+	// offered lines 1 to 8, so the ninth finds them all taken and the code finding at
 	// line 9 is never offered.
-	var leads []candidate
+	var codeFindings []candidate
 	var results []Keyed
 	for i := range 9 {
-		leads = append(leads, candidate{findingID: int64(i + 1), key: "lead", lineKey: "l", line: i + 1})
+		codeFindings = append(codeFindings, candidate{findingID: int64(i + 1), key: "lead", lineKey: "l", line: i + 1})
 		results = append(results, Keyed{Key: "result", LineKey: "l", Placed: placedAt(1)})
 	}
-	if got := pair(leads, results); len(got) != 8 {
+	if got := pair(codeFindings, results); len(got) != 8 {
 		t.Errorf("%d pairs; want 8", len(got))
 	}
 }

@@ -26,11 +26,11 @@ import (
 // then answer a key 404, the answer for a name it may not see, where they
 // refused it.
 //
-// The build holds an analyzer run and the lead it opened, so the receipts a
+// The build holds an analyzer run and the code finding it opened, so the receipts a
 // key reads back carry a run. A receipt counts results and names none: the
 // key reads how many the run opened, and never the file, the message, the
-// rule's finding or the occurrence a lead is addressed by. Verified by naming the
-// lead's file in the receipt's failure field, which fails on the file.
+// rule's finding or the occurrence a code finding is addressed by. Verified by naming the
+// code finding's file in the receipt's failure field, which fails on the file.
 func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	// What a sender may read, and what each answers here: the build's
 	// receipts and its uploads, what one upload changed, and a document it kept. The
@@ -47,7 +47,7 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	parameter := regexp.MustCompile(`\{[^}]+\}`)
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		lead := httpapitest.SeededLead(t, r)
+		codeFinding := httpapitest.SeededCodeFinding(t, r)
 		checked, allowed := 0, 0
 		for path, item := range r.API.OpenAPI().Paths {
 			if item.Get == nil {
@@ -114,9 +114,9 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(receipts.Items) != 1 || receipts.Items[0].Counts == nil || receipts.Items[0].Counts.Opened != 1 {
-			t.Fatalf("the key read %s, want the one run counting the lead it opened", got.Text)
+			t.Fatalf("the key read %s, want the one run counting the code finding it opened", got.Text)
 		}
-		for _, named := range []string{"src/a.c", "src/b.c", "p is leaked", "return;", lead} {
+		for _, named := range []string{"src/a.c", "src/b.c", "p is leaked", "return;", codeFinding} {
 			if strings.Contains(got.Text, named) {
 				t.Errorf("a receipt named %q: %s", named, got.Text)
 			}

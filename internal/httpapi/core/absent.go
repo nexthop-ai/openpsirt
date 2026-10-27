@@ -126,10 +126,10 @@ func NoSuchRule() error {
 	return huma.Error404NotFound("no routing rule is recorded there")
 }
 
-// NoSuchLeadRule answers a standing rule for leads nobody proposed, one
+// NoSuchSuppressionRule answers a suppression rule nobody proposed, one
 // retired already, and one belonging to another product.
-func NoSuchLeadRule() error {
-	return huma.Error404NotFound("no standing rule is in use there")
+func NoSuchSuppressionRule() error {
+	return huma.Error404NotFound("no suppression rule is in use there")
 }
 
 func NoSuchAssessment() error {
@@ -276,7 +276,7 @@ func AmbiguousOrMissing(logger *slog.Logger, err error) error {
 	// one version by two components, a source repository and the package built
 	// from it, and 170 in another by one package described under two
 	// namespaces. Left as versions alone, the refusal offers a choice that
-	// leads straight back to the same refusal.
+	// code findings straight back to the same refusal.
 	var several *graph.Ambiguous
 	if errors.As(err, &several) {
 		return SeveralComponents(several,
@@ -506,12 +506,12 @@ func LocatedVisibly(ctx context.Context, in Deps, subject access.Subject,
 	return named, nil
 }
 
-// LocatedForLead resolves the three names a build is addressed by, for a route
-// reading one lead on it.
-func LocatedForLead(ctx context.Context, in Deps, subject access.Subject,
+// LocatedForCodeFinding resolves the three names a build is addressed by, for a route
+// reading one code finding on it.
+func LocatedForCodeFinding(ctx context.Context, in Deps, subject access.Subject,
 	product, stream, variant string) (*catalog.Named, error) {
 
-	named, err := catalog.NewStore(in.DB.DB).LocateForLead(ctx, subject, product, stream, variant)
+	named, err := catalog.NewStore(in.DB.DB).LocateForCodeFinding(ctx, subject, product, stream, variant)
 	if err != nil {
 		return nil, Absent(in.Logger, err, "that build could not be looked up", NoSuchProduct)
 	}

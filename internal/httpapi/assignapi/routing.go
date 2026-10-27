@@ -130,7 +130,7 @@ func registerRouting(api huma.API, in core.Deps) {
 		}
 		// Triage at any visibility, as reading the rules asks. What comes
 		// back is narrowed to what the asker may read, so somebody who
-		// triages leads alone counts the leads a rule would place.
+		// triages code findings alone counts the code findings a rule would place.
 		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err

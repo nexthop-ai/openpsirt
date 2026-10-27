@@ -530,11 +530,11 @@ func waitFor(t *testing.T, done func() bool, what string) {
 }
 
 // Somebody who triages only internal work reads and previews the routing rules,
-// because a rule places leads. Reading internal work without triaging it is
+// because a rule places code findings. Reading internal work without triaging it is
 // refused both.
-func TestSomebodyWhoTriagesLeadsAloneReadsAndPreviewsTheRoutingRules(t *testing.T) {
+func TestSomebodyWhoTriagesCodeFindingsAloneReadsAndPreviewsTheRoutingRules(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		httpapitest.SeededLead(t, r)
+		httpapitest.SeededCodeFinding(t, r)
 		const at = "/v1/products/mine/assignment-rules"
 		for who, want := range map[string]int{"internal-triager": http.StatusOK, "internal-reader": http.StatusForbidden} {
 			for _, path := range []string{at, at + "/preview?beneath=mine"} {

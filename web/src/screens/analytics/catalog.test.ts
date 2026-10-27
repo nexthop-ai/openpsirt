@@ -153,9 +153,9 @@ describe("what a catalog row carries with it", () => {
   });
 
   // An outcome typed here and not the server's would go uncounted while the
-  // record said no dismissal stands alone. A lead's dismissal needs a second
+  // record said no dismissal stands alone. A code finding's dismissal needs a second
   // person as a vulnerability's does, so the exception report asks for both.
-  it("asks the audit log about every outcome that always needs a second person, a lead's included", () => {
+  it("asks the audit log about every outcome that always needs a second person, a code finding's included", () => {
     const exception = CATALOG.find((report) => report.name === "The exception report")!;
     const asked = new URL(leadsTo(exception, {}, GATED).to!, "http://x").searchParams;
     expect(GATED.length).toBeGreaterThan(0);

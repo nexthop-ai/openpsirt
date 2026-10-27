@@ -152,10 +152,10 @@ describe("the answer a second person gives", () => {
     expect(agree()).toBeUndefined();
   });
 
-  // A lead decision is internal, and its second person holds the approver
+  // A code finding decision is internal, and its second person holds the approver
   // capability: a private triager is refused it, and an internal approver
   // who triages nothing undisclosed is not.
-  it("offers no Agree on a lead decision to a triager of undisclosed work", async () => {
+  it("offers no Agree on a code finding decision to a triager of undisclosed work", async () => {
     const privateTriager: Who = {
       ...BO,
       reach: [{ product: "sonic", agrees_private: true }] as unknown as Who["reach"],
@@ -164,7 +164,7 @@ describe("the answer a second person gives", () => {
     expect(agree()).toBeUndefined();
   });
 
-  it("offers Agree on a lead decision to an approver of internal work", async () => {
+  it("offers Agree on a code finding decision to an approver of internal work", async () => {
     const reviewer: Who = {
       ...BO,
       reach: [{ product: "sonic", agrees_internal: true }] as unknown as Who["reach"],

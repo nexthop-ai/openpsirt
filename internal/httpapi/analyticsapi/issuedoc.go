@@ -37,7 +37,7 @@ var howManyDecisions = 200
 // An internal document. It carries the reasoning behind each decision,
 // which is this deployment's argument rather than its word to a customer — the
 // documents that go out are the advisory and the VEX, and both are assembled
-// elsewhere and deliberately say less. The lead line says so, because a
+// elsewhere and deliberately say less. The code finding line says so, because a
 // document that does not say who it is for is one somebody forwards.
 func registerIssueDocument(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{

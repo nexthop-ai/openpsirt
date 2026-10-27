@@ -39,7 +39,7 @@ end rather than left to be found by clicking.
 - [Product and scan pages](#product-and-scan-pages)
 - [Flaw entry](#flaw-entry)
 - [Vulnerability reports](#vulnerability-reports)
-- [Static analysis leads](#static-analysis-leads)
+- [Security testing](#security-testing)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The Incidents screen](#the-incidents-screen)
 - [The editor](#the-editor)
@@ -330,7 +330,7 @@ waiting for review, what is being worked on, what stopped applying, then the
 trends, and the operational state at the foot. The trends answer a question
 asked occasionally, and they are also the slowest part of the page.
 
-The reader's own work leads, then the shape of the estate. Assigned to them,
+The reader's own work code findings, then the shape of the estate. Assigned to them,
 and decisions of theirs an approver sent back; then open at or above the floor,
 incidents where there are any, known exploited, pending their approval, and
 overdue. Led by the estate, home
@@ -570,7 +570,7 @@ back in its own order rather than refusing.
 | A finding with no deadline sorts last whichever direction is asked for | "No deadline" is neither early nor late |
 | **What came in overnight is a control, not a typed date** | The first question of a working day was a date box behind the filter panel. A chip writes the date a day back into the address — the date rather than the word, so a list somebody sends means the same thing when it is opened |
 | **An empty list says what emptied it and offers the way back** | A narrowed list matching nothing is a dead end: the controls that produced it are scrolled off above, and what is left on screen says so and offers nothing. It names how many filters are in force and carries a control that takes all of them off — and says "nothing is open here at all" where none was in force, which is a different answer |
-| **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the "Sorted by" control over the rows |
+| **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided code finding now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the "Sorted by" control over the rows |
 | **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a decision requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
 | A screen that is waiting says so with a mark that moves | The word alone is one faint line on a page that is otherwise still, and a still page reads as a stopped one. The mark carries no text, so a screen reader hears the word once; the page-wide reduced-motion rule stops it, and a still ring beside the word is still a mark |
 | **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. Unmounting the whole screen — the search box, the chips, the count and the controls with it — blanks the thing being narrowed and takes the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
@@ -707,7 +707,7 @@ binary of the source.
 The screen is arranged on where the package sits, because that is what
 decides what can be done about it. A leaf carries its own risk and is upgraded; a
 package vendored in pre-built carries everything beneath it and moves only when
-it does. So the graph leads — what pulls it in, the package, what it carries —
+it does. So the graph code findings — what pulls it in, the package, what it carries —
 and the act hangs off it.
 
 | Rule | |
@@ -730,7 +730,7 @@ and the act hangs off it.
 | A deadline is absent where nothing is open, never zero | It is the earliest among what is open, so with nothing open there is no such date |
 | The package identifier travels with the row | The ecosystem is read out of it and so is an upstream address, and neither is stored. Nothing is fetched from either |
 | Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
-| Where it could go carries two counts | What a release fixed is how many of what is open name that exact version; what reaching it closes is that plus everything fixed before it. Sorted on the first, the version worth taking sinks: measured on the demo's kernel, the release that closes all 158 fixed 2 of its own and the one that fixed 49 leads |
+| Where it could go carries two counts | What a release fixed is how many of what is open name that exact version; what reaching it closes is that plus everything fixed before it. Sorted on the first, the version worth taking sinks: measured on the demo's kernel, the release that closes all 158 fixed 2 of its own and the one that fixed 49 code findings |
 | Furthest along first where the versions can be ordered, unranked where they cannot | An ordering exists per ecosystem rather than in general, and one version a comparison refuses makes the whole list unrankable. Shown unranked the two counts are equal and the screen says so, rather than implying an order nothing established |
 | The second count is consumers, not occurrences | One decision covers the whole fold, and what varies underneath it is what pulls the package in. An occurrence count is a unit nobody acts in; it is the row's title, being what the ceiling on one action is measured against |
 | It carries where the component sits in the graph | What pulls it in, what it pulls in, and twelve weeks of what opened and closed under it. Somebody arriving from the tree asked a question about the graph, and answering it on a page they have to leave to reach is the same page drawn twice |
@@ -825,7 +825,7 @@ per-product note exists to avoid, and a reader could not tell which product any
 line of it was about. A product is picked where the issue sits in more than
 one.
 
-The description leads, at full width (REQ-60, as amended). The rule putting the
+The description code findings, at full width (REQ-60, as amended). The rule putting the
 action first still holds against the defect it fixes, which is a form three
 screens down; what it must not take with it is the description, which in the
 narrow column runs four words to a line.
@@ -1195,8 +1195,8 @@ its reasoning and its history with no way to answer it.
 
 Assignments is two tabs: what is due soon and undecided, and who holds what.
 A row nobody holds says "unassigned" in muted text rather than drawing nobody
-as a person with an avatar. A lead somebody holds is a row of its own, named by
-its rule and marked lead, and opens the lead's page.
+as a person with an avatar. A code finding somebody holds is a row of its own, named by
+its rule and marked code finding, and opens the code finding's page.
 
 Work nobody holds is the findings list under two filters, not a screen of
 its own: nobody assigned, and nothing decided. The rail entry keeps its label,
@@ -1220,7 +1220,7 @@ them is a different question.
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The findings list spans every product somebody can see when none is picked, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
 | **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
-| Nobody else holding anything in a product picked links that product's unassigned leads, for somebody who reads internal material there | The findings list the empty screen points at holds no lead |
+| Nobody else holding anything in a product picked links that product's unassigned code findings, for somebody who reads internal material there | The findings list the empty screen points at holds no code finding |
 | A person's or team's list carries the vulnerability reports they hold below their findings, and the people tab lists the reports nobody holds | Drawn only where there are any, because most people read no reports. The people table counts each holder's open reports in a column of its own. The narrowing is the product picked |
 | A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 
@@ -1273,7 +1273,7 @@ is what the screen is about.
 The listing behind that column is one upload's own screen: the names it added,
 removed and moved to another version, against the upload before it, with every
 version each name stood at on both sides. It is where an alert about a build
-that changed sharply leads, which is why it is a screen rather than a panel —
+that changed sharply code findings, which is why it is a screen rather than a panel —
 an alert whose investigation path does not exist is an alarm pointing at
 nothing.
 
@@ -1338,7 +1338,7 @@ table. What the settings are and how they are checked is `DESIGN-analysis.md`
 | A path states each source setting as kept, not kept, or inherited | Inherited is sent as the setting left out, which takes the nearest prefix stating it |
 | An empty field is left out, and every field is trimmed | A repository and a branch are optional, and the server refuses one without the other |
 | A refusal is shown and the draft stays as typed | The server names the entry it refused |
-| A save moves the lead screens | A lead's links are built from these settings as it is read |
+| A save moves the code finding screens | A code finding's links are built from these settings as it is read |
 
 ## Product and scan pages
 
@@ -1414,7 +1414,7 @@ are about to file against — which the screen also says as a count.
 | The score is composed as a vector and worked out on the server | The metrics are offered in words rather than letters, because somebody rating a flaw is choosing between "over the network" and "physical access". The formula lives in one place, so a second copy in the browser cannot disagree with the number in the database. A vector settles the severity, so it is not asked twice |
 | The scheme is picked, and the metrics follow it | Version 4 asks eleven metrics, version 3 asks eight, and the two they share are asked in different words. Changing the scheme keeps the answers the new one also asks for |
 | A new assessment is composed under 3.1 | A published advisory has a field for a version 3 score and none for a version 4 one, so a flaw assessed under version 4 publishes without a score. The picker says so where version 4 is chosen, because it is a consequence somebody has to weigh before they answer eleven metrics |
-| A score is shown with the scheme it is on | Two schemes are scorable and their numbers are not comparable. Where the number leads, the scheme is beside it; where the band leads and the number is a hint, the scheme is on the number |
+| A score is shown with the scheme it is on | Two schemes are scorable and their numbers are not comparable. Where the number code findings, the scheme is beside it; where the band code findings and the number is a hint, the scheme is on the number |
 | Weaknesses are suggested and checked for shape only | CWE- and a number, at most sixteen, which is what the server records; a bare number is read as that CWE. What is offered while typing is the server's search over both lists of names, by number or by words, most common first. A picker that refused an identifier it had not heard of would refuse next year's |
 | Names typed for a flaw recorded here are shown on its reporter card, each with a control to remove it | A name removed stops later scans reporting it landing on the flaw. A name a scan reported carries no such control, because the server refuses to remove it. Removing the name the flaw is filed under moves the screen to the name it is refiled under |
 | Files that prove it are attached on the same screen | Stored against the report when it is filed, and against the issue when it is recorded, after either exists. A file that will not store does not undo the record — the words are the finding and the file is evidence for them — and what is reported is which file failed |
@@ -1476,47 +1476,47 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | Rulings sit beside the decisions in the audit log, over its products and period | A ruling is a decision somebody could be asked to account for, and an auditor asks about a period. Beside the triage decisions rather than among them: a ruling is about a report rather than a finding and takes none of their filters. Printed with them, without the controls |
 | The change history sits below the decisions in the audit log, over its period, and narrows to one kind of change | The decision filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
 
-## Static analysis leads
+## Security testing
 
-A product's leads, reached from the product page. `DESIGN-analysis.md` holds
-what a lead is, where it stands and what a standing rule covers; this is how
+The Security testing screen lists a product's code findings, reached from the product page. `DESIGN-analysis.md` holds
+what a code finding is, where it stands and what a suppression rule covers; this is how
 the screens draw them.
 
 | Rule | |
 |---|---|
-| The link appears only for somebody who reads internal material in the product | A lead is internal, and every read of one asks that |
-| The rail carries it under the scope, beside Vulnerability reports, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
-| The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
-| What the queue leaves out is counted above it | How many wait for approval, how many a standing rule dismisses, the second opening the dismissed tab, and how many are past end of life |
-| A row opens the lead on the build it is on | Evidence is per build, so the row names one build and how many others hold the lead in the state listed. The build and the date it opened do not wrap |
+| The link appears only for somebody who reads internal material in the product | A code finding is internal, and every read of one asks that |
+| The rail carries it under the scope as Security testing, beside Findings and Vulnerability reports, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
+| The Security testing screen opens on the queue, with one tab per state | The queue is open code findings with nothing waiting. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
+| What the queue leaves out is counted above it | How many wait for approval, how many a suppression rule dismisses, the second opening the dismissed tab, and how many are past end of life |
+| A row opens the code finding on the build it is on | Evidence is per build, so the row names one build and how many others hold the code finding in the state listed. The build and the date it opened do not wrap |
 | The branch and variant are in the address | A link from a build's screens narrows the queue to it. A product picked in the scope bar keeps the screen and drops them, because a branch is one product's |
-| A lead's page holds the result, the path, the related places, the leads that are the same flaw, and the decision | In that order. Each place is the file and line, linked to the repository where the address passes the link check, with what the analyzer said there and the code it captured |
-| The leads that are the same flaw and those that possibly are are two lists | One decision covers the first and never the second, and the first list says so on hover |
-| The decision card names the decision standing at the lead, or offers the form | A lead under a decision takes no second one, so the form is not offered beside it. The decision opens on the decision page, which is where it is agreed to |
-| The decision page offers Agree on a decision about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A decision says it is internal, and the screen asks the reader's reach there, as the server does |
-| On a decision about internal material the decision page offers the comment box to somebody who triages or approves internal work, and the control linking where it is worked on, Revise reasoning and Withdraw to somebody who triages it | The flaw's readers read a moved lead's decisions and take no part in them. The server refuses both to anybody else |
-| The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
-| A lead not reproduced offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it, and names the build of the first run that did not see it. A fixed lead names the build it was fixed in |
+| A code finding's page holds the result, the path, the related places, Also found by, and the decision | In that order. Each place is the file and line, linked to the repository where the address passes the link check, with what the analyzer said there and the code it captured |
+| Also found by and Possibly also found by are two lists | Also found by holds the code findings that are the same flaw, and Possibly also found by those that may be. One decision covers the first and never the second, and the first list says so on hover |
+| The decision card names the decision standing at the code finding, or offers the form | A code finding under a decision takes no second one, so the form is not offered beside it. The decision opens on the decision page, which is where it is agreed to |
+| The decision page offers Agree on a decision about a code finding to somebody holding `approver` and `internal-read`, and never to its proposer | A decision says it is internal, and the screen asks the reader's reach there, as the server does |
+| On a decision about internal material the decision page offers the comment box to somebody who triages or approves internal work, and the control linking where it is worked on, Revise reasoning and Withdraw to somebody who triages it | The flaw's readers read an included code finding's decisions and take no part in them. The server refuses both to anybody else |
+| The form offers the three code finding outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
+| A code finding no longer detected offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it, and names the build of the first run that did not see it. A fixed code finding names the build it was fixed in |
 | A reader who does not triage internal material sees no control that writes | The same rule as Vulnerability reports |
-| A lead's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work, which is where a lead is held until its flaw is disclosed, and is not offered past end of life. Choosing applies to every build the lead is open on |
-| The queue's rows name who holds each lead | A team carries the word team beside its name |
-| A lead past its end of life says so beside its state and offers no decision, hand-off or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). A move of a lead already handed off stays |
-| A lead in code its run declared third-party reads Third-party beside its state, on its page and on its row in the leads screen, and its hand-off says to report the flaw upstream | The flaw is the upstream's (`DESIGN-analysis.md` § Third-party code). The hand-off is still offered, and what declared it is said on hover |
-| The dismissal rules screen lists every standing rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
+| A code finding's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work, which is where a code finding is held until its flaw is disclosed, and is not offered past end of life. Choosing applies to every build the code finding is open on |
+| The queue's rows name who holds each code finding | A team carries the word team beside its name |
+| A code finding past its end of life says so beside its state and offers no decision, Record as a flaw or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). Include in disclosure on a code finding already recorded as a flaw stays |
+| A code finding in code its run declared third-party reads Third-party beside its state, on its page and on its row in the Security testing screen, and Record as a flaw says to report the flaw upstream | The flaw is the upstream's (`DESIGN-analysis.md` § Third-party code). Record as a flaw is still offered, and what declared it is said on hover |
+| The suppression rules screen lists every suppression rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
 | Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |
 | A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |
-| A confirmed lead offers a hand-off to somebody who triages internal material and undisclosed work | The components offered are cards, most likely first, each saying where it came from; a build that does not hold the one picked is unticked and cannot be ticked |
-| The first component is picked for the person unless it only resembles the lead's directory | A resembling name is a guess, so with nothing confirmed or placed nothing is picked (`DESIGN-analysis.md` § Hand-off offer) |
-| A build holding the component picked that nothing analyzes is listed unticked beside the builds the lead was seen in, and may be ticked | It ships the code, and is a guess about a build the analyzer never read (REQ-19) |
-| Keeping or moving the lead is a choice of two cards, and moving lists what goes public with the flaw before it is sent | Under Disclosed with the flaw: each author's notes in full, the analyzer's messages and paths, and whether source snippets are published |
-| The preview and the move's hover say who public is | "Once the flaw is disclosed, readable by everyone signed in with public access to this product. Not included in published VEX or CSAF." |
-| A handed-off lead shows its flaw, linked, in place of the decision | Moving in or out is one button while the flaw is undisclosed, and its collaborators are listed beside it. A kept lead lists what moving it in discloses above the button |
-| Undoing a hand-off is offered beside the move while the flaw is undisclosed, and asks why | It closes the flaw on every build, which hover says before it is asked for |
-| A recorded flaw's page shows the lead it came from, to a reader who reads the lead | The rule and place, linked to the lead, its state, the component suggested, the builds proposed, and whether the hand-off was undone. On a build where its lead is not reproduced, Fixed here starts from the build that did not see it, and a person closes it |
-| The leads screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
-| A series in the address narrows the leads screen, and is named in its heading | Each figure of Leads by analyzer opens the list of its series and state |
-| Unassigned only narrows the leads screen to the leads nobody holds, kept in the address and named in its heading | The findings list holds no lead, so unheld leads are found here. It holds across the tabs, the counts and the file (`DESIGN-analysis.md` § Lead queue) |
-| Leads by analyzer asks for no count from somebody who does not read internal material in the product | It says leads are internal. A table of zeros reads as an analyzer finding nothing |
+| A confirmed code finding offers Record as a flaw to somebody who triages internal material and undisclosed work | The components offered are cards, most likely first, each saying where it came from; a build that does not hold the one picked is unticked and cannot be ticked |
+| The first component is picked for the person unless it only resembles the code finding's directory | A resembling name is a guess, so with nothing confirmed or placed nothing is picked (`DESIGN-analysis.md` § Flaw record offer) |
+| A build holding the component picked that nothing analyzes is listed unticked beside the builds the code finding was seen in, and may be ticked | It ships the code, and is a guess about a build the analyzer never read (REQ-19) |
+| Include in disclosure is one toggle, off by default, and turned on lists what goes public with the flaw before it is sent | Its hover: "Publishes the path, the analyzer's messages, and the decisions and comments on this finding with the flaw; until then, people on the flaw's case can read it." Under Disclosed with the flaw: each author's notes in full, the analyzer's messages and paths, and whether source snippets are published |
+| The preview and the toggle's hover say who public is | "Once the flaw is disclosed, readable by everyone signed in with public access to this product. Not included in published VEX or CSAF." |
+| A code finding recorded as a flaw reads Recorded as a flaw, and shows its flaw, linked, in place of the decision | It reads Internal only or Included in disclosure, the second with "Included in its flaw's disclosure" on hover. Include in disclosure and Take out of disclosure are one button while the flaw is undisclosed, and its collaborators are listed beside it. An internal-only code finding lists what including it discloses above the button |
+| Withdraw flaw is offered beside Include in disclosure while the flaw is undisclosed, and asks why | It closes the flaw on every build, which hover says before it is asked for |
+| A recorded flaw's page shows the code finding it came from, to a reader who reads the code finding | The rule and place, linked to the code finding, its state, the component suggested, the builds proposed, and whether its flaw record was withdrawn. On a build where its code finding is no longer detected, Fixed here starts from the build that did not see it, and a person closes it |
+| The Security testing screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
+| A series in the address narrows the Security testing screen, and is named in its heading | Each figure of Code findings by analyzer opens the list of its series and state |
+| Unassigned only narrows the Security testing screen to the code findings nobody holds, kept in the address and named in its heading | The findings list holds no code finding, so unheld code findings are found here. It holds across the tabs, the counts and the file (`DESIGN-analysis.md` § Code finding queue) |
+| Code findings by analyzer asks for no count from somebody who does not read internal material in the product | It says code findings are internal. A table of zeros reads as an analyzer finding nothing |
 
 ## Disclosure and advisories
 
@@ -1786,7 +1786,7 @@ to; on an undisclosed finding the mention itself says a finding exists.
 | What is being typed after an `@` is read from the text before the cursor | Rather than tracked as state, so it stays right however somebody edits |
 | What is typed is sent, and the server narrows | The server holds the whole list and matches display names as well as identities. A page of the first few people filtered here leaves out whoever is past it |
 | The pickers that say who is dealing with a finding ask the same endpoint (REQ-34) | They asked for the list of people, which is administration, so for every triager in the deployment both selects were empty. Asking who may *read* it rather than who *exists* also narrows the offer to people who can open what they are handed |
-| A box people type an `@` into offers names, at the visibility of what is being discussed | The comment box is where mentions get written and it offered nobody, while the line under it explained afterwards that the name had reached nobody. A decision is asked at the visibility of its most careful row, and a decision about a lead at internal, the visibility its rows hold until its flaw is disclosed |
+| A box people type an `@` into offers names, at the visibility of what is being discussed | The comment box is where mentions get written and it offered nobody, while the line under it explained afterwards that the name had reached nobody. A decision is asked at the visibility of its most careful row, and a decision about a code finding at internal, the visibility its rows hold until its flaw is disclosed |
 | The one box that offers nothing is the bulk form, and it is the one that cannot ask | Deciding many findings at once carries no visibility on the wire, so the question has no answer to send. Asking as though the set were public would offer people who cannot open half of it |
 
 Both people pickers are typed against the list rather than scrolled. Adding
@@ -2007,7 +2007,7 @@ said so.
 | The feed's flag reads "Known exploited", on the badge and on every caption, column and tile that counts it | The same words the findings filter uses. A bare "Exploited" reads as an attack on this product |
 | An incident is a badge of its own, filled; the feed's flag is an outline of the same color | The record is the rarer fact and the one a person attested. The feed's flag arrives on its own on many rows, so the louder form on it reads as "we are under attack" across a whole list. `DESIGN-incidents.md` § Three conflated facts holds the distinction |
 | The feed's badge says on hover that it is not, on its own, a sign this product was attacked | The one misreading the outline does not prevent by itself |
-| Where both apply, the record's badge comes first | Read left to right, the fact about this product leads |
+| Where both apply, the record's badge comes first | Read left to right, the fact about this product code findings |
 | Every row the server marks with the record draws its badge, and every caption counting the feed's flag counts the record beside it where there is one | A row showing the feed's flag alone, where the record is in hand, says less about this product than the server did |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |
 | The word is what compares down a column | Two schemes weigh reachability and impact differently, so a column of numbers from both is not a ranking. `DESIGN-findings.md` § One ladder for every scheme holds the whole of it |

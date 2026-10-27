@@ -141,12 +141,14 @@
     "path": "/products/:product/vulnerability-reports",
     "query": ["waiting"]
   },
-  "leads": {
-    "path": "/products/:product/leads",
+  "codeFindings": {
+    "path": "/products/:product/code-findings",
     "query": ["state", "stream", "variant", "series"]
   },
-  "lead": { "path": "/products/:product/streams/:stream/variants/:variant/leads/:place" },
-  "leadRules": { "path": "/products/:product/lead-rules" },
+  "codeFinding": {
+    "path": "/products/:product/streams/:stream/variants/:variant/code-findings/:occurrence"
+  },
+  "suppressionRules": { "path": "/products/:product/suppression-rules" },
   "repositories": { "path": "/products/:product/repositories" },
   "vulnerabilityReport": { "path": "/products/:product/vulnerability-reports/:reference" },
   "me": { "path": "/me" },

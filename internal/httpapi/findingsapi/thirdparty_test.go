@@ -27,7 +27,7 @@ func vendoredRun(files ...string) string {
 	}
 	return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"cppcheck","rules":[{"id":"overflow"},{"id":"unfired"}]}},` +
 		`"originalUriBaseIds":{"SRCROOT":{"uri":"file:///build/"}},` +
-		`"versionControlProvenance":[{"repositoryUri":"https://github.com/acme/mine","revisionId":"` + httpapitest.LeadCommit +
+		`"versionControlProvenance":[{"repositoryUri":"https://github.com/acme/mine","revisionId":"` + httpapitest.CodeFindingCommit +
 		`","mappedTo":{"uriBaseId":"SRCROOT"}}],` +
 		`"properties":{"openpsirt/unitsExpected":1,"openpsirt/unitsAnalyzed":1},` +
 		`"results":[` + strings.Join(results, ",") + `]}]}`
@@ -35,11 +35,11 @@ func vendoredRun(files ...string) string {
 
 // Code vendored into the tree without a repository of its own, declared
 // third-party by the run, is one prefix at every depth, and the component
-// confirmed for one lead under it is offered first for the next. The lead and
-// the offer both say it is third-party; a lead outside it says nothing.
+// confirmed for one code finding under it is offered first for the next. The code finding and
+// the offer both say it is third-party; a code finding outside it says nothing.
 func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		httpapitest.SeededLead(t, r)
+		httpapitest.SeededCodeFinding(t, r)
 		const shallow, deep, own = "src/vendor/zlib/inflate.c", "src/vendor/zlib/contrib/minizip/zip.c", "src/c.c"
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),
 			vendoredRun(shallow, deep, own))
@@ -66,13 +66,13 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 		}{shallow: {"src/vendor/zlib", true}, deep: {"src/vendor/zlib", true}, own: {"src", false}} {
 			occurrence := occurrenceOf[path]
 			if occurrence == "" {
-				t.Fatalf("no lead was opened at %s: %v", path, occurrenceOf)
+				t.Fatalf("no code finding was opened at %s: %v", path, occurrenceOf)
 			}
 			if got := evidenceAs(t, r, "internal-reader", occurrence); got.ThirdParty != want.third {
-				t.Errorf("the lead at %s says third-party: %v; want %v", path, got.ThirdParty, want.third)
+				t.Errorf("the code finding at %s says third-party: %v; want %v", path, got.ThirdParty, want.third)
 			}
-			var offer findingsapi.HandoffOfferBody
-			httpapitest.Read(t, r, "lead-handler", leadAt(occurrence)+"/flaw", &offer)
+			var offer findingsapi.FlawOfferBody
+			httpapitest.Read(t, r, "code-finding-handler", codeFindingAt(occurrence)+"/flaw", &offer)
 			if offer.Prefix != want.prefix || offer.ThirdParty != want.third {
 				t.Errorf("the offer for %s is the prefix %q, third-party %v; want %q, %v",
 					path, offer.Prefix, offer.ThirdParty, want.prefix, want.third)
@@ -122,36 +122,36 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			}
 		}
 
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrenceOf[deep])+"/decision",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFindingAt(occurrenceOf[deep])+"/decision",
 			`{"outcome":"confirmed","reasoning":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrenceOf[deep])+"/flaw",
+		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrenceOf[deep])+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"the window overflows"}`); got.Code != http.StatusCreated {
-			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
+			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
 		}
-		var offer findingsapi.HandoffOfferBody
-		// Learned for the declared path rather than the deeper lead's
-		// directory, so a lead nearer the top of the vendored code is
+		var offer findingsapi.FlawOfferBody
+		// Learned for the declared path rather than the deeper code finding's
+		// directory, so a code finding nearer the top of the vendored code is
 		// offered it.
-		httpapitest.Read(t, r, "lead-handler", leadAt(occurrenceOf[shallow])+"/flaw", &offer)
+		httpapitest.Read(t, r, "code-finding-handler", codeFindingAt(occurrenceOf[shallow])+"/flaw", &offer)
 		if first := offer.Suggestions[0]; first.From != "confirmed" || first.Component != "zlib" {
-			t.Errorf("the shallower vendored lead was offered %+v first; want zlib, as its prefix was confirmed", first)
+			t.Errorf("the shallower vendored code finding was offered %+v first; want zlib, as its prefix was confirmed", first)
 		}
-		httpapitest.Read(t, r, "lead-handler", leadAt(occurrenceOf[own])+"/flaw", &offer)
+		httpapitest.Read(t, r, "code-finding-handler", codeFindingAt(occurrenceOf[own])+"/flaw", &offer)
 		if first := offer.Suggestions[0]; first.From == "confirmed" {
-			t.Errorf("a lead outside the vendored code was offered %+v first", first)
+			t.Errorf("a code finding outside the vendored code was offered %+v first", first)
 		}
 	})
 }
 
-// A lead is third-party in the queue when the newest run that saw it declared
+// A code finding is third-party in the queue when the newest run that saw it declared
 // it so, which is the run its evidence reads. An older run's declaration does
 // not reach the queue once a newer run declares nothing.
-func TestTheLeadQueueReadsThirdPartyFromTheNewestRunThatSawTheLead(t *testing.T) {
+func TestTheCodeFindingQueueReadsThirdPartyFromTheNewestRunThatSawTheCodeFinding(t *testing.T) {
 	const vendored = "src/vendor/zlib/inflate.c"
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		httpapitest.SeededLead(t, r)
+		httpapitest.SeededCodeFinding(t, r)
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-2*time.Hour), vendoredRun(vendored))
 		r.PatchedRows(t, `UPDATE "series_run" SET "third_party" = '["src/vendor/zlib"]'
 			WHERE "series_id" IN (SELECT "id" FROM "series" WHERE "name" = 'cppcheck/default')`)
@@ -175,15 +175,15 @@ func TestTheLeadQueueReadsThirdPartyFromTheNewestRunThatSawTheLead(t *testing.T)
 			}
 		}
 		if !seen {
-			t.Fatalf("the queue lists no lead at %s: %+v", vendored, listed.Items)
+			t.Fatalf("the queue lists no code finding at %s: %+v", vendored, listed.Items)
 		}
 		if got := evidenceAs(t, r, "internal-reader", occurrenceAt(t, r, vendored)); got.ThirdParty {
-			t.Errorf("the lead at %s says third-party from an older run; the newest run declared nothing", vendored)
+			t.Errorf("the code finding at %s says third-party from an older run; the newest run declared nothing", vendored)
 		}
 	})
 }
 
-// occurrenceAt is the occurrence identity of the newest lead at a path.
+// occurrenceAt is the occurrence identity of the newest code finding at a path.
 func occurrenceAt(t *testing.T, r *httpapitest.Reach, path string) string {
 	t.Helper()
 	var occurrence string

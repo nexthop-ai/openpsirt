@@ -823,7 +823,7 @@ func candidatesFrom(found []namedFix, scheme vercmp.Scheme) []Candidate {
 	}
 
 	// Furthest along first where that can be said, so the version worth taking
-	// leads. Ranked on what a release fixed instead, the newest lands wherever
+	// code findings. Ranked on what a release fixed instead, the newest lands wherever
 	// its own count happens to put it, which on a maintained line is near the
 	// bottom.
 	sort.SliceStable(out, func(i, j int) bool {

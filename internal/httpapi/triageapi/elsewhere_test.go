@@ -13,7 +13,7 @@ import (
 )
 
 func TestADecisionSaysWhereTheWorkIsHappening(t *testing.T) {
-	// A hand-off to a tracker needs no deployment to decide to let anything
+	// A flaw record to a tracker needs no deployment to decide to let anything
 	// out: a stored link has no egress at all, and it connects what is
 	// decided here to the work being done there.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {

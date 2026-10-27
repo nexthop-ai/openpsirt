@@ -45,7 +45,7 @@ type CanBody struct {
 	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's decision, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's decision there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override"`
 	AgreesPublic      bool   `json:"agrees_public" doc:"Agree to somebody else's decision about disclosed findings, or send it back: reading them, with the approver capability or public-triage"`
 	AgreesPrivate     bool   `json:"agrees_private" doc:"Agree to somebody else's decision about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"`
-	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's decision about internal findings or a standing rule over them, or send it back: reading them, with the approver capability"`
+	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's decision about internal findings or a suppression rule over them, or send it back: reading them, with the approver capability"`
 	MayApproveRulings bool   `json:"may_approve_rulings" doc:"Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"`
 }
 
@@ -66,7 +66,7 @@ type OutcomeBody struct {
 	HidesRisk          bool         `json:"hides_risk" doc:"Whether recording it takes the issue out of the working queue"`
 	Dated              bool         `json:"dated" doc:"Whether it stores a date: when somebody looks again, or when promised work lands"`
 	NeedsJustification bool         `json:"needs_justification" doc:"Whether a decision of it has to state which recognized justification applies. One that does not is refused carrying one"`
-	Dismisses          bool         `json:"dismisses" doc:"Whether it is a dismissal of a vulnerability: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count. False for every outcome about a lead"`
+	Dismisses          bool         `json:"dismisses" doc:"Whether it is a dismissal of a vulnerability: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count. False for every outcome about a code finding"`
 }
 
 // WhoBody is the caller, as the caller.

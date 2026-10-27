@@ -30,8 +30,8 @@ const (
 	ExploitedIssue Column = `"eh"."vulnerability_id"`
 	// CaseIssue is the issue a case grant names.
 	CaseIssue Column = `"cc"."vulnerability_id"`
-	// HandoffIssue is the flaw a lead was handed off as.
-	HandoffIssue Column = `"lh"."vulnerability_id"`
+	// FlawIssue is the flaw a code finding was recorded as.
+	FlawIssue Column = `"lh"."vulnerability_id"`
 	// AbsorbedIssue is the issue a merge folded into another.
 	AbsorbedIssue Column = `"vm"."absorbed_id"`
 )

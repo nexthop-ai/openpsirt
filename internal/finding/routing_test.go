@@ -519,9 +519,9 @@ func TestARoutingRuleIsWrittenAndRetiredOnlyByAnAssigner(t *testing.T) {
 	})
 }
 
-// leadsAt turns two issues' rows into leads, one at each visibility a lead
+// codeFindingsAt turns two issues' rows into code findings, one at each visibility a code finding
 // holds, and leaves the third as the vulnerability it was.
-func leadsAt(t *testing.T, f *fixture) {
+func codeFindingsAt(t *testing.T, f *fixture) {
 	t.Helper()
 	ctx := t.Context()
 	f.shipped(t, twoConsumers())
@@ -543,14 +543,14 @@ func leadsAt(t *testing.T, f *fixture) {
 }
 
 // placedByRule applies the rules of the fixture's product and counts what they
-// placed on its build, leads and the rest apart.
-func placedByRule(t *testing.T, f *fixture) (leads map[access.Visibility]int, others int) {
+// placed on its build, code findings and the rest apart.
+func placedByRule(t *testing.T, f *fixture) (codeFindings map[access.Visibility]int, others int) {
 	t.Helper()
 	return placedWith(t, f, f.team(t, "platform"))
 }
 
 // placedWith is placedByRule with the rule pointing at the team named.
-func placedWith(t *testing.T, f *fixture, team int64) (leads map[access.Visibility]int, others int) {
+func placedWith(t *testing.T, f *fixture, team int64) (codeFindings map[access.Visibility]int, others int) {
 	t.Helper()
 	ctx := t.Context()
 	who := f.planner(t, access.PublicTriage, access.Assigner)
@@ -568,42 +568,42 @@ func placedWith(t *testing.T, f *fixture, team int64) (leads map[access.Visibili
 	if len(rows) == 0 {
 		t.Fatal("the build holds no finding, so this checked nothing")
 	}
-	leads = map[access.Visibility]int{}
+	codeFindings = map[access.Visibility]int{}
 	for _, row := range rows {
 		switch {
 		case row.AssignedTo == nil:
 		case row.Kind == "analysis":
-			leads[row.Visibility]++
+			codeFindings[row.Visibility]++
 		default:
 			others++
 		}
 	}
-	return leads, others
+	return codeFindings, others
 }
 
-// A lead is held and routed by the one implementation a finding is: a rule
+// A code finding is held and routed by the one implementation a finding is: a rule
 // naming its component places it with the team, at whatever visibility it
 // holds.
-func TestARoutingRulePlacesTheLeadsNobodyHolds(t *testing.T) {
+func TestARoutingRulePlacesTheCodeFindingsNobodyHolds(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		leadsAt(t, f)
-		leads, others := placedByRule(t, f)
+		codeFindingsAt(t, f)
+		codeFindings, others := placedByRule(t, f)
 		if others == 0 {
 			t.Error("the rule placed no vulnerability")
 		}
 		for _, v := range []access.Visibility{access.Internal, access.Private} {
-			if leads[v] == 0 {
-				t.Errorf("the rule placed no lead at %s", v)
+			if codeFindings[v] == 0 {
+				t.Errorf("the rule placed no code finding at %s", v)
 			}
 		}
 	})
 }
 
-// A lead every release of which is past its end of life is kept as it stands,
+// A code finding every release of which is past its end of life is kept as it stands,
 // so a rule places it nowhere, and places what is still in support.
-func TestARoutingRulePlacesNoLeadPastItsEndOfLife(t *testing.T) {
+func TestARoutingRulePlacesNoCodeFindingPastItsEndOfLife(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		leadsAt(t, f)
+		codeFindingsAt(t, f)
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
 			Where(`"id" IN (SELECT "stream_id" FROM "target" WHERE "id" = ?)`, f.target).
@@ -620,9 +620,9 @@ func TestARoutingRulePlacesNoLeadPastItsEndOfLife(t *testing.T) {
 		if caught.Work != 1 || caught.Unheld != 1 {
 			t.Errorf("the preview counts %d pieces, %d unheld; want the vulnerability alone", caught.Work, caught.Unheld)
 		}
-		leads, others := placedByRule(t, f)
-		if len(leads) != 0 {
-			t.Errorf("the rule placed leads past their end of life: %v", leads)
+		codeFindings, others := placedByRule(t, f)
+		if len(codeFindings) != 0 {
+			t.Errorf("the rule placed code findings past their end of life: %v", codeFindings)
 		}
 		if others == 0 {
 			t.Error("the rule placed no vulnerability, so the release's end of life stopped all of it")
@@ -630,29 +630,29 @@ func TestARoutingRulePlacesNoLeadPastItsEndOfLife(t *testing.T) {
 	})
 }
 
-// What a rule would catch counts a lead as one piece of work, as it counts an
+// What a rule would catch counts a code finding as one piece of work, as it counts an
 // issue at a component: two results of one rule in one component are two
-// leads.
-func TestARulePreviewCountsEachLeadItWouldPlace(t *testing.T) {
+// code findings.
+func TestARulePreviewCountsEachCodeFindingItWouldPlace(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		leadsAt(t, f)
-		leads, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
+		codeFindingsAt(t, f)
+		codeFindings, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
 			ColumnExpr(`DISTINCT "vulnerability_id", "occurrence_identity"`).
 			Where(`"kind" = ?`, "analysis").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if leads < 2 {
-			t.Fatalf("the fixture holds %d leads, so this checked nothing", leads)
+		if codeFindings < 2 {
+			t.Fatalf("the fixture holds %d code findings, so this checked nothing", codeFindings)
 		}
 		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
 		caught, err := f.store.WouldMatch(t.Context(), who, f.productID, "", "libnl-3-*", 20)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if want := int(leads) + 1; caught.Work != want || caught.Unheld != want {
-			t.Errorf("the preview counts %d pieces, %d unheld; want the vulnerability and each of %d leads",
-				caught.Work, caught.Unheld, leads)
+		if want := int(codeFindings) + 1; caught.Work != want || caught.Unheld != want {
+			t.Errorf("the preview counts %d pieces, %d unheld; want the vulnerability and each of %d code findings",
+				caught.Work, caught.Unheld, codeFindings)
 		}
 	})
 }
@@ -661,10 +661,10 @@ func TestARulePreviewCountsEachLeadItWouldPlace(t *testing.T) {
 // hand assignment to the team asks: what nobody on it reads stays with nobody.
 func TestARoutingRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
 	for _, c := range []struct {
-		name   string
-		roles  []access.Role
-		leads  []access.Visibility
-		others bool
+		name         string
+		roles        []access.Role
+		codeFindings []access.Visibility
+		others       bool
 	}{
 		{"disclosed", []access.Role{access.PublicRead}, nil, true},
 		{"internal", []access.Role{access.InternalRead}, []access.Visibility{access.Internal}, true},
@@ -672,11 +672,11 @@ func TestARoutingRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			each(t, func(t *testing.T, f *fixture) {
-				leadsAt(t, f)
-				leads, others := placedWith(t, f, f.teamReading(t, "desk", c.roles...))
+				codeFindingsAt(t, f)
+				codeFindings, others := placedWith(t, f, f.teamReading(t, "desk", c.roles...))
 				for _, v := range []access.Visibility{access.Internal, access.Private} {
-					if want := slices.Contains(c.leads, v); (leads[v] > 0) != want {
-						t.Errorf("the rule placed %d leads at %s; want them placed: %v", leads[v], v, want)
+					if want := slices.Contains(c.codeFindings, v); (codeFindings[v] > 0) != want {
+						t.Errorf("the rule placed %d code findings at %s; want them placed: %v", codeFindings[v], v, want)
 					}
 				}
 				if (others > 0) != c.others {
@@ -687,24 +687,24 @@ func TestARoutingRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
 	}
 }
 
-// A lead handed off as a flaw is closed work for its holder, so neither the
+// A code finding recorded as a flaw is closed work for its holder, so neither the
 // sweep nor the preview counts it.
-func TestARoutingRulePlacesNoHandedOffLead(t *testing.T) {
+func TestARoutingRulePlacesNoRecordedCodeFinding(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		leadsAt(t, f)
+		codeFindingsAt(t, f)
 		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
-		var lead finding.Finding
-		if err := f.db.DB.NewSelect().Model(&lead).
+		var codeFinding finding.Finding
+		if err := f.db.DB.NewSelect().Model(&codeFinding).
 			Where(`"f"."kind" = ?`, "analysis").Where(`"f"."visibility" = ?`, access.Internal).
 			Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		// An occurrence of its own, as a lead's is: the fixture's leads share the
+		// An occurrence of its own, as a code finding's is: the fixture's code findings share the
 		// occurrences of the vulnerabilities they were made from.
-		lead.OccurrenceIdentity = "lead-handed-off"
+		codeFinding.OccurrenceIdentity = "code-finding-recorded-as-flaw"
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set(`"occurrence_identity" = ?`, lead.OccurrenceIdentity).Where(`"id" = ?`, lead.ID).Exec(ctx); err != nil {
+			Set(`"occurrence_identity" = ?`, codeFinding.OccurrenceIdentity).Where(`"id" = ?`, codeFinding.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		person, err := access.NewStore(f.db.DB).Ensure(ctx, "hander@example.com", "Hander", nil, nil)
@@ -715,9 +715,9 @@ func TestARoutingRulePlacesNoHandedOffLead(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.db.DB.NewInsert().Model(&finding.Handoff{
-			ProductID: f.productID, OccurrenceIdentity: lead.OccurrenceIdentity, VulnerabilityID: lead.VulnerabilityID,
-			Visibility: access.Internal, HandedBy: person.ID, HandedAt: time.Now().UTC().Truncate(time.Second),
+		if _, err := f.db.DB.NewInsert().Model(&finding.CodeFindingFlaw{
+			ProductID: f.productID, OccurrenceIdentity: codeFinding.OccurrenceIdentity, VulnerabilityID: codeFinding.VulnerabilityID,
+			Visibility: access.Internal, RecordedBy: person.ID, RecordedAt: time.Now().UTC().Truncate(time.Second),
 		}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -726,20 +726,20 @@ func TestARoutingRulePlacesNoHandedOffLead(t *testing.T) {
 			t.Fatal(err)
 		}
 		if after.Work != before.Work-1 || after.Unheld != before.Unheld-1 {
-			t.Errorf("the preview counts %d pieces, %d unheld, where it counted %d and %d before the hand-off",
+			t.Errorf("the preview counts %d pieces, %d unheld, where it counted %d and %d before the flaw record",
 				after.Work, after.Unheld, before.Work, before.Unheld)
 		}
-		leads, others := placedByRule(t, f)
-		if leads[access.Private] == 0 || others == 0 {
-			t.Errorf("the rule placed leads %v and %d vulnerabilities; want every piece but the handed-off lead",
-				leads, others)
+		codeFindings, others := placedByRule(t, f)
+		if codeFindings[access.Private] == 0 || others == 0 {
+			t.Errorf("the rule placed code findings %v and %d vulnerabilities; want every piece but the code finding recorded as a flaw",
+				codeFindings, others)
 		}
 		var placed finding.Finding
-		if err := f.db.DB.NewSelect().Model(&placed).Where(`"f"."id" = ?`, lead.ID).Scan(ctx); err != nil {
+		if err := f.db.DB.NewSelect().Model(&placed).Where(`"f"."id" = ?`, codeFinding.ID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if placed.AssignedTo != nil {
-			t.Errorf("the handed-off lead was placed with party %d", *placed.AssignedTo)
+			t.Errorf("the code finding recorded as a flaw was placed with party %d", *placed.AssignedTo)
 		}
 	})
 }

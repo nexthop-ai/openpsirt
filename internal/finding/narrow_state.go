@@ -19,8 +19,8 @@ import (
 //
 // A decision that the scanner matched something that is not here covers the
 // occurrence whatever it now holds, because the versions are not what it is
-// about. A decision about a lead does too, because a lead's occurrence is the
-// lead. Their own version columns record what each was made against and are not
+// about. A decision about a code finding does too, because a code finding's occurrence is the
+// code finding. Their own version columns record what each was made against and are not
 // compared.
 //
 // The four aliases are the caller's to join: a finding's own row carries only

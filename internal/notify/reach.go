@@ -33,7 +33,7 @@ import (
 // A condition about findings asks of two classes of row: disclosed, and
 // withheld, which is every other visibility. A withheld row is told to
 // whoever reads or triages private work. A condition about decisions asks of
-// three, because a decision on a lead is internal work, which a reader of
+// three, because a decision on a code finding is internal work, which a reader of
 // undisclosed work does not read (rows).
 type acts struct {
 	approves                                                 bool

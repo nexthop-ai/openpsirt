@@ -38,7 +38,7 @@ type DecisionDetail struct {
 	When         string        `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
 	By           string        `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
 	ByName       string        `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and an occurrence of it is not a lead past its end of life"`
+	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and an occurrence of it is not a code finding past its end of life"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
@@ -66,7 +66,7 @@ type DecisionDetail struct {
 	Undisclosed bool `json:"undisclosed,omitempty" doc:"At least one occurrence it covers is about a finding nobody has announced"`
 	// Internal says at least one row is about internal material, which
 	// decides who may agree to it.
-	Internal bool `json:"internal,omitempty" doc:"At least one occurrence it covers is about internal material, a static analysis lead. Agreeing to it takes the approver capability"`
+	Internal bool `json:"internal,omitempty" doc:"At least one occurrence it covers is about internal material, a static analysis code finding. Agreeing to it takes the approver capability"`
 }
 
 // EndedReachBody is the rows of a decision that stopped applying one way, and

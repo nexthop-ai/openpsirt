@@ -17,7 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
-// The lines apart two leads' last places may be for the leads to be one flaw,
+// The lines apart two code findings' last places may be for the leads to be one flaw,
 // and for them to be offered as possibly one. Measured over clang, cppcheck,
 // CodeQL and semgrep on four projects and seeded flaws: the family and the
 // last place within two lines grouped every pair that was one flaw and none
@@ -49,15 +49,15 @@ func nearby(lines int) string {
 		WHERE "fa"."vulnerability_id" = "f"."vulnerability_id" AND "fb"."vulnerability_id" = "g"."vulnerability_id")`
 }
 
-// corroborated is whether another analyzer's lead on the build of the finding
+// corroborated is whether another analyzer's code finding on the build of the finding
 // under "f", whose result is under "ar", is the same flaw. It is worked out
-// over every lead, whoever reads it, because where a lead sorts does not
+// over every code finding, whoever reads it, because where a code finding sorts does not
 // depend on who is looking.
 var corroborated = `EXISTS (SELECT 1 FROM "analysis_result" AS "ag"
 	JOIN "finding" AS "g" ON "g"."id" = "ag"."finding_id"
 	WHERE ` + nearby(groupLines) + `)`
 
-// Kin is another lead on a lead's build that is the same flaw, or possibly
+// Kin is another code finding on a code finding's build that is the same flaw, or possibly
 // is.
 type Kin struct {
 	Occurrence string
@@ -68,18 +68,18 @@ type Kin struct {
 	Same bool
 }
 
-// KinOf is the leads on a lead's build that are the same flaw as it, or
+// KinOf is the code findings on a code finding's build that are the same flaw as it, or
 // possibly are, where the subject may read them: same first, then by line.
-func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Kin, error) {
-	// A grant of one lead, or of one case, reads no other lead.
+func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, codeFindingID int64) ([]Kin, error) {
+	// A grant of one code finding, or of one case, reads no other code finding.
 	if !subject.Sees(productID) {
 		return []Kin{}, nil
 	}
-	visible, err := finding.LeadVisible(subject, productID)
+	visible, err := finding.CodeFindingVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}
-	reach := finding.LeadReach(subject, productID)
+	reach := finding.CodeFindingReach(subject, productID)
 	var rows []struct {
 		Occurrence string `bun:"occurrence_identity"`
 		Rule       string `bun:"rule"`
@@ -95,15 +95,15 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 		ColumnExpr(`"g"."occurrence_identity", "vu"."identifier" AS "rule", "ag"."last_path", "ag"."last_line"`).
 		ColumnExpr(`CASE WHEN "ag"."last_line" BETWEEN "ar"."last_line" - ? AND "ar"."last_line" + ? `+
 			`THEN 1 ELSE 0 END AS "same"`, groupLines, groupLines).
-		Where(`"f"."id" = ?`, leadID).
+		Where(`"f"."id" = ?`, codeFindingID).
 		Where(nearby(duplicateLines)).
-		// A lead included in its flaw's case is read by the flaw's readers
+		// A code finding included in its flaw's case is read by the flaw's readers
 		// beside the product's own visibilities, as the queue reads it.
 		Where(`("g"."visibility" IN (?) OR EXISTS (SELECT 1 FROM "finding" AS "f" WHERE "f"."id" = "g"."id" AND `+
 			reach.Included+`))`, append([]any{bun.List(visible)}, reach.IncludedArgs...)...).
 		OrderExpr(`"same" DESC, "ag"."last_line" ASC, "g"."occurrence_identity" ASC`).
 		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read the leads lead %d may be one flaw with: %w", leadID, err)
+		return nil, fmt.Errorf("read the code findings code finding %d may be one flaw with: %w", codeFindingID, err)
 	}
 	out := make([]Kin, 0, len(rows))
 	for _, r := range rows {
@@ -112,20 +112,20 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	return out, nil
 }
 
-// Member is a lead one decision about another lead also answers.
+// Member is a code finding one decision about another code finding also answers.
 type Member struct {
 	VulnerabilityID int64             `bun:"vulnerability_id"`
 	Occurrence      string            `bun:"occurrence_identity"`
 	Visibility      access.Visibility `bun:"visibility"`
 }
 
-// Unanswered is the leads on a lead's build that are the same flaw as it and
+// Unanswered is the code findings on a code finding's build that are the same flaw as it and
 // that nothing answers yet, where the subject may read them: open, under no
-// live decision, waiting or not, covered by no standing rule, not handed off, and
-// seen in a release still in support. A lead already answered keeps its own
-// answer, and a lead past its end of life is kept as it stands.
-func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Member, error) {
-	visible, err := finding.LeadVisible(subject, productID)
+// live decision, waiting or not, covered by no suppression rule, not recorded as a flaw, and
+// seen in a release still in support. A code finding already answered keeps its own
+// answer, and a code finding past its end of life is kept as it stands.
+func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, codeFindingID int64) ([]Member, error) {
+	visible, err := finding.CodeFindingVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,13 +133,13 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 	if err != nil {
 		return nil, err
 	}
-	// The lead asked about is under "g" and each of its kin under "f", so
-	// that the decision and the rule are asked of the kin. Which leads are one
+	// The code finding asked about is under "g" and each of its kin under "f", so
+	// that the decision and the rule are asked of the kin. Which code findings are one
 	// flaw does not depend on which of the two is asked about.
 	var out []Member
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		Join(`JOIN "finding" AS "g" ON "g"."id" = ?`, leadID).
+		Join(`JOIN "finding" AS "g" ON "g"."id" = ?`, codeFindingID).
 		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
 		ColumnExpr(`"f"."vulnerability_id", "f"."occurrence_identity", "f"."visibility"`).
 		Where(nearby(groupLines)).
@@ -149,14 +149,14 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionOccurrenceFiledAt("dc", "f")+`)`,
 			productID).
 		Where(`NOT `+ruled, productID).
-		Where(`NOT `+handedOff, productID).
+		Where(`NOT `+recordedAsFlaw, productID).
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if len(ended) == 0 {
 				return q
 			}
-			// The rule finding.LeadEnded applies to one lead: seen in at
+			// The rule finding.CodeFindingEnded applies to one code finding: seen in at
 			// least one release that is not past its end of life.
-			kinds, kindArgs := kind.Leads.Where(`"fs"."kind"`)
+			kinds, kindArgs := kind.CodeFindings.Where(`"fs"."kind"`)
 			args := append([]any{productID}, kindArgs...)
 			args = append(args, bun.List(ended))
 			return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fs"
@@ -167,7 +167,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		}).
 		OrderExpr(`"f"."occurrence_identity" ASC`).
 		Scan(ctx, &out); err != nil {
-		return nil, fmt.Errorf("read the leads one decision about lead %d answers: %w", leadID, err)
+		return nil, fmt.Errorf("read the code findings one decision about code finding %d answers: %w", codeFindingID, err)
 	}
 	return out, nil
 }

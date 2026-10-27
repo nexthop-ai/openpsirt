@@ -541,12 +541,12 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (decisions, rows i
 }
 
 // closingUnconditionally is what the condition counts whatever the gate's
-// verdict: the vulnerability outcomes that dismiss, and a lead dismissed or
+// verdict: the vulnerability outcomes that dismiss, and a code finding dismissed or
 // called no security issue. Each closes the question and always needs a
 // second person.
 func closingUnconditionally() []Outcome {
 	out := OutcomesDismissing()
-	for _, each := range LeadOutcomes() {
+	for _, each := range CodeFindingOutcomes() {
 		if each.HidesRisk() {
 			out = append(out, each)
 		}

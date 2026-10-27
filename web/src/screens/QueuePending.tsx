@@ -41,9 +41,9 @@ export const PENDING_PAGE = 50;
 //
 // The reason is the whole of what is being agreed to. A movement changes a
 // date somebody outside could hold us to, and the only thing distinguishing a
-// decision from a habit is why — so the reason leads and the dates follow it.
+// decision from a habit is why — so the reason code findings and the dates follow it.
 //
-// Which act it is leads the dates, because an embargo ending later and one
+// Which act it is code findings the dates, because an embargo ending later and one
 // ending sooner are different things to agree to.
 //
 // A request of your own is shown and cannot be agreed to. The person who

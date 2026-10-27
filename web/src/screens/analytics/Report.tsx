@@ -8,7 +8,7 @@ import { Backlog } from "./Backlog";
 import { Compliance } from "./Compliance";
 import { LastUploads } from "./LastUploads";
 import { Effort } from "./Effort";
-import { LeadSeries } from "./LeadSeries";
+import { CodeFindingSeries } from "./CodeFindingSeries";
 import { Overview } from "./Overview";
 import { Published } from "./Published";
 import { Register } from "./Register";
@@ -27,7 +27,7 @@ import { own } from "../../ui/own";
 export const PAGES: Record<string, ReactElement> = {
   "program-overview": <Overview />,
   "last-upload-per-build": <LastUploads />,
-  "leads-by-analyzer": <LeadSeries />,
+  "code-findings-by-analyzer": <CodeFindingSeries />,
   "releases-out-of-support": <Support />,
   "approval-quality": <Scrutiny />,
   "deadline-compliance": <Compliance />,

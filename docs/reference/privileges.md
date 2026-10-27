@@ -47,7 +47,7 @@ others.
 |---|---|
 | Public | Findings that have been disclosed |
 | Private | Findings nobody has announced yet, which are disclosed in time |
-| Internal | Unconfirmed results nobody has judged, such as an analyzer's leads. They are never disclosed and never published |
+| Internal | Unconfirmed results nobody has judged, such as an analyzer's code findings. They are never disclosed and never published |
 
 The three visibilities are separate grants. A private role reaches findings
 nobody has announced and no others, so somebody working private reports is not

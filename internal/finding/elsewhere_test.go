@@ -18,7 +18,7 @@ func TestAnotherBuildReachedFromTwoOccurrencesIsOneEntry(t *testing.T) {
 	// Keyed on the occurrence rather than on the build, the same other build was
 	// listed once per consumer that pulls the package in — so a kernel flaw at
 	// sixty occurrences drew sixty entries about one build, and what the screen
-	// leads with was a count of this build's own graph rather than of builds
+	// code findings with was a count of this build's own graph rather than of builds
 	// the decision travels to.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

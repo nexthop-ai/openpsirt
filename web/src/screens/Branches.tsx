@@ -267,7 +267,7 @@ export function Branches() {
                   <td className="hint">
                     {stream.last_scan_at ? (
                       /* When it last ran is asked as "is this stale", so the
-                         relative form leads and the exact day is on the title
+                         relative form code findings and the exact day is on the title
                          rather than lost. */
                       <span title={on(stream.last_scan_at)}>{since(stream.last_scan_at)}</span>
                     ) : (

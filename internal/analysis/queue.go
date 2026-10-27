@@ -20,7 +20,7 @@ import (
 )
 
 // waitingDecision is whether a decision at the occurrence of the finding under "f", in
-// the product bound, waits for a second person. A lead somebody has already
+// the product bound, waits for a second person. A code finding somebody has already
 // judged is not work for the next person to take.
 var waitingDecision = `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 	WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL
@@ -48,15 +48,15 @@ type Scope struct {
 	// Series is a series' name, matched without regard to capitals. A name
 	// no series of the product holds lists nothing.
 	Series string
-	// Unassigned keeps the leads nobody holds on the build a row names.
+	// Unassigned keeps the code findings nobody holds on the build a row names.
 	Unassigned bool
 }
 
-// LeadAssignees is every word the lead queue asks who holds a lead in: the
+// CodeFindingAssignees is every word the code finding queue asks who holds a code finding in: the
 // findings list's word for work nobody holds.
-func LeadAssignees() []string { return []string{finding.HeldByNobody} }
+func CodeFindingAssignees() []string { return []string{finding.HeldByNobody} }
 
-// QueueRow is one lead in a product: its occurrence, and what the newest of its
+// QueueRow is one code finding in a product: its occurrence, and what the newest of its
 // findings in the scope says about it.
 type QueueRow struct {
 	Occurrence string    `bun:"occurrence_identity"`
@@ -70,70 +70,70 @@ type QueueRow struct {
 	State      State     `bun:"stands"`
 	Builds     int       `bun:"builds"`
 	Opened     time.Time `bun:"opened"`
-	// Holder is the party dealing with the lead on that build, where anybody
+	// Holder is the party dealing with the code finding on that build, where anybody
 	// is: a person, or a team it is queued with.
 	Holder *int64 `bun:"assigned_to"`
-	// ThirdParty says the lead is under a path the newest run that saw it
+	// ThirdParty says the code finding is under a path the newest run that saw it
 	// declared as third-party code, as its evidence says.
 	ThirdParty bool `bun:"-"`
 	// Declared is that run's list of third-party paths, as it is stored.
 	Declared string `bun:"third_party"`
 }
 
-// Queue is one page of a product's leads, with how many the list holds in
-// all and how many leads stand in each state.
+// Queue is one page of a product's code findings, with how many the list holds in
+// all and how many code findings stand in each state.
 type Queue struct {
 	Rows  []QueueRow
 	Total int
-	// ByState counts the leads in each state, Waiting the open ones whose
+	// ByState counts the code findings in each state, Waiting the open ones whose
 	// decision waits for a second person, and Ruled the dismissed ones a
-	// standing rule covers. A lead on two builds in two states counts in
-	// both, and a lead seen twice in one state counts once.
+	// suppression rule covers. A code finding on two builds in two states counts in
+	// both, and a code finding seen twice in one state counts once.
 	ByState map[State]int
 	Waiting int
 	Ruled   int
-	// Ended is the open leads the queue leaves out because every release
+	// Ended is the open code findings the queue leaves out because every release
 	// they were seen in is past its end of life.
 	Ended int
 }
 
-// LeadsOf is one page of a product's leads where the subject may read them,
-// one row per lead however many builds it is on.
+// CodeFindingsOf is one page of a product's code findings where the subject may read them,
+// one row per code finding however many builds it is on.
 //
-// With no state named it is the queue: open leads nobody's decision waits on.
-// Naming a state lists the leads in it. A fixed lead is one closed on a
-// build, and listed there until the lead opens anew at its occurrence on that
+// With no state named it is the queue: open code findings nobody's decision waits on.
+// Naming a state lists the code findings in it. A fixed code finding is one closed on a
+// build, and listed there until the code finding opens anew at its occurrence on that
 // build. Ordered by what is likely real: the rank of the weaknesses the rule
 // names, whether another analyzer reports the same flaw, the tool's own
 // security severity for the rule, its precision, then newest first.
-func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
+func CodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {
-	return leadsOf(ctx, db, subject, scope, want, false, limit, offset)
+	return codeFindingsOf(ctx, db, subject, scope, want, false, limit, offset)
 }
 
-// OpenLeadsOf is one page of the leads a findings file holds: every open lead
+// OpenCodeFindingsOf is one page of the code findings a findings file holds: every open code finding
 // of the selection, the ones a decision waits on included, as the file's findings
-// rows include a finding a decision waits on. A lead open only in releases past
+// rows include a finding a decision waits on. A code finding open only in releases past
 // their end of life is left out, as the queue leaves it out. Ordered as the
 // queue is.
-func OpenLeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
+func OpenCodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	limit, offset int) (*Queue, error) {
-	return leadsOf(ctx, db, subject, scope, "", true, limit, offset)
+	return codeFindingsOf(ctx, db, subject, scope, "", true, limit, offset)
 }
 
-// leadsOf is LeadsOf, with the open leads a decision waits on kept in where
+// codeFindingsOf is CodeFindingsOf, with the open code findings a decision waits on kept in where
 // waiting is set and no state is named.
-func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
+func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	waiting bool, limit, offset int) (*Queue, error) {
 
-	visible, err := finding.LeadVisible(subject, scope.ProductID)
+	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
 	if err != nil {
 		return nil, err
 	}
-	perFinding := func() *bun.SelectQuery { return leadFindings(db, subject, scope, visible) }
+	perFinding := func() *bun.SelectQuery { return codeFindingFindings(db, subject, scope, visible) }
 
 	// A sighting in a release past its end of life is no work for anybody,
-	// so the queue counts none of them, and a lead open only there leaves
+	// so the queue counts none of them, and a code finding open only there leaves
 	// the queue though it may still be decided where it is seen elsewhere.
 	// The lists by state still show it.
 	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, time.Now().UTC())
@@ -159,35 +159,35 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 
 	out := &Queue{ByState: map[State]int{}}
 	var counted []struct {
-		State   State `bun:"stands"`
-		Awaits  int   `bun:"awaits"`
-		Covered int   `bun:"covered"`
-		Leads   int   `bun:"leads"`
+		State        State `bun:"stands"`
+		Awaits       int   `bun:"awaits"`
+		Covered      int   `bun:"covered"`
+		CodeFindings int   `bun:"code_findings"`
 	}
 	if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding()).
-		ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."occurrence_identity") AS "leads"`).
+		ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."occurrence_identity") AS "code_findings"`).
 		GroupExpr(`"l"."stands", "l"."awaits", "l"."covered"`).
 		Scan(ctx, &counted); err != nil {
-		return nil, fmt.Errorf("count the leads of product %d: %w", scope.ProductID, err)
+		return nil, fmt.Errorf("count the code findings of product %d: %w", scope.ProductID, err)
 	}
 	for _, c := range counted {
-		out.ByState[c.State] += c.Leads
+		out.ByState[c.State] += c.CodeFindings
 		if c.State == Open && c.Awaits == 1 {
-			out.Waiting += c.Leads
+			out.Waiting += c.CodeFindings
 		}
 		if c.State == Dismissed && c.Covered == 1 {
-			out.Ruled += c.Leads
+			out.Ruled += c.CodeFindings
 		}
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
 		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &out.Total); err != nil {
-		return nil, fmt.Errorf("count the leads listed in product %d: %w", scope.ProductID, err)
+		return nil, fmt.Errorf("count the code findings listed in product %d: %w", scope.ProductID, err)
 	}
 	if want == "" && len(ended) > 0 {
 		var all int
 		if err := queued(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
 			ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity")`).Scan(ctx, &all); err != nil {
-			return nil, fmt.Errorf("count the leads of product %d past their end of life: %w", scope.ProductID, err)
+			return nil, fmt.Errorf("count the code findings of product %d past their end of life: %w", scope.ProductID, err)
 		}
 		out.Ended = all - out.Total
 	}
@@ -200,7 +200,7 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
 		ColumnExpr(`"l"."occurrence_identity", MAX("l"."id") AS "newest"`).
-		// Builds rather than rows: a lead fixed, seen again and fixed again
+		// Builds rather than rows: a code finding fixed, seen again and fixed again
 		// on one build is two closed rows there.
 		ColumnExpr(`COUNT(DISTINCT "l"."target_id") AS "builds", MIN("l"."opened_at") AS "opened"`).
 		GroupExpr(`"l"."occurrence_identity"`).
@@ -209,7 +209,7 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		OrderExpr(`MIN("l"."opened_at") DESC, "l"."occurrence_identity" ASC`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &page); err != nil {
-		return nil, fmt.Errorf("read the leads of product %d: %w", scope.ProductID, err)
+		return nil, fmt.Errorf("read the code findings of product %d: %w", scope.ProductID, err)
 	}
 	if len(page) == 0 {
 		return out, nil
@@ -237,7 +237,7 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		ColumnExpr(`"sr"."third_party"`).
 		Where(`"f"."id" IN (?)`, bun.List(newest)).
 		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what the leads of product %d say: %w", scope.ProductID, err)
+		return nil, fmt.Errorf("read what the code findings of product %d say: %w", scope.ProductID, err)
 	}
 	byOccurrence := make(map[string]QueueRow, len(rows))
 	for _, r := range rows {
@@ -253,18 +253,18 @@ func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	return out, nil
 }
 
-// leadFindings is every finding of a lead in the scope that the subject may
-// read, one row per finding: the lead's occurrence, its build, its series, where it
-// stands, whether a decision waits on it, whether a standing rule covers it, and
+// codeFindingFindings is every finding of a code finding in the scope that the subject may
+// read, one row per finding: the code finding's occurrence, its build, its series, where it
+// stands, whether a decision waits on it, whether a suppression rule covers it, and
 // what the queue orders it by.
 //
-// The product's own visibilities, and a lead included in its flaw's case. A lead granted
+// The product's own visibilities, and a code finding included in its flaw's case. A code finding granted
 // one at a time is reached through its evidence, never a list. A finding
-// closed on a build is read until the lead opens anew at its occurrence there.
-func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
-	reach := finding.LeadReach(subject, scope.ProductID)
+// closed on a build is read until the code finding opens anew at its occurrence there.
+func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visible []access.Visibility) *bun.SelectQuery {
+	reach := finding.CodeFindingReach(subject, scope.ProductID)
 	state, stateArgs := stateOf(scope.ProductID)
-	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
+	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
@@ -295,7 +295,7 @@ func leadFindings(db bun.IDB, subject access.Subject, scope Scope, visible []acc
 		q = q.Where(`"f"."assigned_to" IS NULL`)
 	}
 	if scope.Series != "" {
-		named, namedArgs := kind.Leads.Where(`"sn"."kind"`)
+		named, namedArgs := kind.CodeFindings.Where(`"sn"."kind"`)
 		q = q.Where(`"si"."series_id" IN (SELECT "sn"."id" FROM "series" AS "sn"
 			WHERE "sn"."product_id" = ? AND "sn"."name_folded" = ? AND `+named+`)`,
 			append([]any{scope.ProductID, typedname.Matching(scope.Series)}, namedArgs...)...)

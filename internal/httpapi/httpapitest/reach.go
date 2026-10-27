@@ -401,15 +401,15 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		"internal-reader":  {access.InternalRead},
 		"internal-triager": {access.InternalTriage},
 		// The right to agree with the internal material it reads, which is
-		// what a second person on a lead holds.
+		// what a second person on a code finding holds.
 		"internal-reviewer": {access.InternalRead, access.Approver},
 		// Both halves on internal material, for the rules that keep one
 		// person from being both.
-		"internal-lead": {access.InternalTriage, access.Approver},
-		// Working the internal lead and the private flaw it becomes, which a
-		// hand-off takes, and the disclosed work the flaw becomes.
-		"lead-handler": {access.PublicRead, access.InternalTriage, access.PrivateTriage},
-		"approver":     {access.Approver},
+		"internal-code-finding": {access.InternalTriage, access.Approver},
+		// Working the internal code finding and the private flaw it becomes, which a
+		// flaw record takes, and the disclosed work the flaw becomes.
+		"code-finding-handler": {access.PublicRead, access.InternalTriage, access.PrivateTriage},
+		"approver":             {access.Approver},
 		// Assigning is the other capability that grants
 		// nothing on its own, and the dispatcher above holds
 		// it alongside a read role, so this is the identity

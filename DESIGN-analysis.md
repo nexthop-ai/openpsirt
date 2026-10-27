@@ -2,8 +2,8 @@
 
 A static analyzer's run over a build arrives as SARIF. Each result it reports
 is placed in the checkout, matched to what the same analysis reported on that
-build before, and recorded as a finding of the analysis kind, called a lead.
-A lead is internal until a person judges it.
+build before, and recorded as a finding of the analysis kind, called a code finding.
+A code finding is internal until a person judges it.
 
 Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-24, REQ-25,
 REQ-19, REQ-27, REQ-28, REQ-30, REQ-40, REQ-42, REQ-43, REQ-66, REQ-69.
@@ -23,12 +23,12 @@ shares is in `DESIGN-ingest.md`.
 - [Matching](#matching)
 - [Placement](#placement)
 - [Source](#source)
-- [Lead triage](#lead-triage)
-- [Lead queue](#lead-queue)
-- [Lead assignment](#lead-assignment)
+- [Code finding triage](#code-finding-triage)
+- [Code finding queue](#code-finding-queue)
+- [Code finding assignment](#code-finding-assignment)
 - [Weakness families](#weakness-families)
-- [Grouped leads](#grouped-leads)
-- [Hand-off](#hand-off)
+- [Grouped code findings](#grouped-code-findings)
+- [Flaw records](#flaw-records)
 - [Third-party code](#third-party-code)
 - [End of life](#end-of-life)
 - [Receipts](#receipts)
@@ -136,14 +136,14 @@ refused for it. None of them carries a snippet; the snippet default is the
 | A result whose rule is an advisory's identifier is dropped and counted | A scanner's finding wearing an analyzer's clothes would be filed as a rule |
 | A result that is the tool's own failure is dropped, counted, and makes the run not comparable, wherever it is and whether or not it names a file | `clang-diagnostic-error`, `syntaxError`, `internalAstError`, `cppcheckError` and `preprocessorErrorDirective` say a unit was not analyzed; a generated header outside the checkout fails a unit as surely as a file in it |
 | A result whose kind is `pass`, `notApplicable` or `informational` is dropped and counted as `not-a-problem` | It reports no problem. A result stating no kind is a `fail`, and `review` and `open` ask a person to settle it |
-| A result covered by a suppression in force is dropped and counted as `suppressed` | A suppression stating no status, or `accepted`, is the tool honoring a person's decision in the source; one `underReview` or `rejected` is not in force |
-| A result whose `baselineState` is `absent` is dropped and counted as `absent` | The tool says it is no longer found, and opening it would leave a lead no later run could find again |
+| A result covered by a suppression in force is dropped and counted as `suppressed-by-the-tool` | A suppression stating no status, or `accepted`, is the tool honoring a person's decision in the source; one `underReview` or `rejected` is not in force |
+| A result whose `baselineState` is `absent` is dropped and counted as `absent` | The tool says it is no longer found, and opening it would leave a code finding no later run could find again |
 | A path is resolved through its named starting points and placed against the source root | Paths arrive absolute, as `file://` addresses, relative to the working directory, and under a starting point left undefined |
 | A path naming no starting point is relative to the working directory the run's first invocation states where that is in the checkout, and to the top of the checkout otherwise; a path under the source root's own name left undefined is relative to the top | cppcheck run from a subdirectory writes its paths relative to that directory |
 | A path outside the checkout is dropped with its result, and counted | A build host's home directory never lands |
 | A result repeating another of the same upload on rule, path, line, column and message is dropped and counted | clang repeats a header's result once per translation unit that includes it |
 | Whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | No whole file or replacement text is stored, and a message is its text |
-| A message holding only markdown is reduced to the words it shows: no emphasis, heading, list or quote marker, a link and an image as their words, escapes and character references resolved in one pass as a renderer resolves them, so `\&lt;` is `&lt;`, code as written, and no raw HTML | The text is what the analyzer said, shown encoded and never rendered, and a message is part of what matches a lead |
+| A message holding only markdown is reduced to the words it shows: no emphasis, heading, list or quote marker, a link and an image as their words, escapes and character references resolved in one pass as a renderer resolves them, so `\&lt;` is `&lt;`, code as written, and no raw HTML | The text is what the analyzer said, shown encoded and never rendered, and a message is part of what matches a code finding |
 | A snippet is kept only where the product keeps source under its path, and counted on the receipt as discarded otherwise (§ Source) | A misconfigured pipeline does not put source into the deployment, and the upload is still accepted |
 | The source root is used at the door and not stored | It is a path on somebody's build host |
 
@@ -159,7 +159,7 @@ What a run says about itself, from its documents or from the fields:
 | Exit status and completion | `invocations[].exitCode` and `executionSuccessful`; the first non-zero and the first failure win |
 | Rule set | A digest of the rule identifiers enabled, and their count. From the `rules` field, or from the documents' rule list where it lists a rule that never fired |
 | Commit, series, build time | `openpsirt/commit`, `openpsirt/series`, `openpsirt/built`, or `automationDetails.id` |
-| Third-party paths | The `third-party` field, recorded on the run and read at hand-off and in the evidence (§ Third-party code) |
+| Third-party paths | The `third-party` field, recorded on the run and read at flaw record and in the evidence (§ Third-party code) |
 
 A rule list naming only rules that fired is not a rule set: clang and cppcheck
 list what fired, and a run of them that found nothing lists nothing.
@@ -179,7 +179,7 @@ holds is recorded:
 
 | Rule | |
 |---|---|
-| A comparable run marks a lead not reproduced only where it is also comparable to the run that last saw the lead: the same tool, version and rule set | A lead last seen before an upgrade says nothing by its absence from a run of the new version. It stays open, and the receipt counts it as uncompared |
+| A comparable run marks a code finding no longer detected only where it is also comparable to the run that last saw the code finding: the same tool, version and rule set | A code finding last seen before an upgrade says nothing by its absence from a run of the new version. It stays open, and the receipt counts it as uncompared |
 
 A tool reports a failure of its own run in three ways, and each one counts:
 
@@ -212,7 +212,7 @@ twice. Each takes the series' row first, by writing a value to it that
 no run wrote before, because a cluster certifies only rows that were written
 (`DESIGN-database.md` § Retryable transactions).
 
-A comparable run marking more of the build's open leads not reproduced than
+A comparable run marking more of the build's open code findings no longer detected than
 the deployment expects of one run is a sharp drop. It is applied, its receipt
 says so, and the product's internal readers are told once, after the run
 commits (`DESIGN-notifications.md` § Analyzer alerts). A run that analyzed
@@ -221,23 +221,23 @@ asked to look; setting the run aside would leave every later run superseded
 behind it.
 
 A sharp drop is two settings, the analyzer drop share and floor, and both
-have to be passed. The share is of the leads the last comparable run saw; the
-floor keeps a small series from raising one each time two leads are fixed.
+have to be passed. The share is of the code findings the last comparable run saw; the
+floor keeps a small series from raising one each time two code findings are fixed.
 
 An applied run, in order:
 
-1. Matches each result to a lead the series holds open on the build (§ Matching).
+1. Matches each result to a code finding the series holds open on the build (§ Matching).
 2. Files each rule as an issue of the rule kind, named `<tool>/<rule>` in lower-case tool name, and records the weaknesses its `external/cwe/cwe-N` tags name (`DESIGN-kinds.md` § Name resolution).
-3. Opens a lead for each result nothing matched, internal, at the occurrence § Matching gives it and the component § Placement gives it.
-4. Replaces what the last run said about each lead it saw again: path, lines, columns, enclosing function, call chain, message, fingerprint, and the flow steps and related places.
-5. Records each lead as seen by this run. A comparable run records each open lead it did not see as not reproduced by it, where it is comparable to the run that last saw the lead, and a lead not reproduced that is seen again is counted as returned.
+3. Opens a code finding for each result nothing matched, internal, at the occurrence § Matching gives it and the component § Placement gives it.
+4. Replaces what the last run said about each code finding it saw again: path, lines, columns, enclosing function, call chain, message, fingerprint, and the flow steps and related places.
+5. Records each code finding as seen by this run. A comparable run records each open code finding it did not see as no longer detected by it, where it is comparable to the run that last saw the code finding, and a code finding no longer detected that is seen again is counted as returned.
 6. Records the repositories the run says its checkout held.
 7. Lets the placed results go, and writes the receipt.
 
-Not reproduced is absence, and a lead stays open (`DESIGN-kinds.md` § Kinds).
-A not-comparable run opens and updates leads and marks none.
+No longer detected is absence, and a code finding stays open (`DESIGN-kinds.md` § Kinds).
+A not-comparable run opens and updates code findings and marks none.
 
-A lead is open and in the queue from the run that opens it, the series' first
+A code finding is open and in the queue from the run that opens it, the series' first
 run in the product included.
 
 ## Matching
@@ -250,7 +250,7 @@ input to a key and never a key by itself.
 | Key | Digest of | Strength |
 |---|---|---|
 | Whole | The rule, the path, the fingerprint or the line where there is none, the message with its digits taken out, the enclosing function and the call chain | Strong |
-| Unprinted | The whole key without the fingerprint or the line. Compared by a fingerprint change alone, and only where one result and one lead hold it (§ Fingerprint change) | Strong |
+| Unprinted | The whole key without the fingerprint or the line. Compared by a fingerprint change alone, and only where one result and one code finding hold it (§ Fingerprint change) | Strong |
 | Function | The rule, the path, the message with its digits taken out, and the enclosing function. Absent where the output names no function | Probable |
 | Line | The rule, the path and the message with its digits taken out, compared with the nearest line | Probable |
 
@@ -264,28 +264,28 @@ input to a key and never a key by itself.
 
 ### Layers
 
-A run is paired with the leads its series holds open on the build, one to
+A run is paired with the code findings its series holds open on the build, one to
 one, a layer at a time, each layer on what the layers before it left: the
 whole key, then the function, then the nearest line. A fingerprint change
 compares the unprinted key after the whole key and before the function.
 
 | Rule | |
 |---|---|
-| A lead the last comparable run did not see is a candidate in every layer | Of 28 absences hand-checked, 5 came back one or two builds later. A lead it saw comes first where a layer cannot tell two apart |
-| The line layer offers a result the eight leads sharing its line key nearest its line | A generated file repeating one message holds thousands of results under one key, and offering each all of them is quadratic |
-| Each lead records how its newest sighting was paired: on the whole key, the unprinted key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Lead triage) |
+| A code finding the last comparable run did not see is a candidate in every layer | Of 28 absences hand-checked, 5 came back one or two builds later. A code finding it saw comes first where a layer cannot tell two apart |
+| The line layer offers a result the eight code findings sharing its line key nearest its line | A generated file repeating one message holds thousands of results under one key, and offering each all of them is quadratic |
+| Each code finding records how its newest sighting was paired: on the whole key, the unprinted key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Code finding triage) |
 
 ### Carrying
 
-A result no open lead on the build took is the same result as a lead the
-series holds elsewhere where one of these finds it. It opens at that lead's
+A result no open code finding on the build took is the same result as a code finding the
+series holds elsewhere where one of these finds it. It opens at that code finding's
 occurrence, so a decision keyed on the occurrence reaches it (REQ-25).
 
 | Order | Where | How |
 |---|---|---|
-| 1 | The leads open on the build of the same variant in the stream this one was cut from, on the series' first run on the build | Every layer, and the unprinted key where the run is a fingerprint change against that build. A new branch inherits what the line it was cut from has decided |
-| 2 | A closed lead on this build | The whole key. The result is the same flaw found again, and opens a new lead at the closed one's occurrence |
-| 3 | Any lead of the series on another build, open or closed | The whole key, the oldest lead first. A probable pairing with a lead this build never saw is a guess |
+| 1 | The code findings open on the build of the same variant in the stream this one was cut from, on the series' first run on the build | Every layer, and the unprinted key where the run is a fingerprint change against that build. A new branch inherits what the line it was cut from has decided |
+| 2 | A closed code finding on this build | The whole key. The result is the same flaw found again, and opens a new code finding at the closed one's occurrence |
+| 3 | Any code finding of the series on another build, open or closed | The whole key, the oldest code finding first. A probable pairing with a code finding this build never saw is a guess |
 
 A result found nowhere opens at an occurrence derived from the series and its whole key, so
 the same result first seen on two builds at once is one occurrence.
@@ -296,7 +296,7 @@ A run records the fingerprint schemes its results' keys were built from, and
 the mark of the salt the client took its own with. A run whose record differs
 from the newest one applied to the build that reported anything is a
 fingerprint change. The series' first run on a build cut from another stream
-is compared with the newest such run on the parent build, whose leads it
+is compared with the newest such run on the parent build, whose code findings it
 inherits.
 
 | Rule | |
@@ -304,16 +304,16 @@ inherits.
 | A run reporting nothing records nothing | It says nothing about how results are fingerprinted, and reading it as a change would make the next run a fingerprint change |
 | `none` is recorded only where no result carried a fingerprint | One unhashable result appearing or going away beside others says nothing about how the run fingerprints |
 | The salt is recorded as the client states its mark, a short digest | A rotated salt changes every fingerprint and no scheme name |
-| A fingerprint change says so on its receipt | Its whole keys no longer meet the leads' |
-| A fingerprint change pairs a result and a lead on the unprinted key where they are the only result and the only lead holding it, and the pairing is strong | A rotated salt or a new scheme changes every fingerprint and nothing else, so a key nothing else holds is the same result, and its dismissal carries |
-| A result or a lead sharing its unprinted key with another falls to the probable layers | The fingerprint was what told them apart, and pairing them by line is a guess, so their dismissals lapse |
+| A fingerprint change says so on its receipt | Its whole keys no longer meet the code findings' |
+| A fingerprint change pairs a result and a code finding on the unprinted key where they are the only result and the only code finding holding it, and the pairing is strong | A rotated salt or a new scheme changes every fingerprint and nothing else, so a key nothing else holds is the same result, and its dismissal carries |
+| A result or a code finding sharing its unprinted key with another falls to the probable layers | The fingerprint was what told them apart, and pairing them by line is a guess, so their dismissals lapse |
 | The unprinted key is compared for a fingerprint change alone | On any other run a fingerprint that changed is the analyzer saying the result changed |
-| Carrying from a closed lead or another build is on the whole key, on a fingerprint change too | A result carried across a rotation opens as a new lead there |
-| Carrying from the parent build on a fingerprint change pairs on the unprinted key as the build's own leads are paired | A branch cut after a salt rotation inherits its line's decisions rather than re-asking them |
+| Carrying from a closed code finding or another build is on the whole key, on a fingerprint change too | A result carried across a rotation opens as a new code finding there |
+| Carrying from the parent build on a fingerprint change pairs on the unprinted key as the build's own code findings are paired | A branch cut after a salt rotation inherits its line's decisions rather than re-asking them |
 
 ## Placement
 
-A lead is one component at one occurrence (REQ-17).
+A code finding is one component at one occurrence (REQ-17).
 
 | Rule | |
 |---|---|
@@ -327,7 +327,7 @@ A lead is one component at one occurrence (REQ-17).
 
 ## Source
 
-Every place a lead names links into the repository's web view at the analyzed
+Every place a code finding names links into the repository's web view at the analyzed
 commit, and carries the source kept beside it where the product keeps source
 under its path. The deployment builds an address and never requests it; the
 reader's browser does, and signs in where the repository is private.
@@ -359,7 +359,7 @@ change is in the administrative trail.
 |---|---|
 | A path is in the run's repository with the longest prefix holding it, and the rest of the path is within that repository | `src/sonic-sairedis/SAI/inc/saiport.h` is `inc/saiport.h` in SAI, at SAI's commit |
 | A relative remote resolves against the remote of the repository holding it, itself resolved the same way; an SSH remote is read as the host and path it names, written with a user or without one | `.gitmodules` uses both |
-| A remote is recorded and shown with any credential and query taken out | It comes from the upload, and a token in it would reach every reader of the lead |
+| A remote is recorded and shown with any credential and query taken out | It comes from the upload, and a token in it would reach every reader of the code finding |
 | A remote on no host the product names is shown as text, unlinked | The remote comes from the upload, so without the list its host is the uploader's choice |
 | A revision an upload states opens a link only where it is a commit: 7 to 64 hexadecimal digits, and is shown unlinked otherwise | A branch an upload names moves, and `?` or `#` in it would steer the link |
 | Each path segment is percent-encoded, and a segment that is empty, `.` or `..` leaves the place unlinked | `?`, `#` and traversal in a path would otherwise steer the link |
@@ -367,7 +367,7 @@ change is in the administrative trail.
 | A repository whose working tree differed from its commit when it was analyzed is marked patched | The link shows the source before the patch |
 | A path no run repository holds links to the branch a product names for its longest prefix, marked approximate | The commit is unknown |
 | A place with no line opens the file; an end before the start is the start | |
-| A lead the build no longer holds open carries a comparison of its repository between the build of the newest run that saw it and the build of the first that did not, or says the two name the same commit and neither was patched | A disappearance where the code did not change is not a fix in that code, and a patch applied at build time is a change the commit does not show |
+| A code finding the build no longer holds open carries a comparison of its repository between the build of the newest run that saw it and the build of the first that did not, or says the two name the same commit and neither was patched | A disappearance where the code did not change is not a fix in that code, and a patch applied at build time is a change the commit does not show |
 
 Each unlinked place says why: no repository is known, the repository is on no
 named host, the revision is not a commit, or the path leaves the repository.
@@ -382,7 +382,7 @@ named host, the revision is not a commit, or the path leaves the repository.
 | A context region's source is preferred to its region's, with the line it starts at | It is the wider of the two |
 | At most `analysis.max_snippet` bytes of source are kept per place, 4 KiB where nobody has said | A client sends a few lines either side |
 | A snippet is answered as text, and shown as text | It is uploaded data (REQ-66) |
-| Source is disclosed with a flaw under a path where the longest prefix stating it says so, and stripped everywhere else | Off by default: a private product's source is not published because one flaw in it was (§ Hand-off) |
+| Source is disclosed with a flaw under a path where the longest prefix stating it says so, and stripped everywhere else | Off by default: a private product's source is not published because one flaw in it was (§ Flaw record) |
 
 ### Rule documentation
 
@@ -397,31 +397,31 @@ is sent.
 
 ### Evidence
 
-`GET …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}` answers one lead's
+`GET …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}` answers one code finding's
 evidence on one build: its rule, where it is, the path the analyzer took to
 it, the related places, each with its link and source, when it was last seen,
-and, for a lead no longer open, when it was first not seen, by which run, with
+and, for a code finding no longer open, when it was first not seen, by which run, with
 the comparison above, and the run a person named as the build that fixed it.
-Beside each of the two builds it names the commit the lead's own repository was
-at: the run's repository holding the lead's path, or the top of the checkout
-where none does, and nothing where that is not a commit. It names the live decision at the lead, agreed to or waiting, where the
-reader may read one. The occurrence identity addresses a lead because a rule's name holds a
+Beside each of the two builds it names the commit the code finding's own repository was
+at: the run's repository holding the code finding's path, or the top of the checkout
+where none does, and nothing where that is not a commit. It names the live decision at the code finding, agreed to or waiting, where the
+reader may read one. The occurrence identity addresses a code finding because a rule's name holds a
 slash.
 
 | Rule | |
 |---|---|
-| The lead is read through the Evidence consumer, which includes the analysis kind alone (`DESIGN-kinds.md` § Consumers) | Nothing of a lead reaches a vulnerability consumer |
-| It is read in the data layer at the visibilities the subject reads in the product, and a lead nobody may read there answers as an occurrence holding nothing (REQ-42, REQ-43) | A different answer would say a lead is there |
-| The open lead is answered, or the newest where none is open | A reappearance opens a new finding at the same occurrence |
+| The code finding is read through the Evidence consumer, which includes the analysis kind alone (`DESIGN-kinds.md` § Consumers) | Nothing of a code finding reaches a vulnerability consumer |
+| It is read in the data layer at the visibilities the subject reads in the product, and a code finding nobody may read there answers as an occurrence holding nothing (REQ-42, REQ-43) | A different answer would say a code finding is there |
+| The open code finding is answered, or the newest where none is open | A reappearance opens a new finding at the same occurrence |
 | Every link is built when the evidence is read, from the newest run's repositories and the product's settings | A change to the hosts reaches every place at once |
 
-## Lead triage
+## Code finding triage
 
-A decision about a lead is a decision as `DESIGN-triage.md` describes one: one
+A decision about a code finding is a decision as `DESIGN-triage.md` describes one: one
 argument, its rows, its reasoning and every revision of it, and a second
 person's approval of one revision (REQ-24, REQ-28). It is keyed on the
-product, the rule the lead is filed under, and the lead's occurrence, with no
-versions, so one decision covers the lead on every stream and variant it is
+product, the rule the code finding is filed under, and the code finding's occurrence, with no
+versions, so one decision covers the code finding on every stream and variant it is
 seen on (REQ-25).
 
 `POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision` records one.
@@ -432,7 +432,7 @@ seen on (REQ-25).
 | `not-security` | Real and harmless: a crash on a path no input reaches, a leak in a tool that exits | Yes |
 | `confirmed` | A real flaw | No |
 
-| Reason a lead is dismissed | Means |
+| Reason a code finding is dismissed | Means |
 |---|---|
 | `false_positive` | The analyzer is wrong: the flaw is not there |
 | `wont_fix` | The flaw is there and will not be fixed |
@@ -441,45 +441,45 @@ seen on (REQ-25).
 
 | Rule | |
 |---|---|
-| A lead takes the lead outcomes alone, and a vulnerability takes none of them | A lead is asked whether it is real; a vulnerability, how a known issue applies |
+| A code finding takes the code finding outcomes alone, and a vulnerability takes none of them | A code finding is asked whether it is real; a vulnerability, how a known issue applies |
 | A dismissal states one of the four reasons | A dismissal nobody can review is one a second person cannot agree to |
-| A decision about a lead covers its occurrence at any version | The occurrence is the lead, carried by matching rather than by versions |
-| A decision about a lead is approved by somebody holding `approver` and `internal-read` on the product, and never by its author | The approval every decision has, at the visibility a lead has |
-| A fixed lead takes no decision | It opens again where it is seen again |
-| A lead paired only probably, on its function or its nearest line, lapses the decision dismissing it or calling it no security issue | The decision was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one decision or many, as a lapsed decision is re-affirmed (`DESIGN-triage.md` § Re-affirmation) |
-| A decision confirming a lead stands through a probable pairing | It says the flaw is real, and a weaker pairing does not make it less so |
+| A decision about a code finding covers its occurrence at any version | The occurrence is the code finding, carried by matching rather than by versions |
+| A decision about a code finding is approved by somebody holding `approver` and `internal-read` on the product, and never by its author | The approval every decision has, at the visibility a code finding has |
+| A fixed code finding takes no decision | It opens again where it is seen again |
+| A code finding paired only probably, on its function or its nearest line, lapses the decision dismissing it or calling it no security issue | The decision was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one decision or many, as a lapsed decision is re-affirmed (`DESIGN-triage.md` § Re-affirmation) |
+| A decision confirming a code finding stands through a probable pairing | It says the flaw is real, and a weaker pairing does not make it less so |
 | The lapse is written in the transaction that records the pairing | A pairing is never recorded with the decision on it left standing |
 
-### Fixed leads
+### Fixed code findings
 
-`POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed` closes a lead
+`POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed` closes a code finding
 on one build, with what fixed it and the build that fixed it.
 
 | Rule | |
 |---|---|
-| Only a lead the newest comparable run did not see is closed as fixed | That absence is the evidence the statement is made with; a run still reporting the result is the authority on what it found |
-| It closes the lead on the build named and nowhere else | Each build holding it is a statement of its own |
-| It names the run whose build fixed it: one of the lead's series on that build, applied and comparable, built at or after the first run that did not see the lead, and any other run is refused | A statement of a fix names the build it shipped in. The lead's evidence names the first run that did not see it, and once it is fixed, the run named |
+| Only a code finding the newest comparable run did not see is closed as fixed | That absence is the evidence the statement is made with; a run still reporting the result is the authority on what it found |
+| It closes the code finding on the build named and nowhere else | Each build holding it is a statement of its own |
+| It names the run whose build fixed it: one of the code finding's series on that build, applied and comparable, built at or after the first run that did not see the code finding, and any other run is refused | A statement of a fix names the build it shipped in. The code finding's evidence names the first run that did not see it, and once it is fixed, the run named |
 | It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`DESIGN-findings.md` § Recorded flaws) |
-| A lead seen again opens anew at the same occurrence | The matching that finds a closed lead carries the result to its occurrence (§ Carrying) |
-| A decision about a lead is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one decision's reads include it; the findings lists do not |
+| A code finding seen again opens anew at the same occurrence | The matching that finds a closed code finding carries the result to its occurrence (§ Carrying) |
+| A decision about a code finding is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one decision's reads include it; the findings lists do not |
 
-### Dismissal rules
+### Suppression rules
 
-A standing rule dismisses every lead of a product it names, with one reason
+A suppression rule dismisses every code finding of a product it names, with one reason
 and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 `…/products/{product}/suppression-rules` lists, proposes, approves and retires them.
 
 | A rule names | Covers |
 |---|---|
-| An analyzer rule | Every lead filed under it, compared as the rule's issue is, without regard to capitals |
-| A path | Every lead at or under it |
-| Both | Every lead of the rule at or under the path |
+| An analyzer rule | Every code finding filed under it, compared as the rule's issue is, without regard to capitals |
+| A path | Every code finding at or under it |
+| Both | Every code finding of the rule at or under the path |
 
 | State | When | Dismisses |
 |---|---|---|
 | `proposed` | Nobody has approved it | Nothing |
-| `in-force` | Approved, and covering no more than the leads its approver was shown times the growth factor | What it names |
+| `in-force` | Approved, and covering no more than the code findings its approver was shown times the growth factor | What it names |
 | `outgrown` | Approved, naming an analyzer rule, and covering more than that | What it names, and asks to be approved again |
 | `needs-path` | Naming an analyzer rule and no path, where a run has since found the rule to find memory safety or injection | Nothing, until it is retired and proposed again with a path |
 | `retired` | Taken out of use | Nothing |
@@ -487,77 +487,77 @@ and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 | Rule | |
 |---|---|
 | A rule is proposed by somebody holding `internal-triage` on the product, and approved by somebody else holding `approver` and `internal-read` there | The second person a dismissal has (REQ-24) |
-| A rule names an analyzer rule, a path, or both, and states one of the four reasons and its reasoning | A rule naming neither would dismiss every lead the product has |
-| A rule naming an analyzer rule and no path is refused, at proposal and at approval, where the rule finds memory safety or injection (§ Weakness families), or where no run has recorded the rule, and one approved before a run found that stops dismissing at once | A flaw of those kinds is judged one lead at a time. A whole checker is dismissed where it fights a convention, measures style, or cannot model the code; a leak checker is dismissed under the pool allocator it cannot see |
+| A rule names an analyzer rule, a path, or both, and states one of the four reasons and its reasoning | A rule naming neither would dismiss every code finding the product has |
+| A rule naming an analyzer rule and no path is refused, at proposal and at approval, where the rule finds memory safety or injection (§ Weakness families), or where no run has recorded the rule, and one approved before a run found that stops dismissing at once | A flaw of those kinds is judged one code finding at a time. A whole checker is dismissed where it fights a convention, measures style, or cannot model the code; a leak checker is dismissed under the pool allocator it cannot see |
 | A path is a prefix from the top of the checkout, with no leading or trailing slash | `src` holds `src/a.c` and `src`, and not `src2/a.c` |
 | A path is compared exactly, character by character | Paths are case-sensitive, and SQLite's LIKE ignores the case of ASCII letters |
 | A path climbing out of the checkout or holding an empty segment is refused | It names nothing a run reports |
 | Its words never change | An approval is of what was read (REQ-28). A rule worded differently is retired and proposed again |
-| Approval records the open leads the rule covers as its approved size | What the approver was shown |
-| The growth factor is `triage.lead-rule-growth`, two where nobody has said | A rule covering ten leads when approved and a thousand later is not what the approver read (REQ-27) |
+| Approval records the open code findings the rule covers as its approved size | What the approver was shown |
+| The growth factor is `triage.suppression-rule-growth`, two where nobody has said | A rule covering ten code findings when approved and a thousand later is not what the approver read (REQ-27) |
 | A rule naming a path alone is never outgrown | Code under a dismissed path grows as a matter of course, and what the approver agreed to is the path |
-| An approval shown no lead is measured as though shown one | A rule approved before its analyzer rule reports anything is not outgrown by its first lead |
+| An approval shown no code finding is measured as though shown one | A rule approved before its analyzer rule reports anything is not outgrown by its first code finding |
 | An outgrown rule is approved again at its new size, and a rule in force is refused | Approving again is how the approver reads what it now covers |
-| An outgrown rule keeps dismissing what it names | Withdrawn, every lead it covers would reach the queue at once, which is the noise the rule exists to hold |
-| A rule's coverage counts open leads by occurrence, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |
-| Coverage is worked out when it is read | A new lead under a rule in force never reaches the queue |
+| An outgrown rule keeps dismissing what it names | Withdrawn, every code finding it covers would reach the queue at once, which is the noise the rule exists to hold |
+| A rule's coverage counts open code findings by occurrence, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |
+| Coverage is worked out when it is read | A new code finding under a rule in force never reaches the queue |
 | Proposal, approval and retirement are recorded in the administrative trail | As routing rules are |
 
-### Lead states
+### Code finding states
 
-A lead's state is worked out when it is read, from its finding, its sighting
-and the decision standing at its occurrence. The evidence of a lead carries it.
+A code finding's state is worked out when it is read, from its finding, its sighting
+and the decision standing at its occurrence. The evidence of a code finding carries it.
 
 | State | When |
 |---|---|
 | Fixed | The finding is closed |
-| Handed off | It was recorded as a flaw (§ Hand-off) |
+| Recorded as a flaw | It was recorded as a flaw (§ Flaw record) |
 | Dismissed, Not a security issue, Confirmed | A decision with that outcome stands at the occurrence: approved, or waiting on nobody and not sent back |
-| Dismissed | No decision stands, and a standing rule in force or outgrown covers it (§ Dismissal rules) |
-| Not reproduced | A comparable run did not see it |
+| Dismissed | No decision stands, and a suppression rule in force or outgrown covers it (§ Suppression rules) |
+| No longer detected | A comparable run did not see it |
 | Open | None of the above |
 
 | Rule | |
 |---|---|
-| A standing decision comes before a standing rule | A decision about one lead is more specific than one about many |
-| A standing decision or rule comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
-| A decision waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
-| A handed-off lead leaves the queue and takes no decision | Its flaw is what is judged |
+| A standing decision comes before a suppression rule | A decision about one code finding is more specific than one about many |
+| A standing decision or rule comes before absence | A dismissed code finding a run does not see stays dismissed and records the absence |
+| A decision waiting for a second person leaves the code finding where it was | It answers nothing until somebody agrees |
+| A code finding recorded as a flaw leaves the queue and takes no decision | Its flaw is what is judged |
 
-## Lead queue
+## Code finding queue
 
-A product's leads are listed one row per lead, however many of the product's
+A product's code findings are listed one row per code finding, however many of the product's
 builds it is open on. A row shows the newest of those findings: its rule, its
 path, line, function and message, the build it is on, and its state there.
 
 | Order | |
 |---|---|
 | The tier of the weaknesses the rule names, highest first (§ Weakness families) | Memory safety above style |
-| Whether another analyzer reports the same flaw on the build (§ Grouped leads) | Two tools agreeing is the strongest sign a result is real |
+| Whether another analyzer reports the same flaw on the build (§ Grouped code findings) | Two tools agreeing is the strongest sign a result is real |
 | The tool's own security severity for the rule, highest first, and a rule with none after every rule with one | CodeQL and semgrep rate a rule's results from 0 to 10 |
 | The tool's own precision for the rule: `very-high`, `high`, `medium`, `low`, then none | How often the rule is right, as its tool measures it |
 | Newest first | The work that arrived last is the work nobody has looked at |
 
 Whether a path ships orders nothing. Code that does not ship — tests, tools,
-examples — is set aside by a standing rule naming its path (§ Dismissal
-rules), which takes its leads out of the queue rather than lower in it, and
+examples — is set aside by a suppression rule naming its path (§ Suppression
+rules), which takes its code findings out of the queue rather than lower in it, and
 one way to say a path does not matter is kept rather than two.
 
 | List | Holds |
 |---|---|
-| The queue, with no state named | Open leads with no decision waiting for a second person |
-| A state named | The leads in that state. Fixed is the leads closed on a build and not opened anew there |
+| The queue, with no state named | Open code findings with no decision waiting for a second person |
+| A state named | The code findings in that state. Fixed is the code findings closed on a build and not opened anew there |
 
 | Rule | |
 |---|---|
-| Every list counts the leads in the scope by state, the open leads a waiting decision leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves leads out says how many it left (REQ-30) |
-| A lead closed as fixed is listed and counted as fixed on its build until it opens anew there | A lead seen again opens at the same occurrence (§ Fixed leads), and then it is what the newer finding says |
-| A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
-| Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
+| Every list counts the code findings in the scope by state, the open code findings a waiting decision leaves out of the queue, and the dismissed code findings a suppression rule covers | A list that leaves code findings out says how many it left (REQ-30) |
+| A code finding closed as fixed is listed and counted as fixed on its build until it opens anew there | A code finding seen again opens at the same occurrence (§ Fixed code findings), and then it is what the newer finding says |
+| A code finding open on two builds in two states counts in both | The count is of code findings in a state, and a code finding no longer detected on one build is open on another |
+| Only what the subject may read is listed or counted | Visibility is enforced where the code findings are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
-| A series narrows the list by its name, matched without regard to capitals | A name no series of the product holds lists nothing, the same answer as a series holding no lead |
-| Narrowed to work nobody holds, the list keeps the leads with no holder on the build each row names, under the parameter and value the findings list uses | The findings list holds no lead, so this is where unheld leads are found (§ Lead assignment) |
-| Narrowed to work nobody holds, every count is of the leads the narrowing keeps | A count beside a narrowed list describes what that list leaves out |
+| A series narrows the list by its name, matched without regard to capitals | A name no series of the product holds lists nothing, the same answer as a series holding no code finding |
+| Narrowed to work nobody holds, the list keeps the code findings with no holder on the build each row names, under the parameter and value the findings list uses | The findings list holds no code finding, so this is where unheld code findings are found (§ Code finding assignment) |
+| Narrowed to work nobody holds, every count is of the code findings the narrowing keeps | A count beside a narrowed list describes what that list leaves out |
 | A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
 | A rule's tier is the highest of every weakness recorded for it, ranked again each time a run names the rule | A rule's weaknesses accumulate as its tags do, and a tier table changed by an upgrade reaches a rule at its next run |
 | A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |
@@ -570,54 +570,54 @@ JSON, as `DESIGN-analytics.md` § Exports writes every file.
 | Rule | |
 |---|---|
 | The file is the list: the same filters, the same order, every row rather than one page | A list and its file are one read, so a filter the screen applies is never missing from the file |
-| It is read under the list's visibility | A reader is written the leads the list shows them, and nothing else (REQ-42, REQ-43) |
-| A row names who holds the lead as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`DESIGN-analytics.md` § Exports) |
-| A row says whether the lead is in third-party code, as the list does | Read from the newest run that saw the lead, as its evidence is (§ Third-party code) |
+| It is read under the list's visibility | A reader is written the code findings the list shows them, and nothing else (REQ-42, REQ-43) |
+| A row names who holds the code finding as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`DESIGN-analytics.md` § Exports) |
+| A row says whether the code finding is in third-party code, as the list does | Read from the newest run that saw the code finding, as its evidence is (§ Third-party code) |
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
-| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out leads a waiting decision holds and leads past their end of life |
+| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out code findings a waiting decision holds and code findings past their end of life |
 | Narrowed to work nobody holds, the file says so beside what it lists | A file read later carries the narrowing it was written under |
 | A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
-| A findings list's file writes every open lead of its selection below its findings, through this read with the leads a decision waits on kept in (`DESIGN-analytics.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
+| A findings list's file writes every open code finding of its selection below its findings, through this read with the code findings a decision waits on kept in (`DESIGN-analytics.md` § Exports) | The finding exports include the code findings the reader reads (REQ-50) |
 
-### Leads by series
+### Code findings by series
 
-`GET /v1/products/{product}/code-finding-series` counts a product's leads per analyzer
-series, by state. The reports catalog draws it as Leads by analyzer
+`GET /v1/products/{product}/code-finding-series` counts a product's code findings per analyzer
+series, by state. The analytics catalog draws it as Code findings by analyzer
 (`DESIGN-analytics.md` § Pages of the catalog's own).
 
 | Rule | |
 |---|---|
-| Every state is counted, zero included, beside how many open leads a waiting decision leaves out of the queue and how many dismissed leads a standing rule covers | The states are worked out for the queue already, so each costs nothing more |
+| Every state is counted, zero included, beside how many open code findings a waiting decision leaves out of the queue and how many dismissed code findings a suppression rule covers | The states are worked out for the queue already, so each costs nothing more |
 | Each count is the total the list answers for that series and state | A figure and the list it opens count one population, under the same visibility |
 | Counted over every build of the product | A series is the product's. A stream or variant would list a series that never ran there with every count zero, which reads as an analyzer that found nothing |
-| A series holding no lead is listed with every count zero | An analyzer that runs and finds nothing is a fact about the product |
-| Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of leads is internal however it is narrowed. A reader of a moved lead through its flaw reads the lead and not the product's figures |
+| A series holding no code finding is listed with every count zero | An analyzer that runs and finds nothing is a fact about the product |
+| Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of code findings is internal however it is narrowed. A reader of an included code finding through its flaw reads the code finding and not the product's figures |
 | Ordered by the series' name | The series are few, and a reader looks one up by its name |
 
-## Lead assignment
+## Code finding assignment
 
 `PUT …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment` gives a
-lead to a person or a team, or hands it back to nobody, as a finding is
+code finding to a person or a team, or hands it back to nobody, as a finding is
 assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 
 | Rule | |
 |---|---|
-| It covers the lead on every build of the product it is open on | A lead is one occurrence across the product's builds, as a decision about it is |
-| The assigner triages the lead at every visibility it is open at | Internal, where a lead not handed off is. Somebody who does not is answered as though the lead were not there |
+| It covers the code finding on every build of the product it is open on | A code finding is one occurrence across the product's builds, as a decision about it is |
+| The assigner triages the code finding at every visibility it is open at | Internal, where a code finding not recorded as a flaw is. Somebody who does not is answered as though the code finding were not there |
 | Giving it to somebody else, or taking it from them, needs `assigner` as well | The assigner right a finding's assignment asks for |
-| A person is given it only where they read it at every visibility it is open at, and a team only where one member reads all of them | Holding a lead is not a way to read one. A lead collaborator reads the lead through their grant and is not given it |
+| A person is given it only where they read it at every visibility it is open at, and a team only where one member reads all of them | Holding a code finding is not a way to read one. A code finding collaborator reads the code finding through their grant and is not given it |
 | Asked inside the transaction that writes | As every assignment asks it |
-| A lead past its end of life is refused with 409 | § End of life |
-| A lead handed off as a flaw, kept or moved, is refused with 409, and its page offers no holder | It is closed work for its holder, and its flaw is assigned instead |
-| A lead seen on a build where it was not open when it was assigned starts unassigned there | As a finding arriving under an assigned component does |
-| Losing the reading a lead needs, deactivation and a handover move leads with everything else, but for the handed-off lead below | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
-| A team's routing rules place leads nobody holds, and no lead handed off | `DESIGN-access.md` § Routing rules. Whoever triages internal work in the product reads and previews them |
-| The lists of held work list a lead, one row per lead, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-kinds.md` § Consumers). A lead is listed to readers of internal work in the product. A row names the analyzer's rule and opens the lead's page |
-| The unassigned list leaves out a lead's sightings in releases past their end of life | Nobody may take a lead seen only there, and the lead queue narrowed to work nobody holds leaves it out the same way (§ End of life) |
-| A lead handed off as a flaw leaves the lists of held work, kept or moved | Its flaw is what is judged, fixed and disclosed, and the flaw is held and listed as itself. The handed-off lead is closed work for its holder |
-| Handing somebody's work to another person leaves a handed-off lead with them, and asks nothing about it. Releasing their work releases it | It is listed to nobody, so moving it hands over nothing, and a recipient who may not read it is not refused for it |
-| The lead's page and every row of the queue and its file name who holds it | The page names the holder on its build while it is open there; a row names the holder of the finding it shows |
-| The person given it is told "a lead assigned", at internal visibility | `DESIGN-notifications.md` § Lead notices |
+| A code finding past its end of life is refused with 409 | § End of life |
+| A code finding recorded as a flaw, included in disclosure or not, is refused with 409, and its page offers no holder | It is closed work for its holder, and its flaw is assigned instead |
+| A code finding seen on a build where it was not open when it was assigned starts unassigned there | As a finding arriving under an assigned component does |
+| Losing the reading a code finding needs, deactivation and a handover move code findings with everything else, but for the code finding recorded as a flaw below | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
+| A team's routing rules place code findings nobody holds, and no code finding recorded as a flaw | `DESIGN-access.md` § Routing rules. Whoever triages internal work in the product reads and previews them |
+| The lists of held work list a code finding, one row per code finding, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-kinds.md` § Consumers). A code finding is listed to readers of internal work in the product. A row names the analyzer's rule and opens the code finding's page |
+| The unassigned list leaves out a code finding's sightings in releases past their end of life | Nobody may take a code finding seen only there, and the code finding queue narrowed to work nobody holds leaves it out the same way (§ End of life) |
+| A code finding recorded as a flaw leaves the lists of held work, included in disclosure or not | Its flaw is what is judged, fixed and disclosed, and the flaw is held and listed as itself. The code finding recorded as a flaw is closed work for its holder |
+| Handing somebody's work to another person leaves a code finding recorded as a flaw with them, and asks nothing about it. Releasing their work releases it | It is listed to nobody, so moving it hands over nothing, and a recipient who may not read it is not refused for it |
+| The code finding's page and every row of the queue and its file name who holds it | The page names the holder on its build while it is open there; a row names the holder of the finding it shows |
+| The person given it is told "a code finding assigned", at internal visibility | `DESIGN-notifications.md` § Code finding notices |
 
 ## Weakness families
 
@@ -659,10 +659,10 @@ class.
 The table is a judgment no decision records: memory safety above style, for
 the C and C++ these analyzers read.
 
-## Grouped leads
+## Grouped code findings
 
 Two analyzers on one build report some flaws twice. Each tool's result stays
-its own lead, with its own history. Two leads are the same flaw where every
+its own code finding, with its own history. Two code findings are the same flaw where every
 one of these holds:
 
 | Condition | |
@@ -680,182 +680,185 @@ at least one.
 | Rule | |
 |---|---|
 | A result's last place is the last step of its path, the last related place in its own file, or its own place | cppcheck lists the places after the first as related, in order |
-| Leads within ten lines and otherwise alike are listed as possibly the same flaw, and never grouped | A false merge hides a second real flaw behind one decision |
-| A lead's evidence lists the leads it is the same flaw with and those it possibly is, where the reader may read them | Visibility is enforced where the leads are read (REQ-42) |
-| A group is a lead and the leads within two lines of it, worked out for each lead | Two leads each the same flaw as a third and four lines apart are two groups |
-| Whether another analyzer reports a lead is worked out over every lead on the build, whoever reads it | Where a lead sorts does not depend on who is looking |
-| The leads near a lead are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 leads of two analyzers' first runs on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
-| A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
-| A decision about a lead covers it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
-| A lead of the group already answered, waiting on a decision, under a standing rule, fixed, handed off, past its end of life (§ End of life), or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a decision reaches no lead its author cannot read (REQ-42) |
-| A lead possibly the same flaw is left out | It is judged on its own |
+| Code findings within ten lines and otherwise alike are listed under Possibly also found by, and never grouped | A false merge hides a second real flaw behind one decision |
+| A code finding's evidence lists, under Also found by and Possibly also found by, the code findings that are the same flaw and those that possibly are, where the reader may read them | Visibility is enforced where the code findings are read (REQ-42) |
+| A group is a code finding and the code findings within two lines of it, worked out for each code finding | Two code findings each the same flaw as a third and four lines apart are two groups |
+| Whether another analyzer reports a code finding is worked out over every code finding on the build, whoever reads it | Where a code finding sorts does not depend on who is looking |
+| The code findings near a code finding are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 code findings of two analyzers' first runs on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
+| A rule with no weakness groups with nothing | clang tags none, so a clang code finding groups only once its weaknesses are known |
+| A decision about a code finding covers it and every code finding of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
+| A code finding of the group already answered, waiting on a decision, under a suppression rule, fixed, recorded as a flaw, past its end of life (§ End of life), or unreadable by the person judging is left out | A code finding already answered keeps its own answer, and a decision reaches no code finding its author cannot read (REQ-42) |
+| A code finding possibly the same flaw is left out | It is judged on its own |
 
-## Hand-off
+## Flaw records
 
-A confirmed lead is recorded as a flaw found here (REQ-19), through the path
+A confirmed code finding is recorded as a flaw found here (REQ-19), through the path
 every recorded flaw takes (`DESIGN-findings.md` § Recorded flaws), and linked
-to it. The lead is then handed off: its flaw is what is judged, fixed and
+to it. The code finding is then recorded as a flaw: its flaw is what is judged, fixed and
 disclosed.
 
 `GET …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw` is what a
-hand-off is offered, and `POST` on the same address records it.
+flaw record is offered, and `POST` on the same address records it.
 
 | Rule | |
 |---|---|
-| Only a confirmed lead is handed off, and only once | Confirmation is the decision that it is a flaw; a second flaw for one lead is one flaw recorded twice |
-| A hand-off links the lead and every lead its confirming decision covers that nobody handed off to the one flaw | One decision confirmed them as one flaw (§ Grouped leads). A lead of the group left behind holds a decision nothing may change, and no flaw |
-| A hand-off is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal lead and writes the private flaw |
-| The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A lead is carried by its occurrence rather than by versions |
-| The flaw and the link are written in one transaction, which reads again that the lead is confirmed and not handed off | A retry is asked the question again (REQ-71) |
-| A hand-off changes the stamp of the decision standing at the lead, matched on the stamp it read, as every write to a decision does (`DESIGN-database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the hand-off would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
-| A handed-off lead takes no decision, and no decision about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a decision out | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
-| A hand-off, a move, an undone move and an undone hand-off are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
+| Only a confirmed code finding is recorded as a flaw, and only once | Confirmation is the decision that it is a flaw; a second flaw for one code finding is one flaw recorded twice |
+| A flaw record links the code finding and every code finding its confirming decision covers that nobody recorded as a flaw to the one flaw | One decision confirmed them as one flaw (§ Grouped code findings). A code finding of the group left behind holds a decision nothing may change, and no flaw |
+| A flaw record is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal code finding and writes the private flaw |
+| The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A code finding is carried by its occurrence rather than by versions |
+| The flaw and the link are written in one transaction, which reads again that the code finding is confirmed and not recorded as a flaw | A retry is asked the question again (REQ-71) |
+| A flaw record changes the stamp of the decision standing at the code finding, matched on the stamp it read, as every write to a decision does (`DESIGN-database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the flaw record would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
+| A code finding recorded as a flaw takes no decision, and no decision about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a decision out | The flaw's decisions replace the code finding's, and a confirmation withdrawn under a code finding recorded as a flaw leaves a flaw nobody confirmed |
+| Recording as a flaw, an inclusion in disclosure, a removal from it and a withdrawn flaw record are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
 
-| The flaw records the lead it was recorded from, the component the offer ranked first, and the builds it proposed: every build the lead was seen in, and the builds holding the chosen component that the series never analyzed | `DESIGN-findings.md` § Recorded flaws. The record outlasts the link, so a flaw whose hand-off was undone still says where it came from |
-| The flaw's page names its lead to a reader who reads the flaw there and the lead in full, and to nobody else | A kept lead is internal, and a reader of the private flaw has not been handed it (REQ-42) |
+| The flaw records the code finding it was recorded from, the component the offer ranked first, and the builds it proposed: every build the code finding was seen in, and the builds holding the chosen component that the series never analyzed | `DESIGN-findings.md` § Recorded flaws. The record outlasts the link, so a flaw whose flaw record was undone still says where it came from |
+| The flaw's page names its code finding to a reader who reads the flaw there and the code finding in full, and to nobody else | An internal-only code finding is internal, and a reader of the private flaw has not been given it (REQ-42) |
 
-### Hand-off offer
+### Flaw record offer
 
 | Part | |
 |---|---|
-| Builds | Every build holding the lead, open or closed, which the flaw is proposed against. The person chooses which it is recorded against |
-| Components | Ranked: the one the lead's prefix was confirmed as before, the one the lead was placed on as it arrived, up to five whose names resemble the prefix's last segment, then the build itself |
-| Lacking | For each component, the builds the lead was seen in that hold no such component. Recording the flaw against them is refused |
-| Unanalyzed | For each component, the builds in use that hold it and that the lead's series never analyzed. A variant nobody analyzes ships the same code |
+| Builds | Every build holding the code finding, open or closed, which the flaw is proposed against. The person chooses which it is recorded against |
+| Components | Ranked: the one the code finding's prefix was confirmed as before, the one the code finding was placed on as it arrived, up to five whose names resemble the prefix's last segment, then the build itself |
+| Lacking | For each component, the builds the code finding was seen in that hold no such component. Recording the flaw against them is refused |
+| Unanalyzed | For each component, the builds in use that hold it and that the code finding's series never analyzed. A variant nobody analyzes ships the same code |
 | Prefix | The innermost repository the run names or third-party path it declared holding the file, or else the file's directory |
 | Third-party | Whether the file is under a path the run declared third-party, so the flaw is reported to the upstream (§ Third-party code) |
-| Together | How many other leads the hand-off links to the flaw with this one, and a move moves with it |
-| Disclosure | What moving the lead and the leads linked with it into the case discloses with the flaw: every note on a decision about them, by author, the paths and messages the analyzer wrote, and whether snippets are published (§ Keep or move) |
+| Together | How many other code findings the flaw record links to the flaw with this one, which are included in disclosure or taken out with it |
+| Disclosure | What including the code finding and the code findings linked with it in disclosure discloses with the flaw: every note on a decision about them, by author, the paths and messages the analyzer wrote, and whether snippets are published (§ Disclosure inclusion) |
 
 | Rule | |
 |---|---|
-| The component chosen is recorded for the prefix, replacing what it was confirmed as before, and the build itself leaves the prefix confirmed as nothing | The next lead under the prefix is offered it first. A component a person turned down is not offered first again |
-| The longest recorded prefix holding a lead's path is the one offered | A repository nested in another names its own component |
+| The component chosen is recorded for the prefix, replacing what it was confirmed as before, and the build itself leaves the prefix confirmed as nothing | The next code finding under the prefix is offered it first. A component a person turned down is not offered first again |
+| The longest recorded prefix holding a code finding's path is the one offered | A repository nested in another names its own component |
 | A resembling component is offered and never chosen for the person | A name contained in a directory's name is a guess |
 
-### Keep or move
+### Disclosure inclusion
 
-A hand-off keeps the lead internal or moves it into its flaw's case.
-`PUT …/code-findings/{occurrence}/flaw/disclosure` moves a kept lead, and `DELETE` on the same address
-takes a moved one back out.
+A code finding recorded as a flaw is internal only, or included in its flaw's
+disclosure. Include in disclosure is one choice, off by default, made when the
+flaw is recorded and changed while it is undisclosed: it decides only what is
+published at disclosure. `PUT …/code-findings/{occurrence}/flaw/disclosure`
+includes an internal-only code finding, and `DELETE` on the same address takes an
+included one out.
 
-| | Kept | Moved |
+| | Internal only | Included in disclosure |
 |---|---|---|
-| Visibility of the lead and the decisions at its occurrence | Internal | Internal |
-| An internal reader reads | The whole lead and its decisions, and nothing of the case | The whole lead and its decisions, and nothing of the case |
-| Somebody granted the lead reads | The whole lead without its decisions, and its flaw | The whole lead without its decisions, and its flaw |
-| A reader of undisclosed work reads | Nothing | The whole lead and its decisions, and its flaw |
-| A reader on the flaw's case reads | Nothing, unless they were granted the lead | The whole lead and its decisions, and its flaw |
-| When the flaw is disclosed | The lead stays internal | The lead and its decisions go public with the flaw (REQ-40) |
+| Visibility of the code finding and the decisions at its occurrence | Internal | Internal |
+| An internal reader reads | The whole code finding and its decisions, and nothing of the case | The whole code finding and its decisions, and nothing of the case |
+| Somebody granted the code finding reads | The whole code finding without its decisions, and its flaw | The whole code finding without its decisions, and its flaw |
+| A reader of undisclosed work reads | Nothing | The whole code finding and its decisions, and its flaw |
+| A reader on the flaw's case reads | Nothing, unless they were granted the code finding | The whole code finding and its decisions, and its flaw |
+| When the flaw is disclosed | The code finding stays internal | The code finding and its decisions go public with the flaw (REQ-40) |
 | A later sighting opens | Internal | Internal, read by both audiences |
 
 | Rule | |
 |---|---|
-| A move adds the flaw's readers to the lead's readers and takes nobody away | Somebody who read the lead once keeps reading it |
-| An undone move takes back only the readers the move added, from the lead and from the decisions at its occurrence | The lead's internal readers and its grants are as they were |
-| The flaw's readers read a moved lead wherever its internal readers do: its evidence, the queue and the counts beside it, its file and the findings file, the coverage of a standing rule, and its kin | One rule in the data layer, so no list answers differently from the page (REQ-42, REQ-43) |
-| Reading undisclosed work reads no internal lead the flaw does not hold | The addition is the moved leads of an undisclosed flaw, and nothing else of the product's internal work |
-| The flaw's readers read the decisions at a moved lead's occurrence while the flaw is undisclosed: the reasoning and its revisions, the approvals, the comments, one decision's page, and every list, count and export holding them | The audience that reads the lead's evidence reads the decisions about it, and those go public with the lead at disclosure |
-| The decisions stay internal, and the addition is the internal decisions at a moved lead's occurrence and nothing else | A decision is filed under the analyzer's rule, and the flaw's readers read no other internal decision in the product |
-| Reading a decision at a moved lead is not arguing it | A comment and an approval each keep the decision's internal triage role, and a decision about a handed-off lead is neither revised nor withdrawn |
+| An inclusion adds the flaw's readers to the code finding's readers and takes nobody away | Somebody who read the code finding once keeps reading it |
+| Taking a code finding out of disclosure takes back only the readers the inclusion added, from the code finding and from the decisions at its occurrence | The code finding's internal readers and its grants are as they were |
+| The flaw's readers read an included code finding wherever its internal readers do: its evidence, the queue and the counts beside it, its file and the findings file, the coverage of a suppression rule, and its kin | One rule in the data layer, so no list answers differently from the page (REQ-42, REQ-43) |
+| Reading undisclosed work reads no internal code finding the flaw does not hold | The addition is the included code findings of an undisclosed flaw, and nothing else of the product's internal work |
+| The flaw's readers read the decisions at an included code finding's occurrence while the flaw is undisclosed: the reasoning and its revisions, the approvals, the comments, one decision's page, and every list, count and export holding them | The audience that reads the code finding's evidence reads the decisions about it, and those go public with the code finding at disclosure |
+| The decisions stay internal, and the addition is the internal decisions at an included code finding's occurrence and nothing else | A decision is filed under the analyzer's rule, and the flaw's readers read no other internal decision in the product |
+| Reading a decision at an included code finding is not arguing it | A comment and an approval each keep the decision's internal triage role, and a decision about a code finding recorded as a flaw is neither revised nor withdrawn |
 
 | Rule | |
 |---|---|
-| A move discloses, with the flaw, every revision of reasoning and every comment on a decision about the lead or the leads linked with it, every path they name and every message the analyzer wrote there | People writing in the record have to know that from the first word (REQ-40) |
-| The offer shows that writing before the move, grouped by author, with the paths and messages, and says whether snippets are published and how many are stripped | The mover reads what goes public |
-| The writing in the offer is read at the visibilities the caller reads in the product | A hand-off takes both triage roles, and the read is narrowed in the data layer all the same (REQ-42) |
-| Disclosed means readable in the portal by everybody signed in with public access to the product | A lead is never in a published VEX or CSAF document, and the anonymous subject reads no lead |
-| At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets), and a later run describing the disclosed lead again is stripped the same way | A product's source is not published because one flaw in it was, and a run writes what the analyzer sent |
-| Disclosure records the time on the hand-off of every lead handed off as the flaw, kept or moved | A kept lead stays internal, so its visibility does not say its flaw is public |
-| A move or its undo is refused with 409 once the flaw is disclosed, kept lead or moved | Disclosure is one way |
-| The notice of a move goes to the audience it went to before the readers changed | A move tells the flaw's people the lead is in the case |
-| A move and its undo take every lead handed off as the flaw | The leads of one flaw are one case |
-| A run writes itself onto the hand-off of every lead it describes or opens at, before it reads a hand-off or writes a lead's source | A disclosure or a move of one of those leads then waits for the run, or finds the hand-off changed |
-| A move, its undo and a disclosure each change the hand-off only as it was read in their transaction: its visibility, its flaw undisclosed, and the last run to describe it | One that lost a race to another, or to a run, is asked again. A disclosure that read the hand-off before a run cannot see the source the run wrote, and a move cannot see the sighting it opened |
-| A move and its undo are recorded in the administrative trail, as the change of access they are | A move changes who reads the lead |
-| A move and its undo are made by somebody holding `internal-triage` and `private-triage` | The hand-off's own rule |
+| An inclusion discloses, with the flaw, every revision of reasoning and every comment on a decision about the code finding or the code findings linked with it, every path they name and every message the analyzer wrote there | People writing in the record have to know that from the first word (REQ-40) |
+| The offer shows that writing before the inclusion, grouped by author, with the paths and messages, and says whether snippets are published and how many are stripped | The person including it reads what goes public |
+| The writing in the offer is read at the visibilities the caller reads in the product | A flaw record takes both triage roles, and the read is narrowed in the data layer all the same (REQ-42) |
+| Disclosed means readable in the portal by everybody signed in with public access to the product | A code finding is never in a published VEX or CSAF document, and the anonymous subject reads no code finding |
+| At disclosure an included code finding's kept source is stripped, except under a path whose setting discloses it (§ Snippets), and a later run describing the disclosed code finding again is stripped the same way | A product's source is not published because one flaw in it was, and a run writes what the analyzer sent |
+| Disclosure records the time on the flaw record of every code finding recorded as the flaw, included in disclosure or not | An internal-only code finding stays internal, so its visibility does not say its flaw is public |
+| An inclusion or its removal is refused with 409 once the flaw is disclosed | Disclosure is one way |
+| The notice of an inclusion goes to the audience it went to before the readers changed | An inclusion tells the flaw's people the code finding is part of the case |
+| An inclusion and its removal take every code finding recorded as the flaw | The code findings of one flaw are one case |
+| A run writes itself onto the flaw record of every code finding it describes or opens at, before it reads a flaw record or writes a code finding's source | A disclosure or an inclusion of one of those code findings then waits for the run, or finds the flaw record changed |
+| An inclusion, its removal and a disclosure each change the flaw record only as it was read in their transaction: its visibility, its flaw undisclosed, and the last run to describe it | One that lost a race to another, or to a run, is asked again. A disclosure that read the flaw record before a run cannot see the source the run wrote, and an inclusion cannot see the sighting it opened |
+| An inclusion and its removal are recorded in the administrative trail, as the change of access they are | An inclusion changes who reads the code finding |
+| An inclusion and its removal are made by somebody holding `internal-triage` and `private-triage` | The flaw record's own rule |
 
-### Undone hand-off
+### Withdrawn flaw record
 
-`POST …/code-findings/{occurrence}/flaw/withdrawal` undoes a hand-off, with why.
+`POST …/code-findings/{occurrence}/flaw/withdrawal` undoes a flaw record, with why.
 
 | Rule | |
 |---|---|
-| It takes every lead handed off as the flaw | The leads of one flaw are one case, as a move takes them |
+| It takes every code finding recorded as the flaw | The code findings of one flaw are one case, as an inclusion takes them |
 | It is refused with 409 once the flaw is disclosed, and asks for a reason | Disclosure is one way. Undoing takes the flaw out of every build, which a person explains |
-| Each lead is confirmed again: the link goes, the decision confirming it stands, and it returns to the queue's lists of held work with whoever held it | Undoing takes back the recording and leaves the decision that it is real |
-| A moved lead is read by its internal readers alone again | A lead with no case to be in is the internal material it always was |
-| Every grant of the leads ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
-| The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a hand-off somebody undid should not have been recorded, and a hand-off made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
-| The flaw keeps the record of its lead, marked undone with who, when and why | What was recorded and taken back stays on the record |
-| It is written in one transaction that reads each hand-off again and deletes it only as read | A move, a disclosure or a run describing the lead since is a lost race, asked again (REQ-71) |
-| It is recorded in the administrative trail once per lead, each under that lead's own name, as each grant it ends is | It changes who reads the leads and what the flaw is |
+| Each code finding is confirmed again: the link goes, the decision confirming it stands, and it returns to the queue's lists of held work with whoever held it | Undoing takes back the recording and leaves the decision that it is real |
+| An included code finding is read by its internal readers alone again | A code finding with no case to be in is the internal material it always was |
+| Every grant of the code findings ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
+| The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a flaw record somebody undid should not have been recorded, and a flaw record made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
+| The flaw keeps the record of its code finding, marked undone with who, when and why | What was recorded and taken back stays on the record |
+| It is written in one transaction that reads each flaw record again and deletes it only as read | An inclusion, a disclosure or a run describing the code finding since is a lost race, asked again (REQ-71) |
+| It is recorded in the administrative trail once per code finding, each under that code finding's own name, as each grant it ends is | It changes who reads the code findings and what the flaw is |
 
 ### Fixed in
 
-A flaw recorded from a lead is offered as fixed on each build it is open on
-where its lead is not reproduced, with the first run there that did not see
-it and, where a person closed the lead as fixed, the run they named. A person
+A flaw recorded from a code finding is offered as fixed on each build it is open on
+where its code finding is no longer detected, with the first run there that did not see
+it and, where a person closed the code finding as fixed, the run they named. A person
 closes the flaw there (`DESIGN-findings.md` § Closure by a person), and the
 advisory names the build fixed from that closure (`DESIGN-remediation.md`
 § The advisory).
 
 | Rule | |
 |---|---|
-| The lead read is the one the hand-off was made at, its newest finding on each build | A lead seen again after a fixed closure opens anew, and the new finding speaks |
+| The code finding read is the one the flaw record was made at, its newest finding on each build | A code finding seen again after a fixed closure opens anew, and the new finding speaks |
 | Nothing closes the flaw but a person | Absence is weak evidence: of 28 comparable absences hand-checked, 10 were fixes |
-| The offer is read where the flaw's lead is, under the reader's visibility | It is part of the lead |
+| The offer is read where the flaw's code finding is, under the reader's visibility | It is part of the code finding |
 
-### Lead collaborators
+### Code finding collaborators
 
 `…/code-findings/{occurrence}/collaborators` lists, adds and removes people brought into
-one handed-off lead, as case collaborators are brought into one flaw
+one code finding recorded as a flaw, as case collaborators are brought into one flaw
 (REQ-43, `DESIGN-access.md` § Case collaborators).
 
 | Rule | |
 |---|---|
-| A grant reaches the lead's evidence while its flaw is undisclosed, and nothing else | It is one lead, never a list. Disclosure ends it, kept lead or moved |
-| A grant does not reach the build's inventory or tree, or the lead's kin | It is a grant of one lead, not of the build it is on or the leads beside it |
-| Collaborators are managed by somebody who reads the product's internal work, kept lead or moved | The lead is internal until its flaw is disclosed. A grant of the lead, and a reading through the flaw, are not readings of internal work |
-| A grant or a withdrawal is refused with 409 once the flaw is disclosed, and is made in one transaction with the read of the hand-off it depends on | The grants have ended |
+| A grant reaches the code finding's evidence while its flaw is undisclosed, and nothing else | It is one code finding, never a list. Disclosure ends it, whether or not the code finding is included in disclosure |
+| A grant does not reach the build's inventory or tree, or the code finding's kin | It is a grant of one code finding, not of the build it is on or the code findings beside it |
+| Collaborators are managed by somebody who reads the product's internal work, whether or not the code finding is included in disclosure | The code finding is internal until its flaw is disclosed. A grant of the code finding, and a reading through the flaw, are not readings of internal work |
+| A grant or a withdrawal is refused with 409 once the flaw is disclosed, and is made in one transaction with the read of the flaw record it depends on | The grants have ended |
 | A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in, in a line their grant reaches | As a case collaborator is |
-| A reader on the flaw's case reads a moved lead in full | The lead is part of the case |
+| A reader on the flaw's case reads an included code finding in full | The code finding is part of the case |
 
 ## Third-party code
 
 A run declares the paths holding code the product did not write (§ Run
-parameters). A lead under one is a lead like any other, triaged and confirmed
+parameters). A code finding under one is a code finding like any other, triaged and confirmed
 as any other is.
 
 | Rule | |
 |---|---|
-| A declared path is a prefix in its own right, as a repository is | Vendored code copied into the tree has no repository of its own. Every file under the path, at any depth, shares one prefix and one confirmed component (§ Hand-off offer) |
+| A declared path is a prefix in its own right, as a repository is | Vendored code copied into the tree has no repository of its own. Every file under the path, at any depth, shares one prefix and one confirmed component (§ Flaw record offer) |
 | The innermost of the run's repositories and declared paths holding a file is its prefix | A repository nested in vendored code names its own component, as a repository nested in another does |
-| A declared path is recorded as a path from the top of the checkout | `./src/vendor`, `src//vendor/` and `/src/vendor` are `src/vendor`, and `..` climbs no higher than the top. A lead's path is compared in that form |
+| A declared path is recorded as a path from the top of the checkout | `./src/vendor`, `src//vendor/` and `/src/vendor` are `src/vendor`, and `..` climbs no higher than the top. A code finding's path is compared in that form |
 | A declared path holds itself and every path under it, compared exactly | `src/vendor/zlib` holds `src/vendor/zlib/inflate.c` and not `src/vendor/zlibx/a.c`; paths are case-sensitive |
-| The declaration read is the newest run's to see the lead | The run's description of the checkout is the one the lead's path was read against, as its repositories are |
+| The declaration read is the newest run's to see the code finding | The run's description of the checkout is the one the code finding's path was read against, as its repositories are |
 | A run's list that does not read as a list of paths declares nothing | The upload writes a list of paths from the top of the checkout, and nothing else is a declaration |
-| The lead's evidence, its hand-off offer, its row in the queue and the queue's file say it is third-party | A person handing off the flaw reports it to the upstream it came from. Its advisory or VEX then reaches the product's builds through the supplier and upstream paths (`DESIGN-ingest.md` § Supplier advisories) |
-| A third-party lead is still handed off here | The flaw ships in the product's builds until the upstream's fix arrives, and recording it is what tracks that |
+| The code finding's evidence, its flaw record offer, its row in the queue and the queue's file say it is third-party | A person recording as a flaw the flaw reports it to the upstream it came from. Its advisory or VEX then reaches the product's builds through the supplier and upstream paths (`DESIGN-ingest.md` § Supplier advisories) |
+| A third-party code finding is still recorded as a flaw here | The flaw ships in the product's builds until the upstream's fix arrives, and recording it is what tracks that |
 
 ## End of life
 
-A lead seen only in releases past their end of life is kept as it stands, and
+A code finding seen only in releases past their end of life is kept as it stands, and
 nothing about it is deleted (REQ-15). When a release reaches its end of life
 is in `DESIGN-data-model.md` § End of support.
 
 | Rule | |
 |---|---|
-| A lead is past its end of life when every release of the product holding a finding of it is | A lead also seen in a supported release is work there |
-| The queue leaves out every sighting in a release past its end of life, and counts the open leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
-| A lead open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A lead closed or not reproduced on a supported release is still that release's to decide, and the queue holds open work |
-| A decision, a fixed closure, an assignment and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
-| A re-affirmation of a lapsed decision leaves such a lead out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes the decision at each occurrence again. The list of what is yours to re-affirm counts the same occurrences and leaves off a decision with none |
-| A decision about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
+| A code finding is past its end of life when every release of the product holding a finding of it is | A code finding also seen in a supported release is work there |
+| The queue leaves out every sighting in a release past its end of life, and counts the open code findings it leaves out | A list that leaves code findings out says how many (REQ-30). The lists by state still hold them |
+| A code finding open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A code finding closed or no longer detected on a supported release is still that release's to decide, and the queue holds open work |
+| A decision, a fixed closure, an assignment and a flaw record are refused with 409 | Nobody fixes a release nobody supports |
+| A re-affirmation of a lapsed decision leaves such a code finding out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes the decision at each occurrence again. The list of what is yours to re-affirm counts the same occurrences and leaves off a decision with none |
+| A decision about a code finding still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
 | A decision already standing at it is still agreed to or withdrawn | The decision is one somebody made, and an approval is of what was read (REQ-28) |
-| A lead already handed off is still moved into or out of its flaw's case | The move is about the flaw, which is judged on its own builds |
+| A code finding already recorded as a flaw is still included in or taken out of its flaw's disclosure | The inclusion is about the flaw, which is judged on its own builds |
 | Its evidence says it is past its end of life | The page offers none of the refused controls |
-| A retired branch, tag or variant takes no run (§ The upload), so it stops producing sightings, and its leads stay listed with the product | `DESIGN-data-model.md` § Catalog retirement. Retiring closes off what arrives, and keeps what was found |
+| A retired branch, tag or variant takes no run (§ The upload), so it stops producing sightings, and its code findings stay listed with the product | `DESIGN-data-model.md` § Catalog retirement. Retiring closes off what arrives, and keeps what was found |
 
 ## Receipts
 
@@ -866,9 +869,9 @@ is in `DESIGN-data-model.md` § End of support.
 | Status, failure | § Run application |
 | Comparable, and the reason where not | § Run parameters |
 | Tool and version | As recorded |
-| Counts | Opened, seen again, returned, not reproduced, left open as uncompared, paired probably, carried from the branch a build was cut from, reopened at a closed lead's occurrence, and what was dropped, left out and discarded, each by reason |
+| Counts | Opened, seen again, returned, no longer detected, left open as uncompared, paired probably, carried from the branch a build was cut from, reopened at a closed code finding's occurrence, and what was dropped, left out and discarded, each by reason |
 | Fingerprint change | Whether the run's fingerprints changed from the build's last (§ Fingerprint change) |
-| Sharp drop | Whether the run marked more not reproduced than the deployment expects of one run (§ Run application) |
+| Sharp drop | Whether the run marked more no longer detected than the deployment expects of one run (§ Run application) |
 
 Beside the runs, the list carries the last upload of each series to the
 build that was turned away after its sender was admitted: the series as the
@@ -877,7 +880,7 @@ series and build, replaced by the next. An upload refused before its sender
 was admitted to the build is recorded nowhere, because recording it would
 tell whoever reads the build that somebody without access tried.
 
-A receipt counts leads and never names one. A pipeline key reads the receipts
+A receipt counts code findings and never names one. A pipeline key reads the receipts
 of a build it may send to; a person reads them where they read internal
 findings in the product, since the counts are of internal findings. A
 pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
@@ -1001,7 +1004,7 @@ it is about.
 
 | Part | State |
 |---|---|
-| Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead decisions: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-analytics.md` § Approval quality) |
+| Code findings over time | Not built. Statistics include no code finding (`DESIGN-kinds.md` § Consumers), so no report says how long a code finding took to be judged or fixed, or how a series' counts moved. What a product's code findings stand at now is counted by series (§ Code findings by series). Approval quality and the exception report read code finding decisions: a code finding's dismissal standing on one person is a control that did not hold (`DESIGN-analytics.md` § Approval quality) |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 
@@ -1009,26 +1012,26 @@ it is about.
 
 | Limit | Detail |
 |---|---|
-| A moved result with no fingerprint and no function is matched on its line alone | clang-tidy, and clang before 22, give rule, path, line and message. A line moved above such a result pairs it with the nearest lead of the same rule and message in the file, which is probable, and two such results moving past each other can swap |
+| A moved result with no fingerprint and no function is matched on its line alone | clang-tidy, and clang before 22, give rule, path, line and message. A line moved above such a result pairs it with the nearest code finding of the same rule and message in the file, which is probable, and two such results moving past each other can swap |
 | A new variant inherits on the whole key alone | Carrying by every layer is from the stream a branch was cut from. A variant's first run of a series takes a sibling variant's occurrences where the whole keys are equal |
-| A result whose whole key equals the one a moved lead was first seen with opens at that lead's occurrence | Occurrences are minted from the first key a series saw. Both are the same rule, path, fingerprint and message, which is one flaw reported twice |
+| A result whose whole key equals the one a moved code finding was first seen with opens at that code finding's occurrence | Occurrences are minted from the first key a series saw. Both are the same rule, path, fingerprint and message, which is one flaw reported twice |
 | A run that ends unread counts nothing on its receipt | A run is read only once its build has an inventory, so one superseded or failed while it waits, or held in a shape the release applying it does not read, ends with a receipt naming no drop and no discard |
-| Coverity's native JSON is not read, so its SARIF is matched as plain SARIF | Coverity's `mergeKey` is in its JSON and is lost in its SARIF. A Coverity lead is matched on the key its SARIF states, as any plain SARIF is (§ Keys) |
+| Coverity's native JSON is not read, so its SARIF is matched as plain SARIF | Coverity's `mergeKey` is in its JSON and is lost in its SARIF. A Coverity code finding is matched on the key its SARIF states, as any plain SARIF is (§ Keys) |
 | Two identical results in one build share an occurrence | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |
 | A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its placed results |
 | The counts per run are measured against small trees | The largest real output measured is CodeQL's 226,586 bytes over a small C++ tree (§ Bounds). No producer's output for a tree the size of a product's own build was measured, so the results per run and the two memory figures rest on the 150,000-result measurement of what reading costs rather than on a producer. A deployment analyzing a large tree raises them, and the memory limit with the two that are memory figures |
 | A link reaches only the repositories a product names a host for | A product of many hosts names each. A repository on none is shown as its remote, which is text |
 | A snippet records what the upload sent | Nothing compares it with the repository, so a patched repository's snippet is the patched source and its link is the source before the patch |
-| A link in a lead with no repository a run names is to a branch | It is marked approximate, and the branch has moved since the build whenever anybody pushed to it |
+| A link in a code finding with no repository a run names is to a branch | It is marked approximate, and the branch has moved since the build whenever anybody pushed to it |
 | The documentation hosts are a list in the code | An analyzer documenting rules elsewhere has its documentation dropped until the list names it |
 | A tool is told apart by the name its output gives it | Two configurations of one tool in one invocation are one series. A pipeline running a tool twice runs the client twice |
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | The client places a path naming no starting point against the directory it runs in, and the deployment against the working directory the output states | One output sent both ways is placed differently when the analyzer ran outside the directory the client runs in |
-| An internal reader reads a moved lead whole, and is not told its flaw | The flaw is undisclosed work. The lead's state reads handed off for both |
-| A grant of a moved lead reaches its evidence and not the decisions at its occurrence | The decisions are widened for the flaw's two audiences, and a lead grant is a third reach of one occurrence's findings |
-| A notice or a mention about a decision at a moved lead reaches its internal readers alone | A mention resolves names against the people who read the decision's visibility in its product, and that stays internal until disclosure. A reader of the flaw reads the decision and is not told of a note on it |
-| A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their decisions to the new name |
-| Every lead of a series' first run is in the queue | A vulnerability scanner's first scan has no baseline either, and starting to analyze a codebase leaves what it already holds to be triaged and fixed. A codebase analyzed for the first time puts every result in front of a triager at once, and the order and the standing rules are what thin it |
+| An internal reader reads an included code finding whole, and is not told its flaw | The flaw is undisclosed work. The code finding's state reads recorded as a flaw for both |
+| A grant of an included code finding reaches its evidence and not the decisions at its occurrence | The decisions are widened for the flaw's two audiences, and a code finding grant is a third reach of one occurrence's findings |
+| A notice or a mention about a decision at an included code finding reaches its internal readers alone | A mention resolves names against the people who read the decision's visibility in its product, and that stays internal until disclosure. A reader of the flaw reads the decision and is not told of a note on it |
+| A renamed file's results open as new code findings | Every key holds the path, so the code findings under the old name go no longer detected and nothing carries their decisions to the new name |
+| Every code finding of a series' first run is in the queue | A vulnerability scanner's first scan has no baseline either, and starting to analyze a codebase leaves what it already holds to be triaged and fixed. A codebase analyzed for the first time puts every result in front of a triager at once, and the order and the suppression rules are what thin it |
 | An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |
-| A lead sorts after every finding in the lists of held work | They are ordered by urgency, and a lead carries none. The rail's Unassigned entry opens the findings list, which holds no lead (`DESIGN-kinds.md` § Consumers): an unassigned lead is listed by the unassigned list's read, and named unheld in the lead queue |
+| A code finding sorts after every finding in the lists of held work | They are ordered by urgency, and a code finding carries none. The rail's Unassigned entry opens the findings list, which holds no code finding (`DESIGN-kinds.md` § Consumers): an unassigned code finding is listed by the unassigned list's read, and named unheld in the code finding queue |

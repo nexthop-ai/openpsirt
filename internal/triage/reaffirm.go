@@ -297,7 +297,7 @@ func turnsOnSeverity(decision Decision) bool {
 	if !decision.Outcome.HidesRisk() || decision.Outcome == Mismatched {
 		return false
 	}
-	// A rule is rated by nobody, so nothing about a lead rises.
+	// A rule is rated by nobody, so nothing about a code finding rises.
 	if decision.Outcome.AboutALead() {
 		return false
 	}

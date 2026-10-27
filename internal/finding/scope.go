@@ -58,7 +58,7 @@ func (s Scope) Narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // Builds is the identifiers of the builds a scope covers, in a stable order.
 //
 // Resolved once and bound into the queries that follow rather than joined into
-// each of them. The findings list reads its page from an index that leads with
+// each of them. The findings list reads its page from an index that code findings with
 // the build (`finding_group_idx`), so naming the builds keeps that index usable
 // as one range per build; joining the catalog into the same statement would
 // make the engine reach a row to discover what it already knew from the key.

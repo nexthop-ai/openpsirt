@@ -940,15 +940,15 @@ func (s *Store) LocateVisible(ctx context.Context, subject access.Subject, produ
 	return s.Locate(ctx, product, stream, variant)
 }
 
-// LocateForLead is LocateVisible for a read of one lead, which somebody
-// granted a handed-off lead in the product may also make. Every read past it
-// asks about the lead.
-func (s *Store) LocateForLead(ctx context.Context, subject access.Subject, product, stream, variant string) (*Named, error) {
+// LocateForCodeFinding is LocateVisible for a read of one code finding, which somebody
+// granted a code finding recorded as a flaw in the product may also make. Every read past it
+// asks about the code finding.
+func (s *Store) LocateForCodeFinding(ctx context.Context, subject access.Subject, product, stream, variant string) (*Named, error) {
 	p, err := s.ProductByName(ctx, product)
 	if err != nil {
 		return nil, err
 	}
-	if !subject.ReachesLead(p.ID) {
+	if !subject.ReachesCodeFinding(p.ID) {
 		return nil, fmt.Errorf("product %q: %w", product, ErrNotFound)
 	}
 	return s.Locate(ctx, product, stream, variant)

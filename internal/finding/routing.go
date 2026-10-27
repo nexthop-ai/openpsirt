@@ -132,7 +132,7 @@ func (s *Store) insertRule(ctx context.Context, by access.Subject, productID, te
 // Rules lists a product's standing rules, in the order they are tried.
 //
 // Read by whoever triages the product at any visibility, internal included,
-// because a rule places leads too. The rules are its triage configuration and
+// because a rule places code findings too. The rules are its triage configuration and
 // carry no finding, so there is nothing to narrow: a reader gets the whole
 // precedence order or none of it.
 func (s *Store) Rules(ctx context.Context, subject access.Subject, productID int64) ([]Routing, error) {
@@ -283,11 +283,11 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		Where(`"closed_at" IS NULL`).
 		Where(`"assigned_to" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(holdable)).
-		Where(notHandedOffIn).
+		Where(notRecordedAsFlawIn).
 		Where(inThisProduct, productID).
 		Where(kinds, kindArgs...).
 		Limit(int64(room))
-	page, err = s.leadsInSupport(ctx, page, productID)
+	page, err = s.codeFindingsInSupport(ctx, page, productID)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -440,7 +440,7 @@ type Catches struct {
 	Components []string
 	Total      int
 	// Work is how many pieces of work sit at those components — one issue in
-	// one component, whatever it sits at, or one lead — and Unheld is how many
+	// one component, whatever it sits at, or one code finding — and Unheld is how many
 	// of those nobody holds. Only the second is what a rule would place, and
 	// they are both shown because the gap between them is the thing worth
 	// knowing.
@@ -491,10 +491,10 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			Where(notHandedOffIn).
+			Where(notRecordedAsFlawIn).
 			Where(inThisProductAs(`"f"."target_id"`), productID).
 			Where(kinds, kindArgs...)
-		q, err := s.leadsInSupport(ctx, q, productID)
+		q, err := s.codeFindingsInSupport(ctx, q, productID)
 		if err != nil {
 			return nil, err
 		}
@@ -546,7 +546,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 
 	counted, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + leadPiece + ` AS "lead_place"`))
+		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + codeFindingPiece + ` AS "code_finding_place"`))
 	if err != nil {
 		return Catches{}, err
 	}
@@ -558,7 +558,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 
 	unheld, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + leadPiece + ` AS "lead_place"`).
+		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + codeFindingPiece + ` AS "code_finding_place"`).
 		Where(`"f"."assigned_to" IS NULL`))
 	if err != nil {
 		return Catches{}, err
@@ -571,17 +571,17 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	return found, nil
 }
 
-// leadPiece is what tells one lead from another at one issue and component,
+// codeFindingPiece is what tells one code finding from another at one issue and component,
 // over a finding under "f": its occurrence. A piece of work is an issue at a
-// component, and a lead is one occurrence under its analyzer's rule, so two
+// component, and a code finding is one occurrence under its analyzer's rule, so two
 // results of one rule in one component are two pieces of work.
-const leadPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
+const codeFindingPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
 
-// leadsInSupport leaves out of a query over findings under "f" every lead past
+// codeFindingsInSupport leaves out of a query over findings under "f" every code finding past
 // its end of life: one every release of the product it was seen in is past
-// its end of life, which is kept as it stands (REQ-15). The rule LeadEnded
+// its end of life, which is kept as it stands (REQ-15). The rule CodeFindingEnded
 // holds, asked of each row.
-func (s *Store) leadsInSupport(ctx context.Context, q *bun.SelectQuery, productID int64) (*bun.SelectQuery, error) {
+func (s *Store) codeFindingsInSupport(ctx context.Context, q *bun.SelectQuery, productID int64) (*bun.SelectQuery, error) {
 	ended, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, s.now().UTC())
 	if err != nil {
 		return nil, err

@@ -39,7 +39,7 @@ import { UpstreamSaid } from "../ui/UpstreamSaid";
 // Arranged on where it sits. What can be done about a package is mostly a
 // function of its position: a leaf carries its own risk and is upgraded, and
 // something vendored in pre-built carries everything beneath it and moves only
-// when it does. So the graph leads — what pulls it in, the package, what it
+// when it does. So the graph code findings — what pulls it in, the package, what it
 // carries — and the act hangs off that.
 //
 // A build is listed because it ships it, not because something is open

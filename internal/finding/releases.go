@@ -223,7 +223,7 @@ func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
 // The component lookup raises an ambiguity before it knows which issue is
 // being asked about, so on its own it can only offer every version of the
 // name. A real image ships one library at fifteen, of which three carry a
-// given issue — offering all fifteen is a list where four in five choices lead
+// given issue — offering all fifteen is a list where four in five choices code finding
 // to "no such finding", which is a worse answer than the refusal it replaced.
 func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 	targetID, vulnerabilityID int64, name string) ([]graph.Choice, error) {

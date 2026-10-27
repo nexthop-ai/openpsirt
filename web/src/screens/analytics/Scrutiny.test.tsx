@@ -11,7 +11,7 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 describe("risk standing on one person", () => {
-  it("files a lead's dismissal standing alone as a control that did not hold", async () => {
+  it("files a code finding's dismissal standing alone as a control that did not hold", async () => {
     serve((path) => {
       if (path === "/v1/session/me") {
         return {

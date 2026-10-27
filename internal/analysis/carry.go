@@ -16,34 +16,34 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/series"
 )
 
-// carried is the lead of the series elsewhere a result new to this build is
+// carried is the code finding of the series elsewhere a result new to this build is
 // the same result as: the occurrence it takes, and how it was found.
 type carried struct {
 	occurrence string
 	on         string
-	// from says where the lead was found.
+	// from says where the code finding was found.
 	from string
 }
 
 // Where a carried occurrence was found.
 const (
-	// fromParent is a lead of the stream this one was cut from, on the
+	// fromParent is a code finding of the stream this one was cut from, on the
 	// build of the same variant, paired by the layers on the build's first
 	// run of the series.
 	fromParent = "parent"
-	// fromReopened is a lead on this build that is closed, found again.
+	// fromReopened is a code finding on this build that is closed, found again.
 	fromReopened = "reopened"
-	// fromSeries is a lead on another build, on the whole key.
+	// fromSeries is a code finding on another build, on the whole key.
 	fromSeries = "series"
 )
 
-// carry finds, for each result new to this build, a lead the series already
+// carry finds, for each result new to this build, a code finding the series already
 // holds that it is the same result as. On the series' first run on the build,
-// the leads open on the parent stream's build of the same variant are paired
+// the code findings open on the parent stream's build of the same variant are paired
 // with them layer by layer, which is how a new branch inherits what the line
 // it was cut from has decided. Whatever is left is looked up across the
 // series, open or closed, on the whole key alone: a probable pairing with a
-// lead the build never saw is a guess. A result found nowhere is absent from
+// code finding the build never saw is a guess. A result found nowhere is absent from
 // the answer, and opens an occurrence of its own.
 func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, first bool, fresh []Keyed) (
 	map[int]carried, error) {
@@ -89,7 +89,7 @@ func parentBuild(ctx context.Context, db bun.IDB, targetID int64) (int64, error)
 	return ids[0], nil
 }
 
-// fromParentBuild pairs the results with the leads open on the parent build,
+// fromParentBuild pairs the results with the code findings open on the parent build,
 // on the unprinted key too where the run's fingerprints differ from that
 // build's last.
 func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fresh []Keyed, printsChanged bool,
@@ -142,14 +142,14 @@ func occurrencesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]stri
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("read where these leads are: %w", err)
+		return nil, fmt.Errorf("read where these code findings are: %w", err)
 	}
 	return out, nil
 }
 
 // fromSeriesKey looks the results nothing has carried yet up across the
-// series on the whole key. A closed lead on this build comes first, since
-// that is the same result found again here, and then the oldest lead
+// series on the whole key. A closed code finding on this build comes first, since
+// that is the same result found again here, and then the oldest code finding
 // elsewhere.
 func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fresh []Keyed, out map[int]carried) error {
 	var keys []string
@@ -182,7 +182,7 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
 			Where(where, args...).
 			Scan(ctx, &rows); err != nil {
-			return fmt.Errorf("read which leads of the series these results are: %w", err)
+			return fmt.Errorf("read which code findings of the series these results are: %w", err)
 		}
 		for _, r := range rows {
 			byKey[r.Key] = append(byKey[r.Key], r)

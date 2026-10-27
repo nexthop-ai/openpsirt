@@ -71,7 +71,7 @@ export function Collaborators({
 }
 
 // The people brought into one grant narrower than the product: a case, or one
-// lead. What the grant reaches is said on the card.
+// code finding. What the grant reaches is said on the card.
 export function People({
   product,
   scope,

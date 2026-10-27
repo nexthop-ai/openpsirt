@@ -101,8 +101,8 @@ decision made about a leaf.
 
 ## Outcomes
 
-These are the outcomes about a vulnerability. A lead takes its own, which
-`DESIGN-analysis.md` § Lead triage holds.
+These are the outcomes about a vulnerability. A code finding takes its own, which
+`DESIGN-analysis.md` § Code finding triage holds.
 
 | Outcome | Means |
 |---|---|
@@ -216,7 +216,7 @@ Arguing, agreeing and reading are separate questions.
 
 | Rule | |
 |---|---|
-| A triager may approve somebody else's decision about disclosed or undisclosed work | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative. A decision about a lead takes the approver capability (`DESIGN-analysis.md` § Lead triage) |
+| A triager may approve somebody else's decision about disclosed or undisclosed work | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative. A decision about a code finding takes the approver capability (`DESIGN-analysis.md` § Code finding triage) |
 | Reading is the finding's own visibility and nothing else (REQ-43) | Asking whether the reader could decide or approve was narrower: a reader saw "deferred" with no way to see why, and on a real deployment somebody holding private reading opened a finding and was told none of its 91 decision rows existed |
 | Writing is named apart from reading in the code | They are separate rules. Adding a comment had leaned on the reading rule, so widening one would let a reader comment on a decision they may not argue about |
 | Every check reads the product and visibility from the row | Never from what a caller stated |
@@ -261,8 +261,8 @@ holds the ones nobody has agreed to yet.
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
 | Undoing a bulk approval takes back only the agreements the person undoing gave | A batch is named by whoever gives it, so two reviewers may each hold one of the same name. Undoing one is not a way to withdraw another reviewer's agreement |
 | A decision it reaches only part of is left alone whole | The agreement is one row keyed on the decision, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
-| A decision about a lead handed off as a flaw is left alone whole | Its flaw is judged instead, and nothing else changes the decision (`DESIGN-analysis.md` § Hand-off) |
-| A lead handed off as a flaw is in no list of held work | Its flaw is held and listed as itself, so the lead is closed work for its holder (`DESIGN-analysis.md` § Lead assignment) |
+| A decision about a code finding recorded as a flaw is left alone whole | Its flaw is judged instead, and nothing else changes the decision (`DESIGN-analysis.md` § Flaw record) |
+| A code finding recorded as a flaw is in no list of held work | Its flaw is held and listed as itself, so the code finding is closed work for its holder (`DESIGN-analysis.md` § Code finding assignment) |
 | What an undo reports is what returned to waiting | A decision another agreement still stands on, and one that has ended, is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
@@ -296,7 +296,7 @@ what became of it, what it wrote, and what it covers now.
 | Refused whole or answered whole | Shown half, a reader would be told about words whose other half is about a finding they may not see |
 | A list showing the rows a reader may read leaves off the reasoning of a decision they may read only part of | The audit log, the list of decision occurrences, one occurrence read alone, and the earlier, similar and elsewhere decisions beside a finding each show a row its reader may read. The reasoning on it is about every occurrence of the decision, so it is shown only where they may read them all |
 | A case grant reaches it | Somebody brought into one issue is offered its decisions by every list they can reach, and a decision offered and then refused reads as a fault rather than as a rule |
-| The flaw's readers reach a decision at a moved lead's occurrence while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the lead, and the same narrowing adds its decisions (`DESIGN-analysis.md` § Keep or move) |
+| The flaw's readers reach a decision at an included code finding's occurrence while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the code finding, and the same narrowing adds its decisions (`DESIGN-analysis.md` § Disclosure inclusion) |
 | The counts are narrowed to findings the reader may see | A decision somebody may read can match findings they may not, and a count is the leak even where no row is shown |
 
 ## Decisions
@@ -346,7 +346,7 @@ underneath carry where it lands and when it stops applying.
 This was on the row. A decision reaching forty-four occurrences was forty-four copies
 of one sentence, each revisable on its own — so revising one returned that row
 to the queue and left the other forty-three saying the old thing under a decision
-that read as agreed. Measured on the demo before the move: 11 decisions, 155
+that read as agreed. Measured on the demo before the inclusion: 11 decisions, 155
 rows, 155 revisions, and five distinct pieces of reasoning; one decision
 carried forty-four identical copies of its own words. Every payload field was
 constant across every row of every decision.
@@ -1051,7 +1051,7 @@ The lapsed population is reached by the findings list's `lapsed` state, and by
 the review queue's To reaffirm tab, which lists the reader's own lapsed decisions.
 A decision with a withdrawn row is neither listed there nor offered on its page:
 its author took it back, and a withdrawal leaves a row that had already lapsed
-as it was. A row at a lead past its end of life is not re-made, and a decision
+as it was. A row at a code finding past its end of life is not re-made, and a decision
 with no other row is neither listed nor offered (`DESIGN-analysis.md` § End of
 life). The act sits on the decision, or on several decisions from that tab
 (§ Re-affirmation across decisions).

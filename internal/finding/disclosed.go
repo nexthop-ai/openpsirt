@@ -170,7 +170,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 
 // makePublic turns every occurrence of one issue in one product public, open
 // and closed, along with every decision occurrence recorded about it there and
-// every lead moved into its case.
+// every code finding included in its flaw's disclosure.
 //
 // A decision occurrence carries the visibility of the finding it was recorded
 // about, so that who may reach it is answered by the row. Left behind, the
@@ -203,8 +203,8 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 		Exec(ctx); err != nil {
 		return fmt.Errorf("disclose the decision occurrences: %w", err)
 	}
-	// A lead moved into the case is part of the record disclosed with it.
-	return leadsFollow(ctx, db, productID, vulnerabilityID, now)
+	// A code finding included in disclosure is part of the record disclosed with it.
+	return codeFindingsFollow(ctx, db, productID, vulnerabilityID, now)
 }
 
 // Audience is who to tell that an issue was disclosed, and the names to tell them

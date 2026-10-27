@@ -480,11 +480,11 @@ func registerTriage(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
-		// A lead an agreed dismissal held out of the queue is back in it.
-		for _, lead := range reopened {
-			if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadReopened,
-				ProductID: lead.ProductID, Occurrence: lead.OccurrenceIdentity, By: subject.ID}); err != nil {
-				in.Log().Error("could not say that a lead's dismissal was withdrawn", "error", err)
+		// A code finding an agreed dismissal held out of the queue is back in it.
+		for _, codeFinding := range reopened {
+			if err := notify.TellCodeFindingTriagers(ctx, in.DB.DB, notify.CodeFindingAct{Kind: notify.CodeFindingReopened,
+				ProductID: codeFinding.ProductID, Occurrence: codeFinding.OccurrenceIdentity, By: subject.ID}); err != nil {
+				in.Log().Error("could not say that a code finding's dismissal was withdrawn", "error", err)
 			}
 		}
 		return &struct{}{}, nil

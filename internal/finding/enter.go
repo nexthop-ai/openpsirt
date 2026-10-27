@@ -108,7 +108,7 @@ type Entering struct {
 	FromReport string
 	// Then runs last inside the transaction that records the flaw, with the
 	// issue minted, so what is recorded beside the flaw stands or falls with
-	// it. A static analysis lead handed off is recorded this way.
+	// it. A static analysis code finding recorded as a flaw is recorded this way.
 	Then func(ctx context.Context, tx bun.IDB, vulnerabilityID int64, now time.Time) error
 }
 

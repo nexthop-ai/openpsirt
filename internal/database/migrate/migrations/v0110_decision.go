@@ -13,11 +13,11 @@ import (
 // writers match on.
 func decisionStampV0110(t *columnTypes) []string {
 	return []string{
-		// Changed by a lead's hand-off resting on the decision, and by
+		// Changed by a code finding's flaw record resting on the decision, and by
 		// revising, withdrawing, approving, setting aside, sending back or
 		// undoing the approval of it, each matching the value it read. A write
 		// matching none lost a race with another and is taken again, so a
-		// hand-off and a withdrawal of the decision it rests on cannot both
+		// flaw record and a withdrawal of the decision it rests on cannot both
 		// commit. A decision with no row here holds the stamp zero.
 		//
 		// A row of its own, which no foreign key points at: InnoDB locks

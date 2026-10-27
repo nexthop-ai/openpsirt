@@ -137,10 +137,10 @@ func registerDecisions(api huma.API, in core.Deps) {
 			if d, ok := described[back.DecisionOccurrence.ID]; ok {
 				link = weblink.Finding(d.Product, d.Stream, d.Variant,
 					d.Issue.Identifier, d.Component, d.Version)
-				// A rule names no finding page; its lead is addressed by
+				// A rule names no finding page; its code finding is addressed by
 				// its occurrence.
 				if d.Issue.Kind == kind.Rule {
-					link = weblink.Lead(d.Product, d.Stream, d.Variant, back.DecisionOccurrence.OccurrenceIdentity)
+					link = weblink.CodeFinding(d.Product, d.Stream, d.Variant, back.DecisionOccurrence.OccurrenceIdentity)
 				}
 			}
 		} else if err != nil {
@@ -248,7 +248,7 @@ func registerReaffirmDecision(api huma.API, in core.Deps) {
 			"`triage.agreed-issues` where nothing goes back to an approver, and against " +
 			"`triage.review-issues` where anything does; the findings it writes count against " +
 			"`triage.write-ceiling`.\n\n" +
-			"A lead past its end of life is not re-made, and a decision with no other occurrence is " +
+			"A code finding past its end of life is not re-made, and a decision with no other occurrence is " +
 			"refused with 409.\n\n" +
 			"An occurrence that is open nowhere any more is not re-made, which is a finding that " +
 			"closed rather than a fault. `reasoning` is required.",

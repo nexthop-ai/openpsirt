@@ -12,7 +12,7 @@ import (
 // The fingerprint of one function's lines, whatever line endings and
 // indentation the checkout gives them. Worked out by hand from the
 // normalized lines, never by this code: a change to the normalization fails
-// here before it reopens every lead a pipeline has.
+// here before it reopens every code finding a pipeline has.
 const (
 	// Line 2, `int d = 0;`, with the line either side.
 	goldenLine2 = "6068ce7eef28160d5cc6621d43275dc90f180092a1e663de9eb2a68e31fa5ee8"

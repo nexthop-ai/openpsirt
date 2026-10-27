@@ -290,7 +290,7 @@ func statedBeside(parts *analysisParts) (analysis.Stated, error) {
 	var paths []string
 	for _, p := range parts.ThirdParty {
 		// Cleaned as a path from the top of the checkout, which is how a
-		// lead's path is compared against it: "./src/vendor" and
+		// code finding's path is compared against it: "./src/vendor" and
 		// "src//vendor/" are "src/vendor", and nothing climbs above the top.
 		if p = strings.Trim(path.Clean("/"+strings.TrimSpace(p)), "/"); p != "" {
 			paths = append(paths, p)

@@ -185,7 +185,7 @@ describe("the audit log's list", () => {
 });
 
 describe("the exception report", () => {
-  it("reads as one that should be empty when asked for a lead's dismissals", async () => {
+  it("reads as one that should be empty when asked for a code finding's dismissals", async () => {
     serve((path) => {
       if (path === "/v1/session/me") {
         return {

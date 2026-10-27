@@ -163,7 +163,7 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 	// an operator to set it: every file of the program. The harness and the
 	// gates are left out, because the names they carry configure a test run
 	// rather than a deployment. The upload client is left out too: its names
-	// configure a pipeline, and docs/analysis.md holds them.
+	// configure a pipeline, and docs/security-testing.md holds them.
 	refusals := goSources(t, "../..", "../../internal/tools", "../../internal/dbtest",
 		"../../web", "../../node_modules", "../../cmd/openpsirt-upload", "../../internal/uploadclient")
 	requireAmong(t, refusals, "../../internal/config/config.go", "../../cmd/openpsirt/main.go")

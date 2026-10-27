@@ -294,7 +294,7 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 	})
 }
 
-func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
+func TestTheVersionWorthTakingCodeFindingsRatherThanTheOneThatFixedMost(t *testing.T) {
 	// Measured on the demo's kernel: of 168 open, the 6.12.100-1 release fixed
 	// 49 and the newest named, 6.12.107-1, fixed 2 — so ranked on what each
 	// release fixed, the version that closes everything sorts near the bottom
@@ -338,7 +338,7 @@ func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 		}
 		// Furthest along first, though it fixed the fewest of its own.
 		if up[0].To != "3.9.0" {
-			t.Errorf("the list leads with %q, want the newest version named", up[0].To)
+			t.Errorf("the list code findings with %q, want the newest version named", up[0].To)
 		}
 		if up[0].FixedHere != 1 {
 			t.Errorf("3.9.0 fixed %d of its own, want one", up[0].FixedHere)
@@ -511,21 +511,21 @@ func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
 		// The weight, which is what this view is for and what it
 		// answers when nothing is asked.
 		if got := leader(finding.Filter{}); got != swss.Name {
-			t.Errorf("unasked, the view leads with %q rather than the package holding the most issues", got)
+			t.Errorf("unasked, the view code findings with %q rather than the package holding the most issues", got)
 		}
 		// Its reach. Three issues at one occurrence against two issues at two
 		// occurrences: a view that ignores the key answers the same as above.
 		if got := leader(finding.Filter{SortBy: finding.ByOccurrences}); got != libnl.Name {
-			t.Errorf("sort=occurrences leads with %q rather than the package sitting at the most occurrences", got)
+			t.Errorf("sort=occurrences code findings with %q rather than the package sitting at the most occurrences", got)
 		}
 		// The worst of what is open against it.
 		if got := leader(finding.Filter{SortBy: finding.BySeverity}); got != libnl.Name {
-			t.Errorf("sort=severity leads with %q rather than the package holding the critical", got)
+			t.Errorf("sort=severity code findings with %q rather than the package holding the critical", got)
 		}
 		// And the other way round, which was accepted and discarded: the
 		// caller asking for the least of something was answered with the most.
 		if got := leader(finding.Filter{SortBy: finding.ByOccurrences, Ascending: true}); got != swss.Name {
-			t.Errorf("asc=true leads with %q, which is what descending answers", got)
+			t.Errorf("asc=true code findings with %q, which is what descending answers", got)
 		}
 	})
 }
@@ -588,17 +588,17 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 
 		// Worst first unasked: the bump carrying the critical.
 		if got := leader(finding.Filter{}); got.Upstream != libnl.Name {
-			t.Errorf("unasked, the list leads with %q rather than the bump closing the critical", got.Upstream)
+			t.Errorf("unasked, the list code findings with %q rather than the bump closing the critical", got.Upstream)
 		}
 		// Most closed first when that is what was asked.
 		if got := leader(finding.Filter{PlannedUpgradeSort: finding.PlannedUpgradesByIssues}); got.Upstream != swss.Name {
-			t.Errorf("sort=issues leads with %q rather than the bump closing the most", got.Upstream)
+			t.Errorf("sort=issues code findings with %q rather than the bump closing the most", got.Upstream)
 		}
 		// And the fewest, which is the direction half of the same question.
 		if got := leader(finding.Filter{
 			PlannedUpgradeSort: finding.PlannedUpgradesByIssues, Ascending: true,
 		}); got.Upstream != libnl.Name {
-			t.Errorf("asc=true leads with %q, which is what descending answers", got.Upstream)
+			t.Errorf("asc=true code findings with %q, which is what descending answers", got.Upstream)
 		}
 	})
 }
@@ -653,7 +653,7 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 			fixedIn []string
 			ordered bool
 		}{
-			// Ranked: every version places, so the newest leads and reaching it
+			// Ranked: every version places, so the newest code findings and reaching it
 			// reaches what the earlier one fixed.
 			{"versions that all place", ecosystem.occurrences, true},
 			// And unranked: one entry nobody can place is not a list ordered
@@ -707,11 +707,11 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 					if !one.ordered {
 						return
 					}
-					// Ranked means the furthest along leads, and that it
+					// Ranked means the furthest along code findings, and that it
 					// reaches what the earlier release fixed as well as its
 					// own.
 					if up[0].To != ecosystem.furthest {
-						t.Errorf("the list leads with %q, want the furthest along", up[0].To)
+						t.Errorf("the list code findings with %q, want the furthest along", up[0].To)
 					}
 					if up[0].Reached != 2 {
 						t.Errorf("%q reaches %d issues, want both", up[0].To, up[0].Reached)

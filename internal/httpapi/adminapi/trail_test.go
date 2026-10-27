@@ -25,14 +25,14 @@ import (
 // seeded is what an act needs that the fixture does not already hold: an issue
 // to name, and the identifier of a rule an earlier act made.
 type seeded struct {
-	issue    string
-	rule     string
-	leadRule string
-	lead     string
-	flaw     string
-	record   string
-	window   string
-	fix      string
+	issue           string
+	rule            string
+	suppressionRule string
+	codeFinding     string
+	flaw            string
+	record          string
+	window          string
+	fix             string
 }
 
 // fill puts what has been seeded into a path, a body or an expected name.
@@ -41,8 +41,8 @@ func (s *seeded) fill(text string) string {
 	text = strings.ReplaceAll(text, "{record}", s.record)
 	text = strings.ReplaceAll(text, "{window}", s.window)
 	text = strings.ReplaceAll(text, "{fix}", s.fix)
-	text = strings.ReplaceAll(text, "{lead-rule}", s.leadRule)
-	text = strings.ReplaceAll(text, "{lead}", s.lead)
+	text = strings.ReplaceAll(text, "{suppression-rule}", s.suppressionRule)
+	text = strings.ReplaceAll(text, "{code finding}", s.codeFinding)
 	text = strings.ReplaceAll(text, "{flaw}", s.flaw)
 	return strings.ReplaceAll(text, "{rule}", s.rule)
 }
@@ -184,10 +184,10 @@ var administrativeActs = []trailedAct{
 		kind: "setting", about: "repositories of mine",
 	},
 	{
-		id: "propose-lead-rule", what: "a standing rule for leads", who: "internal-triager",
+		id: "propose-suppression-rule", what: "a suppression rule", who: "internal-triager",
 		method: http.MethodPost, path: "/v1/products/mine/suppression-rules",
 		body: `{"prefix":"tests","reason":"used_in_tests","reasoning":"the tests do not ship"}`,
-		kind: "lead-rule", about: "mine · {lead-rule}",
+		kind: "suppression-rule", about: "mine · {suppression-rule}",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			var rule struct {
 				ID int64 `json:"id"`
@@ -195,18 +195,18 @@ var administrativeActs = []trailedAct{
 			if err := json.Unmarshal(answered, &rule); err != nil {
 				t.Fatal(err)
 			}
-			seen.leadRule = strconv.FormatInt(rule.ID, 10)
+			seen.suppressionRule = strconv.FormatInt(rule.ID, 10)
 		},
 	},
 	{
-		id: "approve-lead-rule", what: "a standing rule for leads approved", who: "internal-reviewer",
-		method: http.MethodPost, path: "/v1/products/mine/suppression-rules/{lead-rule}/approval", body: `{}`,
-		kind: "lead-rule", about: "mine · {lead-rule}",
+		id: "approve-suppression-rule", what: "a suppression rule approved", who: "internal-reviewer",
+		method: http.MethodPost, path: "/v1/products/mine/suppression-rules/{suppression-rule}/approval", body: `{}`,
+		kind: "suppression-rule", about: "mine · {suppression-rule}",
 	},
 	{
-		id: "retire-lead-rule", what: "a standing rule for leads retired", who: "internal-triager",
-		method: http.MethodDelete, path: "/v1/products/mine/suppression-rules/{lead-rule}",
-		kind: "lead-rule", about: "mine · {lead-rule}",
+		id: "retire-suppression-rule", what: "a suppression rule retired", who: "internal-triager",
+		method: http.MethodDelete, path: "/v1/products/mine/suppression-rules/{suppression-rule}",
+		kind: "suppression-rule", about: "mine · {suppression-rule}",
 	},
 	{
 		id: "set-product-end-of-life", what: "a support date", method: http.MethodPut,
@@ -426,40 +426,40 @@ var administrativeActs = []trailedAct{
 		kind:   "case", about: "mine · {issue} · reader",
 	},
 	{
-		// A kept lead made part of its flaw's case: who reads it changes.
-		id: "move-lead", what: "a handed-off lead moved into its case", who: "lead-handler",
+		// An internal-only code finding made part of its flaw's case: who reads it changes.
+		id: "include-code-finding-in-disclosure", what: "a code finding recorded as a flaw included in its flaw's disclosure", who: "code-finding-handler",
 		kind: "case", about: "mine · {flaw} · clang-tidy/leak",
 		drive: func(t *testing.T, r *httpapitest.Reach, seen *seeded) *httptest.ResponseRecorder {
-			seen.lead, seen.flaw = httpapitest.HandedOffLead(t, r, false)
-			return httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-				seen.fill("/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/disclosure"), "")
+			seen.codeFinding, seen.flaw = httpapitest.RecordedCodeFinding(t, r, false)
+			return httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPut,
+				seen.fill("/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/flaw/disclosure"), "")
 		},
 	},
 	{
-		id: "unmove-lead", what: "a lead taken back out of its case", who: "lead-handler",
+		id: "exclude-code-finding-from-disclosure", what: "a code finding taken out of its flaw's disclosure", who: "code-finding-handler",
 		method: http.MethodDelete,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/disclosure",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/flaw/disclosure",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
 	},
 	{
-		id: "add-lead-collaborator", what: "somebody granted a handed-off lead", who: "lead-handler",
+		id: "add-code-finding-collaborator", what: "somebody granted a code finding recorded as a flaw", who: "code-finding-handler",
 		method: http.MethodPut,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/collaborators/reader",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/collaborators/reader",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
-		id: "remove-lead-collaborator", what: "a lead grant withdrawn", who: "lead-handler",
+		id: "remove-code-finding-collaborator", what: "a code finding grant withdrawn", who: "code-finding-handler",
 		method: http.MethodDelete,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/collaborators/reader",
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/collaborators/reader",
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
-		// The lead is internal again, so who reads it changes. With no grant
-		// left standing, the one row is the hand-off's own.
-		id: "undo-lead-handoff", what: "a lead's hand-off undone", who: "lead-handler",
+		// The code finding is internal again, so who reads it changes. With no grant
+		// left standing, the one row is the flaw record's own.
+		id: "undo-code-finding-flaw", what: "a code finding's flaw record undone", who: "code-finding-handler",
 		method: http.MethodPost,
-		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{lead}/flaw/withdrawal",
-		body:   `{"because":"handed off against the wrong component"}`,
+		path:   "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/{code finding}/flaw/withdrawal",
+		body:   `{"because":"recorded as a flaw against the wrong component"}`,
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
 	},
 	{
@@ -646,16 +646,16 @@ var outsideTheTrail = map[string]string{
 	"approve-decision":             "the decision record",
 	"assess-issue":                 "the decision record",
 	"assign-finding":               "the decision record",
-	"assign-lead":                  "the decision record",
+	"assign-code-finding":          "the decision record",
 	"assign-matching-findings":     "the decision record",
 	"carry-decisions":              "the decision record",
 	"comment-on-decision":          "the decision record",
 	"decide":                       "the decision record",
 	"decide-finding":               "the decision record",
 	"decide-in-bulk":               "the decision record",
-	"decide-lead":                  "the decision record",
-	"hand-off-lead":                "the flaw's own record, linked to the lead; a move it carries is trailed as move-lead's is",
-	"fix-lead":                     "the decision record",
+	"decide-code-finding":          "the decision record",
+	"record-code-finding-as-flaw":  "the flaw's own record, linked to the code finding; an inclusion it carries is trailed as include-code-finding-in-disclosure's is",
+	"fix-code-finding":             "the decision record",
 	"disclose-issue":               "the decision record",
 	"edit-comment":                 "the decision record",
 	"edit-issue-note":              "the decision record",

@@ -216,7 +216,7 @@ builds, and this is a document going to a customer.
 
 | Rule | Reason |
 |---|---|
-| A lead line makes it re-checkable | Which two builds, when the later one was last measured, and the scanner and vulnerability-database versions it was measured with. A vulnerability database ships bad data and is corrected, and "which data said so" is the question a note kept for a year has to answer |
+| A code finding line makes it re-checkable | Which two builds, when the later one was last measured, and the scanner and vulnerability-database versions it was measured with. A vulnerability database ships bad data and is corrected, and "which data said so" is the question a note kept for a year has to answer |
 | Dated by the measurement, not the request | That is the moment the answer reflects, and it is the same for everybody. Dated by the request, two people reading the same comparison hold documents that disagree |
 | Builds are named the way a customer knows them | From the catalog's display names. A heading reading "main container" puts internals on the first line of somebody else's document |
 | Fixes are grouped by what was done, not by the issue | One kernel upgrade closes 917 issues at once, and a bullet per issue states the same version pair 917 times in a document going to a customer — while the part a reader is looking for, which version to move to, is the part that repeats. The move is stated once and the issues it closed are listed under it |
@@ -549,7 +549,7 @@ threshold. The screen states which of the two questions is being asked.
 
 It exists to show that no dismissal sits in that population.
 Not-applicable, wrong match, will-not-fix and already-fixed all require
-approval, and so do a lead dismissed and a lead called no security issue, so
+approval, and so do a code finding dismissed and a code finding called no security issue, so
 that query should return nothing, and a row in it is a control that failed.
 
 That is why nobody has to open it to find out. The same question is asked as
@@ -581,7 +581,7 @@ report that exists to find it.
 |---|---|
 | Asked of the record, never of a flag | The condition is that no agreement stands from somebody other than the proposer, which is the same question the row's own answer is computed from. The test writes a self-approval straight to the table: the report has to answer correctly about a row the write path should have prevented, and one that trusted the write path would be reporting on itself |
 | The product, the outcome and the state each take several answers | "Dismissed or deferred" and "waiting or sent back" are the questions somebody reading the audit log has, and one value cannot ask either; the parameter repeats and any of what is named matches. A product named that the reader may not see refuses the whole request rather than being dropped, because a report answering about two products when three were asked for reads as covering three |
-| It says "this should be empty" only where every outcome asked for is a dismissal, of a vulnerability or a lead | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
+| It says "this should be empty" only where every outcome asked for is a dismissal, of a vulnerability or a code finding | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
 | What was asked for is printed with every value | A sheet headed "dismissed — not applicable" over rows that also hold deferrals is a sheet nobody can check against anything |
 | The audit log narrows to one build, reached through the findings at each occurrence | A decision names no build, deliberately — it is keyed on the product, the issue and the occurrence, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the decision, because an occurrence identity carries none |
 | A build is a product, a stream and a variant together, or none of them | Named alone, a stream would narrow to a stream of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
@@ -711,7 +711,7 @@ also holds the files that are reachable nowhere else.
 | A figure counting anything closed opens nothing | The findings lists hold what is open. "Fixed" counts what closed, and "Appeared" counts what opened in the window whether or not it has closed since, so a link under either opens a list of something else |
 | A link adds its filter to the list's address as a parameter of its own | The address for a partial scope already carries a query, and a second `?` joined onto it becomes part of the branch's name |
 | A section counted by product alone says so | The triage times, the repeated deferrals and the dismissals are read for a product and never for a branch or a variant, so the heading's scope is not theirs. Each names the product, every branch and variant, or every product where none is picked |
-| A sheet counted by product alone says so in its header | Effort, advisories issued, approval quality and leads by analyzer are read for a product and never for a branch or a variant. Their header, on screen and printed, names the product, every branch and variant, in place of the picker's scope |
+| A sheet counted by product alone says so in its header | Effort, advisories issued, approval quality and code findings by analyzer are read for a product and never for a branch or a variant. Their header, on screen and printed, names the product, every branch and variant, in place of the picker's scope |
 | Every narrowing the sheet's controls apply is in the printed header | The controls do not print. Effort names its team, the register its states and closure reasons, and the support sheet how far ahead it warns |
 | A rolling window is asked for as the date it began | The audit log a figure links to reads a date from midnight, and a window counted from this minute holds rows the figure does not count. The program overview and approval quality ask from the same date their links carry |
 | A link out of a report carries the period and the product the figure was computed with | The audit log reads its narrowing from the address rather than from the picker, so an entry that dropped the selection opened every product the reader can see from a page scoped to one — a different population under the same name, which is worse than no link |
@@ -736,7 +736,7 @@ also holds the files that are reachable nowhere else.
 |---|---|
 | Program | Program overview, backlog over time, deadline compliance, effort by component |
 | Controls | Approval quality, the exception report, standing corrections, administrative changes |
-| Coverage | Last upload per build, leads by analyzer, unmatched components, carried patches |
+| Coverage | Last upload per build, code findings by analyzer, unmatched components, carried patches |
 | Releases | Release comparison, release readiness, releases out of support |
 | Records | Disposition register, advisories issued |
 | Also on screens | Assignments, Disclosure deadlines, planned upgrades |
@@ -755,7 +755,7 @@ Deadline compliance and the disposition register have sections above.
 | Effort by component | The subjects of the decisions in a period, most argued first, with what came out of them. Effort by subject, above, holds the rest |
 | Deadline compliance | Whether work met the dates policy set for it, by severity |
 | Disposition register | Every vulnerability known in one build and what became of it |
-| Leads by analyzer | How many static analysis leads each analyzer series of one product holds in each state, across every build of the product. Each figure opens the lead list for its series and state. Read only by somebody holding `internal-read` on the product; anybody else is told leads are internal and is answered no count. `DESIGN-analysis.md` § Leads by series holds what is counted |
+| Code findings by analyzer | How many static analysis code findings each analyzer series of one product holds in each state, across every build of the product. Each figure opens the code finding list for its series and state. Read only by somebody holding `internal-read` on the product; anybody else is told code findings are internal and is answered no count. `DESIGN-analysis.md` § Code findings by series holds what is counted |
 | Advisories issued | What has gone out about flaws in our own product over a period, and what went out twice. Answered per flaw elsewhere, which is the shape somebody about to publish a revision needs; a period asks something else. A row carries the digest the document hashed to when it went out, which is what makes comparing it against what would be generated now possible. Its issue and product counts are the ones that document states, beside the title it carried; an issue taken off the advisory since is still named in what readers hold. An issuance recorded without its bytes is counted from the advisory's coverage today |
 
 An issuance carries no visibility of its own, so a row of the last of those is
@@ -773,9 +773,9 @@ as that answer rather than as an absence.
 
 | Rule | |
 |---|---|
-| It asks for every outcome that hides risk and stores no date, over every kind | The four dismissals of a vulnerability or a flaw, and a lead dismissed or called no security issue. Each always needs a second person |
+| It asks for every outcome that hides risk and stores no date, over every kind | The four dismissals of a vulnerability or a flaw, and a code finding dismissed or called no security issue. Each always needs a second person |
 | The outcomes are the ones the server publishes as that class | A list typed in the interface would leave out an outcome the server adds, while the report said none stood alone |
-| A decision about a lead is listed and counted only for somebody who reads internal material in its product | It is internal, and the audit log narrows every row and count by the reader (REQ-42, REQ-43) |
+| A decision about a code finding is listed and counted only for somebody who reads internal material in its product | It is internal, and the audit log narrows every row and count by the reader (REQ-42, REQ-43) |
 
 The standing corrections are the audit log with its other filters set: the wrong
 matches that apply now. Every other decision lapses when the code moves, so
@@ -796,7 +796,7 @@ reports is where the rule did not apply and where it applied in form only.
 
 | Section | What it says |
 |---|---|
-| Risk standing on one person | Split in two, because the halves read oppositely. A dismissal here, of a vulnerability or a lead, is a control that did not hold. A short deferral, or an upgrade promised inside the deadline the work already had, is the exception working — deliberate, so that gating every routine act does not put ordinary triage through a queue nobody then reads. One at a time it is triage; the pattern across a program is what nothing else shows |
+| Risk standing on one person | Split in two, because the halves read oppositely. A dismissal here, of a vulnerability or a code finding, is a control that did not hold. A short deferral, or an upgrade promised inside the deadline the work already had, is the exception working — deliberate, so that gating every routine act does not put ordinary triage through a queue nobody then reads. One at a time it is triage; the pattern across a program is what nothing else shows |
 | Proposer and approver pairs | Every pair, with the share of everything agreed to that ran between them. The share is the signal rather than the count: fifty of fifty-two and fifty of nine hundred are the same number and not the same situation |
 | Agreements given in bulk | An approver works at the unit the proposer acted at, so agreeing to a batch as one act is the control working. A batch of two hundred is still not a batch of two |
 | Agreed to before, covering more now | What was consented to, recorded at the moment of consent, against what the same decision reaches today. A decision reaches by matching, so a build appearing later is covered with nobody acting and nobody having agreed to the larger number |
@@ -813,7 +813,7 @@ was capped.
 
 | Rule | |
 |---|---|
-| Every section counts decisions about vulnerabilities, flaws and leads, each where the reader may read it | A decision about a lead is internal, so it reaches only somebody who reads internal material in its product, in the counts as in the rows |
+| Every section counts decisions about vulnerabilities, flaws and code findings, each where the reader may read it | A decision about a code finding is internal, so it reaches only somebody who reads internal material in its product, in the counts as in the rows |
 | Growth is capped after it is found, most grown first | Whether a decision grew is known only once what it covers now is counted, so every standing agreement is examined. Capped before that, the oldest decisions fill the page and a decision that grew after them is in no answer |
 | Ties are broken by decision, then by approver | A decision with two standing agreements is two rows of equal growth, and a cap between them is decided by the record rather than by the engine |
 | What a decision covers now is what its live rows reach | A row withdrawn or lapsed covers nothing, so a build holding its occurrence again is not growth |
@@ -848,7 +848,7 @@ Any list that can be read can be exported, as CSV or JSON. What exports: the
 findings list, the cross-product findings list, the audit log, the
 review queue, what became of the reader's own decisions, the by-component view, what is running out of time, the last upload per build,
 what is out of support, a comparison of two builds, a comparison of two
-builds' inventories, the planned upgrades of a product and of one build, the lead queue,
+builds' inventories, the planned upgrades of a product and of one build, the code finding queue,
 what keeps being put off, the backlog over time, what has been changed
 administratively, what a build holds that the scanner cannot match, and the
 disposition register, which is the one an auditor
@@ -884,16 +884,16 @@ stops is one somebody reads as whole.
 | A field the list leaves out is an empty cell in the file, never a zero | The planned upgrades list omits the build count for one build, because it is the same on every row; written as a zero it states that the upgrade is in no build. Every signal the list carries is a column, exploitation here included |
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own decisions; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The audit log's file lists only agreements that still stand, and states separately whether a second person has one |
-| The audit log's file includes decisions about leads | It writes what the audit log shows, under the same visibility (REQ-50) |
-| The lead queue's file is the queue, under the queue's visibility | A row is a lead the reader reads whole, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
-| A findings list's file holds, below its findings, every open lead of the same selection, in the queue's order and under the queue's visibility (REQ-50) | The finding exports include every kind the reader reads (`DESIGN-kinds.md` § Consumers). Readers of disclosed or undisclosed work alone read no lead, and their files hold none |
-| The open leads a decision waits on are held, and the leads open only in releases past their end of life are not | The file's findings rows hold a finding a decision waits on, and the list leaves releases past their end of life out unless asked, which narrows the leads out |
+| The audit log's file includes decisions about code findings | It writes what the audit log shows, under the same visibility (REQ-50) |
+| The code finding queue's file is the queue, under the queue's visibility | A row is a code finding the reader reads whole, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
+| A findings list's file holds, below its findings, every open code finding of the same selection, in the queue's order and under the queue's visibility (REQ-50) | The finding exports include every kind the reader reads (`DESIGN-kinds.md` § Consumers). Readers of disclosed or undisclosed work alone read no code finding, and their files hold none |
+| The open code findings a decision waits on are held, and the code findings open only in releases past their end of life are not | The file's findings rows hold a finding a decision waits on, and the list leaves releases past their end of life out unless asked, which narrows the code findings out |
 | The cross-product file holds each product's queue in turn, by product name | Each product's queue is its own read, under its own visibility |
-| A findings file narrowed by any filter but the order holds no lead, and states that it holds none | A lead carries no rating, component, upstream, decision or deadline, so every filter asks what a lead does not carry. A filter added to the list narrows the leads out without anything naming it |
-| Three filters keep the leads: the minimum severity widened, work no promised upgrade covers, and branches in support | Every lead answers each the same way. The last is what the list reads when no release question is asked, and the screen writes all three into the address it exports |
-| A file states which leads it holds | Without it, an empty lead list in a file reads as a product with no leads |
-| A lead row is a row of the findings file's columns. The rule is the issue, and the opened date, branch or tag and variant are the newest build's, as the queue lists it. The columns after the variant are a lead's: whether the row is a lead, the path, line, function and message. Every other column is empty on a lead, and the lead columns are empty on every other row | One header keeps a file one table, and a reader filters the leads by one column. A lead has no rating, component or decision to fill the rest with |
-| The disposition register holds no lead | It is the Register consumer's, which states what a build ships beside its VEX document (`DESIGN-kinds.md` § Consumers) |
+| A findings file narrowed by any filter but the order holds no code finding, and states that it holds none | A code finding carries no rating, component, upstream, decision or deadline, so every filter asks what a code finding does not carry. A filter added to the list narrows the code findings out without anything naming it |
+| Three filters keep the code findings: the minimum severity widened, work no promised upgrade covers, and branches in support | Every code finding answers each the same way. The last is what the list reads when no release question is asked, and the screen writes all three into the address it exports |
+| A file states which code findings it holds | Without it, an empty code finding list in a file reads as a product with no code findings |
+| A code finding row is a row of the findings file's columns. The rule is the issue, and the opened date, branch or tag and variant are the newest build's, as the queue lists it. The columns after the variant are a code finding's: whether the row is a code finding, the path, line, function and message. Every other column is empty on a code finding, and the code finding columns are empty on every other row | One header keeps a file one table, and a reader filters the code findings by one column. A code finding has no rating, component or decision to fill the rest with |
+| The disposition register holds no code finding | It is the Register consumer's, which states what a build ships beside its VEX document (`DESIGN-kinds.md` § Consumers) |
 
 ## Settings
 

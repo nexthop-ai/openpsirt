@@ -42,7 +42,7 @@ export type Report = {
   // The address it is read at. A report the catalog owns is at its slug; one
   // that points elsewhere builds its address from the selection, so the scope
   // picker is not asked for twice. The outcomes that always need a second
-  // person, about a vulnerability, a flaw or a lead, are passed in for an
+  // person, about a vulnerability, a flaw or a code finding, are passed in for an
   // entry that asks about them; an entry that cannot be asked yet answers
   // nothing.
   to?: (at: Scoped, gated: readonly string[]) => string | null;
@@ -114,16 +114,16 @@ export const GROUPS: Group[] = [
         // answer.
         name: "The exception report",
         answers:
-          "Dismissals of vulnerabilities, flaws and leads with no standing agreement from a second person. Should be empty.",
+          "Dismissals of vulnerabilities, flaws and code findings with no standing agreement from a second person. Should be empty.",
         // The product the catalog is being read for, carried into the audit log.
         // The audit log reads its narrowing from the address alone, and without
         // the product it answers for every product the reader can see.
         // Every outcome that always needs a second person, as the server
-        // publishes them: a lead's dismissal is one, beside the dismissals of
+        // publishes them: a code finding's dismissal is one, beside the dismissals of
         // a vulnerability. Asked of a list typed here, an outcome the server
         // adds would go uncounted while the audit log said none stood alone.
         // Before the server has said, there is nothing to ask. A decision about
-        // a lead is internal, and the audit log lists it only to somebody who
+        // a code finding is internal, and the audit log lists it only to somebody who
         // reads internal material in its product.
         to: (at, gated) =>
           gated.length === 0
@@ -162,10 +162,11 @@ export const GROUPS: Group[] = [
         answers: "What is being scanned, when each build was last seen, and what has gone quiet.",
       },
       {
-        slug: "leads-by-analyzer",
-        name: "Leads by analyzer",
-        answers: "How many static analysis leads each analyzer holds, and where they stand.",
-        // A series is one product's, and its leads are internal to it.
+        slug: "code-findings-by-analyzer",
+        name: "Code findings by analyzer",
+        answers:
+          "How many static analysis code findings each analyzer holds, and where they stand.",
+        // A series is one product's, and its code findings are internal to it.
         needs: "product",
       },
       {

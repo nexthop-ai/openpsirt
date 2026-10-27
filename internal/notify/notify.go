@@ -70,8 +70,8 @@ func Kinds() []Kind {
 		Unanswered, ReportMessage, ReportSent, ReportNoted,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
-		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
-		LeadHandedOff, LeadMoved, LeadReopened, RuleOutgrown, RuleWaiting,
+		InventoryMoved, SecurityTestingDropped, SecurityTestingNotComparable, SecurityTestingStopped,
+		CodeFindingRecordedAsFlaw, CodeFindingIncludedInDisclosure, CodeFindingReopened, SuppressionRuleOutgrown, SuppressionRuleWaiting,
 		ResponseWindowOpen, ResponseWindowNear, ResponseWindowPassed,
 	}
 }
@@ -143,7 +143,7 @@ const (
 	// moment an attack on a product became known, with no notice outside
 	// recorded against it.
 	//
-	// A condition from the moment the record stands rather than from a lead
+	// A condition from the moment the record stands rather than from a code finding
 	// time before the end: the windows in force anywhere are a day to a
 	// fortnight, and waiting to warn gives back the hours the warning is for.
 	// It clears when a notice names the window, when the record is cleared,
@@ -273,43 +273,43 @@ const (
 	// a screen rather than a sentence, and the screen is where the reading
 	// rule is applied.
 	InventoryMoved Kind = "inventory-moved"
-	// AnalysisDropped is an analyzer run that marked more of a build's open
-	// leads not reproduced than the deployment expects of one run.
+	// SecurityTestingDropped is an analyzer run that marked more of a build's open
+	// code findings no longer detected than the deployment expects of one run.
 	//
 	// An event, for the reason InventoryMoved is one: the run is applied, and
 	// what it did stays true of that run. A run that analyzed part of the
 	// tree without saying so reads like a fix sweep, so the product's internal
 	// readers hear about it instead of the run being set aside.
-	AnalysisDropped Kind = "analysis-dropped"
-	// AnalysisNotComparable is an analyzer series whose newest run on a build
+	SecurityTestingDropped Kind = "security-testing-dropped"
+	// SecurityTestingNotComparable is an analyzer series whose newest run on a build
 	// could not be compared, so nothing it stops reporting there is marked not
 	// reproduced. A condition: the next comparable run clears it.
-	AnalysisNotComparable Kind = "analysis-not-comparable"
-	// AnalysisQuiet is an analyzer series that has stopped arriving on a
+	SecurityTestingNotComparable Kind = "security-testing-not-comparable"
+	// SecurityTestingStopped is an analyzer series that has stopped arriving on a
 	// build it ran on regularly, naming the last upload of it turned away
 	// where there was one. A condition: the next run clears it.
-	AnalysisQuiet Kind = "analysis-quiet"
-	// LeadHandedOff is a confirmed lead recorded as a flaw, told to the
+	SecurityTestingStopped Kind = "security-testing-stopped"
+	// CodeFindingRecordedAsFlaw is a confirmed code finding recorded as a flaw, told to the
 	// product's internal triagers. Recording the flaw tells what recording
-	// any flaw tells; this is the lead's side of it.
-	LeadHandedOff Kind = "lead-handed-off"
-	// LeadMoved is a handed-off lead moved into its flaw's case or taken back
+	// any flaw tells; this is the code finding's side of it.
+	CodeFindingRecordedAsFlaw Kind = "code-finding-recorded-as-flaw"
+	// CodeFindingIncludedInDisclosure is a code finding recorded as a flaw included in its flaw's disclosure or taken back
 	// out, told to the product's internal triagers, whose reading of it
 	// narrows or returns.
-	LeadMoved Kind = "lead-moved"
-	// LeadReopened is a lead an agreed dismissal held out of the queue, back
+	CodeFindingIncludedInDisclosure Kind = "code-finding-included-in-disclosure"
+	// CodeFindingReopened is a code finding an agreed dismissal held out of the queue, back
 	// in it because the dismissal was withdrawn, told to the product's
 	// internal triagers. An approval tells nobody; a withdrawal puts work
 	// back.
-	LeadReopened Kind = "lead-reopened"
-	// RuleOutgrown is an approved standing rule on leads covering more than
+	CodeFindingReopened Kind = "code-finding-reopened"
+	// SuppressionRuleOutgrown is an approved suppression rule covering more than
 	// its approver saw by the deployment's factor. A condition: approving it
 	// again, retiring it or its covering less clears it.
-	RuleOutgrown Kind = "rule-outgrown"
-	// RuleWaiting is a standing rule on leads nobody has approved, past the
+	SuppressionRuleOutgrown Kind = "suppression-rule-outgrown"
+	// SuppressionRuleWaiting is a suppression rule nobody has approved, past the
 	// period a decision may wait on a second person. A condition: approving it
 	// or retiring it clears it.
-	RuleWaiting Kind = "rule-waiting"
+	SuppressionRuleWaiting Kind = "suppression-rule-waiting"
 	// RiskUnagreed is something hidden with nobody's agreement behind it.
 	//
 	// The one outcome-shaped failure the record cannot find on its own
@@ -434,7 +434,7 @@ type Telling struct {
 	// was something to say.
 	Private bool
 	// Internal says what Private withholds is internal work: an analyzer's
-	// leads. Refused without Private.
+	// code findings. Refused without Private.
 	Internal bool
 	// ProductID and VulnerabilityID say what this is about, and are what
 	// every later read narrows by. Required alongside Private, refused
@@ -942,20 +942,20 @@ func withheld(q *bun.SelectQuery, private, internal []int64) *bun.SelectQuery {
 // Followed through a merge, so a row about the issue their case merged into is
 // still about their case.
 //
-// A lead grant is one occurrence in one product, and reaches the line telling its
-// holder they were granted it, which is about that lead and names it.
+// A code finding grant is one occurrence in one product, and reaches the line telling its
+// holder they were granted it, which is about that code finding and names it.
 func onCases(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	for _, product := range subject.CaseProducts() {
 		for _, issue := range subject.Cases(product) {
 			q = q.WhereOr(`("product_id" = ? AND `+finding.FiledUnder(filed.Issue)+")", product, issue)
 		}
 	}
-	for _, product := range subject.LeadProducts() {
-		leads := make([]string, 0, len(subject.Leads(product)))
-		for _, occurrence := range subject.Leads(product) {
-			leads = append(leads, ConcerningLead(product, occurrence))
+	for _, product := range subject.CodeFindingProducts() {
+		codeFindings := make([]string, 0, len(subject.CodeFindings(product)))
+		for _, occurrence := range subject.CodeFindings(product) {
+			codeFindings = append(codeFindings, ConcerningCodeFinding(product, occurrence))
 		}
-		q = q.WhereOr(`("product_id" = ? AND "concerns" IN (?))`, product, bun.List(leads))
+		q = q.WhereOr(`("product_id" = ? AND "concerns" IN (?))`, product, bun.List(codeFindings))
 	}
 	return q
 }
@@ -1110,10 +1110,10 @@ func Concerning(productID, vulnerabilityID, componentID int64) string {
 	return fmt.Sprintf("%d/%d/%d", productID, vulnerabilityID, componentID)
 }
 
-// ConcerningLead is what a line about one handed-off lead is about: the lead
+// ConcerningCodeFinding is what a line about one code finding recorded as a flaw is about: the code finding
 // grant reaching it is on the occurrence, which no issue names.
-func ConcerningLead(productID int64, occurrenceIdentity string) string {
-	return fmt.Sprintf("lead/%d/%s", productID, occurrenceIdentity)
+func ConcerningCodeFinding(productID int64, occurrenceIdentity string) string {
+	return fmt.Sprintf("code finding/%d/%s", productID, occurrenceIdentity)
 }
 
 // Withholding is the marks a telling about work holding these visibilities

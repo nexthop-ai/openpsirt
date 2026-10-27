@@ -51,15 +51,15 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 }
 
 // asPieces keeps a write to the kinds whose work is an issue at a component:
-// the findings list's kinds. A lead is one occurrence, named by moveLead, and an
-// analyzer rule at a component is many leads rather than one piece of work.
+// the findings list's kinds. A code finding is one occurrence, named by includeCodeFinding, and an
+// analyzer rule at a component is many code findings rather than one piece of work.
 func asPieces(q *bun.UpdateQuery) *bun.UpdateQuery {
 	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	return q.Where(kinds, kindArgs...)
 }
 
 // moveWhere is moveWork over whichever work the caller names: one issue at one
-// component, several issues at every binary of one fold, or one lead.
+// component, several issues at every binary of one fold, or one code finding.
 //
 // The naming is the only part a caller supplies. The product, the open rows and
 // who may move which of them are this function's, so an act that hands over
@@ -506,11 +506,11 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 		if to == nil {
 			update = update.Set(`"assigned_to" = ?`, nil).Set(`"assigned_at" = ?`, nil)
 		} else {
-			// A handed-off lead is closed work for its holder, and stays
+			// A code finding recorded as a flaw is closed work for its holder, and stays
 			// with them: it is listed to nobody, so moving it hands over
 			// nothing. Released, it is held by nobody.
 			update = update.Set(`"assigned_to" = ?`, *to).Set(`"assigned_at" = ?`, now).
-				Where(notHandedOffIn)
+				Where(notRecordedAsFlawIn)
 		}
 		result, err := update.Exec(ctx)
 		if err != nil {
@@ -549,7 +549,7 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 		Where(`"f"."assigned_to" = ?`, from).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" <> ?`, access.Public).
-		Where(notHandedOff).
+		Where(notRecordedAsFlaw).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &held); err != nil {
 		return fmt.Errorf("read where their undisclosed and internal work is: %w", err)
@@ -644,7 +644,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
-			Where(notHandedOff).
+			Where(notRecordedAsFlaw).
 			Where(`"f"."assigned_to" IS NOT NULL`)
 		// One product where the caller named one, for a screen that is about
 		// one. Zero is every product, which is what the people tab of the
@@ -803,35 +803,35 @@ type Owned struct {
 	// Builds is how many builds hold it. One is the ordinary answer and reads
 	// as it always did; more than one is the whole point of collapsing them.
 	Builds int `bun:"builds"`
-	// Occurrence is the lead's occurrence where this is a lead, and empty for any
-	// other finding. A lead is one piece of work at one occurrence, whatever
+	// Occurrence is the code finding's occurrence where this is a code finding, and empty for any
+	// other finding. A code finding is one piece of work at one occurrence, whatever
 	// component its builds name.
 	Occurrence string `bun:"place"`
 }
 
-// leadOccurrence is the occurrence of the finding under "f" where it is a lead,
+// codeFindingOccurrence is the occurrence of the finding under "f" where it is a code finding,
 // and the empty string for any other kind.
-const leadOccurrence = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
+const codeFindingOccurrence = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
 
-// notHandedOff is whether the finding under "f", in the product of the
-// stream under "st", is no lead handed off as a flaw. A handed-off lead is
+// notRecordedAsFlaw is whether the finding under "f", in the product of the
+// stream under "st", is no code finding recorded as a flaw. A code finding recorded as a flaw is
 // closed work for its holder: its flaw is held and listed as itself.
-const notHandedOff = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+const notRecordedAsFlaw = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
 	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
-// notHandedOffIn is notHandedOff over the finding under "f" alone, in the
+// notRecordedAsFlawIn is notRecordedAsFlaw over the finding under "f" alone, in the
 // product its build is in, for a statement that joins no stream.
-const notHandedOffIn = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+const notRecordedAsFlawIn = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
 	JOIN "stream" AS "hs" ON "hs"."product_id" = "lh"."product_id"
 	JOIN "target" AS "ht" ON "ht"."stream_id" = "hs"."id"
 	WHERE "ht"."id" = "f"."target_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
 
 // pieceOfWork is what one piece of work held is grouped by, over the finding
 // under "f" and its stream under "st": an issue in a component in a product,
-// or one lead in a product. A lead's builds may name different versions of
+// or one code finding in a product. A code finding's builds may name different versions of
 // its component, and it is still one occurrence to judge.
 const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` +
-	`CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN 0 ELSE "f"."component_id" END, ` + leadOccurrence
+	`CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN 0 ELSE "f"."component_id" END, ` + codeFindingOccurrence
 
 // Unassigned reports the work nobody is dealing with, across every product the
 // subject may see, most urgent first.
@@ -863,7 +863,7 @@ func (s *Store) Unassigned(ctx context.Context, subject access.Subject, scope Sc
 
 // AssignedTo reports what one party is dealing with — a person, or a team the
 // work is queued with — in the same units as what nobody is, of the kinds the
-// consumer asking names: the lists of held work name leads, and the digest
+// consumer asking names: the lists of held work name code findings, and the digest
 // does not.
 //
 // The same shape deliberately. "What is waiting for me" and "what is waiting
@@ -923,9 +923,9 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 	limit = database.AList.Of(limit)
 
 	kinds, kindArgs := c.Where(`"f"."kind"`)
-	// Nobody holds a lead seen only in releases past their end of life, and
+	// Nobody holds a code finding seen only in releases past their end of life, and
 	// nobody may take one, so the work nobody holds leaves out each sighting
-	// of a lead in such a release, as the lead queue does.
+	// of a code finding in such a release, as the code finding queue does.
 	var ended []int64
 	if len(holders) == 0 {
 		var err error
@@ -939,7 +939,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
-			Where(notHandedOff)
+			Where(notRecordedAsFlaw)
 		if since != nil {
 			q = q.Where(`"f"."opened_at" > ?`, *since)
 		}
@@ -996,10 +996,10 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 	}
 	err := narrow(s.db.NewSelect()).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		// The lowest of a lead's components, as one of its builds names it.
+		// The lowest of a code finding's components, as one of its builds names it.
 		// Every other piece of work is one component.
 		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
-		ColumnExpr(`MAX(`+leadOccurrence+`) AS "place"`).
+		ColumnExpr(`MAX(`+codeFindingOccurrence+`) AS "place"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		// One of the builds, and how many there are. The one is what a link
 		// and an action need somewhere to point; the count is what stops a
@@ -1028,7 +1028,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(pieceOfWork).
 		OrderExpr(`"urgency" DESC, "f"."vulnerability_id", MIN("f"."component_id"), "st"."product_id", `+
-			`MAX(`+leadOccurrence+`)`).
+			`MAX(`+codeFindingOccurrence+`)`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &heads)
 	if err != nil {

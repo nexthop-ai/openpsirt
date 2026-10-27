@@ -108,7 +108,7 @@ export function AnalysisRuns({ build }: { build: Build }) {
                   className="num"
                   title="Open results this comparable run did not report. Blank where it isn't comparable"
                 >
-                  Not reproduced
+                  No longer detected
                 </th>
               </tr>
             </thead>
@@ -136,7 +136,9 @@ export function AnalysisRuns({ build }: { build: Build }) {
                     <td className="num">{run.counts?.opened.toLocaleString() ?? ""}</td>
                     <td className="num">{run.counts?.seen.toLocaleString() ?? ""}</td>
                     <td className="num" title={run.not_comparable || undefined}>
-                      {run.comparable ? (run.counts?.not_reproduced.toLocaleString() ?? "") : ""}
+                      {run.comparable
+                        ? (run.counts?.no_longer_detected.toLocaleString() ?? "")
+                        : ""}
                     </td>
                   </tr>
                 );

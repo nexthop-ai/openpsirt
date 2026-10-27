@@ -80,14 +80,14 @@ func registerExport(api huma.API, in core.Deps) {
 			"Read with your own visibility, as it streams. It is the same query the screen " +
 			"reads, paged and written out as it goes.\n\n" +
 			"The line this deployment triages at is stated in the file.\n\n" +
-			"Below the findings come every open static analysis lead of the same branch or tag " +
-			"and variant, in the lead queue's order, where you read them, those a decision waits on " +
-			"included and those open only in releases past their end of life left out: `lead` is " +
+			"Below the findings come every open static analysis code finding of the same branch or tag " +
+			"and variant, in the code finding queue's order, where you read them, those a decision waits on " +
+			"included and those open only in releases past their end of life left out: `code finding` is " +
 			"true on those " +
 			"rows, and `path`, `line`, `function` and `message` say where each is and what the " +
-			"analyzer said. No row carries source text. A lead carries no rating, component or " +
-			"decision, so a file narrowed by any filter but the order holds no lead, and says " +
-			"so. Three filters narrow no lead and keep them: `below_minimum_severity`, `planned=unplanned`, " +
+			"analyzer said. No row carries source text. A code finding carries no rating, component or " +
+			"decision, so a file narrowed by any filter but the order holds no code finding, and says " +
+			"so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, " +
 			"and `on=branch` with `support=in-support`, which is what the list reads when " +
 			"neither is asked.\n\n" +
 			"Takes every filter the findings list takes.",
@@ -123,15 +123,15 @@ func registerExport(api huma.API, in core.Deps) {
 			}
 			return rows, nil
 		}
-		parts, leads := []core.Paged{findings}, withLeads(input.Narrowing, input.AtOneBuild)
-		if leads.Value == leadsListed {
-			parts = append(parts, leadRows(in, subject, analysis.Scope{
+		parts, codeFindings := []core.Paged{findings}, withCodeFindings(input.Narrowing, input.AtOneBuild)
+		if codeFindings.Value == codeFindingsListed {
+			parts = append(parts, codeFindingRows(in, subject, analysis.Scope{
 				ProductID: *scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
 			}, ""))
 		}
 		out := core.Exporting{
 			What:   "findings",
-			About:  []core.Stated{{Label: "triaged at or above", Value: line}, leads},
+			About:  []core.Stated{{Label: "triaged at or above", Value: line}, codeFindings},
 			Header: findingColumns(),
 			Rows:   core.InTurn(parts...),
 		}
@@ -164,7 +164,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			"screen reads, paged and written out as it goes.\n\n" +
 			"Each product applies its own minimum severity, so the file states that rather than " +
 			"naming one, and `product` is a column.\n\n" +
-			"Below the findings come the open static analysis leads of every product, by " +
+			"Below the findings come the open static analysis code findings of every product, by " +
 			"product name, as the product export writes them. The columns and the rule about " +
 			"filters are the product export's.\n\n" +
 			"Takes every filter the cross-product list takes. `beneath` and `differs` are " +
@@ -198,8 +198,8 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			}
 			return rows, nil
 		}
-		parts, leads := []core.Paged{findings}, withLeads(input.Narrowing, core.AtOneBuild{})
-		if leads.Value == leadsListed {
+		parts, codeFindings := []core.Paged{findings}, withCodeFindings(input.Narrowing, core.AtOneBuild{})
+		if codeFindings.Value == codeFindingsListed {
 			products, err := catalog.NewStore(in.DB.DB).Products(ctx, subject)
 			if err != nil {
 				return nil, core.WentWrong(in.Logger, "the products could not be read", err)
@@ -208,12 +208,12 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 				if _, err := access.Readable(subject, p.ID); err != nil {
 					continue
 				}
-				parts = append(parts, leadRows(in, subject, analysis.Scope{ProductID: p.ID}, p.Name))
+				parts = append(parts, codeFindingRows(in, subject, analysis.Scope{ProductID: p.ID}, p.Name))
 			}
 		}
 		out := core.Exporting{
 			What:   "findings, every product",
-			About:  []core.Stated{{Label: "triaged at or above", Value: "each product's own line"}, leads},
+			About:  []core.Stated{{Label: "triaged at or above", Value: "each product's own line"}, codeFindings},
 			Header: append([]string{"product"}, findingColumns()...),
 			Rows:   core.InTurn(parts...),
 		}
@@ -233,14 +233,14 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 // comparable, so a column of them read by somebody's script is a ranking that
 // is not one.
 //
-// A lead is a row of the same columns. The columns after the variant are a
-// lead's, and empty on every other row; the columns before it that a lead
-// carries nothing for are empty on a lead's.
+// A code finding is a row of the same columns. The columns after the variant are a
+// code finding's, and empty on every other row; the columns before it that a code finding
+// carries nothing for are empty on a code finding's.
 func findingColumns() []string {
 	return []string{
 		"issue", "severity", "score", "score scheme", "exploited", "component", "version",
 		"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
-		"stream", "variant", "lead", "path", "line", "function", "message",
+		"stream", "variant", "code finding", "path", "line", "function", "message",
 	}
 }
 
@@ -265,33 +265,33 @@ func findingCells(g finding.Group) []string {
 	}
 }
 
-// leadsListed is what a findings file says about its leads where it holds
+// codeFindingsListed is what a findings file says about its code findings where it holds
 // them.
-const leadsListed = "every open lead, below the findings, those a decision waits on included and those open only in releases past their end of life left out"
+const codeFindingsListed = "every open code finding, below the findings, those a decision waits on included and those open only in releases past their end of life left out"
 
-// withLeads is the fact a findings file states about the leads it holds. A
-// lead carries no rating, component, upstream, decision or deadline, so a
+// withCodeFindings is the fact a findings file states about the code findings it holds. A
+// code finding carries no rating, component, upstream, decision or deadline, so a
 // narrowing asking anything but the order matches none, and the file says so
-// rather than leaving a reader to wonder where the leads went.
-func withLeads(by core.Narrowing, at core.AtOneBuild) core.Stated {
+// rather than leaving a reader to wonder where the code findings went.
+func withCodeFindings(by core.Narrowing, at core.AtOneBuild) core.Stated {
 	switch {
 	case !kind.Exports.Includes(kind.Analysis):
 		return core.Stated{}
 	case !by.OnlyOrders() || at != (core.AtOneBuild{}):
-		return core.Stated{Label: "leads", Value: "none: a filter asks what a lead does not carry"}
+		return core.Stated{Label: "code findings", Value: "none: a filter asks what a code finding does not carry"}
 	}
-	return core.Stated{Label: "leads", Value: leadsListed}
+	return core.Stated{Label: "code findings", Value: codeFindingsListed}
 }
 
-// leadRows is the open leads of one product in a selection, as findings file
+// codeFindingRows is the open code findings of one product in a selection, as findings file
 // rows, with the product's name in front where the file spans products.
 //
-// The lead queue's read, under its visibility, with the leads a decision
-// waits on kept in. No row carries source text. A product whose leads the reader may not read is a part holding
+// The code finding queue's read, under its visibility, with the code findings a decision
+// waits on kept in. No row carries source text. A product whose code findings the reader may not read is a part holding
 // no row.
-func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
+func codeFindingRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
 	return func(ctx context.Context, limit, offset int) ([][]string, error) {
-		queue, err := analysis.OpenLeadsOf(ctx, in.DB.DB, subject, scope, limit, offset)
+		queue, err := analysis.OpenCodeFindingsOf(ctx, in.DB.DB, subject, scope, limit, offset)
 		if errors.Is(err, access.ErrDenied) {
 			return nil, nil
 		}
@@ -300,7 +300,7 @@ func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, produc
 		}
 		rows := make([][]string, 0, len(queue.Rows))
 		for _, r := range queue.Rows {
-			cells := leadCells(r)
+			cells := codeFindingCells(r)
 			if product != "" {
 				cells = append([]string{product}, cells...)
 			}
@@ -310,9 +310,9 @@ func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, produc
 	}
 }
 
-// leadCells is one lead as a row of a findings file. The rule is the issue.
+// codeFindingCells is one code finding as a row of a findings file. The rule is the issue.
 // A line the analyzer named none for is an empty cell, never a zero.
-func leadCells(r analysis.QueueRow) []string {
+func codeFindingCells(r analysis.QueueRow) []string {
 	line := ""
 	if r.Line != nil {
 		line = strconv.Itoa(*r.Line)

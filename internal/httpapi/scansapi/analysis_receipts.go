@@ -30,7 +30,7 @@ type AnalysisReceiptBody struct {
 	Status     core.RunStatus `json:"status" doc:"What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, or failed"`
 	Failure    string         `json:"failure,omitempty" doc:"Why the run could not be applied, where it could not"`
 	// Comparable is absent until the run is applied.
-	Comparable    *bool          `json:"comparable,omitempty" doc:"Whether the results this run did not report count as not reproduced. Absent until it is applied"`
+	Comparable    *bool          `json:"comparable,omitempty" doc:"Whether the results this run did not report count as no longer detected. Absent until it is applied"`
 	NotComparable core.RunReason `json:"not_comparable,omitempty" doc:"Why they do not, where they do not"`
 	Tool          string         `json:"tool,omitempty" doc:"The analyzer that ran"`
 	ToolVersion   string         `json:"tool_version,omitempty" doc:"Its version"`

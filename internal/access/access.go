@@ -142,7 +142,7 @@ const (
 	// Private means not yet disclosed.
 	Private Visibility = "private"
 	// Internal is material never disclosed in its own right: results nobody
-	// has judged yet, such as an analyzer's leads. Disclosure never applies
+	// has judged yet, such as an analyzer's code findings. Disclosure never applies
 	// to it, and it is read and triaged under roles of its own.
 	Internal Visibility = "internal"
 )
@@ -275,10 +275,10 @@ type Subject struct {
 	// its comments and its attachments, and a lookup at each of those is
 	// four answers that can disagree.
 	cases map[int64][]int64
-	// leads is the handed-off leads this person was granted one at a time,
-	// as occurrences per product. It reads those leads' evidence and nothing else
+	// codeFindings is the code findings recorded as a flaw this person was granted one at a time,
+	// as occurrences per product. It reads those code findings' evidence and nothing else
 	// of the product. Carried on the subject for the reason cases are.
-	leads map[int64][]string
+	codeFindings map[int64][]string
 	// casesReadOnly takes the write half of a case grant away, for a
 	// credential narrowed to roles that do not include triage. Inverted so
 	// that the zero value acts, which is what every subject not narrowed this
@@ -324,14 +324,14 @@ func (s Subject) OnCaseToAct(productID, vulnerabilityID int64) bool {
 	return !s.casesReadOnly && s.OnCase(productID, vulnerabilityID)
 }
 
-// OnLead reports whether this subject was granted one handed-off lead: one
+// OnCodeFinding reports whether this subject was granted one code finding recorded as a flaw: one
 // occurrence, in one product. Deliberately not part of Reads, for the reason OnCase
 // is not.
-func (s Subject) OnLead(productID int64, occurrenceIdentity string) bool {
+func (s Subject) OnCodeFinding(productID int64, occurrenceIdentity string) bool {
 	if s.Kind != Person {
 		return false
 	}
-	for _, occurrence := range s.leads[productID] {
+	for _, occurrence := range s.codeFindings[productID] {
 		if occurrence == occurrenceIdentity {
 			return true
 		}
@@ -339,12 +339,12 @@ func (s Subject) OnLead(productID int64, occurrenceIdentity string) bool {
 	return false
 }
 
-// Leads is every handed-off lead this subject was granted in one product.
-func (s Subject) Leads(productID int64) []string {
+// CodeFindings is every code finding recorded as a flaw this subject was granted in one product.
+func (s Subject) CodeFindings(productID int64) []string {
 	if s.Kind != Person {
 		return nil
 	}
-	return s.leads[productID]
+	return s.codeFindings[productID]
 }
 
 // Cases is every issue this subject collaborates on in one product. Empty
@@ -363,14 +363,14 @@ func (s Subject) CaseProducts() []int64 {
 	return products
 }
 
-// LeadProducts is every product this subject was granted a handed-off lead
+// CodeFindingProducts is every product this subject was granted a code finding recorded as a flaw
 // in, kept apart from Products for the reason CaseProducts is.
-func (s Subject) LeadProducts() []int64 {
+func (s Subject) CodeFindingProducts() []int64 {
 	if s.Kind != Person {
 		return nil
 	}
-	products := make([]int64, 0, len(s.leads))
-	for id := range s.leads {
+	products := make([]int64, 0, len(s.codeFindings))
+	for id := range s.codeFindings {
 		products = append(products, id)
 	}
 	sort.Slice(products, func(i, j int) bool { return products[i] < products[j] })
@@ -428,10 +428,10 @@ func (s Subject) OnCases(cases map[int64][]int64) Subject {
 	return s
 }
 
-// OnLeads returns this subject with the handed-off leads they were granted.
+// OnCodeFindings returns this subject with the code findings recorded as a flaw they were granted.
 // Chained for the reason OnCases is.
-func (s Subject) OnLeads(leads map[int64][]string) Subject {
-	s.leads = leads
+func (s Subject) OnCodeFindings(codeFindings map[int64][]string) Subject {
+	s.codeFindings = codeFindings
 	return s
 }
 
@@ -613,7 +613,7 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 // MayApprove is who may agree to somebody else's decision at one visibility: the
 // right to read there, and either the approver capability or the right to
 // triage there. At internal visibility it is the capability alone beside the
-// reading: a decision there is about a lead, and a dismissed lead is a result
+// reading: a decision there is about a code finding, and a dismissed code finding is a result
 // nobody acts on again, so its second person is somebody granted the right to
 // agree.
 //
@@ -635,7 +635,7 @@ func MayApprove(visibility Visibility, approver, reads, triages bool) bool {
 // The question an act about the product rather than about one finding asks:
 // routing, a rating, an incident, taking unowned work. The finding-level
 // question narrows further where there is a finding to ask it of. Internal
-// triage answers no: it is the triage of leads, and every one of those acts
+// triage answers no: it is the triage of code findings, and every one of those acts
 // is about what a build ships.
 func (s Subject) TriagesIn(productID int64) bool {
 	for _, v := range []Visibility{Public, Private} {
@@ -650,7 +650,7 @@ func (s Subject) TriagesIn(productID int64) bool {
 // visibility in this product: disclosed, undisclosed or internal.
 //
 // The question reading and previewing the routing rules ask. A rule places
-// leads as it places every other finding, so whoever triages the leads it
+// code findings as it places every other finding, so whoever triages the code findings it
 // places reads what it would place.
 func (s Subject) TriagesAnyIn(productID int64) bool {
 	return s.TriagesIn(productID) || s.Triages(Internal, productID)
@@ -862,12 +862,12 @@ func (s Subject) Reaches(productID int64) bool {
 	return s.Sees(productID) || len(s.cases[productID]) > 0
 }
 
-// ReachesLead is Reaches asked by a lookup that resolves a build only to read
-// one lead: it admits somebody granted a handed-off lead in the product too.
-// Kept apart from Reaches, so a lead grant resolves the names its lead sits at
+// ReachesCodeFinding is Reaches asked by a lookup that resolves a build only to read
+// one code finding: it admits somebody granted a code finding recorded as a flaw in the product too.
+// Kept apart from Reaches, so a code finding grant resolves the names its code finding sits at
 // and never the build's shape.
-func (s Subject) ReachesLead(productID int64) bool {
-	return s.Reaches(productID) || len(s.Leads(productID)) > 0
+func (s Subject) ReachesCodeFinding(productID int64) bool {
+	return s.Reaches(productID) || len(s.CodeFindings(productID)) > 0
 }
 
 // HoldsAnywhere reports whether this subject holds one of these roles on any

@@ -28,7 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
-// RuleState is where a standing rule stands, worked out when it is read.
+// RuleState is where a suppression rule stands, worked out when it is read.
 type RuleState string
 
 const (
@@ -37,10 +37,10 @@ const (
 	// RuleInForce is an approved rule covering no more than its approver
 	// was shown, by the factor the deployment allows.
 	RuleInForce RuleState = "in-force"
-	// RuleOutgrown is an approved rule naming an analyzer rule and covering
+	// SuppressionRuleOutgrown is an approved rule naming an analyzer rule and covering
 	// more than that. It still covers what it names, and asks to be
 	// approved again.
-	RuleOutgrown RuleState = "outgrown"
+	SuppressionRuleOutgrown RuleState = "outgrown"
 	// RuleRetired is a rule taken out of use. It covers nothing.
 	RuleRetired RuleState = "retired"
 	// RuleNeedsPath is a rule naming an analyzer rule and no path whose
@@ -49,29 +49,29 @@ const (
 	RuleNeedsPath RuleState = "needs-path"
 )
 
-// RuleStates are every state a standing rule is in, in the order a rule
+// RuleStates are every state a suppression rule is in, in the order a rule
 // meets them.
 func RuleStates() []RuleState {
-	return []RuleState{RuleProposed, RuleInForce, RuleOutgrown, RuleNeedsPath, RuleRetired}
+	return []RuleState{RuleProposed, RuleInForce, SuppressionRuleOutgrown, RuleNeedsPath, RuleRetired}
 }
 
-// ErrNoSuchRule is a standing rule this product does not hold, or one
+// ErrNoSuchRule is a suppression rule this product does not hold, or one
 // retired already.
-var ErrNoSuchRule = refusal.New("no standing rule of this product is in use under that identifier")
+var ErrNoSuchRule = refusal.New("no suppression rule of this product is in use under that identifier")
 
-// ErrRuleNamesNothing refuses a standing rule naming neither an analyzer rule
-// nor a path, which would dismiss every lead the product has.
-var ErrRuleNamesNothing = refusal.New("a standing rule names an analyzer rule, a path, or both")
+// ErrRuleNamesNothing refuses a suppression rule naming neither an analyzer rule
+// nor a path, which would dismiss every code finding the product has.
+var ErrRuleNamesNothing = refusal.New("a suppression rule names an analyzer rule, a path, or both")
 
-// ErrOwnRule refuses somebody approving a standing rule they proposed.
-var ErrOwnRule = refusal.New("a standing rule is approved by somebody other than the person who proposed it")
+// ErrOwnRule refuses somebody approving a suppression rule they proposed.
+var ErrOwnRule = refusal.New("a suppression rule is approved by somebody other than the person who proposed it")
 
 // ErrRuleInForce refuses approving a rule already approved and not outgrown.
-var ErrRuleInForce = refusal.New("that standing rule is approved, and covers no more than it did then")
+var ErrRuleInForce = refusal.New("that suppression rule is approved, and covers no more than it did then")
 
-// leadRule is a standing rule dismissing the leads it names.
-type leadRule struct {
-	bun.BaseModel `bun:"table:lead_rule,alias:lr"`
+// suppressionRule is a suppression rule dismissing the code findings it names.
+type suppressionRule struct {
+	bun.BaseModel `bun:"table:suppression_rule,alias:lr"`
 
 	ID               int64      `bun:"id,pk,autoincrement"`
 	ProductID        int64      `bun:"product_id,notnull"`
@@ -93,70 +93,70 @@ type leadRule struct {
 	Barred bool `bun:"-"`
 }
 
-// covers is whether the standing rule under "lr" names the finding under "f",
+// covers is whether the suppression rule under "lr" names the finding under "f",
 // whose result is under "ar": the analyzer rule it is filed under, and a path
-// at or under the rule's prefix. A part the rule leaves out names every lead.
+// at or under the rule's prefix. A part the rule leaves out names every code finding.
 const covers = `("lr"."rule_folded" IS NULL OR EXISTS (SELECT 1 FROM "vulnerability" AS "rv"
 		WHERE "rv"."id" = "f"."vulnerability_id" AND "rv"."identifier_folded" = "lr"."rule_folded"))
 	AND ("lr"."prefix" IS NULL OR "lr"."prefix" = "ar"."path"
 		OR SUBSTR("ar"."path", 1, "lr"."under_length") = "lr"."under")`
 
-// ruled is whether an approved standing rule in use in the product bound
+// ruled is whether an approved suppression rule in use in the product bound
 // covers the finding under "f", whose result is under "ar".
 //
 // A rule naming an analyzer rule and no path covers nothing once the rule is
-// found to find memory safety or injection flaws, which are judged one lead
+// found to find memory safety or injection flaws, which are judged one code finding
 // at a time.
-var ruled = `EXISTS (SELECT 1 FROM "lead_rule" AS "lr"
+var ruled = `EXISTS (SELECT 1 FROM "suppression_rule" AS "lr"
 	WHERE "lr"."product_id" = ? AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL
 	  AND ` + covers + `
 	  AND ("lr"."prefix" IS NOT NULL OR "lr"."rule_folded" IS NULL OR NOT EXISTS (
 		SELECT 1 FROM "rule_rating" AS "rb" WHERE "rb"."vulnerability_id" = "f"."vulnerability_id"
 		  AND "rb"."weakness_tier" >= ` + strconv.Itoa(int(weakness.TierInjection)) + `)))`
 
-// StandingRule is a standing rule as it is read: what it names, who proposed
-// and approved it, and how many leads it covers now.
-type StandingRule struct {
+// SuppressionRule is a suppression rule as it is read: what it names, who proposed
+// and approved it, and how many code findings it covers now.
+type SuppressionRule struct {
 	ID         int64
 	Rule       string
 	Prefix     string
-	Reason     triage.LeadReason
+	Reason     triage.CodeFindingReason
 	Reasoning  string
 	ProposedBy int64
 	ProposedAt time.Time
 	ApprovedBy *int64
 	ApprovedAt *time.Time
-	// ApprovedCovering is the leads it covered when it was approved.
+	// ApprovedCovering is the code findings it covered when it was approved.
 	ApprovedCovering *int
 	RetiredAt        *time.Time
-	// Covering is the open leads it names now that the reader may read,
+	// Covering is the open code findings it names now that the reader may read,
 	// whether or not it is approved.
 	Covering int
 	State    RuleState
 }
 
-// Proposal is a standing rule somebody puts forward.
+// Proposal is a suppression rule somebody puts forward.
 type Proposal struct {
 	Rule      string
 	Prefix    string
-	Reason    triage.LeadReason
+	Reason    triage.CodeFindingReason
 	Reasoning string
 }
 
-// ProposeRule records a standing rule in a product. It covers nothing until
+// ProposeRule records a suppression rule in a product. It covers nothing until
 // somebody else approves it. The subject has to triage internal findings in
 // the product.
 func ProposeRule(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
-	in Proposal, now time.Time) (*StandingRule, error) {
+	in Proposal, now time.Time) (*SuppressionRule, error) {
 
 	if !subject.Triages(access.Internal, productID) {
-		return nil, access.Denied(fmt.Sprintf("propose a standing rule in product %d", productID))
+		return nil, access.Denied(fmt.Sprintf("propose a suppression rule in product %d", productID))
 	}
-	row := leadRule{ProductID: productID, Reason: string(in.Reason),
+	row := suppressionRule{ProductID: productID, Reason: string(in.Reason),
 		Reasoning: strings.TrimSpace(in.Reasoning), ProposedBy: subject.ID,
 		ProposedAt: now.UTC().Truncate(time.Microsecond)}
 	if row.Reasoning == "" {
-		return nil, refusal.New("a standing rule says why, in its reasoning")
+		return nil, refusal.New("a suppression rule says why, in its reasoning")
 	}
 	if err := markdown.Check(row.Reasoning); err != nil {
 		return nil, err
@@ -181,13 +181,13 @@ func ProposeRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 	if row.Rule == nil && row.Prefix == nil {
 		return nil, ErrRuleNamesNothing
 	}
-	var out *StandingRule
+	var out *SuppressionRule
 	err := database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
 		if err := wholeRuleDismissable(ctx, tx, row); err != nil {
 			return err
 		}
 		if _, err := tx.NewInsert().Model(&row).Exec(ctx); err != nil {
-			return fmt.Errorf("record the standing rule: %w", err)
+			return fmt.Errorf("record the suppression rule: %w", err)
 		}
 		counted, err := coverage(ctx, tx, subject, productID, []int64{row.ID})
 		if err != nil {
@@ -202,17 +202,17 @@ func ProposeRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 	return out, nil
 }
 
-// ApproveRule approves a standing rule, recording how many leads it covers as
+// ApproveRule approves a suppression rule, recording how many code findings it covers as
 // what the approver was shown. A rule in force is refused; an outgrown one is
 // approved again at its new size. The subject has to hold the approver right
 // and read internal findings in the product, and cannot be the rule's author.
 func ApproveRule(ctx context.Context, db bun.IDB, subject access.Subject, productID, ruleID int64,
-	now time.Time) (*StandingRule, error) {
+	now time.Time) (*SuppressionRule, error) {
 
 	if !subject.Holds(access.Approver, productID) || !subject.Reads(access.Internal, productID) {
-		return nil, access.Denied(fmt.Sprintf("approve a standing rule in product %d", productID))
+		return nil, access.Denied(fmt.Sprintf("approve a suppression rule in product %d", productID))
 	}
-	var out *StandingRule
+	var out *SuppressionRule
 	err := database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
 		row, err := ruleIn(ctx, tx, productID, ruleID)
 		if err != nil {
@@ -241,7 +241,7 @@ func ApproveRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 		if _, err := tx.NewUpdate().Model(row).
 			Column("approved_by", "approved_at", "approved_covering").
 			WherePK().Exec(ctx); err != nil {
-			return fmt.Errorf("approve the standing rule: %w", err)
+			return fmt.Errorf("approve the suppression rule: %w", err)
 		}
 		out = ruleOf(*row, covering, factor)
 		return nil
@@ -252,16 +252,16 @@ func ApproveRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 	return out, nil
 }
 
-// RetireRule takes a standing rule out of use. The leads it covered are open
+// RetireRule takes a suppression rule out of use. The code findings it covered are open
 // again where nothing else answers them. The subject has to triage internal
 // findings in the product.
 func RetireRule(ctx context.Context, db bun.IDB, subject access.Subject, productID, ruleID int64,
-	now time.Time) (*StandingRule, error) {
+	now time.Time) (*SuppressionRule, error) {
 
 	if !subject.Triages(access.Internal, productID) {
-		return nil, access.Denied(fmt.Sprintf("retire a standing rule in product %d", productID))
+		return nil, access.Denied(fmt.Sprintf("retire a suppression rule in product %d", productID))
 	}
-	var out *StandingRule
+	var out *SuppressionRule
 	err := database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
 		row, err := ruleIn(ctx, tx, productID, ruleID)
 		if err != nil {
@@ -271,7 +271,7 @@ func RetireRule(ctx context.Context, db bun.IDB, subject access.Subject, product
 		row.RetiredBy, row.RetiredAt = &subject.ID, &at
 		if _, err := tx.NewUpdate().Model(row).Column("retired_by", "retired_at").
 			WherePK().Exec(ctx); err != nil {
-			return fmt.Errorf("retire the standing rule: %w", err)
+			return fmt.Errorf("retire the suppression rule: %w", err)
 		}
 		out = ruleOf(*row, 0, 0)
 		return nil
@@ -282,23 +282,23 @@ func RetireRule(ctx context.Context, db bun.IDB, subject access.Subject, product
 	return out, nil
 }
 
-// StandingRules is the standing rules of a product, retired ones included,
-// in the order they were proposed, each with the leads it covers that the
+// SuppressionRules is the suppression rules of a product, retired ones included,
+// in the order they were proposed, each with the code findings it covers that the
 // subject may read. The subject has to read internal findings in the
 // product.
-func StandingRules(ctx context.Context, db bun.IDB, subject access.Subject, productID int64) ([]StandingRule, error) {
+func SuppressionRules(ctx context.Context, db bun.IDB, subject access.Subject, productID int64) ([]SuppressionRule, error) {
 	if !subject.Reads(access.Internal, productID) {
-		return nil, access.Denied(fmt.Sprintf("read the standing rules of product %d", productID))
+		return nil, access.Denied(fmt.Sprintf("read the suppression rules of product %d", productID))
 	}
-	var rows []leadRule
+	var rows []suppressionRule
 	if err := db.NewSelect().Model(&rows).
 		Where(`"lr"."product_id" = ?`, productID).
 		OrderExpr(`"lr"."id" ASC`).
 		Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read the standing rules of product %d: %w", productID, err)
+		return nil, fmt.Errorf("read the suppression rules of product %d: %w", productID, err)
 	}
 	if len(rows) == 0 {
-		return []StandingRule{}, nil
+		return []SuppressionRule{}, nil
 	}
 	ids := make([]int64, len(rows))
 	for i, r := range rows {
@@ -321,19 +321,19 @@ func StandingRules(ctx context.Context, db bun.IDB, subject access.Subject, prod
 			return nil, err
 		}
 	}
-	out := make([]StandingRule, 0, len(rows))
+	out := make([]SuppressionRule, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, *ruleOf(r, counted[r.ID], factor))
 	}
 	return out, nil
 }
 
-// wholeRuleDismissable refuses a standing rule naming an analyzer rule and no
+// wholeRuleDismissable refuses a suppression rule naming an analyzer rule and no
 // path where the rule finds memory safety or injection, or where nothing has
 // recorded the rule, so its weaknesses are not known. A flaw of those kinds
-// is judged one lead at a time; a path narrows the rule to code somebody can
+// is judged one code finding at a time; a path narrows the rule to code somebody can
 // vouch for.
-func wholeRuleDismissable(ctx context.Context, tx bun.IDB, row leadRule) error {
+func wholeRuleDismissable(ctx context.Context, tx bun.IDB, row suppressionRule) error {
 	if row.RuleFolded == nil || row.Prefix != nil {
 		return nil
 	}
@@ -350,14 +350,14 @@ func wholeRuleDismissable(ctx context.Context, tx bun.IDB, row leadRule) error {
 	case len(held) == 0:
 		return refusal.Errorf("no analyzer has reported %q, so what it finds is not known: name a path with it", *row.Rule)
 	case weakness.Tier(slices.Max(held)) >= weakness.TierInjection:
-		return refusal.Errorf("%q finds memory safety or injection flaws, which are judged one lead at a time: name a path with it", *row.Rule)
+		return refusal.Errorf("%q finds memory safety or injection flaws, which are judged one code finding at a time: name a path with it", *row.Rule)
 	}
 	return nil
 }
 
-// ruleIn is a standing rule of the product in use, for an update.
-func ruleIn(ctx context.Context, tx bun.IDB, productID, ruleID int64) (*leadRule, error) {
-	var row leadRule
+// ruleIn is a suppression rule of the product in use, for an update.
+func ruleIn(ctx context.Context, tx bun.IDB, productID, ruleID int64) (*suppressionRule, error) {
+	var row suppressionRule
 	err := tx.NewSelect().Model(&row).
 		Where(`"lr"."id" = ?`, ruleID).
 		Where(`"lr"."product_id" = ?`, productID).
@@ -367,32 +367,32 @@ func ruleIn(ctx context.Context, tx bun.IDB, productID, ruleID int64) (*leadRule
 	case errors.Is(err, sql.ErrNoRows):
 		return nil, ErrNoSuchRule
 	case err != nil:
-		return nil, fmt.Errorf("read standing rule %d: %w", ruleID, err)
+		return nil, fmt.Errorf("read suppression rule %d: %w", ruleID, err)
 	}
 	return &row, nil
 }
 
-// coverage is the open leads each of the rules names in the product that the
+// coverage is the open code findings each of the rules names in the product that the
 // subject may read, counted by occurrence, whether or not the rule is approved.
 func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
 	ids []int64) (map[int64]int, error) {
 
-	visible, err := finding.LeadVisible(subject, productID)
+	visible, err := finding.CodeFindingVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}
-	reach := finding.LeadReach(subject, productID)
-	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
+	reach := finding.CodeFindingReach(subject, productID)
+	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	var counted []struct {
-		ID    int64 `bun:"id"`
-		Leads int   `bun:"leads"`
+		ID           int64 `bun:"id"`
+		CodeFindings int   `bun:"code_findings"`
 	}
-	if err := db.NewSelect().TableExpr(`"lead_rule" AS "lr"`).
+	if err := db.NewSelect().TableExpr(`"suppression_rule" AS "lr"`).
 		Join(`JOIN "stream" AS "s" ON "s"."product_id" = "lr"."product_id"`).
 		Join(`JOIN "target" AS "t" ON "t"."stream_id" = "s"."id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."target_id" = "t"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		ColumnExpr(`"lr"."id", COUNT(DISTINCT "f"."occurrence_identity") AS "leads"`).
+		ColumnExpr(`"lr"."id", COUNT(DISTINCT "f"."occurrence_identity") AS "code_findings"`).
 		Where(`"lr"."product_id" = ?`, productID).
 		Where(`"lr"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -401,11 +401,11 @@ func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		Where(covers).
 		GroupExpr(`"lr"."id"`).
 		Scan(ctx, &counted); err != nil {
-		return nil, fmt.Errorf("count the leads the standing rules of product %d cover: %w", productID, err)
+		return nil, fmt.Errorf("count the code findings the suppression rules of product %d cover: %w", productID, err)
 	}
 	out := make(map[int64]int, len(counted))
 	for _, c := range counted {
-		out[c.ID] = c.Leads
+		out[c.ID] = c.CodeFindings
 	}
 	return out, nil
 }
@@ -413,19 +413,19 @@ func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID
 // growth is how many times what its approver was shown an approved rule may
 // cover before it is outgrown.
 func growth(ctx context.Context, db bun.IDB) (int, error) {
-	n, err := setting.NewStore(db).Count(ctx, setting.LeadRuleGrowth, setting.DefaultLeadRuleGrowth)
+	n, err := setting.NewStore(db).Count(ctx, setting.SuppressionRuleGrowth, setting.DefaultSuppressionRuleGrowth)
 	if err != nil {
-		return 0, fmt.Errorf("read how far a standing rule may grow: %w", err)
+		return 0, fmt.Errorf("read how far a suppression rule may grow: %w", err)
 	}
 	return n, nil
 }
 
-// ruleState is where a rule stands covering this many leads. A rule naming a
+// ruleState is where a rule stands covering this many code findings. A rule naming a
 // path alone is never outgrown: code under a dismissed path grows as a
 // matter of course, and what the approver agreed to is the path. An approval
 // shown none is measured as though shown one, so that a rule approved over a
-// rule with no leads yet is not outgrown by its first.
-func ruleState(r leadRule, covering, factor int) RuleState {
+// rule with no code findings yet is not outgrown by its first.
+func ruleState(r suppressionRule, covering, factor int) RuleState {
 	switch {
 	case r.RetiredAt != nil:
 		return RuleRetired
@@ -434,14 +434,14 @@ func ruleState(r leadRule, covering, factor int) RuleState {
 	case r.ApprovedAt == nil:
 		return RuleProposed
 	case r.Rule != nil && covering > max(*r.ApprovedCovering, 1)*factor:
-		return RuleOutgrown
+		return SuppressionRuleOutgrown
 	}
 	return RuleInForce
 }
 
-func ruleOf(r leadRule, covering, factor int) *StandingRule {
-	out := &StandingRule{
-		ID: r.ID, Reason: triage.LeadReason(r.Reason), Reasoning: r.Reasoning,
+func ruleOf(r suppressionRule, covering, factor int) *SuppressionRule {
+	out := &SuppressionRule{
+		ID: r.ID, Reason: triage.CodeFindingReason(r.Reason), Reasoning: r.Reasoning,
 		ProposedBy: r.ProposedBy, ProposedAt: r.ProposedAt,
 		ApprovedBy: r.ApprovedBy, ApprovedAt: r.ApprovedAt, ApprovedCovering: r.ApprovedCovering,
 		RetiredAt: r.RetiredAt, Covering: covering, State: ruleState(r, covering, factor),

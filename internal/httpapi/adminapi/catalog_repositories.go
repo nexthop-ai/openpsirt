@@ -35,7 +35,7 @@ type RepositoryPath struct {
 	Snippets *bool  `json:"snippets,omitempty" doc:"Whether source snippets under the prefix are kept. Absent takes the nearest prefix that states it, and no prefix stating it is off"`
 	// DisclosedSnippets is apart from Snippets: keeping source to read here
 	// and publishing it beside an advisory are two decisions.
-	DisclosedSnippets *bool `json:"disclosed_snippets,omitempty" doc:"Whether the snippets of a lead moved into a case are disclosed with its flaw. Absent takes the nearest prefix that states it, and no prefix stating it strips them at disclosure"`
+	DisclosedSnippets *bool `json:"disclosed_snippets,omitempty" doc:"Whether the snippets of a code finding included in its flaw's disclosure are disclosed with its flaw. Absent takes the nearest prefix that states it, and no prefix stating it strips them at disclosure"`
 }
 
 // RepositoriesBody is what a product says about its repositories.

@@ -72,7 +72,7 @@ type UnassignedBody struct {
 	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	Occurrences int    `json:"occurrences" doc:"The number of findings a decision here would be recorded against, across every build it is in"`
 	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one decision answers"`
-	Occurrence  string `json:"occurrence,omitempty" doc:"The occurrence of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
+	Occurrence  string `json:"occurrence,omitempty" doc:"The occurrence of a static analysis code finding, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
 }
 
 // HoldingBody is how much work one person has.
@@ -168,7 +168,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// triage.
 		//
 		// The same rule the component path states, asked in one place. Two
-		// spellings drift over which status a refused hand-off is, and
+		// spellings drift over which status a refused flaw record is, and
 		// answer a 404 on one route and a 422 on the other about the
 		// identical condition.
 		if err := mayHandOver(subject, product, input.Body.Person, input.Body.Team); err != nil {
@@ -354,8 +354,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		OperationID: "list-unassigned", Method: http.MethodGet, Path: "/v1/unassigned",
 		Summary: "List findings nobody is dealing with",
 		Description: "Returns open findings with no assignee, across every product you can see, " +
-			"most urgent first. Static analysis leads are included where you read them, one item " +
-			"per lead, with `occurrence` set.\n\n" +
+			"most urgent first. Static analysis code findings are included where you read them, one item " +
+			"per code finding, with `occurrence` set.\n\n" +
 			"Deliberately not scoped to one product: work falling between people is exactly what " +
 			"hides when every screen shows one product and nobody looks at the others.\n\n" +
 			"One item per issue in a component in a product, not one per build. The same code " +
@@ -392,7 +392,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Description: "The open findings assigned to somebody, most urgent first, in the same " +
 			"units as what nobody is dealing with: one item per issue in a component in a " +
 			"product, not one per build. The same code built several ways is one piece of " +
-			"work, and it was taken on as one. A static analysis lead is one item, with `occurrence` " +
+			"work, and it was taken on as one. A static analysis code finding is one item, with `occurrence` " +
 			"set, where you read it.\n\n" +
 			"Send `me` as the identity for your own.\n\n" +
 			"An identity nobody holds answers with an empty list rather than a 404, which is " +
@@ -478,7 +478,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Summary: "List what one team is dealing with",
 		Description: "The open findings routed to a team, most urgent first, in the same units " +
 			"as everywhere else: one item per issue in a component in a product, and one per static " +
-			"analysis lead you read, with `occurrence` set.\n\n" +
+			"analysis code finding you read, with `occurrence` set.\n\n" +
 			"Work goes to a team by standing rule and by an assignment naming one, so a team " +
 			"holds work the way a person does — and the totals list says so. This is the list " +
 			"behind that number.\n\n" +
@@ -541,7 +541,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 			"`reports` counts the open vulnerability reports each holds, in the products where " +
 			"you read reports; somebody holding only reports is listed with no findings.\n\n" +
 			"Counted in pieces of work — an issue in a component in a product, or one static " +
-			"analysis lead — which is the unit the list behind each person is in. `occurrences` says how many findings those " +
+			"analysis code finding — which is the unit the list behind each person is in. `occurrences` says how many findings those " +
 			"cover: one flaw in a kernel is one thing to answer and can be dozens of rows to " +
 			"write.\n\n" +
 			"The number worth watching is not how many findings exist but how many are waiting " +

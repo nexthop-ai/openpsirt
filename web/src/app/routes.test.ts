@@ -28,12 +28,12 @@ const SAMPLES: Record<string, () => string[]> = {
     routes.vulnerabilityReportsAt(odd, true),
   ],
   vulnerabilityReportAt: () => [routes.vulnerabilityReportAt(odd, odd)],
-  leadsAt: () => [
-    routes.leadsAt(odd),
-    routes.leadsAt(odd, { state: "not-reproduced", stream: odd, variant: odd }),
+  codeFindingsAt: () => [
+    routes.codeFindingsAt(odd),
+    routes.codeFindingsAt(odd, { state: "no-longer-detected", stream: odd, variant: odd }),
   ],
-  leadAt: () => [routes.leadAt(build, odd)],
-  leadRulesAt: () => [routes.leadRulesAt(odd)],
+  codeFindingAt: () => [routes.codeFindingAt(build, odd)],
+  suppressionRulesAt: () => [routes.suppressionRulesAt(odd)],
   repositoriesAt: () => [routes.repositoriesAt(odd)],
   componentAt: () => [routes.componentAt(odd, odd), routes.componentAt(odd, odd, odd, build)],
   allFindingsAt: () => [routes.allFindingsAt(), routes.allFindingsAt({ q: odd })],

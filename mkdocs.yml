@@ -51,7 +51,7 @@ nav:
   - Current state: built.md
   - Evaluation: trying.md
   - Build pipelines: pipeline.md
-  - Analyzer results: analysis.md
+  - Security testing: security-testing.md
   - A vendor's release: vendor-release.md
   - Configuration: configuration.md
   - Helm: helm.md

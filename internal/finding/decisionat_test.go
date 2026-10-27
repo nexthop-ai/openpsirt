@@ -28,22 +28,22 @@ var decidedIssue = regexp.MustCompile(`"?\bdv"?\."?issue_id"?\s*=\s*"?\w+"?\."?v
 // what each compares.
 var notADecisionAtAFinding = map[string]map[[2]string]string{
 	"analysis/group.go": {
-		{"f", "fs"}: "two sightings of one lead, in the product bound",
+		{"f", "fs"}: "two sightings of one code finding, in the product bound",
 	},
-	"analysis/handoff.go": {
-		{"lh", "od"}: "a decision about a lead handed off as a flaw, at its occurrence in its own product",
+	"analysis/flaw.go": {
+		{"lh", "od"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",
 	},
 	"analysis/queue.go": {
 		{"f", "fo"}: "two rows of one build at one occurrence",
 	},
 	"analysis/state.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product bound",
+		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
 	},
-	"finding/handoff.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product bound",
+	"finding/code_finding_flaw.go": {
+		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
 	},
 	"finding/assign.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product of its stream",
+		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its stream",
 	},
 	"finding/disclaim.go": {
 		{"f", "lt"}: "two rows of one build at one occurrence",
@@ -53,13 +53,13 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"d2", "de"}: "a decision against another of its product at its occurrence",
 	},
 	"finding/routing.go": {
-		{"f", "fs"}: "two rows of one lead in the product bound",
+		{"f", "fs"}: "two rows of one code finding in the product bound",
 	},
 	"notify/stale.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product of its stream",
+		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its stream",
 	},
 	"triage/decision.go": {
-		{"de", "lh"}: "a decision about a lead handed off as a flaw, at its occurrence in its own product",
+		{"de", "lh"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",
 	},
 	"triage/reaffirm_many.go": {
 		{"de", "newer"}: "a decision against another of its product at its occurrence",

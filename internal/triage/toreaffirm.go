@@ -80,9 +80,9 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 		return nil, page.Total, nil
 	}
 
-	// The rows a re-affirmation re-makes, so a lead past its end of life is
+	// The rows a re-affirmation re-makes, so a code finding past its end of life is
 	// not counted.
-	inSupport, supportArgs := finding.LeadInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
+	inSupport, supportArgs := finding.CodeFindingInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
 	var latest []int64
 	if err := stillLatest(s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 		ColumnExpr(`"de"."id"`).
@@ -178,11 +178,11 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 // yoursToReaffirm selects the lapsed rows, nothing having replaced them, of
 // the decisions this subject made and may re-affirm, over decision_occurrence AS "de".
 //
-// A row at a lead past its end of life is left off, and so is a decision holding
+// A row at a code finding past its end of life is left off, and so is a decision holding
 // no other: re-affirming re-makes a decision at its other occurrences, and refuses one
 // with none.
 func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
-	inSupport, args := finding.LeadInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
+	inSupport, args := finding.CodeFindingInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
 	return s.lapsedOfYours(subject).Where(inSupport, args...)
 }
 

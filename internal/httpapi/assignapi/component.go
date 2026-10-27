@@ -372,11 +372,11 @@ func carrying(ctx context.Context, in core.Deps, subject access.Subject, product
 	return &party, teamAdmits(found, productID), nil
 }
 
-// mayHandOver refuses a party nobody may be given work as, and a hand-off the
+// mayHandOver refuses a party nobody may be given work as, and a flaw record the
 // subject may not make.
 //
 // One helper because the rule is one rule. Two routes stating it answer the
-// same request differently: they drift over which status a refused hand-off
+// same request differently: they drift over which status a refused flaw record
 // is, so the two paths to the same act contradict each other about what
 // happened.
 //

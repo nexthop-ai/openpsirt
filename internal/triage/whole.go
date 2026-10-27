@@ -64,7 +64,7 @@ type Whole struct {
 	// this question is asked.
 	Undisclosed bool
 	// Internal says at least one row of the decision is about internal
-	// material, a lead, which is what decides who may agree to it: at
+	// material, a code finding, which is what decides who may agree to it: at
 	// internal visibility a second person holds the approver capability.
 	Internal bool
 }
@@ -132,7 +132,7 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, decisionID in
 		}
 	}
 	if len(refused) > 0 {
-		// A lead included in its flaw's case is read by the flaw's readers.
+		// A code finding included in its flaw's case is read by the flaw's readers.
 		included, err := s.readsIncluded(ctx, subject, refused)
 		if err != nil {
 			return nil, err

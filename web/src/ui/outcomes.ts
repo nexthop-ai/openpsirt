@@ -10,7 +10,7 @@ import { useWho } from "../app/session";
 export type Outcome = NonNullable<Body<"DecisionOccurrenceBody">["outcome"]>;
 
 // The outcomes about a vulnerability, which the findings lists and the reports
-// filter by. A lead's outcomes are recorded on a lead and nowhere else.
+// filter by. A code finding's outcomes are recorded on a code finding and nowhere else.
 export type VulnerabilityOutcome = NonNullable<Body<"DisposedBody">["outcome"]>;
 
 // What one outcome says, as the server publishes it beside the caller.
@@ -25,7 +25,7 @@ export type Decisions = Body<"OutcomeBody">;
 // | known | the server's answer has arrived; until it has, nothing is in any class |
 // | dismissing | the server calls it a dismissal: it hides risk and stores no date, about a vulnerability |
 // | gated | every outcome alwaysGated holds, in the order the server publishes them |
-// | alwaysGated | it hides risk and stores no date, about a vulnerability or a lead, so a second person always agrees |
+// | alwaysGated | it hides risk and stores no date, about a vulnerability or a code finding, so a second person always agrees |
 // | hidesRisk | recording it takes the issue out of the working queue |
 // | dated | it stores a date: a review date, or when promised work lands |
 // | needsJustification | it states which recognized reason applies |

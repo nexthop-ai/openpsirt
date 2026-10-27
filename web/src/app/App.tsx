@@ -53,9 +53,11 @@ const VulnerabilityReports = retrying(() =>
 const VulnerabilityReport = retrying(() =>
   import("../screens/VulnerabilityReport").then((m) => m.VulnerabilityReport),
 );
-const Leads = retrying(() => import("../screens/Leads").then((m) => m.Leads));
-const Lead = retrying(() => import("../screens/Lead").then((m) => m.Lead));
-const LeadRules = retrying(() => import("../screens/LeadRules").then((m) => m.LeadRules));
+const CodeFindings = retrying(() => import("../screens/CodeFindings").then((m) => m.CodeFindings));
+const CodeFinding = retrying(() => import("../screens/CodeFinding").then((m) => m.CodeFinding));
+const SuppressionRules = retrying(() =>
+  import("../screens/SuppressionRules").then((m) => m.SuppressionRules),
+);
 const Repositories = retrying(() => import("../screens/Repositories").then((m) => m.Repositories));
 const InventoryCompare = retrying(() =>
   import("../screens/InventoryCompare").then((m) => m.InventoryCompare),
@@ -210,9 +212,9 @@ export function App() {
               <Route path={ROUTES.inventoryComparison} element={<InventoryCompare />} />
               <Route path={ROUTES.vulnerabilityReports} element={<VulnerabilityReports />} />
               <Route path={ROUTES.vulnerabilityReport} element={<VulnerabilityReport />} />
-              <Route path={ROUTES.leads} element={<Leads />} />
-              <Route path={ROUTES.lead} element={<Lead />} />
-              <Route path={ROUTES.leadRules} element={<LeadRules />} />
+              <Route path={ROUTES.codeFindings} element={<CodeFindings />} />
+              <Route path={ROUTES.codeFinding} element={<CodeFinding />} />
+              <Route path={ROUTES.suppressionRules} element={<SuppressionRules />} />
               <Route path={ROUTES.repositories} element={<Repositories />} />
               {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}

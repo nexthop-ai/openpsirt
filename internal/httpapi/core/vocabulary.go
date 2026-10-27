@@ -81,17 +81,21 @@ type Justification string
 // Schema answers with the reasons the exchange format defines.
 func (Justification) Schema(huma.Registry) *huma.Schema { return words(triage.Justifications()) }
 
-// LeadOutcome is what a decision about a lead says it is.
-type LeadOutcome string
+// CodeFindingOutcome is what a decision about a code finding says it is.
+type CodeFindingOutcome string
 
-// Schema answers with the outcomes a decision about a lead records.
-func (LeadOutcome) Schema(huma.Registry) *huma.Schema { return words(triage.LeadOutcomes()) }
+// Schema answers with the outcomes a decision about a code finding records.
+func (CodeFindingOutcome) Schema(huma.Registry) *huma.Schema {
+	return words(triage.CodeFindingOutcomes())
+}
 
-// LeadReason is the reason a lead was dismissed.
-type LeadReason string
+// CodeFindingReason is the reason a code finding was dismissed.
+type CodeFindingReason string
 
-// Schema answers with the reasons a lead is dismissed for.
-func (LeadReason) Schema(huma.Registry) *huma.Schema { return words(triage.LeadReasons()) }
+// Schema answers with the reasons a code finding is dismissed for.
+func (CodeFindingReason) Schema(huma.Registry) *huma.Schema {
+	return words(triage.CodeFindingReasons())
+}
 
 // StatementScope is whom a statement published from a decision holds for.
 type StatementScope string

@@ -1002,15 +1002,15 @@ var tables = []string{
 	// Before person, which it points at.
 	"outbound",
 	// Before person and product, which it points at.
-	"lead_rule",
+	"suppression_rule",
 	// Before person, product and vulnerability, which they point at.
-	"lead_handoff",
-	// Before flaw_lead and target, which it points at.
-	"flaw_lead_build",
+	"code_finding_flaw",
+	// Before flaw_code_finding and target, which it points at.
+	"flaw_code_finding_build",
 	// Before person, product and vulnerability, which it points at.
-	"flaw_lead",
-	"lead_component",
-	"lead_collaborator",
+	"flaw_code_finding",
+	"code_finding_component",
+	"code_finding_collaborator",
 	// Before team and person, both of which they point at.
 	"team_member",
 	"team",

@@ -125,17 +125,17 @@ func Finding(product, stream, variant, vulnerability, component, version string)
 	return address
 }
 
-// Lead is one static analysis lead's evidence on one build.
-func Lead(product, stream, variant, occurrence string) string {
+// CodeFinding is one static analysis code finding's evidence on one build.
+func CodeFinding(product, stream, variant, occurrence string) string {
 	if climbs(product, stream, variant, occurrence) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/leads/" + url.PathEscape(occurrence)
+	return build(product, stream, variant) + "/code-findings/" + url.PathEscape(occurrence)
 }
 
-// Leads is a product's leads in one state on one build, and of one series
+// CodeFindings is a product's code findings in one state on one build, and of one series
 // where one is named.
-func Leads(product, stream, variant, state, series string) string {
+func CodeFindings(product, stream, variant, state, series string) string {
 	if climbs(product) {
 		return Home()
 	}
@@ -143,15 +143,15 @@ func Leads(product, stream, variant, state, series string) string {
 	if series != "" {
 		query.Set("series", series)
 	}
-	return "/products/" + url.PathEscape(product) + "/leads?" + query.Encode()
+	return "/products/" + url.PathEscape(product) + "/code-findings?" + query.Encode()
 }
 
-// LeadRules is a product's standing rules on leads.
-func LeadRules(product string) string {
+// SuppressionRules is a product's suppression rules.
+func SuppressionRules(product string) string {
 	if climbs(product) {
 		return Home()
 	}
-	return "/products/" + url.PathEscape(product) + "/lead-rules"
+	return "/products/" + url.PathEscape(product) + "/suppression-rules"
 }
 
 // Uploads is the list of what one build was sent.

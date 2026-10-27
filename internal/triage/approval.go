@@ -204,7 +204,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, decisionID i
 // No approval needed, for the same reason revising needs none: it puts risk
 // back on the table rather than taking it off.
 //
-// It answers the leads whose agreed dismissal it took back, each of which is
+// It answers the code findings whose agreed dismissal it took back, each of which is
 // back in the queue.
 func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID int64) ([]Reopened, error) {
 	var reopened []Reopened
@@ -230,7 +230,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 				Where(`"de"."vulnerability_id" IN (SELECT "rv"."id" FROM "vulnerability" AS "rv" WHERE "rv"."kind" = ?)`,
 					string(kind.Rule)).
 				Scan(ctx, &reopened); err != nil {
-				return fmt.Errorf("read the leads the decision dismissed: %w", err)
+				return fmt.Errorf("read the code findings the decision dismissed: %w", err)
 			}
 		}
 		now := s.now().Truncate(time.Microsecond)
@@ -263,7 +263,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 	return reopened, nil
 }
 
-// Reopened is a lead an agreed dismissal no longer holds out of the queue.
+// Reopened is a code finding an agreed dismissal no longer holds out of the queue.
 type Reopened struct {
 	ProductID          int64  `bun:"product_id"`
 	OccurrenceIdentity string `bun:"occurrence_identity"`
@@ -323,7 +323,7 @@ type ForPerson struct {
 	// Internal says any is internal work.
 	Undisclosed bool
 	Internal    bool
-	// Probable says the rows were decisions on leads a run paired only
+	// Probable says the rows were decisions on code findings a run paired only
 	// probably, rather than decisions the code moved under.
 	Probable bool
 	// RatedWorse says the rows lapsed because the issue was rated worse,
@@ -367,15 +367,15 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	if err != nil {
 		return Undone{}, err
 	}
-	// A confirmation a hand-off rests on stands: its flaw is judged
+	// A confirmation a flaw record rests on stands: its flaw is judged
 	// instead, and nothing about the decision changes again. The stamps are
-	// read before the hand-offs are asked about, and every decision undone is
+	// read before the flaw records are asked about, and every decision undone is
 	// restamped from them, as every writer of a decision is (writableRows).
 	stamps, err := s.stampsOf(ctx, decisions)
 	if err != nil {
 		return Undone{}, err
 	}
-	if decisions, occurrences, err = s.leavingHandedOff(ctx, decisions, occurrences); err != nil {
+	if decisions, occurrences, err = s.leavingRecordedAsFlaw(ctx, decisions, occurrences); err != nil {
 		return Undone{}, err
 	}
 	if len(decisions) == 0 {
@@ -442,10 +442,10 @@ func (s *Store) returnToWaiting(ctx context.Context, decisions []int64) (int64, 
 	return database.Affected(res)
 }
 
-// leavingHandedOff is these decisions and their rows without the decisions about a
-// lead handed off as a flaw.
-func (s *Store) leavingHandedOff(ctx context.Context, decisions, occurrences []int64) ([]int64, []int64, error) {
-	handed, err := s.handedOff(ctx, decisions)
+// leavingRecordedAsFlaw is these decisions and their rows without the decisions about a
+// code finding recorded as a flaw.
+func (s *Store) leavingRecordedAsFlaw(ctx context.Context, decisions, occurrences []int64) ([]int64, []int64, error) {
+	handed, err := s.recordedAsFlaw(ctx, decisions)
 	if err != nil || len(handed) == 0 {
 		return decisions, occurrences, err
 	}

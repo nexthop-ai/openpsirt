@@ -15,7 +15,7 @@ import (
 // nothing about which builds hold runs.
 func TestAnalyzerRunsAreRefusedBeforeTheBuildIsLookedUp(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		httpapitest.SeededLead(t, r)
+		httpapitest.SeededCodeFinding(t, r)
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/branches-and-tags",
 			`{"name":"fresh","kind":"branch"}`); got.Code >= 300 {
 			t.Fatalf("declaring the branch answered %d: %s", got.Code, got.Body)

@@ -87,9 +87,9 @@ var sharedKinds = map[Kind]bool{
 	BroughtIn:       false, Disclosed: false, Unanswered: true,
 	ReportMessage: false, ReportSent: false, ReportNoted: false,
 	VulnerabilityDataStale: true, RiskUnagreed: true, PairsConcentrated: true,
-	SupplierSilent: true, InventoryMoved: true, AnalysisDropped: true,
-	AnalysisNotComparable: true, AnalysisQuiet: true,
-	LeadHandedOff: true, LeadMoved: true, LeadReopened: true, RuleOutgrown: true, RuleWaiting: true,
+	SupplierSilent: true, InventoryMoved: true, SecurityTestingDropped: true,
+	SecurityTestingNotComparable: true, SecurityTestingStopped: true,
+	CodeFindingRecordedAsFlaw: true, CodeFindingIncludedInDisclosure: true, CodeFindingReopened: true, SuppressionRuleOutgrown: true, SuppressionRuleWaiting: true,
 	UpstreamFailing: true, UpstreamRecovered: true,
 	ResponseWindowOpen: true, ResponseWindowNear: true, ResponseWindowPassed: true,
 }

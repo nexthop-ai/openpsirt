@@ -289,13 +289,13 @@ func (s Subject) narrowedTo(productID int64) Subject {
 		}
 		s.cases = here
 	}
-	// The leads granted one at a time likewise: the one product's stay.
-	if len(s.leads) > 0 {
+	// The code findings granted one at a time likewise: the one product's stay.
+	if len(s.codeFindings) > 0 {
 		here := map[int64][]string{}
-		if occurrences, on := s.leads[productID]; on {
+		if occurrences, on := s.codeFindings[productID]; on {
 			here[productID] = occurrences
 		}
-		s.leads = here
+		s.codeFindings = here
 	}
 	return s
 }

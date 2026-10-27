@@ -60,11 +60,11 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     what it says about the code under a path prefix.
 //   - A build's node records the repository the build stated a component is
 //     built from.
-//   - A product records the standing rules that dismiss leads.
+//   - A product records the suppression rules that dismiss code findings.
 //   - An analyzer's rule records the tool's own rating of its results and
 //     the weakness families it finds, and a result the last place it names.
 //   - A notification records whether what it withholds is internal work.
-//   - A decision has a stamp, in a table of its own, that a hand-off resting
+//   - A decision has a stamp, in a table of its own, that a flaw record resting
 //     on it and the writes that could take that support away change.
 //   - A product records each VEX document and supplier advisory that arrived
 //     for it: who sent it or which feed fetched it, when, and what became of
@@ -109,7 +109,7 @@ func changeV0110(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
-		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createLeadV0110,
+		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createCodeFindingV0110,
 		notificationInternalV0110, createDecisionStampV0110, createDocumentUploadV0110,
 		reportCaseV0110, reportedProblemFromFlawV0110,
 	} {

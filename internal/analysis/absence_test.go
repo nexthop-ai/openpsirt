@@ -25,7 +25,7 @@ func atCommits(doc, top, frr string) string {
 		`"revisionId":"def"`, `"revisionId":"`+frr+`"`).Replace(doc)
 }
 
-func TestALeadLastSeenByAnotherToolVersionIsNotMarkedNotReproduced(t *testing.T) {
+func TestACodeFindingLastSeenByAnotherToolVersionIsNotMarkedNoLongerDetected(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
 		start := time.Now().UTC().Add(-4 * time.Hour)
@@ -36,13 +36,13 @@ func TestALeadLastSeenByAnotherToolVersionIsNotMarkedNotReproduced(t *testing.T)
 			t.Fatalf("the upgraded run is %q; want tool-changed", upgraded.Reason)
 		}
 		// The next run is comparable to the upgraded one, and not to the run
-		// that last saw the FRR lead.
+		// that last saw the FRR code finding.
 		run, _ := w.send(t, w.Target.ID, start.Add(2*time.Hour), atVersion(document([]sent{inSWSS}, 10), "19.1.0"))
 		if run.Comparable == nil || !*run.Comparable {
 			t.Fatalf("comparable %v (%q); want comparable", run.Comparable, run.Reason)
 		}
-		if r := receiptOf(t, run); r.NotReproduced != 0 || r.Uncompared != 1 || r.Seen != 1 {
-			t.Errorf("receipt %+v; want the FRR lead left open and counted as uncompared", r)
+		if r := receiptOf(t, run); r.NoLongerDetected != 0 || r.Uncompared != 1 || r.Seen != 1 {
+			t.Errorf("receipt %+v; want the FRR code finding left open and counted as uncompared", r)
 		}
 		var absent int
 		if err := w.DB.DB.NewSelect().TableExpr(`"sighting" AS "si"`).ColumnExpr(`COUNT(*)`).
@@ -50,12 +50,12 @@ func TestALeadLastSeenByAnotherToolVersionIsNotMarkedNotReproduced(t *testing.T)
 			t.Fatal(err)
 		}
 		if absent != 0 {
-			t.Errorf("%d leads marked not reproduced; want none", absent)
+			t.Errorf("%d code findings marked no longer detected; want none", absent)
 		}
 	})
 }
 
-func TestTheFirstRunOnABranchFingerprintedAnewTakesItsParentsLeadOnTheUnprintedKey(t *testing.T) {
+func TestTheFirstRunOnABranchFingerprintedAnewTakesItsParentsCodeFindingOnTheUnprintedKey(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		tag := w.TargetFor(w.Tag, w.Customer)
 		w.inventory(t, w.Target.ID)
@@ -71,11 +71,11 @@ func TestTheFirstRunOnABranchFingerprintedAnewTakesItsParentsLeadOnTheUnprintedK
 		run, _ := w.send(t, tag.ID, start.Add(time.Hour),
 			documentOf([]interface{ json() string }{printed}, 10, "fedcba9876543210"))
 		if r := receiptOf(t, run); !r.FingerprintsChanged || r.Inherited != 1 || r.Probable != 0 {
-			t.Errorf("receipt %+v; want a fingerprint change inheriting the lead strongly", r)
+			t.Errorf("receipt %+v; want a fingerprint change inheriting the code finding strongly", r)
 		}
-		branch, cut := w.leads(t, w.Target.ID), w.leads(t, tag.ID)
+		branch, cut := w.codeFindings(t, w.Target.ID), w.codeFindings(t, tag.ID)
 		if len(branch) != 1 || len(cut) != 1 || branch[0].OccurrenceIdentity != cut[0].OccurrenceIdentity {
-			t.Errorf("branch %+v, tag %+v; want one lead each at one occurrence", branch, cut)
+			t.Errorf("branch %+v, tag %+v; want one code finding each at one occurrence", branch, cut)
 		}
 	})
 }
@@ -88,8 +88,8 @@ func TestAResultIsPlacedOnTheComponentWhosePlatformEnumerationNamesItsRepository
 			document([]sent{inFRR}, 10)); status != series.Applied {
 			t.Fatalf("status %s; want applied", status)
 		}
-		if leads := w.leads(t, w.Target.ID); len(leads) != 1 || leads[0].ComponentID != w.frr {
-			t.Errorf("findings %+v; want one on FRR (%d)", leads, w.frr)
+		if codeFindings := w.codeFindings(t, w.Target.ID); len(codeFindings) != 1 || codeFindings[0].ComponentID != w.frr {
+			t.Errorf("findings %+v; want one on FRR (%d)", codeFindings, w.frr)
 		}
 	})
 }
@@ -99,32 +99,32 @@ func TestAPlatformEnumerationNamingAnotherOwnerPlacesNothing(t *testing.T) {
 		w.inventoryWith(t, w.Target.ID, graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr",
 			Version: "10.2", CPE: "cpe:2.3:a:debian:frr:10.2:*:*:*:*:*:*:*"})
 		w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
-		if leads := w.leads(t, w.Target.ID); len(leads) != 1 || leads[0].ComponentID != w.root {
-			t.Errorf("findings %+v; want one on the build (%d)", leads, w.root)
+		if codeFindings := w.codeFindings(t, w.Target.ID); len(codeFindings) != 1 || codeFindings[0].ComponentID != w.root {
+			t.Errorf("findings %+v; want one on the build (%d)", codeFindings, w.root)
 		}
 	})
 }
 
-func TestALeadNoLongerSeenNamesItsRepositorysCommitInBothBuilds(t *testing.T) {
+func TestACodeFindingNoLongerSeenNamesItsRepositorysCommitInBothBuilds(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		w.send(t, w.Target.ID, start, atCommits(document([]sent{inFRR, inSWSS}, 10), "1111111", "AAAAAAA"))
 		w.send(t, w.Target.ID, start.Add(time.Hour), atCommits(document([]sent{inSWSS}, 10), "2222222", "bbbbbbb"))
 		reader := w.holding(t, "analyst", access.InternalRead)
-		for _, lead := range w.leads(t, w.Target.ID) {
-			got, err := EvidenceOf(t.Context(), w.DB.DB, reader, &lead, w.Product.ID)
+		for _, codeFinding := range w.codeFindings(t, w.Target.ID) {
+			got, err := EvidenceOf(t.Context(), w.DB.DB, reader, &codeFinding, w.Product.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
-			switch lead.ComponentID {
+			switch codeFinding.ComponentID {
 			case w.frr:
 				if got.LastCommit != "aaaaaaa" || got.NotSeenCommit != "bbbbbbb" {
-					t.Errorf("the FRR lead names %q and %q; want FRR's commits", got.LastCommit, got.NotSeenCommit)
+					t.Errorf("the FRR code finding names %q and %q; want FRR's commits", got.LastCommit, got.NotSeenCommit)
 				}
 			default:
 				if got.LastCommit != "2222222" || got.NotSeenCommit != "" {
-					t.Errorf("the lead on the build names %q and %q; want the top commit it was last seen at",
+					t.Errorf("the code finding on the build names %q and %q; want the top commit it was last seen at",
 						got.LastCommit, got.NotSeenCommit)
 				}
 			}

@@ -16,7 +16,7 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
-import { findingOf, vulnerabilityReportAt, leadAt, leadsAt } from "../app/routes";
+import { findingOf, vulnerabilityReportAt, codeFindingAt, codeFindingsAt } from "../app/routes";
 import { useHandBack, useHeldReports } from "../api/intake";
 import { on } from "../ui/when";
 
@@ -114,9 +114,9 @@ export function Assignments() {
     !row.team && row.person === who.data?.identity;
   const others = peopleRows.filter((row) => !own(row));
   const myCount = peopleRows.find(own)?.open ?? 0;
-  // Leads are left out of the findings list, so the unheld ones of the
+  // Code findings are left out of the findings list, so the unheld ones of the
   // product in scope are linked where this screen points at unheld work.
-  const leadsIn =
+  const codeFindingsIn =
     scope.product && mayOf(who.data, scope.product)?.reads_internal ? scope.product : undefined;
 
   return (
@@ -207,7 +207,7 @@ export function Assignments() {
         <ByPerson
           rows={others}
           query={holdings}
-          leadsIn={leadsIn}
+          codeFindingsIn={codeFindingsIn}
           onPick={(name, isTeam) => {
             const now = new URLSearchParams(params);
             now.delete("person");
@@ -306,12 +306,12 @@ type Query = { isPending: boolean; isError: boolean; error: unknown };
 function ByPerson({
   rows,
   query,
-  leadsIn,
+  codeFindingsIn,
   onPick,
 }: {
   rows: Body<"HoldingBody">[];
   query: Query;
-  leadsIn?: string;
+  codeFindingsIn?: string;
   onPick: (name: string, team: boolean) => void;
 }) {
   const release = useHandBack();
@@ -326,8 +326,10 @@ function ByPerson({
         title="Nobody else is holding anything."
         detail="What is waiting for nobody is the findings list under Unassigned; this one is about work somebody has taken on."
       >
-        {leadsIn && (
-          <Link to={leadsAt(leadsIn, { assigned: "nobody" })}>Unassigned leads in {leadsIn}</Link>
+        {codeFindingsIn && (
+          <Link to={codeFindingsAt(codeFindingsIn, { assigned: "nobody" })}>
+            Unassigned code findings in {codeFindingsIn}
+          </Link>
         )}
       </Empty>
     );
@@ -422,7 +424,7 @@ function ByPerson({
 // One person's own work, in the same units as what nobody is dealing with: one
 // row per issue in a component in a product, not one per build. The same code
 // built several ways is one piece of work and was taken on as one. A static
-// analysis lead is a row of its own, named by its rule, and opens its page.
+// analysis code finding is a row of its own, named by its rule, and opens its page.
 function Held({
   rows,
   total,
@@ -474,7 +476,7 @@ function Held({
           <tbody>
             {rows.map((row) => {
               const to = row.occurrence
-                ? leadAt(
+                ? codeFindingAt(
                     { product: row.product, stream: row.stream, variant: row.variant },
                     row.occurrence,
                   )
@@ -492,7 +494,7 @@ function Held({
                     <Link to={to} className="id">
                       {row.vulnerability}
                     </Link>{" "}
-                    {row.occurrence && <span className="hint">lead</span>}{" "}
+                    {row.occurrence && <span className="hint">code finding</span>}{" "}
                     <Incident when={row.incident} /> <Exploited when={row.exploited} />
                   </td>
                   <td>

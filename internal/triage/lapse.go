@@ -210,19 +210,19 @@ func markLapsed(ctx context.Context, tx bun.IDB, ids []int64, moment time.Time) 
 	return database.Affected(result)
 }
 
-// LapseLeads marks lapsed the decisions dismissing a lead at these occurrences of a
-// product, because a run paired each lead only probably: on its function or
+// LapseCodeFindings marks lapsed the decisions dismissing a code finding at these occurrences of a
+// product, because a run paired each code finding only probably: on its function or
 // its nearest line, rather than on its whole key. The decision was about the
 // result as it was keyed, and a weaker pairing is a guess that the result is
 // the same one, so somebody re-affirms it.
 //
-// A decision confirming a lead stands: it says the flaw is real, and a weaker
+// A decision confirming a code finding stands: it says the flaw is real, and a weaker
 // pairing does not make it less so.
 //
 // Written inside the transaction that records the pairing, so a pairing is
 // never recorded with the decision on it left standing. Who proposed each is
 // returned for the caller to tell once the transaction commits.
-func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, occurrences []string, moment time.Time) (Lapsed, error) {
+func LapseCodeFindings(ctx context.Context, tx bun.IDB, productID int64, occurrences []string, moment time.Time) (Lapsed, error) {
 	var out Lapsed
 	if len(occurrences) == 0 {
 		return out, nil
@@ -239,14 +239,14 @@ func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, occurrences []
 			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 			Where(`"lc"."outcome" IN (?, ?)`, Dismissed, NotSecurity).
 			Scan(ctx, &ids); err != nil {
-			return out, fmt.Errorf("read the decisions on leads paired probably: %w", err)
+			return out, fmt.Errorf("read the decisions on code findings paired probably: %w", err)
 		}
 		if len(ids) == 0 {
 			continue
 		}
 		n, err := markLapsed(ctx, tx, ids, moment.Truncate(time.Microsecond))
 		if err != nil {
-			return out, fmt.Errorf("lapse the decisions on leads paired probably: %w", err)
+			return out, fmt.Errorf("lapse the decisions on code findings paired probably: %w", err)
 		}
 		out.Rows += n
 		lapsed = append(lapsed, ids...)

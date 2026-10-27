@@ -190,7 +190,7 @@ func holdersNarrowed(ctx context.Context, db bun.IDB, narrowed access.Narrowed) 
 	return out, nil
 }
 
-// heldIn is what one party holds open in one product: findings and leads at
+// heldIn is what one party holds open in one product: findings and code findings at
 // these visibilities, and whether any report.
 type heldIn struct {
 	party        int64
@@ -253,7 +253,7 @@ func heldByParty(ctx context.Context, db bun.IDB, parties []int64) ([]heldIn, er
 	return out, nil
 }
 
-// releaseUnread hands back one party's open findings and leads in one product
+// releaseUnread hands back one party's open findings and code findings in one product
 // at every visibility outside kept, and all of them where kept is empty.
 func releaseUnread(ctx context.Context, db bun.IDB, party, productID int64,
 	kept []access.Visibility) (int64, error) {

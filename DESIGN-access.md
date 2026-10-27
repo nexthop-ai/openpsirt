@@ -98,7 +98,7 @@ by a rule about acting lets none.
 
 Internal is the third visibility, beside public and private. It holds material
 never disclosed in its own right: unconfirmed results nobody has judged, such
-as an analyzer's leads (REQ-14). Analysis results are its first users.
+as an analyzer's code findings (REQ-14). Analysis results are its first users.
 
 | Visibility | Holds | Read under | Triaged under |
 |---|---|---|---|
@@ -112,16 +112,16 @@ as an analyzer's leads (REQ-14). Analysis results are its first users.
 | Its roles are granted like every other read and triage role | Per product, across every product, or from a group mapping. The people working analyzer output work a high volume of noise and the private team works few embargoed cases, and neither is handed the other's material |
 | `internal-read` alone lists the product and nothing open against it but internal findings | It is a read role like the other two, so the product is one its holder may know exists, and a capability granted beside it reaches something |
 | The anonymous subject reads no internal work | It reads disclosed work in a publishing product, and internal work is never disclosed. Described under [anybody at all](#anybody-at-all) |
-| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A lead moved into a flaw's case stays internal, and the case reaches it and the decisions at its occurrence as one of the flaw's readers (`DESIGN-analysis.md` § Keep or move) |
-| A lead moved into its flaw's case is read whole by everybody who read it before, and with the decisions at its occurrence by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the move adds readers. Undoing the move takes back only the readers it added (`DESIGN-analysis.md` § Keep or move) |
-| A lead collaborator is granted one handed-off lead while its flaw is undisclosed, and reads its evidence alone | A grant of one lead is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, kept lead or moved (`DESIGN-analysis.md` § Lead collaborators) |
+| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A code finding included in a flaw's disclosure stays internal, and the case reaches it and the decisions at its occurrence as one of the flaw's readers (`DESIGN-analysis.md` § Disclosure inclusion) |
+| A code finding included in its flaw's disclosure is read whole by everybody who read it before, and with the decisions at its occurrence by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the inclusion adds readers. Taking it out of disclosure takes back only the readers the inclusion added (`DESIGN-analysis.md` § Disclosure inclusion) |
+| A code finding collaborator is granted one code finding recorded as a flaw while its flaw is undisclosed, and reads its evidence alone | A grant of one code finding is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, whether or not the code finding was included (`DESIGN-analysis.md` § Code finding collaborators) |
 | `internal-triage` triages nothing about a product as a whole: routing, assignment, a rating, an incident, a response window, an inventory upload | Each is about what the product's builds ship, which internal triage reads none of |
-| Approving at internal visibility needs its holder to read internal work and hold the approver capability | A decision there is about a lead, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Lead triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
+| Approving at internal visibility needs its holder to read internal work and hold the approver capability | A decision there is about a code finding, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Code finding triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
 | A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
 
 No consumer of vulnerability findings includes analysis results. The findings
 lists, reports, exports, published documents and the interface's screens read
-none; the lead screens read leads. A person sends an
+none; the code finding screens read code findings. A person sends an
 analyzer run where they hold `internal-triage` on the product, since every
 result opens internal. `DESIGN-kinds.md`
 § Consumers holds which kinds each consumer reads.
@@ -249,7 +249,7 @@ yourself is still doing it.
 | Assigner is held alongside triage, not instead of it | The role widens what a triager may do with work; on its own it assigns nothing, because handing around findings in a product you may not argue about is not a narrower version of triaging it. Enforced at the endpoint and again at the store, with the session answer carrying the same conjunction so an interface does not draw a control that always fails |
 | Who may *be* assigned is visibility, not a grant of its own | |
 | The write that moves the rows refuses a hand-off the caller may not make | Every path that hands work over reaches that write, so a path that forgot to check first still moves nothing |
-| Whether the recipient may read the work is asked inside the write's transaction | Asked at every visibility open there, each of which they must read. A scan recording an undisclosed occurrence between a separate read and the write would hand the new row over unasked. The single assignment, a lead's assignment, assignment by narrowing and an upgrade's holder all ask it there |
+| Whether the recipient may read the work is asked inside the write's transaction | Asked at every visibility open there, each of which they must read. A scan recording an undisclosed occurrence between a separate read and the write would hand the new row over unasked. The single assignment, a code finding's assignment, assignment by narrowing and an upgrade's holder all ask it there |
 | A finding is assigned for a whole group at once | One issue in one component, however many occurrences. Assigning one occurrence and not another is not something anybody means to do |
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
@@ -305,7 +305,7 @@ it is assigned, and not in anybody's own because they are not here.
 | Operation | Meaning |
 |---|---|
 | Releasing | Nobody is dealing with it, and it goes back where it can be picked up. The honest answer when who takes it on has not been decided |
-| Handing over | Says who is dealing with it now. Refused whole where any of it sits at a visibility the recipient may not read in its product, asked inside the transaction that moves it; the hand-over would be the disclosure. Leads move with everything else |
+| Handing over | Says who is dealing with it now. Refused whole where any of it sits at a visibility the recipient may not read in its product, asked inside the transaction that moves it; the hand-over would be the disclosure. Code findings move with everything else |
 
 Only an administrator does either; a person hands back their own by assigning it
 to nobody.
@@ -333,7 +333,7 @@ holder who cannot open it.
 | A person keeps undisclosed and internal work where they read it, and disclosed work while they hold any role in the product | Disclosed work travels with its assignment. Anything else left with somebody who cannot open it is in no list at all |
 | A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | The rule a hand assignment to a team asks (§ Teams) |
 | A report goes where undisclosed work goes | A report is read under undisclosed reading (`DESIGN-findings.md` § Report visibility) |
-| Leads go by the same rule as findings | A lead is work at its visibility like any other |
+| Code findings go by the same rule as findings | A code finding is work at its visibility like any other |
 | It goes back to nobody, and no sweep is queued | Exactly as when somebody leaves. The unassigned list holds it until somebody takes it, and a routing rule places it when a rule is next recorded in the product. Queuing a sweep would let a full queue refuse a withdrawal of access |
 | Asked of whoever the write named, and of every team they are on | A team holds work only while a member reads it, so a member's reading going can strand the team's queue |
 | Inside the write that took the reading away | Done after it, a failure leaves the reading gone, the work with somebody who cannot open it, and no request that reaches the hand-back again. Deactivation hands back after its write commits, for the reason under § Somebody who has left |
@@ -514,16 +514,16 @@ numbers are shown because the gap between them is the thing worth knowing.
 | How many one pass places is a setting | A bulk write is bounded and the bound belongs where an operator can move it: a pass too large holds a connection through the whole of it, and one too small leaves a fifty-thousand-finding product re-queuing twenty-five times. It was a constant in the sweeper and a second constant in the writer — two numbers for one bound — under a comment declining the decision without citing it |
 | The preview is narrowed like every other count (REQ-42, REQ-43) | Read unnarrowed, the gap between the preview and the same person's findings list is exactly the amount of undisclosed work. Somebody who may see nothing is told nothing rather than zero |
 | A rule may place vulnerability reports instead of findings | Such a rule names no package and no place, since a report sits at neither, and either key on it is refused. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when it is added. Its preview counts the product's open reports and those nobody holds, where the asker reads the product's reports and as zero elsewhere |
-| A rule places leads as well as findings | A lead is matched by the component it sits in, like any finding, and is one piece of work in the preview. A lead past its end of life is neither placed nor counted, because it is kept as it stands (`DESIGN-analysis.md` § End of life) |
+| A rule places code findings as well as findings | A code finding is matched by the component it sits in, like any finding, and is one piece of work in the preview. A code finding past its end of life is neither placed nor counted, because it is kept as it stands (`DESIGN-analysis.md` § End of life) |
 | A rule places work only at a visibility one member of its team reads | The rule a hand assignment to the team asks (§ Teams). It is asked of each occurrence, so an undisclosed or internal occurrence nobody on the team reads stays with nobody while the disclosed occurrences beside it are placed, and is picked up from the unassigned list by somebody who reads it. A team of nobody is placed nothing |
 | The preview names no team, and counts what the asker reads | It takes the keys alone. Work at a visibility nobody on the team reads is counted and then not placed |
-| A rule places no lead handed off as a flaw | It is closed work for its holder, and its flaw is placed as itself (`DESIGN-analysis.md` § Lead assignment). The preview counts none |
+| A rule places no code finding recorded as a flaw | It is closed work for its holder, and its flaw is placed as itself (`DESIGN-analysis.md` § Code finding assignment). The preview counts none |
 | A rule places only work nobody holds | A human assignment always wins. A rule able to override one would perform the assigner's act continuously on behalf of whoever wrote it, with nobody holding the right at the moment it happened |
 | That nobody holds an occurrence is re-checked at the moment of the write | The batch reads which findings a rule matches and then writes them by identifier; an assignment landing between the two is somebody's |
 | Rules are ordered, first match wins, and the finding records which rule placed it | An unwritten precedence rule is forgettable, and "where did this come from" is asked months later |
 | The order is settled | The ordinal is one past the highest under ordinary isolation, so two rules created at the same moment take the same number. Ties break by identifier rather than letting two rules swap places between batches |
 | Writing a rule asks for the assigner right | Reading the rules asks only for triage, because knowing where work goes is part of working it |
-| Reading and previewing the rules ask for triage at any visibility, internal included | A rule places leads, so whoever triages internal work in the product reads where its leads go. Writing a rule still asks for disclosed or undisclosed triage beside the assigner right |
+| Reading and previewing the rules ask for triage at any visibility, internal included | A rule places code findings, so whoever triages internal work in the product reads where its code findings go. Writing a rule still asks for disclosed or undisclosed triage beside the assigner right |
 | Somebody who can see the product and lacks the right is refused with 403 | The same answer an issue act gives them. A product they cannot see answers as not declared, as every product route does |
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
 | The rule listing names a rule's team by identifier and marks a retired one | The list read is the list the sweep applies, so a rule that places nothing says so. A team past the first page of teams, or retired, still has a name |
@@ -708,7 +708,7 @@ being applied correctly to it.
 | A key's scope is constraints, not a path | The product is always required; release and variant are independent, and either, both or neither may be pinned. Every constraint present must match |
 | A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its full target |
 | A key reads back the receipts of the builds it may upload to and nothing else | The same holds for the documents sent there and what each upload changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Every receipt of the build, whichever key sent it: a rotated key, or a second key on the build, is answered with another sender's scan when it re-sends the same bytes. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many other builds there are |
-| A key reads back the receipts of the analyzer runs sent to the builds it may upload to | A receipt counts the leads a run opened and saw and names none. A person reads the same receipts where they read internal findings in the product, since the counts are of internal findings (`DESIGN-analysis.md` § Receipts) |
+| A key reads back the receipts of the analyzer runs sent to the builds it may upload to | A receipt counts the code findings a run opened and saw and names none. A person reads the same receipts where they read internal findings in the product, since the counts are of internal findings (`DESIGN-analysis.md` § Receipts) |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 | A key's name is stored folded and matched exactly, the way a username is | An administrator types it to make the key and again to withdraw it. A name taken in other capitals is refused as taken, and one that is only spaces is refused as naming nothing |
 | A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so a receipt credits the key that sent it. Withdrawing by name reaches the key in force |
@@ -725,7 +725,7 @@ cookie resolves to it.
 | It reads disclosed work in a product that publishes, and nothing else | Asked whether it reads a product, it answers yes for the disclosed visibility of a publishing product and no for everything else. Every list, count and lookup narrowed by those two questions narrows it the same way, so a product that does not publish is not listed, not counted and not named |
 | It is nobody | It holds no role, no case, no team and nothing over the deployment, so it triages, approves and decides nothing, and every read asking for a person refuses it |
 | Three reads are open to it | The documents published and the advisories that went out, each asking for it by name; and disclosed findings, decisions and patches in a publishing product, which the pass that writes the documents reads through it. Every read asking for a person refuses it |
-| It reads no lead, a disclosed one included | A lead is not one of the security documents a product publishes. A lead moved into a case is public once its flaw is disclosed, so every read of leads, lists, counts and groups included, refuses this subject before it narrows by visibility |
+| It reads no code finding, a disclosed one included | A code finding is not one of the security documents a product publishes. A code finding included in its flaw's disclosure is public once its flaw is disclosed, so every read of code findings, lists, counts and groups included, refuses this subject before it narrows by visibility |
 | Which products publish takes no subject | It is what builds this subject, and it is the deployment's configuration, the same for everybody who asks |
 | A signed-in person does not read the published documents through it | They read findings through the API, where their own grants answer; the store of published documents refuses anybody but this subject and the deployment itself |
 
@@ -1125,7 +1125,7 @@ for work it was never scoped for.
 
 | Rule | Reason |
 |---|---|
-| Narrowing removes, never rebuilds | Who somebody is, the teams they are on and the cases they were brought into are not per-product facts, and a token pinned to a product must not stop them being themselves. The cases and the leads they were granted in other products go, as the roles there do. Written as a fresh subject it carried five fields and dropped the rest, so every "assigned to me" surface answered empty and taking an unowned finding for yourself was refused as giving work to somebody else |
+| Narrowing removes, never rebuilds | Who somebody is, the teams they are on and the cases they were brought into are not per-product facts, and a token pinned to a product must not stop them being themselves. The cases and the code findings they were granted in other products go, as the roles there do. Written as a fresh subject it carried five fields and dropped the rest, so every "assigned to me" surface answered empty and taking an unowned finding for yourself was refused as giving work to somebody else |
 | A live reference to its owner, never a snapshot | What it reaches is read from what they hold at the moment it is used, so a role withdrawn cuts the token at the same instant — including one withdrawn because a group membership went away, which is the case with nothing else to notice it |
 | It may not mint or withdraw another | Minting resolves through the owner, so a token that could mint would ask for a wider one and be given it, making every limit exactly one request deep |
 | Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration and the audit permission are dropped by narrowing to a product or to named roles, because both are held over the whole deployment, and a token narrowed to one product that still administered or read every record of the deployment would not be narrowed. An unnarrowed token keeps both |

@@ -13,7 +13,7 @@ import (
 )
 
 // heldEverywhere puts one of each kind of work in one party's hands: an
-// undisclosed vulnerability, an internal lead, a disclosed vulnerability, and
+// undisclosed vulnerability, an internal code finding, a disclosed vulnerability, and
 // a vulnerability report.
 func (f *fixture) heldEverywhere(t *testing.T, party int64) {
 	t.Helper()
@@ -51,7 +51,7 @@ func (f *fixture) heldEverywhere(t *testing.T, party int64) {
 }
 
 // stillHeld names what one party still holds: a visibility for each finding
-// or lead held at it, and "report" for a report.
+// or code finding held at it, and "report" for a report.
 func (f *fixture) stillHeld(t *testing.T, party int64) []string {
 	t.Helper()
 	ctx := t.Context()
@@ -80,7 +80,7 @@ func held(names ...string) []string {
 
 // A person gives up what each withdrawn role let them read, and everything
 // once nothing is left: undisclosed work and reports with the undisclosed
-// role, internal leads with the internal one, and disclosed work with the
+// role, internal code findings with the internal one, and disclosed work with the
 // last role of all.
 func TestAPersonHandsBackWhatTheyMayNoLongerRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
@@ -244,7 +244,7 @@ func TestASignInThatTakesARoleAwayHandsBackWhatItCovered(t *testing.T) {
 
 // modeWorld gives two people accounts a sign-in recognizes and roles an
 // administrator assigned, with the work of heldEverywhere split between them:
-// the public finding and the internal lead with the first, the undisclosed
+// the public finding and the internal code finding with the first, the undisclosed
 // finding and the report with the second. Both start in direct mode.
 func (f *fixture) modeWorld(t *testing.T, rights *access.Store, groups []access.Mapping,
 	first, second []access.Role) (access.Subject, access.Subject) {

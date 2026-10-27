@@ -167,9 +167,9 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		"VulnerabilityReport":         func(n string) string { return weblink.VulnerabilityReport(n, n) },
 		"Finding":                     func(n string) string { return weblink.Finding(n, n, n, n, n, n) },
 		"Uploads":                     func(n string) string { return weblink.Uploads(n, n, n) },
-		"Lead":                        func(n string) string { return weblink.Lead(n, n, n, n) },
-		"Leads":                       func(n string) string { return weblink.Leads(n, n, n, n, n) },
-		"LeadRules":                   func(n string) string { return weblink.LeadRules(n) },
+		"CodeFinding":                 func(n string) string { return weblink.CodeFinding(n, n, n, n) },
+		"CodeFindings":                func(n string) string { return weblink.CodeFindings(n, n, n, n, n) },
+		"SuppressionRules":            func(n string) string { return weblink.SuppressionRules(n) },
 		"InventoryChanges":            func(n string) string { return weblink.InventoryChanges(n, n, n, 7) },
 		"AnalyticsReport":             func(n string) string { return weblink.AnalyticsReport(n, n) },
 	}

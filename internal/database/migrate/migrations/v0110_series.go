@@ -85,7 +85,7 @@ func seriesV0110(t *columnTypes) []string {
 			-- run reported nothing, and "none" where nothing carried one.
 			"fingerprints"   ` + t.text + ` NULL,
 			-- Whether the fingerprints changed from the last run on the build
-			-- that stated any, which leaves every lead matched probably.
+			-- that stated any, which leaves every code finding matched probably.
 			"fingerprints_changed" ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			-- What the sender is told: what was dropped or discarded and why,
 			-- and how many results it opened, saw again and did not see, as
@@ -147,7 +147,7 @@ func seriesV0110(t *columnTypes) []string {
 
 		// What a series knows of each finding it reports: the run that first
 		// saw it, the last that did, and the first comparable run that did
-		// not, which is what not reproduced is.
+		// not, which is what no longer detected is.
 		`CREATE TABLE "sighting" (
 			"id"                  ` + t.id + `,
 			"finding_id"          ` + t.ref + ` NOT NULL,
@@ -221,14 +221,14 @@ func analysisV0110(t *columnTypes) []string {
 			"match_key"     ` + t.hash + ` NOT NULL,
 			-- The same without the fingerprint or the line, which a run
 			-- whose fingerprints changed compares where one result and one
-			-- lead hold it.
+			-- code finding hold it.
 			"unprinted_key" ` + t.hash + ` NOT NULL,
 			-- The two probable keys: the rule, the path and the message with
 			-- its digits taken out, with the function where the output names
 			-- one, and with neither.
 			"function_key"  ` + t.hash + ` NULL,
 			"line_key"      ` + t.hash + ` NOT NULL,
-			-- How the newest sighting was paired with the lead: on the whole
+			-- How the newest sighting was paired with the code finding: on the whole
 			-- key or on the whole key without its fingerprint, which are
 			-- strong, or on the function or the nearest line, which are
 			-- probable. Null where the sighting opened it.
@@ -252,8 +252,8 @@ func analysisV0110(t *columnTypes) []string {
 			CONSTRAINT "analysis_result_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id")
 		)` + t.suffix,
 		`CREATE INDEX "analysis_result_key_idx" ON "analysis_result" ("match_key")`,
-		// The leads whose last place is near another's, which is how two
-		// analyzers' leads are found to be one flaw.
+		// The code findings whose last place is near another's, which is how two
+		// analyzers' code findings are found to be one flaw.
 		`CREATE INDEX "analysis_result_last_idx" ON "analysis_result" ("last_path_identity", "last_line")`,
 
 		// The other places a result names: related locations, and the steps

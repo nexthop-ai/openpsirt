@@ -13,7 +13,7 @@ import { findingsPath, useScope, type Scoped } from "./scope";
 import {
   vulnerabilityReportsAt,
   uploadsAt,
-  leadsAt,
+  codeFindingsAt,
   issueAt,
   streamsAt,
   dependenciesAt,
@@ -69,9 +69,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // Reading reports takes reading undisclosed work, which is what reads_private says.
   const reportsAnywhere = (who.reach ?? []).some((each) => each.reads_private);
   const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
-  // A lead is internal, so the leads entry follows reading internal material.
-  const leadsAnywhere = (who.reach ?? []).some((each) => each.reads_internal);
-  const leadsHere = !!product && !!mayOf(who, product)?.reads_internal;
+  // A code finding is internal, so the Security testing entry follows reading internal material.
+  const codeFindingsAnywhere = (who.reach ?? []).some((each) => each.reads_internal);
+  const codeFindingsHere = !!product && !!mayOf(who, product)?.reads_internal;
   const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
   const build = whole ? { product, stream, variant } : undefined;
   const [uploading, setUploading] = useState(false);
@@ -281,15 +281,16 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 }
               />
             )}
-            {/* A product's static analysis leads, under the same rule as the
-              vulnerability reports: shown to somebody who reads internal material anywhere, and
-              opening on the branch and variant picked where both are. */}
-            {leadsAnywhere && (
+            {/* A product's code findings from security testing, under the same
+              rule as the vulnerability reports: shown to somebody who reads
+              internal material anywhere, and opening on the branch and
+              variant picked where both are. */}
+            {codeFindingsAnywhere && (
               <Rail
-                to={product ? leadsAt(product, whole ? { stream, variant } : undefined) : ""}
+                to={product ? codeFindingsAt(product, whole ? { stream, variant } : undefined) : ""}
                 icon="triage"
-                label="Leads"
-                needs={leadsHere}
+                label="Security testing"
+                needs={codeFindingsHere}
                 why={
                   product ? "You can't read internal material in this product" : "Pick a product"
                 }

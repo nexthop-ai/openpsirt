@@ -74,7 +74,7 @@ describe("what an act invalidates", () => {
         "held-reports",
         "holdings",
         "home",
-        "leads",
+        "code-findings",
         "reports",
         "team-assigned",
       ].sort(),

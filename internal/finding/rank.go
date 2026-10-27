@@ -154,7 +154,7 @@ type Ranked struct {
 // spike outweighs the 2× between a medium and a critical, so mediums would
 // jump criticals constantly and on noise.
 //
-// So severity leads and likelihood orders what is equally severe. It gives up
+// So severity code findings and likelihood orders what is equally severe. It gives up
 // letting a very likely medium jump a high — on this data almost always noise,
 // and the case that actually matters, something known to be used, is a fact
 // rather than a forecast and already ranks above everything.

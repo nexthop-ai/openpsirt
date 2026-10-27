@@ -134,10 +134,10 @@ export function useAfterDecision() {
     // change under a revision and neither list held them.
     void queries.invalidateQueries({ queryKey: ["decision"] });
     void queries.invalidateQueries({ queryKey: ["comments"] });
-    // A decision about a lead moves where the lead stands, and the queue it is
+    // A decision about a code finding moves where the code finding stands, and the queue it is
     // listed in.
-    void queries.invalidateQueries({ queryKey: ["leads"] });
-    void queries.invalidateQueries({ queryKey: ["lead"] });
+    void queries.invalidateQueries({ queryKey: ["code-findings"] });
+    void queries.invalidateQueries({ queryKey: ["code-finding"] });
     // And the list the work came from. A decision answers findings, so
     // agreeing to one moves what the list says about every occurrence it
     // covers.
