@@ -1,8 +1,9 @@
 # Packaging and deployment
 
-The container image, the Helm chart, and what a deployment looks like.
+The container image, what it carries and where it keeps data, how the process
+starts and stops, and how a deployment is configured.
 
-Satisfies REQ-01, REQ-02, REQ-04, REQ-76, REQ-83, the probe behavior REQ-72
+Satisfies REQ-01, REQ-04, REQ-76, REQ-83, the start-up behavior REQ-72
 requires, and the storage REQ-78 needs.
 
 ## Contents
@@ -13,24 +14,10 @@ requires, and the storage REQ-78 needs.
 - [CVE record snapshot](#cve-record-snapshot)
 - [Repository copies](#repository-copies)
 - [Pod sizing](#pod-sizing)
+- [CPU priority](#cpu-priority)
 - [Image and archive checks](#image-and-archive-checks)
-- [Chart probes](#chart-probes)
 - [Starting and stopping](#starting-and-stopping)
 - [Configuration sources](#configuration-sources)
-- [Chart security context](#chart-security-context)
-- [Network policy](#network-policy)
-- [Render-time refusals](#render-time-refusals)
-- [Secret sources](#secret-sources)
-- [Self-inventories](#self-inventories)
-- [Inventory composition](#inventory-composition)
-- [Release assets](#release-assets)
-- [Version sources](#version-sources)
-- [Image tags and labels](#image-tags-and-labels)
-- [Chart version stamping](#chart-version-stamping)
-- [Signing and provenance](#signing-and-provenance)
-- [The release procedure](#the-release-procedure)
-- [Release notes](#release-notes)
-- [Not built](#not-built)
 - [Limits](#limits)
 
 ## Image structure
@@ -38,639 +25,170 @@ requires, and the storage REQ-78 needs.
 Multi-stage: the interface built with node, the binary built with the Go
 toolchain the module declares, the result run on Alpine.
 
-| | |
+| Part | Detail |
 |---|---|
 | Size | ~40 MB |
 | User | Non-root, no login shell, no home directory |
 | Extras | The vulnerability scanner; git, for labeling patch links with branches; root certificates for outbound TLS to the ranking feeds and the scanner's data; timezone data |
-| Healthcheck | Liveness only. Readiness needs the database and belongs to the orchestrator |
+| Healthcheck | Liveness only; readiness needs the database and belongs to the orchestrator |
 
-The interface is built inside the image rather than taken from the build
-context. The Go build embeds a git-ignored directory, so an image built from a
-clean checkout — which is what CI builds — carries no interface and nothing
-reports it: an API-only binary is a supported build, and the embed tolerates an
-empty directory. Building it here also limits the image's requirements to
-docker.
-
-The binary is fully static, with CGO off, which is part of why the pure-Go
-SQLite driver was chosen. `scratch` or distroless would work and carry no shell.
-Alpine is used because a self-hosted operator debugging their own deployment
-wants a shell.
+| Rule | Reason |
+|---|---|
+| The interface is built inside the image, never taken from the build context | The Go build embeds a git-ignored directory and tolerates it empty, so an image from a clean checkout, as CI builds, would carry no interface and nothing would report it. It also limits the image's requirements to docker |
+| The binary is fully static, with CGO off | Part of why the pure-Go SQLite driver was chosen |
+| The base is Alpine | `scratch` or distroless would work; a self-hosted operator debugging a deployment wants a shell |
 
 ## Base version
 
-Every stage that is not a third-party toolchain image starts from the same build
-argument, so the stages cannot drift apart. The version is pinned rather than
-tracking latest: what a finding means depends on what was measured, and a base
-that moves under a rebuild changes the answer.
+Every stage that is not a third-party toolchain image starts from one build
+argument, so the stages cannot drift. The version is pinned, because what a
+finding means depends on what was measured.
 
-| Rule | |
+| Rule | Reason |
 |---|---|
-| Every base image is named by digest as well as by tag | A tag is a name its owner can move. A re-pushed or compromised one would be pulled by the release build, and what it compiled signed with this project's identity. The tag stays for a reader to see the version. The check reads every `FROM` past its flags, and a base named with no tag, which is its `latest`, is refused the same way |
-| `make pins-check` refuses a base named by tag alone | The same rule the workflows' actions and the downloaded tools are held to, by commit and by checksum |
-
-The packages inside that release are upgraded at build time (REQ-04). This is
-distinct from moving the pin. A base tag's package set is frozen when that image
-was published while the distribution continues publishing fixes for it, so
-pinning alone ships what was known-vulnerable on that date and keeps shipping
-it.
-
-Measured on this image the day the base moved from 3.21 to 3.24: 22 findings
-against the distribution's own packages, 20 of them OpenSSL at `3.5.7-r0` with
-the fix published as `3.5.8-r0`, two of them critical, every one matched
-through Alpine's own advisories rather than by comparing an identifier against an
-upstream range. Upgrading clears them, and every older base has the same
-shape.
+| Every base image is named by digest as well as tag, and `make pins-check` refuses one named by tag alone | A tag is a name its owner can move, and a re-pushed one would be compiled into a release signed with this project's identity. The tag stays for a reader. The check reads every `FROM` past its flags, and a base with no tag, its `latest`, is refused the same way |
+| The packages inside the base are upgraded at build time (REQ-04) | A base tag's package set froze when it was published, so pinning alone keeps shipping what was known vulnerable on that date. The day the base moved from 3.21 to 3.24: 22 findings against the distribution's packages, 20 of them OpenSSL `3.5.7-r0` fixed in `3.5.8-r0`, two critical, all matched through Alpine's own advisories |
 
 ## Bundled scanner
 
-The deployment runs the scan rather than trusting whatever a producer's pipeline
-installed, so an image without a scanner accepts inventories it can never answer
-a question about. The scanner is pinned to a version and its download is
-checksummed: which build of a scanner answered is part of what a finding means.
+The deployment runs the scan itself, so an image without a scanner accepts
+inventories it can never answer for.
 
-Its vulnerability data is fetched at runtime rather than built in. A database
-baked into an image is stale the day after that image is published.
-
-That data requires a writable path and the root filesystem is read-only, so the
-chart mounts a volume. The image and the chart read the directory from one
-value in the chart.
-
-| Where the data lives | |
+| Rule | Reason |
 |---|---|
-| Scratch space lasting as long as the pod | The default, so an install needs no storage to work. It is downloaded and imported again on every start |
-| A claim the chart makes | Off unless asked for. A chart that provisions storage on an upgrade surprises an installation that had none |
-| A claim made elsewhere | Named instead, and it wins over the one the chart makes. Naming both is refused rather than silently ignoring one |
+| The scanner is pinned to a version and its download checksummed | Which build of a scanner answered is part of what a finding means |
+| Its vulnerability data is fetched at run time | A database baked into an image is stale the day after publishing |
+| The chart mounts a volume for the data, and the image and chart read its directory from one chart value | The data needs a writable path, and the root filesystem is read-only |
+| Every replica mounts the one claim, and the chart refuses at render the access-mode pairing it can see | This is a Deployment, never a set with a volume per pod, so the access mode must allow as many nodes as replicas |
 
-Every replica mounts the one claim, because this is a Deployment rather than a
-set with a volume per pod. So the access mode has to allow as many nodes as
-there are replicas, and the pairing the chart can see it refuses at render time.
+| The data lives on | Detail |
+|---|---|
+| Scratch space lasting as long as the pod | The default, so an install needs no storage. Downloaded and imported again on every start |
+| A claim the chart makes | Off unless asked for; storage provisioned on an upgrade surprises an install that had none |
+| A claim made elsewhere | Named instead, and wins over the chart's. Naming both is refused |
 
 ## CVE record snapshot
 
 The CVE record snapshot is kept on the scanner's data volume, in a directory of
-its own inside the scanner's (`design-docs/ingest.md` § CVE records). The chart names
-it from the scanner's directory, after anything given in `extraEnv`, so the two
-cannot name different volumes. The directory is made on the first fetch, so the
-image makes nothing for it.
+its own inside the scanner's (`design-docs/ingest.md` § CVE records). The chart
+names it from the scanner's directory, after anything in `extraEnv`, so the two
+cannot name different volumes. The first fetch makes the directory, so the image
+makes nothing for it.
 
 ## Repository copies
 
-Labeling a patch link with the branches that hold its commit keeps copies of
-repositories (REQ-78). `design-docs/findings-patch-branches.md` holds how they are
-used; this is where they live.
+Labeling a patch link with the branches holding its commit keeps copies of
+repositories (REQ-78); `design-docs/findings-patch-branches.md` says how they are
+used.
 
-| Rule | |
+| Rule | Reason |
 |---|---|
 | git is the distribution's package, run as a child | Nothing of it is linked into the binary |
-| The copies need a writable path, and the chart mounts one | The root filesystem is read-only. The image makes the directory and owns it to the unprivileged user |
-| Scratch space unless a claim is named | Holds nothing until the lookups are turned on. Bounded a fifth above the quota unless set, because a copy arriving adds to the copies kept and scratch space past its bound gets the pod evicted |
-| The quota is written as a whole number whatever the values file holds | A values file reads a whole number as a float, and 5.36870912e+10 is a value the server refuses |
-| The built-in quota the scratch space is sized for is the binary's own, held to it by `make pins-check` | Written in two languages, the two copies drift, and a larger quota than the volume allows gets the pod evicted |
-| The chart makes no claim for it | A deployment turning this on chooses its storage. A claim named in values is mounted instead |
-| The excluded hosts and the quota are chart values | Both are the deployment's boundary rather than an administrator's setting |
-| Turning the lookups on is a chart value too | Nothing about them works until the memory limit, the volume and the excluded hosts are set in the chart, so the person setting those is the one who turns them on. The value sets `OPENPSIRT_PATCH_BRANCHES` |
-| One replica fetches, and every replica serves the labels | The labels are in the database and the copies are one replica's disk. A claim shared by several replicas has to be ReadWriteMany. The chart cannot refuse a ReadWriteOnce claim it did not make, because it cannot see the claim's access mode |
+| The chart mounts a writable path for the copies, and the image makes the directory owned by the unprivileged user | The root filesystem is read-only |
+| Scratch space unless a claim is named, bounded a fifth above the quota unless set | A copy arriving adds to those kept, and scratch past its bound gets the pod evicted. It holds nothing until the lookups are on |
+| The quota is written as a whole number whatever the values file holds | A values file reads a whole number as a float, and the server refuses 5.36870912e+10 |
+| The built-in quota the scratch space is sized for is the binary's own, held to it by `make pins-check` | Two copies in two languages drift, and a quota larger than the volume gets the pod evicted |
+| The chart makes no claim for it; a claim named in values is mounted instead | A deployment turning this on chooses its storage |
+| The excluded hosts, the quota, and turning the lookups on are chart values; turning them on sets `OPENPSIRT_PATCH_BRANCHES` | They are the deployment's boundary, and nothing works until the memory limit, volume and excluded hosts are set in the chart |
+| One replica fetches, and every replica serves the labels | The labels are in the database and the copies on one replica's disk. A shared claim must be ReadWriteMany, which the chart cannot check on a claim it did not make |
 
 ## Pod sizing
 
-The container holds two processes that use memory: the server, and the scanner
+The container holds two processes that use memory, the server and the scanner
 it starts as a child. A cgroup limit covers both, and the kernel answers an
-excess by killing the larger of the two.
+excess by killing the larger.
 
-| Rule | |
+| Rule | Reason |
 |---|---|
-| The limit is sized for both processes | Sized for the server alone, a scan is what dies. The failure reads as a run that failed while the pod stays up, so nothing points at the limit |
-| The server's share is the ingest budget | About 250 MB for one document being read, which `design-docs/ingest.md` sets and every bound of it is configurable. Raising those bounds raises the limit |
-| The scanner's share is not bounded by anything here | It is somebody else's program, and its report is bounded only once it has been written. What it needs to produce one is a number this project has not measured |
-| Importing the vulnerability database is the largest single draw | It happens on every start where the data is not kept, so a deployment that restarts pays that peak repeatedly. Keeping the data is what takes it off the common path |
-| A first copy of a large repository is the other large draw, and the chart says so beside the limit | Off unless patch branches are turned on. Measured for the kernel's stable tree: 1.3 GB fetched whole from git.kernel.org, 0.6 GB where the host sends commits alone. Either can coincide with a scan, so the operator documentation asks for 4 GiB before turning it on for the first |
+| The limit is sized for both processes | Sized for the server alone, a scan dies, and reads as a failed run while the pod stays up |
+| The server's share is the ingest budget | About 250 MB for one document being read, set by `design-docs/ingest.md`, each bound configurable. Raising them raises the limit |
+| The scanner's share is bounded by nothing here | It is somebody else's program, its report is bounded only once written, and what it needs is not measured |
+| Importing the vulnerability database is the largest single draw | It happens on every start where the data is not kept, so keeping the data takes it off the common path |
+| A first copy of a large repository is the other large draw, and the chart says so beside the limit | Off unless patch branches are on. The kernel's stable tree: 1.3 GB fetched whole from git.kernel.org, 0.6 GB where the host sends commits alone. Either can coincide with a scan, so the operator documentation asks for 4 GiB before turning it on |
+| Neither default is measured against the scanner | Its memory moves with each release. Both follow the shape: two processes, one unmeasured, and a peak at start |
 
-Neither default is measured against the scanner, whose memory moves with each
-of its releases. Both are set from the shape of the problem: two processes, one
-of them unmeasured, and a peak paid at start.
+## CPU priority
 
-### CPU priority
-
-| Rule | |
+| Rule | Reason |
 |---|---|
-| The scanner and git start at niceness 10 | Both are background work. The pod's CPU is shared by the server and its children, and at a lower priority they take what the server leaves idle, so a request is answered while a scan or a fetch runs |
-| They are born at it, and what they start inherits it | The priority is lowered on the thread that forks them. Set on a child after it starts, git's own children could already be running at the server's priority |
-| Niceness orders the processes inside one pod | It does not change how CPU is shared between pods: the pod's requests and limits decide that |
-| A priority that cannot be lowered is logged and the program runs anyway | Lowering one's own priority needs no privilege, so this is a platform refusing rather than a configuration to fix |
+| The scanner and git start at niceness 10 | Both are background work sharing the pod's CPU, so a request is answered while a scan or fetch runs |
+| They are born at it, and what they start inherits it | The priority is lowered on the thread that forks them; set after start, git's own children could already run at the server's |
+| Niceness orders the processes inside one pod | Sharing between pods is the pod's requests and limits |
+| A priority that cannot be lowered is logged and the program runs anyway | Lowering one's own priority needs no privilege, so this is a platform refusing |
 
 ## Image and archive checks
 
-These are the only places these claims are tested rather than asserted.
+The only places these claims are tested.
 
 | Check | Detects |
 |---|---|
-| The image runs | A build that produces an unstartable image |
+| The image runs | An unstartable image |
 | It is not running as root | A security context regression |
-| The bundled scanner runs | A scanner binary that does not execute in this base |
-| It serves the interface | An image built with no interface, which answers the page's path with a credential refusal rather than a page |
-| The archive's binary serves the interface | The same build with no interface in it, in the form somebody runs by hand |
+| The bundled scanner runs | A scanner binary that does not execute on this base |
+| It serves the interface | An image built with no interface, which answers the page's path with a credential refusal |
+| The archive's binary serves the interface | The same, in the form somebody runs by hand |
 
-They run against a release as well as against a change. The image a
-release publishes is built from a fresh checkout with its base upgraded as it
-builds, so it is a different set of bytes from the one a merge was gated on,
-and the scanner it bundles can stop working in between. A deployment that
-cannot scan ingests inventories it never reads.
-
-The archive is asked the same question as the image and in the same words, so
-the two cannot drift: it is started on a port nothing else holds, with a
-throwaway database, and asked for the page.
-
-## Chart probes
-
-| Probe | Question | Path |
-|---|---|---|
-| Startup | Has the port opened? | `/healthz` |
-| Liveness | Is the process running? | `/healthz` |
-| Readiness | Can it serve? | `/readyz` |
-
-Liveness does not depend on the database. Restarting a process cannot fix an
-unreachable database, and a liveness probe that fails on one turns a database
-outage into a restart loop on top of a database outage.
-
-The image's own health check, which Kubernetes ignores and Docker acts on,
-runs `openpsirt health`: it reads the configuration the server reads from the
-environment and asks `/healthz` where `OPENPSIRT_ADDR` says the server listens,
-on loopback where that names every interface, never through a proxy. It
-takes `--config` as every other command does. The image's check passes none,
-so a container configured by file replaces that check with one naming the same
-file; left alone, it reads the environment and asks port 8080.
-
-The startup probe asks `/healthz`, which answers from the moment the port opens
-and for the whole of a migration (§ Starting and stopping). It allows ten
-minutes by default, which bounds what comes before the port opens: connecting
-to the database and the refusals that read no database, sign-in provider
-discovery and the store checks among them. The startup deadline ends a start
-that hangs there first.
-
-### Platform health checks
-
-| Check | Path | Why |
-|---|---|---|
-| Whether to keep the process | `/healthz` | It answers while the schema is applied. A check that fails during a migration ends it part way, and the next process starts it again from the beginning |
-| Whether to send it traffic | `/readyz` | It answers only once the router serves, and only while the database answers |
-
-A load balancer whose one health check decides both, such as an AWS
-Application Load Balancer in front of ECS, is pointed at `/healthz`. A
-process applying the schema then receives traffic, and answers it with the
-upgrading response below.
+| Rule | Reason |
+|---|---|
+| The checks run against a release as well as a change | A release image is built from a fresh checkout with its base upgraded, so it differs from what a merge was gated on, and its scanner can break in between |
+| The archive is asked the image's question in the same words, started on a free port with a throwaway database | The two cannot drift |
 
 ## Starting and stopping
 
 | Rule | Reason |
 |---|---|
-| Everything contacted before the server serves is under one deadline, and each step says what it is about to do | An endpoint that accepts the connection and never answers holds the process for ever with no log line written and nothing served, which from outside is a slow image pull. A crash loop naming what it could not reach is the failure a supervisor can act on |
-| Migrating is outside that deadline | A schema change on a large table legitimately takes longer than a deployment starts in. The deadline starts again once the schema is in place |
-| With automatic migration on, the port opens after the database connects and before the schema is applied | A platform's health check is answered for as long as the migration runs, so nothing ends it part way. 873 s for migration 43 on a production-shaped PostgreSQL database |
-| Until the start is complete, `/healthz` answers 200, `/readyz` 503, and every other path 503 with `Retry-After` | The API answers in the shape every refusal takes, a browser asking for a page gets a page, and anything else a sentence: "OpenPSIRT is upgrading its database". Nothing in that answer reads the database |
-| The router replaces the upgrading answer in one step, after everything else in the start | A request reaches one or the other whole. The background passes start after the swap, as they would without it |
-| With automatic migration off, the port opens after every start-up check | Nothing is waited on that takes long, so every refusal comes before anything listens |
-| Every refusal that reads no database comes before the port opens | The sign-in providers and the address they return to, the stores, the interface, the queue's sizes against the scanner's timeout, and the signing key. A bad value is refused in seconds rather than after a migration |
-| A refusal after the port opened closes it and exits 1 | The refusals that read the schema come after the migration: the administrators, the group mappings, and a sign-in provider other than the one identities were bound under |
-| An address somebody else holds is refused as the port opens, before the migration | A start that cannot serve does not spend a migration finding out |
-| A stop signal during the start ends it and exits 0, before the port opens or after | It reaches the migration, or a wait for another process's, through its context, and the error a stopped step answers is logged. On PostgreSQL and SQLite the migration's transaction rolls back, and on MySQL and MariaDB the schema is left part changed (`design-docs/database.md` § Migrations that stop half way). The next start applies it again |
-| A subcommand this does not know is refused | Ignored, a typo in a job meant to apply migrations starts a server instead, against whatever schema is there |
-| Ten background loops run beside the server; two of them may be absent | The mail sender where no channel is configured, and the attachment sweeper where no store is. Every other pass runs whatever a deployment has — a list rather than ten guarded starts, so what runs can be read without opening the package behind each one |
-| Every exit waits for the background work, including a failure to serve | Each pass begins with a timer that fires at once, so returning early leaves them mid-query while the deferred close takes the database away, and an orderly failure becomes failed scans and jobs retried for no reason |
-| Both halves of the shutdown grace answer the same way | One setting bounds them both, so an overrun request exiting 1 and an overrun worker exiting 0 tells a supervisor reading the exit code that half of an unfinished shutdown finished |
-| The chart stops every pod of the earlier release before it starts one of this one | Below 1.0 an upgrade may drop and reshape tables the earlier release reads (REQ-76), so a replica of it left serving fails on them. A ReadWriteOnce claim moves to the new pod too, where a rolling update leaves that pod waiting for a volume the old one holds |
-| A rolling update is the operator's choice | Nothing answers between the old pods stopping and a new one passing readiness, and an upgrade that fails to start leaves nothing serving. A deployment that has to stay up chooses it, and scales to zero by hand before an upgrade that changes the schema |
-| The commands are `serve`, which is also what no command means, and `migrate` | Each takes `--config` after its name as well as before it |
+| Everything contacted before the server serves is under one deadline, and each step logs what it is about to do | An endpoint accepting the connection and never answering otherwise holds the process with no log line, which looks like a slow image pull |
+| Migrating is outside that deadline, which starts again once the schema is in place | A schema change on a large table takes longer than a deployment starts in |
+| With automatic migration on, the port opens after the database connects and before the schema is applied | A platform's health check is answered throughout, so nothing ends the migration part way. 873 s for migration 43 on a production-shaped PostgreSQL database |
+| Until the start completes, `/healthz` answers 200, `/readyz` 503, and every other path 503 with `Retry-After` | The API answers in the refusal shape, a browser gets a page, anything else the sentence "OpenPSIRT is upgrading its database". Nothing in it reads the database |
+| The router replaces the upgrading answer in one step, after everything else in the start; the background passes start after the swap | A request reaches one or the other whole |
+| With automatic migration off, the port opens after every start-up check | Nothing long is waited on |
+| Every refusal reading no database comes before the port opens | Sign-in providers and their return address, the stores, the interface, the queue's sizes against the scanner's timeout, the signing key. A bad value is refused in seconds, before a migration |
+| A refusal after the port opened closes it and exits 1 | The refusals reading the schema follow the migration: the administrators, the group mappings, a sign-in provider other than the one identities were bound under |
+| An address somebody else holds is refused as the port opens, before the migration | A start that cannot serve spends no migration finding out |
+| A stop signal during the start ends it and exits 0 | It reaches the migration, or a wait for another process's, through its context, and the stopped step's error is logged. PostgreSQL and SQLite roll the migration back; MySQL and MariaDB leave the schema part changed (`design-docs/database.md` § Migrations that stop half way). The next start applies it again |
+| An unknown subcommand is refused | Ignored, a typo in a migration job starts a server against whatever schema is there |
+| Background loops run beside the server from one list; the mail sender is absent where no channel is configured and the attachment sweeper where no store is | Every other pass runs whatever a deployment has, and the list shows what runs |
+| Every exit waits for the background work, a failure to serve included | Each pass starts on a timer firing at once, so returning early leaves them mid-query as the database closes, and an orderly failure becomes failed scans and retried jobs |
+| One setting bounds both halves of the shutdown grace, and both answer the same way | An overrun request exiting 1 and an overrun worker exiting 0 would tell a supervisor half an unfinished shutdown finished |
+| The chart stops every pod of the earlier release before starting one of this one | Below 1.0 an upgrade may drop and reshape tables the earlier release reads (REQ-76). A ReadWriteOnce claim moves too, where a rolling update leaves the new pod waiting for the volume |
+| A rolling update is the operator's choice | Nothing answers between the old pods stopping and a new one ready, and a failed upgrade leaves nothing serving. A deployment that must stay up chooses it, and scales to zero by hand before a schema-changing upgrade |
+| The commands are `serve`, which is also what no command means, and `migrate`; each takes `--config` after its name as well as before | |
 
 ## Configuration sources
 
-A deployment is configured by environment variables or by a configuration
-file, never both (REQ-83).
+A deployment is configured by environment variables or by a configuration file,
+never both (REQ-83).
 
-| Rule | |
+| Rule | Reason |
 |---|---|
-| The file is TOML, named by `--config` on the command line | No environment variable names it, since that variable would be one of the deployment's own set beside the file |
-| A variable whose name begins `OPENPSIRT_` beside a file is refused at startup, naming every one | Set-but-empty counts as set. The harness's own variables share the prefix and are refused the same way |
-| Variables the deployment's libraries and child programs read stay in the environment in both modes | `PATH`, `HOME`, `TMPDIR`, `TZ`, the certificate and proxy variables, the PostgreSQL driver's `PG` variables, the object store client's `AWS_` variables and every `GRYPE_` variable. None of them is a setting of this deployment |
-| Every setting has one environment name and one file key, defined together in one table | Both sources read through it. A test holds the table to what the loader reads, both directions, and to the configuration page, which pairs each variable with its key |
+| The file is TOML, named by `--config` on the command line | A variable naming it would be one of the deployment's own set beside the file |
+| A variable whose name begins `OPENPSIRT_` beside a file is refused at startup, naming every one | Set but empty counts as set. The harness's own variables share the prefix and are refused the same way |
+| Variables the deployment's libraries and children read stay in the environment in both modes | `PATH`, `HOME`, `TMPDIR`, `TZ`, the certificate and proxy variables, the PostgreSQL driver's `PG` variables, the object store client's `AWS_` variables, every `GRYPE_` variable. None is a setting of this deployment |
+| Every setting has one environment name and one file key, defined together in one table both sources read through | A test holds the table to the loader and the configuration page (`design-docs/build-docs.md` § The settings reference) |
 | A file's keys are tables by area and a key within, nesting where an area has parts | `database.url` is `url` under `[database]`; `signin.oidc.issuer` is `issuer` under `[signin.oidc]` |
-| A file's values pass through the one loader the environment's do | Every default, every validation and every refusal is one path, so none depends on the source. A value is spelled as the environment would spell it on the way in: a whole number, `true` or `false`, and a list joined with commas |
-| A value of the wrong type is refused rather than converted | A quoted number or a switch written as a word is a mistake a typed format makes visible |
-| A key the table does not know is refused, naming it | A misspelled key otherwise configures nothing and says nothing |
-| A list entry holding a comma is refused | The loader reads a list as the environment carries it, where one entry would become two |
-| A malformed file is refused naming the line | What the parser reports |
-| A file anybody but its owner may read or write is refused, saying to set 0600 | It holds the database password and the sign-in and store secrets. Write is refused with read, because a file somebody else can change is a configuration somebody else chose |
-| A file owned by a user other than the process's own or root is refused | Its owner can rewrite it whatever its mode. Root's is accepted, because a mounted secret is root's |
-| The file is opened once, and every check is made on what was opened | Checked by path and read by path, a file swapped between the two is read unchecked |
-| A directory or a pipe is refused by path before it is opened, and the file opened must be the one checked | Opening a pipe with no writer waits for one, which holds the start with nothing logged |
-| A refusal that stops the process names the key rather than the variable, including one made after startup began | The process rewrites each variable's name in a refusal to its key on the way out, so a check written once for both sources speaks to whichever source is in use |
-| A refusal answered to a request names the setting both ways | Answered while running, it cannot be rewritten on the way out, and the operator reading it relayed may have configured either source. The advisory prefix and the publisher are the two |
-| A pod configured by file sets `enableServiceLinks: false` | Kubernetes gives a pod a variable for every Service in its namespace, named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more. For a Service named `openpsirt` they start `OPENPSIRT_`, and are refused beside a file. The chart configures by environment and is unaffected |
-| The chart configures by environment | Its secrets arrive as references into variables, which is what a cluster already does with a Secret |
-| The image sets no variable of the deployment's own | A file would be refused beside it. The scanner is found on the image's `PATH` |
-
-## Chart security context
-
-Non-root, read-only root filesystem, every capability dropped, the default
-seccomp profile, and no service-account token mounted — this application never
-talks to the Kubernetes API. `/tmp` is an `emptyDir` with a size limit, sized
-for the uploads one server reads at once: `upload.max-concurrent` of the
-largest request a route takes, four of 512 MiB at the shipped values, which the
-shipped 3 GiB holds with room for the rest of the process's scratch files.
-
-The pod's termination grace is twice the process's own shutdown grace: the
-process drains requests for that long and then waits the same again for a worker
-mid-scan.
-
-A SQLite URL with more than one replica is refused at render. Every replica
-serves, reads and scans, coordinated through the database (REQ-03), and SQLite is
-a file inside one pod. The chart sees only a URL given in values; one in an
-operator's own Secret is not checked here, and the process warns at startup that
-SQLite is not a production engine.
-
-| Rule | |
-|---|---|
-| A single-pod SQLite trial keeps its file under `/var/lib/openpsirt` | The root filesystem is read-only, so the chart mounts that one directory for a SQLite URL, on a bounded scratch volume or a claim the operator names. A SQLite URL in values naming any other path, a directory beneath it included, is refused at render, because the process would crash-loop failing to create the file. A claim named for SQLite beside a URL held in a Secret is refused too, because the chart cannot read that URL and would mount nothing |
-| No other install gets the volume | A server database has nothing to keep on the pod |
-
-## Network policy
-
-Sign-in by a trusted header is believed by address alone, and the addresses it
-is believed from are usually the pod network, which every pod in the cluster is
-on. So a trusted-header install renders a NetworkPolicy admitting only the
-ingress controller.
-
-| Rule | |
-|---|---|
-| Rendered whenever a trusted header is named, unless turned off | Off, any pod can send the header to the Service and be signed in as anybody, the bootstrap administrators included |
-| Admits the ingress controller by namespace and pod labels, both configurable, and any further peers named | The defaults are ingress-nginx's own labels. A controller on the host network needs an address block, and a metrics scraper a namespace of its own |
-| The controller's defaults apply only where neither label map is set, and are applied in the template | Helm merges a map an operator sets into a default map, so defaults held in the values would keep ingress-nginx's labels beside another controller's and admit nobody |
-| A controller named by its pods alone is refused at render | A pod selector alone selects pods in the policy's own namespace, which is never where the controller runs, and pod labels matched in every namespace are labels anybody who may create a pod can set. That pod could assert the sign-in header. The policy renders only where trusted-header sign-in is on, so the refusal applies there alone |
-| The controller's admission can be turned off, leaving the further peers alone | A controller on the host network is named by address, and its labels would admit nothing |
-| Anything reaching the Service directly is refused unless named as a further peer | A pipeline uploading with a key from inside the cluster is one |
-| Refused at render where it would admit nobody | See § Render-time refusals |
-| The install notes carry the warning about the header in every trusted-header install, with or without an ingress | An ingress is exactly the arrangement where the header's sources are widest |
-
-A policy is enforced only by a network plugin that supports it, and the
-kubelet's probes come from the node, which most plugins admit.
-
-## Render-time refusals
-
-Each fails at render with a sentence naming the problem. Rendering manifests that
-cannot work moves the failure to a crash-looping pod and a message nobody reads.
-
-| Refused | Reason |
-|---|---|
-| Both a managed Secret and a chart-created one for the database URL, or neither | There must be exactly one |
-| No bootstrap admin | Nobody can administer the deployment |
-| No sign-in provider | Naming a bootstrap admin grants a role; it does not admit anybody |
-| A provider with no base URL | A provider returns somebody to an address and compares it against its registration |
-| A trusted header with no sources | A header named with nothing to trust it from is a header anybody can set |
-| A mail server with no address to send as | Mail configured halfway comes up healthy and sends nothing (REQ-02) |
-| An address with no server | |
-| A password with no username | |
-| A sign-in provider with no client secret | The process refuses to start without one, so the install would render cleanly and never come up |
-| An OIDC provider with no username claim | The same, and there is no default: what an authorization is redeemed against is a question only the deployment's operator can answer |
-| A secret given both ways at once | The chart writes no Secret when one is named, so the value in the values file would be ignored without a word — the rule the database URL already follows |
-| SQLite behind more than one replica | SQLite is one file on one pod, so a second replica starts with an empty database of its own |
-| A chart-made scanner cache claim that every replica mounts and only one node can | The replicas that land elsewhere stay Pending, which is a deployment that never becomes ready rather than one that fails |
-| A scanner cache claim given both ways at once | The same rule as a secret given twice: the claim the chart would make is not created when one is named |
-| A network policy for a trusted header that admits nobody | It would refuse the proxy that sets the header, which is every sign-in |
-
-Mail is opt-in, so refusing half of it costs a deployment that wants none of it
-nothing (REQ-49).
-
-Each refusal is tested by asserting that it fires, and the count of refusals
-examined is printed, because a loop that checked nothing reads exactly like one
-that found nothing wrong.
-
-A legal install is tested the other way round, and read out of the render
-rather than compared against a list: every `secretKeyRef` a legal install
-produces is resolved against the Secrets that same install creates. A list
-written beside the check would give a fifth secret source no row, and stay
-green on the defect it exists for.
-
-## Secret sources
-
-| Value | Where it is read from |
-|---|---|
-| Set in the values | A Secret the chart creates, under a key of the chart's own |
-| A Secret the operator names | That Secret, under the key they name beside it |
-| Both | Refused at render. One of them would be ignored, and which one is not something to leave a reader to work out |
-| Neither, for the mail password | Nothing is asked for. Mail is opt-in and a server may want no credentials |
-| Neither, for a sign-in provider | Refused at render, because the process refuses to start without one |
-
-The key an operator names is read only where they also name the Secret. A
-Secret the chart created holds the value under the chart's key, and asking for
-the operator's key name there asks for a key that is not there — which renders
-perfectly and produces a pod that never starts.
-
-A Secret is written only while the thing that reads it is configured.
-Clearing a provider's issuer removes its Secret. One left behind holds a live
-credential nothing reads.
-
-The same pair answers for the database URL, both client secrets and the mail
-password, because what differs between them is the name of the Secret and the
-key inside it rather than anything about how the question is answered.
-
-Bootstrap admins are applied at every startup rather than once, which makes them
-the recovery path: lose administrative access, add yourself, upgrade. The notes
-printed after an install state this.
-
-The database URL always comes from a Secret. An operator either names one they
-manage or lets the chart create one from a value, with the caveat stated in the
-values file that a password put there enters the release history. Mail
-credentials are in the chart for the same reason.
-
-## Self-inventories
-
-The image ships two inventories, because they are not the same list (REQ-04).
-
-| File | Describes | Produced by |
-|---|---|---|
-| `openpsirt.cdx.json` | What the binary ships: the modules it was linked from and the interface it embeds | Reading the built binary for its modules, and the interface's lock file for its packages, composed under the application. The binary's build information names every module, so no checkout is needed; the version is passed in, because a binary built here is from no module the proxy has seen |
-| `image.cdx.json` | What the image ships | Cataloging the assembled filesystem in a later stage |
-
-musl, busybox, the certificate bundle and the bundled scanner are shipped by this
-image and appear in neither the first list nor any module graph.
-
-The interface is embedded in the binary as a bundle, and neither cataloger sees
-into one: the module reader reads Go build information, and a directory scan
-finds npm packages by their manifests, which bundling leaves behind. So its
-packages are read from the lock file it was installed from, with development
-dependencies left out, because the build tools and the test runner do not ship.
-In the image inventory they sit inside the server's main module, because the
-server is the binary that embeds them.
-
-The image inventory is read off the assembled filesystem rather than by scanning
-a published image, because the image being described does not exist until the
-build finishes.
-
-Packages, not files. The file catalogers add a component per path with no
-version and no package identifier — eight hundred of them here — which no
-scanner can match and no finding can hang off, and they carry the build-time
-scan path into a shipped document. With them off, what is left is the Alpine
-packages, the operating system, the modules of both binaries, and the
-interface's packages inside the server.
-
-## Inventory composition
-
-Neither way of cataloging answers the whole question:
-
-| Method | Produces | Loses |
-|---|---|---|
-| Catalog a directory | Every package in the image | The structure inside a compiled binary. Modules arrive flat, with nothing above them, not even the module that *is* the binary |
-| Catalog one binary | A dependency graph | Any knowledge of the image around it |
-
-So the filesystem is cataloged with the binaries excluded, each binary is
-cataloged separately, and a composer joins them. Nothing is inferred: each input
-states what it found, and the composer adds one edge from the image to each
-component nothing else placed.
-
-Measured: before composition the root had no children and 345 components floated.
-After, the root has ten and every module sits under the binary it came from.
-
-| Composer rule | Reason |
-|---|---|
-| A component is identified by its package identifier without the per-scan package identity, its other qualifiers in a fixed order | A module two binaries both link gets a different reference and a different per-scan qualifier in each catalog. One component with two parents is the truth; two components is a count saying the image ships it twice, and a decision to be made twice. The other qualifiers name which package it is — an architecture, a classifier — so two of them stay two |
-| An input is named once, and every placement names an input | One file read twice is every component twice. A placement naming a file that was not read places nothing, and is refused rather than ignored |
-| Everything else a producer recorded is carried through untouched | Licenses, hashes, and the properties stating where something was found. Composing rewrites references and adds one edge |
-| A part can be placed inside a component another part describes | The interface's packages are inside the server binary, and a finding against one should say so. Placed inside a component no input describes, composing is refused |
-| The root can be one part's own root | The binary's inventory stays rooted at the application its module reader named, with the interface beside the modules, rather than at a container the composer made up |
-
-The generator is pinned by version and checksum, as the scanner is.
-
-The demo declares this deployment as a product and uploads both files as the
-`binary` and `container` variants, so an evaluator sees the difference between
-what was written and what ships.
-
-## Release assets
-
-`make dist` builds every one of these into `bin/dist`. `<version>` is the tag
-with its leading `v` removed (REQ-01 and REQ-02).
-
-| Asset | Name | |
-|---|---|---|
-| Container image | `ghcr.io/nexthop-ai/openpsirt:<version>` | The deployment. Everything else here supports it. `linux/amd64` today — see below |
-| Helm chart | `openpsirt-<version>.tgz`, pushed to `oci://ghcr.io/nexthop-ai/charts` | The registry that already holds the image, rather than an index somebody has to host and keep |
-| Binary archive | `openpsirt_<version>_linux_<arch>.tar.gz` | The binary with `LICENSE`, `NOTICE` and `README.md`. The interface is inside the binary, so the archive serves the same pages the image does. amd64 and arm64, cross-compiled — cgo is off, so neither architecture needs a machine or an emulator of its own |
-| Upload client archive | `openpsirt-upload_<version>_<system>_<arch>.tar.gz`, and `.zip` for Windows | The upload client with `LICENSE` and `NOTICE`, for Linux, macOS and Windows on amd64 and arm64. Cross-compiled with cgo off. A Windows archive is a zip, the archive Windows opens without a tool of its own, and the release check opens each one to find the program. Covered by the checksum file and its signature like every other asset. See `design-docs/analysis.md` § Upload client |
-| Binary inventory | `openpsirt_<version>.cdx.json` | What the binary ships: the modules it was linked from and the interface it embeds |
-| Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | What the image ships. One per architecture, because it is read off an assembled filesystem |
-| Upload client inventory | `openpsirt-upload_<version>_<system>_<arch>.cdx.json` | What one upload client binary ships: the modules it was linked from, the standard library among them, read off the binary. One per archive, because a binary's inventory names the system and architecture it was built for. The release check refuses one naming another system or architecture, or listing no standard library |
-| Checksums | `SHA256SUMS` | Every file above, so a download is checkable without holding a signature |
-| Signature | `SHA256SUMS.cosign.bundle` | One signature over the checksum file rather than one per asset: the file already covers every asset, so a verifier checks one signature and then the hashes |
-
-Every inventory is published rather than left as a workflow artifact that
-expires. We ingest these for other people's software; REQ-04 is the same
-promise kept about our own, and a promise kept where somebody can see it.
-
-## Version sources
-
-| Rule | Why |
-|---|---|
-| The tag is the only place a version is typed | A version written in a file is a version somebody moves in one file. `git describe` derives it, and every asset takes it from there |
-| A tag is `vX.Y.Z`; everything downstream drops the `v` | A chart version, an archive name and an image tag are not tags, and SemVer is what the chart will accept |
-| `make dist` refuses an untagged or dirty tree | Both describe as something nobody else can get back to. Overridable by naming a version outright, because building the assets to look at them is a reasonable thing to want |
-
-Where it lands:
-
-| Reaches | By |
-|---|---|
-| `openpsirt -version`, the startup log, `/v1/version`, the interface footer | Stamped at link time |
-| The CSAF advisory's engine, the VEX document's tooling, the parser a scan records | The same value, read at run time |
-| The image tag and the image's OCI labels | Build arguments |
-| The chart's `version` and `appVersion` | Stamped when the chart is packaged |
-| The inventory of what the image ships | The build argument the cataloger is given |
-| Every asset's file name | The variable that built it |
-
-`make dist` checks every one of those against the tag rather than assuming
-them: an archive named `0.2.0` whose binary reports `0.1.9` is what makes
-"which version were you running" unanswerable, and nothing else in the build
-compares the two. A binary for another architecture than the machine's is asked
-its version where an emulator can run it, and is named as not checked where none
-can: a stripped binary built with `-trimpath` records no linker flags to read
-the stamp from without running it.
-
-The binary's inventory is told its version rather than asked for it. A binary
-built here comes from no module the proxy has seen, so its build information
-records the main module as `(devel)`, and a document that asks describes a
-component with no version at all — the one field a scanner needs to decide
-whether a release is affected.
-
-## Image tags and labels
-
-| Tag | Moves |
-|---|---|
-| `<version>` | Never |
-| `<major>.<minor>` | To the newest patch on that line |
-| `latest` | To the newest release that is not a prerelease |
-
-Without them an image pulled by digest cannot be traced back to what produced
-it, and the two inventories that do carry the version are inside a filesystem
-nobody has mounted at the moment the question is asked.
-
-| Label | Holds |
-|---|---|
-| `org.opencontainers.image.version` | The release |
-| `org.opencontainers.image.revision` | The commit |
-| `org.opencontainers.image.created` | When it was built |
-| `org.opencontainers.image.source` | The repository |
-| `org.opencontainers.image.vendor` | Nexthop Systems Inc. |
-| `org.opencontainers.image.licenses` | `Apache-2.0` |
-| `org.opencontainers.image.title`, `.description` | What it is |
-
-They take the same build arguments the binary is stamped with, so the labels,
-the inventories and `openpsirt -version` cannot disagree about one build.
-
-## Chart version stamping
-
-| Rule | Why |
-|---|---|
-| `version` and `appVersion` are set when the chart is packaged, from the tag | The committed number is the one somebody forgets to move — the failure `pins-check` exists for. Stamping at package time leaves the tag as the only thing that has to be right |
-| `Chart.yaml` carries `0.0.0-dev` as a placeholder | A chart packaged from a checkout is not a release, and names none that exists |
-| `image.tag` stays empty and falls back to `appVersion` | A chart installs the application it was packaged for. An operator who wants another passes it |
-
-## Signing and provenance
-
-| | |
-|---|---|
-| Keyless signatures | cosign, against the workflow's own identity. No key to hold, rotate, or lose to whoever holds it next |
-| What is signed | The image, the chart in the registry, and the checksum file that covers every attached asset. The chart is signed where it is installed from, which is the registry copy rather than the archive |
-| Every registry reference is named once, in lower case | A registry reference is lower case and a repository's owner and name need not be. The image and chart addresses are computed in one step and every push, signature, verification, attestation and release note reads them; the signing identity keeps the repository's own case, because the certificate carries it |
-| Build provenance | An attestation naming the repository, the workflow file and the tag that produced the asset |
-| What it proves | That an asset came out of this repository at that tag. Not that what is inside it is correct — that is what the inventories and the scan are for |
-
-Every signature is verified in the workflow that makes it, with the
-command and the identity a third party would use. A signature nobody has
-verified is a signature nobody has tested, and the first person to find out is
-otherwise somebody who downloaded it.
-
-The identity to pin is published in the release notes, with the two commands
-that check a download:
-
-| | |
-|---|---|
-| Issuer | `https://token.actions.githubusercontent.com` |
-| Identity | The release workflow in this repository, at a tag |
-
-## The release procedure
-
-A release is a tag, on a commit that froze the release's migrations.
-Everything after the tag is the `Release` workflow.
-
-1. Rehearse the upgrade from every earlier release the baseline upgrades, on
-   each engine. `design-docs/database.md` § Upgrade rehearsal says what it checks.
-
-   ```
-   make engines-up
-   for from in v0.7.0 v0.8.0; do for engine in sqlite postgres mysql mariadb; do
-     make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
-   done; done
-   ```
-
-2. Freeze the migrations, on a branch from the head of `main`, and land the
-   record through a pull request. `design-docs/database.md` § Release records says
-   what it holds.
-
-   ```
-   git switch main && git pull && git switch -c freeze-v0.6.0
-   make engines-up
-   make release-freeze VERSION=v0.6.0
-   ```
-
-3. Tag the commit the merge queue put on `main`.
-
-   ```
-   git switch main && git pull
-   make gate full
-   make release-check VERSION=v0.6.0
-   git tag -a v0.6.0 -m "0.6.0"
-   git push origin v0.6.0
-   ```
-
-| The workflow then | |
-|---|---|
-| Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
-| Refuses a release whose migrations were not frozen | A database the release builds applies exactly what it shipped. Unfrozen, nothing holds those files once the next change lands. A release candidate, `-rc.N`, is held to the record of the release it precedes, and any other suffix is refused |
-| Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything. The version and the image name are the ones this workflow pushes, handed to it rather than worked out again, so what is pushed is what was built |
-| Pushes the image and the chart to `ghcr.io` | |
-| Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |
-| Creates the release and uploads every asset | Marked the repository's Latest only where this is the newest release, since GitHub marks a new release Latest unless told. The notes open with what changed, as § Release notes says |
-| Publishes the documentation under the version | And moves `latest`, and makes it the site's default, where this is the newest release |
-
-| Rule | Why |
-|---|---|
-| A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice. The only prerelease the migration check accepts is a release candidate, `-rc.N` |
-| A prerelease moves nothing | No `latest` image tag, no `<major>.<minor>` tag, no documentation alias. It exists to be tried, not to be landed on by somebody who asked for the current version |
-| A fix to an older line moves nothing past a newer release | `latest`, the image's, the documentation's and the repository's Latest release, moves only where the tag is the newest release, and `<major>.<minor>` only where it is the newest on its line. A patch to 0.2 after 0.3 would otherwise hand everybody who asked for the current version the older schema |
-| A release is never rebuilt under the same tag | The tag names one set of bytes. Something wrong in a published release is fixed by the next tag, not by moving this one |
-
-When a step fails, the tag stays and the release does not exist yet. Fix what
-failed, delete the tag on the remote and locally, and tag again — the only case
-where a tag is allowed to move, because nothing has been published under it.
-Once assets exist under a tag, that tag is spent.
-
-## Release notes
-
-A release's notes open with a list of what changed since the previous release,
-then the image, the chart, the downloads and how to verify them.
-
-The list is GitHub's release-notes generator, run by the workflow with this tag
-and the previous one. Each line is one pull request merged in that range, and
-the line is the pull request's title. That is why a title follows the rule in
-`AGENTS.md` § Pull request descriptions: it is read here by an operator
-deciding whether to upgrade.
-
-| Release | Previous tag |
-|---|---|
-| Stable | The newest stable tag that sorts below this one by version. Prereleases are skipped |
-| Prerelease | The newest tag of any kind that sorts below this one |
-| The first of its kind | None. The list covers the history up to this tag |
-
-| Rule | Why |
-|---|---|
-| The previous tag is chosen by the workflow and named in the request | Left to GitHub, the range starts at the most recent release, which for a fix to an older line is a newer one |
-| Versions sort with a prerelease below its release | `0.1.0-rc.1` sorts below `0.1.0`, as semantic versioning orders them |
-| Pull requests fall into two groups, `Changes` and then `Dependencies` | A dependency update is one a reader skims past. `.github/release.yml` sets the groups |
-| `Dependencies` holds every pull request Dependabot opened, and every one labeled `dependencies` | Dependabot applies that label, and a pull request matching neither group would be dropped from the list |
-| The generator needs no permission beyond `contents: write` | The job already holds it to create the release |
-| Notes are written once, when the release is created | A release is never rebuilt under its tag, and its notes are not rewritten either. Releases created before the list existed carry none |
-
-## Not built
-
-Multi-architecture images. The image is published for `linux/amd64`. The
-binaries are cross-compiled for both, because cgo is off and Go needs no machine
-of its own to do it — the image cannot follow, because the stage that catalogs
-what it ships runs the cataloger at the target architecture, so an `arm64` image
-builds `node`, `go` and `syft` under emulation. What that costs is measured in
-tens of minutes, not seconds.
-
-The fix is named rather than guessed at: build the binary stage at the build
-platform and cross-compile from there (`FROM --platform=$BUILDPLATFORM`, with
-`GOARCH` from `TARGETARCH`), which leaves only the cataloger emulated. It is
-not done, so the manifest holds one architecture and the chart runs on
-`amd64` nodes.
-
-Compatibility begins at 1.0 (REQ-76). Below it the API and the schema are both
-alpha: a release exercises the whole publication path and undertakes nothing
-about upgrading from one to the next, and the schema is not collapsed into one
-initial migration until then. The collapse keeps an upgrade from the last 0.x
-release (`design-docs/database.md` § Migrations). What says so is the major version rather
-than a suffix on the tag, which is why `0.1.0` is published as a release and
-moves the aliases — `latest` has to name something, and while every version is
-alpha the newest one is still what somebody asking for the current version
-should get.
+| A file's values pass through the environment's loader, spelled as the environment would: a whole number, `true` or `false`, a list joined with commas | Every default, validation and refusal is one path |
+| A value of the wrong type is refused, never converted | A quoted number or a switch written as a word is a mistake a typed format makes visible |
+| An unknown key is refused, naming it | A misspelled key otherwise configures nothing silently |
+| A list entry holding a comma is refused | The loader reads a list as the environment carries it, splitting the entry |
+| A malformed file is refused naming the line | |
+| A file anybody but its owner may read or write is refused, saying to set 0600 | It holds the database password and the sign-in and store secrets; a file somebody else can change is a configuration somebody else chose |
+| A file owned by a user other than the process's own or root is refused | Its owner can rewrite it whatever its mode; a mounted secret is root's |
+| The file is opened once, and every check is made on what was opened | Checked and read by path, a file swapped between the two is read unchecked |
+| A directory or a pipe is refused by path before opening, and the file opened must be the one checked | Opening a pipe with no writer waits, holding the start with nothing logged |
+| A refusal that stops the process names the key, never the variable, one made after startup began included | The process rewrites each variable's name in a refusal to its key on the way out |
+| A refusal answered to a request names the setting both ways | It cannot be rewritten on the way out, and its relayed reader may use either source. The advisory prefix and the publisher are the two |
+| A pod configured by file sets `enableServiceLinks: false` | Kubernetes gives a pod variables for every Service in its namespace, and a Service named `openpsirt` produces `OPENPSIRT_` ones, refused beside a file |
+| The chart configures by environment | Its secrets arrive as references into variables, as a cluster does with a Secret |
+| The image sets no variable of the deployment's own; the scanner is found on the image's `PATH` | A file would be refused beside it |
 
 ## Limits
 
 | Limit | Detail |
 |---|---|
-| Pinning the base means nothing moves it either | Past a base's end-of-life its packages receive no security backports, and a base, a scanner and an inventory tool each fall behind unnoticed. Dependabot watches what a `FROM` line names, which is the base images and the Go toolchain. The scanner and the inventory tool are watched by nobody: each is a version and a checksum in a build argument, which nothing reads as a dependency |
-| Two builds of one commit can differ | The packages inside the base are upgraded at build time. Accepted because the image carries an inventory of itself, so what shipped is recorded rather than assumed |
-| The packaging gate has one implementation | Written twice, once in the Makefile and once in the workflow, neither copy is a superset of the other. CI runs the target |
-| Pinned pairs are compared rather than trusted | `design-docs/build.md` § Pinned pairs lists them. The same check catches a build argument given two different defaults, which makes a binary report one version and its inventory another |
-| The binary archives are a convenience, not the product | REQ-02 says this ships as an image and a chart, and a binary run bare has none of the chart's render-time refusals in front of it. Linux amd64 and arm64 only: nothing in the design targets another platform, and an archive nobody tests is a support surface rather than a release. The upload client is the one program built for macOS and Windows, because it runs on a build host, and CI tests it on both |
-| `make dist` reads one image inventory, for the architecture it runs on | Cataloging a foreign filesystem means running foreign binaries under emulation. The workflow publishes one per architecture it pushes; a developer who wants the other names it and waits |
-| Text written ahead of time names a setting by its variable whatever the source | A log line, a hint on a screen, the API reference and a recorded history entry are written without knowing which source a deployment uses. Each keeps the variable's name, which the configuration page pairs with the key |
-| Nothing is fetched at run time from a source only this project controls | And nothing is gated on a key this project issues. An operator who mirrors the image into their own registry has the whole thing, which is what Apache 2.0 (REQ-01) requires of delivery |
+| Pinning the base means nothing moves it either | Past a base's end of life its packages get no backports. Dependabot watches what a `FROM` line names, the base images and the Go toolchain; the scanner and the inventory tool, each a version and checksum in a build argument, are watched by nobody |
+| Two builds of one commit can differ | The base's packages are upgraded at build time. The image carries an inventory of itself, so what shipped is recorded |
+| The packaging gate has one implementation, the target CI runs | Written twice, in the makefile and the workflow, neither copy would be a superset |
+| Pinned pairs are compared, never trusted | `design-docs/build-dependencies.md` § Pinned pairs lists them, and catches a build argument given two defaults |
+| Text written ahead of time names a setting by its variable whatever the source | A log line, a screen hint, the API reference and a recorded history entry cannot know the source; the configuration page pairs each variable with its key |
+| Nothing is fetched at run time from a source only this project controls, and nothing is gated on a key it issues | An operator mirroring the image has the whole thing, which Apache 2.0 delivery requires (REQ-01) |

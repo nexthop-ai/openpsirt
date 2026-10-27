@@ -1,8 +1,9 @@
 # Build and validation
 
-Repository layout, the gate, and what stops a change reaching `main`.
+Repository layout, the make targets, the gate, CI, and what stops a change
+reaching `main`.
 
-Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
+Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 
 ## Contents
 
@@ -10,24 +11,11 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Make targets](#make-targets)
 - [Gate tiers](#gate-tiers)
 - [CI jobs](#ci-jobs)
-- [Interface checks](#interface-checks)
-- [Class-name checks](#class-name-checks)
-- [Database engines](#database-engines)
-- [Test databases](#test-databases)
-- [Commit durability](#commit-durability)
-- [Pinned pairs](#pinned-pairs)
-- [Tool pins](#tool-pins)
-- [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
-- [Static analysis](#static-analysis)
-- [Known vulnerabilities](#known-vulnerabilities)
 - [Gate inputs](#gate-inputs)
-- [Licenses](#licenses)
+- [Static analysis](#static-analysis)
 - [The API document](#the-api-document)
-- [Self-inventory](#self-inventory)
 - [Probes](#probes)
-- [Documentation](#documentation)
 - [The review checklist](#the-review-checklist)
-- [Action pinning](#action-pinning)
 - [Repository settings](#repository-settings)
 - [Limits](#limits)
 
@@ -35,95 +23,89 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 
 | Path | Holds |
 |---|---|
-| `cmd/openpsirt/` | The binary. Flag parsing, configuration, server lifecycle |
+| `cmd/openpsirt/` | The binary: flag parsing, configuration, server lifecycle |
 | `cmd/openpsirt-upload/` | The upload client a pipeline runs. See `design-docs/analysis.md` § Upload client |
-| `internal/version/` | What this build is. Values injected at link time |
+| `internal/version/` | What this build is, injected at link time |
 | `internal/config/` | Settings, read from the environment with working defaults |
-| `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `design-docs/api.md` § File organization |
-| `internal/httpapi/core/` | What every area of the API shares: the dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies more than one area answers with |
+| `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and every area's operations registered into the one description the API document is generated from. See `design-docs/api.md` § File organization |
+| `internal/httpapi/core/` | What every API area shares: handler dependencies, resolving a caller, declared rights, refusal sentences, and bodies more than one area answers with |
 | `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/analyticsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, decisions, reports, advisories, administration |
-| `internal/httpapi/httpapitest/`, `internal/httpapi/refusaltest/` | The test harness the areas share — a server over a seeded cast — and the checks each area runs over its own refusal mappers |
+| `internal/httpapi/httpapitest/`, `internal/httpapi/refusaltest/` | The shared test harness, a server over a seeded cast, and the checks each area runs over its refusal mappers |
 | `internal/database/` | Opening, identifying and validating a database. See `design-docs/database.md` |
-| `internal/database/migrate/` | The migration runner and the locks around it |
+| `internal/database/migrate/` | The migration runner and its locks |
 | `internal/database/migrate/migrations/` | The migrations |
-| `internal/schema/` | Applies this application's schema. Exists so that using the runner registers the migrations |
+| `internal/schema/` | Applies this application's schema, so that using the runner registers the migrations |
 | `internal/dbtest/` | Runs a test against every database available to it |
 | `internal/catalog/` | Products, branches and tags, and variants. See `design-docs/data-model.md` |
 | `internal/ingest/` | Arriving scans. See `design-docs/ingest.md` |
 | `internal/queue/` | Durable background work. See `design-docs/queue.md` |
 | `internal/sbom/`, `internal/scanner/` | Reading an inventory and scanning it. See `design-docs/ingest.md` |
-| `internal/docread/` | Reading a document somebody else wrote as a bounded stream, for every reader of one. See `design-docs/ingest.md` |
+| `internal/docread/` | Reading somebody else's document as a bounded stream, for every reader of one. See `design-docs/ingest.md` |
 | `internal/sarif/` | Reading an analyzer's SARIF and placing its results in the checkout. See `design-docs/analysis.md` |
-| `internal/series/` | Runs of one analysis across builds: their order, whether each is comparable, and what each saw. See `design-docs/kinds.md` |
+| `internal/series/` | Runs of one analysis across builds: order, comparability, and what each saw. See `design-docs/kinds.md` |
 | `internal/analysis/` | Applying an analyzer's run to its build as findings of the analysis kind. See `design-docs/analysis.md` |
 | `internal/sourcelink/` | What a product says about its repositories, and the source addresses built from it. See `design-docs/analysis.md` |
-| `internal/uploadclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `design-docs/analysis.md` § Upload client |
+| `internal/uploadclient/` | The SARIF the upload client sends, built from an analyzer's output and the checkout. See `design-docs/analysis.md` § Upload client |
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `design-docs/data-model.md`, `design-docs/findings.md` |
-| `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `design-docs/findings-issues.md` § Merged issues |
-| `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `design-docs/findings-severity.md` |
-| `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector, and the band a score falls in. A computation with no database, which findings, advisories and the API each call. See `design-docs/findings-severity.md` |
+| `internal/filed/` | The one spelling of a record filed under an issue read as another. See `design-docs/findings-issues.md` § Merged issues |
+| `internal/rating/` | A product's own rating of an issue as spelled in a query, where both sides of the graph may say it. See `design-docs/findings-severity.md` |
+| `internal/cvss/` | Scoring a CVSS 3.0, 3.1 or 4.0 base vector and its band, with no database. See `design-docs/findings-severity.md` |
 | `internal/triage/`, `internal/advisory/` | Decisions, approvals, and the CSAF document. See `design-docs/triage.md` |
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `design-docs/access.md` |
 | `internal/notify/` | Notifications. See `design-docs/notifications.md` |
-| `internal/weblink/` | The addresses into the interface that the server hands out, held to the interface's route table. See `design-docs/notifications.md` § Links |
-| `internal/incident/` | The response windows a deployment counts after an incident, the notices given, and the shelf over both. See `design-docs/incidents.md` |
+| `internal/weblink/` | Addresses into the interface the server hands out, held to the route table. See `design-docs/notifications.md` § Links |
+| `internal/incident/` | Response windows after an incident, the notices given, and the shelf over both. See `design-docs/incidents.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
-| `internal/attach/` | Files that hang off an issue, and what may be served back. See `design-docs/attachments.md` |
+| `internal/attach/` | Files on an issue, and what may be served back. See `design-docs/attachments.md` |
 | `internal/trail/` | What somebody changed about how this deployment works. See `design-docs/access.md` |
-| `internal/saved/` | A narrowing of a list somebody kept, and the decision it prepares. See `design-docs/remediation.md` |
-| `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `design-docs/remediation.md` |
-| `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `design-docs/remediation.md` |
-| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, and the lists a provider serves, which the directory writes and the published surface serves. The supplier reader reads the fields it uses under the names these declare. See `design-docs/remediation.md` |
-| `internal/publish/` | The security documents served to anybody: what each states, the revisions kept, and the pass that writes them. See `design-docs/publishing.md` |
-| `internal/httpapi/published/` | The surface that serves them, beside the API rather than in it. See `design-docs/publishing.md` |
-| `internal/signing/` | Signing what is published with the key an operator supplied. See `design-docs/publishing.md` |
-| `internal/supplier/` | The publishers whose advisories are read on a schedule, and what a pass over one takes. See `design-docs/ingest.md` |
-| `internal/upstream/` | The upstream a product trusts, and the pass that reads its VEX documents. See `design-docs/upstream.md` |
-| `internal/cverecord/` | The CVE record snapshot: fetching it, reading it, and what a record says about a component's version. See `design-docs/findings-closure.md` § CVE record ranges and `design-docs/ingest.md` § CVE records |
-| `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `design-docs/findings-patch-branches.md` |
+| `internal/saved/` | A kept narrowing of a list, and the decision it prepares. See `design-docs/remediation.md` |
+| `internal/vex/`, `internal/publisher/` | What is decided about what a build ships, and who says so. See `design-docs/remediation.md` |
+| `internal/directory/` | Issued advisories, written where another web server serves them. See `design-docs/remediation.md` |
+| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, and the lists a provider serves; the supplier reader reads its fields under these names. See `design-docs/remediation.md` |
+| `internal/publish/` | Security documents served to anybody: statements, revisions, and the pass that writes them. See `design-docs/publishing.md` |
+| `internal/httpapi/published/` | The surface serving them, beside the API. See `design-docs/publishing.md` |
+| `internal/signing/` | Signing what is published with the operator's key. See `design-docs/publishing.md` |
+| `internal/supplier/` | Publishers whose advisories are read on a schedule, and a pass over one. See `design-docs/ingest.md` |
+| `internal/upstream/` | The upstream a product trusts, and the pass reading its VEX documents. See `design-docs/upstream.md` |
+| `internal/cverecord/` | The CVE record snapshot: fetching, reading, and what a record says about a version. See `design-docs/findings-closure.md` § CVE record ranges and `design-docs/ingest.md` § CVE records |
+| `internal/patchbranch/` | Which branches hold a patch link's commit, the repository copies answering it, and git's outbound proxy. See `design-docs/findings-patch-branches.md` |
 | `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `design-docs/remediation.md` |
 | `internal/outward/` | The one HTTP client this process reaches the internet with. See `design-docs/access.md` |
-| `internal/typedname/` | The one form a name somebody typed is stored and matched in, for every store that keys a row on one. See `design-docs/data-model.md` |
-| `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes or characters without splitting a character |
+| `internal/typedname/` | The one stored and matched form of a typed name. See `design-docs/data-model.md` |
+| `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a byte or character count without splitting a character |
 | `internal/redact/` | An address that may carry a credential, as text safe to log or refuse with. See `design-docs/access.md` § Secrets and logs |
 | `internal/refusal/` | A sentence a caller may read, told apart from a fault whose text is withheld. See `design-docs/api.md` |
 | `internal/webui/` | The built interface, embedded. See `design-docs/interface.md` |
-| `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `design-docs/remediation.md` |
+| `internal/weakness/` | The weakness catalog's name for each identifier. See `design-docs/remediation.md` |
 | `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the commands the makefile runs: the gates that are not linters, and the release, rehearsal and image-inventory tools |
 | `web/` | The interface source. See `design-docs/interface.md` |
-| `deploy/helm/openpsirt/` | The chart. See `design-docs/packaging.md` |
+| `deploy/helm/openpsirt/` | The chart. See `design-docs/packaging-chart.md` |
 | `docs/` | The published documentation site |
 | `assets/` | Logo files |
-| `tools/` | One module per Go tool the gate and the image run, each requiring that tool at one version. See § Tool pins |
-| `Makefile` | The build, the test runs, the linter, the gate and `check`, the interface build, the measurements, and what they clean up. Every other makefile is included from it, after its own targets, so its first target stays the default. Each makefile declares its own targets phony, and a test fails on a makefile in the tree that no include names |
+| `tools/` | One module per Go tool the gate and the image run. See `design-docs/build-dependencies.md` § Tool pins |
+| `Makefile` | The build, test runs, linter, gate, `check`, interface build, measurements and cleanup. Every other makefile is included after its own targets, so the first target stays the default |
 | `mk/engines.mk` | The database servers the suite runs against, as containers, and `check-engines` |
-| `mk/gates.mk` | The checks beside the linter and the suite: dependency vulnerabilities and licenses, the inventory, credentials, the gate programs under `internal/tools/`, the generated files held to what generates them, and the pinned versions held to each other |
+| `mk/gates.mk` | The checks beside the linter and suite: vulnerabilities, licenses, inventory, credentials, the gate programs, generated files against their generators, and pinned versions against each other |
 | `mk/dist.mk` | The release assets, built and checked in one directory, and the record of a release's migrations |
-| `mk/packaging.mk` | The container image and the chart, checked as what ships |
-| `Makefile.demo` | The image and what is built from it: the seeded demo deployment, the hot-reload loop, and the offline scanner bundle. Included by the makefile beside it, so every target is reached the same way. A file of its own because it shares nothing with the gate half but the names of the docker and npm commands, so the half that decides whether a change may be pushed reads without the half that stands an instance up. The scanner bundle is here because it is built from the demo image rather than because it is a demo target, and every variable these read is here with them |
+| `mk/packaging.mk` | The container image and chart, checked as what ships |
+| `Makefile.demo` | The image and what is built from it: the seeded demo, the hot-reload loop, and the offline scanner bundle, with every variable they read. Apart from the gate half, which shares nothing with it but the docker and npm command names |
 
-Everything is under `internal/`, so nothing is importable by another module.
-
-Two import constraints are worth stating, because a fix proposed without them
-cannot be written:
-
-| Constraint | Why |
+| Rule | Reason |
 |---|---|
-| `internal/database` cannot read a setting | `internal/setting` imports `internal/database`, so a bound read from the settings store cannot live below it. Bounds that low come from the environment |
+| Everything is under `internal/` | Nothing is importable by another module |
+| Each makefile declares its own targets phony, and a test fails on a makefile no include names | |
+| `internal/database` cannot read a setting | `internal/setting` imports it, so a bound that low comes from the environment |
 | The schema's tests cannot reach the harness's table list | They are an external test package, and the list is the harness's own |
 
 ## Make targets
 
 Every check CI runs is a `make` target, so a CI failure reproduces locally with
-the same command and the same pinned tool versions (REQ-75).
+the same command and the same pinned tools (REQ-75).
 
-The Go package pattern is not `./...`. An npm dependency ships a Go package —
-`web/node_modules/flatted/golang` — and `./...` matches it, so it is compiled,
-vetted, tested and scanned as part of this module. Nobody chooses that: a
-JavaScript dependency putting Go source into the build graph is a surface
-rather than a curiosity. Every tool written here skips `node_modules` by name,
-and the package pattern is the list `go list` gives minus that directory,
-computed rather than written out so a new directory of ours needs no edit.
+The Go package pattern is the list `go list` gives minus `node_modules`, never
+`./...`, because an npm dependency ships a Go package (`web/node_modules/flatted/golang`)
+that `./...` would compile, vet, test and scan. Every tool written here skips
+`node_modules` by name.
 
 | Target | Runs |
 |---|---|
@@ -131,1120 +113,204 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make gate` | The checks this change has to pass, chosen from what it touches |
 | `make gate full` | All of them, whatever the change touches |
 | `make test` | SQLite only, packages in parallel, cached. Seconds |
-| `make test-all` | Every configured engine, nothing cached: the two runs below, at once |
-| `make test-race` | SQLite with the race detector, tests within a package beside each other |
+| `make test-all` | Every configured engine, uncached: the two runs below, at once |
+| `make test-race` | SQLite with the race detector, tests within a package in parallel |
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
-| `make vet-other-os` | Type-checks the build for macOS, which compiles the files a build constraint keeps off Linux, and the upload client for Windows |
-| `make client-test` | The upload client's tests, uncached. What the macOS and Windows jobs run. `make client-packages` and `make client-sources` print the lists those jobs read |
+| `make vet-other-os` | Type-checks the build for macOS, which compiles files a build constraint keeps off Linux, and the upload client for Windows |
+| `make client-test` | The upload client's tests, uncached, as the macOS and Windows jobs run them. `make client-packages` and `make client-sources` print the lists those jobs read |
 | `make govulncheck` | Known vulnerabilities in Go modules and the toolchain, failing only what the change introduced |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
 | `make web-audit` | Known vulnerabilities in what the interface installs, failing only what the change introduced |
-| `make secrets` | Credentials in what a commit could carry — tracked files as they stand and untracked files git does not ignore — with a pinned scanner |
+| `make secrets` | Credentials in tracked files and in untracked files git does not ignore, with a pinned scanner |
 | `make openapi` | Regenerates the API document from the code |
 | `make openapi-current` | The committed API document against what the code generates |
 | `make sbom` | This project's own CycloneDX inventory |
-| `make web-check` | Interface: locked install, type check, Prettier, ESLint, Stylelint, tests with coverage, class-name checks, and the generated client diffed against the API document. Refuses without npm rather than skipping |
-| `make unreachable` | Exported code nothing reaches. A function, type, constant or variable is counted by its package and its name, a qualified reference resolving through the file's imports; a method is counted by name alone, because telling which type a selector reaches needs type information. A test counts as a caller |
-| `make negatives` | A 404 built from an error's own text, or given an error as a detail: it asserts a name reaches nothing, and publishes whatever the error carried. Read as parsed Go, so a call spread over lines and an error under any name are one shape. The text counts however it arrives: read with its method, formatted from a value named like an error, or bound to a name earlier in the same declaration |
-| `make granted` | Every function that reaches one grant table reaches the other, by the table's name, by a model whose struct tag binds it under whatever name the model and its package carry, by a type built from such a model as an alias or an embedding, or through a package-level name whose value does. Each package-level name is judged by its own value as well. The functions that legitimately ask one — writing or listing that table's own rows — are named in the gate with a reason each, and a name nothing matches fails it |
-| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read. A resolution bound by an assignment or by `var` is followed, and so is every value copied, collected or built from it; one used inline without a binding is not. The call around a use that decides is the innermost one |
-| `make subjected` | An exported method of the finding, triage or graph store that queries and takes no subject, unless the tool's exempt list names it with the reason it takes none. A method queries when it builds a query or calls a function or method of its own package that does, followed to a fixed point and matched by name. A query reached through another package, or a subject taken and not applied, is not seen |
-| `make attached` | A doc comment describing something other than the declaration it sits on |
+| `make web-check` | Interface: locked install, type check, Prettier, ESLint, Stylelint, tests with coverage, class-name checks, and the generated client against the API document. Refuses without npm |
+| `make unreachable` | Exported code nothing reaches. A function, type, constant or variable is counted by package and name, a qualified reference resolving through the file's imports; a method by name alone, since its receiver type needs type information. A test counts as a caller |
+| `make negatives` | A 404 built from an error's text, or given an error as a detail, which publishes whatever the error carried. Read as parsed Go, so a call spread over lines and an error under any name are one shape; the text counts read with its method, formatted from a value named like an error, or bound earlier in the same declaration |
+| `make granted` | Every function reaching one grant table reaches the other: by the table's name, by a model whose struct tag binds it, by a type built from such a model as an alias or embedding, or through a package-level name whose value does. Each package-level name is judged by its own value too. The functions that legitimately ask one table are named in the gate with a reason each, and a name matching nothing fails it |
+| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read. A resolution bound by assignment or `var` is followed, and every value copied, collected or built from it; one used inline is not. The innermost call around a use decides |
+| `make subjected` | An exported method of the finding, triage or graph store that queries and takes no subject, unless the exempt list names it with a reason. A method queries when it builds a query or calls a function of its own package that does, to a fixed point, by name. A query through another package, or a subject taken and not applied, is not seen |
+| `make attached` | A doc comment describing something other than its declaration |
 | `make confined` | Engine-specific code outside the two places allowed to hold it |
-| `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
+| `make readable` | Source files a text tool will not read, which every text check skips in silence |
 | `make unclaimed` | Every requirement is named by a design document |
-| `make vendored` | Every file somebody else wrote is accounted for, under a license this tree may carry, and named in `NOTICE` where its license asks. See below |
-| `make spdx` | Every source file opens with this project's copyright and an SPDX license identifier. `make spdx-fix` writes it where missing. See below |
+| `make vendored` | Every copied file is accounted for under a license this tree may carry, and named in `NOTICE` where its license asks. See `design-docs/build-dependencies.md` § Copied files |
+| `make spdx` | Every source file opens with this project's copyright and an SPDX identifier; `make spdx-fix` writes it where missing. See `design-docs/build-dependencies.md` § License headers |
 | `make pins-check` | Every version pinned in two files still agrees |
 | `make go-version` | The Go release the image builds with, which every workflow installs |
-| `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
-| `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
+| `make check` | Everything above. Needs npm |
+| `make check-engines` | All four engines ran, each was the engine it claimed, and the reserved-word list matches what they reserve |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
-| `make weakness-names` | Rewrites the weakness names, and each weakness's primary parent in the catalog's research view, from the catalog that publishes them. In no gate, unlike the word list: the engines that one asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes |
-| `make cppcheck-weaknesses` | Rewrites the weakness each cppcheck check finds from `cppcheck --errorlist`, with the version it asked. In no gate, because CI installs no cppcheck. `CPPCHECK` names the binary |
+| `make weakness-names` | Rewrites the weakness names, and each weakness's primary parent in the catalog's research view, from the catalog. In no gate: the catalog is not pinned, so a drift check would fail a build on the day it publishes |
+| `make cppcheck-weaknesses` | Rewrites the weakness each cppcheck check finds from `cppcheck --errorlist`, with the version asked. In no gate, since CI installs no cppcheck. `CPPCHECK` names the binary |
 | `make clang-checkers` | Fails naming each clang static analyzer checker for C the weakness table has not looked at. Run against each new clang release. `CLANG` names the binary |
-| `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
-| `make check-packaging` | The container image and the Helm chart. Needs `$(DOCKER)` — docker unless set — and helm, and says so where it has neither. `make dist` refuses to run without them, because it gates the image it builds |
-| `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `design-docs/packaging.md` |
-| `make release-freeze VERSION=vX.Y.Z` | The record of a release's migrations: the schema they build on every engine, then each file and its digest, then the check below. Run on a branch from the head of `main`, with the four engines up, and landed before the tag. See `design-docs/database.md` § Release records |
-| `make release-check VERSION=vX.Y.Z` | That the release a tag names was frozen and the tree still ships what it froze. The release workflow runs it before it builds anything |
+| `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, which has them running |
+| `make check-packaging` | The container image and Helm chart. Needs `$(DOCKER)`, docker unless set, and helm, and says which is missing |
+| `make dist` | Every release asset into `bin/dist`, each checked against its tag. Needs docker, helm and npm, and refuses without them, since it builds the interface and gates the image. See `design-docs/packaging-release.md` § Release assets |
+| `make release-freeze VERSION=vX.Y.Z` | The record of a release's migrations: the schema they build on every engine, each file and its digest, then the check below. Run on a branch from the head of `main` with the four engines up, landed before the tag. See `design-docs/database.md` § Release records |
+| `make release-check VERSION=vX.Y.Z` | The release a tag names was frozen and the tree still ships what it froze. The release workflow runs it before building |
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
-| `make engines-clean` | Drops the test databases no running test holds, on every configured server. See § Test databases |
-| `make measure` | Measurements rather than gates. Behind a build tag. Each starts from tables laid out as a fresh load leaves them, and prints the layout beside its timings. See § Measurement databases |
+| `make engines-clean` | Drops the test databases no running test holds, on every configured server. See `design-docs/build-tests.md` § Test databases |
+| `make measure` | Measurements, behind a build tag. Each starts from tables laid out as a fresh load leaves them and prints the layout beside its timings. See `design-docs/build-tests.md` § Measurement databases |
 | `make sbom-shape` | The reader over a full-size inventory, decompressed from a committed fixture. Inside `check` |
 
 ## Gate tiers
 
-The full gate is minutes, and most changes cannot fail most of it: a prose edit
-cannot break a database engine, and an interface change cannot make a Go query
-non-portable. Running everything anyway is what teaches people to skip the gate,
-which is the failure the gate exists to prevent (REQ-75).
-
-`make gate` reads what the working tree has changed and runs the tier that
-change lands in. The tiers accumulate: a commit carrying a design document and a
-query runs both.
+`make gate` reads what the working tree changed and runs the tier that change
+lands in, because running everything for a prose edit teaches people to skip the
+gate (REQ-75). Tiers accumulate: a commit carrying a design document and a query
+runs both.
 
 | Touched | Adds |
 |---|---|
 | `*.md` alone | `docs-check`, `unclaimed`, `pins-check`, `readable`, `secrets` |
 | `web/**` alone | `web-check`, `spdx`, `readable`, `secrets` |
 | the interface's manifest, lockfile or source | `licenses` as well as the interface's tier |
-| the interface's route table | the Go tier as well as the interface's, because a Go test holds the server's links to it |
+| the interface's route table | the Go tier as well, because a Go test holds the server's links to it |
 | Go reaching no SQL | `build`, `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `subjected`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
-| a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
-| Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |
+| a query, the schema, a migration, or the shared test harness | `reserved`, `test-all`, `check-engines` |
+| Go the API document is generated from: any file of the registering package, and any declaring a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |
-| a tool's module under `tools/`, its source included | the whole gate, because the tool it pins is one the gate runs |
+| a tool's module under `tools/`, its source included | the whole gate, because the gate runs that tool |
+| a gate program's shared repository reader | the whole gate (§ Gate inputs) |
 | anything else, or nothing | the whole gate |
 
-| Rule | |
+| Rule | Reason |
 |---|---|
-| **The choice is a program's, not a person's** | A table is read optimistically at six in the evening; a program reads the same change every time |
-| **A path nobody classified takes the whole gate** | The makefile, the container, the chart, an asset, a fixture. Being generous about a handful of paths costs less than a tier that quietly omits one |
-| **A Go file is classified by what the whole file holds** | Not by what the edited lines hold. A change anywhere in a file of queries can move what a query returns |
-| **A file takes every tier it lands in** | A route file holding a query is the API document's input and portability work at once |
-| **Every tier a change reaches alone scans for secrets** | Any file can carry a credential, and one pushed is in the remote's history before CI reads it. The other tiers come with one that runs it |
-| **Every target `check` runs is chosen by some narrow tier** | A test holds the join, so a target added to `check` and to no tier fails it |
-| **`docs-check` tests every package whose tests read a document** | A test holds the list to the tests that climb out of their package to a `.md` file |
-| **A clean tree takes the whole gate** | Nothing there to choose from, and a clean tree before a push is carrying work that is already committed |
-| **`test-all` replaces `test`** | The same tests, against four engines rather than one |
-| **Local and CI run the identical command** | The moment they differ, "it passed locally" stops meaning anything |
-
-Three steps pass only on a commit — `openapi-current`, `web-api` and
-`reserved-current` each diff a regenerated file against the last commit, so on
-an uncommitted tree they report the file as stale.
-
-Test code a tag or an environment variable guards is compiled by the gate.
-A file behind a build tag is loaded by nothing an ordinary run compiles, so a
-rename anywhere it reaches leaves it silently broken while the build, the
-linter and CI all pass — and the one target that does pass the tag refuses
-outright unless three server engines are configured, so nobody finds out. It is
-linted rather than run: the linter is given the tag, type-checks what it
-compiles, and needs no database. A test guarded by an environment
-variable nothing sets is the same gap with a different lock, and the answer is
-the same: a target that sets it, inside `check`.
+| A program chooses the tier | It reads the same change the same way every time |
+| A path nobody classified takes the whole gate | The makefile, the container, the chart, an asset, a fixture. A tier that quietly omits one costs more |
+| A Go file is classified by what the whole file holds, never the edited lines | A change anywhere in a file of queries can move what a query returns |
+| A file takes every tier it lands in | A route file holding a query is API input and portability work at once |
+| Every tier a change reaches alone scans for secrets | A credential pushed is in the remote's history before CI reads it |
+| Every target `check` runs is chosen by some narrow tier | A test holds the join |
+| `docs-check` tests every package whose tests read a document | A test holds the list to the tests that climb out of their package to a `.md` file |
+| A clean tree takes the whole gate | Before a push it is carrying committed work |
+| `test-all` replaces `test` | The same tests, on four engines |
+| Local and CI run the identical command | Otherwise "it passed locally" means nothing |
+| `openapi-current`, `web-api` and `reserved-current` pass only on a commit | Each diffs a regenerated file against the last commit |
+| Test code behind a build tag is linted, with the tag passed | Nothing an ordinary run compiles loads it, and the target that runs it refuses without three server engines, so a rename leaves it broken with every check green. The linter type-checks it with no database |
+| A test behind an environment variable has a target inside `check` that sets it | A variable nothing sets is the same gap |
 
 ## CI jobs
 
-Four, and each beside the first is separate for a reason of its own rather
-than for tidiness.
-
-| Job | Holds | Why it is not a step of the first |
+| Job | Holds | Separate because |
 |---|---|---|
 | Build, test and check | `engines-check`, `make check`, `check-engines`, and the bill of materials as an artifact | — |
-| Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
-| Documentation builds | The documentation site built | Python, and nothing else needs it |
-| Upload client on macOS and Windows | `client-test` on each system, after a step on Linux compares the change against `client-sources` | The upload client is the one program here that runs on a build host, and the other two systems are the only place its paths and line endings are seen as a pipeline there sees them |
+| Container image and chart | The image built, then `check-packaging` against it | buildx and helm, with a build cache of its own |
+| Documentation builds | The documentation site built | Python, which nothing else needs |
+| Upload client on macOS and Windows | `client-test` on each system, after a Linux step compares the change against `client-sources` | The client runs on a build host, and only those systems show its paths and line endings as a pipeline there does |
 
-| Rule | |
+| Rule | Reason |
 |---|---|
-| **The two systems run only when a client source moved** | A macOS or Windows runner costs several Linux ones, and a change elsewhere cannot reach the client |
-| **The source list is what reaches the client** | A test in `internal/build` fails on a package the client imports that `client-sources` does not hold. The list also holds the fixtures the client's tests read from another package, and the Dockerfile, whose `golang` tag is the Go release the runners build with |
-| **A skipped job satisfies the merge check** | The aggregator waits for checks to pass or be skipped. A queue entry and a pull request compare against their own base |
-| **No make on Windows** | The Linux step prints the package list and the Go release, and the two jobs run `go test` on them directly |
+| The first job runs `make check`, never a list of targets | `check` is the definition of what CI checks, so a target added to it runs in CI. Hand-listed jobs leave targets in no job, the reserved-word check among them |
+| Jobs declaring only a checkout and a Go setup are one job | Separate, they are as many clones and toolchain restores for one machine's work |
+| No composite action or reusable workflow | One Go setup remains, and a reusable workflow re-clones and re-installs on a runner of its own |
+| The macOS and Windows jobs run only when a client source moved | Such a runner costs several Linux ones, and nothing else reaches the client |
+| The source list is what reaches the client | A test in `internal/build` fails on a package the client imports that `client-sources` lacks. The list holds the fixtures the client's tests read from another package, and the Dockerfile, whose `golang` tag is the runners' Go release |
+| No make on Windows | The Linux step prints the package list and the Go release, and both jobs run `go test` on them |
+| A skipped job satisfies the merge check | The aggregator waits for checks to pass or be skipped. A queue entry and a pull request compare against their own base |
+| `PR`, the aggregator, is the one check the ruleset names; `Release` runs on a tag (`design-docs/packaging-release.md` § The release procedure) | Both report no build of their own |
+| Every gating workflow declares `merge_group:` | A workflow without it contributes no check to a queue entry, which the aggregator cannot tell from one not started |
+| Publishing documentation is a workflow of its own | It runs on `main` alone, writes to the repository, and publishes |
+| Dependency review is not run | The action needs GitHub Advanced Security on a private repository, a paid add-on per committer. `licenses`, `web-audit` and `secrets` cover it, and each runs locally with one command, which an action cannot (REQ-75) |
 
 ### CI caches
 
 | Cache | Holds | Keyed on | Saved |
 |---|---|---|---|
 | Go modules | Every module the tree and the pinned tools need, extracted and as downloaded | `go.sum` and each tool's under `tools/` | When the key is new |
-| Go build | The tree compiled plain and race-instrumented, its test binaries' objects, and the five tools built from source | The run, restored by prefix so a run starts from the newest | On `main` |
+| Go build | The tree compiled plain and race-instrumented, test binaries' objects, and the tools built from source | The run, restored by prefix so a run starts from the newest | On `main` |
 | Linter results | The linter's analysis of each package, by the content it read | The run, restored by prefix | On `main` |
 | Image layers | Every stage's layers | The buildkit scope | On `main` |
 
-A pull request's run restores all four and writes none of them: what its
-build would save is keyed to its own commit, which no later run builds, and a
-branch's scope is read by nothing but that branch. The store holds 10 GB and
-evicts what was used least recently, so a cache written for nobody is a cache
-that pushes out one somebody reads.
-
-A fresh Go build cache for this tree is 2.1 GB, 470 MB as stored; the race
-flavor is 640 MB of it and the tools 840 MB. Go trims an entry only after five
-days unused, so a cache saved as the run left it carries every version of the
-tree compiled on `main` in that time: 2.87 GB as stored, 55 to 71 s to restore
-and 38 to 47 s to save.
-
-The build and linter caches are saved holding what the run read and nothing
-else. Both mark an entry as used by moving its modification time to the
-present, but only when it is more than an hour old. Before the checks, every
-restored entry is moved two hours back, which is old enough for any read to
-move it again and too new for a trim to remove it; after them, every entry
-that did not move is deleted. Marking and deleting take under five seconds.
-Emptying the cache and building again would cost the whole compilation, which
-is 150 s on four cores for the test binaries alone.
-
-| | Saved as the run left it | Saved holding what the run read |
-|---|---|---|
-| Go build cache, as stored | 2.87 GB | 683 MB |
-| Its restore | 55 s | 11 s |
-| Its save | 38 to 47 s | 7 to 10 s |
-| The linter, with no results / with results for the same tree | 74 to 75 s | 1.4 s |
-
-The linter's results are 0.7 MB as stored. They are keyed by the content each
-package was analyzed from, so a file that changed is analyzed again and nothing
-else is: on four local cores, one changed file costs 9 to 12 s against 42 s
-with no results at all.
-
-A layer written after the source is copied is keyed to the commit, so nothing
-a later commit builds reuses it. The image's Go steps mount the Go build cache
-rather than writing it into their layers, and the bill-of-materials tool is
-fetched before the source is copied, beside `go mod download`, so its modules
-sit in a layer every commit reuses. With the cache inside the layers, the
-compile step's layer was 441 MB and the bill-of-materials step's 499 MB per
-commit, and each run exported about 420 MB of blobs no later run read; the
-same two steps are 39 MB and 131 kB, the binary and the document.
-
-Dependency review is not a fourth job. The action needs GitHub Advanced
-Security on a private repository — a paid add-on, per active committer, that
-nothing else in this organization buys. Targets cover what it checks, and cover
-it better: `licenses` reads the npm tree as well as the Go one, `web-audit`
-scans what the interface installs, and `secrets` replaces the platform's secret
-scanning. Each runs locally with one command, which an action cannot, and that
-is the half of REQ-75 an action cannot meet.
-
-Two workflows beside this one report no build of their own. `PR` is the
-aggregator that waits for every check here and is the only one the ruleset
-names; `Release` runs on a tag and is described in `design-docs/packaging.md`.
-Both declare `merge_group:` as this one does — a workflow that does not
-contributes no check to a queue entry, and the aggregator cannot tell that
-from one that has not started.
-
-The first job runs one target, not a list of them. `make check` is the
-definition of what CI checks, so a target added to it is run by CI without
-anybody remembering to add a step.
-
-Naming targets individually is what makes the two drift. Jobs listing their
-targets by hand leave targets `make check` runs in no job, so the rule that
-local and CI run the identical command is written down, believed and false —
-including for the check that no invented name collides with a word an engine
-reserves, which is a non-negotiable.
-
-Jobs that declare nothing but a checkout and a Go setup are one job. The
-interface, static analysis, vulnerabilities and licenses, the API document and
-the bill of materials share a runner image, a toolchain and a module cache, and
-declare no services and no conditions: separate, they are that many clones and
-toolchain restores doing one machine's worth of work, and parallelism is all
-that folding them costs.
-
-A composite action is not needed. One Go setup is left in the workflow, so an
-action abstracting it would have a single caller, and a reusable workflow runs
-on a runner of its own — it re-clones and re-installs, which organizes the file
-and keeps the cost.
-
-Publishing documentation is a workflow of its own, not this one's fourth job. It
-runs on `main` alone, writes to the repository, and publishes rather than
-checks.
-
-## Interface checks
-
-| Tool | Covers |
+| Rule | Reason |
 |---|---|
-| `tsc` | Strict, with unused locals and parameters, unchecked indexed access and verbatim module syntax |
-| ESLint | Only what `tsc` has no view of. The rules of hooks are the reason it is present |
-| Prettier | Formatting, for TypeScript and CSS. The counterpart to `gofmt` |
-| Stylelint | CSS correctness: unknown properties, duplicate selectors, notation. Nothing about whitespace |
-| `npm run classes` | Three questions about class names, below |
-| `npm run lint`, after ESLint | A query's data defaulted to an empty list in a file that never consults that read's failure: its error, `known`, a count, a failure line beside a picker, or handing it whole to the component that draws a read's three arms. A read allowed to be quiet carries `silent-read:` and its reason. `design-docs/interface.md` § A read that failed holds the rule |
-| `npm run copy` | A paragraph, hint or empty-state detail on a screen putting more than 20 words up at once. `design-docs/interface.md` § Screen copy says what it measures |
-| Query keys, in the web tests | An invalidation whose key no read's key starts with. The query cache matches an invalidation by prefix, so a key nothing reads refreshes nothing, and a control that saved looks as though it did not. Compared as far as each key is literal |
-
-The web tests run each file in a VM context of its own, inside a child process
-that runs file after file. Every file still gets a DOM of its own; the process
-is what is shared, and starting one per file was 70% of the run. They are
-processes because Node applies a change of the time zone only on a process's
-main thread, and a test setting a zone to tell a typed minute from a local one
-passes vacuously under UTC. Such a test asserts the zone took effect before
-relying on it. On four cores the run is 29 s with a process per file and 9 s
-this way.
-
-The web tests that read the whole interface — addresses against the route
-table, query keys, screen copy and control names — run in one test file, over
-syntax trees built once and shared. A test file is a module graph of its own,
-so in separate files each parses every source again: 1.19 s of test time
-across the four, against 0.66 s sharing one parse.
-
-Formatting belongs to one tool. Stylelint's whitespace rules are off rather than
-left to disagree with Prettier.
-
-ESLint is deliberately narrow. A second opinion about style is noise beside a
-formatter, and a rule that fires on working code teaches people to read past the
-output. What it carries is the hook rules, which catch an impure read during
-render, a dependency list that makes an effect run every time, and a value
-assigned and never used.
-
-One rule reports rather than refuses: writing state from an effect. The fix is
-to remount with a key, which changes how a component mounts rather than what it
-does, so each has to be driven in a browser.
-
-## Class-name checks
-
-A class name this project defines that Tailwind also defines. Tailwind is
-imported wholesale, so it emits a utility rule for any class name in the source
-it recognizes. Where that name is also defined here, both rules apply and
-Tailwind's wins for the properties it sets. Nothing fails: a column with
-`class="col fixed"` picks up `position: fixed` and leaves the grid.
-
-The set is derived rather than listed. Every class this stylesheet defines a rule
-for is put to Tailwind's compiler, and anything it answers for is a collision. A
-utility Tailwind adds in a later version is caught on the next run.
-
-A rule that styles nothing. Matched against the whole source rather than against
-`className=`, because class names are built as well as written: `col ${kind}`
-puts a modifier in the markup that appears nowhere as a literal. The check is
-deliberately weak — it finds a name mentioned nowhere at all, and stays quiet
-otherwise. Names from a charting library or the markdown renderer's `language-`
-prefix are excluded.
-
-A class applied to an element that nothing styles. The mirror of the question
-above, and the one that catches an element rendering with no rule at all: a
-label with no fill takes the browser's default, which on a dark canvas is
-invisible, and a state word with no rule renders in the same grey as the state
-that means the opposite. Names Tailwind emits a rule for are not the subject and
-are excluded by asking its compiler, which is the same weakness the collision
-check lives with — a name that happens to be a utility passes either way.
-
-Only names written as literals are read. A class assembled entirely from an
-interpolation produces no token, so this stays quiet rather than reporting
-something it cannot see.
-
-A modifier whose bare rule draws a box. A class reached as a modifier —
-`.state.warn` — that also has a rule of its own setting a display, a margin, a
-padding, a border or a background hands that rule to every element carrying the
-modifier, at the same specificity. The later rule wins, so a chip in a table cell
-draws as a block-level callout. A modifier's bare rule sets no display, margin,
-padding, border or background, longhands included. A web test reads every
-stylesheet for it.
-
-An export of the interface that nothing else names. A web test reads every
-module and fails on an export no other file mentions, which is the interface's
-half of `make unreachable`. A test counts as a caller, as it does there. It
-matches names rather than walking imports, so a name that is also an ordinary
-word elsewhere passes.
-
-An address into the interface that no route answers, or one put together
-outside the route module. A web test reads every module for both, and holds
-every query parameter the route table lists to a read on the screen that route
-renders; a Go test holds every link the server builds to the same table and
-fails on one spelled outside its package. `design-docs/interface.md` § The route
-table has the rules.
-
-## Database engines
-
-The suite runs against SQLite alone unless pointed at real servers, and a
-skipped engine passes. A green run does not mean four engines agreed; it means
-nothing failed, which is also what running almost nothing looks like.
-
-`make engines-up` starts them, waits until each answers, and writes their URLs to
-`local.mk` — git-ignored, included by the makefile if present.
-
-| Property | Reason |
-|---|---|
-| Each server is asked with its own client, inside its own container | A container reported "Up" is not one that answers, and nothing should depend on a client installed on the machine |
-| Each is published on the loopback address alone | They carry the password `test` and accept any statement, and a laptop on a shared network would otherwise offer them to anyone who can reach it |
-| `local.mk` is never overwritten | It is machine-local, and may point at an operator's own servers |
-| Starting is idempotent | A running engine is left alone; a stopped container is started rather than replaced |
-| Images are pinned and compared against CI's, in both directions, with CI running the check | A local four-engine pass means what CI's means only if they are the same servers |
-| Each image is named by tag and digest, here and in CI, and `pins-check` refuses a workflow service named by tag alone | A tag is moved by an upstream rebuild, which would change both servers with no change here. Dependabot reads no workflow service, so the two lists move by hand, together |
-| One of the four is below the supported version floor | The refusal to run against an old server is exercised rather than skipped |
-
-The URLs are read when make starts, so the run that writes `local.mk` is not the
-run that uses it.
-
-## Test databases
-
-Every test binary is one package, and every binary holds a database of its own
-on each engine while it runs, so packages running at once share nothing and run
-in parallel.
-
-| Engine | What a test gets | Emptied between tests |
-|---|---|---|
-| SQLite | A copy of a template migrated once per run and kept in the temporary directory, and a connection of its own | Not needed — each test holds its own file |
-| The three servers | A database the binary leases on the server for as long as it runs, through one pool every test in the binary shares | Before every test, by deleting from the tables that hold rows. A measurement truncates every table instead: see § Measurement databases |
-
-The pool on a server is shared because a PostgreSQL connection is a process on
-the server that starts knowing nothing of the schema. Its first statement over
-the fifty-odd tables costs 43 ms, and the same statement on a warm connection
-3.4 ms. With a pool per test, every test paid the first: the API package spent
-90 s on PostgreSQL that way and spends 48 s with one pool. Tests in a package
-run one after another on a server, so the pool carries nothing from one test to
-the next that the emptying does not remove.
-
-The SQLite template is migrated by the first binary that asks and kept in the
-temporary directory for the rest. Each package is a binary, and migrating once
-in each was 6% of the race pass's processor time: 24 s of 383 s sampled. The
-file is named for everything its content follows from — the migrations'
-fingerprint, the name widths the migrations read, the SQLite library and the
-migration library — so any of those changing names a different file, and one
-that does not open like a database is migrated again.
-
-A handle whose commit is made to lose a race starts from a copy of the same
-template, opened through the connector that refuses the commit. Under the race
-detector, migrating a fresh file for it costs 1.3 s of processor time a test,
-and copying the template 0.06 s.
-
-Each test gets a query builder of its own over the shared pool. A test counts
-or interrupts its statements through a copy of that builder carrying a query
-hook, and builds the stores under test on the copy. The builder it was given
-stays unhooked, because a hook on a shared builder goes on firing in every
-later test — alongside that test's own writers, which the race detector
-reports.
-
-A package whose tests start from the same rows declares them once, as a seeded
-template: a function that fills a migrated, empty database and returns what a
-test needs to reach the rows, such as an identifier or a secret shown once.
-
-| Engine | When the seed runs |
-|---|---|
-| SQLite | Once per binary, against the template, before the first copy |
-| The three servers | Per test, after the binary's database is emptied |
-
-A test that needs a product, its branches and tags, its variants and a build of them
-takes them from one shared default world rather than declaring its own. The
-world is seeded either per test or as the rows a package's template starts
-from, and it keeps apart the attributes a hand-written seed collapses.
-
-| The default world holds | So that |
-|---|---|
-| A product whose display name is not its name in other capitals | A read answering the display name where the name is resolved fails |
-| A branch and a tag cut from it | A read keyed on the branch or tag answers more than one bucket |
-| One variant reaching customers and one not | A rule keyed on that flag is shown on both sides |
-| A person whose display name is neither empty nor their identity | A read of one never coincides with the other |
-
-A test needing a second product declares it on the same world. The catalog and
-access packages, the API package's catalog tests and the schema width tests
-declare their own rows, because the declarations are what they test. The API
-authorization tests keep a world of their own, whose two products and people are
-what that matrix tests, and a migration test seeds the older schema it migrates
-from, which the default world does not match.
-
-The harness empties the database before every test, so a test does not empty
-it again before it starts. Emptying it part way through is for a test that
-starts over within itself: one seeding a second world, one whose cases each need
-an empty table, and a migration test dropping the schema to apply an earlier
-release's.
-
-What the seed returns on SQLite is one value shared by every test copying the
-template, and those tests run beside each other, so a test reads it and does
-not write to it. The API package's fixture is two products and eighteen people
-with their claims and grants, about sixty transactions; run per test that was
-27% of the package's processor time under the race detector on two cores, and
-as a seeded template it is a file write.
-
-A server database is kept between binaries and between runs, and reused.
-Applying the migrations is nearly the whole cost of a server engine on a disk —
-9.8 s on MySQL and 7.2 s on MariaDB for one database — and none of it tests
-anything the migration tests do not. A server CI starts is new every run, so
-there the first binary to lease each slot builds its database and every binary
-after it in that slot reuses it. A pass running two binaries at once builds
-two databases per engine, where a database per package built 33 or 34.
-
-| Server pass, fresh containers, two binaries at once | A database per package | A database per slot |
-|---|---|---|
-| PostgreSQL, processor time, test binaries and server | 211 s | 188 s |
-| MySQL, the same | 154 s | 103 s |
-| MariaDB, the same | 97 s | 79 s |
-| PostgreSQL, wall time | 230 s | 123 s |
-| MySQL, wall time | 403 s | 151 s |
-| MariaDB, wall time | 308 s | 132 s |
-
-Each engine was measured alone, on four cores, against a container started for
-the run on its own disk, as CI starts one.
-
-A server database belongs to a slot of a schema, and a test binary leases the
-slot for as long as it runs. The database and the slot's lock share one name.
-
-| Part of the name | Why |
-|---|---|
-| A hash of the migration sources' fingerprint | An edited migration names different databases rather than reusing a stale one |
-| The slot's number | Two binaries running at once hold different databases |
-
-Neither the package nor the checkout is in the name. A binary of any package,
-from any checkout of the same migrations, takes a slot another binary freed,
-with its database. A server holds as many databases per schema as the most
-binaries built from it that were alive there at once.
-
-| Slot rule | Why |
-|---|---|
-| A binary leases one slot per server, the lowest no other binary of its schema holds | Slots stay few, and the lowest is the one most likely to hold a database already |
-| The lease is a lock the server keeps for one connection: a named lock on MySQL and MariaDB, a session advisory lock on PostgreSQL | A binary that exits or crashes closes the connection, and the server releases the lock with it |
-| Each slot is asked for without waiting | Two binaries starting at once are granted different slots, and neither waits on the other |
-| The lock is keyed on the schema and the slot | Two checkouts of different migrations hold different slots, and neither builds over the other's database |
-| On PostgreSQL every lock is taken in the maintenance database, `postgres` | An advisory lock is scoped to one database while the slot databases belong to the cluster. Two URLs naming different databases would otherwise take two lock spaces over one set of databases, share a slot, and empty each other's rows |
-| Sixty-four slots per schema | Every binary of every run on a server draws on them. A binary finding every one held refuses in words |
-
-What one package's tests leave in a database is what the next package's tests
-start from.
-
-| Left by an earlier binary | Why a later one is unaffected |
-|---|---|
-| Rows | Every test empties the database before it runs |
-| Identifiers continuing past the last binary's | A test reads the identifiers it made, and never assumes where a sequence starts |
-| A schema a test changed: a table renamed, an earlier release applied | The test puts the schema back when it ends |
-
-The fingerprint is recorded in the name. Below 1.0 a schema change edits what
-declares the thing rather than adding a migration beside it, so the applied
-version does not move and only the content of the migrations tells one schema
-from another.
-
-| A kept database | What the harness does |
-|---|---|
-| Named for this build's schema, at the version its migrations end at | Uses it; the first test empties it as every test does |
-| Named for this build's schema, at any other version, or none | Drops it and builds it again. A run killed while it migrated leaves one, and on MySQL and MariaDB a schema statement commits on its own, so the part a migration applied before it stopped is recorded by no version |
-| Named for another schema, its slot held | Leaves it. A checkout of that schema is running its tests |
-| Named for another schema, its slot free | Drops it when a binary creates a database for its own schema, under the same locks as the clean below. A drop the server refuses — a session still open on it, or a role this account may not drop — is reported and leaves the lease standing, since the database the binary built is whole |
-
-`make engines-clean` drops the harness's databases on every configured server
-whose slot nobody holds, and is safe while other checkouts run their tests.
-
-| Step | Why |
-|---|---|
-| Each database's locks are taken without waiting, on the clean's own connection | A held lock is a running binary using the database, and it is left |
-| The locks are the one named for the database and the one named for it without its last part | The second is the slot lock of a harness that names a database for its package, a slot and a schema, which a checkout of an older tree runs |
-| The database is dropped while the clean holds the locks, and the locks released after | A binary starting meanwhile is refused that slot and takes another, so nothing it uses is dropped under it |
-| A database whose name is no slot's is dropped | Its locks are ones no binary takes |
-
-The race detector runs on SQLite alone. A Go data race does not vary by database
-engine, and the detector's cost is in-process work — which is most of what
-SQLite spends and almost none of what a server engine does.
-
-| `internal/httpapi`, one engine | With the detector | Without |
-|---|---|---|
-| SQLite | 73.6 s | 10.1 s |
-| PostgreSQL | 59.6 s | 33.5 s |
-| MySQL | 18.5 s | 12.0 s |
-| MariaDB | 16.9 s | 12.0 s |
-
-The detector is a property of the binary and cannot be turned on for one
-subtest, so `test-all` is two runs: SQLite with it, the three servers without.
-
-A race-instrumented binary sleeps before it exits, so that a goroutine still
-running can report a race first. The race pass sets that sleep to 100 ms. The
-default of one second is paid by every test binary: 1.02 s against 0.015 s for
-a package whose tests take milliseconds, and the better part of a minute across
-the tree on a runner that runs the pass one package at a time. 100 ms keeps a
-window for a goroutine mid-operation; nothing in the tests leaves one running
-on purpose.
-
-The race pass compiles the SQLite engine's translated C, and the C library it
-runs on, without the detector and without the pointer checks the detector
-turns on. Instrumenting that code is most of what the detector costs: an empty
-test spends 57 ms under the detector against 4.4 ms without, 48% of it in the
-engine parsing the schema and another 16 to 22% in the pointer checks.
-
-| The race pass, every package, four cores | Processor time | Wall time | Races reported |
-|---|---|---|---|
-| Every package instrumented | 481 s | 123 s | None |
-| Pointer checks off in the engine's packages | 316 s | 81 s | None |
-| The translated engine left out | 235 s | 62 s | None |
-| The translated engine and its C library left out | 186 s | 49 s | None |
-| Every package of the engine left out, its Go driver included | 180 s | 57 s | False, in 3 of 10 runs of one package |
-
-| Rule | Why |
-|---|---|
-| The translated engine and its C library are left out, and nothing else | This tree, the engine's Go driver, the query builder and the standard library's database layer stay instrumented and checked |
-| The engine's Go driver stays instrumented | An error it fills in uninstrumented leaves no record of the write, so this tree reading it is checked against whatever last used that memory, and the report is a race that is not there |
-| A race inside the engine's translated C or its C library is not reported | That code is the one thing the pass no longer inspects |
-| A test races this tree's code against the standard library's database layer and expects the report | Leaving out this tree or the database layer as well silences it, and the test fails |
-| The compiler flags are not documented for turning the detector off in one package | A Go release that rejects one fails the build loudly, and the patterns are then removed or respelled |
-
-The two run at once. They share no engine, so neither can see the other's rows,
-and they are bottlenecked on different things — the detector is in-process work
-and the server pass spends its time waiting on a socket — so each fills what the
-other leaves idle. Each takes half the cores, so the number of test binaries
-alive at once is what a single pass has, and the peak memory falls rather than
-rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run together,
-on twelve cores with everything warm.
-
-Each pass labels its own lines. Held and printed at the end, a run says nothing
-for the whole of it — on a slow machine a quarter of an hour of a log that looks
-stopped — and interleaved without labels, two runs of fifty packages are two
-answers to "did it pass" with no way to tell which said what. A failure in
-either fails the target, which is checked by breaking one pass at a time and
-watching it go red.
-
-`OPENPSIRT_TEST_ENGINES` narrows which engines a run touches, and `test` and
-`test-race` both set it to `sqlite`. The pool's idle reaper, the migration lock
-and the version floor open connections themselves rather than through `dbtest`,
-so a copy of the rule in each is a copy that reads its URL without consulting
-the variable — and then the quick loop and the race run open three servers,
-failing on the day the servers are stopped in a way that reads as a code
-regression rather than a stopped container.
-
-The rule lives in `dbtest/engines`, a package below both `dbtest` and
-`migrate`. The migration lock's test is an internal test of `migrate`, which
-`dbtest` depends on, so it cannot reach a rule held in `dbtest` and a second
-copy of the parsing is the alternative.
-
-Tests within a package run beside each other when SQLite is the whole run. That
-is the only run where each test already holds a database nothing else can reach;
-on a server the package has one database and its tests empty it between
-themselves, so two at once would clear each other's rows. A test that changes
-something the whole process shares — an environment variable, the working
-directory — says so and runs alone.
-
-Together: one minute fifteen against warm servers and two minutes forty-five
-against cold ones, from four minutes four seconds.
-
-### Measurement databases
-
-A measurement binary empties a server database by truncating every table, where
-the rest of the suite deletes from the tables that hold rows. The `measure` build
-tag selects it. A measurement then times plans chosen over tables laid out as a
-load into a newly migrated database leaves them, which is the layout closest to
-a deployment's.
-
-| Engine | A table loaded again after a delete | Emptied for a measurement |
-|---|---|---|
-| PostgreSQL | Fills the space the deleted rows left, wherever it sits: more pages, and an order the identifiers no longer follow | One `TRUNCATE` naming every table |
-| MySQL, MariaDB | The clustered index takes a number of pages that varies with how far the server has purged the deleted rows | `TRUNCATE TABLE` per table, with foreign key checks suspended on that one connection and restored before it returns to the pool |
-| SQLite | Not reached: each test copies a migrated file | The ordinary way |
-
-The `finding` table after two measurements, each run twice over a reused slot
-database and twice with truncation, one engine at a time:
-
-| Measurement, engine | Deleted, then reloaded | Truncated, then reloaded | A newly built database |
-|---|---|---|---|
-| The list across products, PostgreSQL | 20,900 pages, correlation of `id` −0.38 and of `vulnerability_id` −0.32; then 12,697 pages, 1.00 and 0.68 | 12,697 pages, 1.00 and 0.68, then 0.67 | Correlation 1.00 and 0.67 |
-| A planned upgrades page, PostgreSQL | 20,900 and 18,867 pages | 6,169 and 6,170 pages | — |
-| A planned upgrades page, MySQL | 3,078 and 3,014 pages, 30.6 s and 31.4 s | 2,854 pages, 14.5 s, both runs | 2,854 pages, 15.1 s |
-| A planned upgrades page, MariaDB | 2,886 and 2,823 pages, 25.0 s and 24.7 s | 2,854 pages, 11.3 s and 10.6 s | 2,854 pages, 11.3 s |
-| The list across products, MySQL and MariaDB | 5,802 pages, and once 5,834 on MariaDB | 5,802 pages | — |
-
-The deleted runs on PostgreSQL disagree with each other because autovacuum
-decides when the deleted space becomes free, and that is a race with the next
-load. The plan the planner picks moves with the layout: in the list across
-products, a plan taking 32 to 104 s was chosen over a newly built database in
-four runs of four and over a reused one in none of six.
-
-| Rule | Why |
-|---|---|
-| Truncation is for measurements alone | It costs 96 ms on PostgreSQL, 232 ms on MySQL and 47 ms on MariaDB for a database already empty, against 1 to 4 ms for the ordinary emptying, and the ordinary emptying runs before every test in the suite |
-| Every table is truncated, whether or not it holds rows | Slot databases are shared with the rest of the suite, so a table empty now may have been filled and deleted by another package's binary |
-| The layout of `finding` is printed beside the timings | Two runs reading different layouts are two different measurements, and the output says which one each was |
-| A table with no statistics is refused rather than printed | No pages and no correlation read the same as an empty table |
-
-| Engine | Printed with the refreshed statistics |
-|---|---|
-| PostgreSQL | The table's pages, and the correlation of every column that leads an index |
-| MySQL, MariaDB | The clustered index's pages. InnoDB keeps rows in primary key order, so it holds no correlation to print |
-| SQLite | Nothing: no earlier test's layout reaches a copied file |
-
-## Commit durability
-
-A test database is created by the harness and dropped by a later run, and a
-crash part-way through a suite is answered by running the suite again. The
-durability a commit waits for protects nothing here, and it is most of what a
-run costs.
-
-| Engine | Setting | Where it is asked for |
-|---|---|---|
-| SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens, the racing handle included |
-| PostgreSQL | `synchronous_commit` off | The connection string, so the session gets it and the server is untouched |
-| MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server's command line, for the containers `make engines-up` starts; and the server, once per engine per binary, where `OPENPSIRT_TEST_RELAX_DURABILITY` is 1. Both are global on this protocol, so there is no session to ask, and the change outlives the run for every database on that server |
-
-The harness changes a server's globals only where it is told the server is a
-throwaway. `make engines-up` writes `OPENPSIRT_TEST_RELAX_DURABILITY ?= 1` into
-the `local.mk` it creates, and CI sets it beside its URLs. A URL naming a
-server of somebody's own, which may hold other databases, leaves that server's
-durability as it is, and the test pinning the settings skips there.
-
-Nothing a test can observe changes. The settings govern what survives a crash,
-not what a statement returns, what a transaction sees, or which constraint an
-engine enforces.
-
-| Every package, one engine | Durable | Relaxed |
-|---|---|---|
-| PostgreSQL | 90 s | 60 s |
-| MySQL | 59 s | 12 s |
-| MariaDB | 19 s | 12 s |
-| The three together | 240 s | 77 s |
-
-The saving belongs to the storage underneath rather than to the engines.
-Containers on a workstation pay the durable figures above. The servers a
-GitHub runner starts pay little enough that the whole server pass does not
-move: 412 s against 413 s, where the variance between two runs of the same
-tree is 5 s to 10 s on each of the large packages. The configuration this
-reaches is therefore a server somebody else started, which is the one
-`make engines-up` cannot pass a command line to.
-
-The harness asks, rather than the command line the server was started with. A
-server a run meets is not always one this repository started: `make engines-up`
-passes the same intent at startup, which also reaches the settings an engine
-accepts only there, and a workflow declaring a service container has no command
-line to pass. Asking from the connection reaches both.
-
-The settings govern commits, and a schema change syncs the files it creates
-whatever they say. So a server `make engines-up` starts keeps its data
-directory in memory, which removes the disk from building a schema as well as
-from committing to it. The CI services keep theirs on disk: a runner's memory
-is what the suite runs in, and its disk pays little for a schema change.
-
-| Building the schema, one database, a workstation | On disk | In memory | Server processor time, in memory |
-|---|---|---|---|
-| PostgreSQL | 0.43 s | 0.42 s | 0.37 s |
-| MySQL | 9.8 s | 0.83 s | 1.38 s |
-| MariaDB | 7.2 s | 0.18 s | 0.14 s |
-
-The server pass over every package, six at once, went from 516 s to 246 s of
-package time with the pool above and the data in memory, where the 516 s reused
-databases migrated by an earlier run and the 246 s migrated every one. A
-container stopped and started again has lost its databases, and the harness
-migrates new ones.
-
-A connection that may not set a global leaves the server as it is and the suite
-runs slower. A test reads the setting back from the session it was handed and
-fails where it is durable on a connection that could have changed it, which
-separates a harness that stopped asking from a server nobody may configure.
-
-## Pinned pairs
-
-A version written in two files is a version somebody moves in one of them: the Go
-toolchain the container builds with against the one the module and each tool's
-module accept, and the Python the documentation closure was resolved on against
-the one the workflows build it with. The Go and Node releases the workflows
-install are read from the image rather than written twice.
-
-A check of its own rather than part of the engine check: that answers what the
-tests run against, this answers what the release is built from. An image
-carrying two defaults for the version passed in is what it catches — a build
-with none then reports `dev` in the binary and `0.0.0` in its own inventory.
-
-The Go patch counts. A floating base image cannot tell one patch apart, so a
-tarball and an image built from the same commit would be a release built twice
-by two toolchains with the gate green.
-
-| Rule | Why |
-|---|---|
-| The image's `golang` tag is the one pin of the Go patch release | One number to move, in the file Dependabot's image update edits |
-| Every workflow installs the release `make go-version` reads from that tag | The tarball, the image and the tests are built by one toolchain |
-| `go.mod`'s `go` line is held at or below the image's release, compared as versions | It is the oldest release the module accepts. Held equal, an image bump would fail until somebody edited `go.mod` by hand on the same pull request |
-| A `go` line above the image's release fails | A module needing a newer Go lands after the image moves, never before |
-| Each tool's module under `tools/` is held to the same `go` line rule | The image and the workflows build the tools with the image's release |
-| The image's `node` tag is the one pin of the interface's Node, and every workflow installs the release `make node-version` reads from it | The pull request moving the tag moves the interface's toolchain everywhere |
-| A workflow naming a Node release itself fails | A second copy of the number is the one a bump leaves behind |
-| The `modernc.org/libc` the build selects is the one `modernc.org/sqlite` requires, and `pins-check` fails otherwise | The SQLite driver is generated against one libc release, and libc's own notes ask for that release and no other. Another module requiring a newer one moves it by minimal version selection with no line here changing. goose 3.29.0 requires a newer libc than sqlite 1.60.1, and Dependabot is told to ignore goose from there until sqlite moves |
-
-| What that costs | What answers it |
-|---|---|
-| The image no longer picks up a Go release by itself | Dependabot watches the images. Its pull request moving the `golang` tag moves the toolchain everywhere and passes `pins-check` on its own. The tag is grouped alone, so an image bump held red never holds the standard library's fixes with it |
-| A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities against the toolchain both artifacts are built with, and the image update carries the fix |
-| A Go release can write export data the pinned linter cannot read, and the linter then fails on every package | The tools' weekly update brings the linter release that reads it. That pull request lands first, and the toolchain's goes green after it. Go 1.27.2 writes format 5, and golangci-lint v2.14.0 is the first release that reads it |
-
-## Tool pins
-
-Every Go tool the gate or the image runs is required by a module of its own
-under `tools/`, and run with `go tool` against that module.
-
-| Rule | Why |
-|---|---|
-| A tool's version is a requirement in its module's `go.mod`, and its `go.sum` holds the checksum of everything it is built from | A requirement is what the dependency updates read. A version in the makefile is one nothing moves |
-| One module per tool | Moving one tool never moves a library another is built against |
-| A build-constrained source file imports the tool's command | The requirement is then direct. A module declaring a tool and importing nothing marks it indirect, and the updates move direct requirements |
-| A tool's directory is named for the command its module declares, and `pins-check` refuses one that is not | The targets call a tool by its directory |
-| The image builds the inventory generator from the same module the makefile runs | One pin, read by both |
-
-| Tool | Run by |
-|---|---|
-| golangci-lint | `make lint`, `make fmt` |
-| govulncheck | `make govulncheck` |
-| go-licenses | `make licenses` |
-| gitleaks | `make secrets` |
-| cyclonedx-gomod | `make sbom`, and the image's inventory of its binary |
-
-## Hash pinning per ecosystem
-
-| Ecosystem | What names the bytes |
-|---|---|
-| Go | `go.sum`, and each tool's under `tools/`, through the checksum database |
-| Node | `package-lock.json`, by integrity |
-| Python, for the documentation | `docs/requirements.txt`, a lock with a hash for every package in the closure, installed with `--require-hashes` |
-| The scanner and the cataloger | A version and a per-architecture hash in the image |
-| Actions | A commit, never a tag |
-
-The Python closure is the one that runs beside a token that can write to the
-repository. Pinning the direct packages and not the closure they pull in leaves
-a republished transitive release executing on the next push.
-
-Direct versions are written in `docs/requirements.in` and the lock beside it is
-generated, never edited:
-
-```
-pip-compile --generate-hashes --output-file docs/requirements.txt docs/requirements.in
-```
-
-`pins-check` asks that every package in the lock carries a hash, that each
-direct version is the one the lock resolved, that every workflow installing it
-passes `--require-hashes`, and that they agree on one Python — the lock was
-resolved on one, and a second would resolve a different closure.
-
-A hash-pinned install fails closed when an upstream republishes, which is a
-refusal to install rather than something executing unnoticed, and it is
-answered by regenerating the lock in a commit somebody reviews.
-
-## Static analysis
-
-Rule selection lives in `.golangci.yml` and nowhere else. Two scopes only: a
-rule gates, or it is advisory. There is no third scope for grandfathering a
-backlog (REQ-75).
-
-The linter set is tuned rather than enabled wholesale. Documentation rules are
-off; error checking excludes the cleanup-path functions conventionally ignored.
-
-The linter is also the vet. Its `govet` runs every analyzer `go vet` does and one
-more, over test files and the file behind the `measure` tag, so the gate runs no
-separate `go vet`: the same analysis twice was 50 s of a two-core runner. A
-mistake planted in a test file and in the tagged file was reported by the
-linter in both. What keeps that true is the configuration, so a test holds it:
-`govet` enabled, no `govet` settings narrowing its analyzers, test files not
-excluded, generated files not excluded, no exclusion naming `govet` or a test
-file, and the `measure` tag passed. The linter's own default skips any file
-marked generated, which `go vet` reads, so the configuration turns that off for
-every linter.
-
-The linter reports one issue per line. Two problems on one line appear one at a
-time, where `go vet` alone would name both.
-
-The linter must be built with a Go release at least as new as the code, or it
-cannot read the compiler's export data and fails on every file with a message
-about import versions. The pinned version moves when the language version does.
-
-## Known vulnerabilities
-
-`make govulncheck` and `make web-audit` fail a change for a known vulnerability
-it introduces, and report one already on the branch it targets without failing
-it (REQ-75).
-
-| Rule | |
-|---|---|
-| The base is where this branch left the branch it targets | `AUDIT_BASE` names that branch, `origin/main` unless set. CI fetches the whole history so the common commit is there to find |
-| An advisory is present when the base was already affected by it, and introduced otherwise | A bump that fixes one advisory and leaves another introduces nothing, so the automated security update for it stays green |
-| A Go finding is present when the version the base's `go.mod` requires falls in the advisory's affected ranges | `go.mod` names every module a build uses, and each advisory govulncheck reports carries its ranges |
-| A standard-library finding is present when the Go release the base's Dockerfile builds with falls in the advisory's affected ranges | That tag is the toolchain every workflow installs. `go.mod`'s `go` line is a floor below it and stands in only where the base's Dockerfile names no release |
-| An npm advisory is present when npm's audit of the base's lockfile names the same advisory against the same package | npm's range syntax is npm's to read. A package moved to another place in the tree, or bumped to a version still affected, was affected before |
-| Anything the base does not hold is introduced | A new dependency arrives with whatever is known against it |
-| A Go finding gates when a called function reaches it | The same line govulncheck draws on its own |
-| An npm advisory gates at high and above | The same line `npm audit --audit-level=high` draws |
-| A package listed only because something beneath it is affected carries no advisory | npm lists every package on the path to an affected one, and counting those counts one advisory many times |
-| No common commit with the base refuses, in words | Without a base every advisory reads as introduced, or every one as not |
-| A govulncheck run that exits non-zero refuses, with what it printed to standard error | Its JSON mode exits zero whatever it finds, and it prints its configuration before it loads anything, so a failed scan can read as a clean one |
-| A govulncheck run whose inventory names no module refuses | An empty package list scans nothing and exits zero |
-| Both npm audits read the lockfile alone | npm otherwise audits the installed tree, which a checkout that has not reinstalled since a bump holds stale |
-| A file the base lacks is decided by a listing of the base's tree | git's message for a missing path changes with whether the file is on disk and with the locale |
-| An npm run refuses when its output is not a report, with npm's own message where it gave one | npm exits non-zero whenever it finds anything, and without the registry it prints a message in place of a report |
-| On the base branch itself nothing is introduced | The common commit is the commit checked, so a push to `main` reports and does not fail |
-
-An advisory already on the base blocks neither `main` nor a release. It
-reaches a fix through Dependabot, which opens the bump as a pull request of its
-own:
-
-| Advisory against | The pull request that fixes it |
-|---|---|
-| A Go module | The weekly `gomod` update, grouped into one pull request |
-| The Go standard library | The weekly image update moving the `golang` tag, which is the toolchain every workflow installs |
-| An interface package | The weekly `npm` update of `web/`, grouped into one pull request |
-| A documentation build package | The weekly `pip` update of `docs/`, which regenerates the hashed lock |
-
-A new call into an affected function of an unchanged module is not introduced
-by this rule. The module was already affected and already reported.
+| A pull request's run restores all four and saves none | What it would save is keyed to a commit no later run builds, and the 10 GB store evicts the least recently used |
+| The build and linter caches are saved holding only what the run read | Before the checks every restored entry is moved two hours back, and after them every entry no read moved is deleted; both tools refresh an entry's time only past an hour old. A cache saved as the run left it carries every version of the tree compiled on `main` in five days: 2.87 GB against 683 MB |
+| The linter's results are keyed by each package's content | One changed file costs 9 to 12 s against 42 s with no results |
+| The image's Go steps mount the Go build cache, never write it into a layer | A layer after the source copy is keyed to the commit. 441 MB and 499 MB per commit became 39 MB and 131 kB |
+| The bill-of-materials tool is fetched before the source is copied, beside `go mod download` | Its modules sit in a layer every commit reuses |
+
+`design-docs/build-measurements.md` § CI caches has the runs.
 
 ## Gate inputs
 
-Every gate program written here walks the repository through one reader, which
-holds the default set of directories none of them read: the version history, a
-local run's scratch, a local tool's working directory, somebody else's code,
-and the three output directories. The output directories were built from what
-is checked anyway, and the tool's working directory holds worktrees that are
-whole copies of the checkout.
+Every gate program written here walks the repository through one reader. Its
+default skip set is the version history, a local run's scratch, a local tool's
+working directory, which holds whole worktree copies, vendored code, and the
+three output directories. Each caller names what else it skips at the call
+site, with the reason: the Go gates skip the interface, which is TypeScript, and
+the text-encoding gate skips a vendor directory and reads the interface, since a
+byte that makes a text tool skip a file is no Go question.
 
-Each caller names what it adds, at the call site, with the reason beside it. The
-five Go gates add the interface, which is TypeScript; the text-encoding gate
-adds a vendor directory and deliberately does not add the interface, because a
-byte that makes a text tool skip a file is not a Go question.
-
-| Rule | |
+| Rule | Reason |
 |---|---|
-| **A walk that reaches nothing refuses** | An empty result is what "nothing is wrong" looks like and what "I read nothing" looks like. No caller can tell those apart from a count of zero, so the reader answers an error rather than a silence |
-| **What is counted is what the caller kept**, not what it was shown | A count of visits is held above zero by any file at all, so the refusal above could never fire for a gate that reads one kind of file |
-| **Every gate says how much it read** | The count is beside the all-clear, so a run that quietly stopped reading part of the tree does not look like a run that read all of it |
-| **A directory is matched by name at any depth**, not by path prefix | Which is what a caller adding one means, and it is how nested dependency directories are covered |
-| **A change here takes the whole gate** | These programs decide what every other check looks at, and no narrower tier covers that: the reader holds no queries and registers no operation, so it would otherwise be classified as ordinary code and skip the checks it governs |
+| A walk that reaches nothing refuses | "Nothing is wrong" and "read nothing" are both zero |
+| What is counted is what the caller kept, never what it was shown | A count of visits is held above zero by any file at all |
+| Every gate prints how much it read beside the all-clear | A run that stopped reading part of the tree looks like one that read all of it |
+| A skipped directory is matched by name at any depth | Nested dependency directories are covered |
+| A change to the reader takes the whole gate | It decides what every other check reads, and holds nothing a narrow tier would catch |
 
-## Licenses
+## Static analysis
 
-Permitted for shipped dependencies: Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC,
-MIT, MPL-2.0 (REQ-01).
-
-Checked two ways, because they catch different things: `make licenses` walks what
-the module links, and dependency review inspects what a pull request adds.
-
-A short exception list covers modules whose license the classifier cannot read.
-Each entry names the license and why the tool fails on it, and the license has
-been read by hand before being added. Lowering the classifier's confidence
-threshold would accept every other unreadable license silently.
-
-Build tooling is exempt. The linter is GPL-licensed; running a tool over the code
-affects its license no more than the compiler does.
-
-Both ecosystems, one allowlist. The interface is built into the binary, so what
-npm installs ships exactly as a Go module does. `make licenses` runs both
-halves against the same `ALLOWED_LICENSES`, passed in rather than repeated, and
-dev dependencies are unrestricted on both sides because a build tool binds
-whoever builds rather than whoever installs.
-
-A development dependency the interface's source imports is in the bundle, so
-the npm half refuses one: an import or re-export that is not type-only, a
-dynamic import, or a stylesheet `@import` naming a package the lockfile marks
-for development. Tests and the test harness are not shipped and are not read.
-A package the bundle carries is declared a dependency, where its license is
-checked. A run that reads no import from the source refuses, as one that finds
-no shipped dependency in the lockfile does.
-
-| Exception | Why |
+| Rule | Reason |
 |---|---|
-| `@fontsource/*` under OFL-1.1 | The license fonts are published under. What it withholds is selling the fonts on their own, which is not something a shipped application does |
-| `argparse` under PSF-2.0 | A port of Python's argparse carrying the original's license. Permissive, and compatible |
-
-An exception names a package whole, wherever it is installed: `argparse`
-admits neither `argparse-lite` nor `@someone/argparse`. A name ending in `/`
-names a scope and admits every package in it.
-
-An SPDX expression is evaluated rather than matched: `MIT AND ISC` needs both
-allowed and `(MPL-2.0 OR Apache-2.0)` needs either. Treating the string as a
-name refuses both, and adding the strings to the allowlist accepts every other
-expression spelled that way. An expression read to anything short of its end,
-a group that never closes included, is refused.
-
-### Copied files
-
-What is copied into the tree rather than imported is checked by `make
-vendored`: a version suite taken from another project, a specification's
-example document, a publisher's advisory, a table transcribed from a reference
-implementation, a generated catalog. Each is in one list, with where it came
-from and the license its source states.
-
-| Rule | |
-|---|---|
-| A file is found in the tree, then looked for in the list | Every file under a `testdata` directory, and every file carrying a copyright line that is not this project's, a license identifier, a document's data license, or a comment saying `NOTICE` records it. A file copied in without a line in the list fails the gate |
-| This project's own header is not a mark | A file carrying this project's copyright is ours, and the identifier beside it naming this tree's own license says nothing more. Any other identifier in it is still somebody else's terms |
-| Found broadly, and a file written here is listed as ours | A file the search misses is one nobody is asked about. A fixture written here costs a line saying so |
-| A line is held only where its file needs it, or `NOTICE` names it | A line nothing needs is one a change left behind, and it would hold whatever is copied into that path next without a look |
-| Not searched | `NOTICE` and `LICENSE`, which are the statements; markdown, which is prose about the tree; a file that is not text; and the gate's own source and the list it reads, which spell every mark it looks for |
-| Held to a license this tree may carry | The dependency allowlist, and beside it the licenses data is published under: a dedication to the public domain, CC-BY-4.0, and the weakness catalog's own terms. An expression is evaluated as the dependency check evaluates one: AND binds tighter than OR, parentheses group, and an expression that does not parse is refused |
-| Named in `NOTICE` where the license asks for attribution | Every license here but a public-domain dedication asks for it. A file under one that `NOTICE` does not name fails the gate |
-| Every path `NOTICE` names is in the tree and held as somebody else's | The other direction, so a file removed or renamed leaves no attribution pointing at nothing |
-| What a file's license is, is read by a person | A data file states its license in its own words where it states one at all. The list is where somebody writes down what they read, and the gate holds them to having written it |
-
-### License headers
-
-Every source file opens with this project's copyright and an SPDX license
-identifier, checked by `make spdx` and written where missing by `make
-spdx-fix`.
-
-    // Copyright Nexthop Systems Inc.
-    // SPDX-License-Identifier: Apache-2.0
-
-| Rule | |
-|---|---|
-| Source is Go, TypeScript, JavaScript, CSS, shell, Python, a makefile and a Dockerfile | The files a license scanner reads as code. Markdown, configuration and data carry none |
-| Each writes it in its own comment | Two slashes, a slash-star pair per line in CSS, and a hash elsewhere |
-| It comes first, after only what has to | An interpreter line, and a Dockerfile's parser directives, which are read only from the top. A blank line follows it, so a Go file's package comment stays attached to the package |
-| A file carrying somebody else's work states their terms beside this tree's own | The expression is this license joined with the one the list of copied files holds for it, so the two gates cannot disagree about a file |
-| A fixture and a file a third party's tool writes whole carry none | A fixture is data the copied-files list accounts for. A generated file loses the header every time it is written; the generators that are this project's write it themselves |
-| A wrong header is reported and not rewritten | Which of the two is right is a person's to read |
-| No year | The dated notice is in `NOTICE`. A year per file is either touched every January or wrong, and a wrong one reads worse than none |
+| Rule selection lives in `.golangci.yml` alone, in two scopes: a rule gates or is advisory | No third scope grandfathers a backlog (REQ-75) |
+| The linter set is tuned: documentation rules off, and error checking excluding the cleanup-path functions conventionally ignored | |
+| The linter is the vet: its `govet` runs every `go vet` analyzer and one more, over test files and the `measure`-tagged file | The same analysis twice was 50 s of a two-core runner |
+| A test holds that configuration | `govet` enabled with no settings narrowing it, test and generated files not excluded, no exclusion naming `govet` or a test file, the `measure` tag passed. The linter skips generated files by default, so the configuration turns that off for every linter |
+| The linter reports one issue per line | Two problems on one line appear one at a time |
+| The linter is built with a Go release at least as new as the code | Otherwise it cannot read the compiler's export data and fails on every file (`design-docs/build-dependencies.md` § Pinned pairs) |
 
 ## The API document
 
-Generated from the operations registered in `internal/httpapi` and its areas,
-never written by hand (REQ-61). CI regenerates it and fails if the committed copy
-differs. What each operation asks of a caller rides on the same document
-(REQ-62), so "who may call this" is checked by the same diff.
-
-The application serves the document itself, authenticated like every other route,
-and nothing that renders it (REQ-63).
-
-## Self-inventory
-
-Generated from the built binary's module graph rather than from source, so it
-describes what ships (REQ-04). CycloneDX, the format this project treats as
-authoritative on the way in.
-
-License fields are not populated reliably by the generator and nothing depends on
-them; compliance is gated by the allowlist check. The file is also this project's
-first test fixture.
+| Rule | Reason |
+|---|---|
+| Generated from the operations registered in `internal/httpapi` and its areas, never written by hand (REQ-61) | |
+| CI regenerates it and fails where the committed copy differs | What each operation asks of a caller rides on it (REQ-62), so "who may call this" is checked by the same diff |
+| The application serves the document itself, authenticated like every route, and nothing that renders it (REQ-63) | |
 
 ## Probes
 
-`/healthz` and `/readyz` answer without authentication and report nothing beyond
-whether the process is up. A container probe cannot sign in. They are outside the
-documented API and must never grow a response body describing the system's
-contents.
-
-They are not the only routes answering without a credential; the sign-in paths
-and the interface's assets do too, and none of those reads anything from the
-database about what this deployment holds (REQ-43). The published security
-documents are the one surface that does, as anybody at all
-(`design-docs/publishing.md`).
-
-## Documentation
-
-Built with mkdocs-material and published to GitHub Pages, with sets versioned by
-`mike` (REQ-63).
-
-| Set | Published by |
+| Rule | Reason |
 |---|---|
-| `main` | Every push to `main` |
-| Each release, by version | The release workflow, which also moves `latest` to the newest release (`design-docs/packaging.md` § The release procedure) |
+| `/healthz` and `/readyz` answer without authentication and report only whether the process is up | A container probe cannot sign in |
+| They are outside the documented API and never grow a body describing contents | |
+| The sign-in paths and the interface's assets also answer without a credential, and read nothing about what the deployment holds (REQ-43) | The published security documents are the one surface that does, as anybody (`design-docs/publishing.md`) |
 
-| Rule | |
-|---|---|
-| The site's default is `latest` once a release carries it, and `main` until then | The root of the site is what a visitor reads first, and unreleased documentation there describes a version nobody can install |
-| A push to `main` sets the default to `latest` where a set carries it, and to `main` where none does | Set on every merge, so a default another run moved is put back rather than left until the next release |
-
-### Link check
-
-A test in `internal/docs` follows every link in every document and fails on one
-that reaches nothing. A test in `internal/build` holds every make command a
-document names to the makefiles.
-
-| Rule | Why |
-|---|---|
-| A fragment is checked against the anchors the renderer of its own page derives | A link is followed where its page is read |
-| A page under `docs/` is held to the site's rule: decomposed to ASCII, punctuation removed, each run of spaces and hyphens one hyphen | The site renders those pages with the table-of-contents extension's default |
-| Every other document is held to the forge's rule: punctuation other than the underscore removed, each space a hyphen | The forge renders them. A heading separated by a dash takes two hyphens there and one on the site |
-| A link to a directory or a file of another kind is checked for existence, whatever fragment, query or title follows its path | A renamed `LICENSE` or `docs/` dangles a link as surely as a renamed document |
-| A link inside a code fence or an inline code span is not read | It renders no link |
-| A make command a document names is a target one of the makefiles defines | Read inline in backticks, and on a line of its own inside a fenced code block, after a prompt or variables set for the run. A block is the form a reader copies. Prose outside one is not read by line, because "make the claim" opens a line as readily as a command |
-
-### Release version
-
-A page names the release a reader deploys as `{{ release }}`, and the build
-writes the version in. No page names a release by hand.
-
-| Build | Version written in |
-|---|---|
-| A release tag, published by the release workflow | The tag's own version, passed to the build as `DOCS_RELEASE`. A release candidate's pages name the candidate |
-| `main`, published on every push | The newest release tag reachable from the commit, release candidates left out |
-| The CI check and a local `make docs-site` | The same as `main` |
-| None of those resolves | The build fails. A blank or a default version is a command somebody copies |
-
-A version is `X.Y.Z` or `X.Y.Z-rc.N`, with or without a leading `v`, and
-anything else in `DOCS_RELEASE` fails the build. Every workflow that builds the
-site checks out full history, because a shallow checkout carries no tags.
-
-A test in `internal/docs` fails on a release version written by hand in
-`README.md`, `SECURITY.md` or any page under `docs/`.
-
-| Not reported | Why |
-|---|---|
-| The upgrade notes in the configuration page: a `From vX.Y.Z` heading and everything beneath it | Past releases are their subject |
-| Four numeric parts, or a version running on into a letter | A network address, and a third party's package version |
-| The versions an example on one page shows, listed by page in the test | A third party's version or a customer's tag |
-
-`README.md` is not built by the site, so it names no version at all. The
-compatibility notes on it and on the site say that a database built by any
-release is upgraded in place, which holds while every release's migrations are
-kept, and that one a release candidate built is recreated, because a
-candidate's migration can be fixed before the release (`design-docs/database.md`
-§ Migrations).
-
-### Scanner pins
-
-The pages name what the Dockerfile's scanner stage pins, and the build writes
-it in.
-
-| Placeholder | Filled with |
-|---|---|
-| `{{ scanner }}` | The scanner version the image carries |
-| `{{ scanner_sha256_amd64 }}`, `{{ scanner_sha256_arm64 }}` | The checksum the image build verifies each architecture's download against, so a host installing the scanner checks it against the same pin rather than a checksum file from the release it is checking |
-
-| Rule | |
-|---|---|
-| The hook declares every name a page may write | The build fails on a page writing any other, and on a declared name it does not fill |
-| Each pin is read from the scanner stage alone, and must appear there once | Another stage pins another tool's checksums the same way. None, or two, fails the build |
-| A written-out scanner version is reported | It is a release-shaped literal, which the release test already reports |
-| A workflow expression, `${{ … }}`, in a pipeline example is not a placeholder | It follows a dollar sign and holds a dot |
-
-A test in `internal/docs` reads the declared names from the hook, and fails on
-a page writing any other, on a declared name no page writes, and on a pin the
-scanner stage does not hold exactly once.
-
-### The settings reference
-
-The configuration page lists every setting the process reads, with its
-environment variable, its key in a configuration file, its meaning and its
-default. A value that is set and cannot be read stops the process with the
-setting named rather than falling back.
-
-| Held by a test | |
-|---|---|
-| Every variable the loader reads is on the page, and every variable on the page is read | Both directions, failing on zero examined |
-| Every setting's file key is on the page, in the row of its variable, and no other key is | A key read into the wrong setting shows as a key documented beside the wrong variable |
-| The table of settings in code is what the loader reads | A name the loader asks for and the table lacks is settable from neither source |
+`design-docs/packaging-chart.md` § Chart probes says how the chart uses them.
 
 ## The review checklist
 
-The checklist in `AGENTS.md` is worked through on every review rather than
-consulted when somebody remembers (REQ-75).
-
-It is not enforced by the pipeline. What CI can check, CI checks; the gate is
-long precisely so the checklist holds only what a machine cannot decide.
-
-## Action pinning
-
-| Rule | Why |
-|---|---|
-| Every action is pinned to the commit of a release, with the version in a comment beside it | A tag moves. An action that moves is code running with this repository's token on a day nobody chose, and `v4` is a tag |
-| The repository requires it | `sha_pinning_required` refuses a workflow referencing an action by tag, so the rule is enforced rather than remembered by whoever writes the next workflow |
-| Dependabot moves the pins, weekly, as one pull request per group: actions, images, the `golang` image alone, the database layer's Go modules, the other Go modules, the Go tools, the interface packages and the documentation closure | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
-| The database layer's modules are a group of their own: the query builder, the drivers and the migration runner | A release there can change an interface every store is written against, and the work it needs holds nothing else back. bun v1.3.0 makes every limit, offset and count an int64 |
-| The interface group carries minor and patch releases, and a major release arrives as a pull request of its own | A major release is the kind that needs work, and one that does holds nothing else back |
-| TypeScript's major releases are not offered | The linter's TypeScript support and the API client generator each declare the compiler releases they accept, and neither accepts 7, so npm refuses the install. It lifts when both do |
-| An update arrives through the queue like anything else | The commit being pinned is visible in the diff, and the gate runs against it |
+The checklist in `AGENTS.md` is worked through on every review (REQ-75). The
+pipeline does not enforce it: what a machine can check, CI checks, so the
+checklist holds only what a machine cannot decide.
 
 ## Repository settings
 
-Nothing here is in a file, so each is listed with what it is for and what its
-absence looks like — an absent setting fails somewhere far from itself.
+None of these is in a file, and an absent one fails somewhere far from itself.
 
 | Setting | Needed by | Symptom when off |
 |---|---|---|
 | Every change through a pull request, no direct push to `main` | The gate meaning anything | A commit reaches `main` having passed nothing |
-| Merge queue, squash, `ALLGREEN` | Landing what was tested | A pull request green against a `main` that has since moved |
-| One required check, `Merge Status` | Every other check | A workflow added later gates nothing until somebody edits the ruleset |
-| Dependency graph, via Dependabot alerts | Being told about a vulnerable dependency between changes | A dependency goes bad and nothing says so until somebody looks |
-| Actions pinned to a SHA | The section above | A tag somebody else controls executes here |
+| Merge queue, squash, `ALLGREEN` | Landing what was tested | A pull request green against a `main` that has moved |
+| One required check, `Merge Status` | Every other check | A workflow added later gates nothing until the ruleset is edited |
+| Dependency graph, via Dependabot alerts | Hearing of a vulnerable dependency between changes | A dependency goes bad unreported |
+| Actions pinned to a SHA (`design-docs/build-dependencies.md` § Action pinning) | Running only reviewed action code | A tag somebody else controls executes here |
 | Pages, serving the `gh-pages` branch | Documentation publishing | The workflow succeeds and nothing is served |
 
-Private and public differ, and what differs is paid for. Secret scanning, push
-protection and dependency review are free on a public repository and are
-Advanced Security products on a private one, billed per active committer across
-the repositories that enable them. None is enabled here: the gate runs `make
-secrets`, `make licenses` and `make web-audit` instead, which cost nothing and
-run locally. Dependabot alerts are free either way and are on.
-
-What is genuinely lost by not buying them is history: a credential committed
-and later removed is still in the objects, and scanning the working tree
-cannot see it. Push protection would also refuse the push that put it there.
-Both are worth reconsidering when the repository goes public, where they are
-free.
-
-A private Pages site is served only to accounts with read access, at a
-generated address rather than at the organization's.
+| Rule | Reason |
+|---|---|
+| Secret scanning, push protection and dependency review are not enabled | On a private repository each is an Advanced Security product billed per committer. `make secrets`, `make licenses` and `make web-audit` run instead, free and local. Dependabot alerts are free and on |
+| A private Pages site is served only to accounts with read access, at a generated address | |
 
 ## Limits
 
-| | |
+| Limit | Detail |
 |---|---|
-| Branch protection is not enforced | The gate runs on every pull request but nothing blocks a merge, which is the state REQ-75 warns about. Deliberate for early development, and it needs revisiting before outside contributions |
-| The install and operate guides are not written | Both are about a release — how to get a version, how to move between them, what to back up before an upgrade — and there is no release process, so a guide written now would describe the demo target and the development database |
-| The gate and CI run the same commands | Written twice, neither copy a superset of the other, a reviewer running the gate and a merge being blocked check different things |
-| A test database is named for its schema and slot, never its package or checkout | A name carrying the checkout outlives the checkout. Measured on one workstation running many short-lived worktrees: about 750 databases and 55,000 tables per MySQL and MariaDB server, and every information-schema question slowed with them |
-| A test killed part way through changing the schema leaves it changed | The version still matches, so the next binary of any package uses the database and its first test fails on the missing table. `make engines-clean` drops it |
-| Checkouts of two schemas running at once drop each other's free databases | Only a binary creating a database drops another schema's, so each drop costs the other checkout one build, not one per binary |
-| The clean trusts the slot lock alone | A database somebody uses without holding its slot's lock — one made by hand, or by a harness that names databases another way — is dropped while in use |
-| A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |
-| `README.md` and `docs/index.md` are compared, from their first section to the end of their deployment section, with link targets set aside | Neither can include the other, and the same list maintained twice drifts. Each links to the other pages by its own path |
+| History is not scanned for credentials | A credential committed and later removed stays in the objects, and push protection would have refused the push. Both are free once the repository is public, and worth enabling then |
+| The gate and CI run the same commands | Written twice, neither copy a superset of the other, a reviewer's gate and the merge block check different things |
