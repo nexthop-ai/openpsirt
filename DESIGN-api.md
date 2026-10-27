@@ -532,7 +532,7 @@ route, sign-in and the served interface, and registers each area in turn.
 
 | Area | Operations |
 |---|---|
-| Inventories arriving | Uploads, their receipts, the documents a build sent, one scanner run |
+| Uploads arriving | Uploads, their receipts, the documents a build sent, one scanner run |
 | Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
 | Handing work out | Assignment, routing rules, teams, tags, bulk acts, fix bundles, planned upgrades, one component |
 | Decisions | The review queue, proposing, approving, re-affirmation, comments, incidents, response windows, assessments, scrutiny, readiness |
