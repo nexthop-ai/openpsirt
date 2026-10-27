@@ -607,10 +607,10 @@ type EvidenceBody struct {
 	// group at once. Where the occurrences somehow disagree it is left empty rather
 	// than naming one of them, which is the same rule the deadline list uses.
 	AssignedTo string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person"`
-	// AssignedByRule names the standing rule that placed this, where a rule did
+	// AssignedByRule names the assignment rule that placed this, where a rule did
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
-	AssignedByRule string `json:"assigned_by_rule,omitempty" doc:"The standing rule that placed this, where one did. Empty means a person did, or nobody has"`
+	AssignedByRule string `json:"assigned_by_rule,omitempty" doc:"The assignment rule that placed this, where one did. Empty means a person did, or nobody has"`
 
 	// Standing is the decisions in force here, so the finding is the
 	// working screen after a decision as well as before it: the live

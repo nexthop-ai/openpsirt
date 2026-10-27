@@ -19,7 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// RuleBody is a standing rule that hands work nobody holds to a team.
+// RuleBody is a rule that hands work nobody holds to a team.
 type RuleBody struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name" doc:"The name, so a placement can be explained in words"`
@@ -58,7 +58,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-assignment-rules", Method: http.MethodGet, Path: path,
 		Summary: "List assignment rules",
-		Description: "The standing rules for this product, in the order they are tried.\n\n" +
+		Description: "The assignment rules for this product, in the order they are tried.\n\n" +
 			"First match wins, and which rule placed a finding is recorded on the finding.",
 		Tags: []string{"Administration"},
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
@@ -181,7 +181,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "add-assignment-rule", Method: http.MethodPost, Path: path,
 		Summary: "Add an assignment rule",
-		Description: "Records a standing rule and queues it against what is already open.\n\n" +
+		Description: "Records an assignment rule and queues it against what is already open.\n\n" +
 			"It matches on component identity as well as on a place in the tree. A rule " +
 			"naming a source package catches every binary package built from it, wherever " +
 			"they sit.\n\n" +

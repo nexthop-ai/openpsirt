@@ -479,7 +479,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Description: "The open findings assigned to a team, most urgent first, in the same units " +
 			"as everywhere else: one item per issue in a component in a product, and one per static " +
 			"analysis code finding you read, with `occurrence` set.\n\n" +
-			"Work goes to a team by standing rule and by an assignment naming one, so a team " +
+			"Work goes to a team by an assignment rule and by an assignment naming one, so a team " +
 			"holds work the way a person does — and the totals list says so. This is the list " +
 			"behind that number.\n\n" +
 			"A team nobody declared answers with an empty list rather than a 404, which is also " +

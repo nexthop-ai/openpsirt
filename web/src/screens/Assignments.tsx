@@ -56,8 +56,8 @@ export function Assignments() {
   // Whose work is being looked at on the second tab. Empty is the roll-up of
   // everybody; a name is that holder's list.
   //
-  // The kind of holder, because a team is not a person. Work goes to a team by
-  // standing rule and by an assignment naming one, and the person's route
+  // The kind of holder, because a team is not a person. Work goes to a team by an
+  // assignment rule and by an assignment naming one, and the person's route
   // resolves an identity, so a team's list is read from the team's own route.
   const person = params.get("person") ?? "";
   const team = params.get("team") ?? "";

@@ -15,7 +15,7 @@ import { Loading } from "../ui/Loading";
 import { Suggest } from "../ui/Suggest";
 import { Wide } from "../ui/Wide";
 
-// The standing rules that hand work nobody holds to a team.
+// The assignment rules that hand work nobody holds to a team.
 //
 // First match wins, and the order is the whole of the precedence, so the
 // screen shows it as a numbered list rather than as a set.

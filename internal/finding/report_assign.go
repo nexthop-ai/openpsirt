@@ -4,7 +4,7 @@
 package finding
 
 // Who holds a report: a person, or a team whose queue it sits in, given by
-// hand or placed by a standing rule, with every change kept for its history.
+// hand or placed by an assignment rule, with every change kept for its history.
 
 import (
 	"context"
@@ -30,7 +30,7 @@ type ReportAssignment struct {
 	FlawReportID int64 `bun:"flaw_report_id,notnull"`
 	// AssignedTo is the party it went to. Absent is handed back to nobody.
 	AssignedTo *int64 `bun:"assigned_to"`
-	// AssignedBy is the person who did it. Absent where a standing rule
+	// AssignedBy is the person who did it. Absent where an assignment rule
 	// placed it, or an administrator's hand-over of everything somebody
 	// held, which AssignedByRule and the act's own record tell apart.
 	AssignedBy     *int64    `bun:"assigned_by"`
@@ -277,7 +277,7 @@ func reportProductsHeld(ctx context.Context, tx bun.IDB, party int64) ([]int64, 
 	return products, nil
 }
 
-// AddReportRule records a standing rule that places a product's reports
+// AddReportRule records an assignment rule that places a product's reports
 // nobody holds in a team's queue, and returns it. It names no package and no
 // place: a report sits at neither.
 func (s *Store) AddReportRule(ctx context.Context, by access.Subject, productID, teamID int64,

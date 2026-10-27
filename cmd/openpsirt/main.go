@@ -611,7 +611,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// is built around is a rate per deployment, so which replica asks is
 	// settled by a lease rather than by all of them asking at once.
 	current := currency.NewRefresher(db.DB, logger, name, ours)
-	// Places work nobody holds onto the team a standing rule names. Queued
+	// Places work nobody holds onto the team an assignment rule names. Queued
 	// work rather than part of the request that saved the rule: one rule
 	// sweeps thousands of findings, and saving a form must not hold a
 	// transaction open across the estate.

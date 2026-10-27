@@ -77,12 +77,12 @@ type MessageBody struct {
 type ReportEventBody struct {
 	At          string           `json:"at"`
 	Act         ReportActName    `json:"act"`
-	By          string           `json:"by,omitempty" doc:"The person who did it, by sign-in identity. Absent where a standing rule placed it, or an administrator's hand-over moved it"`
+	By          string           `json:"by,omitempty" doc:"The person who did it, by sign-in identity. Absent where an assignment rule placed it, or an administrator's hand-over moved it"`
 	ByName      string           `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	To          string           `json:"to,omitempty" doc:"Who it went to, on an assignment: a person by sign-in identity, or a team by name"`
 	ToName      string           `json:"to_name,omitempty" doc:"Their display name, where it differs from the name above"`
 	ToTeam      bool             `json:"to_team,omitempty" doc:"Whether it went to a team's queue"`
-	Rule        int64            `json:"rule,omitempty" doc:"The standing rule that placed it"`
+	Rule        int64            `json:"rule,omitempty" doc:"The assignment rule that placed it"`
 	Version     int              `json:"version,omitempty" doc:"The version an edit replaced, or a note's earlier version"`
 	Note        int64            `json:"note,omitempty" doc:"The note written or changed"`
 	Dated       string           `json:"dated,omitempty" doc:"The day a message carries"`

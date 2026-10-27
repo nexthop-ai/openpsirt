@@ -216,7 +216,7 @@ export function Assignee({
   at: At;
   assigned: string;
   undisclosed: boolean;
-  // The standing rule that placed this, where one did. A placement nobody can
+  // The assignment rule that placed this, where one did. A placement nobody can
   // explain is one nobody can correct.
   assignedByRule: string;
 }) {

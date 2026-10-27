@@ -349,7 +349,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* Who holds what, which the audit permission is largely for.
               The screen already degrades for a reader who cannot grant. */}
             {(who.admin || who.audits) && <Rail to="/access" icon="roles" label="Access" />}
-            {/* Assignment without a person doing it, by standing rule.
+            {/* Assignment without a person doing it, by an assignment rule.
               Under Manage because it is something set up once rather than worked
               at, and called what it does: the act it automates is assignment. */}
             <Rail to="/auto-assignment" icon="route" label="Auto-assignment" />

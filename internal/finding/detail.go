@@ -138,7 +138,7 @@ type Evidence struct {
 	// has to be unable to miss before saying anything about it.
 	Undisclosed bool
 	DiscloseAt  *time.Time
-	// AssignedByRule names the standing rule that placed this, where a rule did
+	// AssignedByRule names the assignment rule that placed this, where a rule did
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
 	AssignedByRule string
@@ -821,7 +821,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, err
 	}
 	evidence.AssignedTo = held
-	// And which standing rule put it there, where one did. Read here rather
+	// And which assignment rule put it there, where one did. Read here rather
 	// than left to a caller for the same reason the holder is: the screen
 	// somebody reads a finding on is where "why is this mine" gets asked.
 	placed, err := s.assignedByRule(ctx, targetID, vulnerabilityID, componentID, visible)

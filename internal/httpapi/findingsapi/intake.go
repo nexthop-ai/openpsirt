@@ -59,7 +59,7 @@ func registerIntake(api huma.API, in core.Deps) {
 			"`found_here` marks a flaw somebody here found. Recorded as a flaw, it carries " +
 			"no disclosure date, and it is never listed as waiting for an answer.\n\n" +
 			"`title` is an optional line naming the reported problem, and is refused across lines.\n\n" +
-			"Where a standing rule places this product's reports, the report goes to the " +
+			"Where an assignment rule places this product's reports, the report goes to the " +
 			"first such rule's team that has a member who reads undisclosed work here.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {

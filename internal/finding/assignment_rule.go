@@ -22,7 +22,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// AssignmentRule is a standing rule that hands work nobody holds to a team.
+// AssignmentRule is a rule that hands work nobody holds to a team.
 type AssignmentRule struct {
 	bun.BaseModel `bun:"table:assignment_rule,alias:rr"`
 
@@ -49,7 +49,7 @@ type AssignmentRule struct {
 	RetiredAt *time.Time `bun:"retired_at"`
 }
 
-// AddRule records a standing rule and returns it.
+// AddRule records an assignment rule and returns it.
 //
 // The ordinal is assigned here, at the end of the product's list, because
 // precedence is a property of the set rather than something a caller invents:
@@ -129,7 +129,7 @@ func (s *Store) insertRule(ctx context.Context, by access.Subject, productID, te
 	return rule, nil
 }
 
-// Rules lists a product's standing rules, in the order they are tried.
+// Rules lists a product's assignment rules, in the order they are tried.
 //
 // Read by whoever triages the product at any visibility, internal included,
 // because a rule places code findings too. The rules are its triage configuration and

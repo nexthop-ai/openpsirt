@@ -1219,12 +1219,12 @@ them is a different question.
 | Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The findings list spans every product somebody can see when none is picked, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
-| **A team's row opens the team's queue** | A team holds work the way a person does: assigned by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
+| **A team's row opens the team's queue** | A team holds work the way a person does: assigned by an assignment rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
 | Nobody else holding anything in a product picked links that product's unassigned code findings, for somebody who reads internal material there | The findings list the empty screen points at holds no code finding |
 | A person's or team's list carries the vulnerability reports they hold below their findings, and the people tab lists the reports nobody holds | Drawn only where there are any, because most people read no reports. The people table counts each holder's open reports in a column of its own. The narrowing is the product picked |
 | A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
 
-A screen for the standing rules (REQ-34), per product, shown as a numbered list
+A screen for the assignment rules (REQ-34), per product, shown as a numbered list
 because the order *is* the precedence: the first rule that matches places the
 work, and a set with no visible order is a precedence nobody wrote down.
 

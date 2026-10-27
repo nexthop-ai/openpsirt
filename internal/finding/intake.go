@@ -180,7 +180,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 		if _, err = tx.NewInsert().Model(row).Exec(ctx); err != nil {
 			return err
 		}
-		// Placed by the first standing rule for reports whose team may hold
+		// Placed by the first assignment rule for reports whose team may hold
 		// it, in the same transaction, so a report never sits unheld between
 		// arriving and the next sweep.
 		return routeReport(ctx, tx, row, now)
