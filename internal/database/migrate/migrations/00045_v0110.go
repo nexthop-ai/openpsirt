@@ -6,9 +6,12 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 func init() {
@@ -60,13 +63,32 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     held it, and the acknowledgement is the first message sent. A routing
 //     rule may place reports. The report beside a flaw recorded by hand
 //     carries the flaw's summary as its reported problem.
+//
+// Each phase logs how long it took, so a slow upgrade says which part was
+// slow: the renames wait on locks, the stored words grow with the rows that
+// hold them, and the changes build indexes.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
-	if err := renameV0110(ctx, tx); err != nil {
-		return err
+	for _, phase := range []struct {
+		name string
+		run  func(context.Context, bun.Tx) error
+	}{
+		{"renames", renameV0110},
+		{"stored words", valuesV0110},
+		{"changes", changeV0110},
+	} {
+		start := time.Now()
+		if err := phase.run(ctx, tx); err != nil {
+			return err
+		}
+		migrate.LoggerFrom(ctx).Info("the v0.11.0 upgrade finished a phase",
+			"phase", phase.name, "took", time.Since(start))
 	}
-	if err := valuesV0110(ctx, tx); err != nil {
-		return err
-	}
+	return nil
+}
+
+// changeV0110 is everything the upgrade changes after its renames and stored
+// words, written against the v0.11.0 names.
+func changeV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err

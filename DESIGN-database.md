@@ -593,8 +593,15 @@ its own after the renames.
 | The trail of administrative changes keeps the former setting name | It records a change under the name the setting had |
 | A decision's record of how its set was chosen is kept as written | It records what somebody asked for |
 
-The rewrite's time grows with the notifications of the two kinds, and is not
-measured.
+Each of the upgrade's three phases logs how long it took: the renames, the
+stored values, and the changes after them.
+
+| Rule | Why |
+|---|---|
+| Neither the renames nor the stored values grow with the rows a table holds | A measurement under the `measure` tag upgrades a v0.10.0 database holding 1,000 rows in each table it fills and one holding 1,000,000, each with the same 1,000 rows holding a value the upgrade rewrites, and fails a phase taking more than twice as long on the larger, each time taken as at least half a second. Row work on a thousand times the rows is far past twice; noise on a shared host is well under it |
+| The stored values grow with the rows holding them | Each is found through an index leading with the column holding it, apart from a decision's kind and a kept filter's address, which are read from their tables. A table of a million decisions is read in under half a second on every engine |
+| SQLite's renames are logged, not held | It builds a renamed index again, so they grow with the rows by design |
+| The changes are logged, not held | They build indexes, which grow with the rows by their nature |
 
 | Table | Change | Every engine |
 |---|---|---|
