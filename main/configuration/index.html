@@ -1087,6 +1087,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#renamed-api-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed API fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#renamed-api-paths" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1855,6 +1866,17 @@
   
     <nav class="md-nav" aria-label="From v0.10.2">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#renamed-api-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed API fields
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#renamed-api-paths" class="md-nav__link">
@@ -3178,7 +3200,7 @@ refused at startup.</p>
 <tbody>
 <tr>
 <td>A person, directly</td>
-<td>What is their own — work assigned to them, a note naming them, a claim sent back — and what is about a product or a team where no channel carries it. On by default; each person can turn it off, or ask for what the channels carry as well</td>
+<td>What is their own — work assigned to them, a note naming them, a decision sent back — and what is about a product or a team where no channel carries it. On by default; each person can turn it off, or ask for what the channels carry as well</td>
 </tr>
 <tr>
 <td>A team's channel</td>
@@ -3777,7 +3799,7 @@ its documents are signed with; trusting it confirms that key.</p>
 </tr>
 <tr>
 <td>One depending on the upstream's own build</td>
-<td>Offered in the review queue beside each open finding it speaks about. Accepting it proposes an ordinary claim citing it, which goes through approval</td>
+<td>Offered in the review queue beside each open finding it speaks about. Accepting it proposes an ordinary decision citing it, which goes through approval</td>
 </tr>
 <tr>
 <td>Anything else</td>
@@ -3785,7 +3807,7 @@ its documents are signed with; trusting it confirms that key.</p>
 </tr>
 </tbody>
 </table>
-<p>A place somebody here decided about is left as they decided. Anybody who may
+<p>An occurrence somebody here decided about is left as they decided. Anybody who may
 triage the product can decline one statement, which stops it closing anything
 or being offered; stopping trusting the upstream sets aside everything it said.
 Each of these, and the upstream withdrawing a statement, opens what it closed:
@@ -4253,7 +4275,7 @@ and one that failed says why at the end.</p>
 <tr>
 <td><code>OPENPSIRT_SCANNER_MAX_MATCHES</code></td>
 <td><code>scanner.max_matches</code></td>
-<td>How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that</td>
+<td>How many matches one report may state. One match becomes as many findings as its component has occurrences, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that</td>
 <td>500,000</td>
 </tr>
 <tr>
@@ -4412,16 +4434,16 @@ on.</p>
 </thead>
 <tbody>
 <tr>
-<td>A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands</td>
-<td>The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check <code>/healthz</code> for whether to keep the process, as the chart does (<a href="#health-checks">Health checks</a>), or set <code>autoMigrate: false</code> and run <code>openpsirt migrate up</code> before deploying</td>
+<td>A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a decision made beneath it stands</td>
+<td>The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 decision occurrences, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check <code>/healthz</code> for whether to keep the process, as the chart does (<a href="#health-checks">Health checks</a>), or set <code>autoMigrate: false</code> and run <code>openpsirt migrate up</code> before deploying</td>
 </tr>
 <tr>
 <td>On PostgreSQL the upgrade indexes each column pointing at an image's components and nodes while it merges them, and removes those indexes when it is done. v0.10.1 and earlier read the whole finding table for every component the merge removed, which stalled the upgrade on a database larger than the server's memory</td>
 <td>Nothing. An index made by hand on <code>finding.component_id</code>, <code>finding.consumer_id</code>, <code>finding_tag.component_id</code>, <code>graph_node.component_id</code> or <code>graph_edge.parent_id</code> to get past a stalled upgrade is harmless, and may be dropped once the upgrade is done</td>
 </tr>
 <tr>
-<td>A live judgment beneath an image is keyed on the image with no version</td>
-<td>Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed</td>
+<td>A live decision beneath an image is keyed on the image with no version</td>
+<td>Nothing. Where two live decisions at one occurrence differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed</td>
 </tr>
 <tr>
 <td>Findings a rebuild closed before the upgrade stay closed</td>
@@ -4469,14 +4491,14 @@ on.</p>
 </tr>
 <tr>
 <td>A component's name, version and package identifier are held without control characters. A stored component with one in any of them is a different component on the next scan</td>
-<td>Nothing. Its findings close and reopen once, on the next scan of each build holding it, and judgments beneath it are asked again</td>
+<td>Nothing. Its findings close and reopen once, on the next scan of each build holding it, and decisions beneath it are asked again</td>
 </tr>
 <tr>
 <td>A build's scanner is given the distribution, the source package and the other package-identifier qualifiers that builds of its own product stated for a component. v0.8.0 filled them onto the component row every product shares, from whichever product stated them first</td>
 <td>State each component's distribution and source package in every build's inventory. On a branch's first scan after the upgrade, a component its own product never described that way loses the matches another product's description gave it, and those findings close as unexplained. A tag is not scanned from a new inventory, and keeps the description the upgrade copied onto its nodes, which on v0.8.0 may be another product's</td>
 </tr>
 <tr>
-<td>Compliance, cumulative deferral, the triage measures and time to fix are worked out again. A deferral counts for the time it held, with overlaps once; a send-back and a wait count once per claim; an issue fixed in two products is one fix</td>
+<td>Compliance, cumulative deferral, the triage measures and time to fix are worked out again. A deferral counts for the time it held, with overlaps once; a send-back and a wait count once per decision; an issue fixed in two products is one fix</td>
 <td>Nothing. A figure read before the upgrade may differ from the same period read after it</td>
 </tr>
 <tr>
@@ -4515,7 +4537,7 @@ on.</p>
 <td>Nothing, unless you want it: <a href="#published-documents">Published documents</a></td>
 </tr>
 <tr>
-<td>A claim may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No claim the upgrade carries states one, and the reason decides</td>
+<td>A decision may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No decision the upgrade carries states one, and the reason decides</td>
 <td>Nothing</td>
 </tr>
 <tr>
@@ -4599,8 +4621,108 @@ changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> s
 <td>The findings lists take <code>label</code>, <code>below_minimum_severity</code>, <code>decision</code> and <code>decision_state</code> in place of <code>tag</code>, <code>below_floor</code>, <code>claim</code> and <code>claim_state</code>. <code>GET /v1/advisories</code> takes <code>issue</code> in place of <code>vulnerability</code></td>
 <td>Rename them in the request. A former name is refused with 400, naming it</td>
 </tr>
+<tr>
+<td>Response and request fields use the words the interface uses: a claim is a decision, a decision's row at one occurrence is a decision occurrence, and a place is an occurrence</td>
+<td>Rename the fields a client reads or sends, as <a href="#renamed-api-fields">Renamed API fields</a> lists. A request carrying a former field name is refused with 422, naming it</td>
+</tr>
+<tr>
+<td>The CSV and JSON downloads name their columns the same way: <code>claim</code> is <code>decision</code>, <code>place</code> is <code>occurrence</code>, <code>places</code> is <code>occurrences</code>, and a count of a decision's rows beside a count of occurrences is <code>rows</code>. The file of somebody's own decisions downloads as <code>my-decisions</code></td>
+<td>Rename the columns a script reads</td>
+</tr>
+<tr>
+<td>The findings lists and the planned upgrades sort by <code>occurrences</code> in place of <code>places</code></td>
+<td>Ask for <code>sort=occurrences</code>. The upgrade rewrites a saved filter's <code>sort=places</code>, <code>claim</code> and <code>claim_state</code> to <code>sort=occurrences</code>, <code>decision</code> and <code>decision_state</code></td>
+</tr>
+<tr>
+<td>The interface's addresses for a decision are <code>/decisions/{id}</code>, for a decision occurrence <code>/decision-occurrences/{id}</code>, and for a bulk decision <code>…/components/{component}/bulk-decision</code>. <code>/claims/{id}</code> and <code>…/components/{component}/decide</code> forward to them, with the query and fragment they arrived with</td>
+<td>Nothing</td>
+</tr>
+<tr>
+<td>A bulk decision's <code>kind</code> is <code>bulk</code>, which v0.10.2 answered as <code>together</code></td>
+<td>A client matching on the kind matches <code>bulk</code>. The upgrade rewrites every stored one</td>
+</tr>
+<tr>
+<td>The notification kinds <code>claim-waiting</code> and <code>claim-lapsed</code> are <code>decision-waiting</code> and <code>decision-lapsed</code>, in the notifications, a webhook's body and a chat message</td>
+<td>A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for either kind</td>
+</tr>
+<tr>
+<td>A notification v0.10.2 stored linking a decision's row at <code>/decisions/{id}</code> links <code>/decision-occurrences/{id}</code>, because <code>/decisions/{id}</code> is the decision itself</td>
+<td>Nothing for a notification read in the application: the upgrade rewrites the link. A <code>/decisions/{id}</code> link already sent by mail or chat opens the decision with that identifier, which is a different record. Open the notification in the application instead</td>
+</tr>
+<tr>
+<td>The setting <code>triage.bulk-decision-cap</code> is the bulk action limit, which v0.10.2 named <code>triage.together-cap</code></td>
+<td>Nothing. The upgrade moves the value to the new name, and <code>/v1/settings/triage.together-cap</code> answers 404. A value written under the former name afterwards, by a v0.10.2 still running, is read while the new name is unset, and each start logs <code>a setting is held under its former name and is read from there: set it under its new name</code>. With both set, the new one is read, and the start logs <code>a setting is held under its former name and its new one: the new one is read</code>. Changing the setting under its new name removes the former one and ends the warning</td>
+</tr>
+<tr>
+<td>The upgrade renames the triage tables and columns, then rewrites the stored values above. Each rename waits up to three seconds for a table another session holds, then waits again, logging <code>a rename is waiting for a table something else holds</code> with what holds it</td>
+<td>Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end</td>
+</tr>
 </tbody>
 </table>
+<h4 id="renamed-api-fields">Renamed API fields<a class="headerlink" href="#renamed-api-fields" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Former field</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>claim</code></td>
+<td><code>decision</code></td>
+</tr>
+<tr>
+<td><code>claims</code></td>
+<td><code>decisions</code></td>
+</tr>
+<tr>
+<td><code>claim_id</code></td>
+<td><code>decision_id</code></td>
+</tr>
+<tr>
+<td><code>previous_claim_id</code></td>
+<td><code>previous_decision_id</code></td>
+</tr>
+<tr>
+<td><code>returned_claim</code></td>
+<td><code>returned_decision</code></td>
+</tr>
+<tr>
+<td><code>decision</code>, a decision's row at one occurrence</td>
+<td><code>decision_occurrence</code></td>
+</tr>
+<tr>
+<td><code>decision_id</code>, that row's identifier</td>
+<td><code>decision_occurrence_id</code></td>
+</tr>
+<tr>
+<td><code>decision_ids</code></td>
+<td><code>decision_occurrence_ids</code></td>
+</tr>
+<tr>
+<td><code>decisions</code>, a list of such rows</td>
+<td><code>decision_occurrences</code></td>
+</tr>
+<tr>
+<td><code>decisions</code>, a count of such rows</td>
+<td><code>occurrences</code>, or <code>rows</code> beside a count of occurrences</td>
+</tr>
+<tr>
+<td><code>place</code></td>
+<td><code>occurrence</code></td>
+</tr>
+<tr>
+<td><code>places</code></td>
+<td><code>occurrences</code></td>
+</tr>
+<tr>
+<td><code>place_limit</code></td>
+<td><code>occurrence_limit</code></td>
+</tr>
+</tbody>
+</table>
+<p>A notice's <code>places</code>, the places it named, keeps its name.</p>
 <h4 id="renamed-api-paths">Renamed API paths<a class="headerlink" href="#renamed-api-paths" title="Permanent link">&para;</a></h4>
 <p>Every path below <code>/v1/products/{product}/streams</code> moves below
 <code>/v1/products/{product}/branches-and-tags</code>, and <code>…</code> below is a build's address,
