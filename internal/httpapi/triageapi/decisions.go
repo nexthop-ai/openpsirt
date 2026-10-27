@@ -218,7 +218,7 @@ type ReaffirmedBody struct {
 	PreviousDecisionID  int64   `json:"previous_decision_id" doc:"The decision that lapsed"`
 	DecisionID          int64   `json:"decision_id" doc:"The decision this action made, which is what a second person agrees to where one is needed"`
 	DecisionOccurrences []int64 `json:"decision_occurrences"`
-	Occurrences         int     `json:"occurrences" doc:"The number of occurrences it covers. One component at two versions in two builds counts twice, because a decision expires on the version"`
+	Occurrences         int     `json:"occurrences" doc:"The number of distinct occurrences it covers. An occurrence at two versions in two builds is two decision occurrences, because a decision expires on the version"`
 	Waiting             bool    `json:"waiting" doc:"Whether a second person has to agree"`
 }
 

@@ -90,8 +90,8 @@ type AuditedDecisionBody struct {
 	Version     string `json:"version,omitempty"`
 	Consumer    string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 	Components  int    `json:"components" doc:"How many component names sit at the matching occurrences, counted through the findings you may read"`
-	Rows        int    `json:"rows" doc:"How many of its occurrences match"`
-	Occurrences int    `json:"occurrences" doc:"How many occurrences match"`
+	Rows        int    `json:"rows" doc:"How many of its occurrences match, counted once for each issue"`
+	Occurrences int    `json:"occurrences" doc:"How many distinct occurrences match"`
 
 	Outcome       core.Outcome        `json:"outcome"`
 	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`

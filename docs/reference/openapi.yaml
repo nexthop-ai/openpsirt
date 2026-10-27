@@ -1270,7 +1270,7 @@ components:
           description: The mitigation a holder can apply
           type: string
         occurrences:
-          description: How many occurrences match
+          description: How many distinct occurrences match
           format: int64
           type: integer
         outcome:
@@ -1313,7 +1313,7 @@ components:
           description: The words the decision currently rests on. Editing them withdraws every agreement
           type: string
         rows:
-          description: How many of its occurrences match
+          description: How many of its occurrences match, counted once for each issue
           format: int64
           type: integer
         scope:
@@ -10292,7 +10292,7 @@ components:
             - array
             - "null"
         occurrences:
-          description: The number of occurrences it covers. One component at two versions in two builds counts twice, because a decision expires on the version
+          description: The number of distinct occurrences it covers. An occurrence at two versions in two builds is two decision occurrences, because a decision expires on the version
           format: int64
           type: integer
         previous_decision_id:

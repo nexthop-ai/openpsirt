@@ -224,7 +224,7 @@ hears and when each clears.
 
 ## Bulk acts
 
-No act over many issues reaches a standing record. `DESIGN-triage.md` § Claims
+No act over many issues reaches a standing record. `DESIGN-triage.md` § Decisions
 against a recorded attack holds the rules.
 
 | | |

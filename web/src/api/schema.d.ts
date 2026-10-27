@@ -7823,7 +7823,7 @@ export interface components {
             mitigation?: string;
             /**
              * Format: int64
-             * @description How many occurrences match
+             * @description How many distinct occurrences match
              */
             occurrences: number;
             /** @enum {string} */
@@ -7848,7 +7848,7 @@ export interface components {
             reasoning: string;
             /**
              * Format: int64
-             * @description How many of its occurrences match
+             * @description How many of its occurrences match, counted once for each issue
              */
             rows: number;
             /**
@@ -12900,7 +12900,7 @@ export interface components {
             decision_occurrences: number[] | null;
             /**
              * Format: int64
-             * @description The number of occurrences it covers. One component at two versions in two builds counts twice, because a decision expires on the version
+             * @description The number of distinct occurrences it covers. An occurrence at two versions in two builds is two decision occurrences, because a decision expires on the version
              */
             occurrences: number;
             /**
