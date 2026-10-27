@@ -536,7 +536,7 @@ route, sign-in and the served interface, and registers each area in turn.
 | Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
 | Handing work out | Assignment, routing rules, teams, tags, bulk acts, fix bundles, planned upgrades, one component |
 | Decisions | The review queue, proposing, approving, re-affirmation, comments, incidents, response windows, assessments, scrutiny, readiness |
-| Reports | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
+| Analytics | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
 | Advisories | Advisories, VEX, supplier imports, the suppliers read on a schedule, outbound destinations |
 | Administration | The catalog, people and their roles, role bindings, keys, tokens, settings, the trail, work set aside, saved filters, notifications, the caller's own session |
 

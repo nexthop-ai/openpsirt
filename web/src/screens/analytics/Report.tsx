@@ -1,0 +1,58 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+import { type ReactElement } from "react";
+import { Navigate, useLocation, useParams } from "react-router-dom";
+import { analyticsReportAt } from "../../app/routes";
+import { Backlog } from "./Backlog";
+import { Compliance } from "./Compliance";
+import { Coverage } from "./Coverage";
+import { Effort } from "./Effort";
+import { LeadSeries } from "./LeadSeries";
+import { Overview } from "./Overview";
+import { Published } from "./Published";
+import { Register } from "./Register";
+import { Scrutiny } from "./Scrutiny";
+import { Support } from "./Support";
+import { own } from "../../ui/own";
+
+// The page a report address draws.
+//
+// One route through this map rather than a route per report, so the list
+// somebody reads and the addresses that answer cannot come apart: a name in
+// the catalog with no page behind it is a link that goes nowhere, and a page
+// no catalog entry names is a report nobody finds. A test pins both
+// directions.
+// eslint-disable-next-line no-restricted-syntax -- Keyed on this interface's own report addresses.
+export const PAGES: Record<string, ReactElement> = {
+  "program-overview": <Overview />,
+  "scan-coverage": <Coverage />,
+  "leads-by-analyzer": <LeadSeries />,
+  "releases-out-of-support": <Support />,
+  "approval-quality": <Scrutiny />,
+  "deadline-compliance": <Compliance />,
+  "disposition-register": <Register />,
+  "advisories-issued": <Published />,
+  "effort-by-component": <Effort />,
+  "backlog-over-time": <Backlog />,
+};
+
+// Addresses a report has been reached at under an earlier name. A link to one
+// sits in mail and chat messages already sent and in notifications already
+// stored, so it opens the report it named, with the window it asked for.
+// eslint-disable-next-line no-restricted-syntax -- Keyed on report addresses that have moved.
+const RENAMED: Record<string, string> = {
+  "rubber-stamp": "approval-quality",
+  "where-the-effort-went": "effort-by-component",
+};
+
+export function Report() {
+  const { report = "" } = useParams();
+  const { search } = useLocation();
+  const now = own(RENAMED, report);
+  if (now) return <Navigate to={{ pathname: analyticsReportAt(now), search }} replace />;
+  // A name this catalog does not hold goes back to the catalog rather than
+  // home: somebody following a stale link is looking for a report, and the
+  // list of them is the answer nearest to what they asked for.
+  return own(PAGES, report) ?? <Navigate to="/analytics" replace />;
+}

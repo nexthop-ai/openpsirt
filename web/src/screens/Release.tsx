@@ -15,7 +15,7 @@ import { Wide } from "../ui/Wide";
 import {
   buildFindingsAt,
   comparisonAt,
-  reportAt,
+  analyticsReportAt,
   streamsAt,
   dependenciesAt,
   vexAt,
@@ -262,7 +262,7 @@ export function Release({ product, stream }: { product: string; stream: string }
           </li>
           <li>
             <div>
-              <Link to="/reports/advisories-issued">Advisories issued</Link>
+              <Link to="/analytics/advisories-issued">Advisories issued</Link>
             </div>
             {/* Not narrowed to this release. An advisory is about a flaw and is
                 published once, so tying it to whichever release was cut nearby
@@ -297,7 +297,7 @@ export function Release({ product, stream }: { product: string; stream: string }
                 {/* The register answers for the build the picker holds, so
                     the link picks this one on its way there. */}
                 <Link
-                  to={reportAt("disposition-register")}
+                  to={analyticsReportAt("disposition-register")}
                   onClick={() => remember({ product, stream, variant: variant.name ?? "" })}
                 >
                   Disposition register · {variant.name}

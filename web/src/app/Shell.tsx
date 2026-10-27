@@ -230,7 +230,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               built by hand. Here rather than under a build because a report
               spans whatever the picker has selected, up to every product a
               reader can see. */}
-            <Rail to="/reports" icon="chart" label="Reports" />
+            <Rail to="/analytics" icon="chart" label="Analytics" />
           </>
         )}
         <Group name="scope" label={scope} shut={shut} onToggle={toggleGroup} />

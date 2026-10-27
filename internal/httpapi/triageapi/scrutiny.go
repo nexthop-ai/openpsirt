@@ -113,7 +113,7 @@ func registerScrutiny(api huma.API, in core.Deps) {
 			"Everything is dated by when the decision was proposed, not by when it was agreed to, " +
 			"and narrowed by what you may see.\n\n" +
 			"Asked for neither a period nor a window, this is the last 90 days.",
-		Tags: []string{"Reports"},
+		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		core.Period

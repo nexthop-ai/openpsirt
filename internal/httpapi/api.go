@@ -31,11 +31,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/adminapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/advisoryapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/analyticsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/assignapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/findingsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/published"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/reportsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/scansapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/triageapi"
 	"github.com/nexthop-ai/openpsirt/internal/version"
@@ -379,7 +379,7 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	findingsapi.Register(api, in)
 	assignapi.Register(api, in)
 	triageapi.Register(api, in)
-	reportsapi.Register(api, in)
+	analyticsapi.Register(api, in)
 	advisoryapi.Register(api, in)
 	adminapi.Register(api, in)
 	components.complete()

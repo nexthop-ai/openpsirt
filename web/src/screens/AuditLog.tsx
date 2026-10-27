@@ -19,7 +19,7 @@ import { useOutcomes, type Outcome } from "../ui/outcomes";
 import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
-import { calendarDay, coveringPeriod, endExclusive, stated } from "./reports/Window";
+import { calendarDay, coveringPeriod, endExclusive, stated } from "./analytics/Window";
 import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./ReportRuling";
 import { allFindingsAt, decisionAt } from "../app/routes";

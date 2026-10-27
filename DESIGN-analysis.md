@@ -565,25 +565,25 @@ one way to say a path does not matter is kept rather than two.
 ### Queue file
 
 `GET /v1/products/{product}/code-findings.{format}` writes the list out as CSV or
-JSON, as `DESIGN-reporting.md` § Exports writes every file.
+JSON, as `DESIGN-analytics.md` § Exports writes every file.
 
 | Rule | |
 |---|---|
 | The file is the list: the same filters, the same order, every row rather than one page | A list and its file are one read, so a filter the screen applies is never missing from the file |
 | It is read under the list's visibility | A reader is written the leads the list shows them, and nothing else (REQ-42, REQ-43) |
-| A row names who holds the lead as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`DESIGN-reporting.md` § Exports) |
+| A row names who holds the lead as the list does: who, their display name, and whether it is a team's queue | A team and a person may share a name, and every signal the list carries is a column (`DESIGN-analytics.md` § Exports) |
 | A row says whether the lead is in third-party code, as the list does | Read from the newest run that saw the lead, as its evidence is (§ Third-party code) |
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
 | With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out leads a waiting decision holds and leads past their end of life |
 | Narrowed to work nobody holds, the file says so beside what it lists | A file read later carries the narrowing it was written under |
 | A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
-| A findings list's file writes every open lead of its selection below its findings, through this read with the leads a decision waits on kept in (`DESIGN-reporting.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
+| A findings list's file writes every open lead of its selection below its findings, through this read with the leads a decision waits on kept in (`DESIGN-analytics.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
 
 ### Leads by series
 
 `GET /v1/products/{product}/code-finding-series` counts a product's leads per analyzer
 series, by state. The reports catalog draws it as Leads by analyzer
-(`DESIGN-reporting.md` § Pages of the catalog's own).
+(`DESIGN-analytics.md` § Pages of the catalog's own).
 
 | Rule | |
 |---|---|
@@ -1001,7 +1001,7 @@ it is about.
 
 | Part | State |
 |---|---|
-| Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead decisions: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
+| Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead decisions: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-analytics.md` § Approval quality) |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 

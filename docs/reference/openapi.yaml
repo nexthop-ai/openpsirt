@@ -14806,7 +14806,7 @@ paths:
           description: Error
       summary: List advisories that have gone out
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -15375,7 +15375,7 @@ paths:
           description: Error
       summary: Get approval coverage
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -15802,7 +15802,7 @@ paths:
           description: Error
       summary: List decisions with who made them and who agreed
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -15965,7 +15965,7 @@ paths:
           description: Error
       summary: Export the audit log of decisions
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
@@ -16138,7 +16138,7 @@ paths:
           description: Error
       summary: List the audit log by decision
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -16305,7 +16305,7 @@ paths:
           description: Error
       summary: Report what proportion of work met its deadline
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -17053,7 +17053,7 @@ paths:
           description: Error
       summary: List repeated deferrals
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -17104,7 +17104,7 @@ paths:
           description: Error
       summary: Export repeated deferrals
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
@@ -17367,7 +17367,7 @@ paths:
           description: Error
       summary: Report where triage effort went
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -19066,7 +19066,7 @@ paths:
           description: Error
       summary: Show how long triage is taking and who is doing it
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -23289,7 +23289,7 @@ paths:
           description: Error
       summary: List every known vulnerability in a build and its disposition
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -23420,7 +23420,7 @@ paths:
           description: Error
       summary: Export the disposition register
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
@@ -24236,7 +24236,7 @@ paths:
           description: Error
       summary: Count code findings by analyzer series
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Requires internal-read on the product.
@@ -24843,7 +24843,7 @@ paths:
           description: Error
       summary: Render a comparison as release notes
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -29862,7 +29862,7 @@ paths:
   /v1/products/{product}/report-rulings/{ruling}/withdrawal:
     post:
       description: |-
-        Takes a ruling back, waiting or in force, and returns every report it covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
+        Takes a ruling back, waiting or in force, and opens every report it covered again, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
 
         Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
 
@@ -31625,7 +31625,7 @@ paths:
           description: Error
       summary: List releases that are out of support
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -31693,7 +31693,7 @@ paths:
           description: Error
       summary: Export releases that are out of support
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
@@ -31773,7 +31773,7 @@ paths:
           description: Error
       summary: Report how fast findings are being fixed
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
@@ -33510,7 +33510,7 @@ paths:
           description: Error
       summary: Export new, resolved and open over time
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Exports only what you may see.
@@ -33575,7 +33575,7 @@ paths:
           description: Error
       summary: Show what each release shipped with
       tags:
-        - Reports
+        - Analytics
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.

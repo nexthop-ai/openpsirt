@@ -171,7 +171,7 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		"Leads":                       func(n string) string { return weblink.Leads(n, n, n, n, n) },
 		"LeadRules":                   func(n string) string { return weblink.LeadRules(n) },
 		"InventoryChanges":            func(n string) string { return weblink.InventoryChanges(n, n, n, 7) },
-		"Report":                      func(n string) string { return weblink.Report(n, n) },
+		"AnalyticsReport":             func(n string) string { return weblink.AnalyticsReport(n, n) },
 	}
 
 	// Every builder the package exports has a sample above, and every sample

@@ -82,7 +82,7 @@ const SAMPLES: Record<string, () => string[]> = {
   issueAt: () => [routes.issueAt(odd)],
   personAt: () => [routes.personAt(odd)],
   advisoryAt: () => [routes.advisoryAt(odd)],
-  reportAt: () => [routes.reportAt(odd)],
+  analyticsReportAt: () => [routes.analyticsReportAt(odd)],
   settingsAt: () => [routes.settingsAt(odd)],
   reviewQueueAt: () => [routes.reviewQueueAt(), routes.reviewQueueAt({ product: odd, mine: true })],
   recordFlawAt: () => [

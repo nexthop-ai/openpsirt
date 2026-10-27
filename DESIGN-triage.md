@@ -7,7 +7,7 @@ REQ-29, REQ-30, REQ-31, REQ-32, REQ-33, REQ-35, REQ-40, REQ-43, REQ-53,
 REQ-57, REQ-65, REQ-66.
 
 The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
-`DESIGN-reporting.md`.
+`DESIGN-analytics.md`.
 
 ## Contents
 
@@ -171,7 +171,7 @@ recurs at every point release.
 ### The standing set
 
 Corrections in force are read from the audit log with its filters set: the
-outcome, and what applies now. `DESIGN-reporting.md` holds the audit log and
+outcome, and what applies now. `DESIGN-analytics.md` holds the audit log and
 the one other question it is asked this way.
 
 Asking for what applies now is not asking for what was approved. A decision is

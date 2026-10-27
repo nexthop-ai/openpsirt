@@ -156,8 +156,8 @@
     "path": "/audit-log",
     "query": ["alone", "from", "in_force", "outcome", "product", "to"]
   },
-  "reports": { "path": "/reports" },
-  "report": { "path": "/reports/:report", "query": ["days"] },
+  "analytics": { "path": "/analytics" },
+  "analyticsReport": { "path": "/analytics/:report", "query": ["days"] },
   "recordFlaw": { "path": "/record-a-flaw", "query": ["from", "product", "source"] },
   "disclosureDeadlines": { "path": "/disclosure-deadlines" },
   "incidents": { "path": "/incidents", "query": ["product"] },
@@ -176,6 +176,8 @@
   "formerRecord": { "path": "/record" },
   "formerDisclosureDeadlines": { "path": "/disclosing" },
   "formerRecordFlaw": { "path": "/report-a-flaw" },
+  "formerAnalytics": { "path": "/reports" },
+  "formerAnalyticsReport": { "path": "/reports/:report" },
   "formerVulnerabilityReports": { "path": "/products/:product/inbox" },
   "formerVulnerabilityReport": { "path": "/products/:product/inbox/:reference" },
   "formerDependencies": {

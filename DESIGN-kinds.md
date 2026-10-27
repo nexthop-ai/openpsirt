@@ -100,7 +100,7 @@ leads, because it writes what the audit log shows, under the same visibility
 | Rule | |
 |---|---|
 | Exports names the findings lists' files alone, and the disposition register is Register | The register states the decision at every occurrence of a build beside its VEX document, and reads findings rows by the consumer it names. Naming analysis on one consumer covering both would put every lead into a statement about what a build ships |
-| A findings list's file reads its leads through the Leads consumer's read, and its other rows through the list's own | A list and its file are one read (`DESIGN-reporting.md` § Exports), and a findings file holds the open leads under the queue's visibility and in its order |
+| A findings list's file reads its leads through the Leads consumer's read, and its other rows through the list's own | A list and its file are one read (`DESIGN-analytics.md` § Exports), and a findings file holds the open leads under the queue's visibility and in its order |
 | The counts by series are part of Leads, not of Statistics | Statistics feeds the vulnerability figures, and a lead nobody has judged is not one of them |
 | Each is the queue's own read over the queue's own visibility | A figure, the list it opens and the file of that list count one population |
 | Assignment is a consumer of its own, not part of Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a lead nobody has judged into both. Holding work is one act whatever the work is, so a handover and a lost role move a lead with everything else |

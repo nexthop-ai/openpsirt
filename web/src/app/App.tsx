@@ -13,6 +13,7 @@ import { Moved, built } from "./moved";
 import { retrying } from "./retrying";
 import {
   ROUTES,
+  analyticsReportAt,
   bulkDecisionAt,
   decisionAt,
   dependenciesAt,
@@ -86,8 +87,8 @@ const Uploads = retrying(() => import("../screens/Uploads").then((m) => m.Upload
 const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
 const System = retrying(() => import("../screens/System").then((m) => m.System));
 const AuditLog = retrying(() => import("../screens/AuditLog").then((m) => m.AuditLog));
-const Reports = retrying(() => import("../screens/reports/Catalog").then((m) => m.Catalog));
-const Report = retrying(() => import("../screens/reports/Report").then((m) => m.Report));
+const Analytics = retrying(() => import("../screens/analytics/Catalog").then((m) => m.Catalog));
+const AnalyticsReport = retrying(() => import("../screens/analytics/Report").then((m) => m.Report));
 const RecordFlaw = retrying(() => import("../screens/RecordFlaw").then((m) => m.RecordFlaw));
 const Person = retrying(() => import("../screens/Person").then((m) => m.Person));
 const Branch = retrying(() => import("../screens/Branch").then((m) => m.Branch));
@@ -219,8 +220,8 @@ export function App() {
               <Route path={ROUTES.teams} element={<Teams />} />
               <Route path={ROUTES.assignments} element={<Assignments />} />
               <Route path={ROUTES.auditLog} element={<AuditLog />} />
-              <Route path={ROUTES.reports} element={<Reports />} />
-              <Route path={ROUTES.report} element={<Report />} />
+              <Route path={ROUTES.analytics} element={<Analytics />} />
+              <Route path={ROUTES.analyticsReport} element={<AnalyticsReport />} />
               <Route path={ROUTES.recordFlaw} element={<RecordFlaw />} />
               <Route path={ROUTES.disclosureDeadlines} element={<DisclosureDeadlines />} />
               <Route path={ROUTES.incidents} element={<Incidents />} />
@@ -257,6 +258,11 @@ export function App() {
               <Route
                 path={ROUTES.formerRecordFlaw}
                 element={<Moved to={() => "/record-a-flaw"} />}
+              />
+              <Route path={ROUTES.formerAnalytics} element={<Moved to={() => "/analytics"} />} />
+              <Route
+                path={ROUTES.formerAnalyticsReport}
+                element={<Moved to={(at) => analyticsReportAt(at.report ?? "")} />}
               />
               <Route
                 path={ROUTES.formerVulnerabilityReports}

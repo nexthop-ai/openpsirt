@@ -5183,7 +5183,7 @@ export interface paths {
         put?: never;
         /**
          * Withdraw a ruling on vulnerability reports
-         * @description Takes a ruling back, waiting or in force, and returns every report it covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
+         * @description Takes a ruling back, waiting or in force, and opens every report it covered again, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
          *
          *     Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
          *

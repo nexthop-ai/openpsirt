@@ -53,7 +53,7 @@ end rather than left to be found by clicking.
 - [A person's own page](#a-persons-own-page)
 - [A person, whole](#a-person-whole)
 - [A release, gathered](#a-release-gathered)
-- [Reports, settings, inheritance](#reports-settings-inheritance)
+- [Analytics, settings, inheritance](#analytics-settings-inheritance)
 - [The System screen](#the-system-screen)
 - [The administration screens](#the-administration-screens)
 - [The ordering signals](#the-ordering-signals)
@@ -236,7 +236,7 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the audit log. The audit log is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the published advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
+| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed under Analytics with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the published advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.
@@ -363,7 +363,7 @@ Every figure opens the list it counts, narrowed the way the figure was counted �
 the aging buckets and both deadline tiles. A number nobody can act on from where
 they read it sends somebody to build the same question by hand, and the question
 they build is not always the same one. A figure counting anything closed opens
-nothing, because the findings list holds what is open (`DESIGN-reporting.md`).
+nothing, because the findings list holds what is open (`DESIGN-analytics.md`).
 
 ## The findings list
 
@@ -1043,7 +1043,7 @@ far, because recording the distance keeps a component once per path to it:
 | Rule | |
 |---|---|
 | Every row is ordered on the number that describes it | For a branch, what is open beneath it; for a leaf, its own count. What opens still comes before what does not, so the structure of a build is on the first screen |
-| The header says how many components the scanner cannot match, and opens the list of them | Such a component is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some. The count and the list are one definition, `DESIGN-reporting.md` § Match coverage |
+| The header says how many components the scanner cannot match, and opens the list of them | Such a component is tracked and never matched, so a build of nothing else reports no findings and reads as clean. One real container image of 37 packages arrived that way and scanned to zero. Said only when there are some. The count and the list are one definition, `DESIGN-analytics.md` § Match coverage |
 | What nothing in the build pulls in hangs from the root | The build contains it, and nothing else does. The root's own count is everything beneath it and beneath those, as one set. A real switch image arrives with 60,935 components, 1,358 edges and none from its root; drawn from the root's edges alone, that tree is empty |
 | A level is drawn whole | An honest inventory has tens of components at a level. The remaining cap is high and exists for the inventory that is not honest — a real image has been seen with 5,270 components directly under its root |
 | Arriving from a finding opens the tree on the component, with every parent expanded | The chain travels in the link rather than being walked upward here. Where a level is past its cap, the step on the path is kept whatever its position: a link that opens a tree without the component it was opened for shows the one thing it exists to show |
@@ -1448,7 +1448,7 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | The link appears only for somebody who may read reports | Reading undisclosed work in the product, which is what every read of a report asks. A link leading to a refusal is worse than none. The product page's link says how many rulings wait for approval there |
 | The rail carries it under the scope, for somebody who may read reports anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read reports in the one picked |
 | A reader of reports sees no control that writes | Recording, editing, recording a message, writing a note, assigning, accepting, attaching, proposing and withdrawing are working reports. The notes and the correspondence are drawn for them without a composer. Approve is offered where the reader may agree to a ruling, which the answer to what they may do reports as its own field |
-| A claim somebody sent is called a vulnerability report wherever a person reads it | The rail has a Reports entry for the named reports, and a bare "report" beside it reads as one of those |
+| A claim somebody sent is called a vulnerability report wherever a person reads it | The rail has an Analytics entry for the named reports, and a bare "report" beside it reads as one of those |
 | The claim, a message and a ruling's reason offer no mentions | Nothing reads a mention in any of them. An autocomplete there names somebody who is never told |
 | A note on a report offers mentions of readers of undisclosed work in the product | The people a mention can reach. A name nobody reading reports holds is said to have reached nobody, without saying why, as on a finding's notes |
 | Two tabs: the reports, and the rulings waiting for approval | The second is where the waiting notice points. Its count is on the tab, because it is somebody else's turn and nothing else on the screen says so |
@@ -1473,7 +1473,7 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | Files are attached from the report's page and held at once | A file attached into the text of a message, a note or the claim is held on the report the same way, and listed with the rest |
 | The reporter card on an issue carries its report's correspondence and notes, and links the report | Read under the report rule, so absent for somebody who may not read reports. Writing to either is offered where the reader works reports |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
-| The audit log draws one card per decision | The issue, the outcome, the state in one word, what it is about or how many components, and how many occurrences it covers, with the states counted where they differ. The issue opens the decision page, and "Findings there now" opens the findings list narrowed to the decision and the states asked for. `DESIGN-reporting.md` § Dismissals and scan coverage holds what is counted |
+| The audit log draws one card per decision | The issue, the outcome, the state in one word, what it is about or how many components, and how many occurrences it covers, with the states counted where they differ. The issue opens the decision page, and "Findings there now" opens the findings list narrowed to the decision and the states asked for. `DESIGN-analytics.md` § Dismissals and scan coverage holds what is counted |
 | Rulings sit beside the decisions in the audit log, over its products and period | A ruling is a decision somebody could be asked to account for, and an auditor asks about a period. Beside the triage decisions rather than among them: a ruling is about a report rather than a finding and takes none of their filters. Printed with them, without the controls |
 | The change history sits below the decisions in the audit log, over its period, and narrows to one kind of change | The decision filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
 
@@ -1892,17 +1892,17 @@ goes out with the release, which sat in four places reached four ways.
 | Advisories are not narrowed to the release | An advisory is about a flaw and goes out once, however many releases carry it. Tying it to whichever release was cut nearby would invent a relationship the record does not hold |
 | The per-variant count comes from the same answer the severity split is added from | The endpoint that lists what a release was built as does not fill a count in, so reading it there drew a column of zeroes under a section reporting twenty-six |
 
-## Reports, settings, inheritance
+## Analytics, settings, inheritance
 
-Reports is a catalog of named reports, under "Across products", beside the
+Analytics is the catalog of named reports, under "Across products", beside the
 Audit log rather than inside it — the audit log is what was judged and who
-agreed; a report is the shape of the judging. **Reports may span products**, unlike every
-other screen: comparing products is often the point, and it costs no visibility,
-since a person only ever sees products they hold a role on.
+agreed; a report is the shape of the judging. **Reports may span products**,
+unlike every other screen: comparing products is often the point, and it costs
+no visibility, since a person only ever sees products they hold a role on.
 
 | Rule | |
 |---|---|
-| A report is a page of its own, at `/reports/<name>` | A page is printable, linkable and quotable; a section of a dashboard is none of those. The catalog screen holds the list and the files reachable nowhere else; a question with no name is asked on the findings list, which is where the filters live |
+| A report is a page of its own, at `/analytics/<name>` | A page is printable, linkable and quotable; a section of a dashboard is none of those. The catalog screen holds the list and the files reachable nowhere else; a question with no name is asked on the findings list, which is where the filters live |
 | A report about the thing you are standing on stays on that screen and is listed in the catalog; one that spans things lives only in the catalog | The comparison of two releases is the screen where the two are picked, so it keeps its address and gains a catalog entry that arrives with the product already chosen |
 | An entry that cannot answer at the current selection is still listed, with a tag saying whether it needs a product or a build | A report missing from a list reads as a report that does not exist. The tag sits beside the name rather than at the end of the line beneath, where it reads as part of the description. The name stays drawn as a name, and pressing it opens the scope picker |
 | The catalog is grouped by the question a report answers | Program, controls, coverage, releases and records. An entry leading to a filter on the audit log sits with the reports asking its question |

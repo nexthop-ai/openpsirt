@@ -626,7 +626,7 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 		store, signal, admin := hook.store, hook.signal, hook.admin
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A decision stands with nobody agreeing.",
-			Link: "/reports/approval-quality",
+			Link: "/analytics/approval-quality",
 		}}
 
 		for _, step := range []struct {
@@ -672,7 +672,7 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 		}
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A decision stands with nobody agreeing.",
-			Link: "/reports/approval-quality",
+			Link: "/analytics/approval-quality",
 		}}
 
 		// Ana's row opens first, so the delivery is claimed for it.

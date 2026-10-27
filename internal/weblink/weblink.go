@@ -170,12 +170,12 @@ func InventoryChanges(product, stream, variant string, scan int64) string {
 	return build(product, stream, variant) + "/uploads/" + strconv.FormatInt(scan, 10) + "/changes"
 }
 
-// Report is one report sheet, opened on a window of days.
-func Report(slug, days string) string {
+// AnalyticsReport is one report under Analytics, opened on a window of days.
+func AnalyticsReport(slug, days string) string {
 	if climbs(slug) {
 		return Home()
 	}
-	return "/reports/" + url.PathEscape(slug) + "?days=" + url.QueryEscape(days)
+	return "/analytics/" + url.PathEscape(slug) + "?days=" + url.QueryEscape(days)
 }
 
 // build is the prefix every address under one build shares. It is not an

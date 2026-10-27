@@ -41,7 +41,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/config/` | Settings, read from the environment with working defaults |
 | `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `DESIGN-api.md` § File organization |
 | `internal/httpapi/core/` | What every area of the API shares: the dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies more than one area answers with |
-| `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/reportsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, decisions, reports, advisories, administration |
+| `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/analyticsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | The operations, one package per area: inventories arriving, findings, handing work out, decisions, reports, advisories, administration |
 | `internal/httpapi/httpapitest/`, `internal/httpapi/refusaltest/` | The test harness the areas share — a server over a seeded cast — and the checks each area runs over its own refusal mappers |
 | `internal/database/` | Opening, identifying and validating a database. See `DESIGN-database.md` |
 | `internal/database/migrate/` | The migration runner and the locks around it |

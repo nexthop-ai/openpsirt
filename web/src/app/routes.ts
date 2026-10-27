@@ -229,7 +229,7 @@ export const decisionOccurrenceAt = (id: number) => at("decisionOccurrence", { i
 export const issueAt = (vulnerability: string) => at("issue", { vulnerability });
 export const personAt = (identity: string) => at("person", { identity });
 export const advisoryAt = (advisory: string | number) => at("advisory", { advisory });
-export const reportAt = (report: string) => at("report", { report });
+export const analyticsReportAt = (report: string) => at("analyticsReport", { report });
 export const settingsAt = (section: string) => at("settingsSection", { section });
 
 // The review queue, for one product, on one of its lists, or opened on the

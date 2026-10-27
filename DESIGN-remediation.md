@@ -6,7 +6,7 @@ documents generated from what was decided.
 Satisfies REQ-15, REQ-19, REQ-24, REQ-28, REQ-33, REQ-34, REQ-35, REQ-36, REQ-39.
 
 Neighboring pieces: the escalation view, per-item time remaining and the SLA
-compliance rate are in `DESIGN-reporting.md`; the assignment model is in
+compliance rate are in `DESIGN-analytics.md`; the assignment model is in
 `DESIGN-access.md`, which defines the party a thing is assigned to.
 
 ## Contents
@@ -239,7 +239,7 @@ compliance rate. Three of the reasons already have somewhere to be seen — the
 line is stated wherever a list hides something, a tag's findings are read at the
 release, and what upstream has done is a column of the findings list and a
 filter over it. End-of-life does not, so releases out of support are a report of
-their own; `DESIGN-reporting.md` holds it.
+their own; `DESIGN-analytics.md` holds it.
 
 A tag was built once and is what somebody received. No work will land in it
 whatever a date says, so a deadline on one is unmeetable the moment it is

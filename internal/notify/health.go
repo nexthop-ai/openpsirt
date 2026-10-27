@@ -280,7 +280,7 @@ func (w *Watch) riskUnagreed(ctx context.Context) ([]Holds, error) {
 		// shown a page with nothing on it, which is the alert nobody can clear
 		// that REQ-49 is about. The longest window the sheet offers reads as
 		// "everything" and is also the bound on what an address may ask for.
-		Link: weblink.Report("approval-quality", everythingBack),
+		Link: weblink.AnalyticsReport("approval-quality", everythingBack),
 	}}, nil
 }
 
@@ -423,7 +423,7 @@ func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 				"people who may approve that one pair doing most of it is worth a look.",
 				each.product.DisplayName, people[each.pair.First], people[each.pair.Second],
 				each.percent, days),
-			Link:      weblink.Report("approval-quality", pairsBack),
+			Link:      weblink.AnalyticsReport("approval-quality", pairsBack),
 			ProductID: &productID,
 		})
 	}
