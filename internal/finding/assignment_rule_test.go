@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// team declares a team to route work to.
+// team declares a team to assign work to.
 func (f *fixture) team(t *testing.T, name string) int64 {
 	t.Helper()
 	return f.teamReading(t, name, access.PublicRead, access.PrivateRead, access.InternalRead)
@@ -188,7 +188,7 @@ func TestAComponentNamedOutsideASCIIMatchesTheSameOnEveryEngine(t *testing.T) {
 	// Matching a component's name asked the engine to fold it, and the
 	// four do not fold alike: SQLite's LOWER folds ASCII and nothing else
 	// while the three servers fold the whole character set. So a component
-	// named with any letter outside ASCII was swept by a routing rule on
+	// named with any letter outside ASCII was swept by an assignment rule on
 	// three engines and not on the fourth, and which engine a deployment
 	// ran decided the answer — with nothing reporting the difference,
 	// because both look like a correct answer.
@@ -280,9 +280,9 @@ func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read the finding named %q: %v", named, err)
 			}
-			if seen.RoutedBy != "" {
+			if seen.AssignedByRule != "" {
 				t.Errorf("named %q, the screen says %q placed the whole fold, and it placed "+
-					"part of it", named, seen.RoutedBy)
+					"part of it", named, seen.AssignedByRule)
 			}
 			if seen.AssignedTo != "" {
 				t.Errorf("named %q, the screen says %q is dealing with the whole fold",
@@ -348,7 +348,7 @@ func TestARuleNamingMostOfABuildIsRefused(t *testing.T) {
 func TestARuleThatOutgrewItsBoundDoesNotStopTheRestOfTheSweep(t *testing.T) {
 	// A rule is refused when it is written, but the tree grows under one that
 	// was accepted. That condition is permanent, so returned as a job failure
-	// it stopped the product's whole routing — every rule ordered after it
+	// it stopped the product's whole assignment by rule — every rule ordered after it
 	// included — and a retry could never clear it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -497,7 +497,7 @@ func TestARuleForARetiredTeamPlacesNothing(t *testing.T) {
 	})
 }
 
-func TestARoutingRuleIsWrittenAndRetiredOnlyByAnAssigner(t *testing.T) {
+func TestAnAssignmentRuleIsWrittenAndRetiredOnlyByAnAssigner(t *testing.T) {
 	// A rule hands work to a team over and over with nobody present, which is
 	// the act the assigner right names. Triaging the product is not it.
 	each(t, func(t *testing.T, f *fixture) {
@@ -581,10 +581,10 @@ func placedWith(t *testing.T, f *fixture, team int64) (codeFindings map[access.V
 	return codeFindings, others
 }
 
-// A code finding is held and routed by the one implementation a finding is: a rule
+// A code finding is held and assigned by rule by the one implementation a finding is: a rule
 // naming its component places it with the team, at whatever visibility it
 // holds.
-func TestARoutingRulePlacesTheCodeFindingsNobodyHolds(t *testing.T) {
+func TestAnAssignmentRulePlacesTheCodeFindingsNobodyHolds(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		codeFindingsAt(t, f)
 		codeFindings, others := placedByRule(t, f)
@@ -601,7 +601,7 @@ func TestARoutingRulePlacesTheCodeFindingsNobodyHolds(t *testing.T) {
 
 // A code finding every release of which is past its end of life is kept as it stands,
 // so a rule places it nowhere, and places what is still in support.
-func TestARoutingRulePlacesNoCodeFindingPastItsEndOfLife(t *testing.T) {
+func TestAnAssignmentRulePlacesNoCodeFindingPastItsEndOfLife(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		codeFindingsAt(t, f)
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
@@ -659,7 +659,7 @@ func TestARulePreviewCountsEachCodeFindingItWouldPlace(t *testing.T) {
 
 // A rule places work only at a visibility one member of its team reads, as a
 // hand assignment to the team asks: what nobody on it reads stays with nobody.
-func TestARoutingRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
+func TestAnAssignmentRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
 	for _, c := range []struct {
 		name         string
 		roles        []access.Role
@@ -689,7 +689,7 @@ func TestARoutingRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
 
 // A code finding recorded as a flaw is closed work for its holder, so neither the
 // sweep nor the preview counts it.
-func TestARoutingRulePlacesNoRecordedCodeFinding(t *testing.T) {
+func TestAnAssignmentRulePlacesNoRecordedCodeFinding(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		codeFindingsAt(t, f)

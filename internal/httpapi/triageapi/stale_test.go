@@ -172,12 +172,12 @@ func TestWorkSittingInATeamQueueIsSaidToTheTeam(t *testing.T) {
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/assignment",
 			`{"team":"kernel"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("routing to the team answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("assigning to the team answered %d: %s", got.Code, got.Body.String())
 		}
 
 		// Just arrived is not sitting still.
 		if told := r.Alerts(t, "triager", "queue-untaken"); len(told) != 0 {
-			t.Fatalf("work routed a moment ago is reported as sitting: %v", told)
+			t.Fatalf("work assigned a moment ago is reported as sitting: %v", told)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
 			Set(`"assigned_at" = ?`, time.Now().UTC().Add(-5*24*time.Hour)).

@@ -535,8 +535,9 @@ is 21 to 29 MB beside a 306 MB table.
 Migration 45, the untagged release's own. `DESIGN-findings.md` § The case
 says what a report's case holds.
 
-It renames the triage and incident records first, so the rest of it and the
-release's declarations are written against the new names.
+It renames the triage and incident records and the standing rules first, so
+the rest of it and the release's declarations are written against the new
+names.
 
 | v0.10.0 table | v0.11.0 table |
 |---|---|
@@ -546,6 +547,7 @@ release's declarations are written against the new names.
 | `claim_revision`, `claim_approval`, `claim_comment`, `claim_comment_revision`, `claim_build` | `decision_revision`, `decision_approval`, `decision_comment`, `decision_comment_revision`, `decision_build` |
 | `exploited_here`, `exploited_fix` | `incident`, `incident_fix` |
 | `obligation_window`, `obligation_window_product` | `response_window`, `response_window_product` |
+| `routing_rule` | `assignment_rule` |
 
 | Column | v0.11.0 name |
 |---|---|
@@ -555,6 +557,7 @@ release's declarations are written against the new names.
 | `exploited_here_id`, on `incident_fix` and `told_outside` | `incident_id` |
 | `urgency_exploited_here`, on `finding` | `urgency_incident` |
 | `triage_floor`, on `product` | `minimum_severity` |
+| `routed_by`, on `finding` | `assigned_by_rule` |
 
 Every index and constraint named after a renamed table or column is renamed
 with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`,
@@ -589,6 +592,9 @@ its own after the renames.
 | A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
 | The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
 | The minimum severity's `name` on `application_setting` | `triage.floor` | `triage.minimum-severity` |
+| The assignment batch's `name` on `application_setting` | `routing.batch` | `assignment.batch` |
+| An assignment rule's change's `kind` on `admin_change` | `routing` | `assignment-rule` |
+| The assignment sweep's `kind` on `job` | `routing.sweep` | `assignment.sweep` |
 
 | Rule | Why |
 |---|---|
@@ -619,8 +625,8 @@ stored values, and the changes after them.
 | `flaw_report_revision` | A new table: what a report said before each edit | Made by the release's statement. Where it is already there, each of its indexes the table lacks is made |
 | `report_message` | A new table: the correspondence with a reporter | Made by the release's statement. Where it is already there, each of its indexes the table lacks is made |
 | `report_note`, `report_note_revision` | New tables: the notes on a report, and each earlier wording | Made by the release's statement. Where they are already there, each of their indexes a table lacks is made |
-| `report_assignment` | A new table: every change of who holds a report, with the rule that routed it | Made by the release's statement. Where it is already there, each of its indexes the table lacks is made |
-| `routing_rule` | Whether it places vulnerability reports, false for every rule | Added where the table stands, and stepped over where it is already there |
+| `report_assignment` | A new table: every change of who holds a report, with the rule that assigned it | Made by the release's statement. Where it is already there, each of its indexes the table lacks is made |
+| `assignment_rule` | Whether it places vulnerability reports, false for every rule | Added where the table stands, and stepped over where it is already there |
 
 | Check, on each of the four engines | What it holds |
 |---|---|
@@ -628,6 +634,7 @@ stored values, and the changes after them.
 | A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
 | A v0.10.0 database holding an incident, a release carrying its fix, a notice outside, a window counted from another and limited to a product, and a finding the incident ranks first | Upgraded, each row read back under its v0.11.0 name pointing where it did, each renamed table's declaration describing the table built, and a window declared after it numbered after the rows it had |
 | The same two, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
+| A v0.10.0 database holding a standing rule, upgraded whole and stopped after each of its renames | The rule read back as an assignment rule placing findings, and each renamed table's declaration describing the table built |
 | A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
 | A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a notification linking a decision's row and one linking a claim, a failed job, a kept filter naming the renamed words, the bulk action limit and a change on the trail of the renamed kind | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
 | The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, a job's state, a change's, the links, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
@@ -1148,7 +1155,7 @@ and the caller retries a request that changed nothing.
 | Job | A full queue |
 |---|---|
 | Parsing an upload | Refuses the upload with 503, and nothing is stored |
-| Applying a saved routing rule to what is open | Refuses the rule with 503, and nothing is recorded. Nothing else sweeps for a rule |
+| Applying a saved assignment rule to what is open | Refuses the rule with 503, and nothing is recorded. Nothing else sweeps for a rule |
 | Scanning an inventory a read stored | Is not the read's failure. The periodic pass asks again once the queue has drained |
 
 | Outside the act | Why |
@@ -1537,7 +1544,7 @@ one point, so that every test schedules them the same way.
 | A hidden table | Renamed away and put back when the test ends, whatever ends it: a server database is shared by a package's tests |
 | A closed database | Opened and closed, so every call fails. A missing database is refused by a different arm |
 
-The rule has to be applied. Routing rules, VEX statements, teams, saved filters
+The rule has to be applied. Assignment rules, VEX statements, teams, saved filters
 and the administration trail have handler tests on the two-engine form, and
 between them they hold a `LIKE` with an explicit escape, a case-folded `IN`, and
 conditional updates read for whether the row was still there — three of the

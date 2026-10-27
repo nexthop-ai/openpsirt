@@ -52,7 +52,7 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"d3", "de"}: "a decision against another of its product at its occurrence",
 		{"d2", "de"}: "a decision against another of its product at its occurrence",
 	},
-	"finding/routing.go": {
+	"finding/assignment_rule.go": {
 		{"f", "fs"}: "two rows of one code finding in the product bound",
 	},
 	"notify/stale.go": {

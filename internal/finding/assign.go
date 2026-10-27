@@ -104,7 +104,7 @@ func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subjec
 	// triaging and needs no dispatch right: work nobody holds, work already
 	// theirs, and work sitting in a queue of a team they are on. That last is
 	// not taking work off a colleague, which is the act the dispatch right
-	// names: work routed to a team is unheld until somebody takes it. It
+	// names: work assigned to a team is unheld until somebody takes it. It
 	// reaches what they read, and a disclosed row of their own whatever they
 	// read, because an assignment carries it to them and disclosure does not
 	// strand it there.

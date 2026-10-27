@@ -75,7 +75,7 @@ func registerTrail(api huma.API, in core.Deps) {
 		OperationID: "list-administrative-changes", Method: http.MethodGet,
 		Path:    "/v1/administration/changes",
 		Summary: "List administrative changes",
-		Description: "Who changed a setting, a role grant, a routing rule, a support date, a " +
+		Description: "Who changed a setting, a role grant, an assignment rule, a support date, a " +
 			"credential, an account, a team or an issue's names — with what it held " +
 			"before and what it holds now.\n\n" +
 			"This is the layer above the triage record rather than part of it. Three of the " +

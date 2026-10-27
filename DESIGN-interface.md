@@ -34,7 +34,7 @@ end rather than left to be found by clicking.
 - [The dependency tree](#the-dependency-tree)
 - [The review queue](#the-review-queue)
 - [The decision page](#the-decision-page)
-- [Assignments and routing rules](#assignments-and-routing-rules)
+- [Assignments and assignment rules](#assignments-and-assignment-rules)
 - [Catalog and uploads](#catalog-and-uploads)
 - [Product and scan pages](#product-and-scan-pages)
 - [Flaw entry](#flaw-entry)
@@ -660,7 +660,7 @@ nothing at all where they have kept none.
 | A deferral kept before there was a length to keep fills nothing, and says so | Reading it as "no rule" would leave the form blank under a banner saying the filter prepared it |
 
 Saved filters were argued for as the cheap half of ownership by subtree; the
-expensive half is now team routing, so what they are for is being the thing a
+expensive half is now team assignment by rule, so what they are for is being the thing a
 prefill rule is built on.
 
 ## The by-component view
@@ -1191,7 +1191,7 @@ while the operation accepts a triager too, a two-person team where neither
 holds the capability — the ordinary shape of a small team — is shown a decision,
 its reasoning and its history with no way to answer it.
 
-## Assignments and routing rules
+## Assignments and assignment rules
 
 Assignments is two tabs: what is due soon and undecided, and who holds what.
 A row nobody holds says "unassigned" in muted text rather than drawing nobody
@@ -1219,7 +1219,7 @@ them is a different question.
 | Who holds it is the field's value, never its placeholder | A placeholder is the grey a browser paints when nobody has typed, so work somebody had taken read as an empty box asking for a name |
 | A picker nobody can use says so in the box | With no product chosen it reads "Pick a product to assign". A tooltip is a sentence nobody sees, and a disabled field is drawn as disabled everywhere rather than looking live |
 | Offering work to somebody is a question about one product | The findings list spans every product somebody can see when none is picked, so the picker fills once a product is chosen and says why it is not otherwise. Taking work yourself needs no product chosen |
-| **A team's row opens the team's queue** | A team holds work the way a person does: routed by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
+| **A team's row opens the team's queue** | A team holds work the way a person does: assigned by standing rule, or by an assignment naming one. The drill-down resolved an identity, so a team's name matched nobody and the screen answered "they are not holding anything" over work the row beside it had just counted. Worse than an absent view, because it answered |
 | Nobody else holding anything in a product picked links that product's unassigned code findings, for somebody who reads internal material there | The findings list the empty screen points at holds no code finding |
 | A person's or team's list carries the vulnerability reports they hold below their findings, and the people tab lists the reports nobody holds | Drawn only where there are any, because most people read no reports. The people table counts each holder's open reports in a column of its own. The narrowing is the product picked |
 | A holder nothing matches holds nothing, rather than being refused | Refusing would answer "does this team exist" for any credential at all, which is how the organization divides its work for the price of one request. The read is narrowed by what the caller may see anyway |
@@ -1466,7 +1466,7 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | The holder card is the holder picker, offered to somebody who works reports while the report is open | The picker a finding's page draws, asked for readers of undisclosed work. A team's queue says so. Once judged it names the last holder and offers nothing |
 | The correspondence card says whether the reporter was answered, and lists every message | "Not answered." with the line that the first message sent is the acknowledgement, until one is recorded; "Acknowledged" with its day and who recorded it after. Each message reads Sent or Received with its day and who logged it |
 | Recording a message says it sends nothing | Direction, day and the text, with a file attached into the text held on the report. The day is today where it is left empty |
-| The history card lists every act, oldest first | One line an act, with its moment and who did it. A report a routing rule placed says so |
+| The history card lists every act, oldest first | One line an act, with its moment and who did it. A report an assignment rule placed says so |
 | The rows carry the title beside the reference, and who holds each | A team carries the word team beside its name |
 | The list's control for a new report opens the flaw entry form | With the product picked. One form for every report, so a flaw found here and one sent in are filed the same way |
 | Files are attached from the report's page and held at once | A file attached into the text of a message, a note or the reported problem is held on the report the same way, and listed with the rest |

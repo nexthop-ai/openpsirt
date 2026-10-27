@@ -6,7 +6,7 @@
 //
 // Go's own convention is that a doc comment opens with the name of the thing
 // it documents, which makes the drift mechanically visible: a comment opening
-// "DefaultAttachmentMaxSize is …" above `const DefaultRoutingBatch` is a block
+// "DefaultAttachmentMaxSize is …" above `const DefaultAssignmentBatch` is a block
 // that was left behind when its symbol moved. Nineteen of those arrived in one
 // round of file splits and insertions, each of them making `godoc` render one
 // symbol's documentation under another's name — and each invisible to every

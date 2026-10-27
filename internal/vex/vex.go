@@ -182,7 +182,7 @@ type Store struct {
 	// most is how many statements one document carries, or zero for the
 	// shipped number. Carried on the store so a test can bring it down to a
 	// fixture rather than building a fixture up to it, which is how the
-	// routing reach is tested for the same reason.
+	// assignment rule reach is tested for the same reason.
 	most int
 	// generated runs between the document being generated and the write that
 	// records it. Set by a test that has to commit a second issuance inside

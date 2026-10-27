@@ -314,13 +314,13 @@ var administrativeActs = []trailedAct{
 		path: "/v1/teams/kernel/members/newcomer", kind: "team", about: "kernel · newcomer",
 	},
 	{
-		// Routing is neither a grant nor a withdrawal and is not held against
+		// An assignment rule is neither a grant nor a withdrawal and is not held against
 		// a person, so it carries a kind of its own rather than being read as
 		// a role change by anybody filtering the trail.
-		id: "add-routing-rule", what: "a routing rule", who: "assigner",
+		id: "add-assignment-rule", what: "an assignment rule", who: "assigner",
 		method: http.MethodPost, path: "/v1/products/mine/assignment-rules",
 		body: `{"name":"kernel things","team":"kernel","beneath":"libnl-3-200"}`,
-		kind: "routing", about: "mine · kernel things",
+		kind: "assignment-rule", about: "mine · kernel things",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			var rule struct {
 				ID int64 `json:"id"`
@@ -332,9 +332,9 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
-		id: "retire-routing-rule", what: "a routing rule retired", who: "assigner",
+		id: "retire-assignment-rule", what: "an assignment rule retired", who: "assigner",
 		method: http.MethodDelete, path: "/v1/products/mine/assignment-rules/{rule}",
-		kind: "routing", about: "mine · {rule}",
+		kind: "assignment-rule", about: "mine · {rule}",
 	},
 	{
 		id: "retire-team", what: "a team retired", method: http.MethodDelete,

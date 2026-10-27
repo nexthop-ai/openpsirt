@@ -35,12 +35,15 @@ var valuesRewrittenV0110 = []valueRewrite{
 	{"outbound", "kind", "obligation-passed", "response-window-passed"},
 	{"admin_change", "kind", "exploited-here", "incident"},
 	{"job", "state", "dead", "failed"},
+	{"admin_change", "kind", "routing", "assignment-rule"},
+	{"job", "kind", "routing.sweep", "assignment.sweep"},
 }
 
 // settingsRenamedV0110 is each setting v0.11.0 renames, from its v0.10.0 name.
 var settingsRenamedV0110 = []struct{ from, to string }{
 	{"triage.together-cap", "triage.bulk-decision-cap"},
 	{"triage.floor", "triage.minimum-severity"},
+	{"routing.batch", "assignment.batch"},
 }
 
 // savedWordsV0110 is each word of the findings list's address v0.11.0
@@ -56,6 +59,7 @@ var errValuesStopped = errors.New("the stored words were stopped part way")
 // valuesV0110 gives every stored word the renames reach its v0.11.0
 // spelling: a decision's kind, the kinds of notification and destination,
 // the link a notification holds to a decision's row, a job's state, the
+// administrative trail's and the job queue's kinds, the
 // address a kept filter opens and the settings' names. It runs after the
 // renames, against the tables as v0.11.0 names them.
 //

@@ -25,7 +25,7 @@ const PATHS: Record<string, string> = {
     '<path d="M19.5 11.5 12 19a4.5 4.5 0 0 1-6.4-6.4l7.7-7.7a3 3 0 0 1 4.2 4.2l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1l6.9-6.9"/>',
   // A screen is found by its shape, which only works while no two share one.
   // These four were added because four pairs did: teams and people drew the
-  // byte-identical glyph, as did settings and routing, the audit log and an
+  // byte-identical glyph, as did settings and auto-assignment, the audit log and an
   // upload, and recording a flaw and a finding.
   teams:
     '<circle cx="12" cy="6.5" r="2.8"/><circle cx="4.8" cy="10.5" r="2.2"/><circle cx="19.2" cy="10.5" r="2.2"/><path d="M6.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M1.5 17.2a3.8 3.8 0 0 1 3.3-3.4"/><path d="M22.5 17.2a3.8 3.8 0 0 0-3.3-3.4"/>',

@@ -211,14 +211,14 @@ export function Assignee({
   at,
   assigned,
   undisclosed,
-  routedBy,
+  assignedByRule,
 }: {
   at: At;
   assigned: string;
   undisclosed: boolean;
   // The standing rule that placed this, where one did. A placement nobody can
   // explain is one nobody can correct.
-  routedBy: string;
+  assignedByRule: string;
 }) {
   const queries = useQueryClient();
   const hand = useMutation({
@@ -266,7 +266,7 @@ export function Assignee({
           onPick={(held) => hand.mutate(held)}
         />
       </div>
-      {routedBy && <span className="hint">by rule {routedBy}</span>}
+      {assignedByRule && <span className="hint">by rule {assignedByRule}</span>}
       {hand.isPending && <span className="hint">Saving…</span>}
       {hand.error != null && <Failed error={hand.error} what="That could not be recorded." />}
     </div>

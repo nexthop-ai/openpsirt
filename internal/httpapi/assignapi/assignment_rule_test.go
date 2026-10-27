@@ -78,22 +78,22 @@ func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
 		// And the finding says which rule placed it, which is what
 		// makes a placement correctable rather than mysterious.
 		var detail struct {
-			AssignedTo string `json:"assigned_to"`
-			RoutedBy   string `json:"routed_by"`
+			AssignedTo     string `json:"assigned_to"`
+			AssignedByRule string `json:"assigned_by_rule"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-CURL2/components/libcurl3t64", &detail)
-		if detail.RoutedBy != "curl to the curlers" {
-			t.Errorf("the finding says %q placed it", detail.RoutedBy)
+		if detail.AssignedByRule != "curl to the curlers" {
+			t.Errorf("the finding says %q placed it", detail.AssignedByRule)
 		}
 		// The one a person took stays a person's, and names no rule.
 		var byHand struct {
-			RoutedBy string `json:"routed_by"`
+			AssignedByRule string `json:"assigned_by_rule"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-CURL1/components/libcurl4t64", &byHand)
-		if byHand.RoutedBy != "" {
-			t.Errorf("something a person took names the rule %q", byHand.RoutedBy)
+		if byHand.AssignedByRule != "" {
+			t.Errorf("something a person took names the rule %q", byHand.AssignedByRule)
 		}
 
 		// A triager may see the rules but not write one: a rule hands work to
@@ -313,7 +313,7 @@ func TestASweepDoesNotStopBecauseSomebodyTookOneRow(t *testing.T) {
 		}
 
 		work := queue.New(r.DB, queue.DefaultOptions())
-		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.RoutingBatch, "2"); err != nil {
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.AssignmentBatch, "2"); err != nil {
 			t.Fatal(err)
 		}
 		sweeper := finding.NewSweeper(r.DB, work,
@@ -364,15 +364,15 @@ func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
 
 		work := queue.New(r.DB, queue.DefaultOptions())
 		// The rule's own sweep is waiting, and another beside it. With room
-		// for one waiting routing job, claiming the first leaves the second
+		// for one waiting assignment sweep, claiming the first leaves the second
 		// filling the queue, so the rest of the first cannot be queued.
-		if _, err := work.Add(ctx, queue.Route, "another product"); err != nil {
+		if _, err := work.Add(ctx, queue.AssignmentSweep, "another product"); err != nil {
 			t.Fatal(err)
 		}
 		if _, _, err := setting.NewStore(r.DB.DB).Change(ctx, setting.QueueBacklog, "1"); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.RoutingBatch, "1"); err != nil {
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.AssignmentBatch, "1"); err != nil {
 			t.Fatal(err)
 		}
 		sweeper := finding.NewSweeper(r.DB, work,
@@ -381,7 +381,7 @@ func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
 			t.Fatal("a full batch whose continuation could not be queued reported success")
 		}
 		done, err := r.DB.DB.NewSelect().Table("job").
-			Where(`"kind" = ?`, queue.Route).Where(`"state" = ?`, queue.Done).Count(ctx)
+			Where(`"kind" = ?`, queue.AssignmentSweep).Where(`"state" = ?`, queue.Done).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -401,7 +401,7 @@ func TestARuleWhoseSweepCannotBeQueuedIsNotRecorded(t *testing.T) {
 			`{"name":"curlers","members":["triager"]}`); made.Code != http.StatusCreated {
 			t.Fatal(made.Body.String())
 		}
-		if _, err := queue.New(r.DB, queue.DefaultOptions()).Add(ctx, queue.Route,
+		if _, err := queue.New(r.DB, queue.DefaultOptions()).Add(ctx, queue.AssignmentSweep,
 			"another product"); err != nil {
 			t.Fatal(err)
 		}
@@ -412,7 +412,7 @@ func TestARuleWhoseSweepCannotBeQueuedIsNotRecorded(t *testing.T) {
 			"/v1/products/mine/assignment-rules",
 			`{"name":"curl to the curlers","team":"curlers","upstream":"curl"}`),
 			http.StatusServiceUnavailable)
-		rules, err := r.DB.DB.NewSelect().Table("routing_rule").Count(ctx)
+		rules, err := r.DB.DB.NewSelect().Table("assignment_rule").Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -453,7 +453,7 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 }
 
 func TestTheSweeperWorksAWholeBacklogInOneWakeAndReturnsWhenCancelled(t *testing.T) {
-	// Sweeper.Run is what cmd/openpsirt starts and what places routed work.
+	// Sweeper.Run is what cmd/openpsirt starts and what places work by rule.
 	// The other tests here drive Once, one of them in a loop of twenty that
 	// stands in for the loop being tested — and what only the loop does is
 	// keep going while there is work, reset the timer and return on
@@ -479,7 +479,7 @@ func TestTheSweeperWorksAWholeBacklogInOneWakeAndReturnsWhenCancelled(t *testing
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()
 		work := queue.New(r.DB, queue.DefaultOptions())
-		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.RoutingBatch, "2"); err != nil {
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.AssignmentBatch, "2"); err != nil {
 			t.Fatal(err)
 		}
 		sweeper := finding.NewSweeper(r.DB, work,
@@ -529,10 +529,10 @@ func waitFor(t *testing.T, done func() bool, what string) {
 	t.Fatalf("waited for %s and it did not happen", what)
 }
 
-// Somebody who triages only internal work reads and previews the routing rules,
+// Somebody who triages only internal work reads and previews the assignment rules,
 // because a rule places code findings. Reading internal work without triaging it is
 // refused both.
-func TestSomebodyWhoTriagesCodeFindingsAloneReadsAndPreviewsTheRoutingRules(t *testing.T) {
+func TestSomebodyWhoTriagesCodeFindingsAloneReadsAndPreviewsTheAssignmentRules(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededCodeFinding(t, r)
 		const at = "/v1/products/mine/assignment-rules"

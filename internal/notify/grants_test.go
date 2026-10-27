@@ -113,7 +113,7 @@ func (s *split) decision(t *testing.T, by int64, public, private int,
 	}
 }
 
-// queued writes one open finding at this visibility, routed to a team long
+// queued writes one open finding at this visibility, assigned to a team long
 // enough ago to count as sitting there.
 func (s *split) queued(t *testing.T, team *access.Team, visibility access.Visibility) {
 	t.Helper()

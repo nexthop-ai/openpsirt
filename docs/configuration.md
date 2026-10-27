@@ -1417,7 +1417,7 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | `POST /v1/products/{product}/reports/{reference}/acknowledgement` and `POST /v1/products/{product}/issues/{vulnerability}/report/acknowledgement` are removed, and a request to either is refused. v0.10.2 recorded with them that somebody answered the reporter | Record a message sent to the reporter instead, with `POST /v1/products/{product}/reports/{reference}/messages` and `direction` set to `sent`. The first message recorded as sent is the acknowledgement |
 | A report's `acknowledged` is the day of the first message recorded as sent, as `YYYY-MM-DD`, and `acknowledged_by` is whoever recorded it. v0.10.2 answered the moment somebody pressed acknowledge | Nothing. The upgrade writes each acknowledgement v0.10.2 recorded as the first message sent, dated the day it was recorded in UTC, by whoever recorded it, with no text. A client parsing `acknowledged` as a moment parses a day |
 | A report's reported problem, which v0.10.2 named `summary`, is required when it is recorded and when it is edited. v0.10.2 accepted an empty one | Send `reported_problem`. A report v0.10.2 left with none on a flaw recorded here takes the flaw's summary as its reported problem. Any other report v0.10.2 recorded with none keeps none, and an edit to it while it is open fills one in |
-| A routing rule takes `reports`, which places the product's vulnerability reports instead of findings | Nothing. A rule without it places findings, as before |
+| An assignment rule takes `reports`, which places the product's vulnerability reports instead of findings | Nothing. A rule without it places findings, as before |
 | The unanswered notice and a reporter writing back go to whoever holds the report, the members of the team whose queue it is in, or everybody who works reports in the product where nobody holds it | Nothing. Every report the upgrade carries is held by nobody, so its notices reach whom they reached in v0.10.2 |
 | Withdrawing a role that is not somebody's last, a group-bound sign-in that derives fewer roles, the first sign-in after the switch into group-bound mode, a switch out of it, taking somebody off a team and retiring a team hand back the work they leave with a holder who may no longer read it. v0.10.2 handed work back only when somebody's last role on a product went, or they were deactivated | Nothing. Work v0.10.2 already left with somebody who cannot read it stays with them until a write names its holder |
 | A role held across every product counts in every notice's audience as a role on each product. v0.10.2 read per-product roles alone, so somebody reading a product only through such a role was told nothing about it | Nothing |
@@ -1442,7 +1442,10 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | The interface's address for incidents and response windows is `/incidents`. `/exploited-here` and `/obligations` forward to it | Nothing |
 | Screens are renamed: Reports is Analytics, at `/analytics`, Inbox is Vulnerability reports, at `/products/{product}/vulnerability-reports`, Disclosing is Disclosure deadlines, at `/disclosure-deadlines`, Report a flaw is Record a flaw, at `/record-a-flaw`, and The record is Audit log, at `/audit-log`. Advisories is Published advisories and Scan results is Known vulnerability scan, at the addresses they had | Nothing. An address v0.10.2 served forwards to the screen's new one, with its query |
 | A finding with no deadline because it is below its product's minimum severity says `below-minimum-severity` as its `no_deadline`, which v0.10.2 answered as `below-the-line` | A client matching on the reason matches the new word |
-| The upgrade renames the triage tables and columns, then rewrites the stored values above. Each rename waits up to three seconds for a table another session holds, then waits again, logging `a rename is waiting for a table something else holds` with what holds it | Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end |
+| The administrative trail's kind for an assignment rule is `assignment-rule`, which v0.10.2 named `routing`, in each change and in `GET /v1/administration/changes` | Ask for `kind=assignment-rule`. The upgrade rewrites every stored change |
+| The setting `assignment.batch` is how many findings one pass of the assignment rules places, which v0.10.2 named `routing.batch` | Nothing. The upgrade moves the value to the new name, and a value under the former name is read as one under `triage.together-cap` is |
+| The background job applying the assignment rules is `assignment.sweep`, which v0.10.2 named `routing.sweep` | A monitor matching on the job's kind matches the new one. The upgrade rewrites every stored job |
+| The upgrade renames tables and columns, then rewrites the stored values above. Each rename waits up to three seconds for a table another session holds, then waits again, logging `a rename is waiting for a table something else holds` with what holds it | Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end |
 
 #### Renamed API fields
 
@@ -1466,6 +1469,7 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | `summary`, on a vulnerability report | `reported_problem` |
 | `triage_floor`, a product's own | `minimum_severity` |
 | `floor`, setting a product's minimum severity, on the findings list and on a build's readiness | `minimum_severity` |
+| `routed_by`, the rule that placed a finding | `assigned_by_rule` |
 
 A notice's `places`, the places it named, keeps its name.
 

@@ -77,7 +77,7 @@ func personAdmits(person *access.Account, productID int64) finding.Admits {
 	}
 }
 
-// teamAdmits refuses routing work to a team none of whose members may read it,
+// teamAdmits refuses assigning work to a team none of whose members may read it,
 // where it would sit in a queue nobody on it can see.
 func teamAdmits(team *access.Team, productID int64) finding.Admits {
 	return func(ctx context.Context, db bun.IDB, withheld []access.Visibility) error {
@@ -104,7 +104,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			"`GET /v1/products/{product}/findings`.\n\n" +
 			"Each row is assigned the way one finding is: across every build of the product, " +
 			"at every package the row folds together. Send `person` as an empty string to " +
-			"hand the rows back to nobody, or `team` to route them to a team.\n\n" +
+			"hand the rows back to nobody, or `team` to assign them to a team.\n\n" +
 			"`only` limits the act to rows somebody picked from the list. A picked row the " +
 			"filter no longer matches is not assigned; `pieces` says how many were.\n\n" +
 			"Without the assigner right you may take what nobody holds and hand back your own. " +

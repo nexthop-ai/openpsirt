@@ -74,7 +74,7 @@ describe("the teams screen", () => {
     expect(text).toContain("platform");
     expect(mount.host().querySelector(".screen-head button")).toBeNull();
     expect(text).not.toContain("Retire");
-    expect(text).not.toContain("work routed here stays unassigned");
+    expect(text).not.toContain("work assigned here sits unheld");
   });
 });
 

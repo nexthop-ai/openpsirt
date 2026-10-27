@@ -85,10 +85,10 @@ type passes struct {
 	post    *notify.Post
 	outward *notify.Signal
 	// talk carries notifications to chat. Nil where no platform is configured.
-	talk    *notify.Talk
-	keeper  *attach.Keeper
-	routing *finding.Sweeper
-	analyze *analysis.Worker
+	talk      *notify.Talk
+	keeper    *attach.Keeper
+	assigning *finding.Sweeper
+	analyze   *analysis.Worker
 	// undertaker fails the jobs whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
 	undertaker *queue.Undertaker
@@ -145,7 +145,7 @@ func (p passes) loops() []loop {
 		{"look up the branches patches are on", p.branches.Run, 0},
 		{"watch for quiet builds", p.watch.Run, 0},
 		{"send what is owed outward", p.outward.Run, 0},
-		{"route unheld work to teams", p.routing.Run, readInterval},
+		{"assign unheld work to teams", p.assigning.Run, readInterval},
 		{"apply analyzer runs", p.analyze.Run, readInterval},
 		{"fail jobs whose worker died", p.undertaker.Run, 0},
 	}

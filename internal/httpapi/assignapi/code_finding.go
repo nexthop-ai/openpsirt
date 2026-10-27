@@ -30,7 +30,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 			"It covers the product, not the build named in the path: what is assigned is the " +
 			"code finding on every build of the product it is open on.\n\n" +
 			"Send `person` as an empty string to hand it back to nobody. Send `team` instead to " +
-			"route it to a team, which is a queue rather than a holding: it stays unheld until " +
+			"assign it to a team, which is a queue rather than a holding: it stays unheld until " +
 			"somebody takes it.\n\n" +
 			"A person is given a code finding only where they may read it at its visibility, and a team " +
 			"only where one member may. A code finding every release of which is past its end of life " +
@@ -47,7 +47,7 @@ func registerCodeFindingAssigning(api huma.API, in core.Deps) {
 		Occurrence string `path:"occurrence" doc:"The code finding's occurrence identity"`
 		Body       struct {
 			Person string `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
-			Team   string `json:"team,omitempty" doc:"A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
+			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
 	}) (*struct{}, error) {
 		subject, err := core.Reading(ctx)

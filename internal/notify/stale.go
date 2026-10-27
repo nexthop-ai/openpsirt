@@ -379,7 +379,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 //
 // One condition per team and product rather than per finding, which is the
 // one place these four differ in shape. The others are somebody's action —
-// a decision is one thing a person did — and this is a population: a routing rule
+// a decision is one thing a person did — and this is a population: an assignment rule
 // places thousands of findings in a single sweep, so a notification
 // each would be the estate arriving in a notification area. What somebody has
 // to know is that their team's queue has stopped being emptied, and a count

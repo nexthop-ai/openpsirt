@@ -251,7 +251,7 @@ line is withheld as internal (§ The notification list).
 | A suppression rule waiting for approval is one condition per rule | It dismisses nothing while it waits, so every code finding it names stays in the queue, and one approval answers all of them |
 | Code findings in a team's queue are counted one per occurrence, for each team and product, apart from the team's other queued work, and the condition names the team | A code finding is one piece of work at its occurrence (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
 | A code finding a decision stands on, or one recorded as a flaw, is not waiting | A decision is somebody judging it, and a code finding recorded as a flaw is closed work for its holder |
-| Team routing reaches a code finding notice through the team's queue alone | A flaw record, an inclusion and an assignment are each one act about one code finding, told to the people the table names. A series alert is about a series, which no team holds |
+| Assignment to a team reaches a code finding notice through the team's queue alone | A flaw record, an inclusion and an assignment are each one act about one code finding, told to the people the table names. A series alert is about a series, which no team holds |
 
 ## Staleness conditions
 
@@ -302,7 +302,7 @@ be closed and goes on being raised until it is answered.
 Every one is bounded by what the person may read. An alert is not a way back in
 to something somebody has lost the reading of.
 
-The team queue is the one that needs stating. Work routed to a team is neither
+The team queue is the one that needs stating. Work assigned to a team is neither
 owned nor unowned, so it sits in a gap where it looks handled and is not.
 
 A deferral that is not in force has no end to announce. The notice states that a
@@ -317,7 +317,7 @@ findings list.
 
 The queue is counted per team and product; the others per decision. A decision is one
 person's action and one thing to read, however many rows it wrote. A queue is a
-population: one routing rule places thousands of findings in a sweep. Within it
+population: one assignment rule places thousands of findings in a sweep. Within it
 the unit is an issue in a component, whatever its occurrences' visibility, and the
 condition is undisclosed where any of those occurrences is.
 
@@ -505,7 +505,7 @@ what somebody may do, not what they want to read.
 |---|---|
 | Assembled as its reader | Every query narrows by the subject it is handed. The sweep holds no rights of its own |
 | Nothing is repeated | An event records what it was about, kept apart from the name a condition clears against, which is a uniqueness key and would deduplicate two unrelated events into one |
-| It pages past what it has already said | Filtering one page rather than paging until enough survive gives a holder with a page's worth of already-told items an empty digest. Routed work arrives deliberately without a message, so the digest is the only place it is named |
+| It pages past what it has already said | Filtering one page rather than paging until enough survive gives a holder with a page's worth of already-told items an empty digest. Work assigned by rule arrives deliberately without a message, so the digest is the only place it is named |
 | A digest with nothing in it is not sent, and the clock still moves | A daily "nothing" is how somebody stops opening the daily message. Leaving the mark unmoved would make a quiet week report itself as new the following Monday |
 | A digest that cannot be assembled moves the clock | On the rule a refusing mailbox follows: it is tried tomorrow rather than every minute, and a batch of them cannot crowd out a reader it can serve |
 | A first digest reports nothing under "nobody owns" | There is no "since" to measure against |
@@ -883,7 +883,7 @@ finding it names may since have been decided, closed or reopened.
 | Not built | Detail |
 |---|---|
 | Teams and Google Chat | Slack and Zulip are built. § Chat says what each of the other two needs |
-| A message when a rule routes work to a team | Routed work arrives without a notification, so a team's channel hears of it through the condition that work is sitting in the queue |
+| A message when a rule assigns work to a team | Work assigned by rule arrives without a notification, so a team's channel hears of it through the condition that work is sitting in the queue |
 | The HTML part of a mail | Every mail body is text the server composes, so the part is that text escaped, with the link as an anchor. A renderer would be needed only for typed notes, which mail does not carry |
 
 ## Limits
@@ -895,5 +895,5 @@ finding it names may since have been decided, closed or reopened.
 | Slack shows a backslash before each character escaped as markdown in a webhook's text | Slack's markup has no backslash escape and Teams renders markdown, and one text goes to both. A stray backslash costs less than a link labelled anything |
 | A chat account registered to somebody's address is taken to be theirs | The platform's administrator controls which addresses its accounts hold, and a deployment that does not trust them should not configure the bot |
 | Chat carries nothing opened more than a day ago | A backlog from before a platform was configured, or from a day it refused, is in the application, and delivered at once it buries what is new |
-| A team's channel carries only the queue condition | It is the one notification that names a team. Assignment to a team and routing by rule make none |
+| A team's channel carries only the queue condition | It is the one notification that names a team. Assignment to a team, by hand or by rule, makes none |
 | A report's watchers are its audience, with no list of their own | Nobody joins or leaves a report except by who holds it. Findings and code findings have no watch list to follow, and the audience already decides who may open the report |

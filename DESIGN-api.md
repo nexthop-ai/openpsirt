@@ -102,7 +102,7 @@ description, which is the one thing a reader of these asks for first.
 | 202 | Accepted, not yet done. Only an upload, which answers before it has been read |
 | 204 | Done, with nothing worth saying |
 | 400 | A query parameter the operation does not take, or a NUL character in typed input. The refusal names the input |
-| 403 | An act the caller may not do, on a product they can see: an issue act or a routing rule without the role it asks for |
+| 403 | An act the caller may not do, on a product they can see: an issue act or an assignment rule without the role it asks for |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
 | 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the decision, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was being generated, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written: a promise naming a release past end-of-life, for one |
@@ -507,7 +507,7 @@ product declared `acme-router` and displayed `Acme Router`, listed as the
 label, is sent back by the withdraw beside it and matches nothing.
 
 Every listing carries both fields: the collaborators, the roles, the
-credentials, the bindings, the tokens and the routing rules.
+credentials, the bindings, the tokens and the assignment rules.
 
 The pipeline-key and personal-token lists leave a product's label off where it
 repeats the product's name.
@@ -535,7 +535,7 @@ route, sign-in and the served interface, and registers each area in turn.
 |---|---|
 | Uploads arriving | Uploads, their receipts, the documents a build sent, one scanner run |
 | Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
-| Handing work out | Assignment, routing rules, teams, tags, bulk acts, planned upgrades, one component |
+| Handing work out | Assignment, assignment rules, teams, tags, bulk acts, planned upgrades, one component |
 | Decisions | The review queue, proposing, approving, re-affirmation, comments, incidents, response windows, assessments, scrutiny, readiness |
 | Analytics | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
 | Advisories | Advisories, VEX, supplier imports, the suppliers read on a schedule, outbound destinations |
@@ -580,7 +580,7 @@ Recorded because the conclusion is the deliverable.
 | Paging is `limit` and `offset`, with a total | A cursor is better under concurrent writes and worse for jumping to a page. The total is separate from the page because somebody deciding whether to start work needs to know how much there is |
 | A list answers with an object, not an array | An array at the top level has nowhere to put the total |
 | Names in paths, identifiers in bodies | A product, stream and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
-| A removal takes something out of use rather than out of the database | A team, a routing rule, an outbound destination and a variant are each reached by `DELETE` and each keep their row. What they hold is named by findings, decisions and documents that went to customers, so removing the row would take those with it |
+| A removal takes something out of use rather than out of the database | A team, an assignment rule, an outbound destination and a variant are each reached by `DELETE` and each keep their row. What they hold is named by findings, decisions and documents that went to customers, so removing the row would take those with it |
 | An amendment leaves out what it does not change, and naming nothing is refused | Absent and cleared are different requests wherever a field has a default, and a request that asks for nothing answered as done would say something happened |
 | An occurrence in a path is the identity the findings list gave out | A caller free to compose one would be choosing which decisions apply where |
 | Comment density in this layer is low by design | It is a registration and a mapping: the operation is declared, a store is called, its answer becomes a body. What is worth explaining about a rule belongs where the rule is enforced |

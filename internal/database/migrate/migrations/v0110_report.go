@@ -180,7 +180,7 @@ func flawReportV0110(t *columnTypes) []string {
 			-- The person who did it. Null where a standing rule placed it.
 			"assigned_by"    ` + t.refNull + ` NULL,
 			-- The standing rule that placed it, where one did.
-			"routed_by"      ` + t.refNull + ` NULL,
+			"assigned_by_rule" ` + t.refNull + ` NULL,
 			"assigned_at"    ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "report_assignment_report_fk" FOREIGN KEY ("flaw_report_id")
 				REFERENCES "flaw_report"("id"),
@@ -188,35 +188,32 @@ func flawReportV0110(t *columnTypes) []string {
 				REFERENCES "party"("id"),
 			CONSTRAINT "report_assignment_by_fk" FOREIGN KEY ("assigned_by")
 				REFERENCES "person"("id"),
-			CONSTRAINT "report_assignment_rule_fk" FOREIGN KEY ("routed_by")
-				REFERENCES "routing_rule"("id")
+			CONSTRAINT "report_assignment_rule_fk" FOREIGN KEY ("assigned_by_rule")
+				REFERENCES "assignment_rule"("id")
 		)` + t.suffix,
 		`CREATE INDEX "report_assignment_report_idx"
 			ON "report_assignment" ("flaw_report_id", "assigned_at")`,
 	}
 }
 
-// routingRuleV0110 is v0.11.0's declaration of the routing rule table.
+// assignmentRuleV0110 is v0.11.0's declaration of the assignment rule table.
 //
-// The baseline's, with whether a rule places vulnerability reports. Derived
-// from the baseline's declaration; no release between changed it.
-func routingRuleV0110(t *columnTypes) []string {
-	made, indexes, err := pick(routingBaseline(t), "routing_rule")
-	if err != nil {
-		panic(err)
-	}
-	made = withColumn(made, `"beneath"    `+t.name+` NULL,`,
+// The baseline's, renamed, with whether a rule places vulnerability reports.
+// Derived from the baseline's declaration; no release between changed it.
+func assignmentRuleV0110(t *columnTypes) []string {
+	statements := declaredV0110(t, "assignment_rule")
+	statements[0] = withColumn(statements[0], `"beneath"    `+t.name+` NULL,`,
 		`-- Whether this rule places the product's vulnerability reports
 			-- rather than findings. A report sits at no component, so a rule
 			-- placing reports names neither key.
 			"reports"    `+t.boolean+` DEFAULT FALSE NOT NULL,`)
-	return append([]string{made}, indexes...)
+	return statements
 }
 
 // reportCaseV0110 makes a report a case: it gains a title and a holder, the
 // tables of its revisions, notes, correspondence and holders are made, every
 // acknowledgement v0.10.0 recorded becomes the first message sent, and the
-// acknowledged stamp is removed. A routing rule gains whether it places
+// acknowledged stamp is removed. An assignment rule gains whether it places
 // reports.
 //
 // Every step is stepped over where a stopped upgrade already made it, because
@@ -335,11 +332,11 @@ func reportCaseV0110(ctx context.Context, tx bun.Tx) error {
 		}
 	}
 
-	places, err := u.hasColumn("routing_rule", "reports")
+	places, err := u.hasColumn("assignment_rule", "reports")
 	if err != nil || places {
 		return err
 	}
-	return u.change(routingRuleV0110(u.t), change{table: "routing_rule",
+	return u.change(assignmentRuleV0110(u.t), change{table: "assignment_rule",
 		add: []added{{column: "reports"}}})
 }
 

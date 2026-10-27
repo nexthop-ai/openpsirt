@@ -43,7 +43,7 @@ type FindingBody struct {
 	Component string        `json:"component" doc:"The component that carries it"`
 	Version   string        `json:"version" doc:"The version that ships"`
 	Upstream  string        `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
-	Source    string        `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"`
+	Source    string        `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, assigned by one rule"`
 	Ecosystem string        `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
 	Namespace string        `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version"`
 	FixState  core.FixState `json:"fix_state,omitempty" doc:"Upstream's answer about it"`
@@ -81,7 +81,7 @@ type FindingBody struct {
 
 	// Fold is the row's subject: the source package at the version it was
 	// built at. Two binaries of one source are one row, because deciding about
-	// them is one decision, upgrading them is one act and routing them is one
+	// them is one decision, upgrading them is one act and assigning them is one
 	// rule.
 	Fold string `json:"fold" doc:"The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from"`
 	// Packages and Consumers are the numbers a reader is shown, counted in
@@ -159,7 +159,7 @@ type ComponentFindingBody struct {
 	Component   string `json:"component"`
 	Version     string `json:"version"`
 	Upstream    string `json:"upstream,omitempty" doc:"The upstream a fork was cut from, where one is known"`
-	Source      string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
+	Source      string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What an assignment rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
 	Ecosystem   string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
 	Namespace   string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version"`
 	Issues      int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
@@ -607,10 +607,10 @@ type EvidenceBody struct {
 	// group at once. Where the occurrences somehow disagree it is left empty rather
 	// than naming one of them, which is the same rule the deadline list uses.
 	AssignedTo string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person"`
-	// RoutedBy names the standing rule that placed this, where a rule did
+	// AssignedByRule names the standing rule that placed this, where a rule did
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
-	RoutedBy string `json:"routed_by,omitempty" doc:"The standing rule that placed this, where one did. Empty means a person did, or nobody has"`
+	AssignedByRule string `json:"assigned_by_rule,omitempty" doc:"The standing rule that placed this, where one did. Empty means a person did, or nobody has"`
 
 	// Standing is the decisions in force here, so the finding is the
 	// working screen after a decision as well as before it: the live
@@ -784,7 +784,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Matched: core.MatchRoute(e.Matched), MatchedFrom: e.MatchedFrom,
 		MatchedIn: e.MatchedIn, MatchedRange: e.MatchedRange, Recorded: e.Recorded,
 		LatestVersion: e.LatestVersion, NothingSince: e.NothingSince,
-		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, RoutedBy: e.RoutedBy,
+		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, AssignedByRule: e.AssignedByRule,
 		Tags:        e.Tags,
 		Occurrences: make([]SittingBody, 0, len(e.Occurrences)),
 		Claimed:     make([]BuildClaimBody, 0, len(e.Claimed)),

@@ -34,7 +34,7 @@ A job holds no payload. The reference points at the subject, so the queue stays
 small however large that subject is.
 
 Kinds are constants defined with the queue rather than with the worker that runs
-them: read a scan, scan for vulnerabilities, sweep the routing rules. A kind is
+them: read a scan, scan for vulnerabilities, sweep the assignment rules. A kind is
 also stored in the row, so renaming one leaves queued work that nothing claims.
 
 ## Exclusive handout
@@ -167,7 +167,7 @@ administrator sets. The caller is told to retry.
 
 | Rule | Reason |
 |---|---|
-| Counted per kind | The cap exists so a runaway producer cannot push everyone else's work behind its own. Counted across every kind it does the opposite: the producer that filled the queue keeps its place while every other producer is refused, so a bulk change to the routing rules refuses every scan upload in the deployment |
+| Counted per kind | The cap exists so a runaway producer cannot push everyone else's work behind its own. Counted across every kind it does the opposite: the producer that filled the queue keeps its place while every other producer is refused, so a bulk change to the assignment rules refuses every scan upload in the deployment |
 | The depth counts work held by a worker that has stopped reporting | Counting only what is waiting reads a queue in the middle of a reclaim cycle as empty: every row sits in the claimed state, held by workers that died, and the one number an operator has says there is nothing to do |
 | A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
 | Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
@@ -212,7 +212,7 @@ The caller states whether a job commits with the rows it is about.
 | Mode | Used for | Failure mode it prevents |
 |---|---|---|
 | Commit with the rows | Work describing something the same transaction wrote, such as an upload | A job committed alone can be claimed before its rows exist; rows committed without their job are work nobody picks up |
-| Queue on its own | Work no write of the same act describes: a build the periodic pass finds due, the next batch of a routing sweep, an overtaken scan read again | None needed. Nothing was written beside it, so a failure to queue is returned to whatever asked and leaves no rows waiting on a job |
+| Queue on its own | Work no write of the same act describes: a build the periodic pass finds due, the next batch of a assignment sweep, an overtaken scan read again | None needed. Nothing was written beside it, so a failure to queue is returned to whatever asked and leaves no rows waiting on a job |
 
 Every write the queue makes of its own — queueing, claiming, renewing,
 finishing, failing, setting aside, putting back, and taking or handing back a

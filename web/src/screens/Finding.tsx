@@ -1129,7 +1129,7 @@ export function Finding() {
                       at={located}
                       assigned={it.assigned_to ?? ""}
                       undisclosed={!!it.undisclosed}
-                      routedBy={it.routed_by ?? ""}
+                      assignedByRule={it.assigned_by_rule ?? ""}
                     />
                   }
                   onDone={(r) => {
@@ -1200,7 +1200,7 @@ export function Finding() {
             at={located}
             assigned={it.assigned_to ?? ""}
             undisclosed={!!it.undisclosed}
-            routedBy={it.routed_by ?? ""}
+            assignedByRule={it.assigned_by_rule ?? ""}
           />
         )}
 

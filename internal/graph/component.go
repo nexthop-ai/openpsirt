@@ -53,7 +53,7 @@ type Component struct {
 	// NameFolded and UpstreamFolded are the two names lowered once, on the
 	// way in, so that matching one is an equality test rather than
 	// something an engine is asked to fold. The four do not fold alike
-	// outside ASCII, so asking them to made whether a routing rule swept a
+	// outside ASCII, so asking them to made whether an assignment rule swept a
 	// component — or a VEX statement reached it — depend on which engine
 	// was running. It also leaves the comparison able to use an index,
 	// which wrapping the column in a function did not.
@@ -749,7 +749,7 @@ func (d Described) Source() (name, version string) {
 // Done here rather than by the engine because the four do not agree: SQLite's
 // LOWER folds ASCII and nothing else, while the three servers fold the whole
 // character set. A component named with any letter outside ASCII therefore
-// matched a routing rule, a search, or a published VEX statement on three
+// matched an assignment rule, a search, or a published VEX statement on three
 // engines and not on the fourth — and which one a deployment ran decided the
 // answer, with nothing reporting the difference, because both look correct.
 //

@@ -615,7 +615,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// work rather than part of the request that saved the rule: one rule
 	// sweeps thousands of findings, and saving a form must not hold a
 	// transaction open across the estate.
-	routing := finding.NewSweeper(db, work, logger, name)
+	assigning := finding.NewSweeper(db, work, logger, name)
 	// Applies what an analyzer reported against a build, once the build has
 	// an inventory to place the results on, and tells the product's internal
 	// readers of a run that dropped sharply.
@@ -692,7 +692,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	}
 	return handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: current,
-		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing, analyze: analyze,
+		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, assigning: assigning, analyze: analyze,
 		undertaker: undertaker, publish: writer, suppliers: suppliers, forks: forks,
 		branches:  branches,
 		records:   records,

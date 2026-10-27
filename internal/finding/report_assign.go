@@ -32,10 +32,10 @@ type ReportAssignment struct {
 	AssignedTo *int64 `bun:"assigned_to"`
 	// AssignedBy is the person who did it. Absent where a standing rule
 	// placed it, or an administrator's hand-over of everything somebody
-	// held, which RoutedBy and the act's own record tell apart.
-	AssignedBy *int64    `bun:"assigned_by"`
-	RoutedBy   *int64    `bun:"routed_by"`
-	AssignedAt time.Time `bun:"assigned_at,notnull"`
+	// held, which AssignedByRule and the act's own record tell apart.
+	AssignedBy     *int64    `bun:"assigned_by"`
+	AssignedByRule *int64    `bun:"assigned_by_rule"`
+	AssignedAt     time.Time `bun:"assigned_at,notnull"`
 }
 
 // reportHeld is the visibility a report is held at, which is what a recipient
@@ -134,7 +134,7 @@ func recordHolder(ctx context.Context, tx bun.IDB, reportID int64, to, by, rule 
 	at time.Time) error {
 
 	if _, err := tx.NewInsert().Model(&ReportAssignment{
-		FlawReportID: reportID, AssignedTo: to, AssignedBy: by, RoutedBy: rule, AssignedAt: at,
+		FlawReportID: reportID, AssignedTo: to, AssignedBy: by, AssignedByRule: rule, AssignedAt: at,
 	}).Exec(ctx); err != nil {
 		return fmt.Errorf("keep who held the report: %w", err)
 	}
@@ -281,9 +281,9 @@ func reportProductsHeld(ctx context.Context, tx bun.IDB, party int64) ([]int64, 
 // nobody holds in a team's queue, and returns it. It names no package and no
 // place: a report sits at neither.
 func (s *Store) AddReportRule(ctx context.Context, by access.Subject, productID, teamID int64,
-	name string) (*Routing, error) {
+	name string) (*AssignmentRule, error) {
 
-	if err := mayRoute(by, productID); err != nil {
+	if err := mayAssignByRule(by, productID); err != nil {
 		return nil, err
 	}
 	return s.insertRule(ctx, by, productID, teamID, name, "", "", true)
@@ -293,7 +293,7 @@ func (s *Store) AddReportRule(ctx context.Context, by access.Subject, productID,
 // hold a report, and that team's party: one member reads undisclosed work
 // there. Zero where none does.
 func reportTeam(ctx context.Context, db bun.IDB, productID int64) (rule, party int64, err error) {
-	var rules []Routing
+	var rules []AssignmentRule
 	if err := db.NewSelect().Model(&rules).
 		Where(`"product_id" = ?`, productID).
 		Where(`"retired_at" IS NULL`).
@@ -344,7 +344,7 @@ func routeReport(ctx context.Context, tx bun.IDB, row *FlawReport, now time.Time
 // applyReportRule is one report rule's share of a sweep: the product's open
 // reports nobody holds, placed in the rule's team's queue where a member reads
 // undisclosed work there.
-func (s *Store) applyReportRule(ctx context.Context, productID int64, rule Routing,
+func (s *Store) applyReportRule(ctx context.Context, productID int64, rule AssignmentRule,
 	party int64, room int) (read, placed int, err error) {
 
 	reads, err := access.NewStore(s.db).AnyMemberReads(ctx, rule.TeamID, productID, access.Private)

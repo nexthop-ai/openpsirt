@@ -26,9 +26,9 @@ const (
 // word v0.11.0 renames: a bulk claim, a notification and a destination of
 // each renamed kind, a notification linking a decision's row and one linking
 // a claim, a job that ran out of attempts beside one that finished, a kept
-// filter naming the renamed words, the bulk action limit and the minimum
-// severity under their v0.10.0 names, and a change on the trail of the
-// renamed kind beside one of a kind kept.
+// filter naming the renamed words, a trail row and a job of each renamed
+// kind, the renamed settings under their v0.10.0 names, and a change on the
+// trail of the renamed kind beside one of a kind kept.
 func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	declared, err := world.Declare(ctx, db)
@@ -78,6 +78,15 @@ func seedWordsV0100(t *testing.T, ctx context.Context, db *database.DB) {
 	}
 	exec(`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
 		"triage.floor", "medium", at)
+	exec(`INSERT INTO "application_setting" ("name", "value", "updated_at") VALUES (?, ?, ?)`,
+		"routing.batch", "500", at)
+	exec(`INSERT INTO "admin_change" ("at", "by", "kind", "about", "actor") VALUES (?, ?, ?, ?, ?)`,
+		at, person, "routing", "mine · routing", "person")
+	for _, kind := range []string{"routing.sweep", "scan.read"} {
+		exec(`INSERT INTO "job" ("kind", "reference", "state", "attempts", "max_attempts", "run_after",
+			"created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			kind, "1", "done", 1, 5, at, at, at)
+	}
 }
 
 // wordsRenamed asserts every stored word the seed wrote reads in v0.11.0's
@@ -139,6 +148,16 @@ func wordsRenamed(t *testing.T, ctx context.Context, db *database.DB) {
 			WHERE "name" = 'triage.minimum-severity' AND "value" = 'medium'`, 1},
 		{"the minimum severity under its v0.10.0 name",
 			`SELECT COUNT(*) FROM "application_setting" WHERE "name" = 'triage.floor'`, 0},
+		{"the assignment batch under its new name", `SELECT COUNT(*) FROM "application_setting"
+			WHERE "name" = 'assignment.batch' AND "value" = '500'`, 1},
+		{"the assignment batch under its v0.10.0 name",
+			`SELECT COUNT(*) FROM "application_setting" WHERE "name" = 'routing.batch'`, 0},
+		{"a trail row of an assignment rule",
+			`SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'assignment-rule'`, 1},
+		{"a trail row of a v0.10.0 kind", `SELECT COUNT(*) FROM "admin_change" WHERE "kind" = 'routing'`, 0},
+		{"a job of the assignment sweep", `SELECT COUNT(*) FROM "job" WHERE "kind" = 'assignment.sweep'`, 1},
+		{"a job of a kind kept", `SELECT COUNT(*) FROM "job" WHERE "kind" = 'scan.read'`, 1},
+		{"a job of a v0.10.0 kind", `SELECT COUNT(*) FROM "job" WHERE "kind" = 'routing.sweep'`, 0},
 	} {
 		var n int
 		if err := db.DB.NewRaw(c.query).Scan(ctx, &n); err != nil {
@@ -183,7 +202,8 @@ func TestAnUpgradeStoppedPartWayThroughItsStoredWordsResumes(t *testing.T) {
 	for _, step := range []string{
 		"decision.bulk", "notification.decision-lapsed", "outbound.decision-waiting",
 		"notification.link", "notification.response-window-near", "outbound.response-window-passed",
-		"admin_change.incident", "job.failed", "saved_filter", "application_setting",
+		"admin_change.incident", "job.failed", "admin_change.assignment-rule", "job.assignment.sweep",
+		"saved_filter", "application_setting",
 	} {
 		t.Run(step, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

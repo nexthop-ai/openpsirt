@@ -22,9 +22,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// Routing is a standing rule that hands work nobody holds to a team.
-type Routing struct {
-	bun.BaseModel `bun:"table:routing_rule,alias:rr"`
+// AssignmentRule is a standing rule that hands work nobody holds to a team.
+type AssignmentRule struct {
+	bun.BaseModel `bun:"table:assignment_rule,alias:rr"`
 
 	ID        int64 `bun:"id,pk,autoincrement"`
 	ProductID int64 `bun:"product_id,notnull"`
@@ -55,14 +55,14 @@ type Routing struct {
 // precedence is a property of the set rather than something a caller invents:
 // two rules claiming the same position is a precedence nobody wrote down.
 func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamID int64,
-	name, upstream, beneath string) (*Routing, error) {
+	name, upstream, beneath string) (*AssignmentRule, error) {
 
 	// Asked here rather than only where the request arrives. A rule
 	// performs the act the assigner right is named for, continuously, on
 	// behalf of whoever wrote it — and a rule written without that right
 	// is one nobody can point at afterwards. The handler asks the same
 	// question; this is the place a second caller cannot forget to.
-	if err := mayRoute(by, productID); err != nil {
+	if err := mayAssignByRule(by, productID); err != nil {
 		return nil, err
 	}
 	upstream, beneath = strings.TrimSpace(upstream), strings.TrimSpace(beneath)
@@ -93,16 +93,16 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 // insertRule writes a rule at the end of the product's list, once its writer
 // and its keys have been accepted.
 func (s *Store) insertRule(ctx context.Context, by access.Subject, productID, teamID int64,
-	name, upstream, beneath string, reports bool) (*Routing, error) {
+	name, upstream, beneath string, reports bool) (*AssignmentRule, error) {
 
-	var rule *Routing
+	var rule *AssignmentRule
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		createdAt := s.now().UTC().Truncate(time.Microsecond)
 		// Built inside, because an insert writes the generated identifier back
 		// into the model and the ordinal below is read from the database. A
 		// retry of a rolled-back attempt would re-insert a model carrying both
 		// of that attempt's answers.
-		rule = &Routing{
+		rule = &AssignmentRule{
 			ProductID: productID, TeamID: teamID, Name: strings.TrimSpace(name),
 			Upstream: graph.Folded(upstream), Beneath: graph.Folded(beneath), Reports: reports,
 			CreatedBy: by.ID, CreatedAt: createdAt,
@@ -113,7 +113,7 @@ func (s *Store) insertRule(ctx context.Context, by access.Subject, productID, te
 		// and PostgreSQL refuses outright — the four-engine run is what said
 		// so, and nothing about the code looked wrong.
 		var highest int
-		if err := tx.NewSelect().Model((*Routing)(nil)).
+		if err := tx.NewSelect().Model((*AssignmentRule)(nil)).
 			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
 			Where(`"product_id" = ?`, productID).
 			Scan(ctx, &highest); err != nil {
@@ -135,17 +135,17 @@ func (s *Store) insertRule(ctx context.Context, by access.Subject, productID, te
 // because a rule places code findings too. The rules are its triage configuration and
 // carry no finding, so there is nothing to narrow: a reader gets the whole
 // precedence order or none of it.
-func (s *Store) Rules(ctx context.Context, subject access.Subject, productID int64) ([]Routing, error) {
+func (s *Store) Rules(ctx context.Context, subject access.Subject, productID int64) ([]AssignmentRule, error) {
 	if !subject.TriagesAnyIn(productID) {
-		return nil, access.Denied(fmt.Sprintf("read the routing rules of product %d", productID))
+		return nil, access.Denied(fmt.Sprintf("read the assignment rules of product %d", productID))
 	}
 	return s.rules(ctx, productID)
 }
 
 // rules is every rule in force for a product, for the sweep that applies them
 // as the deployment and for Rules once it has authorized the reader.
-func (s *Store) rules(ctx context.Context, productID int64) ([]Routing, error) {
-	var rules []Routing
+func (s *Store) rules(ctx context.Context, productID int64) ([]AssignmentRule, error) {
+	var rules []AssignmentRule
 	if err := s.db.NewSelect().Model(&rules).
 		Where(`"product_id" = ?`, productID).
 		Where(`"retired_at" IS NULL`).
@@ -164,10 +164,10 @@ func (s *Store) rules(ctx context.Context, productID int64) ([]Routing, error) {
 // changing a rule never takes something out of somebody's hands, and that
 // holds for the team's queue as much as for a person.
 func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id int64) error {
-	if err := mayRoute(by, productID); err != nil {
+	if err := mayAssignByRule(by, productID); err != nil {
 		return err
 	}
-	took, err := database.Retire(ctx, s.db, (*Routing)(nil), id, s.now().UTC().Truncate(time.Microsecond),
+	took, err := database.Retire(ctx, s.db, (*AssignmentRule)(nil), id, s.now().UTC().Truncate(time.Microsecond),
 		func(q *bun.UpdateQuery) *bun.UpdateQuery { return q.Where(`"product_id" = ?`, productID) })
 	if err != nil {
 		return fmt.Errorf("retire that rule: %w", err)
@@ -178,7 +178,7 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 	return nil
 }
 
-// ErrNoSuchRule is a routing rule not in use in this product: retired already,
+// ErrNoSuchRule is an assignment rule not in use in this product: retired already,
 // never declared, or another product's.
 var ErrNoSuchRule = refusal.New("no rule of this product is in use under that identifier")
 
@@ -205,13 +205,13 @@ var ErrNoSuchRule = refusal.New("no rule of this product is in use under that id
 // A rule that has outgrown the bound places nothing and stops nothing else.
 // It was accepted when it was written and the tree grew under it, which is not
 // a fault of the sweep's, and the condition is permanent: as a job failure it
-// would stop that product's routing entirely, every rule ordered after it
+// would stop that product's assignment by rule entirely, every rule ordered after it
 // included, with a retry that can never clear it. They come back named so the
 // caller can say which, because a rule that silently stopped placing is the
 // same shape as a rule nobody notices is wrong.
 func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, bool, []int64, error) {
 	if cap <= 0 {
-		cap = setting.DefaultRoutingBatch
+		cap = setting.DefaultAssignmentBatch
 	}
 	rules, err := s.rules(ctx, productID)
 	if err != nil {
@@ -260,7 +260,7 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 }
 
 // applyOne is one rule's share of a batch.
-func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
+func (s *Store) applyOne(ctx context.Context, productID int64, rule AssignmentRule,
 	party int64, room int) (read, placed int, err error) {
 
 	now := s.now().UTC().Truncate(time.Microsecond)
@@ -323,7 +323,7 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 	res, err := s.db.NewUpdate().Model((*Finding)(nil)).
 		Set(`"assigned_to" = ?`, party).
 		Set(`"assigned_at" = ?`, now).
-		Set(`"routed_by" = ?`, rule.ID).
+		Set(`"assigned_by_rule" = ?`, rule.ID).
 		Where(`"id" IN (?)`, bun.List(ids)).
 		// Re-checked at the moment of the write: an assignment that
 		// landed between the read and here is somebody's, and a rule
@@ -669,7 +669,7 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 
 // partiesOf is the assignable name of each rule's team, and omits a team that
 // has been retired.
-func (s *Store) partiesOf(ctx context.Context, rules []Routing) (map[int64]int64, error) {
+func (s *Store) partiesOf(ctx context.Context, rules []AssignmentRule) (map[int64]int64, error) {
 	ids := make([]int64, 0, len(rules))
 	for _, rule := range rules {
 		ids = append(ids, rule.TeamID)
@@ -695,12 +695,12 @@ func (s *Store) partiesOf(ctx context.Context, rules []Routing) (map[int64]int64
 	return out, nil
 }
 
-// mayRoute refuses somebody who may not hand work to anybody.
+// mayAssignByRule refuses somebody who may not hand work to anybody.
 //
 // Writing a rule is the assigner right rather than triage: it takes work and
 // gives it to a team, over and over, without anybody being present at the
 // moment it happens.
-func mayRoute(by access.Subject, productID int64) error {
+func mayAssignByRule(by access.Subject, productID int64) error {
 	if by.Kind != access.Person || !by.Holds(access.Assigner, productID) {
 		return access.Denied(fmt.Sprintf("hand work to somebody in product %d", productID))
 	}
@@ -712,10 +712,10 @@ func (s *Store) reaching() int {
 	if s.reach > 0 {
 		return s.reach
 	}
-	return RoutingReach
+	return AssignmentRuleReach
 }
 
-// RoutingReach is how many places in one build a rule's pattern may name.
+// AssignmentRuleReach is how many places in one build a rule's pattern may name.
 //
 // A rule says where in the tree something sits, and a pattern matching most of
 // a build is not that — a bare `*` matched every open node, and each was a
@@ -725,8 +725,8 @@ func (s *Store) reaching() int {
 //
 // A constant rather than a setting: what counts as an absurdly broad rule is
 // not a judgment about a deployment, and the number that is one — how much a
-// single pass may place — is already `routing.batch`.
-const RoutingReach = 2000
+// single pass may place — is already `assignment.batch`.
+const AssignmentRuleReach = 2000
 
 // ErrTooBroad is returned when a rule's pattern names most of a build rather
 // than a place in it.

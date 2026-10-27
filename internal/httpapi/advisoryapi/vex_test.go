@@ -475,7 +475,7 @@ func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarg
 	// generates it too, so it refuses the same way.
 	//
 	// The ceiling is brought down to the fixture rather than the fixture
-	// built up to twenty thousand, which is how the routing reach is tested
+	// built up to twenty thousand, which is how the assignment rule reach is tested
 	// and for the same reason.
 	carryingOne := func(d *core.Deps) { d.VexCeiling = 1 }
 	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Two, carryingOne, func(t *testing.T, r *httpapitest.Reach) {

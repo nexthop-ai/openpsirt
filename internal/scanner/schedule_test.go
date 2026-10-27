@@ -314,7 +314,7 @@ func TestAReplicaThatStopsDoesNotHoldTheReScansForADay(t *testing.T) {
 func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 	// The cap exists so a runaway producer cannot push everyone else's work
 	// behind its own. Counted across every kind it did the opposite: a bulk
-	// change to the routing rules filled the queue and then refused every
+	// change to the assignment rules filled the queue and then refused every
 	// scan and every upload in the deployment.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
@@ -322,7 +322,7 @@ func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 			MaxAttempts: 5, MaxBacklog: 1, ClaimTimeout: 30 * time.Minute,
 			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
 		})
-		if _, err := full.Add(ctx, queue.Route, "a-bulk-rule-change"); err != nil {
+		if _, err := full.Add(ctx, queue.AssignmentSweep, "a-bulk-rule-change"); err != nil {
 			t.Fatal(err)
 		}
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))

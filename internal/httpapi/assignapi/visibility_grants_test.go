@@ -106,9 +106,9 @@ func TestProductWideTriageIsHeldByTheUndisclosedHalfAlone(t *testing.T) {
 			want, refused            int
 		}
 		asks := []ask{
-			{"listing routing rules", http.MethodGet, "/v1/products/mine/assignment-rules", "",
+			{"listing assignment rules", http.MethodGet, "/v1/products/mine/assignment-rules", "",
 				http.StatusOK, http.StatusForbidden},
-			{"previewing a routing rule", http.MethodGet,
+			{"previewing an assignment rule", http.MethodGet,
 				"/v1/products/mine/assignment-rules/preview?upstream=libnl", "", http.StatusOK,
 				http.StatusForbidden},
 			{"rating an issue", http.MethodPost, "/v1/products/mine/issues/" + hidden + "/assessment",

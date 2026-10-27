@@ -81,7 +81,7 @@ type HoldingBody struct {
 	// Name is the label beside the address rather than in its place: the
 	// address is what the holder's own list resolves.
 	Name string `json:"person_name,omitempty" doc:"Their display name, where it differs from the name above"`
-	// Team says this is a queue rather than a holding: work routed to a
+	// Team says this is a queue rather than a holding: work assigned to a
 	// team is unheld until somebody takes it.
 	Team bool `json:"team,omitempty" doc:"This is a team's queue rather than one person's work"`
 	// Open counts pieces of work — an issue in a component in a product — and
@@ -121,10 +121,10 @@ func registerAssigning(api huma.API, in core.Deps) {
 			"holding the same component, and every occurrence of that component.\n\n" +
 			"Send `person` as an empty string to hand it back to nobody, which is this same " +
 			"operation rather than one of its own.\n\n" +
-			"Send `team` instead to route it to a team. That is a queue rather than a " +
+			"Send `team` instead to assign it to a team. That is a queue rather than a " +
 			"holding: it stays unheld until somebody takes it, and anybody on the team may " +
-			"take it with the triage right alone. Routing to a team asks that at least one " +
-			"member may read what is being routed there — not that every member may.\n\n" +
+			"take it with the triage right alone. Assigning to a team asks that at least one " +
+			"member may read what is being assigned there — not that every member may.\n\n" +
 			"Findings arriving later under the same component start unassigned.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Giving work to somebody else also needs assigner. Taking unowned work, "+
@@ -137,7 +137,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		core.ComponentQuery
 		Body struct {
 			Person string `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
-			Team   string `json:"team,omitempty" doc:"A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
+			Team   string `json:"team,omitempty" doc:"A team to assign it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
 	}) (*struct{}, error) {
 		subject, err := core.Reading(ctx)
@@ -206,7 +206,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 				return nil, err
 			}
 			// At least one member has to be able to read what is being
-			// routed there, asked at the strictest visibility present.
+			// assigned there, asked at the strictest visibility present.
 			party := team.PartyID
 			to = &party
 			admits = teamAdmits(team, product)
@@ -476,7 +476,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		OperationID: "list-team-assigned", Method: http.MethodGet,
 		Path:    "/v1/teams/{team}/assignments",
 		Summary: "List what one team is dealing with",
-		Description: "The open findings routed to a team, most urgent first, in the same units " +
+		Description: "The open findings assigned to a team, most urgent first, in the same units " +
 			"as everywhere else: one item per issue in a component in a product, and one per static " +
 			"analysis code finding you read, with `occurrence` set.\n\n" +
 			"Work goes to a team by standing rule and by an assignment naming one, so a team " +

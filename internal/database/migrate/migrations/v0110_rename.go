@@ -45,6 +45,7 @@ var tablesRenamedV0110 = []tableRename{
 	{"exploited_fix", "incident_fix"},
 	{"obligation_window", "response_window"},
 	{"obligation_window_product", "response_window_product"},
+	{"routing_rule", "assignment_rule"},
 }
 
 // columnRename is a column's name before and after, on its table as v0.11.0
@@ -68,6 +69,7 @@ var columnsRenamedV0110 = []columnRename{
 	{"told_outside", "exploited_here_id", "incident_id"},
 	{"finding", "urgency_exploited_here", "urgency_incident"},
 	{"product", "triage_floor", "minimum_severity"},
+	{"finding", "routed_by", "assigned_by_rule"},
 }
 
 // nameKind is what a renamed name belongs to, which decides how each engine
@@ -184,6 +186,12 @@ var namesRenamedV0110 = []nameRename{
 		"response_window_product_product_fk"},
 
 	{anIndex, "job", "job_set_aside_idx", "job_failed_idx"},
+
+	{aPrimaryKey, "assignment_rule", "routing_rule_pkey", "assignment_rule_pkey"},
+	{aForeignKey, "assignment_rule", "routing_rule_product_fk", "assignment_rule_product_fk"},
+	{aForeignKey, "assignment_rule", "routing_rule_team_fk", "assignment_rule_team_fk"},
+	{aForeignKey, "assignment_rule", "routing_rule_by_fk", "assignment_rule_by_fk"},
+	{anIndex, "assignment_rule", "routing_rule_order_idx", "assignment_rule_order_idx"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
@@ -260,6 +268,8 @@ func declaredV0110(t *columnTypes, table string) []string {
 		statements = claimBuildBaseline(t)
 	case "exploited_here", "exploited_fix", "obligation_window", "obligation_window_product":
 		statements = obligationBaseline(t)
+	case "routing_rule":
+		statements = routingBaseline(t)
 	case "":
 		kept, ok := keptV0110[table]
 		if !ok {

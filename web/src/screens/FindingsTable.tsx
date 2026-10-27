@@ -445,7 +445,7 @@ export function FindingsTable({
                       {/* The same issue at two binaries of one source
                                 package is two rows here and one piece of work
                                 everywhere else: it is decided once, upgraded
-                                once, and routed by one rule. Said on the row
+                                once, and assigned by one rule. Said on the row
                                 rather than folded away, because the occurrences are
                                 real and a reader counting them should get the
                                 same number the list does — what they were not

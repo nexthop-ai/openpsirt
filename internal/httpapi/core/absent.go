@@ -120,10 +120,10 @@ func NoSuchNote() error {
 	return huma.Error404NotFound("no note is recorded there")
 }
 
-// NoSuchRule answers a routing rule nobody declared, and one belonging to a
+// NoSuchRule answers an assignment rule nobody declared, and one belonging to a
 // product the caller cannot reach.
 func NoSuchRule() error {
-	return huma.Error404NotFound("no routing rule is recorded there")
+	return huma.Error404NotFound("no assignment rule is recorded there")
 }
 
 // NoSuchSuppressionRule answers a suppression rule nobody proposed, one

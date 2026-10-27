@@ -316,7 +316,7 @@ type ComponentGroup struct {
 	// carried on a finding: a version nobody recognizes needs it.
 	Upstream string
 	// UpstreamName is the source package this was built from, where one is
-	// recorded. It is what a routing rule matches on, and without it a
+	// recorded. It is what an assignment rule matches on, and without it a
 	// component row cannot say what a rule about it would have to name — so
 	// somebody types the binary package's own name into a field matching
 	// source packages and is told, truthfully and uselessly, that nothing is

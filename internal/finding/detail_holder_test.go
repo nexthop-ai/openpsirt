@@ -57,10 +57,10 @@ func TestAFindingsHolderIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 	})
 }
 
-func TestAFindingsRoutingRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
+func TestAFindingsAssignmentRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.T) {
 	// The rule that placed a finding is one name where its occurrences agree. A
 	// rule read off an occurrence the reader may not read names how undisclosed
-	// work is routed.
+	// work is assigned.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -80,7 +80,7 @@ func TestAFindingsRoutingRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.
 				t.Fatal(err)
 			}
 			q := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set(`"routed_by" = ?`, rule.ID).Where(`"id" = ?`, open[i].ID)
+				Set(`"assigned_by_rule" = ?`, rule.ID).Where(`"id" = ?`, open[i].ID)
 			if i == 1 {
 				q = q.Set(`"visibility" = ?`, access.Private)
 			}
@@ -94,8 +94,8 @@ func TestAFindingsRoutingRuleIsReadOffTheOccurrencesItsReaderMayRead(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		if evidence.RoutedBy != "in the open" {
-			t.Errorf("a reader of the disclosed occurrence reads its rule as %q", evidence.RoutedBy)
+		if evidence.AssignedByRule != "in the open" {
+			t.Errorf("a reader of the disclosed occurrence reads its rule as %q", evidence.AssignedByRule)
 		}
 	})
 }

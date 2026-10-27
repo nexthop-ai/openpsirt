@@ -365,7 +365,7 @@ function ByPerson({
                     <span className="who2">
                       {/* A team is a queue rather than a person, and drawing
                           it with somebody's initials says the opposite: work
-                          routed to a team is unheld until somebody takes it. */}
+                          assigned to a team is unheld until somebody takes it. */}
                       <span className="avatar">
                         {row.team ? "◇" : initials(row.person_name || row.person || "")}
                       </span>

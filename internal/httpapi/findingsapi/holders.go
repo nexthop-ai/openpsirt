@@ -61,7 +61,7 @@ func registerHolders(api huma.API, in core.Deps) {
 			"finding the offer itself would say a finding exists.\n\n" +
 			"Teams are listed whole. A team holds work and grants nothing, so one " +
 			"carries mixed clearance as a matter of course and what each member sees of " +
-			"what is routed to it is what they could see anyway.\n\n" +
+			"what is assigned to it is what they could see anyway.\n\n" +
 			"Narrow with `q`, which matches the identity and the displayed name without " +
 			"regard to capitals. This is not the people list: that is the deployment's " +
 			"directory and needs administration.",

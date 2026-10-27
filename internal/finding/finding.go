@@ -526,7 +526,7 @@ type Store struct {
 	// export path, which is never inside somebody else's transaction.
 	pool *bun.DB
 	now  func() time.Time
-	// reach is how many places in one build a routing rule's pattern may
+	// reach is how many places in one build an assignment rule's pattern may
 	// name, or zero for the shipped number. Carried on the store so a test can
 	// bring it down to a fixture rather than building a fixture up to it.
 	reach int

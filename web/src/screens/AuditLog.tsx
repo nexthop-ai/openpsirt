@@ -630,7 +630,7 @@ type ChangeKind = Body<"ChangeBody">["kind"];
 const CHANGE_SAID: Record<ChangeKind, string> = {
   setting: "Settings",
   role: "Roles",
-  routing: "Routing rules",
+  "assignment-rule": "Assignment rules",
   "suppression-rule": "Suppression rules",
   support: "Support dates",
   release: "Release dates",

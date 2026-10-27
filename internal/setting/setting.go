@@ -281,11 +281,11 @@ const (
 	// question about that deployment. A request past it is answered 503 and
 	// asked to send again.
 	UploadsAtOnce = "upload.max-concurrent"
-	// RoutingBatch is how many findings one pass of the routing sweep may
-	// place. A bulk decision is bounded, and the bound is a setting: an
+	// AssignmentBatch is how many findings one pass of the assignment sweep
+	// may place. A bulk decision is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
 	// rebuilding is not a way to change a number.
-	RoutingBatch = "routing.batch"
+	AssignmentBatch = "assignment.batch"
 	// SavedPerPerson is how many filters one person may keep.
 	//
 	// A ceiling on rows one person writes one at a time, which is the
@@ -383,14 +383,14 @@ const (
 	DefaultQueuedAfter    = 3 * 24 * time.Hour
 )
 
-// DefaultRoutingBatch is how many findings one routing pass places where
+// DefaultAssignmentBatch is how many findings one assignment pass places where
 // nobody has said.
 //
 // Generous, because the case it exists for is an estate where a rule matches
 // tens of thousands of rows at once; the bound is there because an unbounded
 // write is something somebody triggers by accident, not because two thousand
 // is a suspicious number.
-const DefaultRoutingBatch = 2000
+const DefaultAssignmentBatch = 2000
 
 // DefaultSavedPerPerson is how many filters one person may keep where
 // nobody has said.
@@ -689,6 +689,7 @@ func (s *Store) read(ctx context.Context, name string) (string, bool, error) {
 var formerNames = map[string]string{
 	BulkDecisionCap: "triage.together-cap",
 	MinimumSeverity: "triage.floor",
+	AssignmentBatch: formerAssignmentBatch,
 }
 
 // clearFormer removes the row under a setting's former name, inside the
@@ -710,6 +711,11 @@ func clearFormer(ctx context.Context, tx bun.IDB, name string) (string, bool, er
 	}
 	return row.Value, true, nil
 }
+
+// formerAssignmentBatch is the name the assignment batch had. A constant,
+// because a field's value spelled as a word, a dot and a column reads to the
+// reserved-word check as a column written bare.
+const formerAssignmentBatch = "routing.batch"
 
 // FormerName is a row held under a setting's former name.
 type FormerName struct {

@@ -633,7 +633,7 @@ func MayApprove(visibility Visibility, approver, reads, triages bool) bool {
 // findings in this product.
 //
 // The question an act about the product rather than about one finding asks:
-// routing, a rating, an incident, taking unowned work. The finding-level
+// an assignment rule, a rating, an incident, taking unowned work. The finding-level
 // question narrows further where there is a finding to ask it of. Internal
 // triage answers no: it is the triage of code findings, and every one of those acts
 // is about what a build ships.
@@ -649,7 +649,7 @@ func (s Subject) TriagesIn(productID int64) bool {
 // TriagesAnyIn reports whether this subject triages findings at any
 // visibility in this product: disclosed, undisclosed or internal.
 //
-// The question reading and previewing the routing rules ask. A rule places
+// The question reading and previewing the assignment rules ask. A rule places
 // code findings as it places every other finding, so whoever triages the code findings it
 // places reads what it would place.
 func (s Subject) TriagesAnyIn(productID int64) bool {

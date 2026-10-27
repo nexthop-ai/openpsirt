@@ -77,7 +77,7 @@ and a kind it does not name never reaches it.
 | Version carry | A decision lapsing when a version it was about moved, and a decision carried to a build whose versions match (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
 | Triage | The findings lists and their counts, one finding's page, notes on an issue, and disclosure | Vulnerability, entered |
-| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, routing by a team's rules and its preview, and the lists of who holds what: unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Code finding assignment) | Vulnerability, entered, analysis |
+| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, assignment by a team's rules and their preview, and the lists of who holds what: unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Code finding assignment) | Vulnerability, entered, analysis |
 | Decisions | Decisions and their occurrences, the reasoning and its revisions, approvals, comments on a decision, the review queue, every read of one decision, the audit log and its file, and the notices about decisions: waiting, sent back, lapsed and an agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the occurrences it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |

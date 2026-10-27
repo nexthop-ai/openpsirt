@@ -47,7 +47,7 @@ func queueNotices(t *testing.T, r *httpapitest.Reach, who string) []string {
 	return out
 }
 
-// A code finding routed to a team's queue and left there is told to the members who
+// A code finding assigned to a team's queue and left there is told to the members who
 // read internal work, as any queued work is, and to nobody else on the team.
 func TestACodeFindingLeftInATeamsQueueIsToldToTheMembersWhoReadIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {

@@ -37,6 +37,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A record that a product was attacked is an incident, and the windows
 //     a deployment declares to answer one are response windows. Renamed
 //     with the triage records.
+//   - A standing rule that hands unheld work to a team is an assignment
+//     rule, and a finding names the rule that assigned it under that name.
 //   - The stored words those renames reach follow them, in a step of their
 //     own after the renames: a bulk decision's kind, the kinds of
 //     notification a decision waiting or lapsed and a response window
@@ -71,8 +73,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     it.
 //   - A vulnerability report is a case: its summary is its reported problem,
 //     and it has a title, a holder, revisions, notes, a log of correspondence with its reporter and a record of who
-//     held it, and the acknowledgement is the first message sent. A routing
-//     rule may place reports. The report beside a flaw recorded by hand
+//     held it, and the acknowledgement is the first message sent. An
+//     assignment rule may place reports. The report beside a flaw recorded by hand
 //     carries the flaw's summary as its reported problem.
 //
 // Each phase logs how long it took, so a slow upgrade says which part was

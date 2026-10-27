@@ -19,7 +19,7 @@ REQ-44, REQ-45, REQ-56, REQ-63, REQ-68, REQ-69's server half.
 - [Statistics and the audit permission](#statistics-and-the-audit-permission)
 - [Somebody who has left](#somebody-who-has-left)
 - [Teams](#teams)
-- [Routing rules](#routing-rules)
+- [Assignment rules](#assignment-rules)
 - [Store methods with no subject](#store-methods-with-no-subject)
 - [Decisions about an issue](#decisions-about-an-issue)
 - [Subject kinds](#subject-kinds)
@@ -115,7 +115,7 @@ as an analyzer's code findings (REQ-14). Analysis results are its first users.
 | A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A code finding included in a flaw's disclosure stays internal, and the case reaches it and the decisions at its occurrence as one of the flaw's readers (`DESIGN-analysis.md` § Disclosure inclusion) |
 | A code finding included in its flaw's disclosure is read whole by everybody who read it before, and with the decisions at its occurrence by the flaw's readers while the flaw is undisclosed | Somebody who read it once keeps reading it, and the inclusion adds readers. Taking it out of disclosure takes back only the readers the inclusion added (`DESIGN-analysis.md` § Disclosure inclusion) |
 | A code finding collaborator is granted one code finding recorded as a flaw while its flaw is undisclosed, and reads its evidence alone | A grant of one code finding is no grant of a list, a build's tree or its inventory, and its flaw's disclosure ends it, whether or not the code finding was included (`DESIGN-analysis.md` § Code finding collaborators) |
-| `internal-triage` triages nothing about a product as a whole: routing, assignment, a rating, an incident, a response window, an inventory upload | Each is about what the product's builds ship, which internal triage reads none of |
+| `internal-triage` triages nothing about a product as a whole: an assignment rule, assignment, a rating, an incident, a response window, an inventory upload | Each is about what the product's builds ship, which internal triage reads none of |
 | Approving at internal visibility needs its holder to read internal work and hold the approver capability | A decision there is about a code finding, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Code finding triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
 | A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
 
@@ -334,7 +334,7 @@ holder who cannot open it.
 | A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | The rule a hand assignment to a team asks (§ Teams) |
 | A report goes where undisclosed work goes | A report is read under undisclosed reading (`DESIGN-findings.md` § Report visibility) |
 | Code findings go by the same rule as findings | A code finding is work at its visibility like any other |
-| It goes back to nobody, and no sweep is queued | Exactly as when somebody leaves. The unassigned list holds it until somebody takes it, and a routing rule places it when a rule is next recorded in the product. Queuing a sweep would let a full queue refuse a withdrawal of access |
+| It goes back to nobody, and no sweep is queued | Exactly as when somebody leaves. The unassigned list holds it until somebody takes it, and an assignment rule places it when a rule is next recorded in the product. Queuing a sweep would let a full queue refuse a withdrawal of access |
 | Asked of whoever the write named, and of every team they are on | A team holds work only while a member reads it, so a member's reading going can strand the team's queue |
 | Inside the write that took the reading away | Done after it, a failure leaves the reading gone, the work with somebody who cannot open it, and no request that reaches the hand-back again. Deactivation hands back after its write commits, for the reason under § Somebody who has left |
 | Nobody is told | The same as any other work handed back (§ Assignment by narrowing) |
@@ -434,18 +434,18 @@ Recorded by an administrator, as a date on the person.
 A team is a named set of people, managed here. It holds work and grants nothing:
 no role, no visibility, no capability.
 
-Managing a team is administration, and routing to one is not. An assigner
+Managing a team is administration, and assigning work to one is not. An assigner
 holds their right per product; a team is deployment-wide. So an assigner may
 hand work to a team and may not create one, retire one, or decide who is on it —
 those are deployment acts, and a per-product right cannot authorize one.
 
 | | |
 |---|---|
-| Why an assigner can route to a team but not populate it | The two rights are at different grains. Letting a per-product assigner add somebody to a team would let them change who receives work in every other product that routes to it |
+| Why an assigner can assign to a team but not populate it | The two rights are at different grains. Letting a per-product assigner add somebody to a team would let them change who receives work in every other product that assigns to it |
 | Why the split is not made finer now | A role between the two — team administration, per team — is possible and buys nothing yet. Decide it against evidence of the burden rather than in advance |
 
 Who is on a team is listed for an administrator; anybody else sees the names.
-Routing work needs the name and not the membership, and the membership of a team
+Assigning work needs the name and not the membership, and the membership of a team
 is a fact about people.
 
 | Bound | |
@@ -460,7 +460,7 @@ map to how the team actually divides work.
 
 Keeping roles out of a team is what lets one carry mixed clearance. A kernel
 team where two members may read undisclosed work and four may not is the
-ordinary arrangement. A team that granted anything would make routing work to it
+ordinary arrangement. A team that granted anything would make assigning work to it
 an access decision, and a queue could then only be built out of people who all
 see the same things.
 
@@ -480,14 +480,14 @@ precedence rule nobody would remember.
 
 | Rule | Reason |
 |---|---|
-| Team names are answered to anybody, membership to an administrator | Routing work to a team means naming one; who is on a team is the same question as who is here |
-| A team assignment is a queue, not a holding | Work routed to a team is unheld until a person takes it, and taking it is the ordinary act of picking up unowned work — triage alone, no dispatch right. *Filling* the queue is dispatching. The alternative marks rows as held by the team, and hundreds then read as owned while nobody has looked at them |
-| Routing asks that at least one member may read it, not every member | Asked at every visibility the open occurrences carry, of one member reading each of them, so one undisclosed occurrence among fifty makes the whole undisclosed for this purpose. Disclosed work travels with the assignment, so for it a member reading the product at either visibility is enough. Requiring every member turns routing pressure into access pressure; requiring nobody leaves work showing as held in every administrative view and sitting in nobody's list. A rule's sweep asks it of each occurrence (§ Routing rules) |
+| Team names are answered to anybody, membership to an administrator | Assigning work to a team means naming one; who is on a team is the same question as who is here |
+| A team assignment is a queue, not a holding | Work assigned to a team is unheld until a person takes it, and taking it is the ordinary act of picking up unowned work — triage alone, no dispatch right. *Filling* the queue is dispatching. The alternative marks rows as held by the team, and hundreds then read as owned while nobody has looked at them |
+| Assigning to a team asks that at least one member may read it, not every member | Asked at every visibility the open occurrences carry, of one member reading each of them, so one undisclosed occurrence among fifty makes the whole undisclosed for this purpose. Disclosed work travels with the assignment, so for it a member reading the product at either visibility is enough. Requiring every member turns assignment pressure into access pressure; requiring nobody leaves work showing as held in every administrative view and sitting in nobody's list. A rule's sweep asks it of each occurrence (§ Assignment rules) |
 | The queue is narrowed per viewer, counts included | A badge reading "Kernel team · 14" shown to everybody says two embargoed items exist. Asserted by a matrix test rather than assumed from the row query being right |
 | A team gives up the work in its queue that no remaining member reads | Asked whenever who is on it, or what one of them reads, changes (§ Lost reading). Retiring a team empties it, so its whole queue goes back |
-| Retiring a team keeps its row and does not free its name | Work already routed has to keep resolving to something a screen can name. Declaring that name again brings the team back, because declaring is idempotent everywhere else and the alternative was a refusal citing a team the person asking cannot see |
+| Retiring a team keeps its row and does not free its name | Work already assigned has to keep resolving to something a screen can name. Declaring that name again brings the team back, because declaring is idempotent everywhere else and the alternative was a refusal citing a team the person asking cannot see |
 
-## Routing rules
+## Assignment rules
 
 A rule matches on component identity as well as a place in the tree. The
 upstream name is the key that matters: one rule naming a source package catches
@@ -570,12 +570,12 @@ take no subject are each named, with which of the three they are, in a list a
 gate holds them to (`make subjected`, `DESIGN-build.md` § Make targets). A
 method querying through a helper of its own package counts as querying.
 
-Anything else takes a subject. What a routing rule would catch and which words
+Anything else takes a subject. What an assignment rule would catch and which words
 are in use on a product both read findings and both answer for the whole
 product, so a reader reached straight from a request is a product-wide read
 with nobody attached.
 
-Product-scoped configuration is no exception. A product's routing rules, the
+Product-scoped configuration is no exception. A product's assignment rules, the
 response windows and the products each is limited to, an upload's receipt and
 the documents it kept are each read with the subject, and the store decides
 what that subject reaches: the rules for whoever triages the product, a window
@@ -609,7 +609,7 @@ ordering taken over a visibility column anywhere in the source.
 |---|---|
 | An act on one finding — a decision, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |
 | Approving somebody else's decision | Reading at the decision's visibility, with the approver capability or triage there, and the capability alone at internal visibility. The session answer says which visibilities, so a screen offers it only where it succeeds |
-| An act about the product rather than one finding — a routing rule, a rating, a scan sent by hand, an incident, taking unowned work | Triage at any visibility. The finding-level question narrows further wherever there is a finding to ask it of |
+| An act about the product rather than one finding — an assignment rule, a rating, a scan sent by hand, an incident, taking unowned work | Triage at any visibility. The finding-level question narrows further wherever there is a finding to ask it of |
 | Taking unowned work, handing back your own | Rows at a visibility they read, and a disclosed row of their own whatever they read, because the assignment carried it to them |
 | Reading or publishing a VEX document, and what has gone out | Public reading to read, public triage to publish. A document is disclosed work alone, and a row saying one went out is as much a disclosure as the document |
 | A release note between two builds | Public reading at both. Undisclosed work is added only where asked for and read |
@@ -1235,7 +1235,7 @@ prevented in the browser; losing the *place* is prevented here.
 ## The administration trail
 
 An administrative change is recorded — who, what, before, after, and when
-(REQ-22): settings, role grants and withdrawals, routing rules, end-of-life
+(REQ-22): settings, role grants and withdrawals, assignment rules, end-of-life
 dates, the minimum severity, credentials, accounts, teams, who is on a case, and
 the names an issue answers to. An administrator reads it beside the triage
 record, because it is the same question one layer up.
@@ -1264,7 +1264,7 @@ that is neither.
 
 | | |
 |---|---|
-| **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the minimum severity, destinations, who is on a case, and another name for an issue |
+| **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, assignment rules, support dates, the minimum severity, destinations, who is on a case, and another name for an issue |
 | **Leaves none, deliberately** | A triage decision and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as editing a report, recording a message to or from its reporter, assigning it, or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because

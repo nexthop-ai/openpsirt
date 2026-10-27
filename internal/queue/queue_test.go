@@ -776,12 +776,12 @@ func TestABacklogIsCountedPerKind(t *testing.T) {
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		for i := range opts.MaxBacklog {
-			if _, err := q.Add(ctx, queue.Route, fmt.Sprintf("rule-%d", i)); err != nil {
+			if _, err := q.Add(ctx, queue.AssignmentSweep, fmt.Sprintf("rule-%d", i)); err != nil {
 				t.Fatal(err)
 			}
 		}
 		// That kind is full and says so.
-		if _, err := q.Add(ctx, queue.Route, "one-too-many"); !errors.Is(err, queue.ErrBacklogFull) {
+		if _, err := q.Add(ctx, queue.AssignmentSweep, "one-too-many"); !errors.Is(err, queue.ErrBacklogFull) {
 			t.Errorf("a full kind accepted more work: %v", err)
 		}
 		// Everybody else is unaffected, which is the whole point of the cap.

@@ -44,13 +44,14 @@ const (
 	Account Kind = "account"
 	// Team is a team declared or retired, or somebody put on one or taken off.
 	Team Kind = "team"
-	// Routing is a suppression rule that hands unheld work to a team, added or
-	// retired. Not a Role: a role is granted to a person against one product,
-	// and a routing rule grants nobody anything — it decides who is asked.
-	Routing Kind = "routing"
+	// AssignmentRule is a suppression rule that hands unheld work to a team,
+	// added or retired. Not a Role: a role is granted to a person against one
+	// product, and an assignment rule grants nobody anything — it decides who
+	// is asked.
+	AssignmentRule Kind = "assignment-rule"
 	// SuppressionRule is a suppression rule that dismisses static analysis code findings:
-	// proposed, approved or retired. Not a Routing: it decides what a code finding
-	// is, which is a decision, where a routing rule decides who is asked.
+	// proposed, approved or retired. Not an AssignmentRule: it decides what a code finding
+	// is, which is a decision, where an assignment rule decides who is asked.
 	SuppressionRule Kind = "suppression-rule"
 	// Alias is another identifier an issue answers to. Deployment-wide and
 	// permanent: from the moment it is recorded, a scan of any product
@@ -104,7 +105,7 @@ const (
 // which shows up as an empty screen rather than as a failure.
 func Kinds() []Kind {
 	return []Kind{
-		Setting, Role, Routing, SuppressionRule, Support, Release,
+		Setting, Role, AssignmentRule, SuppressionRule, Support, Release,
 		Credential, Account, Team, Case, Alias, Catalog, Incident, Merge, Upstream,
 	}
 }
@@ -417,7 +418,8 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 // `axb@example.com` and report somebody else's history as this person's. The
 // escape character is "#" rather than a backslash, because a backslash inside a
 // string literal is itself an escape on two of the four engines and `ESCAPE
-// '\'` does not parse there at all — the same reason the routing rules use it.
+// '\'` does not parse there at all, the same reason the assignment rules use
+// it.
 //
 // The prefix is compared exactly as well. SQLite's LIKE ignores the case of
 // ASCII letters, and identities are compared exactly, so `alice@example.com`

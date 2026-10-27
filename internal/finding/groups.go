@@ -61,7 +61,7 @@ type Group struct {
 	// Source is the package this binary was built from, where the two differ.
 	// The same issue at two binaries of one source is two rows here and one
 	// piece of work everywhere else — it is decided once, upgraded once and
-	// routed by one rule — and a reader with no way to see that is reading a
+	// assigned by one rule — and a reader with no way to see that is reading a
 	// list a third of which is the same work said again.
 	Source string
 	// Ecosystem is the kind of package this is, as its identifier spells it.
@@ -806,7 +806,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 //
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
-// decision and routing them is one rule.
+// decision and assigning them is one rule.
 func (s *Store) foldGroups(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
 	return filter.folded(s.db, openRows(s.db, targets, visible), issueAndComponent).
 		GroupExpr(GroupedOn)
@@ -860,7 +860,7 @@ func openRows(db bun.IDB, targets []int64, visible []access.Visibility) *bun.Sel
 //
 // The fold is the unit a person acts in: two binaries of one source package
 // are one row, because upgrading them is one act, deciding about them is one
-// decision and routing them is one rule.
+// decision and assigning them is one rule.
 func openGroups(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
 	return openRows(db, targets, visible).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).

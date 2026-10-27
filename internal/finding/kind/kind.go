@@ -103,8 +103,8 @@ const (
 	Triage Consumer = "triage"
 	// Assignment is who deals with a finding: the write that gives work to a
 	// person or a team or hands it back, handing over everything one person
-	// holds, the routing rules' sweep and preview, and the lists of who holds
-	// what. It names code findings, which Triage does not, so a code finding is held, routed
+	// holds, the assignment rules' sweep and preview, and the lists of who holds
+	// what. It names code findings, which Triage does not, so a code finding is held, assigned by rule
 	// and listed as held work by the one implementation a finding is without
 	// reaching the findings lists or disclosure.
 	Assignment Consumer = "assignment"

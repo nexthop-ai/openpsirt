@@ -45,7 +45,7 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 	// telling at the finding's visibility and the honest sentence on the
 	// privileges page: the declaration is not the check, the check is a
 	// line in each handler, and the two drifted apart three times before
-	// this review and three times during it — the routing preview, the tag
+	// this review and three times during it — the assignment rule preview, the tag
 	// list and the reporter's contact details all answered somebody the
 	// declaration said could not ask.
 	//

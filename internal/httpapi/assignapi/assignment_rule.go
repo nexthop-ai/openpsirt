@@ -25,7 +25,7 @@ type RuleBody struct {
 	Name string `json:"name" doc:"The name, so a placement can be explained in words"`
 	Team string `json:"team" doc:"The team work lands on, by the name that addresses it"`
 	// TeamDisplayName is the label shown beside it. The field above is the one
-	// add-routing-rule resolves through TeamByName, which matches the folded
+	// add-assignment-rule resolves through TeamByName, which matches the folded
 	// name column — so a team declared "platform-security" and displayed
 	// "Platform Security" lists as the label, and sending that back finds no
 	// team at all.
@@ -52,11 +52,11 @@ type CatchesOutput struct {
 	}
 }
 
-func registerRouting(api huma.API, in core.Deps) {
+func registerAssignmentRules(api huma.API, in core.Deps) {
 	const path = "/v1/products/{product}/assignment-rules"
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-routing-rules", Method: http.MethodGet, Path: path,
+		OperationID: "list-assignment-rules", Method: http.MethodGet, Path: path,
 		Summary: "List assignment rules",
 		Description: "The standing rules for this product, in the order they are tried.\n\n" +
 			"First match wins, and which rule placed a finding is recorded on the finding.",
@@ -106,7 +106,7 @@ func registerRouting(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "preview-routing-rule", Method: http.MethodGet, Path: path + "/preview",
+		OperationID: "preview-assignment-rule", Method: http.MethodGet, Path: path + "/preview",
 		Summary: "Preview what an assignment rule would catch",
 		Description: "Answers what a rule with these keys matches, without recording " +
 			"anything: the components it names, how many pieces of work sit at them, and how " +
@@ -179,7 +179,7 @@ func registerRouting(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "add-routing-rule", Method: http.MethodPost, Path: path,
+		OperationID: "add-assignment-rule", Method: http.MethodPost, Path: path,
 		Summary: "Add an assignment rule",
 		Description: "Records a standing rule and queues it against what is already open.\n\n" +
 			"It matches on component identity as well as on a place in the tree. A rule " +
@@ -207,14 +207,14 @@ func registerRouting(api huma.API, in core.Deps) {
 			Reports  bool   `json:"reports,omitempty" doc:"Whether it places vulnerability reports rather than findings. Refused with either key"`
 		}
 	}) (*struct{ Body RuleBody }, error) {
-		subject, product, err := routable(ctx, in, input.Product)
+		subject, product, err := ruleWriter(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
 		}
 		if input.Body.Reports && (input.Body.Upstream != "" || input.Body.Beneath != "") {
 			return nil, huma.Error422UnprocessableEntity(reportRuleKeyed)
 		}
-		var rule *finding.Routing
+		var rule *finding.AssignmentRule
 		var team *access.Team
 		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
 			var err error
@@ -231,7 +231,7 @@ func registerRouting(api huma.API, in core.Deps) {
 			if err != nil {
 				return core.Asked(in.Logger, err)
 			}
-			if err := core.Noted(ctx, tx, trail.Routing, input.Product+" · "+rule.Name,
+			if err := core.Noted(ctx, tx, trail.AssignmentRule, input.Product+" · "+rule.Name,
 				nil, trail.Said("to "+team.Called(), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
@@ -252,7 +252,7 @@ func registerRouting(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "retire-routing-rule", Method: http.MethodDelete,
+		OperationID: "retire-assignment-rule", Method: http.MethodDelete,
 		Path:    path + "/{id}",
 		Summary: "Retire an assignment rule",
 		Description: "Takes a rule out of use. What it already placed stays placed: " +
@@ -264,7 +264,7 @@ func registerRouting(api huma.API, in core.Deps) {
 			Product string `path:"product"`
 			ID      int64  `path:"id"`
 		}) (*struct{}, error) {
-			subject, product, err := routable(ctx, in, input.Product)
+			subject, product, err := ruleWriter(ctx, in, input.Product)
 			if err != nil {
 				return nil, err
 			}
@@ -272,7 +272,7 @@ func registerRouting(api huma.API, in core.Deps) {
 				if err := finding.NewStore(tx).RetireRule(ctx, subject, product, input.ID); err != nil {
 					return core.Absent(in.Logger, err, "that rule could not be retired", core.NoSuchRule)
 				}
-				if err := core.Noted(ctx, tx, trail.Routing,
+				if err := core.Noted(ctx, tx, trail.AssignmentRule,
 					input.Product+" · "+strconv.FormatInt(input.ID, 10),
 					trail.Said("in use", true), nil); err != nil {
 					return core.NotRecorded(in.Logger, err)
@@ -288,14 +288,14 @@ func registerRouting(api huma.API, in core.Deps) {
 // reportRuleKeyed refuses a rule placing reports that names a key.
 const reportRuleKeyed = "a rule placing reports names no package and no place: a report sits at neither"
 
-// routable resolves who is asking and the product they are asking about, and
+// ruleWriter resolves who is asking and the product they are asking about, and
 // refuses somebody who may not hand work to anybody.
 //
 // The conjunction is checked here rather than by the route's own role list,
 // which is satisfied by any one of what it names. Writing a rule performs the
 // act the assigner right is named for — continuously, on behalf of whoever
 // wrote it — so it asks for that right and not merely for triage.
-func routable(ctx context.Context, in core.Deps, name string) (access.Subject, int64, error) {
+func ruleWriter(ctx context.Context, in core.Deps, name string) (access.Subject, int64, error) {
 	subject, err := core.Reading(ctx)
 	if err != nil {
 		return access.Subject{}, 0, err
@@ -319,7 +319,7 @@ func routable(ctx context.Context, in core.Deps, name string) (access.Subject, i
 // leaves every open finding it covers unrouted until another rule is saved, so
 // a full queue refuses the rule and the caller sends it again.
 func queueSweep(ctx context.Context, in core.Deps, tx bun.Tx, productID int64) error {
-	_, err := in.Queue.AddTx(ctx, tx, queue.Route, strconv.FormatInt(productID, 10))
+	_, err := in.Queue.AddTx(ctx, tx, queue.AssignmentSweep, strconv.FormatInt(productID, 10))
 	switch {
 	case errors.Is(err, queue.ErrBacklogFull):
 		return huma.NewError(http.StatusServiceUnavailable,

@@ -28,7 +28,7 @@ type Team struct {
 	bun.BaseModel `bun:"table:team,alias:tm"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
-	// PartyID is what work is routed to. A team and a person share one
+	// PartyID is what work is assigned to. A team and a person share one
 	// name space so that "who holds this" is one question.
 	PartyID int64 `bun:"party_id,notnull"`
 	// Name is what is matched, stored normalized, and DisplayName is the
@@ -36,7 +36,7 @@ type Team struct {
 	Name        string `bun:"name,notnull"`
 	DisplayName string `bun:"display_name"`
 	// RetiredAt takes a team out of use without deleting it. Work already
-	// routed to it has to keep resolving to something a screen can name.
+	// assigned to it has to keep resolving to something a screen can name.
 	RetiredAt *time.Time `bun:"retired_at"`
 	CreatedAt time.Time  `bun:"created_at,notnull"`
 }
@@ -88,7 +88,7 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 
 	team := new(Team)
 	// Both statements or neither, for the reason a person and their party
-	// are written together: a team nothing can be routed to is not a team.
+	// are written together: a team nothing can be assigned to is not a team.
 	// And the lookup is inside, because a retry runs against a database
 	// that has moved and what it decides is whether to insert.
 	//
@@ -106,7 +106,7 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			return nil
 		case err == nil:
 			// Retired, and declaring the name again brings it back. The name
-			// is unique across retired teams too — work already routed to one
+			// is unique across retired teams too — work already assigned to one
 			// has to keep resolving to something a screen can name, so the row
 			// stays — and inserting a second team under the same name would be
 			// refused by the index with a message about a team that is not
@@ -148,8 +148,8 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 }
 
 // TeamByName reads a team by the name people type. A retired one is not found:
-// nothing new is routed to it, and it is absent from every list. The name is
-// not free, though — the row stays so that work already routed to it resolves
+// nothing new is assigned to it, and it is absent from every list. The name is
+// not free, though — the row stays so that work already assigned to it resolves
 // to something a screen can name — so declaring that name again reinstates
 // the team rather than making a second one.
 func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
@@ -241,7 +241,7 @@ func narrowTeams(query *bun.SelectQuery, term string) *bun.SelectQuery {
 // RetireTeam takes a team out of use. Its membership goes with it — the team
 // is not somewhere work arrives any more, and a list of people who used to be
 // on it is a record nobody asked for — while the row and its party stay, so
-// that work routed to it before still names something.
+// that work assigned to it before still names something.
 func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 	write := func(ctx context.Context, db bun.IDB) error {
 		if _, err := db.NewDelete().Model((*Membership)(nil)).
@@ -365,7 +365,7 @@ type Held struct {
 	// Name is what to show. A person's display name or sign-in identity, or a
 	// team's.
 	Name string
-	// Team says this is a queue rather than a holding: work routed here is
+	// Team says this is a queue rather than a holding: work assigned here is
 	// unheld until somebody takes it.
 	Team bool
 }
@@ -443,7 +443,7 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 // for: recorded, and not deactivated.
 //
 // One spelling, because "may this person do this" excludes somebody who has
-// left at every site that asks it: the mention picker, routing work to them,
+// left at every site that asks it: the mention picker, assigning work to them,
 // and counting administrators. They are refused at sign-in, so anything handed
 // to them is handed to somebody who will never see it.
 func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
@@ -503,7 +503,7 @@ func rolesReading(productID int64, visibility Visibility) []Role {
 // finding of each of these visibilities in this product: one member who reads
 // every one of them. Naming none is a question nobody answers yes to.
 //
-// Not every member: requiring that would turn routing pressure into access
+// Not every member: requiring that would turn assignment pressure into access
 // pressure — an administrator granting somebody private reading so that a
 // queue works is an access decision made as a workflow convenience, and it
 // arrives one team at a time. Requiring nobody is the failure in the other

@@ -397,7 +397,7 @@ func TestATeamsQueueCanBeOpened(t *testing.T) {
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at,
 			`{"team":"platform"}`); got.Code != http.StatusNoContent {
-			t.Fatalf("routing work to a team answered %d: %s", got.Code, got.Body.String())
+			t.Fatalf("assigning work to a team answered %d: %s", got.Code, got.Body.String())
 		}
 
 		// The totals list says the team holds it.

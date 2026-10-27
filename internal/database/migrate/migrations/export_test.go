@@ -113,7 +113,7 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		"flaw_report":               flawReportV0110(t), "flaw_report_revision": flawReportV0110(t),
 		"report_note": flawReportV0110(t), "report_note_revision": flawReportV0110(t),
 		"report_message": flawReportV0110(t), "report_assignment": flawReportV0110(t),
-		"routing_rule": routingRuleV0110(t),
+		"assignment_rule": assignmentRuleV0110(t),
 	} {
 		made, indexes, err := pick(declared, table)
 		if err != nil {
@@ -129,7 +129,43 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 // it, at a later step.
 func RunV0110ReportStep(ctx context.Context, db *database.DB) error {
 	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
-	return inV020(ctx, db.DB.DB, reportCaseV0110)
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		return renamedForV0110(ctx, tx, reportCaseV0110)
+	})
+}
+
+// renamedForV0110 runs a step of the v0.11.0 upgrade against the names it is
+// written for, as a start that stopped after that step left them. MySQL and
+// MariaDB commit each rename as it runs, so such a start had made every one.
+// PostgreSQL and SQLite keep nothing a stopped start did, so the tables the
+// step names are given their new names for it and their former ones after,
+// and a later start makes every rename.
+func renamedForV0110(ctx context.Context, tx bun.Tx, step func(context.Context, bun.Tx) error) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if u.engine == database.MySQL || u.engine == database.MariaDB {
+		if err := renameV0110(ctx, tx); err != nil {
+			return err
+		}
+		return step(ctx, tx)
+	}
+	named := []tableRename{{"routing_rule", "assignment_rule"}}
+	for _, r := range named {
+		if err := u.run([]string{`ALTER TABLE "` + r.from + `" RENAME TO "` + r.to + `"`}); err != nil {
+			return err
+		}
+	}
+	if err := step(ctx, tx); err != nil {
+		return err
+	}
+	for _, r := range named {
+		if err := u.run([]string{`ALTER TABLE "` + r.to + `" RENAME TO "` + r.from + `"`}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // StopV0110AfterAcknowledgements makes the report step's tables and writes
@@ -143,14 +179,16 @@ func StopV0110AfterAcknowledgements(ctx context.Context, db *database.DB) error 
 		if err != nil {
 			return err
 		}
-		declared := flawReportV0110(u.t)
-		for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
-			"report_note_revision", "report_assignment"} {
-			if err := u.create(declared, table); err != nil {
-				return err
+		return renamedForV0110(ctx, tx, func(ctx context.Context, tx bun.Tx) error {
+			declared := flawReportV0110(u.t)
+			for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
+				"report_note_revision", "report_assignment"} {
+				if err := u.create(declared, table); err != nil {
+					return err
+				}
 			}
-		}
-		return acknowledgedAsSentV0110(ctx, tx)
+			return acknowledgedAsSentV0110(ctx, tx)
+		})
 	})
 }
 

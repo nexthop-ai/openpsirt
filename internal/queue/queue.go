@@ -246,7 +246,7 @@ func (q *Queue) AddTx(ctx context.Context, db bun.IDB, kind, reference string) (
 // Per kind, because the cap it feeds exists so that a runaway producer cannot
 // push everyone else's work behind its own — and counted across every kind,
 // the runaway producer's work is exactly what stays queued while everybody
-// else is refused. A bulk change to the routing rules would otherwise refuse
+// else is refused. A bulk change to the assignment rules would otherwise refuse
 // every scan upload in the deployment.
 func (q *Queue) Depth(ctx context.Context, kind string) (int, error) {
 	return q.depthIn(ctx, q.db, kind)

@@ -140,7 +140,7 @@ func (s *Store) ReportHistory(ctx context.Context, subject access.Subject, produ
 			act = ActHandedBack
 		}
 		out = append(out, ReportEvent{At: h.AssignedAt, Act: act, By: h.AssignedBy,
-			Party: h.AssignedTo, RuleID: h.RoutedBy})
+			Party: h.AssignedTo, RuleID: h.AssignedByRule})
 	}
 
 	var rulings []ReportRuling

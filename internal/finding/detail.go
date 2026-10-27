@@ -138,10 +138,10 @@ type Evidence struct {
 	// has to be unable to miss before saying anything about it.
 	Undisclosed bool
 	DiscloseAt  *time.Time
-	// RoutedBy names the standing rule that placed this, where a rule did
+	// AssignedByRule names the standing rule that placed this, where a rule did
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
-	RoutedBy string
+	AssignedByRule string
 	// Tags are the words somebody put on this, as they were typed.
 	Tags []string
 	// DueAt is the earliest deadline among these occurrences, which is the one
@@ -824,11 +824,11 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	// And which standing rule put it there, where one did. Read here rather
 	// than left to a caller for the same reason the holder is: the screen
 	// somebody reads a finding on is where "why is this mine" gets asked.
-	placed, err := s.routedBy(ctx, targetID, vulnerabilityID, componentID, visible)
+	placed, err := s.assignedByRule(ctx, targetID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}
-	evidence.RoutedBy = placed
+	evidence.AssignedByRule = placed
 	// The words somebody put on it.
 	marks, err := s.TagsOn(ctx, productID, vulnerabilityID, componentID, visible)
 	if err != nil {
@@ -877,18 +877,18 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 	return *holders[0].Identity, nil
 }
 
-// routedBy is the name of the rule that placed this finding, or empty where a
+// assignedByRule is the name of the rule that placed this finding, or empty where a
 // person did or nobody has.
 //
 // One name for the whole group, and empty where its occurrences disagree: the
 // same rule the holder follows, because a group placed two ways is a state
 // nobody chose and naming one of them would hide it. The group is the fold, and
-// routing places findings one at a time — so asked about one component this
+// assignment by rule places findings one at a time — so asked about one component this
 // reported no rule where a rule had placed part of the fold, and the whole
 // thing where the name given happened to be the part it placed.
 //
 // Over the occurrences the reader may read, for the reason the holder is.
-func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
+func (s *Store) assignedByRule(ctx context.Context, targetID, vulnerabilityID,
 	componentID int64, visible []access.Visibility) (string, error) {
 
 	var named []struct {
@@ -898,7 +898,7 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 	err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Where(kinds, kindArgs...).
-		Join(`LEFT JOIN "routing_rule" AS "rr" ON "rr"."id" = "f"."routed_by"`).
+		Join(`LEFT JOIN "assignment_rule" AS "rr" ON "rr"."id" = "f"."assigned_by_rule"`).
 		ColumnExpr(`"rr"."name" AS "name"`).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).

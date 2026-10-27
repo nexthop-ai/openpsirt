@@ -388,7 +388,7 @@ func (r *Reach) Reported(t *testing.T, problem string) string {
 	return recorded.Reference
 }
 
-// Swept runs the routing sweep the way the worker does.
+// Swept runs the assignment sweep the way the worker does.
 func (r *Reach) Swept(t *testing.T) int {
 	t.Helper()
 	work := queue.New(r.DB, queue.DefaultOptions())
@@ -414,7 +414,7 @@ func (r *Reach) Preview(t *testing.T, query string) caught {
 	return out
 }
 
-// PreviewAs is the routing preview read as somebody in particular, because
+// PreviewAs is the assignment rule preview read as somebody in particular, because
 // what it answers is supposed to depend on that.
 func (r *Reach) PreviewAs(t *testing.T, who, query string) caught {
 	t.Helper()

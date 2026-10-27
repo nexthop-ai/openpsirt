@@ -501,7 +501,7 @@ and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 | An outgrown rule keeps dismissing what it names | Withdrawn, every code finding it covers would reach the queue at once, which is the noise the rule exists to hold |
 | A rule's coverage counts open code findings by occurrence, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |
 | Coverage is worked out when it is read | A new code finding under a rule in force never reaches the queue |
-| Proposal, approval and retirement are recorded in the administrative trail | As routing rules are |
+| Proposal, approval and retirement are recorded in the administrative trail | As assignment rules are |
 
 ### Code finding states
 
@@ -611,7 +611,7 @@ assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 | A code finding recorded as a flaw, included in disclosure or not, is refused with 409, and its page offers no holder | It is closed work for its holder, and its flaw is assigned instead |
 | A code finding seen on a build where it was not open when it was assigned starts unassigned there | As a finding arriving under an assigned component does |
 | Losing the reading a code finding needs, deactivation and a handover move code findings with everything else, but for the code finding recorded as a flaw below | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
-| A team's routing rules place code findings nobody holds, and no code finding recorded as a flaw | `DESIGN-access.md` § Routing rules. Whoever triages internal work in the product reads and previews them |
+| A team's assignment rules place code findings nobody holds, and no code finding recorded as a flaw | `DESIGN-access.md` § Assignment rules. Whoever triages internal work in the product reads and previews them |
 | The lists of held work list a code finding, one row per code finding, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-kinds.md` § Consumers). A code finding is listed to readers of internal work in the product. A row names the analyzer's rule and opens the code finding's page |
 | The unassigned list leaves out a code finding's sightings in releases past their end of life | Nobody may take a code finding seen only there, and the code finding queue narrowed to work nobody holds leaves it out the same way (§ End of life) |
 | A code finding recorded as a flaw leaves the lists of held work, included in disclosure or not | Its flaw is what is judged, fixed and disclosed, and the flaw is held and listed as itself. The code finding recorded as a flaw is closed work for its holder |

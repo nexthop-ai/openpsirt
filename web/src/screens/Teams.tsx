@@ -138,7 +138,7 @@ export function Teams() {
                       </span>
                     ) : (team.members ?? []).length === 0 ? (
                       <span style={{ color: "var(--faint)" }}>
-                        nobody — work routed here stays unassigned
+                        nobody — work assigned here sits unheld
                       </span>
                     ) : (
                       <span className="variants">
@@ -194,7 +194,7 @@ export function Teams() {
       )}
 
       <p className="hint" style={{ marginTop: 12 }}>
-        A team routes work; it grants no reading.{" "}
+        A team holds work; it grants no reading.{" "}
         <Link to="/auto-assignment" className="linkish">
           Auto-assignment →
         </Link>{" "}

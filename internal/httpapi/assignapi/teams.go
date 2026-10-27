@@ -40,11 +40,11 @@ func registerTeams(api huma.API, a core.Administering) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-teams", Method: http.MethodGet, Path: "/v1/teams",
 		Summary: "List teams",
-		Description: "Lists the teams work can be routed to.\n\n" +
+		Description: "Lists the teams work can be assigned to.\n\n" +
 			"A team holds work and grants nothing: no role, no visibility, no capability. " +
 			"One team therefore carries mixed clearance as a matter of course, and what each " +
-			"member sees of the work routed to it is what they could see anyway.\n\n" +
-			"Names to anybody, membership to an administrator. Routing work to a team " +
+			"member sees of the work assigned to it is what they could see anyway.\n\n" +
+			"Names to anybody, membership to an administrator. Assigning work to a team " +
 			"means naming one, so anybody who may hand work around has to be able to see the " +
 			"names; who is on it is the same question as who is here, and that is answered " +
 			"where the rest of the record is.",
@@ -90,7 +90,7 @@ func registerTeams(api huma.API, a core.Administering) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "record-team", Method: http.MethodPost, Path: "/v1/teams",
 		Summary: "Create a team",
-		Description: "Records a team so that work can be routed to it. Recording the same " +
+		Description: "Records a team so that work can be assigned to it. Recording the same " +
 			"name again returns the team and adds any members named, so a script that sets a " +
 			"deployment up stays runnable.\n\n" +
 			"Everybody named must already have been recorded: a team cannot bring somebody " +
@@ -176,9 +176,9 @@ func registerTeams(api huma.API, a core.Administering) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "retire-team", Method: http.MethodDelete, Path: "/v1/teams/{team}",
 		Summary: "Retire a team",
-		Description: "Takes a team out of use. Nothing new is routed to it and its membership " +
+		Description: "Takes a team out of use. Nothing new is assigned to it and its membership " +
 			"goes. Work in its queue goes back to the unassigned list, since nobody is left on " +
-			"it to read that work. The row stays, so where work was routed before still names " +
+			"it to read that work. The row stays, so where work was assigned before still names " +
 			"it, for the same reason an account is deactivated rather than deleted.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {

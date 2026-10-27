@@ -98,7 +98,7 @@ may see and each bounded, and none of them is that list (REQ-42):
 - **The mentionable** in a comment on a particular finding: people who can
  already read it. Scoped to the product, capped.
 - **The holders of work** in a product: people who could open what they would
- be given, and the teams routed work there. Scoped to the product, capped.
+ be given, and the teams assigned work there. Scoped to the product, capped.
 - **The holdings you can see**: a name and how much, across the products your
  grants reach. Narrowed by subject in the data layer rather than by a product
  in the path, and bounded like every other list, worst first.
