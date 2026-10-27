@@ -326,13 +326,13 @@ func distinctVersions(rows []occurrenceRow) int {
 	return len(seen)
 }
 
-// InBundle is one component of a fix bundle, with the occurrences the bundle
+// InPlannedUpgrade is one component of a planned upgrade, with the occurrences the upgrade
 // reaches in it.
 //
 // Grouped by component and issue because that is the grain a decision and a
-// fix target are both keyed on: a bundle spanning two binary packages of one
+// fix target are both keyed on: an upgrade spanning two binary packages of one
 // source is two of these, and one act covers both.
-type InBundle struct {
+type InPlannedUpgrade struct {
 	VulnerabilityID int64
 	ComponentID     int64
 	TargetID        int64
@@ -356,7 +356,7 @@ type InBundle struct {
 // retry can propose about a finding somebody closed in between.
 func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 	subject access.Subject, productID int64, targets []int64,
-	component, version string) ([]InBundle, error) {
+	component, version string) ([]InPlannedUpgrade, error) {
 
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
@@ -402,7 +402,7 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// nothing here has and would leave out everything fixed in an
 		// earlier release of the same line.
 		//
-		// Matched on the fold, which is the reason the bundle view
+		// Matched on the fold, which is the reason the upgrade view
 		// existed: curl, libcurl4t64 and libcurl3t64 are one source package
 		// bumping once, and keying on the binary name would make upgrading
 		// them three acts that can disagree. Naming any of the three reaches
@@ -419,13 +419,13 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 	}
 
 	order := []string{}
-	grouped := map[string]*InBundle{}
+	grouped := map[string]*InPlannedUpgrade{}
 	seen := map[string]bool{}
 	for _, row := range rows {
 		at := fmt.Sprintf("%d\x00%d\x00%d", row.VulnerabilityID, row.ComponentID, row.TargetID)
 		one, held := grouped[at]
 		if !held {
-			one = &InBundle{
+			one = &InPlannedUpgrade{
 				VulnerabilityID: row.VulnerabilityID, ComponentID: row.ComponentID,
 				TargetID: row.TargetID,
 			}
@@ -454,7 +454,7 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 			Occurrences:        1,
 		})
 	}
-	bundled := make([]InBundle, 0, len(order))
+	bundled := make([]InPlannedUpgrade, 0, len(order))
 	for _, at := range order {
 		bundled = append(bundled, *grouped[at])
 	}

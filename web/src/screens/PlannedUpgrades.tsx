@@ -31,13 +31,13 @@ function rank(state?: string): number {
 // Dependency hygiene rather than a plan for the product's own release: which
 // packages this build is waiting to move, and how much of each has landed.
 //
-// The fix-bundle query read from the other end: a triager reads a bump and the
+// The product's planned upgrades read from the other end: a triager reads a bump and the
 // issues it closes, a coordinator reads a build and the upgrades it is waiting
 // on. One query, so the two cannot come to disagree.
-export function Upgrades() {
+export function PlannedUpgrades() {
   const { product = "", stream = "", variant = "" } = useParams();
   const plan = useQuery({
-    queryKey: ["pending-upgrades", product, stream, variant],
+    queryKey: ["build-planned-upgrades", product, stream, variant],
     queryFn: async () =>
       unwrap(
         await api.GET(
@@ -51,7 +51,7 @@ export function Upgrades() {
 
   if (plan.isPending) return <Loading />;
   if (plan.isError) {
-    return <Failed error={plan.error} what="The pending upgrades could not be read." />;
+    return <Failed error={plan.error} what="The planned upgrades could not be read." />;
   }
   // Lapsed first: it is the row somebody has to do something about, and the
   // rest of the screen is a status board.
@@ -62,7 +62,7 @@ export function Upgrades() {
     <>
       <div className="screen-head">
         <h2>
-          Pending upgrades{" "}
+          Planned upgrades{" "}
           <span className="n">{rows.filter((row) => row.state !== "landed").length}</span>
         </h2>
         <p>

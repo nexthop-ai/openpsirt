@@ -197,7 +197,7 @@ func UpgradeStates() []UpgradeState {
 
 // Planned is one bump a build is waiting on, and how far it has landed.
 type Planned struct {
-	// The commitment's key: the build's fold, exactly as the fix-bundle list
+	// The commitment's key: the build's fold, exactly as the planned-upgrade list
 	// gives it, because this is that query read from the other end.
 	Fold string
 	// Upstream is what to call it — the source package — and From and To the
@@ -240,10 +240,10 @@ type Planned struct {
 	DecisionID int64
 }
 
-// PendingUpgrades is everything committed for one build, by the bump that would
+// PlannedUpgradesFor is everything committed for one build, by the bump that would
 // deliver it, and how much of each is still open.
 //
-// The fix-bundle query inverted. The triager reads a bump and the issues it
+// The planned-upgrade query inverted. The triager reads a bump and the issues it
 // closes; the coordinator reads a build and the bumps it is waiting on. One
 // query read from either end, which is why they are one piece rather than two
 // reports that will disagree.
@@ -251,7 +251,7 @@ type Planned struct {
 // A commitment outlives the findings it was made about, which is the whole
 // point: what has landed is exactly the part where the findings are closed, and
 // a plan that dropped those rows could only ever say what is left.
-func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
+func (s *Store) PlannedUpgradesFor(ctx context.Context, subject access.Subject,
 	targetID int64) ([]Planned, error) {
 
 	_, visible, err := readableIn(ctx, s.db, subject, targetID)

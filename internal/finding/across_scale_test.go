@@ -176,7 +176,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 				acrossTook.Round(time.Millisecond), across, time.Since(at).Round(time.Millisecond), here)
 		}
 
-		// The component and fix-bundle views keep the list's groups under the
+		// The component and planned-upgrade views keep the list's groups under the
 		// same conditions over a group, grouped at their own grain.
 		// Each is bounded rather than left to run, so a statement that runs
 		// away is reported as having no answer within the bound. MySQL and
@@ -218,11 +218,11 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 				_, n, err := store.ComponentGroups(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
 				return n, err
 			})
-			bundles := bounded(func(ctx context.Context) (int, error) {
-				_, n, err := store.Bundles(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
+			upgrades := bounded(func(ctx context.Context) (int, error) {
+				_, n, err := store.PlannedUpgrades(ctx, reader, finding.Scope{ProductID: &product.ID}, 1, 0, one.filter)
 				return n, err
 			})
-			t.Logf("%-20s components %s · fix bundles %s", one.name, components, bundles)
+			t.Logf("%-20s components %s · planned upgrades %s", one.name, components, upgrades)
 		}
 
 		approver := access.NewPerson(person.ID+2, "an approver", false, map[int64][]access.Role{

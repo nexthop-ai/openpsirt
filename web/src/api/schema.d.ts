@@ -637,9 +637,9 @@ export interface paths {
         };
         /**
          * List the audit log by decision
-         * @description The audit log one decision at a time, newest first: every decision with an occurrence the filters match, once, however many occurrences it covers.
+         * @description The record one decision at a time, newest first: every decision with an occurrence the filters match, once, however many occurrences it covers.
          *
-         *     Takes every filter the per-occurrence list takes, with the same meaning. A decision is listed where any of its occurrences match, and every count on it is of the occurrences that match and that you may read. Asked for `state=lapsed`, a decision that lapsed at one occurrence of forty reads as one occurrence, lapsed. `total` counts decisions.
+         *     Takes every filter the per-occurrence record takes, with the same meaning. A decision is listed where any of its occurrences match, and every count on it is of the occurrences that match and that you may read. Asked for `state=lapsed`, a decision that lapsed at one occurrence of forty reads as one occurrence, lapsed. `total` counts decisions.
          *
          *     What the decision is about is named from its earliest matching occurrence, beside how many issues, products, components and occurrences the matches reach.
          *
@@ -1403,7 +1403,7 @@ export interface paths {
         };
         /**
          * List incidents and their response windows
-         * @description Every standing incident, earliest known first. Each carries every window this deployment counts, as it runs for that incident, every notice recorded about it, and every tag named as carrying the fix. A window starts when the attack became known, at the first notice for the window it starts from, or at the earliest release date stated for a tag named as carrying the fix, and has no end until then.
+         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, every notice recorded about it, and every tag named as carrying the fix. A window starts when the attack became known, at the first notice for the window it starts from, or at the earliest release date stated for a tag named as carrying the fix, and has no end until then.
          *
          *     A window is answered where a notice names it. Nothing here says whether a notice met anything.
          *
@@ -1411,7 +1411,7 @@ export interface paths {
          *
          *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
          */
-        get: operations["list-incidents"];
+        get: operations["list-obligations"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1440,7 +1440,7 @@ export interface paths {
          *
          *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
          */
-        delete: operations["clear-incident"];
+        delete: operations["clear-exploited-here"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3409,7 +3409,7 @@ export interface paths {
          *
          *     What it covers is a match, not a list. A finding is covered when its component folds to the same key in this build, so changing the version a release is moving to is one row, and an issue published tonight against the same package is covered by this morning's commitment with nobody acting.
          *
-         *     The fix-bundle query read from the other end. A triager reads an upgrade and the issues it closes; a coordinator reads a build and the upgrades it is waiting on. One query rather than two reports that will eventually disagree.
+         *     The planned-upgrade query read from the other end. A triager reads an upgrade and the issues it closes; a coordinator reads a build and the upgrades it is waiting on. One query rather than two reports that will eventually disagree.
          *
          *     Nothing here is declared done. A piece of work has landed when the build stops holding it, which the scans already say — a declared fix that is still open after a scan has run is a missed target, and the scan is independent evidence against the claim.
          *
@@ -3419,7 +3419,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
-        get: operations["get-pending-upgrades"];
+        get: operations["list-build-planned-upgrades"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3443,7 +3443,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
-        get: operations["export-pending-upgrades"];
+        get: operations["export-build-planned-upgrades"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4753,7 +4753,7 @@ export interface paths {
          *
          *     Requires: public-triage or private-triage or internal-triage on the product
          */
-        post: operations["record-incident"];
+        post: operations["record-exploited-here"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4995,7 +4995,7 @@ export interface paths {
          *
          *     Keyed on the source package where one is recorded and on the component's own name otherwise, so packages built from one source are one row — curl, libcurl4t64 and libcurl3t64 are upgraded once.
          *
-         *     Only what has a fix: a bundle is a version to move to, so a finding upstream has released nothing for is not in one.
+         *     Only what has a fix: an upgrade is a version to move to, so a finding upstream has released nothing for is not in one.
          *
          *     Grouping is presentation: one act still records its decision separately at every occurrence of every component.
          *
@@ -5007,7 +5007,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
-        get: operations["list-fix-bundles"];
+        get: operations["list-planned-upgrades"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5031,7 +5031,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
-        get: operations["export-fix-bundles"];
+        get: operations["export-planned-upgrades"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5183,7 +5183,7 @@ export interface paths {
         put?: never;
         /**
          * Withdraw a ruling on vulnerability reports
-         * @description Takes a ruling back, waiting or in force, and opens every report it covered again, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
+         * @description Takes a ruling back, waiting or in force, and returns every report it covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
          *
          *     Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
          *
@@ -5205,7 +5205,7 @@ export interface paths {
         };
         /**
          * List vulnerability reports
-         * @description Every report recorded against this product, newest first, judged or not.
+         * @description Every claim recorded against this product, newest first, judged or not.
          *
          *     A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
          *
@@ -5215,17 +5215,17 @@ export interface paths {
         put?: never;
         /**
          * Record a vulnerability report
-         * @description Records a report that arrived, or a flaw somebody here found, and returns the reference it is reached by.
+         * @description Records a claim that arrived, or a flaw somebody here found, and returns the reference it is reached by.
          *
-         *     No issue is minted. What arrived is a report, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
+         *     No issue is minted. What arrived is a claim, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
          *
-         *     `reported_problem` is required and everything else is optional: a report arriving anonymously is an ordinary report, and a report with nothing in it records only that a mail arrived. The reported problem is stored as markdown and goes through the same submission policy a justification does, so raw HTML and a link using anything but http, https, mailto, attachment or issue are refused naming the line they are on.
+         *     `summary` is required and everything else is optional: a claim arriving anonymously is an ordinary claim, and a report with nothing in it records only that a mail arrived. The summary is stored as markdown and goes through the same submission policy a justification does, so raw HTML and a link using anything but http, https, mailto, attachment or issue are refused naming the line they are on.
          *
          *     `received` is the day it arrived, which is what an embargo would be counted from. A date that cannot be read is treated as one nobody gave.
          *
          *     `found_here` marks a flaw somebody here found. Recorded as a flaw, it carries no disclosure date, and it is never listed as waiting for an answer.
          *
-         *     `title` is an optional line naming the reported problem, and is refused across lines.
+         *     `title` is an optional line naming the claim, and is refused across lines.
          *
          *     Where a standing rule places this product's reports, the report goes to the first such rule's team that has a member who reads undisclosed work here.
          *
@@ -5247,7 +5247,7 @@ export interface paths {
         };
         /**
          * Show a vulnerability report
-         * @description The reported problem, who reported it, when it arrived, when somebody answered them, who holds it, and what it turned out to be.
+         * @description What was claimed, who claimed it, when it arrived, when somebody answered them, who holds it, and what it turned out to be.
          *
          *     A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
          *
@@ -5256,7 +5256,7 @@ export interface paths {
         get: operations["get-recorded-report"];
         /**
          * Edit a vulnerability report
-         * @description Replaces the title, the reported problem and what is recorded about the reporter. Every field is the whole new value, and one left empty is cleared, apart from `reported_problem`, which is required.
+         * @description Replaces the title, the claim and what is recorded about the reporter. Every field is the whole new value, and one left empty is cleared, apart from `summary`, which is required.
          *
          *     What it said before is kept, and read back from its revisions, the original first. An edit that changes nothing keeps nothing.
          *
@@ -5319,9 +5319,9 @@ export interface paths {
         put?: never;
         /**
          * Attach a file to a vulnerability report
-         * @description Stores one file against a report and returns the reference to put in text. A report that has not been judged has no issue to hang a screenshot on, and the screenshot is often the whole of what was sent.
+         * @description Stores one file against a report and returns the reference to put in text. A claim that has not been judged has no issue to hang a screenshot on, and the screenshot is often the whole of what was sent.
          *
-         *     The file stays with the report once the report gains an issue, and stays as readable as the report: saying a report is a disclosed issue does not publish what somebody sent with it. Attach it to the issue to put it there.
+         *     The file stays with the report once the report gains an issue, and stays as readable as the report: saying a claim is a disclosed issue does not publish what somebody sent with it. Attach it to the issue to put it there.
          *
          *     The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
          *
@@ -5370,7 +5370,7 @@ export interface paths {
          * Accept a vulnerability report as an issue
          * @description Points a report at the issue it turned out to be, and records who said so and when.
          *
-         *     The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a report is real is not the same keystroke as declaring where it lives.
+         *     The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a claim is real is not the same keystroke as declaring where it lives.
          *
          *     Refused where the report has already been judged, where a ruling holds it — withdraw a waiting ruling first — and where another report is already the record of that issue: one report is one issue's record, and a second pointed at the same issue is a duplicate rather than this.
          *
@@ -5411,7 +5411,7 @@ export interface paths {
          *
          *     The message is told to the report's audience: whoever holds it, the members of the team whose queue it is in who read reports, or everybody who works reports here where nobody holds it. Whoever records it is not told.
          *
-         *     The text is markdown and goes through the policy a reported problem does; a 422 names the line and the offending text. Attach a file that came with it to the report and refer to it here.
+         *     The text is markdown and goes through the policy a report's claim does; a 422 names the line and the offending text. Attach a file that came with it to the report and refer to it here.
          *
          *     Requires: private-triage on the product
          */
@@ -6075,7 +6075,7 @@ export interface paths {
          *
          *     Requires: any signed-in person, and not a pipeline key
          */
-        get: operations["list-response-windows"];
+        get: operations["list-obligation-windows"];
         put?: never;
         /**
          * Declare a response window
@@ -6085,7 +6085,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        post: operations["declare-response-window"];
+        post: operations["declare-obligation-window"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6108,7 +6108,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        put: operations["change-response-window"];
+        put: operations["change-obligation-window"];
         post?: never;
         /**
          * Retire a response window
@@ -6118,7 +6118,7 @@ export interface paths {
          *
          *     Requires: administrator
          */
-        delete: operations["retire-response-window"];
+        delete: operations["retire-obligation-window"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7677,10 +7677,10 @@ export interface components {
             due?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
+            /** @description This product records being exploited through it. A decision over several issues that sets this one aside or puts it off is refused */
+            exploited_here?: boolean;
             /** @description The version the report says fixes it, where it names one */
             fixed_in?: string;
-            /** @description Whether an incident stands in this product through it. A decision over several issues that sets this one aside or puts it off is refused */
-            incident?: boolean;
             /**
              * Format: double
              * @description Published estimate that this will be exploited, 0 to 1
@@ -8086,39 +8086,6 @@ export interface components {
             /** Format: int64 */
             rows: number;
         };
-        BundleBody: {
-            /**
-             * Format: int64
-             * @description The number of builds of the selection holding any of it. Absent where the selection is one build
-             */
-            builds?: number;
-            /** @description The packages this one upgrade moves. More than one where a source package builds several */
-            components: string[] | null;
-            /** @description Some of what it closes is being exploited */
-            exploited?: boolean;
-            /** @description The version in hand */
-            from: string;
-            /** @description The builds that hold this upgrade */
-            in: components["schemas"]["BuildName"][] | null;
-            /** @description Whether an incident stands in this product through some of what it closes */
-            incident?: boolean;
-            /**
-             * Format: int64
-             * @description Distinct vulnerabilities the upgrade closes
-             */
-            issues: number;
-            /**
-             * Format: int64
-             * @description The number of findings those sit at
-             */
-            occurrences: number;
-            /** @description The worst of what it closes */
-            severity?: string;
-            /** @description The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped */
-            to: string;
-            /** @description The upgrade's subject: the source package where one is recorded, and the component's own name otherwise */
-            upstream: string;
-        };
         CVSSv3: {
             /** Format: double */
             baseScore: number;
@@ -8283,7 +8250,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "incident" | "merge" | "upstream";
+            kind: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -8334,11 +8301,31 @@ export interface components {
             /** @description What a channel carries is sent to them directly as well */
             shared: boolean;
         };
-        "Clear-incidentRequest": {
+        ClaimedBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/Clear-incidentRequest.json
+             * @example https://example.com/schemas/ClaimedBody.json
+             */
+            readonly $schema?: string;
+            contact?: string;
+            /** @description The credit they asked for in an advisory */
+            credit?: string;
+            /** @description Whether somebody here found it. Unset is a report from outside, which carries a disclosure date once it is recorded as a flaw */
+            found_here?: boolean;
+            /** @description The day it arrived, as YYYY-MM-DD, which the embargo is counted from */
+            received?: string;
+            reported_by?: string;
+            /** @description What was claimed, in the words it was claimed in */
+            summary: string;
+            /** @description A line naming the claim */
+            title?: string;
+        };
+        "Clear-exploited-hereRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Clear-exploited-hereRequest.json
              */
             readonly $schema?: string;
             /** @description Why the record is being cleared */
@@ -8398,8 +8385,8 @@ export interface components {
             ecosystem?: string;
             /** @description Whether any of them is known-exploited */
             exploited: boolean;
-            /** @description Whether an incident stands in this product through any of them */
-            incident?: boolean;
+            /** @description Whether this product is recorded as having been exploited through any of them */
+            exploited_here?: boolean;
             /**
              * Format: int64
              * @description Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list
@@ -8464,20 +8451,6 @@ export interface components {
              */
             total: number;
         };
-        CountedListBodyBundleBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/CountedListBodyBundleBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["BundleBody"][] | null;
-            /**
-             * Format: int64
-             * @description The total, so a page says what it is a page of
-             */
-            total: number;
-        };
         CountedListBodyCarriedDecisionBody: {
             /**
              * Format: uri
@@ -8486,6 +8459,20 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["CarriedDecisionBody"][] | null;
+            /**
+             * Format: int64
+             * @description The total, so a page says what it is a page of
+             */
+            total: number;
+        };
+        CountedListBodyPlannedUpgradeItemBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CountedListBodyPlannedUpgradeItemBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["PlannedUpgradeItemBody"][] | null;
             /**
              * Format: int64
              * @description The total, so a page says what it is a page of
@@ -9446,6 +9433,8 @@ export interface components {
             elsewhere: components["schemas"]["ElsewhereBody"][] | null;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
+            /** @description What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared */
+            exploited_here?: components["schemas"]["ExploitedHereBody"][] | null;
             /** @enum {string} */
             fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
             /** @description The date that version became available */
@@ -9454,8 +9443,6 @@ export interface components {
             fixed_in?: string;
             /** @description The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found */
             found_by?: components["schemas"]["MeasuredBody"];
-            /** @description The incidents recorded in this product through this issue, newest first. At most one of them stands; the rest were cleared */
-            incidents?: components["schemas"]["IncidentBody"][] | null;
             /** @description The date that version shipped */
             latest_released_at?: string;
             /** @description The newest version the ecosystem's own index knows of */
@@ -9532,6 +9519,65 @@ export interface components {
             /** @description The kinds of flaw, as CWE identifiers with their names, the root cause first */
             weaknesses?: components["schemas"]["WeaknessBody"][] | null;
         };
+        ExploitedHereBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ExploitedHereBody.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            cleared_at?: string;
+            /** @description Why it was cleared */
+            cleared_because?: string;
+            /** @description Who cleared it */
+            cleared_by?: string;
+            /** @description The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom */
+            fixes?: components["schemas"]["FixBody"][] | null;
+            /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
+            grounds: string;
+            /** Format: int64 */
+            id?: number;
+            /**
+             * Format: date-time
+             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+             */
+            known_at: string;
+            /** @description The product this record belongs to, by the name an address takes */
+            product?: string;
+            /** @description That product's spelling on screen */
+            product_name?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** @description Who recorded it */
+            recorded_by?: string;
+            /** @description Whether this is the record in force. One stands at a time per issue and product */
+            standing: boolean;
+            /** @description Who outside was told about this, when, and what they were told */
+            told?: components["schemas"]["NoticeBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of occurrences you may read that this returned to the review queue: those under a decision that the issue does not apply, or under a decision over many issues that set this one aside or put it off
+             */
+            undone?: number;
+            /** @description The issue this is about */
+            vulnerability?: string;
+        };
+        ExploitedHereKept: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ExploitedHereKept.json
+             */
+            readonly $schema?: string;
+            /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
+            grounds: string;
+            /**
+             * Format: date-time
+             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+             */
+            known_at: string;
+        };
         "Extend-disclosureRequest": {
             /**
              * Format: uri
@@ -9600,6 +9646,8 @@ export interface components {
             ecosystem?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
+            /** @description This product is recorded as having been exploited through this issue */
+            exploited_here?: boolean;
             /**
              * @description Upstream's answer about it
              * @enum {string}
@@ -9609,8 +9657,6 @@ export interface components {
             fixed_in?: string;
             /** @description The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
-            /** @description Whether an incident stands in this product through this issue */
-            incident?: boolean;
             /**
              * Format: double
              * @description Published estimate that this will be exploited, 0 to 1
@@ -10222,74 +10268,6 @@ export interface components {
         };
         IdentificationHelper: {
             purl?: string;
-        };
-        IncidentBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/IncidentBody.json
-             */
-            readonly $schema?: string;
-            /** Format: date-time */
-            cleared_at?: string;
-            /** @description Why it was cleared */
-            cleared_because?: string;
-            /** @description Who cleared it */
-            cleared_by?: string;
-            /** @description The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom */
-            fixes?: components["schemas"]["FixBody"][] | null;
-            /** @description What happened and how it is known. Nothing re-checks an incident, so this is the whole of what a later reader has */
-            grounds: string;
-            /** Format: int64 */
-            id?: number;
-            /**
-             * Format: date-time
-             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
-             */
-            known_at: string;
-            /** @description The product this record belongs to, by the name an address takes */
-            product?: string;
-            /** @description That product's spelling on screen */
-            product_name?: string;
-            /** Format: date-time */
-            recorded_at?: string;
-            /** @description Who recorded it */
-            recorded_by?: string;
-            /** @description Whether this is the record in force. One stands at a time per issue and product */
-            standing: boolean;
-            /** @description Who outside was told about this, when, and what they were told */
-            told?: components["schemas"]["NoticeBody"][] | null;
-            /**
-             * Format: int64
-             * @description The number of occurrences you may read that this returned to the review queue: those under a decision that the issue does not apply, or under a decision over many issues that set this one aside or put it off
-             */
-            undone?: number;
-            /** @description The issue this is about */
-            vulnerability?: string;
-        };
-        IncidentKept: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/IncidentKept.json
-             */
-            readonly $schema?: string;
-            /** @description What happened and how it is known. Nothing re-checks an incident, so this is the whole of what a later reader has */
-            grounds: string;
-            /**
-             * Format: date-time
-             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
-             */
-            known_at: string;
-        };
-        IncidentsBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/IncidentsBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["StandingIncidentBody"][] | null;
         };
         Info: {
             /**
@@ -11762,26 +11740,6 @@ export interface components {
             namespace?: string;
             version: string;
         };
-        NewReportBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/NewReportBody.json
-             */
-            readonly $schema?: string;
-            contact?: string;
-            /** @description The credit they asked for in an advisory */
-            credit?: string;
-            /** @description Whether somebody here found it. Unset is a report from outside, which carries a disclosure date once it is recorded as a flaw */
-            found_here?: boolean;
-            /** @description The day it arrived, as YYYY-MM-DD, which the embargo is counted from */
-            received?: string;
-            reported_by?: string;
-            /** @description What the reporter says is wrong, in their words */
-            reported_problem: string;
-            /** @description A line naming the reported problem */
-            title?: string;
-        };
         Note: {
             category: string;
             text: string;
@@ -11918,7 +11876,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "response-window-open" | "response-window-near" | "response-window-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -11940,6 +11898,59 @@ export interface components {
              * @description The number waiting on you
              */
             total: number;
+        };
+        ObligationBody: {
+            /** Format: date-time */
+            cleared_at?: string;
+            /** @description Why it was cleared */
+            cleared_because?: string;
+            /** @description Who cleared it */
+            cleared_by?: string;
+            /** @description The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom */
+            fixes?: components["schemas"]["FixBody"][] | null;
+            /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
+            grounds: string;
+            /** Format: int64 */
+            id?: number;
+            /**
+             * Format: date-time
+             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+             */
+            known_at: string;
+            /** @description Whether you may record a notice about this record, and name or withdraw a tag carrying its fix */
+            may_tell: boolean;
+            /** @description The product this record belongs to, by the name an address takes */
+            product?: string;
+            /** @description That product's spelling on screen */
+            product_name?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** @description Who recorded it */
+            recorded_by?: string;
+            /** @description Whether this is the record in force. One stands at a time per issue and product */
+            standing: boolean;
+            /** @description Who outside was told about this, when, and what they were told */
+            told?: components["schemas"]["NoticeBody"][] | null;
+            /** @description Whether the issue is undisclosed somewhere in this product */
+            undisclosed: boolean;
+            /**
+             * Format: int64
+             * @description The number of occurrences you may read that this returned to the review queue: those under a decision that the issue does not apply, or under a decision over many issues that set this one aside or put it off
+             */
+            undone?: number;
+            /** @description The issue this is about */
+            vulnerability?: string;
+            /** @description Every window in force that applies to this product, shortest first, as it runs for this incident */
+            windows: components["schemas"]["DueBody"][] | null;
+        };
+        ObligationsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ObligationsBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ObligationBody"][] | null;
         };
         OccurrenceBody: {
             /** @description The occurrence in the build, as the findings list gives it */
@@ -12022,7 +12033,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "response-window-open" | "response-window-near" | "response-window-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -12065,9 +12076,9 @@ export interface components {
             /** @description The first two hundred characters of what the report says */
             description?: string;
             exploited?: boolean;
+            /** @description This product records being attacked through it */
+            exploited_here?: boolean;
             fixed_in?: string;
-            /** @description Whether an incident stands in this product through it */
-            incident?: boolean;
             severity?: string;
             vulnerability: string;
             /** @description The signals that made it stand out */
@@ -12081,14 +12092,14 @@ export interface components {
             exploited: number;
             /**
              * Format: int64
+             * @description Issues this product records being attacked through. Agreeing to the decision is refused while any is in it; set them aside
+             */
+            exploited_here: number;
+            /**
+             * Format: int64
              * @description Issues a fix is available for
              */
             fixable: number;
-            /**
-             * Format: int64
-             * @description Issues an incident stands in this product through. Agreeing to the decision is refused while any is in it; set them aside
-             */
-            incidents: number;
             /** @description The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed */
             rows: components["schemas"]["OutlierBody"][] | null;
             /**
@@ -12372,13 +12383,13 @@ export interface components {
             ecosystem?: string;
             /** @description Whether any of what is open here is known to be exploited */
             exploited: boolean;
+            /** @description Whether this product is recorded as having been exploited through any of what is open here */
+            exploited_here?: boolean;
             /**
              * Format: int64
              * @description The number of open issues any version fixes, counted once per issue however many binaries carry it
              */
             fixable: number;
-            /** @description Whether an incident stands in this product through any of what is open here */
-            incident?: boolean;
             /**
              * Format: int64
              * @description Distinct vulnerabilities open across the source package here, counted once however many binaries carry each
@@ -12548,11 +12559,44 @@ export interface components {
             occurrences: number;
             /**
              * Format: int64
-             * @description Build-level intents recorded, which is what the pending upgrades screen reads
+             * @description Build-level intents recorded, which is what the planned upgrades screen reads
              */
             targets: number;
             /** @description Whether this needs a second person. True when the date is past the earliest deadline among what it covers, because that defers the worst thing in it */
             waiting: boolean;
+        };
+        PlannedUpgradeItemBody: {
+            /**
+             * Format: int64
+             * @description The number of builds of the selection holding any of it. Absent where the selection is one build
+             */
+            builds?: number;
+            /** @description The packages this one upgrade moves. More than one where a source package builds several */
+            components: string[] | null;
+            /** @description Some of what it closes is being exploited */
+            exploited?: boolean;
+            /** @description Some of what it closes is something this product is recorded as having been exploited through */
+            exploited_here?: boolean;
+            /** @description The version in hand */
+            from: string;
+            /** @description The builds that hold this upgrade */
+            in: components["schemas"]["BuildName"][] | null;
+            /**
+             * Format: int64
+             * @description Distinct vulnerabilities the upgrade closes
+             */
+            issues: number;
+            /**
+             * Format: int64
+             * @description The number of findings those sit at
+             */
+            occurrences: number;
+            /** @description The worst of what it closes */
+            severity?: string;
+            /** @description The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped */
+            to: string;
+            /** @description The upgrade's subject: the source package where one is recorded, and the component's own name otherwise */
+            upstream: string;
         };
         "Point-decision-elsewhereRequest": {
             /**
@@ -13288,13 +13332,13 @@ export interface components {
             /** @description The credit they asked for in an advisory */
             credit?: string;
             /**
-             * @description What the report was judged to be, once that has taken effect
+             * @description What the claim was judged to be, once that has taken effect
              * @enum {string}
              */
             disposition?: "accepted" | "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
             /** @description The issue a duplicate points at */
             duplicate_of?: string;
-            /** @description Whether its title, reported problem and reporter may still be edited: nobody has judged it and no ruling holds it */
+            /** @description Whether its title, claim and reporter may still be edited: nobody has judged it and no ruling holds it */
             editable: boolean;
             /**
              * Format: int64
@@ -13309,7 +13353,7 @@ export interface components {
             evaluated_by_name?: string;
             /** @description Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date, nobody is owed an answer, and it has no correspondence */
             found_here: boolean;
-            /** @description The issue the report turned out to be */
+            /** @description The issue the claim turned out to be */
             issue?: string;
             /** @description The product it was reported against, by name. The notes and correspondence of a report are read under it */
             product: string;
@@ -13324,14 +13368,14 @@ export interface components {
             /** @description The name this report is reached by */
             reference: string;
             reported_by?: string;
-            /** @description The reported problem, as markdown, as it stands now */
-            reported_problem?: string;
             /**
              * Format: int64
              * @description The ruling that answers it, waiting or in force
              */
             ruling?: number;
-            /** @description A line naming the reported problem */
+            /** @description What was claimed, as markdown, as it stands now */
+            summary?: string;
+            /** @description A line naming the claim */
             title?: string;
             /**
              * @description A disposition proposed and waiting for a second person
@@ -13354,9 +13398,9 @@ export interface components {
             received?: string;
             /** @description The reporter, as they gave their name. Empty clears it */
             reported_by?: string;
-            /** @description The reported problem, as markdown. Required */
-            reported_problem: string;
-            /** @description A line naming the reported problem. Empty clears it */
+            /** @description What was claimed, as markdown. Required */
+            summary: string;
+            /** @description A line naming the claim. Empty clears it */
             title?: string;
         };
         ReportEventBody: {
@@ -13424,9 +13468,9 @@ export interface components {
             replaced_by_name?: string;
             /** @description The reporter, as they gave their name */
             reported_by?: string;
-            /** @description The reported problem, as markdown */
-            reported_problem?: string;
-            /** @description The line naming the reported problem */
+            /** @description What was claimed, as markdown */
+            summary?: string;
+            /** @description The line naming the claim */
             title?: string;
             /**
              * Format: int64
@@ -14288,50 +14332,6 @@ export interface components {
              */
             state: "proposed" | "approved";
         };
-        StandingIncidentBody: {
-            /** Format: date-time */
-            cleared_at?: string;
-            /** @description Why it was cleared */
-            cleared_because?: string;
-            /** @description Who cleared it */
-            cleared_by?: string;
-            /** @description The releases named as carrying the fix, earliest named first. A withdrawn one carries when it was withdrawn and by whom */
-            fixes?: components["schemas"]["FixBody"][] | null;
-            /** @description What happened and how it is known. Nothing re-checks an incident, so this is the whole of what a later reader has */
-            grounds: string;
-            /** Format: int64 */
-            id?: number;
-            /**
-             * Format: date-time
-             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
-             */
-            known_at: string;
-            /** @description Whether you may record a notice about this record, and name or withdraw a tag carrying its fix */
-            may_tell: boolean;
-            /** @description The product this record belongs to, by the name an address takes */
-            product?: string;
-            /** @description That product's spelling on screen */
-            product_name?: string;
-            /** Format: date-time */
-            recorded_at?: string;
-            /** @description Who recorded it */
-            recorded_by?: string;
-            /** @description Whether this is the record in force. One stands at a time per issue and product */
-            standing: boolean;
-            /** @description Who outside was told about this, when, and what they were told */
-            told?: components["schemas"]["NoticeBody"][] | null;
-            /** @description Whether the issue is undisclosed somewhere in this product */
-            undisclosed: boolean;
-            /**
-             * Format: int64
-             * @description The number of occurrences you may read that this returned to the review queue: those under a decision that the issue does not apply, or under a decision over many issues that set this one aside or put it off
-             */
-            undone?: number;
-            /** @description The issue this is about */
-            vulnerability?: string;
-            /** @description Every window in force that applies to this product, shortest first, as it runs for this incident */
-            windows: components["schemas"]["DueBody"][] | null;
-        };
         "Start-advisoryRequest": {
             /**
              * Format: uri
@@ -14696,8 +14696,8 @@ export interface components {
             /** @description The kind of package, as its identifier spells it */
             ecosystem?: string;
             exploited?: boolean;
-            /** @description Whether an incident stands in this product through this issue */
-            incident?: boolean;
+            /** @description This product is recorded as having been exploited through this issue */
+            exploited_here?: boolean;
             /** @description The namespace its package identifier names, where it names one */
             namespace?: string;
             /** @description The occurrence of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built */
@@ -15311,7 +15311,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "incident" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -15351,7 +15351,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "incident" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -17425,7 +17425,7 @@ export interface operations {
             };
         };
     };
-    "list-incidents": {
+    "list-obligations": {
         parameters: {
             query?: never;
             header?: never;
@@ -17440,7 +17440,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IncidentsBody"];
+                    "application/json": components["schemas"]["ObligationsBody"];
                 };
             };
             /** @description Error */
@@ -17454,7 +17454,7 @@ export interface operations {
             };
         };
     };
-    "clear-incident": {
+    "clear-exploited-here": {
         parameters: {
             query?: never;
             header?: never;
@@ -17465,7 +17465,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Clear-incidentRequest"];
+                "application/json": components["schemas"]["Clear-exploited-hereRequest"];
             };
         };
         responses: {
@@ -20467,7 +20467,7 @@ export interface operations {
             };
         };
     };
-    "get-pending-upgrades": {
+    "list-build-planned-upgrades": {
         parameters: {
             query?: never;
             header?: never;
@@ -20500,7 +20500,7 @@ export interface operations {
             };
         };
     };
-    "export-pending-upgrades": {
+    "export-build-planned-upgrades": {
         parameters: {
             query?: never;
             header?: never;
@@ -22887,7 +22887,7 @@ export interface operations {
             };
         };
     };
-    "record-incident": {
+    "record-exploited-here": {
         parameters: {
             query?: never;
             header?: never;
@@ -22900,7 +22900,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["IncidentKept"];
+                "application/json": components["schemas"]["ExploitedHereKept"];
             };
         };
         responses: {
@@ -22910,7 +22910,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["IncidentBody"];
+                    "application/json": components["schemas"]["ExploitedHereBody"];
                 };
             };
             /** @description Error */
@@ -23222,7 +23222,7 @@ export interface operations {
             };
         };
     };
-    "list-fix-bundles": {
+    "list-planned-upgrades": {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag */
@@ -23241,7 +23241,7 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
-                /** @description The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "severity" | "issues" | "occurrences" | "builds" | "deadline";
                 /** @description Order the other way — fewest, least urgent, nearest deadline first */
                 asc?: boolean;
@@ -23264,7 +23264,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CountedListBodyBundleBody"];
+                    "application/json": components["schemas"]["CountedListBodyPlannedUpgradeItemBody"];
                 };
             };
             /** @description Error */
@@ -23278,7 +23278,7 @@ export interface operations {
             };
         };
     };
-    "export-fix-bundles": {
+    "export-planned-upgrades": {
         parameters: {
             query?: {
                 /** @description Limit to one branch or tag */
@@ -23297,7 +23297,7 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
-                /** @description The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "severity" | "issues" | "occurrences" | "builds" | "deadline";
                 /** @description Order the other way — fewest, least urgent, nearest deadline first */
                 asc?: boolean;
@@ -23605,7 +23605,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewReportBody"];
+                "application/json": components["schemas"]["ClaimedBody"];
             };
         };
         responses: {
@@ -25004,7 +25004,7 @@ export interface operations {
             };
         };
     };
-    "list-response-windows": {
+    "list-obligation-windows": {
         parameters: {
             query?: never;
             header?: never;
@@ -25033,7 +25033,7 @@ export interface operations {
             };
         };
     };
-    "declare-response-window": {
+    "declare-obligation-window": {
         parameters: {
             query?: never;
             header?: never;
@@ -25066,7 +25066,7 @@ export interface operations {
             };
         };
     };
-    "change-response-window": {
+    "change-obligation-window": {
         parameters: {
             query?: never;
             header?: never;
@@ -25101,7 +25101,7 @@ export interface operations {
             };
         };
     };
-    "retire-response-window": {
+    "retire-obligation-window": {
         parameters: {
             query?: never;
             header?: never;

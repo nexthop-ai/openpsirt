@@ -240,7 +240,7 @@ var AheadOfUs = time.Now().UTC().AddDate(0, 0, 2).UTC().Format(time.DateOnly)
 // ScannedSiblings puts two packages built from one source into a build, each
 // carrying the same two issues, plus one issue nothing has released a fix for.
 //
-// The shape the fix bundle is about: curl, libcurl4t64 and libcurl3t64 are one
+// The shape the planned upgrade is about: curl, libcurl4t64 and libcurl3t64 are one
 // source package bumping once, and keying on the component would make that
 // three rows that all say the same thing.
 func (r *Reach) ScannedSiblings(t *testing.T) {
@@ -316,7 +316,7 @@ func (r *Reach) siblingsIn(t *testing.T, variant string, also ...graph.Described
 			},
 		)
 	}
-	// And one nothing has released a fix for, which is in no bundle.
+	// And one nothing has released a fix for, which is in no upgrade.
 	reported = append(reported, finding.Reported{
 		Issue:     finding.Named{Identifier: "CVE-2026-CURL3", Severity: "high"},
 		Component: four, FixState: finding.NoFix,

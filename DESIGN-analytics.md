@@ -33,7 +33,7 @@ this document is its own.
 - [Dismissals and scan coverage](#dismissals-and-scan-coverage)
 - [Match coverage](#match-coverage)
 - [The analytics catalog](#the-analytics-catalog)
-- [Fix-bundle page cost](#fix-bundle-page-cost)
+- [Planned upgrades page cost](#planned-upgrades-page-cost)
 - [Exports](#exports)
 - [Settings](#settings)
 - [Limits](#limits)
@@ -722,7 +722,7 @@ also holds the files that are reachable nowhere else.
 | The register is a page of the catalog's own | It is about one build, and had no screen — only a file, which an auditor had to download to read. So the catalog owns it rather than a build screen listing it, and it asks for a whole build the way the build-scoped entries do |
 | An entry may point at a screen rather than owning a page | Release comparison, release readiness, match coverage, carried patches, the exception report, standing corrections and administrative changes do. Each is a report about the thing you are standing on, so it stays where it is and the catalog carries it with the scope already applied |
 | The catalog is grouped by the question each report answers | The groups are below. A report is looked for by its question, and a flat list of names hides which of them answer the same one |
-| A rail screen that answers a named question is listed apart, under "Also on screens" | Assignments answers holder workload, Disclosure deadlines answers what is running out of embargo, and pending upgrades answers what a build is waiting on. Each is a screen somebody already works in, under the name the rail gives it, and listed among the reports it reads as reporting that does not exist |
+| A rail screen that answers a named question is listed apart, under "Also on screens" | Assignments answers holder workload, Disclosure deadlines answers what is running out of embargo, and planned upgrades answers what a build is waiting on. Each is a screen somebody already works in, under the name the rail gives it, and listed among the reports it reads as reporting that does not exist |
 | One address is one entry | Two names over one screen read as two reports, and the reader opens both to find the same page. Known issues at release is the comparison's third column, so it is part of the release comparison entry |
 | An entry that points at a build's screen asks for a whole build | Those screens exist for one build and no other. An entry into one on a partial selection would open on a scope that means nothing |
 | An entry that needs a scope says so beside its name, and its name opens the scope picker | "Needs a product" or "Needs a build". Appended to the description it reads as part of it, and a name drawn as plain text reads as a broken link |
@@ -739,7 +739,7 @@ also holds the files that are reachable nowhere else.
 | Coverage | Scan coverage, leads by analyzer, match coverage, carried patches |
 | Releases | Release comparison, release readiness, releases out of support |
 | Records | Disposition register, advisories issued |
-| Also on screens | Assignments, Disclosure deadlines, pending upgrades |
+| Also on screens | Assignments, Disclosure deadlines, planned upgrades |
 
 ### Pages of the catalog's own
 
@@ -819,14 +819,14 @@ was capped.
 | What a decision covers now is what its live rows reach | A row withdrawn or lapsed covers nothing, so a build holding its occurrence again is not growth |
 | What decisions cover now is counted a bounded set of decisions per statement | One statement per decision is ten thousand round trips on ten thousand decisions |
 
-## Fix-bundle page cost
+## Planned upgrades page cost
 
 One build, 204,000 open findings, 136,000 of them naming a version that fixes
 them, folding to 700 bumps — the same two-thirds-fixable ratio a real switch
-image has, at the same order of open rows. Measured with the bundles grouped
+image has, at the same order of open rows. Measured with the planned upgrades grouped
 in one level, every open row grouped on the fold directly:
 
-| One level | Fix bundles | The findings list, over the same rows |
+| One level | Planned upgrades | The findings list, over the same rows |
 |---|--:|--:|
 | SQLite | 1.28 s | 0.19 s |
 | PostgreSQL | 1.29 s | 0.43 s |
@@ -834,7 +834,7 @@ in one level, every open row grouped on the fold directly:
 | MySQL | 1.56 s | 0.48 s |
 
 The cost in one level is the sort on the fold, a 64-character key, over every
-open row. The bundles are grouped in two levels, by integers first and by the
+open row. The planned upgrades are grouped in two levels, by integers first and by the
 fold over the partial groups;
 [DESIGN-findings.md § Two-level grouping](DESIGN-findings.md#two-level-grouping)
 holds the form and its measurement.
@@ -848,7 +848,7 @@ Any list that can be read can be exported, as CSV or JSON. What exports: the
 findings list, the cross-product findings list, the audit log, the
 review queue, what became of the reader's own decisions, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, a comparison of two
-builds' inventories, the fix bundles, the upgrades one build is waiting on, the lead queue,
+builds' inventories, the planned upgrades of a product and of one build, the lead queue,
 what keeps being put off, the backlog over time, what has been changed
 administratively, what a build holds that the scanner cannot match, and the
 disposition register, which is the one an auditor
@@ -881,7 +881,7 @@ stops is one somebody reads as whole.
 | The deadline report needed an offset before it could be a file | What somebody exports a deadline report for is precisely the part they have not read. Paging it also needed the build in the ordering, since an arbitrary order between pages repeats one row and skips another |
 | The comparison is one file with a column naming which of the three parts a row belongs to | Three files are three things to keep together by hand. It is read whole rather than paged, because a comparison is a single answer computed from two builds at once |
 | The inventory comparison is read whole, like the findings comparison | It is one answer computed from two builds at once. A name held at several versions has them joined in one cell per side, so a row is still one name |
-| A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
+| A field the list leaves out is an empty cell in the file, never a zero | The planned upgrades list omits the build count for one build, because it is the same on every row; written as a zero it states that the upgrade is in no build. Every signal the list carries is a column, exploitation here included |
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own decisions; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The audit log's file lists only agreements that still stand, and states separately whether a second person has one |
 | The audit log's file includes decisions about leads | It writes what the audit log shows, under the same visibility (REQ-50) |

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Body } from "../api/client";
-import { buildFindingsAt, streamAt, streamsAt, upgradesAt } from "../app/routes";
+import { buildFindingsAt, plannedUpgradesAt, streamAt, streamsAt } from "../app/routes";
 
 type Build = Body<"PerBuildBody">;
 
@@ -28,7 +28,7 @@ export function openIssues(product: string, row: Build): { label: string; to: st
 }
 
 // Where a promised upgrade is followed once it is made. Three builds or fewer
-// is a link to each build's pending upgrades; more is one link to the release
+// is a link to each build's planned upgrades; more is one link to the release
 // they share, or to the product's releases where they span several.
 export function promiseLinks(
   product: string,
@@ -36,8 +36,8 @@ export function promiseLinks(
 ): { label: string; to: string }[] {
   if (builds.length <= 3) {
     return builds.map((build) => ({
-      label: `Pending upgrades in ${build.stream} · ${build.variant} →`,
-      to: upgradesAt({ product, ...build }),
+      label: `Planned upgrades in ${build.stream} · ${build.variant} →`,
+      to: plannedUpgradesAt({ product, ...build }),
     }));
   }
   const streams = new Set(builds.map((build) => build.stream));

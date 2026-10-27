@@ -48,7 +48,7 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 	// Set nowhere below. Each is a sort, a release narrowing applied where
 	// the builds are resolved, or a condition on a row.
 	unset := map[string]bool{
-		"BundleSort": true, "SortBy": true, "Floor": true, "Workable": true,
+		"PlannedUpgradeSort": true, "SortBy": true, "Floor": true, "Workable": true,
 		"Origin": true, "AcrossVariants": true,
 	}
 	now, one := time.Now(), int64(1)

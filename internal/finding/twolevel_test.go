@@ -157,24 +157,24 @@ func TestAFoldIsOneRowInEveryCountOfTheList(t *testing.T) {
 			t.Errorf("by component the total alone is %d (%v), and the page says %d", alone, err, byComponent)
 		}
 
-		bundles, byBump, err := f.store.Bundles(ctx, who, f.scope, 50, 0, finding.Filter{})
+		upgrades, byBump, err := f.store.PlannedUpgrades(ctx, who, f.scope, 50, 0, finding.Filter{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if byBump != 1 || len(bundles) != 1 || bundles[0].Occurrences != 2 || bundles[0].Issues != 1 ||
-			len(bundles[0].Components) != 2 {
-			t.Errorf("by upgrade the fold is %+v (total %d), want one bump of both packages", bundles, byBump)
+		if byBump != 1 || len(upgrades) != 1 || upgrades[0].Occurrences != 2 || upgrades[0].Issues != 1 ||
+			len(upgrades[0].Components) != 2 {
+			t.Errorf("by upgrade the fold is %+v (total %d), want one bump of both packages", upgrades, byBump)
 		}
-		bumps, err := f.store.CountBundles(ctx, who, f.scope, finding.Filter{})
+		bumps, err := f.store.CountPlannedUpgrades(ctx, who, f.scope, finding.Filter{})
 		if err != nil || bumps != byBump {
 			t.Errorf("by upgrade the total alone is %d (%v), and the page says %d", bumps, err, byBump)
 		}
 	})
 }
 
-func TestABundleNamesEachPackageAndBuildOnceInNameOrder(t *testing.T) {
+func TestAPlannedUpgradeNamesEachPackageAndBuildOnceInNameOrder(t *testing.T) {
 	// A fold of two packages, each with two issues the same version fixes,
-	// shipped in two builds, beside a bundle of another fold. Each bundle
+	// shipped in two builds, beside an upgrade of another fold. Each upgrade
 	// names its own packages and builds, once each, in the order a reader
 	// scans them, however many occurrences and issues sit under a name.
 	each(t, func(t *testing.T, f *fixture) {
@@ -216,31 +216,31 @@ func TestABundleNamesEachPackageAndBuildOnceInNameOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		bundles, _, err := f.store.Bundles(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(),
+		upgrades, _, err := f.store.PlannedUpgrades(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(),
 			50, 0, finding.Filter{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		named := map[string]finding.Bundle{}
-		for _, bundle := range bundles {
-			named[bundle.To] = bundle
+		named := map[string]finding.PlannedUpgrade{}
+		for _, upgrade := range upgrades {
+			named[upgrade.To] = upgrade
 		}
 		if got := named["8.6.0"].Components; len(got) != 2 || got[0] != "curl" || got[1] != "libcurl4t64" {
-			t.Errorf("the curl bundle names %v, want curl and libcurl4t64 once each, in name order", got)
+			t.Errorf("the curl upgrade names %v, want curl and libcurl4t64 once each, in name order", got)
 		}
 		builds := named["8.6.0"].In
 		if len(builds) != 2 || builds[0] == builds[1] ||
 			builds[0].Stream > builds[1].Stream {
-			t.Errorf("the curl bundle is in %v, want its two builds once each, in name order", builds)
+			t.Errorf("the curl upgrade is in %v, want its two builds once each, in name order", builds)
 		}
 		if got := named["1.3.1"]; len(got.Components) != 1 || got.Components[0] != "zlib1g" ||
 			len(got.In) != 1 {
-			t.Errorf("the zlib bundle names %v in %v, want zlib1g in the one build shipping it",
+			t.Errorf("the zlib upgrade names %v in %v, want zlib1g in the one build shipping it",
 				got.Components, got.In)
 		}
 	})
 }
-func TestBundlesTiedOnEveryOtherKeyAreOrderedByTheirFold(t *testing.T) {
+func TestPlannedUpgradesTiedOnEveryOtherKeyAreOrderedByTheirFold(t *testing.T) {
 	// Two versions of one source, each fixed in the same version with the same
 	// urgency and issue count, tie on every column but the fold. The fold
 	// breaks the tie, so a page boundary between them is a boundary.
@@ -262,7 +262,7 @@ func TestBundlesTiedOnEveryOtherKeyAreOrderedByTheirFold(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		var folds []string
 		for offset := 0; offset < 2; offset++ {
-			page, total, err := f.store.Bundles(ctx, who, f.scope, 1, offset, finding.Filter{})
+			page, total, err := f.store.PlannedUpgrades(ctx, who, f.scope, 1, offset, finding.Filter{})
 			if err != nil {
 				t.Fatal(err)
 			}

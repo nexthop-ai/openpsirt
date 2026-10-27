@@ -128,7 +128,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 				_ = err
 				target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
 				_ = err
-				planned, err := store.PendingUpgrades(ctx, target.ID)
+				planned, err := store.PlannedUpgradesFor(ctx, target.ID)
 				_ = planned
 			}`,
 			true,
@@ -140,7 +140,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 				_ = err
 				target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
 				_ = err
-				planned, err := store.PendingUpgrades(ctx, subject, target.ID)
+				planned, err := store.PlannedUpgradesFor(ctx, subject, target.ID)
 				_ = planned
 			}`,
 			false,
@@ -176,7 +176,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 				named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
 				_ = err
 				var target, _ = core.TargetRow(ctx, in, named.StreamID, named.VariantID)
-				planned, err := store.PendingUpgrades(ctx, target.ID)
+				planned, err := store.PlannedUpgradesFor(ctx, target.ID)
 				_ = planned
 			}`,
 			true,

@@ -275,7 +275,7 @@ func (s *Store) occurrencesOf(ctx context.Context, targetID int64, fold []int64,
 // Candidate is a version a component could go to, and how much reaching it
 // would close.
 //
-// This is the fix-bundle grouping read per component rather than as a list of
+// This is the planned-upgrade grouping read per component rather than as a list of
 // its own: a package at a version, and where it could go.
 //
 // Two counts, because they answer different questions. `FixedHere` is how

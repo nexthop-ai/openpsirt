@@ -322,7 +322,7 @@ func reports(versionOf func(int) string, extra int) []finding.Reported {
 		}
 		// Two thirds of them name the version that fixes them, which is what
 		// a real image looks like: 5,047 of 7,612 open rows were fixable on
-		// the one this model is drawn from. Without it every bundle query
+		// the one this model is drawn from. Without it every upgrade query
 		// measured here reads an empty set, which is not what anybody waits
 		// for.
 		if v%3 != 0 {
@@ -440,9 +440,9 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 	// and what a page costs is a question about the whole set rather than
 	// about the fifty rows it answers with.
 	start = time.Now()
-	bumps, bundles, err := store.Bundles(ctx, who, scope, 50, 0, finding.Filter{})
+	bumps, upgrades, err := store.PlannedUpgrades(ctx, who, scope, 50, 0, finding.Filter{})
 	if err != nil {
-		t.Fatalf("fix bundles: %v", err)
+		t.Fatalf("planned upgrades: %v", err)
 	}
 	bundled := time.Since(start)
 
@@ -458,8 +458,8 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 		list.Round(time.Millisecond), total,
 		out.Round(time.Millisecond), len(due),
 		trend.Round(time.Millisecond), len(points))
-	t.Logf("    fix bundles %s (%d of %d bumps)",
-		bundled.Round(time.Millisecond), len(bumps), bundles)
+	t.Logf("    planned upgrades %s (%d of %d bumps)",
+		bundled.Round(time.Millisecond), len(bumps), upgrades)
 }
 
 // counting counts the statements a store issues, so a night's cost can be
@@ -490,13 +490,13 @@ func per(took time.Duration, statements int64) time.Duration {
 //
 // The year of nights above never builds a large *open* set — findings close as
 // versions move, so its open population stays near 1,300 groups while its table
-// grows to 148,614 rows. The bundle query scans what is open, so that model
+// grows to 148,614 rows. The upgrade query scans what is open, so that model
 // answers a different question from the one asked. A real switch image carried
 // 272,539 open rows, 5,047 of them fixable; this reaches the same order in one
 // night by carrying more issues rather than more nights.
 const bigIssues = 6_000
 
-func TestMeasureAFixBundlePage(t *testing.T) {
+func TestMeasureAPlannedUpgradePage(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
@@ -508,7 +508,7 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 			map[int64][]access.Role{product.ID: {access.PrivateRead}}, 0)
 
 		scan, _, err := scans.Record(ctx, ingest.Arriving{
-			TargetID: target.ID, ContentHash: "bundles", BuiltAt: time.Now().UTC(),
+			TargetID: target.ID, ContentHash: "upgrades", BuiltAt: time.Now().UTC(),
 			ParserVersion: "measure",
 		})
 		if err != nil {
@@ -556,16 +556,16 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 		// Three runs, because the first pays for a cold cache and what a person
 		// waits for is the ordinary one.
 		var took time.Duration
-		var bundles int
+		var upgrades int
 		for range 3 {
 			at := time.Now()
-			page, total, err := store.Bundles(ctx, who, scope, 50, 0, finding.Filter{})
+			page, total, err := store.PlannedUpgrades(ctx, who, scope, 50, 0, finding.Filter{})
 			if err != nil {
-				t.Fatalf("fix bundles: %v", err)
+				t.Fatalf("planned upgrades: %v", err)
 			}
 			took = time.Since(at)
-			bundles = total
-			t.Logf("fix bundles %s (%d of %d bumps)",
+			upgrades = total
+			t.Logf("planned upgrades %s (%d of %d bumps)",
 				took.Round(time.Millisecond), len(page), total)
 		}
 		// The findings list beside it, over the same rows: it reads its page
@@ -578,7 +578,7 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 		}
 		t.Logf("findings list %s (%d groups) — same rows, an index that covers it",
 			time.Since(at).Round(time.Millisecond), groups)
-		t.Logf("%d open, %d fixable, %d bumps", open, fixable, bundles)
+		t.Logf("%d open, %d fixable, %d bumps", open, fixable, upgrades)
 	})
 }
 

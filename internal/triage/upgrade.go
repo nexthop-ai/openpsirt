@@ -158,7 +158,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 					occurrence.ComponentUpstream, occurrence.ConsumerUpstream}
 				if already, seen := written[key]; seen {
 					// The stricter visibility of the two, for the reason a
-					// bundle takes it: one occurrence decided once.
+					// upgrade takes it: one occurrence decided once.
 					if occurrence.Visibility == access.Private {
 						proposals[already].Occurrence.Visibility = access.Private
 					}
@@ -192,7 +192,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// record false, because the bump closes what it closes.
 		//
 		// One kernel bump in a real image reaches 4,485 findings across 44,016
-		// occurrences, and a cumulative bundle reaches 243,945. Bounded at the
+		// occurrences, and a cumulative upgrade reaches 243,945. Bounded at the
 		// shipped two thousand, the highest-value action in the data was
 		// refused by a factor of twenty-two, and the only escape offered was
 		// raising a setting that guards the dismissal path this one has
@@ -222,7 +222,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
-		// The commitment per build, which is what the pending-upgrades screen
+		// The commitment per build, which is what the planned upgrades screen
 		// reads. One row per build and fold rather than one per issue: a bump
 		// moves the source package, so what it covers is a join and everything
 		// open on the fold follows it — including an issue published tonight.

@@ -837,7 +837,7 @@ func TestTheListFiltersOnTheRatingInForce(t *testing.T) {
 	})
 }
 
-func TestTheBundleAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) {
+func TestThePlannedUpgradeAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) {
 	// The rating is read through one expression and the product it is read for
 	// is carried on the filter, set where the selection is resolved. These two
 	// lists reach that expression through helpers of their own, so a chain
@@ -878,7 +878,7 @@ func TestTheBundleAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) 
 
 		found := func(scope finding.Scope) (int, int) {
 			t.Helper()
-			bundles, _, err := f.store.Bundles(ctx, who, scope, 50, 0, high)
+			upgrades, _, err := f.store.PlannedUpgrades(ctx, who, scope, 50, 0, high)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -886,17 +886,17 @@ func TestTheBundleAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			return len(bundles), len(components)
+			return len(upgrades), len(components)
 		}
 
-		if bundles, components := found(f.scope); bundles != 1 || components != 1 {
-			t.Errorf("in the product that rated it critical the lists found %d bundles and %d "+
+		if upgrades, components := found(f.scope); upgrades != 1 || components != 1 {
+			t.Errorf("in the product that rated it critical the lists found %d upgrades and %d "+
 				"components, want one of each — they are reading the other product's rating "+
-				"or none", bundles, components)
+				"or none", upgrades, components)
 		}
-		if bundles, components := found(theirs); bundles != 0 || components != 0 {
-			t.Errorf("in the product that rated it low the lists found %d bundles and %d "+
-				"components, want none — they are reading this product's rating", bundles,
+		if upgrades, components := found(theirs); upgrades != 0 || components != 0 {
+			t.Errorf("in the product that rated it low the lists found %d upgrades and %d "+
+				"components, want none — they are reading this product's rating", upgrades,
 				components)
 		}
 	})

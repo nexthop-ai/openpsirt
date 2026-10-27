@@ -68,7 +68,7 @@ const SAMPLES: Record<string, () => string[]> = {
   uploadsAt: () => [routes.uploadsAt(build), routes.uploadsAt(build, "sarif")],
   inventoryChangesAt: () => [routes.inventoryChangesAt(build, 7)],
   runAt: () => [routes.runAt(build, 7)],
-  upgradesAt: () => [routes.upgradesAt(build)],
+  plannedUpgradesAt: () => [routes.plannedUpgradesAt(build)],
   matchCoverageAt: () => [routes.matchCoverageAt(build)],
   vexAt: () => [routes.vexAt(build)],
   sameScreenAt: () => [

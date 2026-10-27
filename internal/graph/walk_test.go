@@ -470,7 +470,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 	})
 }
 
-func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testing.T) {
+func TestAProductsOwnRatingDrawsTheTreeTheUpgradeStripAndTheReleaseNote(t *testing.T) {
 	// One rule for what a finding's severity is: this product's word where it
 	// has stated one, the published word otherwise. Nine queries read the
 	// published word alone with no rating joined, so a product that re-rated

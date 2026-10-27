@@ -95,7 +95,7 @@ export function useFindingsViews({
       ),
   });
   const byUpgrade = useQuery({
-    queryKey: ["fix-bundles", "count", product, selection, query],
+    queryKey: ["planned-upgrades", "count", product, selection, query],
     enabled: !spanning,
     queryFn: async () =>
       unwrap(

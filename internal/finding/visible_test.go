@@ -254,7 +254,7 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 					return err
 				}},
 				{"the upgrades promised", func(s access.Subject) error {
-					_, err := f.store.PendingUpgrades(ctx, s, f.target)
+					_, err := f.store.PlannedUpgradesFor(ctx, s, f.target)
 					return err
 				}},
 				{"the patches carried", func(s access.Subject) error {

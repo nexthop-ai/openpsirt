@@ -10,7 +10,7 @@ import {
   analyticsReportAt,
   streamsAt,
   type Build,
-  upgradesAt,
+  plannedUpgradesAt,
 } from "../../app/routes";
 
 // The named reports, and where each is read.
@@ -241,9 +241,9 @@ export const ON_SCREENS: Report[] = [
     to: () => "/disclosure-deadlines",
   },
   {
-    name: "Pending upgrades",
+    name: "Planned upgrades",
     answers: "The upgrades promised for a build, what they would close, and which have landed.",
-    to: (at) => upgradesAt(buildOf(at)),
+    to: (at) => plannedUpgradesAt(buildOf(at)),
     needs: "build",
   },
 ];

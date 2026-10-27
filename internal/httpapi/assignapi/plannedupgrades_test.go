@@ -18,7 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// bundled is the fix-bundle list.
+// bundled is the planned-upgrade list.
 type bundled struct {
 	Items []struct {
 		Upstream    string   `json:"upstream"`
@@ -45,30 +45,30 @@ func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 		var page bundled
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/planned-upgrades", &page)
 		if page.Total != 1 || len(page.Items) != 1 {
-			t.Fatalf("two packages of one source bumping once are %d bundles: %+v",
+			t.Fatalf("two packages of one source bumping once are %d upgrades: %+v",
 				page.Total, page.Items)
 		}
 		one := page.Items[0]
 		if one.Upstream != "curl" || one.To != "8.5.0-1" {
-			t.Errorf("the bundle is %q moving to %q", one.Upstream, one.To)
+			t.Errorf("the upgrade is %q moving to %q", one.Upstream, one.To)
 		}
 		if len(one.Components) != 2 {
-			t.Errorf("the bundle moves %v, want both packages", one.Components)
+			t.Errorf("the upgrade moves %v, want both packages", one.Components)
 		}
 		// Two issues across two packages is two distinct vulnerabilities and
 		// four findings: the row says both, because they answer different
 		// questions.
 		if one.Issues != 2 || one.Occurrences != 4 {
-			t.Errorf("the bundle closes %d issues at %d occurrences, want 2 and 4",
+			t.Errorf("the upgrade closes %d issues at %d occurrences, want 2 and 4",
 				one.Issues, one.Occurrences)
 		}
 		// Worth doing for its worst member.
 		if one.Severity != "critical" || !one.Exploited {
-			t.Errorf("the bundle reads %q exploited=%v, want its worst member",
+			t.Errorf("the upgrade reads %q exploited=%v, want its worst member",
 				one.Severity, one.Exploited)
 		}
 
-		// Nothing without a fix is in a bundle: a bundle is a version to move
+		// Nothing without a fix is in an upgrade: an upgrade is a version to move
 		// to, and one keyed on an empty version would hold everything
 		// unfixable.
 		var all struct {
@@ -77,13 +77,13 @@ func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings", &all)
 		// Three rows rather than five: the list groups on the fold, so the two
 		// binaries of one source package are one row wherever they carry the
-		// same issue. That is the same collapse the bundle makes, which is why
+		// same issue. That is the same collapse the upgrade makes, which is why
 		// the two are one query read from either end.
 		if all.Total != 3 {
 			t.Fatalf("the fixture lists %d rows, want its three folds", all.Total)
 		}
 		// The whole point: three rows to answer one at a time, or one
-		// bump to declare. The one with no fix is in neither the bundle nor
+		// bump to declare. The one with no fix is in neither the upgrade nor
 		// its issue count.
 	})
 }
@@ -188,7 +188,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			t.Error("an upgrade recorded no decision")
 		}
 		// One commitment per build and fold, which is the grain the work is
-		// done in and what the pending-upgrades screen reads. It was one per
+		// done in and what the planned upgrades screen reads. It was one per
 		// issue and per component and per target version, so changing the
 		// version meant rewriting every row of it.
 		if done.Targets != 1 {
@@ -237,7 +237,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 }
 
 func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
-	// The fix-bundle query read from the other end: a triager reads a bump
+	// The planned-upgrade query read from the other end: a triager reads a bump
 	// and the issues it closes, a coordinator reads a build and the bumps
 	// it is waiting on. One query, so the two cannot come to disagree.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -309,7 +309,7 @@ func TestAnUpgradeIsOneDecisionPerOccurrenceHoweverManyBuildsShipIt(t *testing.T
 	// second collided with the index that keeps one decision standing per
 	// occurrence
 	// and took the whole act down with it, so every product with more than
-	// one build refused every bundle it was asked to declare.
+	// one build refused every upgrade it was asked to declare.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		r.SiblingsAlsoIn(t, "mellanox")
@@ -847,10 +847,10 @@ func TestANarrowedDecisionRecordsWhatThatNarrowingReaches(t *testing.T) {
 	})
 }
 
-// The fix-bundle file is the list: for one build it states no build count, as
-// the list does, and it carries whether the bundle closes something this
+// The planned-upgrade file is the list: for one build it states no build count, as
+// the list does, and it carries whether the upgrade closes something this
 // product was exploited through.
-func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
+func TestThePlannedUpgradeFileSaysWhatTheListSays(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
@@ -868,7 +868,7 @@ func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
 			t.Fatalf("the file has no builds or incident column: %v", body[0])
 		}
 		if len(body) < 2 {
-			t.Fatal("the file holds no bundle")
+			t.Fatal("the file holds no upgrade")
 		}
 		if body[1][builds] != "" {
 			t.Errorf("one build's file states a build count of %q", body[1][builds])
@@ -876,9 +876,9 @@ func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
 	})
 }
 
-// The pending-upgrades file names its columns and carries in each one what
+// The build planned upgrades file names its columns and carries in each one what
 // the list carries in the field of the same meaning.
-func TestThePendingUpgradesFileSaysWhatTheListSays(t *testing.T) {
+func TestTheBuildPlannedUpgradeFileSaysWhatTheListSays(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
@@ -953,7 +953,7 @@ func TestThePendingUpgradesFileSaysWhatTheListSays(t *testing.T) {
 	})
 }
 
-// A limit of zero answers the total of the fix-bundle list and of the list by
+// A limit of zero answers the total of the planned-upgrade list and of the list by
 // component without a row, and the totals are the ones their pages report.
 func TestALimitOfZeroAnswersTheTotalAlone(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DecisionOccurrence } from "./DecisionOccurrence";
 import { InventoryChanges } from "./InventoryChanges";
 import { Run } from "./Run";
-import { Upgrades } from "./Upgrades";
+import { PlannedUpgrades } from "./PlannedUpgrades";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import { press, type Init } from "../test/controls";
 
@@ -93,7 +93,7 @@ describe("the upgrades a build is waiting on", () => {
         ],
       },
     }));
-    mount.render(screen(<Upgrades />, `${BUILD}/upgrades`, `${BUILT}/upgrades`));
+    mount.render(screen(<PlannedUpgrades />, `${BUILD}/upgrades`, `${BUILT}/upgrades`));
     await settle();
     const first = Array.from(mount.host().querySelectorAll("tbody tr")).map(
       (tr) => tr.querySelector("td")?.textContent,

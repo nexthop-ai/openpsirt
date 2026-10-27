@@ -34,15 +34,15 @@ describe("where a promised upgrade is followed", () => {
   const builds = (...names: [string, string][]) =>
     names.map(([stream, variant]) => ({ stream, variant }));
 
-  it("links to each build's pending upgrades for three builds or fewer", () => {
+  it("links to each build's planned upgrades for three builds or fewer", () => {
     expect(promiseLinks("sonic", builds(["4.2", "broadcom"], ["main", "mellanox"]))).toEqual([
       {
-        label: "Pending upgrades in 4.2 · broadcom →",
-        to: "/products/sonic/streams/4.2/variants/broadcom/pending-upgrades",
+        label: "Planned upgrades in 4.2 · broadcom →",
+        to: "/products/sonic/streams/4.2/variants/broadcom/planned-upgrades",
       },
       {
-        label: "Pending upgrades in main · mellanox →",
-        to: "/products/sonic/streams/main/variants/mellanox/pending-upgrades",
+        label: "Planned upgrades in main · mellanox →",
+        to: "/products/sonic/streams/main/variants/mellanox/planned-upgrades",
       },
     ]);
   });

@@ -38,7 +38,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Reach across builds](#reach-across-builds)
 - [Reach across builds](#reach-across-builds)
 - [Bulk decisions](#bulk-decisions)
-- [Fix bundles](#fix-bundles)
+- [Planned upgrades](#planned-upgrades)
 - [Promised work](#promised-work)
 - [Deadlines](#deadlines)
 - [Lapse marking](#lapse-marking)
@@ -932,12 +932,12 @@ instead for those occurrences to be left out.
 | Every occurrence decided refuses the request | Nothing is recorded. A decision with no rows is not something a second person can agree to |
 | The approver sees the rows the decision wrote | What was skipped is not recorded on the decision. The narrowing's two counts still compare the issues named with the issues the narrowing reaches |
 
-## Fix bundles
+## Planned upgrades
 
 One row per bump with what it would close, and one act that answers the whole of
 it.
 
-A fix bundle is keyed on the upstream name, the version in hand, and the version
+A planned upgrade is keyed on the upstream name, the version in hand, and the version
 that fixes it (REQ-35), falling back to the component name where no upstream is
 recorded. The version in hand is the upstream version where one is recorded. It
 is presentation, like every other grouping here.
@@ -951,21 +951,21 @@ feature.
 
 | Rule | |
 |---|---|
-| No build appears in the key | A component shipped at the same version by two builds is one thing to decide about and two findings. The bundle proposes once per key rather than once per row it closes |
+| No build appears in the key | A component shipped at the same version by two builds is one thing to decide about and two findings. The upgrade proposes once per key rather than once per row it closes |
 | Where the same occurrence is undisclosed in one build and public in another, the one row there carries the stricter | |
 | Everything it decides from is read inside the transaction | The builds the request names, which are past end-of-life, and the occurrences the bump reaches are all reads, and a retry re-runs the closure against a database that has moved |
-| One request, one transaction, one decision | Half of it written would be a pending upgrade that says a bump is declared for a release it is not, so the decision and the fix targets are written together |
+| One request, one transaction, one decision | Half of it written would be a planned upgrade that says a bump is declared for a release it is not, so the decision and the fix targets are written together |
 | A release past end-of-life named in the request refuses the whole of it as 422, "release X is retired" | The caller may triage there and asked for something that cannot be done; naming the release says which one to drop |
 
 Proposing per row instead writes the same key twice, and the second collides
 with the index that keeps one decision standing per occurrence, taking the whole
 transaction with it: every product with more than one build then refuses every
-bundle it is asked to declare, with a message naming a decision it has just
+upgrade it is asked to declare, with a message naming a decision it has just
 written itself.
 
 It is safe at that size because of what it carries. The outcome hides nothing and
-needs no second person, and a fix target is intent the next scan answers, so a
-bundle that never lands is reported rather than quietly wrong.
+needs no second person, and a fix target is intent the next scan answers, so an
+upgrade that never lands is reported rather than quietly wrong.
 
 ## Promised work
 
@@ -1590,7 +1590,7 @@ reasoning at all.
 | Both versions come from one finding | Where the new line holds two open findings at the occurrence, one finding's pair of component and consumer versions is taken whole, the first in the order both sort as text, in the preview and in the act. A pair drawn half from each is a key no finding holds |
 | A dated decision carries what it said | A deferral keeps its date, and a patch promise keeps its date. Quietly moving a date forward would be the tool making the decision it is asking for, and a promise without its date is refused on every write path. The total a deferral has already run for is shown beside it, because that is what agreeing to it again agrees to |
 | **A decision whose date has gone by is not offered** | It carries its date rather than having it moved forward, so carrying one that has run out writes a decision finished the moment it lands. Offering it is offering something the act behind the button turns down |
-| **A promised upgrade is not carried** | An upgrade covers a component in the releases it names and records what each release is waiting on. A decision carried onto one occurrence writes neither, so the new line would hold a promise its own list of pending upgrades never shows. Planned from the component, naming the new line, it writes both |
+| **A promised upgrade is not carried** | An upgrade covers a component in the releases it names and records what each release is waiting on. A decision carried onto one occurrence writes neither, so the new line would hold a promise its own list of planned upgrades never shows. Planned from the component, naming the new line, it writes both |
 | What is carried is checked like anything else written | The occurrence it builds records whether the new line is a tag, so a dated decision carried onto a release built once is refused as it is when proposed there. Who may write it is asked at the visibility the occurrence has on the new line |
 | An occurrence the carrier may not argue about on the new line is neither offered nor counted | The new line's visibility there may be undisclosed where the old line's was not. A decision carried onto it would be written on work its carrier may not argue about, and a count of such occurrences says what the new line holds |
 | Bounded, and written in one transaction | Carrying six decisions is one act, and half of it landing is a line nobody can tell from one somebody chose that way |

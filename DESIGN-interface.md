@@ -546,11 +546,11 @@ is what has not been answered yet.
 | Rule | |
 |---|---|
 | Two filters are about a group rather than a row | The age is the *oldest* occurrence, because a group open for a month with one occurrence added yesterday has been somebody's problem for a month. What upstream did has to hold at every occurrence, or a state known at one occurrence and not another would drop the occurrences that lack it and report a group smaller than it is |
-| A group whose occurrences disagree has its own word | A package fixed in one variant and not in another is one row with two answers, and asked for any single state it matched none of them. "Mixed" is also the population worth looking at: a bump that has landed in one build and not the others is a pending upgrade somebody is halfway through |
+| A group whose occurrences disagree has its own word | A package fixed in one variant and not in another is one row with two answers, and asked for any single state it matched none of them. "Mixed" is also the population worth looking at: a bump that has landed in one build and not the others is a planned upgrade somebody is halfway through |
 | Filtering by outcome asks what stands, not what was proposed | "What have we dismissed" is a question about this deployment's answer, and a decision still waiting for a second person is not an answer. Counting a proposal would let one person put their own unreviewed decision into the number the question was asked about |
 | "Assigned to me" means mine or a team I am on | Here as everywhere the phrase appears. A group whose occurrences are held by different parties is neither mine nor anybody's |
 | The by-component view asks the same question as the by-issue view | It was building its own query out of a hand-copied subset of nine filters, so switching views quietly widened the list back out by everything the subset left out — a deadline, an assignee, an outcome — while the chips above went on saying they were on |
-| A filter over a group is asked at the list's grain, one issue at one fold, in the by-component view and the fix bundles alike | Asked of a whole component, "exploited" holds for every issue of a component with one exploited issue and "has a fix" fails a component with one issue lacking one, so the counts differ from the list's. The list's groups are chosen first and joined in, and only the conditions on a row are asked of the component's rows. A filter with no condition over a group reads the covering index |
+| A filter over a group is asked at the list's grain, one issue at one fold, in the by-component view and the planned upgrades alike | Asked of a whole component, "exploited" holds for every issue of a component with one exploited issue and "has a fix" fails a component with one issue lacking one, so the counts differ from the list's. The list's groups are chosen first and joined in, and only the conditions on a row are asked of the component's rows. A filter with no condition over a group reads the covering index |
 
 ## Sorting, paging and selection
 
@@ -684,9 +684,8 @@ package, so upgrading curl still reaches both of its binaries in one go.
 
 ## The by-upgrade view
 
-One row per upstream upgrade, with what moving it would close: the
-pending-upgrades question read from the triager's end rather than the
-coordinator's. Keyed on the fold, so packages built from one source are one row.
+One row per upstream upgrade, with what moving it would close: a build's
+planned upgrades read from the triager's end rather than the coordinator's. Keyed on the fold, so packages built from one source are one row.
 
 | Rule | |
 |---|---|
@@ -1680,7 +1679,7 @@ confirmation is never a toast and nothing navigates away.
 | Deciding on the finding screen | Directly above the decision card it produced, brought into view once the card is drawn | The next finding in the list, and the decision's own page where it waits |
 | Deciding from a row's preview on the findings list | Where the row was: under it while it is listed, in its place once the list read again does not hold it, and at the end of the page, or over the empty list, where neither it nor the row after it is listed. The cursor moves to the row that followed it | The decision's own page where it waits |
 | A bulk decision | Above the submit button | The decision's own page |
-| Promising an upgrade on the component screen | In place of the form | The decision's own page where it waits; each build's pending upgrades for three builds or fewer, and above three one link to the release they share, or to the product's releases where they span several |
+| Promising an upgrade on the component screen | In place of the form | The decision's own page where it waits; each build's planned upgrades for three builds or fewer, and above three one link to the release they share, or to the product's releases where they span several |
 | Moving a disclosure date or disclosing | On the row or in the notice the act was taken from, and above the list where the act took the row off it | The review queue's disclosure dates where it waits |
 | Rating an issue | On the rating line the form opened from | The review queue's ratings where it waits |
 | Reaffirming | On the card or the tab it was done from | The re-made decision's own page where it waits; from the tab, each waiting decision's page for three or fewer, and Mine, recent above three |

@@ -224,7 +224,7 @@ type PlannedUpgradeBody struct {
 	DecisionID  int64 `json:"decision_id" doc:"The one decision the whole upgrade was recorded under"`
 	Occurrences int   `json:"occurrences" doc:"Occurrences answered"`
 	Issues      int   `json:"issues" doc:"Distinct vulnerabilities it covers"`
-	Targets     int   `json:"targets" doc:"Build-level intents recorded, which is what the pending upgrades screen reads"`
+	Targets     int   `json:"targets" doc:"Build-level intents recorded, which is what the planned upgrades screen reads"`
 	Components  int   `json:"components" doc:"The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
 	// Waiting says a second person has to agree, which happens when the date
 	// is past the earliest deadline among what this covers.
@@ -238,7 +238,7 @@ type PlannedUpgradeBody struct {
 // registerPlanUpgrade records moving a component as the answer to what is
 // open.
 //
-// The act the component screen exists for. It replaces declaring a fix bundle:
+// The act the component screen exists for. It replaces declaring a planned upgrade:
 // the same thing, recorded as a decision with the version and the date as its
 // payload rather than as a record beside one, so what somebody decided and
 // what a release is waiting on cannot come to disagree.

@@ -38,7 +38,7 @@ import (
 )
 
 // The sizes a real image produces. One kernel bump reaches 4,485 findings
-// across 44,016 occurrences; a cumulative bundle reaches 243,945, which is the
+// across 44,016 occurrences; a cumulative upgrade reaches 243,945, which is the
 // largest single act the data can ask for.
 var promiseSizes = []int{2_000, 44_016, 243_945}
 

@@ -17,7 +17,7 @@ import {
   issueAt,
   streamsAt,
   dependenciesAt,
-  upgradesAt,
+  plannedUpgradesAt,
   variantsAt,
 } from "./routes";
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
@@ -257,12 +257,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               needs={whole}
             />
             <Rail to={build ? uploadsAt(build) : ""} icon="scan" label="Uploads" needs={whole} />
-            {/* What this build is waiting on, which is the fix-bundle view read
-              from the other end. */}
+            {/* What this build is waiting on, which is the product's planned
+              upgrades read from the other end. */}
             <Rail
-              to={build ? upgradesAt(build) : ""}
+              to={build ? plannedUpgradesAt(build) : ""}
               icon="flag"
-              label="Pending upgrades"
+              label="Planned upgrades"
               needs={whole}
             />
             {/* What people outside have sent a product. Only for somebody who may

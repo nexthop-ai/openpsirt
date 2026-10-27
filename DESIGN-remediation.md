@@ -15,7 +15,7 @@ compliance rate are in `DESIGN-analytics.md`; the assignment model is in
 - [The unit](#the-unit)
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
-- [Pending upgrades](#pending-upgrades)
+- [Planned upgrades of a build](#planned-upgrades-of-a-build)
 - [Upstream currency](#upstream-currency)
 - [Version ordering](#version-ordering)
 - [Promise states](#promise-states)
@@ -268,9 +268,9 @@ its clock starts when it is first given a severity (REQ-33).
 | Everything else is the rule above | Exploitation learned later and a fix arriving move it the way they move a scanned finding |
 | A recorded flaw is recounted on its own | Recorded flaws are few, one row per occurrence in each build, so they are rewritten row by row rather than in the bands a scan's findings are |
 
-## Pending upgrades
+## Planned upgrades of a build
 
-The fix-bundle query inverted (REQ-35). A triager reads an upgrade and the
+The product's planned upgrades inverted (REQ-35). A triager reads an upgrade and the
 issues it closes, in the findings list's by-upgrade view; a coordinator reads a
 build and the upgrades it is waiting on, here. One query read from either end,
 and both ends are drawn.
@@ -280,7 +280,7 @@ direction.
 
 | Ordering | |
 |---|---|
-| The bundle list breaks its last tie on the fold | The fold is the last column a bundle is grouped on, so two bundles equal on every other key keep one order across pages |
+| The planned upgrades list breaks its last tie on the fold | The fold is the last column a planned upgrade is grouped on, so two equal on every other key keep one order across pages |
 | One source at two versions in one build lists the earlier version first | By the ecosystem's version ordering where the fold has one, and by text where it has none |
 
 The version in hand and the version being moved to are both stored with the
@@ -948,7 +948,7 @@ on is assembled from the flaws the advisory covers.
 
 | | |
 |---|---|
-| A bump is keyed on where it is going as well as where it comes from | Pending upgrades grouped on the first two fields and took the third from whichever row made the bucket, so two bundles at 5.9.0 and 5.9.2 rendered as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
+| A bump is keyed on where it is going as well as where it comes from | Grouped on the first two fields alone, two upgrades at 5.9.0 and 5.9.2 read as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
 | A fix declared for a product covers its builds without being written per build | A decision occurrence's live key names the occurrence and not the build, so a product shipping the same component in two builds produced two identical proposals and the second collided with the unique index, rolling back the whole declaration. The proposals are made distinct before they are written |
 | A statement about a group speaks for the group | The outbound format has no occurrence granularity, so a dismissal covering some of a group is not published as covering all of it |
 | Only a decision made where a build was in hand records one | A decision from before the builds were kept, and one made where no build was on screen, records none. The advisory says so and flags nothing, because a guess from where the occurrence sat names every variant holding the same code, which is the case the flag exists for |

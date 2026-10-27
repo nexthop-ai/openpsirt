@@ -334,7 +334,7 @@ part of the statement.
 | Rule | |
 |---|---|
 | Six keys, each selecting an expression stored beside it | The key a caller sends is a lookup and never the value |
-| The fix-bundle list has six of its own | A bundle is one upstream bump rather than a finding: it has an issue count and a build count a finding has not, and no age of its own. One allowlist covering both would offer each list keys that mean nothing there, so it has a second — read the same way, with the same direction word, and offered by the same generated enum |
+| The planned upgrades list has six of its own | A planned upgrade is one upstream bump rather than a finding: it has an issue count and a build count a finding has not, and no age of its own. One allowlist covering both would offer each list keys that mean nothing there, so it has a second — read the same way, with the same direction word, and offered by the same generated enum |
 | Nothing else reaches the statement | No derivation from the parameter, no mapping that falls through, no default that is the parameter |
 | The direction is one of two words written here | Not a word that arrived |
 | A key that misses answers in the list's own order | An unknown sort is a mistake about a list, not a reason not to show it |
@@ -534,7 +534,7 @@ route, sign-in and the served interface, and registers each area in turn.
 |---|---|
 | Uploads arriving | Uploads, their receipts, the documents a build sent, one scanner run |
 | Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
-| Handing work out | Assignment, routing rules, teams, tags, bulk acts, fix bundles, planned upgrades, one component |
+| Handing work out | Assignment, routing rules, teams, tags, bulk acts, planned upgrades, one component |
 | Decisions | The review queue, proposing, approving, re-affirmation, comments, incidents, response windows, assessments, scrutiny, readiness |
 | Analytics | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
 | Advisories | Advisories, VEX, supplier imports, the suppliers read on a schedule, outbound destinations |

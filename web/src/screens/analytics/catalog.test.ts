@@ -69,7 +69,7 @@ describe("where a catalog row leads", () => {
   });
 
   it("asks for a whole build where the screen it points at needs one", () => {
-    const upgrades = CATALOG.find((report) => report.name === "Pending upgrades")!;
+    const upgrades = CATALOG.find((report) => report.name === "Planned upgrades")!;
     // A product alone is not enough: the screen exists for one build and no
     // other, so an entry into it on a partial scope would open on a selection
     // that means nothing.
@@ -80,7 +80,7 @@ describe("where a catalog row leads", () => {
     expect(leadsTo(upgrades, { product: "sonic", stream: "master" }, GATED).needs).toBe("build");
     const whole = { product: "sonic", stream: "master", variant: "broadcom" };
     expect(leadsTo(upgrades, whole, GATED).to).toBe(
-      "/products/sonic/streams/master/variants/broadcom/pending-upgrades",
+      "/products/sonic/streams/master/variants/broadcom/planned-upgrades",
     );
   });
 

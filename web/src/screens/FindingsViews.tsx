@@ -366,7 +366,7 @@ export function bumpQuery(
 
 // One row per upstream bump, with what moving it would close.
 //
-// The other end of the same query the pending-upgrades screen reads: a
+// The other end of the same query a build's planned upgrades screen reads: a
 // coordinator reads a build and the upgrades it is waiting on, and a triager
 // reads a bump and the issues it closes. Keyed on the fold, so packages built
 // from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
@@ -396,7 +396,7 @@ export function ByBump({
   const narrowed = bumpQuery(at, query, size, offset);
 
   const bundles = useQuery({
-    queryKey: ["fix-bundles", at, narrowed],
+    queryKey: ["planned-upgrades", at, narrowed],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/planned-upgrades", {
@@ -644,7 +644,7 @@ export function Pager({
     </span>
   );
 }
-// The address the fix-bundle view comes from as a file.
+// The address the planned upgrades view comes from as a file.
 //
 // The same filters the table was read with, so the file and the table cannot
 // disagree about what was asked for — and a link somebody follows rather than

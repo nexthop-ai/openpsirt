@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package assignapi holds the operations that hand work out: assignment of
-// findings and leads, routing rules, teams, tags, bulk acts, fix bundles and planned upgrades.
+// findings and leads, routing rules, teams, tags, bulk acts, planned upgrades and planned upgrades.
 package assignapi
 
 import (
@@ -13,7 +13,7 @@ import (
 )
 
 // Register adds the operations that hand work to people and teams: assignment,
-// routing rules, teams, tags, bulk acts, fix bundles and upgrades.
+// routing rules, teams, tags, bulk acts, planned upgrades and upgrades.
 func Register(api huma.API, in core.Deps) {
 	registerComponent(api, in)
 	registerPlanUpgrade(api, in)
@@ -21,8 +21,8 @@ func Register(api huma.API, in core.Deps) {
 	registerAssignMatching(api, in)
 	registerLeadAssigning(api, in)
 	registerReportAssignment(api, in)
-	registerBundles(api, in)
-	registerPendingUpgrades(api, in)
+	registerPlannedUpgrades(api, in)
+	registerBuildPlannedUpgrades(api, in)
 	registerRouting(api, in)
 	registerBulk(api, in)
 	// A change to a team's membership hands back what no remaining member

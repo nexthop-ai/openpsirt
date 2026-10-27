@@ -28,12 +28,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
-// Bundle is one upstream bump and everything it would close.
+// PlannedUpgrade is one upstream bump and everything it would close.
 //
 // The unit a remediation is actually done in, which nothing here had: the same
 // bump answers thousands of rows. On a real image 5,047 fixable rows are 271
 // distinct bumps and one kernel bump closes 917 of them.
-type Bundle struct {
+type PlannedUpgrade struct {
 	// Fold is what a bump is *of*, and what everything under it is grouped by:
 	// the source package at the version it was built at, in the ecosystem and
 	// distribution it came from. Siblings collapse — curl, libcurl4t64 and
@@ -50,8 +50,8 @@ type Bundle struct {
 	// have.
 	From string
 	To   string
-	// Components are the names this bundle covers, which is what makes a
-	// bundle keyed on an upstream readable — somebody declaring a curl bump
+	// Components are the names this upgrade covers, which is what makes a
+	// upgrade keyed on an upstream readable — somebody declaring a curl bump
 	// should see which packages it moves.
 	Components []string
 	// Issues is how many distinct vulnerabilities the bump closes, Occurrences
@@ -65,29 +65,29 @@ type Bundle struct {
 	// ones that have it.
 	In []Build
 	// Urgency is the worst of what it closes and Severity that as a word. A
-	// bundle is worth doing for its worst member.
+	// upgrade is worth doing for its worst member.
 	Urgency  int64
 	Severity string
 	// Exploited says a feed reports somebody in the world using one of these,
 	// and Incident that somebody recorded this product being attacked
-	// through one. Different facts, so different flags: a bundle carrying the
+	// through one. Different facts, so different flags: an upgrade carrying the
 	// second is answering an incident.
 	Exploited bool
 	Incident  bool
 }
 
-// Bundles groups what is fixable by the bump that would fix it.
+// PlannedUpgrades groups what is fixable by the bump that would fix it.
 //
 // Presentation, like every other grouping here. One act still writes a
 // row at every occurrence of every component; this only says which rows a
 // person is answering at once.
 //
-// Only what has a fix: a bundle is a version to move to, so a finding with no
+// Only what has a fix: an upgrade is a version to move to, so a finding with no
 // fixed version is not in one. That is the same population the fixable filter
 // selects, and it is applied here rather than left to a caller, because a
-// bundle keyed on an empty version is one bundle holding everything unfixable.
-func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope,
-	limit, offset int, filter Filter) ([]Bundle, int, error) {
+// upgrade keyed on an empty version is one upgrade holding everything unfixable.
+func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, scope Scope,
+	limit, offset int, filter Filter) ([]PlannedUpgrade, int, error) {
 
 	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
 	if err != nil || len(targets) == 0 {
@@ -109,7 +109,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		Worst       int    `bun:"worst"`
 		Total       int    `bun:"total"`
 	}
-	// The worst thing in the bundle, as a rank rather than as a word, because
+	// The worst thing in the upgrade, as a rank rather than as a word, because
 	// the four engines do not agree on how words order. Folded exactly the way
 	// the line and the deadline fold them, so an unrated issue is a medium
 	// here as it is everywhere else — which is what asking the fold rather
@@ -134,7 +134,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		// Worst first unless somebody asks otherwise, and every order is
 		// through the allowlist above: the key selects a stored expression
 		// and the direction selects one of two words written there.
-		OrderExpr(bundleSorted(filter)).
+		OrderExpr(plannedUpgradeSorted(filter)).
 		Limit(int64(limit)).Offset(int64(offset))
 	if err := page.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what one bump would close: %w", err)
@@ -147,9 +147,9 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		return nil, 0, err
 	}
 
-	bundles := make([]Bundle, 0, len(rows))
+	upgrades := make([]PlannedUpgrade, 0, len(rows))
 	for _, row := range rows {
-		bundles = append(bundles, Bundle{
+		upgrades = append(upgrades, PlannedUpgrade{
 			Fold:     row.Fold,
 			Upstream: row.Upstream, From: row.From, To: row.To,
 			Issues: row.Issues, Occurrences: row.Occurrences, Builds: row.Builds,
@@ -157,15 +157,15 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 			Exploited: row.Exploited == 1, Incident: row.Incident == 1,
 		})
 	}
-	if err := s.namesIn(ctx, targets, visible, filter, bundles); err != nil {
+	if err := s.namesIn(ctx, targets, visible, filter, upgrades); err != nil {
 		return nil, 0, err
 	}
-	return bundles, total, nil
+	return upgrades, total, nil
 }
 
-// CountBundles is how many bundles Bundles would page through under the
+// CountPlannedUpgrades is how many upgrades PlannedUpgrades would page through under the
 // filter, without reading any of them.
-func (s *Store) CountBundles(ctx context.Context, subject access.Subject, scope Scope,
+func (s *Store) CountPlannedUpgrades(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
 	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
@@ -205,7 +205,7 @@ func (s *Store) countBumps(ctx context.Context, targets []int64,
 	return int(total), nil
 }
 
-// bumps is the fix-bundle list's grouping in two levels. The first groups the
+// bumps is the planned-upgrade list's grouping in two levels. The first groups the
 // open occurrences that name a fix by component, issue, build and the version
 // that fixes it, narrowed as the findings list holds them; the second joins the
 // component and groups by fold and version. The bump is the second level's key
@@ -213,7 +213,7 @@ func (s *Store) countBumps(ctx context.Context, targets []int64,
 // and the issues and the builds are distinct counts over far fewer rows.
 func (s *Store) bumps(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
 	inner := occurrenceHeads(openRows(s.db, targets, visible)).
-		// A bundle is a version to move to.
+		// An upgrade is a version to move to.
 		Where(`"f"."fixed_in" IS NOT NULL`).
 		Where(`"f"."fixed_in" <> ?`, "").
 		ColumnExpr(`"f"."component_id"`).
@@ -221,7 +221,7 @@ func (s *Store) bumps(targets []int64, visible []access.Visibility, filter Filte
 		ColumnExpr(`"f"."target_id"`).
 		ColumnExpr(`"f"."fixed_in"`).
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."target_id", "f"."fixed_in"`)
-	if filter.BundleSort == BundlesByDeadline {
+	if filter.PlannedUpgradeSort == PlannedUpgradesByDeadline {
 		// Under the column's own name, so the order reads the same.
 		inner = inner.ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
 	}
@@ -249,7 +249,7 @@ type Build struct {
 	Variant string
 }
 
-// worstWord turns the rank the bundle query folds severities to back into the
+// worstWord turns the rank the upgrade query folds severities to back into the
 // word, in the same four the rest of this speaks.
 //
 // Read out of the one list rather than written back out as a switch: the
@@ -257,15 +257,15 @@ type Build struct {
 // defect twice.
 func worstWord(rank int) string { return wordAt(rank) }
 
-// namesIn fills in which component names each bundle on the page covers.
+// namesIn fills in which component names each upgrade on the page covers.
 //
-// A second statement over the page's bundles rather than a string aggregate in
+// A second statement over the page's upgrades rather than a string aggregate in
 // the first: the four engines spell that three ways, and the one thing this
 // needs is a list of names.
 func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.Visibility,
-	filter Filter, bundles []Bundle) error {
+	filter Filter, upgrades []PlannedUpgrade) error {
 
-	if len(bundles) == 0 {
+	if len(upgrades) == 0 {
 		return nil
 	}
 	var rows []struct {
@@ -276,14 +276,14 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		Variant string `bun:"variant"`
 	}
 	// The page's folds and the page's versions, as two lists, which is the
-	// trade decorate makes: it admits a fold of one bundle at the version of
+	// trade decorate makes: it admits a fold of one upgrade at the version of
 	// another, and those rows are read and dropped, for the index. Then the
 	// distinct components and builds under them, and only then their names.
-	folds := make([]string, 0, len(bundles))
-	versions := make([]string, 0, len(bundles))
-	for _, bundle := range bundles {
-		folds = append(folds, bundle.Fold)
-		versions = append(versions, bundle.To)
+	folds := make([]string, 0, len(upgrades))
+	versions := make([]string, 0, len(upgrades))
+	for _, upgrade := range upgrades {
+		folds = append(folds, upgrade.Fold)
+		versions = append(versions, upgrade.To)
 	}
 	// The folds' components are read first and named as a list. The first
 	// level then groups the occurrences on the component, the build and the
@@ -329,7 +329,7 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		ColumnExpr(`"st"."name" AS "stream"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		GroupExpr(FoldedOn + `, "f"."fixed_in", "c"."name", "st"."name", "va"."name"`).
-		// In the order a reader scans them, so a bundle names its packages and
+		// In the order a reader scans them, so an upgrade names its packages and
 		// its builds the same way on every read.
 		OrderExpr(`"c"."name", "st"."name", "va"."name"`)
 	if err := q.Scan(ctx, &rows); err != nil {
@@ -349,10 +349,10 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 			in[at] = append(in[at], Build{Stream: row.Stream, Variant: row.Variant})
 		}
 	}
-	for i := range bundles {
-		at := bundles[i].Fold + "\x00" + bundles[i].To
-		bundles[i].Components = named[at]
-		bundles[i].In = in[at]
+	for i := range upgrades {
+		at := upgrades[i].Fold + "\x00" + upgrades[i].To
+		upgrades[i].Components = named[at]
+		upgrades[i].In = in[at]
 	}
 	return nil
 }
@@ -509,79 +509,79 @@ func (s *Store) byComponent(targets []int64, visible []access.Visibility,
 		GroupExpr(`"f"."component_id"`)
 }
 
-// BundleSortKey is which order the fix-bundle list pages in.
+// PlannedUpgradeSortKey is which order the planned-upgrade list pages in.
 //
-// Its own vocabulary rather than the findings list's. A bundle is one bump: it
+// Its own vocabulary rather than the findings list's. An upgrade is one bump: it
 // has an issue count and a build count, which a finding does not, and it has
 // no age of its own. The two lists answer different questions, and an
 // allowlist covering both would offer each of them keys that mean nothing
 // there.
-type BundleSortKey string
+type PlannedUpgradeSortKey string
 
 const (
-	// BundlesByUrgency is the default: a bundle is worth doing for its worst
+	// PlannedUpgradesByUrgency is the default: an upgrade is worth doing for its worst
 	// member, and one closing nine hundred low findings is not the one to do
-	// before a bundle closing one that is being exploited.
-	BundlesByUrgency BundleSortKey = "urgency"
-	// BundlesBySeverity is the worst rating in the bundle, as the band rather
+	// before an upgrade closing one that is being exploited.
+	PlannedUpgradesByUrgency PlannedUpgradeSortKey = "urgency"
+	// PlannedUpgradesBySeverity is the worst rating in the upgrade, as the band rather
 	// than the urgency — which puts what is being exploited in a band of its
 	// own above every rating.
-	BundlesBySeverity BundleSortKey = "severity"
-	// BundlesByIssues is how many distinct issues the bump closes, which is
+	PlannedUpgradesBySeverity PlannedUpgradeSortKey = "severity"
+	// PlannedUpgradesByIssues is how many distinct issues the bump closes, which is
 	// the "what should I do this afternoon" order: on a seeded image one
 	// kernel bump closed 4,485 of 8,377 open findings.
-	BundlesByIssues BundleSortKey = "issues"
-	// BundlesByOccurrences is how many findings those sit at.
-	BundlesByOccurrences BundleSortKey = "occurrences"
-	// BundlesByBuilds is how many builds of the selection hold any of it,
+	PlannedUpgradesByIssues PlannedUpgradeSortKey = "issues"
+	// PlannedUpgradesByOccurrences is how many findings those sit at.
+	PlannedUpgradesByOccurrences PlannedUpgradeSortKey = "occurrences"
+	// PlannedUpgradesByBuilds is how many builds of the selection hold any of it,
 	// which is what says whether one bump is a release-wide job.
-	BundlesByBuilds BundleSortKey = "builds"
-	// BundlesByDeadline is the soonest deadline the bump would meet. A bundle
+	PlannedUpgradesByBuilds PlannedUpgradeSortKey = "builds"
+	// PlannedUpgradesByDeadline is the soonest deadline the bump would meet. An upgrade
 	// with none sorts last whichever direction is asked for.
-	BundlesByDeadline BundleSortKey = "deadline"
+	PlannedUpgradesByDeadline PlannedUpgradeSortKey = "deadline"
 )
 
-// bundleOrder is the expression each key sorts by, and whether it can have no
+// plannedUpgradeOrder is the expression each key sorts by, and whether it can have no
 // value. Keyed by the constant rather than by a string a caller supplies: what
 // reaches the statement is this map's value, never its lookup.
-var bundleOrder = map[BundleSortKey]struct {
+var plannedUpgradeOrder = map[PlannedUpgradeSortKey]struct {
 	expr    string
 	nothing bool
 }{
-	BundlesByUrgency:     {expr: "urgency"},
-	BundlesBySeverity:    {expr: "worst"},
-	BundlesByIssues:      {expr: "issues"},
-	BundlesByOccurrences: {expr: "places"},
-	BundlesByBuilds:      {expr: "builds"},
-	BundlesByDeadline:    {expr: `MIN("f"."due_at")`, nothing: true},
+	PlannedUpgradesByUrgency:     {expr: "urgency"},
+	PlannedUpgradesBySeverity:    {expr: "worst"},
+	PlannedUpgradesByIssues:      {expr: "issues"},
+	PlannedUpgradesByOccurrences: {expr: "places"},
+	PlannedUpgradesByBuilds:      {expr: "builds"},
+	PlannedUpgradesByDeadline:    {expr: `MIN("f"."due_at")`, nothing: true},
 }
 
-// BundleSortKeys are the orders somebody may ask this list for, in the order
+// PlannedUpgradeSortKeys are the orders somebody may ask this list for, in the order
 // they are offered.
 //
 // One list, as the findings list has one: the query parameter's enum is built
 // from this at registration and the interface's own union is generated from
 // the document that enum produces, so an order added here is offered and one
 // removed here is refused.
-func BundleSortKeys() []BundleSortKey {
-	return []BundleSortKey{
-		BundlesByUrgency, BundlesBySeverity, BundlesByIssues,
-		BundlesByOccurrences, BundlesByBuilds, BundlesByDeadline,
+func PlannedUpgradeSortKeys() []PlannedUpgradeSortKey {
+	return []PlannedUpgradeSortKey{
+		PlannedUpgradesByUrgency, PlannedUpgradesBySeverity, PlannedUpgradesByIssues,
+		PlannedUpgradesByOccurrences, PlannedUpgradesByBuilds, PlannedUpgradesByDeadline,
 	}
 }
 
-// byBump is the order a bundle list has unless somebody asks for another, and
+// byBump is the order an upgrade list has unless somebody asks for another, and
 // the tie-break under every other order: two rows equal on the sorted column
 // must not swap between pages.
 const byBump = "urgency DESC, issues DESC, upstream, fixed_in, fold"
 
-// bundleSorted is how the fix-bundle list is ordered.
+// plannedUpgradeSorted is how the planned-upgrade list is ordered.
 //
 // The list had no order to ask for at all, though every field worth ordering
 // by was already on the row. The ranking it has answers what should worry
 // somebody; nothing answered what to do this afternoon.
-func bundleSorted(filter Filter) string {
-	by, asked := bundleOrder[filter.BundleSort]
+func plannedUpgradeSorted(filter Filter) string {
+	by, asked := plannedUpgradeOrder[filter.PlannedUpgradeSort]
 	if !asked {
 		return byBump
 	}

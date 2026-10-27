@@ -386,7 +386,12 @@ export function Findings() {
   // writes. That is the half of the rule the hold is justified under: a number
   // that is wrong in a way nothing reports.
   function reread() {
-    for (const key of [["findings"], ["findings-by-component"], ["fix-bundles"], ["holdings"]]) {
+    for (const key of [
+      ["findings"],
+      ["findings-by-component"],
+      ["planned-upgrades"],
+      ["holdings"],
+    ]) {
       void queries.invalidateQueries({ queryKey: key });
     }
   }

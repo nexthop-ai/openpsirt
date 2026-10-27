@@ -23,6 +23,7 @@ import {
   incidentsAt,
   vulnerabilityReportAt,
   vulnerabilityReportsAt,
+  plannedUpgradesAt,
 } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
@@ -79,7 +80,9 @@ const DisclosureDeadlines = retrying(() =>
   import("../screens/DisclosureDeadlines").then((m) => m.DisclosureDeadlines),
 );
 const Incidents = retrying(() => import("../screens/Incidents").then((m) => m.Incidents));
-const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgrades));
+const PlannedUpgrades = retrying(() =>
+  import("../screens/PlannedUpgrades").then((m) => m.PlannedUpgrades),
+);
 const MatchCoverage = retrying(() =>
   import("../screens/MatchCoverage").then((m) => m.MatchCoverage),
 );
@@ -199,7 +202,7 @@ export function App() {
               <Route path={ROUTES.uploadsOf} element={<Uploads />} />
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
               <Route path={ROUTES.run} element={<Run />} />
-              <Route path={ROUTES.upgrades} element={<Upgrades />} />
+              <Route path={ROUTES.plannedUpgrades} element={<PlannedUpgrades />} />
               <Route path={ROUTES.matchCoverage} element={<MatchCoverage />} />
               <Route path={ROUTES.vex} element={<VEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
@@ -301,6 +304,10 @@ export function App() {
               <Route
                 path={ROUTES.formerBulkDecision}
                 element={<Moved to={(at) => bulkDecisionAt(built(at), at.component ?? "")} />}
+              />
+              <Route
+                path={ROUTES.formerPendingUpgrades}
+                element={<Moved to={(at) => plannedUpgradesAt(built(at))} />}
               />
               {/* An address this application does not answer. It says so, and
                 keeps the address in the bar: redirecting home threw away the

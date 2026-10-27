@@ -87,7 +87,7 @@ func TestEveryVocabularyListsEveryConstantOfItsType(t *testing.T) {
 		listed(finding.ReferenceKinds()),
 		listed(finding.RulingStates()),
 		listed(finding.SortKeys()),
-		listed(finding.BundleSortKeys()),
+		listed(finding.PlannedUpgradeSortKeys()),
 		listed(finding.Closures()),
 		listed(finding.VariantSpreads(), "AnyVariants"),
 		listed(graph.Reasons),

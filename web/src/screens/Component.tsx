@@ -784,7 +784,7 @@ function Upgrade({
   const [holder, setHolder] = useState<Held | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   // Where the promise just made is followed: its own page while it waits for
-  // a second person, and the pending upgrades of the builds it names.
+  // a second person, and the planned upgrades of the builds it names.
   const [made, setMade] = useState<{
     decisionId: number;
     waiting: boolean;

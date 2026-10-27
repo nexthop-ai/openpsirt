@@ -708,9 +708,9 @@ database and twice with truncation, one engine at a time:
 | Measurement, engine | Deleted, then reloaded | Truncated, then reloaded | A newly built database |
 |---|---|---|---|
 | The list across products, PostgreSQL | 20,900 pages, correlation of `id` −0.38 and of `vulnerability_id` −0.32; then 12,697 pages, 1.00 and 0.68 | 12,697 pages, 1.00 and 0.68, then 0.67 | Correlation 1.00 and 0.67 |
-| A fix bundle page, PostgreSQL | 20,900 and 18,867 pages | 6,169 and 6,170 pages | — |
-| A fix bundle page, MySQL | 3,078 and 3,014 pages, 30.6 s and 31.4 s | 2,854 pages, 14.5 s, both runs | 2,854 pages, 15.1 s |
-| A fix bundle page, MariaDB | 2,886 and 2,823 pages, 25.0 s and 24.7 s | 2,854 pages, 11.3 s and 10.6 s | 2,854 pages, 11.3 s |
+| A planned upgrades page, PostgreSQL | 20,900 and 18,867 pages | 6,169 and 6,170 pages | — |
+| A planned upgrades page, MySQL | 3,078 and 3,014 pages, 30.6 s and 31.4 s | 2,854 pages, 14.5 s, both runs | 2,854 pages, 15.1 s |
+| A planned upgrades page, MariaDB | 2,886 and 2,823 pages, 25.0 s and 24.7 s | 2,854 pages, 11.3 s and 10.6 s | 2,854 pages, 11.3 s |
 | The list across products, MySQL and MariaDB | 5,802 pages, and once 5,834 on MariaDB | 5,802 pages | — |
 
 The deleted runs on PostgreSQL disagree with each other because autovacuum

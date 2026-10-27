@@ -119,7 +119,9 @@
     "path": "/products/:product/streams/:stream/variants/:variant/uploads/:scan/changes"
   },
   "run": { "path": "/products/:product/streams/:stream/variants/:variant/runs/:run" },
-  "upgrades": { "path": "/products/:product/streams/:stream/variants/:variant/pending-upgrades" },
+  "plannedUpgrades": {
+    "path": "/products/:product/streams/:stream/variants/:variant/planned-upgrades"
+  },
   "matchCoverage": {
     "path": "/products/:product/streams/:stream/variants/:variant/match-coverage"
   },
@@ -196,5 +198,8 @@
   "formerDecision": { "path": "/claims/:id" },
   "formerBulkDecision": {
     "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide"
+  },
+  "formerPendingUpgrades": {
+    "path": "/products/:product/streams/:stream/variants/:variant/pending-upgrades"
   }
 }

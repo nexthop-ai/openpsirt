@@ -207,7 +207,7 @@ export const uploadsAt = (build: Build, type?: UploadType) =>
 export const inventoryChangesAt = (build: Build, scan: number) =>
   at("inventoryChanges", { ...build, scan });
 export const runAt = (build: Build, run: number) => at("run", { ...build, run });
-export const upgradesAt = (build: Build) => at("upgrades", build);
+export const plannedUpgradesAt = (build: Build) => at("plannedUpgrades", build);
 export const matchCoverageAt = (build: Build) => at("matchCoverage", build);
 export const vexAt = (build: Build) => at("vex", build);
 

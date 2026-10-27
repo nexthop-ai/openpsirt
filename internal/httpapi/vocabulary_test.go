@@ -214,7 +214,7 @@ func statedVocabularies() map[string][]string {
 		"setting kinds":                  words(setting.Kinds()),
 		"setting sections":               words(setting.Sections()),
 		"finding sorts":                  words(finding.SortKeys()),
-		"bundle sorts":                   words(finding.BundleSortKeys()),
+		"upgrade sorts":                  words(finding.PlannedUpgradeSortKeys()),
 		"closures":                       words(finding.Closures()),
 		"exchange document kinds":        words(vex.Kinds()),
 		"visibilities":                   words(access.Visibilities()),

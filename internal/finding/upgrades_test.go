@@ -548,10 +548,10 @@ func TestEveryOrderTheGroupedListsOfferAreOrdersTheyRun(t *testing.T) {
 				}
 			}
 		}
-		for _, by := range finding.BundleSortKeys() {
+		for _, by := range finding.PlannedUpgradeSortKeys() {
 			for _, way := range []bool{false, true} {
-				filter := finding.Filter{BundleSort: by, Ascending: way}
-				if _, total, err := f.store.Bundles(t.Context(), who,
+				filter := finding.Filter{PlannedUpgradeSort: by, Ascending: way}
+				if _, total, err := f.store.PlannedUpgrades(t.Context(), who,
 					f.wholeProduct(), 50, 0, filter); err != nil || total == 0 {
 					t.Errorf("by bump, sorting by %q ascending=%v answered %d: %v",
 						by, way, total, err)
@@ -560,8 +560,8 @@ func TestEveryOrderTheGroupedListsOfferAreOrdersTheyRun(t *testing.T) {
 		}
 		// A key nobody allows is the list's own default rather than a failure
 		// or a key reaching the statement.
-		hostile := finding.Filter{BundleSort: "builds); DROP TABLE finding; --"}
-		if _, total, err := f.store.Bundles(t.Context(), who, f.wholeProduct(), 50, 0,
+		hostile := finding.Filter{PlannedUpgradeSort: "builds); DROP TABLE finding; --"}
+		if _, total, err := f.store.PlannedUpgrades(t.Context(), who, f.wholeProduct(), 50, 0,
 			hostile); err != nil || total == 0 {
 			t.Errorf("a bump order nobody allows made the list fail rather than fall back: %v", err)
 		}
@@ -574,16 +574,16 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		spread(t, f)
 		who := f.holding(t, access.PublicTriage)
-		leader := func(filter finding.Filter) finding.Bundle {
+		leader := func(filter finding.Filter) finding.PlannedUpgrade {
 			t.Helper()
-			bundles, _, err := f.store.Bundles(t.Context(), who, f.wholeProduct(), 50, 0, filter)
+			upgrades, _, err := f.store.PlannedUpgrades(t.Context(), who, f.wholeProduct(), 50, 0, filter)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(bundles) == 0 {
+			if len(upgrades) == 0 {
 				t.Fatal("nothing has a version to move to")
 			}
-			return bundles[0]
+			return upgrades[0]
 		}
 
 		// Worst first unasked: the bump carrying the critical.
@@ -591,12 +591,12 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 			t.Errorf("unasked, the list leads with %q rather than the bump closing the critical", got.Upstream)
 		}
 		// Most closed first when that is what was asked.
-		if got := leader(finding.Filter{BundleSort: finding.BundlesByIssues}); got.Upstream != swss.Name {
+		if got := leader(finding.Filter{PlannedUpgradeSort: finding.PlannedUpgradesByIssues}); got.Upstream != swss.Name {
 			t.Errorf("sort=issues leads with %q rather than the bump closing the most", got.Upstream)
 		}
 		// And the fewest, which is the direction half of the same question.
 		if got := leader(finding.Filter{
-			BundleSort: finding.BundlesByIssues, Ascending: true,
+			PlannedUpgradeSort: finding.PlannedUpgradesByIssues, Ascending: true,
 		}); got.Upstream != libnl.Name {
 			t.Errorf("asc=true leads with %q, which is what descending answers", got.Upstream)
 		}
@@ -753,7 +753,7 @@ func TestACommitmentStandsWhenALaterInventoryStatesMore(t *testing.T) {
 		}
 		f.shipped(t, restated)
 
-		planned, err := f.store.PendingUpgrades(ctx, who, f.target)
+		planned, err := f.store.PlannedUpgradesFor(ctx, who, f.target)
 		if err != nil {
 			t.Fatal(err)
 		}

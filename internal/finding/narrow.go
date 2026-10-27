@@ -27,12 +27,12 @@ import (
 // arbitrary subset each time. It also makes the total meaningless, which is the
 // number people quote.
 type Filter struct {
-	// BundleSort is which order the fix-bundle list pages in, and is read by
-	// that list alone: a bundle is a bump rather than a finding, so what it is
+	// PlannedUpgradeSort is which order the planned-upgrade list pages in, and is read by
+	// that list alone: an upgrade is a bump rather than a finding, so what it is
 	// worth ordering by — how many issues it closes, how many builds hold it —
 	// has no meaning on a list of findings, and the six the findings list
 	// takes do not all have one on a bump. The direction below is shared.
-	BundleSort BundleSortKey
+	PlannedUpgradeSort PlannedUpgradeSortKey
 	// MinSeverity keeps issues rated at this word or worse. Empty — or "low",
 	// which excludes nothing — keeps everything, including issues carrying no
 	// rating at all.
@@ -469,7 +469,7 @@ func (f Filter) keepsAfterGrouping() bool {
 // the fold is read from the component by its key. On PostgreSQL the groups have
 // no index to probe, so an estimate of 279 kept groups where 1,753 pass cannot
 // become a walk of a component's rows once per group: that walk took 185 s for
-// the lapsed fix bundles. On MariaDB the membership test is materialized once.
+// the lapsed planned upgrades. On MariaDB the membership test is materialized once.
 // A grouped table joined on its grouping keys is instead worked out again for
 // every row it is joined to: the one-level kept groups, joined that way to the
 // open occurrences, had built the decision table again for 10,572 occurrences
