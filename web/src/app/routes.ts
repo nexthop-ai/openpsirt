@@ -98,6 +98,7 @@ export const codeFindingsAt = (
     branch_or_tag?: string;
     variant?: string;
     series?: string;
+    method?: string;
     assigned?: "nobody";
   },
 ) => at("codeFindings", { product }, query);

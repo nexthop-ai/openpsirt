@@ -53,11 +53,12 @@ type CodeFindingsOutput struct {
 // its file. One struct, because a file taking fewer filters than its list
 // answers a different question under the same name.
 type CodeFindingsAsked struct {
-	Product     string           `path:"product"`
-	BranchOrTag string           `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
-	Variant     string           `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
-	Series      string           `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing"`
-	State       CodeFindingState `query:"state" doc:"List the code findings in one state. Left out, the queue"`
+	Product     string            `path:"product"`
+	BranchOrTag string            `query:"branch_or_tag" doc:"Limit to one branch or tag. Left out, every one under the product"`
+	Variant     string            `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+	Series      string            `query:"series" maxLength:"200" doc:"Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing"`
+	State       CodeFindingState  `query:"state" doc:"List the code findings in one state. Left out, the queue"`
+	Method      CodeFindingMethod `query:"method" doc:"Limit to the code findings one testing method reported. Left out, every method. sast is static analysis"`
 	// Assigned is the findings list's parameter and value for work nobody
 	// holds, so the two read alike.
 	Assigned CodeFindingAssignee `query:"assigned" doc:"Limit to the code findings with no holder on the build each row names. Every count is then of those code findings"`
@@ -82,6 +83,7 @@ func (a CodeFindingsAsked) scoped(ctx context.Context, in core.Deps) (access.Sub
 	return subject, analysis.Scope{
 		ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
 		Series: strings.TrimSpace(a.Series), Unassigned: a.Assigned == finding.HeldByNobody,
+		Method: analysis.Method(a.Method),
 	}, nil
 }
 
@@ -159,7 +161,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			"releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in " +
 			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +
 			"it off are refused with 409. " +
-			"`branch_or_tag`, `variant` and `series` are optional and independent. `assigned=nobody` keeps " +
+			"`branch_or_tag`, `variant`, `series` and `method` are optional and independent. `assigned=nobody` keeps " +
 			"the code findings nobody holds on the build each row names, and combines with every other filter. " +
 			"Supports limit and offset.",
 		Tags: []string{"Findings"},

@@ -50,7 +50,24 @@ type Scope struct {
 	Series string
 	// Unassigned keeps the code findings nobody holds on the build a row names.
 	Unassigned bool
+	// Method keeps the code findings one testing method reported. Empty, every
+	// method.
+	Method Method
 }
+
+// Method is a way of testing our own code, by the word people search for it
+// under.
+type Method string
+
+// SAST is static analysis: an analyzer reading the source.
+const SAST Method = "sast"
+
+// methodKinds is the kind of finding each method records.
+var methodKinds = map[Method]kind.Kind{SAST: kind.Analysis}
+
+// Methods is every method the code finding queue narrows by, in the order a
+// filter offers them.
+func Methods() []string { return []string{string(SAST)} }
 
 // CodeFindingAssignees is every word the code finding queue asks who holds a code finding in: the
 // findings list's word for work nobody holds.
@@ -293,6 +310,9 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 	}
 	if scope.Unassigned {
 		q = q.Where(`"f"."assigned_to" IS NULL`)
+	}
+	if scope.Method != "" {
+		q = q.Where(`"f"."kind" = ?`, methodKinds[scope.Method])
 	}
 	if scope.Series != "" {
 		named, namedArgs := kind.CodeFindings.Where(`"sn"."kind"`)

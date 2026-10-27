@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -540,6 +541,23 @@ func TestAFixedCodeFindingNamesOnlyAnAppliedComparableRunOfItsSeriesOnItsBuild(t
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, codeFinding+"/fixed", body); got.Code != http.StatusOK {
 			t.Errorf("naming the later run of the code finding's series on its build answered %d: %s", got.Code, got.Body)
+		}
+	})
+}
+
+// Static analysis is the one testing method recorded, so narrowing to it keeps
+// every code finding, and a method nothing records is refused by name.
+func TestTheQueueNarrowsByTheMethodThatReportedACodeFinding(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		got := codeFindingsOf(t, r, "internal-reader", "?method=sast")
+		if got.Total != 1 || len(got.Items) != 1 || got.Items[0].Occurrence != occurrence {
+			t.Fatalf("the static analysis queue is %+v; want the seeded code finding", got)
+		}
+		refused := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet,
+			"/v1/products/mine/code-findings?method=dast", "")
+		if refused.Code != http.StatusUnprocessableEntity || !strings.Contains(refused.Body.String(), "method") {
+			t.Errorf("a method nothing records answered %d: %s", refused.Code, refused.Body)
 		}
 	})
 }

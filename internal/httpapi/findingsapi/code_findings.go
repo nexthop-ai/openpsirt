@@ -123,6 +123,18 @@ func (CodeFindingAssignee) Schema(huma.Registry) *huma.Schema {
 	return &huma.Schema{Type: huma.TypeString, Enum: offered}
 }
 
+// CodeFindingMethod is a testing method the code finding queue narrows by.
+type CodeFindingMethod string
+
+// Schema offers every method the code finding queue narrows by.
+func (CodeFindingMethod) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(analysis.Methods()))
+	for _, each := range analysis.Methods() {
+		offered = append(offered, each)
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
+}
+
 func registerCodeFindings(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-code-finding-evidence", Method: http.MethodGet,

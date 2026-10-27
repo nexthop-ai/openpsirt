@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodeFindings } from "./CodeFindings";
 import { location, mounted, screen, serve, settle } from "../test/mount";
-import { press, tick } from "../test/controls";
+import { change, press, tick } from "../test/controls";
 
 const mount = mounted();
 
@@ -133,6 +133,25 @@ describe("the code findings", () => {
     expect(new URL(file?.getAttribute("href") ?? "", "http://x").searchParams.get("assigned")).toBe(
       "nobody",
     );
+  });
+
+  it("narrows to one testing method, which the address and the file carry", async () => {
+    const asked = await drawn("/products/sonic/code-findings?state=open");
+    change(mount.host().querySelector<HTMLSelectElement>('select[aria-label="Method"]'), "sast");
+    await settle();
+    expect(location()).toBe("/products/sonic/code-findings?state=open&method=sast");
+    expect(asked.at(-1)).toMatchObject({ state: "open", method: "sast" });
+    const file = Array.from(mount.host().querySelectorAll("a")).find(
+      (each) => each.textContent === "JSON",
+    );
+    expect(new URL(file?.getAttribute("href") ?? "", "http://x").searchParams.get("method")).toBe(
+      "sast",
+    );
+  });
+
+  it("leaves out a method the address names that is not one", async () => {
+    const asked = await drawn("/products/sonic/code-findings?method=dast");
+    expect(asked.at(-1)).not.toHaveProperty("method");
   });
 
   it("asks for the build the address names", async () => {

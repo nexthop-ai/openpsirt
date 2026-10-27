@@ -9,6 +9,7 @@ import {
   PAGE,
   codeFindingsQuery,
   useCodeFindings,
+  type CodeFindingMethod,
   type CodeFindingState,
 } from "../api/codeFindings";
 import { codeFindingAt, suppressionRulesAt, codeFindingsAt, productAt } from "../app/routes";
@@ -19,7 +20,13 @@ import { Paged } from "../ui/Paged";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
-import { CODE_FINDING_STATES, CODE_FINDING_TONES, located, stateSaid } from "./codeFindings";
+import {
+  CODE_FINDING_METHODS,
+  CODE_FINDING_STATES,
+  CODE_FINDING_TONES,
+  located,
+  stateSaid,
+} from "./codeFindings";
 
 // A product's static analysis code findings. With no state it is the queue: open
 // code findings nothing waits on. A state lists that state's code findings instead.
@@ -31,6 +38,10 @@ export function CodeFindings() {
   const branchOrTag = params.get("branch_or_tag") ?? undefined;
   const variant = params.get("variant") ?? undefined;
   const series = params.get("series") ?? undefined;
+  const askedMethod = params.get("method") ?? "";
+  const method = Object.hasOwn(CODE_FINDING_METHODS, askedMethod)
+    ? (askedMethod as CodeFindingMethod)
+    : undefined;
   const assigned = params.get("assigned") === "nobody" ? "nobody" : undefined;
   const [offset, setOffset] = useState(0);
   const listed = useCodeFindings(product, {
@@ -38,13 +49,14 @@ export function CodeFindings() {
     branch_or_tag: branchOrTag,
     variant,
     series,
+    method,
     assigned,
     offset,
   });
   const opener = useRowOpener();
   const reads = !!mayOf(useWho().data, product)?.reads_internal;
 
-  const go = (next?: CodeFindingState, unheld = assigned) => {
+  const go = (next?: CodeFindingState, unheld = assigned, by = method) => {
     setOffset(0);
     setParams(
       Object.fromEntries(
@@ -53,6 +65,7 @@ export function CodeFindings() {
           branch_or_tag: branchOrTag,
           variant,
           series,
+          method: by,
           assigned: unheld,
         }).filter(([, value]) => value !== undefined),
       ) as Record<string, string>,
@@ -64,7 +77,14 @@ export function CodeFindings() {
   const file = (format: "csv" | "json") =>
     fileAt("/v1/products/{product}/code-findings.{format}", format, {
       path: { product },
-      query: codeFindingsQuery({ state, branch_or_tag: branchOrTag, variant, series, assigned }),
+      query: codeFindingsQuery({
+        state,
+        branch_or_tag: branchOrTag,
+        variant,
+        series,
+        method,
+        assigned,
+      }),
     });
   const counts = listed.data?.states ?? {};
   const rows = listed.data?.items ?? [];
@@ -78,6 +98,7 @@ export function CodeFindings() {
           {branchOrTag && ` · ${branchOrTag}`}
           {variant && ` · ${variant}`}
           {series && ` · ${series}`}
+          {method && ` · ${CODE_FINDING_METHODS[method].label}`}
           {assigned && " · unassigned"}
         </p>
         <span style={{ marginLeft: "auto" }}>
@@ -92,7 +113,6 @@ export function CodeFindings() {
           </a>
         </span>
       </div>
-
       <div className="tabs2">
         <button type="button" className="tab2" aria-selected={!state} onClick={() => go()}>
           Queue
@@ -110,6 +130,21 @@ export function CodeFindings() {
           </button>
         ))}
       </div>
+      <select
+        value={method ?? ""}
+        onChange={(e) =>
+          go(state, assigned, (e.target.value || undefined) as CodeFindingMethod | undefined)
+        }
+        aria-label="Method"
+        title="How the code findings were found"
+      >
+        <option value="">Any method</option>
+        {(Object.keys(CODE_FINDING_METHODS) as CodeFindingMethod[]).map((each) => (
+          <option key={each} value={each} title={CODE_FINDING_METHODS[each].hint}>
+            {CODE_FINDING_METHODS[each].label}
+          </option>
+        ))}
+      </select>{" "}
       <label className="hint">
         <input
           type="checkbox"
@@ -136,6 +171,7 @@ export function CodeFindings() {
                     branch_or_tag: branchOrTag,
                     variant,
                     series,
+                    method,
                     assigned,
                   })}
                 >

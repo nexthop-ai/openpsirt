@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+  CodeFindingMethod,
   CodeFindingOutcome,
   CodeFindingReason,
   SuppressionRuleState,
@@ -10,6 +11,11 @@ import type {
 
 // The words for what the server says about code findings. Keyed by the generated
 // unions, so a word the server adds is a compile error here until it has one.
+
+// The testing methods, by the word people search for and what each is.
+export const CODE_FINDING_METHODS: Record<CodeFindingMethod, { label: string; hint: string }> = {
+  sast: { label: "SAST", hint: "Static analysis" },
+};
 
 export const CODE_FINDING_STATES: Record<CodeFindingState, string> = {
   open: "Open",

@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
+import type { paths } from "./schema";
 import { unwrap } from "./queries";
 import { useAfterDecision } from "./decisions";
 import type { Build } from "../app/routes";
@@ -23,6 +24,9 @@ export type CodeFindingOutcome = Body<"CodeFindingDecisionBody">["outcome"];
 export type CodeFindingReason = NonNullable<Body<"CodeFindingDecisionBody">["reason"]>;
 export type SuppressionRule = Body<"SuppressionRuleBody">;
 export type SuppressionRuleState = SuppressionRule["state"];
+export type CodeFindingMethod = NonNullable<
+  NonNullable<paths["/v1/products/{product}/code-findings"]["get"]["parameters"]["query"]>["method"]
+>;
 
 // The rows one request carries, named so the pager and the request agree.
 export const PAGE = 50;
@@ -46,6 +50,7 @@ type CodeFindingsAsked = {
   branch_or_tag?: string;
   variant?: string;
   series?: string;
+  method?: CodeFindingMethod;
   state?: CodeFindingState;
   assigned?: "nobody";
 };
@@ -74,6 +79,7 @@ export function useCodeFindings(
               ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
               ...(asked.variant ? { variant: asked.variant } : {}),
               ...(asked.series ? { series: asked.series } : {}),
+              ...(asked.method ? { method: asked.method } : {}),
               ...(asked.state ? { state: asked.state } : {}),
               ...(asked.assigned ? { assigned: asked.assigned } : {}),
             },

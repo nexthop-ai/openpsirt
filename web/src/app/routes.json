@@ -149,7 +149,7 @@
   },
   "codeFindings": {
     "path": "/products/:product/code-findings",
-    "query": ["state", "branch_or_tag", "variant", "series"]
+    "query": ["state", "branch_or_tag", "variant", "series", "method"]
   },
   "codeFinding": {
     "path": "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant/code-findings/:occurrence"

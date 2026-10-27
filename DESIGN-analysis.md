@@ -556,6 +556,7 @@ one way to say a path does not matter is kept rather than two.
 | Only what the subject may read is listed or counted | Visibility is enforced where the code findings are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
 | A series narrows the list by its name, matched without regard to capitals | A name no series of the product holds lists nothing, the same answer as a series holding no code finding |
+| A testing method narrows the list to the kind of finding the method records, and the filter offers every method the queue knows | SAST is static analysis, the analysis kind, and the one method recorded. A method nothing records is refused by name |
 | Narrowed to work nobody holds, the list keeps the code findings with no holder on the build each row names, under the parameter and value the findings list uses | The findings list holds no code finding, so this is where unheld code findings are found (§ Code finding assignment) |
 | Narrowed to work nobody holds, every count is of the code findings the narrowing keeps | A count beside a narrowed list describes what that list leaves out |
 | A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
