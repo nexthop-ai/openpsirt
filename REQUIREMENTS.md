@@ -252,6 +252,6 @@ Asked for, and deliberately not built.
 | **SSVC as a vocabulary over the ranking** | This tool's audience asks for CSAF, VEX, CVSS and exploitation data. Adopting a named framework is a standing commitment to track it as it revises |
 | **Detecting abandoned dependencies to explain a finding with no fix** | Measured on a real image: of 1,125 findings with no fix, 1,113 are distribution packages. The maintainer is Debian, which is not dead |
 | **"Contained another way" as an outcome of its own** | Already sayable as not-applicable with the standard justification for existing mitigations. VEX puts this distinction in the justification rather than the status |
-| **Versions inside the identity of a place** | The top-level version changes every build, so every decision would lapse nightly |
+| **Versions inside the identity of an occurrence** | The top-level version changes every build, so every decision would lapse nightly |
 | **Backport tracking through pull requests tagged with a target branch** | Assumes commit and pull-request linkage we do not have. The same picture is derived from scans (REQ-35) |
 | **A reverse proxy at the ingress as the only sign-in** | Works in Kubernetes, does not travel to self-hosted or local development |
