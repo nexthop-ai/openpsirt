@@ -194,3 +194,24 @@ func TestReasoningIsKeptByteForByteAsTheUpgradeStoresIt(t *testing.T) {
 		t.Errorf("text at the bound was cut to %d bytes", len(got))
 	}
 }
+
+func TestARenamedTableKeepsItsRowsUnderItsNewName(t *testing.T) {
+	renamed := map[string]string{"decision": "decision_occurrence", "claim": "decision"}
+	held := Counts{"decision": 12, "claim": 5, "finding": 40}
+	after := Counts{"decision_occurrence": 12, "decision": 5, "finding": 40}
+	if faults := Compare(AsRenamed(renamesV0110-1, held, renamed), after, nil); len(faults) != 0 {
+		t.Errorf("a rename that kept every row was reported: %v", faults)
+	}
+	if faults := Compare(AsRenamed(renamesV0110-1, held, renamed), Counts{"decision_occurrence": 11, "decision": 5,
+		"finding": 40}, nil); len(faults) != 1 || !strings.HasPrefix(faults[0], "decision_occurrence") {
+		t.Errorf("a row lost from a renamed table was not reported under its new name: %v", faults)
+	}
+}
+
+func TestATableIsRenamedOnlyByAnUpgradeThatRenamesIt(t *testing.T) {
+	held := Counts{"decision": 12}
+	got := AsRenamed(renamesV0110, held, map[string]string{"decision": "decision_occurrence"})
+	if got["decision"] != 12 || len(got) != 1 {
+		t.Errorf("a release already past the renames had its tables renamed: %v", got)
+	}
+}

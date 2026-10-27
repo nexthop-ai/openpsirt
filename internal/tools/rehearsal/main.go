@@ -58,6 +58,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
@@ -250,11 +251,14 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.note("%d tables, %d findings, %d decisions, %d claims", len(held), held["finding"], held["decision"], held["claim"])
+	// Every count below is under the name this tree gives its table.
+	held = AsRenamed(record.Last, held, migrations.TablesRenamedV0110())
+	r.note("%d tables, %d findings, %d decisions, %d decision occurrences", len(held), held["finding"],
+		held["decision"], held["decision_occurrence"])
 	// An upgrade of an empty database passes every check here, so a seed
 	// that filled nothing is a failed rehearsal rather than a clean one.
 	var empty []string
-	for _, table := range []string{"finding", "decision", "claim", "vex_statement", "flaw_report"} {
+	for _, table := range []string{"finding", "decision", "decision_occurrence", "vex_statement", "flaw_report"} {
 		if held[table] == 0 {
 			empty = append(empty, table)
 		}
