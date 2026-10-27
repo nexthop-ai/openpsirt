@@ -24797,7 +24797,7 @@ paths:
 
         It carries what was fixed and nothing else. Not what is still present, not what newly appeared, and not an upgrade that carried the issue with it — those are statements about what a build contains, and the document for them is a VEX, which a customer's own scanner reads. The comparison itself still answers all three.
 
-        Worst first and stably ordered, so two runs over the same pair of builds produce the same document. A code finding line names both builds, the day, and the scanner and vulnerability-database versions the later build was last measured with.
+        Worst first and stably ordered, so two runs over the same pair of builds produce the same document. A lead line names both builds, the day, and the scanner and vulnerability-database versions the later build was last measured with.
 
         Public findings only unless you ask otherwise, as the comparison itself is. Where fixes are left out for not having been disclosed, the note says how many and never which.
 
