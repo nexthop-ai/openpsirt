@@ -32,9 +32,17 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 
 | Document | Covers | Terms |
 |---|---|---|
-| [triage](design-docs/triage.md) | What people decide about findings, and when a decision stops applying | decision identity, expiry, outcomes, approval, rights, bulk decisions, review queue, extensions, minimum severity, issue assessments, reach across builds, re-affirmation, lapse |
+| [triage](design-docs/triage.md) | What a decision is keyed on, its outcomes, and when it stops applying | decision identity, expiry, outcomes, already fixed, mitigations, outcomes on a tag, dates still to come, corrections, wrong match, one live decision per key, statement scope |
+| [triage-decisions](design-docs/triage-decisions.md) | One decision, its rows, and how its record is read back | decision kinds, rows, act placement, readback, undoing a bulk approval, the whole decision, reach when it stopped, standing and previous lists, extensions, comments, notes, labels |
+| [triage-approval](design-docs/triage-approval.md) | The second person and the review queue | approval, revisions, carried agreement, rights, visibility of the record, set-aside rows, outliers, partial approval, sending back, deferral threshold, queue entries, queue contents, queue filters |
+| [triage-bulk](design-docs/triage-bulk.md) | Decisions over many occurrences, issues and builds | reach across builds, coverage count, bulk decisions, issue limit, occurrence ceiling, narrowing record, decided occurrences, rule-prepared decisions, saved filter prefill, decisions on a new branch |
+| [triage-promises](design-docs/triage-promises.md) | Promises to upgrade or patch by a date | planned upgrades, upgrade needed, patch needed, source package coverage, handover, no cap, approval gate, covered work |
+| [triage-lapse](design-docs/triage-lapse.md) | How a decision is marked lapsed and re-made | lapse marking, moved versions, worse rating, merged issues, stopped standing, re-affirmation, severity bands, carried agreement, whole-action re-affirmation, To reaffirm, re-affirmation across decisions |
+| [triage-severity](design-docs/triage-severity.md) | What is worth triaging and a product's own rating | minimum severity, product minimum, issue assessments, rating in force, milder rating, effects of agreement, deadline windows, deadline rewrite |
+| [triage-evidence](design-docs/triage-evidence.md) | What publishers say, what it closes, and decisions elsewhere | evidence from publishers, VEX statements, supplier advisories, supplier statements applied, statements about the build, evidence placement, statement filters, decided elsewhere |
+| [triage-measurements](design-docs/triage-measurements.md) | Benchmark runs behind the triage rules | kernel upgrade promise, autovacuum, foreign key checks, review queue reach, query plan cost |
 | [remediation](design-docs/remediation.md) | Declared fix intent and whether it arrived | planned upgrades, resolution, deadlines, version ordering, promise states, advisory, CSAF document, VEX document, issuance, provider directory |
-| [incidents](design-docs/incidents.md) | A regulator's questions after an incident | stored facts, response windows, notices, fix releases, the shelf |
+| [incidents](design-docs/incidents.md) | A regulator's questions after an incident, and what one does to decisions | three conflated facts, stored facts, decisions against an incident, response windows, window clock, notices, fix releases, the shelf |
 
 ## Access and the API
 
