@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package obligation_test
+package incident_test
 
 import (
 	"context"
@@ -17,8 +17,8 @@ import (
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -113,7 +113,7 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 
 type fixture struct {
 	db                                *database.DB
-	store                             *obligation.Store
+	store                             *incident.Store
 	product, issue                    int64
 	admin, triager, insider, outsider access.Subject
 	reader                            access.Subject
@@ -131,7 +131,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			return resolved
 		}
 		fn(t, &fixture{
-			db: db, store: obligation.NewStore(db.DB), product: c.product, issue: c.issue,
+			db: db, store: incident.NewStore(db.DB), product: c.product, issue: c.issue,
 			admin: subject("admin"), triager: subject("triager"), insider: subject("insider"),
 			outsider: subject("outsider"), reader: subject("reader"),
 		})
@@ -139,9 +139,9 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 }
 
 // attacked keeps a record that the product was exploited through the issue.
-func (f *fixture) attacked(t *testing.T) *triage.ExploitedHere {
+func (f *fixture) attacked(t *testing.T) *triage.Incident {
 	t.Helper()
-	record, _, err := triage.NewStore(f.db.DB).RecordExploitedHere(t.Context(), f.triager,
+	record, _, err := triage.NewStore(f.db.DB).RecordIncident(t.Context(), f.triager,
 		f.product, f.issue, knownAt, "A customer sent packet captures.")
 	if err != nil {
 		t.Fatal(err)
@@ -150,9 +150,9 @@ func (f *fixture) attacked(t *testing.T) *triage.ExploitedHere {
 }
 
 // window declares one, as the administrator.
-func (f *fixture) window(t *testing.T, name string, hours int) *obligation.Window {
+func (f *fixture) window(t *testing.T, name string, hours int) *incident.Window {
 	t.Helper()
-	declared, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{Name: name, Hours: hours})
+	declared, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{Name: name, Hours: hours})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func (f *fixture) window(t *testing.T, name string, hours int) *obligation.Windo
 
 func TestAWindowIsDeclaredByAnAdministratorAndNobodyElse(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		_, err := f.store.DeclareWindow(t.Context(), f.triager, obligation.WindowSaid{Name: "Early warning", Hours: 24})
+		_, err := f.store.DeclareWindow(t.Context(), f.triager, incident.WindowSaid{Name: "Early warning", Hours: 24})
 		if !errors.Is(err, access.ErrDenied) {
 			t.Fatalf("a triager declaring a window answered %v", err)
 		}
@@ -173,8 +173,8 @@ func TestAWindowOfNoLengthIsRefusedRatherThanStored(t *testing.T) {
 	// Zero reads as unset everywhere, so a window of none is refused rather
 	// than kept as one that closes the moment it opens.
 	each(t, func(t *testing.T, f *fixture) {
-		for _, hours := range []int{0, -1, obligation.LongestHours + 1} {
-			if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{Name: "Notice", Hours: hours}); err == nil {
+		for _, hours := range []int{0, -1, incident.LongestHours + 1} {
+			if _, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{Name: "Notice", Hours: hours}); err == nil {
 				t.Errorf("a window of %d hours was declared", hours)
 			}
 		}
@@ -186,7 +186,7 @@ func TestAWarningOfNoLeadIsRefusedRatherThanStored(t *testing.T) {
 	// nothing the end does not.
 	each(t, func(t *testing.T, f *fixture) {
 		for _, lead := range []int{0, -1} {
-			if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
+			if _, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{
 				Name: "Notice", Hours: 24, LeadHours: ptr(lead),
 			}); err == nil {
 				t.Errorf("a window warning %d hours before its end was declared", lead)
@@ -198,7 +198,7 @@ func TestAWarningOfNoLeadIsRefusedRatherThanStored(t *testing.T) {
 func TestAWarningAtOrBeforeTheWindowOpensIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		for _, lead := range []int{24, 25} {
-			if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
+			if _, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{
 				Name: "Notice", Hours: 24, LeadHours: ptr(lead),
 			}); err == nil {
 				t.Errorf("a window of 24 hours warning %d hours before its end was declared", lead)
@@ -213,14 +213,14 @@ func TestAWindowNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		first := f.window(t, "Early warning", 24)
-		if _, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{Name: "  EARLY WARNING ", Hours: 48}); !errors.Is(err,
-			obligation.ErrWindowNamed) {
+		if _, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{Name: "  EARLY WARNING ", Hours: 48}); !errors.Is(err,
+			incident.ErrWindowNamed) {
 			t.Fatalf("a second window under the same name answered %v", err)
 		}
 		if err := f.store.RetireWindow(ctx, f.admin, first.ID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{Name: "early warning", Hours: 48}); err != nil {
+		if _, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{Name: "early warning", Hours: 48}); err != nil {
 			t.Fatalf("a retired window kept its name: %v", err)
 		}
 	})
@@ -263,7 +263,7 @@ func TestANoticeNamingAWindowAnswersThatWindowAlone(t *testing.T) {
 		record := f.attacked(t)
 
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
-			knownAt.Add(19*time.Hour), "An attack through the management socket.", obligation.Details{}); err != nil {
+			knownAt.Add(19*time.Hour), "An attack through the management socket.", incident.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		shelf, err := f.store.Shelf(ctx, f.triager)
@@ -289,13 +289,13 @@ func TestAWindowIsReadNarrowedToTheProductsTheReaderMayKnow(t *testing.T) {
 	// out, and the products a window names are narrowed to the ones they may.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		hidden, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		hidden, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Sonic only", Hours: 24, Products: []string{world.ProductName},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		both, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		both, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Both", Hours: 48, Products: []string{world.ProductName, "other"},
 		})
 		if err != nil {
@@ -322,7 +322,7 @@ func TestAWindowIsReadNarrowedToTheProductsTheReaderMayKnow(t *testing.T) {
 		}
 
 		// The deployment's own pass reads every window whole.
-		all, err := f.store.Windows(ctx, access.Everything("the obligation sweep"))
+		all, err := f.store.Windows(ctx, access.Everything("the response window sweep"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -338,13 +338,13 @@ func TestANoticeNamesOnlyAWindowThatAppliesToItsProduct(t *testing.T) {
 	// nobody declared.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		elsewhere, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		elsewhere, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Other's window", Hours: 24, Products: []string{"other"},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		here, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		here, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Sonic's window", Hours: 24, Products: []string{world.ProductName},
 		})
 		if err != nil {
@@ -352,17 +352,17 @@ func TestANoticeNamesOnlyAWindowThatAppliesToItsProduct(t *testing.T) {
 		}
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &elsewhere.ID, "ENISA",
-			knownAt.Add(time.Hour), "Told.", obligation.Details{}); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			knownAt.Add(time.Hour), "Told.", incident.Details{}); !errors.Is(err, incident.ErrNoSuchWindow) {
 			t.Errorf("a notice naming a window limited to another product answered %v", err)
 		}
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &here.ID, "ENISA",
-			knownAt.Add(time.Hour), "Told.", obligation.Details{}); err != nil {
+			knownAt.Add(time.Hour), "Told.", incident.Details{}); err != nil {
 			t.Fatalf("a notice naming a window limited to its own product answered %v", err)
 		}
 
 		// Renamed and limited since to a product the triager may not know,
 		// the window is read as the list of windows reads it: not at all.
-		if _, err := f.store.ChangeWindow(ctx, f.admin, here.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, here.ID, incident.WindowSaid{
 			Name: "Other's second window", Hours: 24, Products: []string{"other"},
 		}); err != nil {
 			t.Fatal(err)
@@ -397,11 +397,11 @@ func TestANoticeIsNotBeforeTheAttackBecameKnown(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",
-			knownAt.Add(-time.Hour), "An attack.", obligation.Details{}); err == nil {
+			knownAt.Add(-time.Hour), "An attack.", incident.Details{}); err == nil {
 			t.Error("a notice before the attack became known was recorded")
 		}
 		if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",
-			time.Now().Add(time.Hour), "An attack.", obligation.Details{}); err == nil {
+			time.Now().Add(time.Hour), "An attack.", incident.Details{}); err == nil {
 			t.Error("a notice still to come was recorded")
 		}
 	})
@@ -413,19 +413,19 @@ func TestANoticeIsRecordedOnlyByWhoeverMayTriageTheProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		_, err := f.store.RecordTold(t.Context(), f.outsider, record.ID, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
-		if !errors.Is(err, obligation.ErrNoSuchRecord) {
+			knownAt.Add(time.Hour), "An attack.", incident.Details{})
+		if !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Fatalf("somebody with nothing on the product recording a notice answered %v", err)
 		}
 		// Somebody told of the issue who triages nothing on the product.
 		_, err = f.store.RecordTold(t.Context(), f.reader, record.ID, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
-		if !errors.Is(err, obligation.ErrNoSuchRecord) {
+			knownAt.Add(time.Hour), "An attack.", incident.Details{})
+		if !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Fatalf("a reader of the product recording a notice answered %v", err)
 		}
 		_, err = f.store.RecordTold(t.Context(), f.outsider, record.ID+1000, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
-		if !errors.Is(err, obligation.ErrNoSuchRecord) {
+			knownAt.Add(time.Hour), "An attack.", incident.Details{})
+		if !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Fatalf("a record nobody kept answered %v", err)
 		}
 	})
@@ -450,7 +450,7 @@ func TestAClearedRecordLeavesTheShelf(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		record := f.attacked(t)
-		if err := triage.NewStore(f.db.DB).ClearExploitedHere(ctx, f.triager, record.ID,
+		if err := triage.NewStore(f.db.DB).ClearIncident(ctx, f.triager, record.ID,
 			"The captures were of somebody else's deployment."); err != nil {
 			t.Fatal(err)
 		}
@@ -472,7 +472,7 @@ func TestChangingAWindowMovesEveryIncidentsEnd(t *testing.T) {
 		early := f.window(t, "Early warning", 24)
 		f.attacked(t)
 
-		changed, err := f.store.ChangeWindow(ctx, f.admin, early.ID, obligation.WindowSaid{Name: "Early notice", Hours: 36})
+		changed, err := f.store.ChangeWindow(ctx, f.admin, early.ID, incident.WindowSaid{Name: "Early notice", Hours: 36})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -496,19 +496,19 @@ func TestAWindowIsChangedOnlyByAnAdministratorIntoANameNobodyHolds(t *testing.T)
 		early := f.window(t, "Early warning", 24)
 		f.window(t, "Notification", 72)
 
-		if _, err := f.store.ChangeWindow(ctx, f.triager, early.ID, obligation.WindowSaid{Name: "Early", Hours: 24}); !errors.Is(err,
+		if _, err := f.store.ChangeWindow(ctx, f.triager, early.ID, incident.WindowSaid{Name: "Early", Hours: 24}); !errors.Is(err,
 			access.ErrDenied) {
 			t.Errorf("a triager changing a window answered %v", err)
 		}
-		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, obligation.WindowSaid{Name: "NOTIFICATION", Hours: 24}); !errors.Is(err,
-			obligation.ErrWindowNamed) {
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, incident.WindowSaid{Name: "NOTIFICATION", Hours: 24}); !errors.Is(err,
+			incident.ErrWindowNamed) {
 			t.Errorf("renaming onto a window in force answered %v", err)
 		}
 		// Its own name, in other capitals, is not somebody else's.
-		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, obligation.WindowSaid{Name: "early warning", Hours: 30}); err != nil {
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, incident.WindowSaid{Name: "early warning", Hours: 30}); err != nil {
 			t.Errorf("changing a window's length under its own name answered %v", err)
 		}
-		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, obligation.WindowSaid{Name: "Early", Hours: 0}); err == nil {
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, incident.WindowSaid{Name: "Early", Hours: 0}); err == nil {
 			t.Error("a window was changed to run for no time at all")
 		}
 	})
@@ -522,23 +522,23 @@ func TestARetiredWindowIsNeitherChangedNorAnswered(t *testing.T) {
 		early := f.window(t, "Early warning", 24)
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
-			knownAt.Add(time.Hour), "An attack.", obligation.Details{}); err != nil {
+			knownAt.Add(time.Hour), "An attack.", incident.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.RetireWindow(ctx, f.admin, early.ID); err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, obligation.WindowSaid{Name: "Early", Hours: 24}); !errors.Is(err,
-			obligation.ErrNoSuchWindow) {
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, incident.WindowSaid{Name: "Early", Hours: 24}); !errors.Is(err,
+			incident.ErrNoSuchWindow) {
 			t.Errorf("changing a retired window answered %v", err)
 		}
 		if err := f.store.RetireWindow(ctx, f.admin, early.ID); !errors.Is(err,
-			obligation.ErrNoSuchWindow) {
+			incident.ErrNoSuchWindow) {
 			t.Errorf("retiring a window twice answered %v", err)
 		}
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
-			knownAt.Add(2*time.Hour), "More.", obligation.Details{}); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			knownAt.Add(2*time.Hour), "More.", incident.Details{}); !errors.Is(err, incident.ErrNoSuchWindow) {
 			t.Errorf("a notice naming a retired window answered %v", err)
 		}
 
@@ -567,7 +567,7 @@ func TestANoticeSaysWhoWhenAndWhat(t *testing.T) {
 			at                    time.Time
 		}{
 			{"nobody named", "  ", "An attack.", when},
-			{"a recipient longer than a name", strings.Repeat("x", obligation.RecipientLimit+1),
+			{"a recipient longer than a name", strings.Repeat("x", incident.RecipientLimit+1),
 				"An attack.", when},
 			{"nothing said", "ENISA", "  ", when},
 			{"no moment", "ENISA", "An attack.", time.Time{}},
@@ -578,7 +578,7 @@ func TestANoticeSaysWhoWhenAndWhat(t *testing.T) {
 			{"more said than the bound", "ENISA", strings.Repeat("x", markdown.MaxBytes+1), when},
 		} {
 			if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil,
-				tc.recipient, tc.at, tc.said, obligation.Details{}); err == nil {
+				tc.recipient, tc.at, tc.said, incident.Details{}); err == nil {
 				t.Errorf("a notice with %s was recorded", tc.name)
 			}
 		}
@@ -592,7 +592,7 @@ func TestANoticeIsRecordedAgainstAPerson(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		_, err := f.store.RecordTold(t.Context(), access.Everything("a background pass"),
-			record.ID, nil, "ENISA", knownAt.Add(time.Hour), "An attack.", obligation.Details{})
+			record.ID, nil, "ENISA", knownAt.Add(time.Hour), "An attack.", incident.Details{})
 		if err == nil || !strings.Contains(err.Error(), "against whoever recorded it") {
 			t.Errorf("a notice recorded by no person answered %v, want the refusal naming who records one", err)
 		}
@@ -601,17 +601,17 @@ func TestANoticeIsRecordedAgainstAPerson(t *testing.T) {
 
 // rivalAfterRead returns a store over a handle on which rival lands between
 // the act's read of one table and its write to another.
-func rivalAfterRead(t *testing.T, f *fixture, read, write string, rival func() error) (*obligation.Store, func() error) {
+func rivalAfterRead(t *testing.T, f *fixture, read, write string, rival func() error) (*incident.Store, func() error) {
 	t.Helper()
 	hooked, finished := dbtest.RivalAfterRead(t, f.db, read, write, 300*time.Millisecond, rival)
-	return obligation.NewStore(hooked), finished
+	return incident.NewStore(hooked), finished
 }
 
 // trailed counts the administrative trail's rows about one window.
 func trailed(t *testing.T, f *fixture, name string) int {
 	t.Helper()
 	n, err := f.db.DB.NewSelect().TableExpr(`"admin_change"`).
-		Where(`"about" = ?`, "Obligation window "+name).Count(t.Context())
+		Where(`"about" = ?`, "Response window "+name).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +634,7 @@ func TestTwoRetirementsAtOnceRecordOneAct(t *testing.T) {
 			t.Errorf("two retirements at once answered %v and %v, want one of them refused", first, second)
 		}
 		for _, err := range []error{first, second} {
-			if err != nil && !errors.Is(err, obligation.ErrNoSuchWindow) {
+			if err != nil && !errors.Is(err, incident.ErrNoSuchWindow) {
 				t.Errorf("the refused retirement answered %v", err)
 			}
 		}
@@ -655,13 +655,13 @@ func TestAWindowRetiredWhileBeingChangedIsNotChanged(t *testing.T) {
 			return f.store.RetireWindow(context.Background(), f.admin, early.ID)
 		})
 		_, changed := racing.ChangeWindow(t.Context(), f.admin, early.ID,
-			obligation.WindowSaid{Name: "Early warning", Hours: 48})
+			incident.WindowSaid{Name: "Early warning", Hours: 48})
 		if err := rival(); err != nil {
 			t.Fatalf("the rival retirement: %v", err)
 		}
 		want := 3 // declared, changed, retired
 		if changed != nil {
-			if !errors.Is(changed, obligation.ErrNoSuchWindow) {
+			if !errors.Is(changed, incident.ErrNoSuchWindow) {
 				t.Errorf("changing a window retired since it was read answered %v", changed)
 			}
 			want = 2
@@ -682,8 +682,8 @@ func TestANoticeAboutAnUndisclosedIssueIsRefusedToWhoMayNotReadIt(t *testing.T) 
 			t.Fatal(err)
 		}
 		_, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
-		if !errors.Is(err, obligation.ErrNoSuchRecord) {
+			knownAt.Add(time.Hour), "An attack.", incident.Details{})
+		if !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Fatalf("a public triager recording a notice of an undisclosed attack answered %v", err)
 		}
 	})
@@ -692,7 +692,7 @@ func TestANoticeAboutAnUndisclosedIssueIsRefusedToWhoMayNotReadIt(t *testing.T) 
 func TestAWindowNeedsANameThatFits(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		for _, name := range []string{"  ", strings.Repeat("x", database.NameWidth+1)} {
-			if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{Name: name, Hours: 24}); err == nil {
+			if _, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{Name: name, Hours: 24}); err == nil {
 				t.Errorf("a window named %.20q was declared", name)
 			}
 		}
@@ -757,7 +757,7 @@ func TestANoticeIsReadOnlyByWhoMayBeToldOfTheAttack(t *testing.T) {
 		ctx := t.Context()
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, nil, "ENISA",
-			knownAt.Add(time.Hour), "An attack.", obligation.Details{}); err != nil {
+			knownAt.Add(time.Hour), "An attack.", incident.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		told, err := f.store.ToldAbout(ctx, f.outsider, []int64{record.ID})
@@ -787,7 +787,7 @@ func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		limited, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		limited, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			// One product named twice, differently capitalized, is one
 			// product: stored twice it would be a duplicate key.
 			Name: "Early warning", Hours: 24,
@@ -831,7 +831,7 @@ func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
 			t.Error("a window limited to the attacked product is not counted for it")
 		}
 
-		if _, err := f.store.ChangeWindow(ctx, f.admin, limited.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, limited.ID, incident.WindowSaid{
 			Name: "Early warning", Hours: 24, Products: []string{"other"},
 		}); err != nil {
 			t.Fatal(err)
@@ -859,9 +859,9 @@ func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
 // product.
 func TestABlankProductInAWindowsListIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
+		if _, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{
 			Name: "Early warning", Hours: 24, Products: []string{" "},
-		}); !errors.Is(err, obligation.ErrNoSuchProduct) {
+		}); !errors.Is(err, incident.ErrNoSuchProduct) {
 			t.Errorf("a window over a blank product answered %v", err)
 		}
 	})

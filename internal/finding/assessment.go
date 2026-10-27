@@ -537,7 +537,7 @@ func reranking(tx bun.IDB, productID int64, rest string, args ...any) *bun.Updat
 		Set(`"urgency" = (CASE WHEN "urgency_incident" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_exploited" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_shipped" THEN ? ELSE 0 END) + `+rest,
-			append([]any{int64(exploitedHereBand), int64(exploitedBand), int64(shippedBand)}, args...)...).
+			append([]any{int64(incidentBand), int64(exploitedBand), int64(shippedBand)}, args...)...).
 		Where(`"closed_at" IS NULL`).
 		// This product's findings alone. The number being written was worked
 		// out from this product's rating, and writing it over another
@@ -716,12 +716,12 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		// which the line admits and the window does not read: a window is how
 		// long a fix may take, and being attacked here says nothing about how
 		// long upstream will be.
-		ExploitedHere bool       `bun:"incident"`
-		OpenedAt      time.Time  `bun:"opened_at"`
-		LearnedAt     *time.Time `bun:"learned_at"`
-		Severity      string     `bun:"severity"`
-		FixState      FixState   `bun:"fix_state"`
-		FixedAt       *time.Time `bun:"fixed_at"`
+		Incident  bool       `bun:"incident"`
+		OpenedAt  time.Time  `bun:"opened_at"`
+		LearnedAt *time.Time `bun:"learned_at"`
+		Severity  string     `bun:"severity"`
+		FixState  FixState   `bun:"fix_state"`
+		FixedAt   *time.Time `bun:"fixed_at"`
 	}
 	err = tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -766,7 +766,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 			Where(`"vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"closed_at" IS NULL`).
 			Where(`"urgency_exploited" = ?`, group.Exploited).
-			Where(`"urgency_incident" = ?`, group.ExploitedHere).
+			Where(`"urgency_incident" = ?`, group.Incident).
 			Where(`"opened_at" = ?`, group.OpenedAt).
 			Where(`"kind" = ?`, Vulnerable).
 			// An occurrence a supplier answers on some routes carries no
@@ -787,11 +787,11 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		// The one rule, asked here rather than restated. A recount that worked
 		// the deadline out its own way is a second policy nobody chose, and
 		// the two agreed only until one of them moved.
-		due := Deadline(group.FixState, group.Exploited || group.ExploitedHere,
+		due := Deadline(group.FixState, group.Exploited || group.Incident,
 			group.OpenedAt, recountedAt,
 			group.LearnedAt, group.FixedAt,
 			windows.For(group.Exploited, group.Severity))
-		if due == nil || !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity) {
+		if due == nil || !floor.Admits(group.Exploited || group.Incident, group.Severity) {
 			q = q.Set(`"due_at" = NULL`)
 		} else {
 			q = q.Set(`"due_at" = ?`, *due)
@@ -1035,9 +1035,9 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		// milder rating would take off the list has to read both. Reading one
 		// of them offered an approver a number that promised to hide findings
 		// the line would go on admitting.
-		ExploitedHere bool   `bun:"incident"`
-		Severity      string `bun:"severity"`
-		Open          int    `bun:"open"`
+		Incident bool   `bun:"incident"`
+		Severity string `bun:"severity"`
+		Open     int    `bun:"open"`
 	}
 	type pair struct{ filed, product int64 }
 	rows := map[pair][]group{}
@@ -1087,7 +1087,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 			// finding already below it is not taken off anything by this, and
 			// saying it was would inflate the number an approver is being
 			// asked to weigh.
-			exploited := row.Exploited || row.ExploitedHere
+			exploited := row.Exploited || row.Incident
 			if floor.Admits(exploited, row.Severity) &&
 				!floor.Admits(exploited, claim.Severity) {
 				would.OffTheList += row.Open

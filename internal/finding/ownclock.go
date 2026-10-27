@@ -28,19 +28,19 @@ import (
 // Everything else is the one rule a scanned finding goes through (Deadline),
 // so exploitation and a fix arriving move it the same way.
 func ownDeadline(own Windows, severity string, ratedAt *time.Time, state FixState,
-	exploited, exploitedHere bool, observedAt time.Time, learnedAt, fixedAt *time.Time,
+	exploited, incident bool, observedAt time.Time, learnedAt, fixedAt *time.Time,
 	floor Floor) *time.Time {
 
 	if severity == "" || ratedAt == nil {
 		return nil
 	}
-	if !floor.Admits(exploited || exploitedHere, severity) {
+	if !floor.Admits(exploited || incident, severity) {
 		return nil
 	}
 	// Being attacked here admits the finding to the line and moves no window,
 	// for the reason Enter gives: how long a fix may take is a question about
 	// the work rather than about the attack.
-	return Deadline(state, exploited || exploitedHere, *ratedAt, observedAt,
+	return Deadline(state, exploited || incident, *ratedAt, observedAt,
 		learnedAt, fixedAt, own.For(exploited, severity))
 }
 
@@ -72,14 +72,14 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	}
 
 	var rows []struct {
-		ID            int64      `bun:"id"`
-		Severity      string     `bun:"severity"`
-		RatedAt       *time.Time `bun:"rated_at"`
-		FixState      FixState   `bun:"fix_state"`
-		FixedAt       *time.Time `bun:"fixed_at"`
-		Exploited     bool       `bun:"exploited"`
-		ExploitedHere bool       `bun:"incident"`
-		LearnedAt     *time.Time `bun:"learned_at"`
+		ID        int64      `bun:"id"`
+		Severity  string     `bun:"severity"`
+		RatedAt   *time.Time `bun:"rated_at"`
+		FixState  FixState   `bun:"fix_state"`
+		FixedAt   *time.Time `bun:"fixed_at"`
+		Exploited bool       `bun:"exploited"`
+		Incident  bool       `bun:"incident"`
+		LearnedAt *time.Time `bun:"learned_at"`
 		// OnTheClock is whether the release carries deadlines at all: a tag
 		// and a release past end of life do not.
 		OnTheClock int `bun:"on_the_clock"`
@@ -121,7 +121,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 			row.RatedAt = &at
 		}
 		at := ownDeadline(own, row.Severity, row.RatedAt, row.FixState,
-			row.Exploited, row.ExploitedHere, now, row.LearnedAt, row.FixedAt, floor)
+			row.Exploited, row.Incident, now, row.LearnedAt, row.FixedAt, floor)
 		if at == nil || row.OnTheClock == 0 {
 			none = append(none, row.ID)
 			continue

@@ -307,15 +307,15 @@ func decisionBody(c triage.Decision, proposedBy, proposedByName string) Decision
 
 func outliersBody(o triage.Outliers) *OutliersBody {
 	body := &OutliersBody{
-		ExploitedHere: o.ExploitedHere,
-		Exploited:     o.Exploited, Severe: o.Severe, Fixable: o.Fixable, Unmatched: o.Unmatched,
+		Incidents: o.Incident,
+		Exploited: o.Exploited, Severe: o.Severe, Fixable: o.Fixable, Unmatched: o.Unmatched,
 		Rows: make([]OutlierBody, 0, len(o.Rows)),
 	}
 	for _, row := range o.Rows {
 		body.Rows = append(body.Rows, OutlierBody{
 			DecisionOccurrenceID: row.DecisionOccurrenceID, DecisionOccurrenceIDs: row.DecisionOccurrenceIDs,
 			Vulnerability: row.Vulnerability, Severity: row.Severity,
-			ExploitedHere: row.ExploitedHere, Exploited: row.Exploited, FixedIn: row.FixedIn,
+			Incident: row.Incident, Exploited: row.Exploited, FixedIn: row.FixedIn,
 			Description: row.Description, Why: row.Why,
 		})
 	}

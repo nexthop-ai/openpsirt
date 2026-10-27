@@ -124,16 +124,16 @@ type Group struct {
 	NoDeadline NoDeadline
 	// Urgency is how far up the list this belongs, and the two flags say
 	// whether it is there because somebody is using it. Exploited is a feed's
-	// word about the world; ExploitedHere is somebody here recording that this
+	// word about the world; Incident is somebody here recording that this
 	// product was attacked through it, which is the signal that outranks
 	// everything.
 	//
 	// Both are carried rather than left to be inferred from the number: a
 	// position nobody can explain is one people stop trusting and then work
 	// around, and the number cannot tell the two apart in any case.
-	Urgency       int64
-	Exploited     bool
-	ExploitedHere bool
+	Urgency   int64
+	Exploited bool
+	Incident  bool
 	// LikelihoodPPM is the published estimate that this will be exploited, in
 	// parts per million. Carried because it ranks *above* severity: without it
 	// on the row, a medium sitting above a high looks like the list is
@@ -515,7 +515,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
 		Occurrences: row.Occurrences, Answered: row.Answered,
 		Urgency: row.Urgency, Exploited: row.Exploited == 1,
-		ExploitedHere: row.ExploitedHere == 1,
+		Incident:      row.Incident == 1,
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
 		Scored:       row.Scored == 1,
 		ScoreVersion: row.ScoreVersion,
@@ -562,15 +562,15 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		switch {
 		case row.Recorded > 0 && group.Severity == "":
 			group.NoDeadline = NotRated
-		case !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity):
+		case !floor.Admits(group.Exploited || group.Incident, group.Severity):
 			group.NoDeadline = BelowTheLine
 		// Asked of both ends rather than of the word they agree on. A group
 		// whose occurrences disagree reports "mixed", which is not a state
 		// upstream is ever in — and reading it as one tells a reader that a
 		// supported release is past its end of life, on the ordinary shape
 		// where a scanner says one thing in one build and another in the next.
-		case !Clocked(FixState(row.FixStateLeast), group.Exploited || group.ExploitedHere) &&
-			!Clocked(FixState(row.FixStateMost), group.Exploited || group.ExploitedHere):
+		case !Clocked(FixState(row.FixStateLeast), group.Exploited || group.Incident) &&
+			!Clocked(FixState(row.FixStateMost), group.Exploited || group.Incident):
 			group.NoDeadline = NothingToTake
 		default:
 			group.NoDeadline = OutOfSupport
@@ -642,8 +642,8 @@ type groupHead struct {
 	// cannot tell them apart — both lift it into a band above everything
 	// else — and a list that showed one where the other holds would be the
 	// confusion the two columns exist to prevent.
-	Exploited     int `bun:"exploited"`
-	ExploitedHere int `bun:"incident"`
+	Exploited int `bun:"exploited"`
+	Incident  int `bun:"incident"`
 	// Total is how many groups the filter admits, the same on every row.
 	Total int `bun:"total"`
 }
@@ -760,7 +760,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// decision appears is the worst of what it covers.
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "incident"`)
+		ColumnExpr(overParts.incident() + ` AS "incident"`)
 	if key != "" {
 		grouped = grouped.ColumnExpr(key + ` AS "sort_key"`)
 	}

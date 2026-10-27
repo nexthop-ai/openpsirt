@@ -20,20 +20,20 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// ExploitedHereKept is what a caller supplies to record one.
+// IncidentKept is what a caller supplies to record one.
 //
 // Its own shape rather than the body above. What comes back carries who kept
 // the record, when, and whether it still stands, none of which a caller
 // states — offered as input those read as fields somebody may set, and one of
 // them is the answer to "did this happen".
-type ExploitedHereKept struct {
+type IncidentKept struct {
 	KnownAt string `json:"known_at" format:"date-time" doc:"When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in"`
-	Grounds string `json:"grounds" minLength:"1" maxLength:"65536" doc:"What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has"`
+	Grounds string `json:"grounds" minLength:"1" maxLength:"65536" doc:"What happened and how it is known. Nothing re-checks an incident, so this is the whole of what a later reader has"`
 }
 
-func registerExploitedHere(api huma.API, in core.Deps) {
+func registerIncident(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "record-exploited-here", Method: http.MethodPost,
+		OperationID: "record-incident", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/issues/{issue}/incidents",
 		Summary: "Record an incident",
 		Description: "A different fact from the exploitation a feed reports. A feed says a " +
@@ -58,8 +58,8 @@ func registerExploitedHere(api huma.API, in core.Deps) {
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
-		Body          ExploitedHereKept
-	}) (*struct{ Body core.ExploitedHereBody }, error) {
+		Body          IncidentKept
+	}) (*struct{ Body core.IncidentBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -77,19 +77,19 @@ func registerExploitedHere(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that issue could not be looked up", core.NoSuchIssue)
 		}
-		record, undone, err := store.RecordExploitedHere(ctx, subject, product.ID, issue,
+		record, undone, err := store.RecordIncident(ctx, subject, product.ID, issue,
 			knownAt, input.Body.Grounds)
 		if err != nil {
 			// Exactly what an unused name answers. An issue somebody may not
 			// be told about is not one they get to confirm the existence of
 			// by recording an attack through it.
-			if errors.Is(err, triage.ErrNoSuchExploitedHere) {
+			if errors.Is(err, triage.ErrNoSuchIncident) {
 				return nil, core.NoSuchIssue()
 			}
-			if errors.Is(err, triage.ErrAlreadyExploitedHere) {
+			if errors.Is(err, triage.ErrIncidentStands) {
 				return nil, huma.Error409Conflict(
-					"this product already records being exploited through this issue — " +
-						"clear that record before keeping another, so there is one answer " +
+					"an incident already stands in this product through this issue — " +
+						"clear that incident before recording another, so there is one answer " +
 						"rather than two")
 			}
 			return nil, core.RefusedDecision(in.Logger, err)
@@ -100,19 +100,19 @@ func registerExploitedHere(api huma.API, in core.Deps) {
 		// Recorded, and the proposers told. A failure naming who recorded it
 		// answers with the name left blank: answered as a fault, the caller
 		// sends it again and is told it is already recorded.
-		people, err := store.PeopleNamed(ctx, core.WhoTouched([]triage.ExploitedHere{*record}))
+		people, err := store.PeopleNamed(ctx, core.WhoTouched([]triage.Incident{*record}))
 		if err != nil {
 			in.Log().ErrorContext(ctx, "who recorded an exploitation could not be named",
 				"record", record.ID, "error", err)
 		}
-		body := core.ExploitedHereBodyOf(*record, input.Vulnerability, people)
+		body := core.IncidentBodyOf(*record, input.Vulnerability, people)
 		body.Product, body.ProductName = product.Name, catalog.Shown(product.DisplayName, product.Name)
 		body.Undone = undone.Rows
-		return &struct{ Body core.ExploitedHereBody }{Body: body}, nil
+		return &struct{ Body core.IncidentBody }{Body: body}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "clear-exploited-here", Method: http.MethodDelete,
+		OperationID: "clear-incident", Method: http.MethodDelete,
 		Path:    "/v1/incidents/{id}",
 		Summary: "Clear an incident",
 		Description: "A deliberate act with a reason on it. Nothing else clears one: no " +
@@ -136,9 +136,9 @@ func registerExploitedHere(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if err := store.ClearExploitedHere(ctx, subject, input.ID, input.Body.Because); err != nil {
-			if errors.Is(err, triage.ErrNoSuchExploitedHere) {
-				return nil, noSuchExploitedHere()
+		if err := store.ClearIncident(ctx, subject, input.ID, input.Body.Because); err != nil {
+			if errors.Is(err, triage.ErrNoSuchIncident) {
+				return nil, noSuchIncident()
 			}
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
@@ -147,11 +147,11 @@ func registerExploitedHere(api huma.API, in core.Deps) {
 
 }
 
-// noSuchExploitedHere answers a record that is not there and one belonging to
+// noSuchIncident answers a record that is not there and one belonging to
 // a product the caller cannot reach. One sentence for both, because telling
 // them apart turns the route into a way to walk identifiers.
-func noSuchExploitedHere() error {
-	return huma.Error404NotFound("no record of being exploited is kept there")
+func noSuchIncident() error {
+	return huma.Error404NotFound("no incident is kept there")
 }
 
 // tellTheProposers says that an agreement was taken back.

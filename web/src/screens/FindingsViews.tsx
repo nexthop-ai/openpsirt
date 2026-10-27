@@ -21,7 +21,7 @@ import { own } from "../ui/own";
 import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Exploited, ExploitedHere, Severity } from "../ui/Severity";
+import { Exploited, Incident, Severity } from "../ui/Severity";
 
 import { PAGE, type Row, type SortWord } from "./list";
 import { useRowOpener } from "../ui/opens";
@@ -231,11 +231,10 @@ export function ByComponent({
                     <Link className="linkish id" title={`Open ${name}`} to={to}>
                       {name}
                     </Link>
-                    {(row.exploited || row.exploited_here) && (
+                    {(row.exploited || row.incident) && (
                       <>
                         {" "}
-                        <ExploitedHere when={row.exploited_here} />{" "}
-                        <Exploited when={row.exploited} />
+                        <Incident when={row.incident} /> <Exploited when={row.exploited} />
                       </>
                     )}
                     <br />
@@ -461,8 +460,8 @@ export function ByBump({
             {rows.map((row) => (
               <tr key={`${row.upstream} ${row.from} ${row.to}`} className="row">
                 <td>
-                  <span className="id">{row.upstream}</span>{" "}
-                  <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
+                  <span className="id">{row.upstream}</span> <Incident when={row.incident} />{" "}
+                  <Exploited when={row.exploited} />
                   <br />
                   <span className="id" style={{ color: "var(--faint)" }}>
                     {row.from}

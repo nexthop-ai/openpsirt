@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package triageapi holds the operations over decisions and their occurrences: the
-// review queue, proposing, approving, re-affirmation, comments, exploitation
-// here and obligation windows.
+// review queue, proposing, approving, re-affirmation, comments, incidents and
+// response windows.
 package triageapi
 
 import (
@@ -13,15 +13,15 @@ import (
 )
 
 // Register adds the operations over decisions and their occurrences: the review queue,
-// proposing, approving, re-affirming, comments, and what is exploited here.
+// proposing, approving, re-affirming, comments, incidents and response windows.
 func Register(api huma.API, in core.Deps) {
 	registerScrutiny(api, in)
 	registerReadiness(api, in)
 	registerTriage(api, in)
 	registerFindingDecision(api, in)
 	registerAssessment(api, in)
-	registerExploitedHere(api, in)
-	registerObligations(api, in)
+	registerIncident(api, in)
+	registerIncidents(api, in)
 	registerFixes(api, in)
 	registerTriageReading(api, in)
 	registerComments(api, in)

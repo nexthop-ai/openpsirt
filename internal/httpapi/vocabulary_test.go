@@ -23,9 +23,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/series"
@@ -208,7 +208,7 @@ func statedVocabularies() map[string][]string {
 		"reasons for no upstream answer": words(currency.Whys()),
 		"trail kinds":                    words(trail.Kinds()),
 		"trail actors":                   words(trail.Actors()),
-		"malice":                         obligation.Malice,
+		"malice":                         incident.Malice,
 		"advisory statuses":              advisory.Statuses(),
 		"release statuses":               advisory.ReleaseStatuses(),
 		"setting kinds":                  words(setting.Kinds()),

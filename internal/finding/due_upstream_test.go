@@ -123,7 +123,7 @@ func TestRewritingTheWindowsKeepsAnIssueAttackedHereOnTheClock(t *testing.T) {
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{low}); err != nil {
 			t.Fatal(err)
 		}
-		if err := finding.ExploitedHereChanged(t.Context(), f.db.DB,
+		if err := finding.IncidentChanged(t.Context(), f.db.DB,
 			f.productID, f.issue(t, "CVE-2026-ATTACKED"), true, time.Now()); err != nil {
 			t.Fatal(err)
 		}
@@ -478,14 +478,14 @@ func TestAnUpstreamRefusalOfAnExploitedIssueKeepsItsDeadline(t *testing.T) {
 				t.Fatal(err)
 			}
 			issue := f.issue(t, "CVE-2026-REFUSED-HERE")
-			if err := finding.ExploitedHereChanged(t.Context(), f.db.DB,
+			if err := finding.IncidentChanged(t.Context(), f.db.DB,
 				f.productID, issue, true, time.Now()); err != nil {
 				t.Fatal(err)
 			}
 			if f.deadlineOrZero(t, "CVE-2026-REFUSED-HERE").IsZero() {
 				t.Error("this product was attacked through an issue upstream refuses to fix, and it carries no deadline")
 			}
-			if err := finding.ExploitedHereChanged(t.Context(), f.db.DB,
+			if err := finding.IncidentChanged(t.Context(), f.db.DB,
 				f.productID, issue, false, time.Now()); err != nil {
 				t.Fatal(err)
 			}

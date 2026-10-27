@@ -225,7 +225,7 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		//
 		// Either exploitation signal, which is what the threshold
 		// asks: a feed's word about the world and this product's own
-		// record of being attacked both sit in bands above everything
+		// incident both sit in bands above everything
 		// the rest can add together (the exploiting threshold). Which of the
 		// two it is, the line does not care and the number does not
 		// say.

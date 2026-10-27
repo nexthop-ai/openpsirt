@@ -66,7 +66,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
 | `internal/weblink/` | The addresses into the interface that the server hands out, held to the interface's route table. See `DESIGN-notifications.md` § Links |
-| `internal/obligation/` | The windows a deployment counts after an attack, the notices given, and the shelf over both. See `DESIGN-obligations.md` |
+| `internal/incident/` | The response windows a deployment counts after an incident, the notices given, and the shelf over both. See `DESIGN-obligations.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
 | `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
 | `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |

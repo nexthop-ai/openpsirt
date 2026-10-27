@@ -863,9 +863,9 @@ func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
 			t.Fatal(err)
 		}
 		body := httpapitest.RowsUnder(lines)
-		builds, here := httpapitest.IndexOf(body[0], "builds"), httpapitest.IndexOf(body[0], "exploited here")
+		builds, here := httpapitest.IndexOf(body[0], "builds"), httpapitest.IndexOf(body[0], "incident")
 		if builds < 0 || here < 0 {
-			t.Fatalf("the file has no builds or exploited here column: %v", body[0])
+			t.Fatalf("the file has no builds or incident column: %v", body[0])
 		}
 		if len(body) < 2 {
 			t.Fatal("the file holds no bundle")

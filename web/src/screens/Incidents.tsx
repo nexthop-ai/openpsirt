@@ -16,20 +16,19 @@ import { Loading } from "../ui/Loading";
 import { Unread } from "../ui/Reading";
 import { scanState } from "../ui/fixes";
 import { at, since, typedMoment, typedNow } from "../ui/when";
-import { issueAt, exploitedAt } from "../app/routes";
+import { issueAt, incidentsAt } from "../app/routes";
 import { notACredential } from "../ui/noautofill";
-import { Keep } from "./FindingExploited";
+import { Keep } from "./FindingIncident";
 
-// Every standing record that a product was exploited here, with the windows
-// this deployment counts for each and the notices given. Called "Exploited
-// here" on screen: the words of the record, the finding's badge and the act,
-// so the three read as one thing.
+// Every standing incident, with the response windows this deployment counts
+// for each and the notices given. Called Incidents on screen: the words of the
+// record, the finding's badge and the act, so the three read as one thing.
 //
 // Its own screen rather than a filter over the overdue list: a window here has
 // somebody outside waiting on it, and a remediation deadline has nobody. What
 // the screen shows is times and parties. Whether a notice met anything is not
 // the tool's answer to give, so no row says so.
-type Incident = Body<"ObligationBody">;
+type Incident = Body<"StandingIncidentBody">;
 type Window = Body<"WindowBody">;
 type Notice = Body<"NoticeBody">;
 type Fix = Body<"FixBody">;
@@ -43,7 +42,7 @@ const MALICE: Record<NonNullable<Notice["suspected_malicious"]>, string> = {
   unknown: "Malice unknown",
 };
 
-export function Exploited() {
+export function Incidents() {
   const who = useWho();
   // A product in the address narrows the shelf to that product's records, so a
   // count taken over one product opens the records it counted. The shelf is
@@ -53,11 +52,11 @@ export function Exploited() {
   const product = params.get("product") ?? "";
   const [recording, setRecording] = useState(false);
   const shelf = useQuery({
-    queryKey: ["obligations"],
+    queryKey: ["incidents"],
     queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
   });
   const windows = useQuery({
-    queryKey: ["obligation-windows"],
+    queryKey: ["response-windows"],
     queryFn: async () => unwrap(await api.GET("/v1/response-windows", {})),
   });
 
@@ -68,7 +67,7 @@ export function Exploited() {
 
   if (shelf.isPending || windows.isPending) return <Loading />;
   if (shelf.isError) {
-    return <Failed error={shelf.error} what="The exploited-here records could not be read." />;
+    return <Failed error={shelf.error} what="The incidents could not be read." />;
   }
   const items = (shelf.data?.items ?? []).filter(
     (incident) => !product || incident.product === product,
@@ -83,19 +82,19 @@ export function Exploited() {
     <>
       <div className="screen-head">
         <h2>
-          Exploited here <span className="n">{items.length.toLocaleString()}</span>
+          Incidents <span className="n">{items.length.toLocaleString()}</span>
         </h2>
         <p>
           {product ? (
             <>
-              Exploited here on {productName} · <Link to={exploitedAt()}>every product</Link>
+              Incidents on {productName} · <Link to={incidentsAt()}>every product</Link>
             </>
           ) : (
             "Attacks on our own products, not a feed flag, and the windows counted for each."
           )}
         </p>
         {triaged.length > 0 && (
-          <AddButton label="Record exploited here" onClick={() => setRecording((was) => !was)} />
+          <AddButton label="Record an incident" onClick={() => setRecording((was) => !was)} />
         )}
       </div>
 
@@ -109,14 +108,10 @@ export function Exploited() {
 
       {items.length === 0 ? (
         <Empty
-          title={
-            product
-              ? `${productName} is not recorded as exploited.`
-              : "No products recorded as exploited."
-          }
+          title={product ? `${productName} has no incidents.` : "No incidents are recorded."}
           detail={
             triaged.length > 0
-              ? "Use Record exploited here, above or on the finding. A record stays until cleared."
+              ? "Use Record an incident, above or on the finding. An incident stays until cleared."
               : "Somebody who triages the product records one on its finding."
           }
         />
@@ -252,7 +247,7 @@ function Fixes({ incident }: { incident: Incident }) {
   const standing = fixes.filter((fix) => !fix.withdrawn_at);
   const withdrawn = fixes.filter((fix) => fix.withdrawn_at);
   const done = () => {
-    void queries.invalidateQueries({ queryKey: ["obligations"] });
+    void queries.invalidateQueries({ queryKey: ["incidents"] });
     void queries.invalidateQueries({ queryKey: ["finding"] });
   };
   const withdraw = useMutation({
@@ -459,7 +454,7 @@ function Tell({
       ),
     onSuccess: () => {
       onClose();
-      void queries.invalidateQueries({ queryKey: ["obligations"] });
+      void queries.invalidateQueries({ queryKey: ["incidents"] });
       void queries.invalidateQueries({ queryKey: ["finding"] });
     },
   });
@@ -571,8 +566,8 @@ function Windows({ windows }: { windows: Window[] }) {
   const [editing, setEditing] = useState<number | null>(null);
   const done = () => {
     setEditing(null);
-    void queries.invalidateQueries({ queryKey: ["obligation-windows"] });
-    void queries.invalidateQueries({ queryKey: ["obligations"] });
+    void queries.invalidateQueries({ queryKey: ["response-windows"] });
+    void queries.invalidateQueries({ queryKey: ["incidents"] });
   };
   const retire = useMutation({
     mutationFn: async (id: number) =>
@@ -824,13 +819,13 @@ function Record({
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h3>Record exploited here</h3>
+      <h3>Record an incident</h3>
       <Keep
         product={product}
         vulnerability={issue}
         onClose={onClose}
         done={() => {
-          void queries.invalidateQueries({ queryKey: ["obligations"] });
+          void queries.invalidateQueries({ queryKey: ["incidents"] });
           void queries.invalidateQueries({ queryKey: ["finding"] });
         }}
         pick={

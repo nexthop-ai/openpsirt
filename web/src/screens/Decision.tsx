@@ -581,8 +581,8 @@ function HoldBack({
       <header className="dhead">
         <h3>Rows that do not match the rest</h3>
         <span className="hint">
-          {(decision.outliers?.exploited_here ?? 0) > 0 &&
-            `${decision.outliers?.exploited_here} exploited here · `}
+          {(decision.outliers?.incidents ?? 0) > 0 &&
+            `${decision.outliers?.incidents} with an incident · `}
           {decision.outliers?.exploited ?? 0} known exploited · {decision.outliers?.severe ?? 0}{" "}
           severe · {decision.outliers?.fixable ?? 0} fixable · {decision.outliers?.unmatched ?? 0}{" "}
           off the term

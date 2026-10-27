@@ -42,10 +42,10 @@ type BundleBody struct {
 	Builds      int      `json:"builds,omitempty" doc:"The number of builds of the selection holding any of it. Absent where the selection is one build"`
 	Severity    string   `json:"severity,omitempty" doc:"The worst of what it closes"`
 	Exploited   bool     `json:"exploited,omitempty" doc:"Some of what it closes is being exploited"`
-	// ExploitedHere is the other exploitation signal, and the one that
+	// Incident is the other exploitation signal, and the one that
 	// outranks it: a bundle carrying it closes something this product was
 	// attacked through.
-	ExploitedHere bool `json:"exploited_here,omitempty" doc:"Some of what it closes is something this product is recorded as having been exploited through"`
+	Incident bool `json:"incident,omitempty" doc:"Whether an incident stands in this product through some of what it closes"`
 	// In names the builds that hold it, which is what a declaration is
 	// offered against: a bump is declared for releases, and the ones worth
 	// offering are the ones that have it.
@@ -173,7 +173,7 @@ func registerBundles(api huma.API, in core.Deps) {
 			About: []core.Stated{{Label: "triaged at or above", Value: line}},
 			Header: []string{
 				"upstream", "from", "to", "components", "issues", "occurrences",
-				"builds", "severity", "exploited", "exploited here", "in",
+				"builds", "severity", "exploited", "incident", "in",
 			},
 			// Paged through the store the screen reads, so the file is the
 			// list rather than a second query that will come to disagree
@@ -201,7 +201,7 @@ func registerBundles(api huma.API, in core.Deps) {
 						strconv.Itoa(body.Issues), strconv.Itoa(body.Occurrences),
 						count, body.Severity,
 						strconv.FormatBool(body.Exploited),
-						strconv.FormatBool(body.ExploitedHere),
+						strconv.FormatBool(body.Incident),
 						strings.Join(builds, " "),
 					})
 				}
@@ -223,8 +223,8 @@ func bundleBodies(bundles []finding.Bundle, oneBuild bool) []BundleBody {
 			Components: bundle.Components,
 			Issues:     bundle.Issues, Occurrences: bundle.Occurrences,
 			Severity: bundle.Severity, Exploited: bundle.Exploited,
-			ExploitedHere: bundle.ExploitedHere,
-			In:            make([]BuildName, 0, len(bundle.In)),
+			Incident: bundle.Incident,
+			In:       make([]BuildName, 0, len(bundle.In)),
 		}
 		for _, at := range bundle.In {
 			body.In = append(body.In, BuildName{Stream: at.Stream, Variant: at.Variant})

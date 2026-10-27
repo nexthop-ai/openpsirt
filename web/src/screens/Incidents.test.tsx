@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Exploited } from "./Exploited";
+import { Incidents } from "./Incidents";
 import { accept, screen, serve, settle, mounted, type Sent } from "../test/mount";
 
 const mount = mounted();
@@ -56,10 +56,10 @@ function shelf() {
   });
 }
 
-describe("the exploited-here shelf", () => {
+describe("the Incidents screen", () => {
   it("narrows to the product the address names, and offers every product back", async () => {
     shelf();
-    mount.render(screen(<Exploited />, "/exploited-here?product=sonic"));
+    mount.render(screen(<Incidents />, "/incidents?product=sonic"));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("CVE-2026-0001");
@@ -70,15 +70,13 @@ describe("the exploited-here shelf", () => {
     expect(text).toContain("sonic-2.0");
     expect(text).not.toContain("edge regulator");
     expect(text).not.toContain("edge-2.0");
-    expect(text).toContain("Exploited here on SONIC");
-    expect(mount.host().querySelector('a[href="/exploited-here"]')?.textContent).toBe(
-      "every product",
-    );
+    expect(text).toContain("Incidents on SONIC");
+    expect(mount.host().querySelector('a[href="/incidents"]')?.textContent).toBe("every product");
   });
 
   it("lists every product's records where the address names none", async () => {
     shelf();
-    mount.render(screen(<Exploited />, "/exploited-here"));
+    mount.render(screen(<Incidents />, "/incidents"));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("CVE-2026-0001");
@@ -121,14 +119,14 @@ function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
   field.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-describe("recording exploited here from its own screen", () => {
+describe("recording an incident from its own screen", () => {
   it("sends the request a finding sends, for the product and issue picked", async () => {
     const asked = serving([can("sonic", true), can("other", false)]);
     const sent = accept(() => ({ status: 201, data: {} }));
-    mount.render(screen(<Exploited />));
+    mount.render(screen(<Incidents />));
     await settle();
 
-    act(() => button("Record exploited here")?.click());
+    act(() => button("Record an incident")?.click());
     const select = mount.host().querySelector<HTMLSelectElement>(".card select");
     // Only a product the reader triages is offered: the server refuses the rest.
     expect(Array.from(select?.options ?? []).map((each) => each.value)).toEqual(["", "sonic"]);
@@ -171,9 +169,9 @@ describe("recording exploited here from its own screen", () => {
 
   it("offers the control to nobody who triages no product", async () => {
     serving([can("sonic", false)]);
-    mount.render(screen(<Exploited />));
+    mount.render(screen(<Incidents />));
     await settle();
-    expect(button("Record exploited here")).toBeUndefined();
-    expect(mount.host().textContent).toContain("No products recorded as exploited.");
+    expect(button("Record an incident")).toBeUndefined();
+    expect(mount.host().textContent).toContain("No incidents are recorded.");
   });
 });

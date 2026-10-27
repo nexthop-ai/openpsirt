@@ -13,9 +13,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/series"
@@ -520,7 +520,7 @@ func (TrailActor) Schema(huma.Registry) *huma.Schema { return words(trail.Actors
 type Malice string
 
 // Schema offers every word a notice may say about malice.
-func (Malice) Schema(huma.Registry) *huma.Schema { return words(obligation.Malice) }
+func (Malice) Schema(huma.Registry) *huma.Schema { return words(incident.Malice) }
 
 // AdvisoryStatus is where an advisory document is in its life.
 type AdvisoryStatus string

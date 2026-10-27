@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// fixed is the obligation list as one person reads it, with the window
+// fixed is the incident list as one person reads it, with the window
 // counting from the fix and the releases named on the record.
 type fixed struct {
 	Items []struct {

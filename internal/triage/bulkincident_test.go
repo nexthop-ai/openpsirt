@@ -52,9 +52,9 @@ func (f *fixture) selected() triage.Occurrence {
 
 // recorded keeps a record that the fixture's product was exploited through its
 // issue, over whatever the test has already put there.
-func (f *fixture) recorded(t *testing.T) (*triage.ExploitedHere, triage.Undone) {
+func (f *fixture) recorded(t *testing.T) (*triage.Incident, triage.Undone) {
 	t.Helper()
-	record, undone, err := f.store.RecordExploitedHere(t.Context(), f.triager,
+	record, undone, err := f.store.RecordIncident(t.Context(), f.triager,
 		f.product, f.issue, knownAt,
 		"A customer sent packet captures of the management socket.")
 	if err != nil {
@@ -74,7 +74,7 @@ func (f *fixture) wontFix() triage.Proposal {
 }
 
 func TestAnActOverManyIssuesCannotSetAsideOneThisProductWasAttackedThrough(t *testing.T) {
-	// A standing record is an obligation somebody may be answering to, and one
+	// A standing incident is a deadline somebody may be answering to, and one
 	// sentence over a selection is not how that leaves anybody's list. Each
 	// outcome that sets a finding aside or puts it off is refused, and each is
 	// an outcome a person may record against that one finding by itself.
@@ -92,7 +92,7 @@ func TestAnActOverManyIssuesCannotSetAsideOneThisProductWasAttackedThrough(t *te
 				}
 				_, recorded, _, err := f.store.BulkDecision(t.Context(), f.triager, at, decision,
 					triage.DefaultBounds())
-				if !errors.Is(err, triage.ErrBulkOverExploitedHere) {
+				if !errors.Is(err, triage.ErrBulkOverIncident) {
 					t.Fatalf("a %s over a selection reaching an attacked issue answered %v",
 						outcome, err)
 				}
@@ -140,13 +140,13 @@ func TestAnActOverManyIssuesWaitingWhenARecordArrivesCannotBeAgreedTo(t *testing
 		f.recorded(t)
 
 		if err := agreeTo(ctx, f.store, f.reviewer, decisionID, ""); !errors.Is(err,
-			triage.ErrBulkOverExploitedHere) {
+			triage.ErrBulkOverIncident) {
 			t.Fatalf("agreeing to a selection over an attacked issue answered %v", err)
 		}
 	})
 }
 
-func TestARecordOfBeingExploitedReturnsAnAgreedActOverManyIssuesToTheQueue(t *testing.T) {
+func TestAnIncidentReturnsAnAgreedActOverManyIssuesToTheQueue(t *testing.T) {
 	// The same rule from the direction where the act came first. The decision
 	// stands and whoever wrote it is told; the agreement goes, which is what
 	// puts the finding back in front of somebody.
@@ -178,7 +178,7 @@ func TestARecordOfBeingExploitedReturnsAnAgreedActOverManyIssuesToTheQueue(t *te
 	})
 }
 
-func TestARecordOfBeingExploitedLeavesADeferralAtTheFindingAlone(t *testing.T) {
+func TestAnIncidentLeavesADeferralAtTheFindingAlone(t *testing.T) {
 	// Putting one finding off, at the finding, is a decision somebody made
 	// about that finding. It is not contradicted by an attack, and only the
 	// act over a selection is what this rule is about.
@@ -274,7 +274,7 @@ func TestAnApproverMaySetTheAttackedIssueAsideAndAgreeToTheRest(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := agreeTo(ctx, f.store, f.reviewer, approved.Returned.ID, ""); !errors.Is(err,
-			triage.ErrBulkOverExploitedHere) {
+			triage.ErrBulkOverIncident) {
 			t.Fatalf("agreeing to the rows set aside from a selection answered %v", err)
 		}
 	})
@@ -311,7 +311,7 @@ func TestReaffirmingALapsedActOverManyIssuesCannotSetAsideAnAttackedOne(t *testi
 			Reasoning: "Still in a driver this image never loads.",
 			Bounds:    triage.DefaultBounds(),
 		})
-		if !errors.Is(err, triage.ErrBulkOverExploitedHere) {
+		if !errors.Is(err, triage.ErrBulkOverIncident) {
 			t.Fatalf("re-affirming a lapsed selection over an attacked issue answered %v", err)
 		}
 	})
@@ -369,7 +369,7 @@ func TestTheQueueHandsAnApproverEveryOccurrenceOfAnAttackedIssueToSetAside(t *te
 		hooked := &fixture{store: triage.NewStore(bun.NewDB(f.db.DB.DB, f.db.Dialect()).WithQueryHook(listed)),
 			reviewer: f.reviewer}
 		outliers := hooked.outliersIn(t, decisionID)
-		if outliers == nil || outliers.ExploitedHere != 1 || len(outliers.Rows) == 0 {
+		if outliers == nil || outliers.Incident != 1 || len(outliers.Rows) == 0 {
 			t.Fatalf("the queue's table for the selection reads %+v", outliers)
 		}
 		for _, want := range []struct {
@@ -386,7 +386,7 @@ func TestTheQueueHandsAnApproverEveryOccurrenceOfAnAttackedIssueToSetAside(t *te
 			}
 		}
 		row := outliers.Rows[0]
-		if !row.ExploitedHere || len(row.DecisionOccurrenceIDs) != 2 {
+		if !row.Incident || len(row.DecisionOccurrenceIDs) != 2 {
 			t.Fatalf("the attacked issue's row reads %+v, want both of its occurrences", row)
 		}
 
@@ -405,7 +405,7 @@ func TestTheQueueHandsAnApproverEveryOccurrenceOfAnAttackedIssueToSetAside(t *te
 			"Still in a driver this image never loads."); err != nil {
 			t.Fatal(err)
 		}
-		if again := f.outliersIn(t, approved.Returned.ID); again == nil || again.ExploitedHere != 1 {
+		if again := f.outliersIn(t, approved.Returned.ID); again == nil || again.Incident != 1 {
 			t.Errorf("the rows set aside from a selection carry the table %+v", again)
 		}
 	})

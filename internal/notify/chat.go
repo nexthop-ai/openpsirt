@@ -91,7 +91,7 @@ var sharedKinds = map[Kind]bool{
 	AnalysisNotComparable: true, AnalysisQuiet: true,
 	LeadHandedOff: true, LeadMoved: true, LeadReopened: true, RuleOutgrown: true, RuleWaiting: true,
 	UpstreamFailing: true, UpstreamRecovered: true,
-	ObligationOpen: true, ObligationNear: true, ObligationPassed: true,
+	ResponseWindowOpen: true, ResponseWindowNear: true, ResponseWindowPassed: true,
 }
 
 // isShared says a kind is about a product, a team or the deployment rather

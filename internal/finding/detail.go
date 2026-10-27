@@ -79,12 +79,12 @@ type Evidence struct {
 	// from the thousands that can wait.
 	Exploited     bool
 	LikelihoodPPM int
-	// ExploitedHere says somebody recorded this product being attacked through
+	// Incident says somebody recorded this product being attacked through
 	// the issue. A different fact from the one above: that is a feed's word
 	// about the world, and this is an incident here. It admits the finding to
 	// the line whatever the rating says, which is why it is read beside the
 	// occurrences rather than left to the screen.
-	ExploitedHere bool
+	Incident bool
 	// LikelihoodPercentilePPM is where that estimate stands among all of
 	// them, and the day it is about. The number alone is unreadable —
 	// 0.00042 is not something anybody acts on — and the day is what says
@@ -306,8 +306,8 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		Vector:   issue.Vector, Exploited: issue.Exploited,
 		// Off the occurrences rather than off the issue: the record belongs to
 		// one product, and the issue is shared by every product that holds it.
-		ExploitedHere: rows[0].ExploitedHere,
-		Description:   issue.Description, Advisory: issue.Advisory,
+		Incident:    rows[0].Incident,
+		Description: issue.Description, Advisory: issue.Advisory,
 		References: references,
 		Component:  component.Name, Version: component.Version,
 		FixedAt:     rows[0].FixedAt,
@@ -334,7 +334,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	// wherever the occurrences disagree — which is not a state upstream is ever
 	// in, and reading it as one says a supported release is past its end of
 	// life.
-	exploited := evidence.Exploited || evidence.ExploitedHere
+	exploited := evidence.Exploited || evidence.Incident
 	evidence.nothingToTake = !Clocked(FixState(least), exploited) &&
 		!Clocked(FixState(most), exploited)
 	evidence.unrated = Kind(rows[0].Kind) == Entered && issue.InForce() == ""
@@ -506,7 +506,7 @@ type evidenceRow struct {
 	AnsweredBy         string     `bun:"answered_by"`
 	AnsweredIn         string     `bun:"answered_in"`
 	Urgency            int64      `bun:"urgency"`
-	ExploitedHere      bool       `bun:"incident"`
+	Incident           bool       `bun:"incident"`
 	FixState           string     `bun:"fix_state"`
 	FixedIn            string     `bun:"fixed_in"`
 	FixedAt            *time.Time `bun:"fixed_at"`
@@ -758,7 +758,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		switch {
 		case evidence.unrated:
 			evidence.NoDeadline = NotRated
-		case !line.Admits(evidence.Exploited || evidence.ExploitedHere, issue.InForce()):
+		case !line.Admits(evidence.Exploited || evidence.Incident, issue.InForce()):
 			evidence.NoDeadline = BelowTheLine
 		case evidence.nothingToTake:
 			evidence.NoDeadline = NothingToTake

@@ -28,7 +28,7 @@ import (
 const standingExploitationHere = `LEFT JOIN "incident" AS "eh"` +
 	` ON "eh"."live_vulnerability_id" = "v"."id" AND "eh"."product_id" = ?`
 
-// ExploitedHere reports whether this product has a standing record of being
+// Incident reports whether this product has a standing record of being
 // attacked through each of these issues.
 //
 // Read for a set rather than one at a time: the paths that ask are applying a
@@ -38,7 +38,7 @@ const standingExploitationHere = `LEFT JOIN "incident" AS "eh"` +
 // Takes the handle because every caller is inside a transaction of its own.
 // The answer decides what gets written, so reading it outside would describe a
 // world a retry has left behind.
-func ExploitedHere(ctx context.Context, tx bun.IDB, productID int64,
+func Incident(ctx context.Context, tx bun.IDB, productID int64,
 	issues []int64) (map[int64]bool, error) {
 
 	standing := map[int64]bool{}
@@ -68,8 +68,8 @@ func ExploitedHere(ctx context.Context, tx bun.IDB, productID int64,
 	return standing, nil
 }
 
-// ExploitedHereChanged puts this product's open findings of one issue back
-// where the signals now say they belong, after a record of being attacked
+// IncidentChanged puts this product's open findings of one issue back
+// where the signals now say they belong, after an incident
 // started or stopped standing.
 //
 // Two statements rather than one. The flag is what the packed number is
@@ -90,7 +90,7 @@ func ExploitedHere(ctx context.Context, tx bun.IDB, productID int64,
 // Takes the handle because the caller writes inside its own transaction: the
 // record and the order it forces are one act. The moment is the caller's store
 // clock, which the recount reasons at.
-func ExploitedHereChanged(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
+func IncidentChanged(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	standing bool, now time.Time) error {
 
 	// The findings of the issue the record is read as, and whatever record
@@ -100,7 +100,7 @@ func ExploitedHereChanged(ctx context.Context, tx bun.IDB, productID, vulnerabil
 	if err != nil {
 		return err
 	}
-	still, err := ExploitedHere(ctx, tx, productID, []int64{vulnerabilityID})
+	still, err := Incident(ctx, tx, productID, []int64{vulnerabilityID})
 	if err != nil {
 		return err
 	}

@@ -65,8 +65,9 @@ func Products() string { return "/products" }
 // System is the deployment's own health.
 func System() string { return "/system" }
 
-// ExploitedHere is the list of what the deployment owes somebody by a date.
-func ExploitedHere() string { return "/exploited-here" }
+// Incidents is every standing incident, with the response windows counted for
+// each.
+func Incidents() string { return "/incidents" }
 
 // Decision is one decision, whole.
 func Decision(id int64) string { return "/decisions/" + strconv.FormatInt(id, 10) }

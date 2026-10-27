@@ -51,10 +51,10 @@ func (g grain) occurrences() string { return g.pick("COUNT(*)", `SUM("f"."n")`) 
 // peak is the highest urgency among the group's occurrences.
 func (g grain) peak() string { return g.pick(`MAX("f"."urgency")`, `MAX("f"."peak")`) }
 
-// exploited and exploitedHere are the two exploitation flags.
+// exploited and incident are the two exploitation flags.
 func (g grain) exploited() string { return g.pick(exploitedAcross, `MAX("f"."hit")`) }
 
-func (g grain) exploitedHere() string { return g.pick(exploitedHereAcross, `MAX("f"."hit_here")`) }
+func (g grain) incident() string { return g.pick(incidentAcross, `MAX("f"."hit_here")`) }
 
 // withFix is how many occurrences name a version that fixes the issue.
 func (g grain) withFix() string { return g.pick(withFixAcross, `SUM("f"."with_fix")`) }
@@ -307,7 +307,7 @@ var headColumns = []partColumn{
 	{overRows.occurrences(), "SUM", "n"},
 	{overRows.peak(), "MAX", "peak"},
 	{overRows.exploited(), "MAX", "hit"},
-	{overRows.exploitedHere(), "MAX", "hit_here"},
+	{overRows.incident(), "MAX", "hit_here"},
 }
 
 // selecting selects each column's expression under its name.

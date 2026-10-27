@@ -31,10 +31,10 @@ var knownAt = time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
 // The issue is opened somewhere in the product first. What may be recorded
 // about an issue in a product is what may be read about it there, and an issue
 // that sits nowhere in the product is one nobody there may be told of.
-func (f *fixture) exploited(t *testing.T) (*triage.ExploitedHere, triage.Undone) {
+func (f *fixture) exploited(t *testing.T) (*triage.Incident, triage.Undone) {
 	t.Helper()
 	f.sits(t, access.Public)
-	record, undone, err := f.store.RecordExploitedHere(t.Context(), f.triager,
+	record, undone, err := f.store.RecordIncident(t.Context(), f.triager,
 		f.product, f.issue, knownAt,
 		"A customer sent packet captures of the management socket.")
 	if err != nil {
@@ -57,7 +57,7 @@ func TestADecisionThatAnExploitedIssueDoesNotApplyIsRefused(t *testing.T) {
 			Reasoning:     "The parser is never reached: we only call the encoder.",
 			By:            f.proposer, NeedsApproval: true,
 		})
-		if !errors.Is(err, triage.ErrContradictsExploitedHere) {
+		if !errors.Is(err, triage.ErrContradictsIncident) {
 			t.Fatalf("stating an exploited issue does not apply answered %v", err)
 		}
 		if standing, _ := f.store.Applying(t.Context(), f.at()); standing != nil {
@@ -98,7 +98,7 @@ func TestARefusedDecisionIsOnlyTheOneThatContradicts(t *testing.T) {
 	})
 }
 
-func TestARecordOfBeingExploitedTakesBackTheAgreementUnderADismissal(t *testing.T) {
+func TestAnIncidentTakesBackTheAgreementUnderADismissal(t *testing.T) {
 	// The second contradiction rule, which is the asymmetry the first one
 	// rests on: a decision gives way to a fact, and never the other way
 	// round. The decision itself stands — whether it was wrong is for whoever
@@ -138,7 +138,7 @@ func TestARecordOfBeingExploitedTakesBackTheAgreementUnderADismissal(t *testing.
 	})
 }
 
-func TestARecordOfBeingExploitedCountsOnlyWhatItsRecorderMayRead(t *testing.T) {
+func TestAnIncidentCountsOnlyWhatItsRecorderMayRead(t *testing.T) {
 	// Every agreement it contradicts is taken back, and the count it answers
 	// is of the rows the person recording may read: a count of the others
 	// says how much undisclosed work stood on the issue.
@@ -165,7 +165,7 @@ func TestARecordOfBeingExploitedCountsOnlyWhatItsRecorderMayRead(t *testing.T) {
 	})
 }
 
-func TestARecordOfBeingExploitedLeavesAnUnagreedDecisionAlone(t *testing.T) {
+func TestAnIncidentLeavesAnUnagreedDecisionAlone(t *testing.T) {
 	// Nothing to take back. A decision still waiting for a second person is
 	// already in the queue, and reporting that something was undone would
 	// tell whoever wrote it that an agreement they never had was withdrawn.
@@ -178,7 +178,7 @@ func TestARecordOfBeingExploitedLeavesAnUnagreedDecisionAlone(t *testing.T) {
 	})
 }
 
-func TestOnlyOneRecordOfBeingExploitedStandsAtATime(t *testing.T) {
+func TestOnlyOneIncidentStandsAtATime(t *testing.T) {
 	// One answer rather than two. The rule is the database's — a unique pair
 	// over the live issue and the product — because a read-then-write check
 	// is what two requests arriving together both walk through.
@@ -186,26 +186,26 @@ func TestOnlyOneRecordOfBeingExploitedStandsAtATime(t *testing.T) {
 		ctx := t.Context()
 		record, _ := f.exploited(t)
 
-		_, _, err := f.store.RecordExploitedHere(ctx, f.triager, f.product, f.issue,
+		_, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
 			knownAt, "The same thing again.")
-		if !errors.Is(err, triage.ErrAlreadyExploitedHere) {
+		if !errors.Is(err, triage.ErrIncidentStands) {
 			t.Fatalf("a second record answered %v", err)
 		}
 
 		// Cleared, and then a second may be kept: what happened once may
 		// happen again, and the cleared record stays readable beside it.
-		if err := f.store.ClearExploitedHere(ctx, f.triager, record.ID,
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
 			"The captures were of a different deployment."); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := f.store.RecordExploitedHere(ctx, f.triager, f.product, f.issue,
+		if _, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
 			knownAt, "It happened again, and this time it is ours."); err != nil {
 			t.Fatalf("recording another after clearing answered %v", err)
 		}
 	})
 }
 
-func TestClearingARecordOfBeingExploitedIsAnActWithANameOnIt(t *testing.T) {
+func TestClearingAIncidentIsAnActWithANameOnIt(t *testing.T) {
 	// Nothing verifies the record, so nothing may clear it quietly. What the
 	// cleared row keeps is who cleared it and why — the record is not deleted,
 	// because a record that went away is one nobody can account for.
@@ -213,10 +213,10 @@ func TestClearingARecordOfBeingExploitedIsAnActWithANameOnIt(t *testing.T) {
 		ctx := t.Context()
 		record, _ := f.exploited(t)
 
-		if err := f.store.ClearExploitedHere(ctx, f.triager, record.ID, "  "); err == nil {
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID, "  "); err == nil {
 			t.Error("a record was cleared with no reason given")
 		}
-		if err := f.store.ClearExploitedHere(ctx, f.triager, record.ID,
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
 			"The captures were of a different deployment."); err != nil {
 			t.Fatal(err)
 		}
@@ -224,7 +224,7 @@ func TestClearingARecordOfBeingExploitedIsAnActWithANameOnIt(t *testing.T) {
 			t.Errorf("a cleared record still stands: %+v", standing)
 		}
 
-		records, err := f.store.ExploitedHereAt(ctx, f.triager, f.product, f.issue)
+		records, err := f.store.IncidentAt(ctx, f.triager, f.product, f.issue)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -245,13 +245,13 @@ func TestClearingARecordOfBeingExploitedIsAnActWithANameOnIt(t *testing.T) {
 	})
 }
 
-func TestRecordingBeingExploitedAsksForTriageOnThatProduct(t *testing.T) {
+func TestRecordingAnIncidentAsksForTriageOnThatProduct(t *testing.T) {
 	// A record moves this product's findings and refuses a dismissal somebody
 	// there would otherwise be free to make, so reading the product is not
 	// enough to keep one.
 	each(t, func(t *testing.T, f *fixture) {
 		f.sits(t, access.Public)
-		_, _, err := f.store.RecordExploitedHere(t.Context(), f.onlooker,
+		_, _, err := f.store.RecordIncident(t.Context(), f.onlooker,
 			f.product, f.issue, knownAt, "I read about it somewhere.")
 		if !errors.Is(err, access.ErrDenied) {
 			t.Fatalf("somebody who may only read the product recorded one: %v", err)
@@ -259,7 +259,7 @@ func TestRecordingBeingExploitedAsksForTriageOnThatProduct(t *testing.T) {
 	})
 }
 
-func TestARecordOfBeingExploitedSaysWhenAndWhy(t *testing.T) {
+func TestAnIncidentSaysWhenAndWhy(t *testing.T) {
 	// The two things nothing else holds. Nothing re-checks the record, so
 	// grounds are the whole of what a later reader has; and every window a
 	// deployment might be under counts from the moment it became known, which
@@ -267,11 +267,11 @@ func TestARecordOfBeingExploitedSaysWhenAndWhy(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.sits(t, access.Public)
-		if _, _, err := f.store.RecordExploitedHere(ctx, f.triager, f.product, f.issue,
+		if _, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
 			knownAt, "   "); err == nil {
 			t.Error("a record was kept with nothing said about it")
 		}
-		if _, _, err := f.store.RecordExploitedHere(ctx, f.triager, f.product, f.issue,
+		if _, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
 			time.Time{}, "A customer sent packet captures."); err == nil {
 			t.Error("a record was kept with no moment to count from")
 		}
@@ -284,7 +284,7 @@ func TestAnAttackKnownOfInTheFutureIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.sits(t, access.Public)
 		ahead := time.Now().UTC().Add(24 * time.Hour)
-		if _, _, err := f.store.RecordExploitedHere(t.Context(), f.triager, f.product, f.issue,
+		if _, _, err := f.store.RecordIncident(t.Context(), f.triager, f.product, f.issue,
 			ahead, "A customer sent packet captures."); !refusal.In(err) {
 			t.Errorf("a record known of tomorrow answered %v, want a refusal", err)
 		}
@@ -300,7 +300,7 @@ func TestAnAttackKnownOfBeforeTwoThousandIsRefusedOnEveryEngine(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.sits(t, access.Public)
 		early := time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC)
-		if _, _, err := f.store.RecordExploitedHere(t.Context(), f.triager, f.product, f.issue,
+		if _, _, err := f.store.RecordIncident(t.Context(), f.triager, f.product, f.issue,
 			early, "A customer sent packet captures."); !refusal.In(err) {
 			t.Errorf("a record known of in 1999 answered %v, want a refusal", err)
 		}
@@ -310,7 +310,7 @@ func TestAnAttackKnownOfBeforeTwoThousandIsRefusedOnEveryEngine(t *testing.T) {
 	})
 }
 
-func TestARecordOfBeingExploitedOutranksAnythingAFeedSays(t *testing.T) {
+func TestAnIncidentOutranksAnythingAFeedSays(t *testing.T) {
 	// The order, which is the whole reason the record reaches the findings at
 	// all. A feed saying somebody somewhere is exploiting an issue says
 	// nothing about whether it reaches this product; a person saying this
@@ -327,14 +327,14 @@ func TestARecordOfBeingExploitedOutranksAnythingAFeedSays(t *testing.T) {
 			ScoreCenti: 1000, LikelihoodPPM: 1_000_000,
 		}.Rank())
 
-		record, _, err := f.store.RecordExploitedHere(ctx, f.triager, f.product, f.issue,
+		record, _, err := f.store.RecordIncident(ctx, f.triager, f.product, f.issue,
 			knownAt, "A customer sent packet captures of the management socket.")
 		if err != nil {
 			t.Fatal(err)
 		}
 		row := f.findingRow(t, id)
 		switch {
-		case !row.RankExploitedHere:
+		case !row.RankIncident:
 			t.Error("the finding does not carry the record")
 		case row.RankExploited:
 			t.Error("the record was written into the flag that holds a feed's word")
@@ -343,7 +343,7 @@ func TestARecordOfBeingExploitedOutranksAnythingAFeedSays(t *testing.T) {
 				row.Urgency, worst)
 		}
 
-		if err := f.store.ClearExploitedHere(ctx, f.triager, record.ID,
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
 			"The captures were of a different deployment."); err != nil {
 			t.Fatal(err)
 		}
@@ -351,7 +351,7 @@ func TestARecordOfBeingExploitedOutranksAnythingAFeedSays(t *testing.T) {
 		// rank a finding carrying one of the two signals can have.
 		lowest := int64(finding.Ranked{Exploited: true}.Rank())
 		cleared := f.findingRow(t, id)
-		if cleared.RankExploitedHere || cleared.Urgency >= lowest {
+		if cleared.RankIncident || cleared.Urgency >= lowest {
 			t.Errorf("clearing left the finding ranked as exploited: urgency %d",
 				cleared.Urgency)
 		}
@@ -369,7 +369,7 @@ func (f *fixture) findingRow(t *testing.T, id int64) finding.Finding {
 	return row
 }
 
-func TestRecordsOfBeingExploitedAreNarrowedToWhoMayBeToldOfTheIssue(t *testing.T) {
+func TestIncidentsAreNarrowedToWhoMayBeToldOfTheIssue(t *testing.T) {
 	// The record names an issue and carries what somebody wrote about an
 	// attack through it. Reading one is reading the issue, so somebody who
 	// may not be told of the issue in that product is answered as somebody
@@ -377,19 +377,19 @@ func TestRecordsOfBeingExploitedAreNarrowedToWhoMayBeToldOfTheIssue(t *testing.T
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.sits(t, access.Private)
-		if _, _, err := f.store.RecordExploitedHere(ctx, f.privately(t), f.product, f.issue,
+		if _, _, err := f.store.RecordIncident(ctx, f.privately(t), f.product, f.issue,
 			knownAt, "A customer sent packet captures."); err != nil {
 			t.Fatal(err)
 		}
 
 		// Public triage on the product, and the issue sits nowhere they may
 		// read it.
-		if _, err := f.store.ExploitedHereAt(ctx, f.triager, f.product,
-			f.issue); !errors.Is(err, triage.ErrNoSuchExploitedHere) {
+		if _, err := f.store.IncidentAt(ctx, f.triager, f.product,
+			f.issue); !errors.Is(err, triage.ErrNoSuchIncident) {
 			t.Errorf("somebody who may not be told of the issue read its records: %v", err)
 		}
-		if _, err := f.store.ExploitedHereAt(ctx, f.onlooker, f.product,
-			f.issue); !errors.Is(err, triage.ErrNoSuchExploitedHere) {
+		if _, err := f.store.IncidentAt(ctx, f.onlooker, f.product,
+			f.issue); !errors.Is(err, triage.ErrNoSuchIncident) {
 			t.Errorf("somebody who may only read the product read the record: %v", err)
 		}
 	})
@@ -397,9 +397,9 @@ func TestRecordsOfBeingExploitedAreNarrowedToWhoMayBeToldOfTheIssue(t *testing.T
 
 // standingHere is the record in force, picked out of everything kept about
 // the fixture's issue the way a reader of the finding picks it out.
-func (f *fixture) standingHere(t *testing.T) *triage.ExploitedHere {
+func (f *fixture) standingHere(t *testing.T) *triage.Incident {
 	t.Helper()
-	kept, err := f.store.ExploitedHereAt(t.Context(), f.triager, f.product, f.issue)
+	kept, err := f.store.IncidentAt(t.Context(), f.triager, f.product, f.issue)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -411,15 +411,15 @@ func (f *fixture) standingHere(t *testing.T) *triage.ExploitedHere {
 	return nil
 }
 
-func TestClearingARecordOfBeingExploitedAsksForTriageOnThatProduct(t *testing.T) {
+func TestClearingAIncidentAsksForTriageOnThatProduct(t *testing.T) {
 	// Clearing one is recording one. Without this the next gate is whether
 	// the reader may be told of the issue, which somebody holding nothing but
 	// read on the product passes — so reading would be enough to clear an
 	// incident record.
 	each(t, func(t *testing.T, f *fixture) {
 		record, _ := f.exploited(t)
-		if err := f.store.ClearExploitedHere(t.Context(), f.onlooker, record.ID,
-			"I read about it somewhere."); !errors.Is(err, triage.ErrNoSuchExploitedHere) {
+		if err := f.store.ClearIncident(t.Context(), f.onlooker, record.ID,
+			"I read about it somewhere."); !errors.Is(err, triage.ErrNoSuchIncident) {
 			t.Fatalf("somebody who may only read the product cleared one: %v", err)
 		}
 		if standing := f.standingHere(t); standing == nil {
@@ -439,7 +439,7 @@ func TestAgreeingToADismissalIsRefusedWhileARecordStands(t *testing.T) {
 		f.exploited(t)
 
 		err := agreeTo(ctx, f.store, f.reviewer, claimed.DecisionID, "")
-		if !errors.Is(err, triage.ErrContradictsExploitedHere) {
+		if !errors.Is(err, triage.ErrContradictsIncident) {
 			t.Fatalf("agreeing to a dismissal of an exploited issue answered %v", err)
 		}
 		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
@@ -465,7 +465,7 @@ func TestBulkDismissalNamesEachIssueOnce(t *testing.T) {
 		hooked := triage.NewStore(bun.NewDB(f.db.DB.DB, f.db.Dialect()).WithQueryHook(lists))
 		if _, err := hooked.ProposeMany(t.Context(), f.triager, dismissing(f, f.occurrences(
 			"place-of-e", "place-of-f", "place-of-g"))); !errors.Is(
-			err, triage.ErrContradictsExploitedHere) {
+			err, triage.ErrContradictsIncident) {
 			t.Fatalf("a bulk dismissal of an exploited issue answered %v", err)
 		}
 		sizes := lists.read()
@@ -526,15 +526,15 @@ func dismissing(f *fixture, occurrences []triage.Occurrence) []triage.Proposal {
 	return proposals
 }
 
-func TestARecordOfBeingExploitedIsClearedOnlyByWhoTriagesWhatItIsAbout(t *testing.T) {
+func TestAnIncidentIsClearedOnlyByWhoTriagesWhatItIsAbout(t *testing.T) {
 	// Each refusal is reached by somebody who passes the one before it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		record, _ := f.exploited(t)
 
 		// Told of the issue and triaging nothing here.
-		if err := f.store.ClearExploitedHere(ctx, f.onlooker, record.ID,
-			"It was a test."); !errors.Is(err, triage.ErrNoSuchExploitedHere) {
+		if err := f.store.ClearIncident(ctx, f.onlooker, record.ID,
+			"It was a test."); !errors.Is(err, triage.ErrNoSuchIncident) {
 			t.Errorf("a reader of the product cleared the record: %v", err)
 		}
 		// Triaging disclosed work, with the issue undisclosed here now.
@@ -542,8 +542,8 @@ func TestARecordOfBeingExploitedIsClearedOnlyByWhoTriagesWhatItIsAbout(t *testin
 			Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.ClearExploitedHere(ctx, f.triager, record.ID,
-			"It was a test."); !errors.Is(err, triage.ErrNoSuchExploitedHere) {
+		if err := f.store.ClearIncident(ctx, f.triager, record.ID,
+			"It was a test."); !errors.Is(err, triage.ErrNoSuchIncident) {
 			t.Errorf("somebody who may not be told of the issue cleared the record: %v", err)
 		}
 	})
@@ -554,8 +554,8 @@ func TestAnAttackIsRecordedOnlyBySomebodyWhoMayBeToldOfTheIssue(t *testing.T) {
 	// as a record nobody could keep.
 	each(t, func(t *testing.T, f *fixture) {
 		f.sits(t, access.Private)
-		if _, _, err := f.store.RecordExploitedHere(t.Context(), f.triager, f.product, f.issue,
-			knownAt, "A customer sent packet captures."); !errors.Is(err, triage.ErrNoSuchExploitedHere) {
+		if _, _, err := f.store.RecordIncident(t.Context(), f.triager, f.product, f.issue,
+			knownAt, "A customer sent packet captures."); !errors.Is(err, triage.ErrNoSuchIncident) {
 			t.Errorf("somebody who may not be told of the issue recorded an attack: %v", err)
 		}
 	})

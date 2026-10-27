@@ -101,10 +101,10 @@ type Deciding struct {
 	Summary       string
 	Exploited     bool
 	LikelihoodPPM int
-	// ExploitedHere is this product's own standing record of being attacked
+	// Incident is this product's own standing incident
 	// through the issue. A bulk act that sets such an issue aside is refused,
 	// so the screen building one says which they are before it is sent.
-	ExploitedHere bool
+	Incident bool
 	// Consumer is what pulls the component in here, for naming the occurrence to
 	// somebody choosing which of them a decision covers. Empty where that is
 	// the product itself.

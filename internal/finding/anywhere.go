@@ -161,7 +161,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// Never below the line where somebody is using one, and being exploited
 	// is not a claim about how bad something is — it is a fact, and the one
 	// thing a line cannot set aside. Read off the urgency, whose two top bands
-	// are the feed's word and this product's own record of being attacked (the
+	// are the feed's word and this product's own incident (the
 	// exploiting threshold).
 	lined := func(q *bun.SelectQuery, urgent string, args ...any) *bun.SelectQuery {
 		if wasBelow {
@@ -312,7 +312,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		// tell apart. A column this query does not select is left at its zero
 		// value, so both are selected here as on the per-product list.
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross+` AS "incident"`).
+		ColumnExpr(incidentAcross+` AS "incident"`).
 		ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
 		// Whether anything here carries a score at all, and the scheme it is

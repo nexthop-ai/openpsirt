@@ -19,6 +19,7 @@ import {
   uploadsAt,
   inventoryChangesAt,
   personAt,
+  incidentsAt,
 } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
@@ -68,7 +69,7 @@ const AutoAssignment = retrying(() =>
   import("../screens/AutoAssignment").then((m) => m.AutoAssignment),
 );
 const Disclosing = retrying(() => import("../screens/Disclosing").then((m) => m.Disclosing));
-const Exploited = retrying(() => import("../screens/Exploited").then((m) => m.Exploited));
+const Incidents = retrying(() => import("../screens/Incidents").then((m) => m.Incidents));
 const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgrades));
 const MatchCoverage = retrying(() =>
   import("../screens/MatchCoverage").then((m) => m.MatchCoverage),
@@ -214,7 +215,7 @@ export function App() {
               <Route path={ROUTES.report} element={<Report />} />
               <Route path={ROUTES.reportFlaw} element={<ReportFlaw />} />
               <Route path={ROUTES.disclosing} element={<Disclosing />} />
-              <Route path={ROUTES.exploited} element={<Exploited />} />
+              <Route path={ROUTES.incidents} element={<Incidents />} />
               <Route path={ROUTES.advisories} element={<Advisories />} />
               <Route path={ROUTES.advisory} element={<Advisory />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
@@ -236,9 +237,10 @@ export function App() {
                 element={<Moved to={() => "/assignments"} />}
               />
               <Route
-                path={ROUTES.formerExploited}
-                element={<Moved to={() => "/exploited-here"} />}
+                path={ROUTES.formerExploitedHere}
+                element={<Moved to={() => incidentsAt()} />}
               />
+              <Route path={ROUTES.formerObligations} element={<Moved to={() => incidentsAt()} />} />
               <Route path={ROUTES.formerRecord} element={<Moved to={() => "/record"} />} />
               <Route
                 path={ROUTES.formerDependencies}

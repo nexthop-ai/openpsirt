@@ -25,7 +25,7 @@ import {
   allFindingsAt,
   comparisonAt,
   uploadsAt,
-  exploitedAt,
+  incidentsAt,
   productFindingsAt,
   reviewQueueAt,
 } from "../app/routes";
@@ -425,7 +425,7 @@ function Figures({
   // is unpaged and narrowed record by record, so its length is the count, and
   // the scope is applied here: a record belongs to a product and no build.
   const shelf = useQuery({
-    queryKey: ["obligations"],
+    queryKey: ["incidents"],
     queryFn: async () => unwrap(await api.GET("/v1/incidents", {})),
   });
   // This person's holdings, and what has come back to them: Home answers
@@ -593,10 +593,10 @@ function Figures({
         <button
           type="button"
           className="kpi urgent"
-          onClick={() => navigate(exploitedAt(at.product))}
+          onClick={() => navigate(incidentsAt(at.product))}
         >
           <span className="l">
-            <i style={{ background: "var(--sev-exploited)" }} /> Exploited here
+            <i style={{ background: "var(--sev-exploited)" }} /> Incidents
           </span>
           <span className="n">
             <Count of={shelf}>{() => attacked.toLocaleString()}</Count>

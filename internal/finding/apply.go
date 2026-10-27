@@ -397,14 +397,14 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 			}
 			rated := run.ratings[vulnerabilityID]
 			ranked := Ranked{
-				ExploitedHere: rated.ExploitedHere,
-				Exploited:     rated.Exploited, Shipped: run.shipped,
+				Incident:  rated.Incident,
+				Exploited: rated.Exploited, Shipped: run.shipped,
 				LikelihoodPPM: rated.LikelihoodPPM,
 				ScoreCenti:    rated.Score(),
 			}
 			entry.Urgency = int64(ranked.Rank())
 			entry.RankExploited, entry.RankShipped = ranked.Exploited, ranked.Shipped
-			entry.RankExploitedHere = ranked.ExploitedHere
+			entry.RankIncident = ranked.Incident
 			// A finding that opens already exploited was learned about when it
 			// opened, and every later recount has to reach the same answer.
 			entry.ExploitedLearnedAt = learnedExploitation(entry, rated.ExploitedOn, run.startedAt)
@@ -418,14 +418,14 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 			// carries no deadline: every count of what is late then agrees
 			// about it without each having to ask.
 			if run.onTheClock && answeredBy == nil &&
-				run.floor.Admits(rated.Exploited || rated.ExploitedHere, severity) {
+				run.floor.Admits(rated.Exploited || rated.Incident, severity) {
 				window := run.windows.For(rated.Exploited, severity)
 				w.windowFor[k] = window
 				// From this run, which for a new finding is when it was first
 				// seen. One already open is answered against what is held,
 				// from its own opening.
 				entry.DueAt = Deadline(entry.FixState,
-					rated.Exploited || rated.ExploitedHere, run.startedAt, run.startedAt,
+					rated.Exploited || rated.Incident, run.startedAt, run.startedAt,
 					entry.ExploitedLearnedAt, entry.FixedAt, window)
 			}
 			w.findings[k] = entry
@@ -574,7 +574,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			learned = learnedExploitation(f, run.ratings[f.VulnerabilityID].ExploitedOn, run.startedAt)
 		}
 		if window, onClock := want.windowFor[k]; onClock {
-			f.DueAt = Deadline(f.FixState, f.RankExploited || f.RankExploitedHere,
+			f.DueAt = Deadline(f.FixState, f.RankExploited || f.RankIncident,
 				already.OpenedAt, run.startedAt, learned, f.FixedAt, window)
 		}
 		// Asked of the answer rather than of what moved. A fix appearing
@@ -1111,7 +1111,7 @@ type ratingRow struct {
 	Published     string     `bun:"published"`
 	Assessed      string     `bun:"assessed"`
 	Exploited     bool       `bun:"exploited"`
-	ExploitedHere int        `bun:"incident"`
+	Incident      int        `bun:"incident"`
 	ScoreCenti    int        `bun:"score_centi"`
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ExploitedOn   *time.Time `bun:"exploited_on"`
@@ -1179,7 +1179,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 	for _, row := range rows {
 		ratings[row.ID] = Rating{
 			Published: row.Published, Assessed: row.Assessed,
-			Exploited: row.Exploited, ExploitedHere: row.ExploitedHere == 1,
+			Exploited: row.Exploited, Incident: row.Incident == 1,
 			ScoreCenti:    row.ScoreCenti,
 			LikelihoodPPM: row.LikelihoodPPM,
 			ExploitedOn:   row.ExploitedOn,

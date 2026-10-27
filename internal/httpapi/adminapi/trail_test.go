@@ -525,7 +525,7 @@ var administrativeActs = []trailedAct{
 		// decision that the issue does not apply is refused while one stands —
 		// which is what puts them in the trail rather than in the decision
 		// record beside the decisions.
-		id: "record-exploited-here", what: "this product exploited through an issue",
+		id: "record-incident", what: "this product exploited through an issue",
 		who: "private-triage", method: http.MethodPost,
 		path: "/v1/products/mine/issues/CVE-2026-9999/incidents",
 		body: `{"known_at":"2026-09-20T14:00:00Z",` +
@@ -579,7 +579,7 @@ var administrativeActs = []trailedAct{
 		kind: "incident", about: "CVE-2026-9999 on mine, fix release",
 	},
 	{
-		id: "clear-exploited-here", what: "a record of being exploited cleared",
+		id: "clear-incident", what: "an incident cleared",
 		who: "private-triage", method: http.MethodDelete,
 		path: "/v1/incidents/{record}",
 		body: `{"because":"The captures were of a different deployment."}`,
@@ -588,10 +588,10 @@ var administrativeActs = []trailedAct{
 	{
 		// A window decides what every standing attack is watched against,
 		// which is the layer a setting sits in.
-		id: "declare-obligation-window", what: "a window after an attack",
+		id: "declare-response-window", what: "a response window",
 		method: http.MethodPost, path: "/v1/response-windows",
 		body: `{"name":"Early warning","hours":24}`,
-		kind: "setting", about: "Obligation window Early warning",
+		kind: "setting", about: "Response window Early warning",
 		keep: func(t *testing.T, seen *seeded, answered []byte) {
 			t.Helper()
 			var declared struct {
@@ -604,15 +604,15 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
-		id: "change-obligation-window", what: "a window after an attack changed",
+		id: "change-response-window", what: "a response window changed",
 		method: http.MethodPut, path: "/v1/response-windows/{window}",
 		body: `{"name":"Early warning","hours":36}`,
-		kind: "setting", about: "Obligation window Early warning",
+		kind: "setting", about: "Response window Early warning",
 	},
 	{
-		id: "retire-obligation-window", what: "a window after an attack retired",
+		id: "retire-response-window", what: "a response window retired",
 		method: http.MethodDelete, path: "/v1/response-windows/{window}",
-		kind: "setting", about: "Obligation window Early warning",
+		kind: "setting", about: "Response window Early warning",
 	},
 	{
 		id: "deactivate-person", what: "somebody deactivated", method: http.MethodPut,

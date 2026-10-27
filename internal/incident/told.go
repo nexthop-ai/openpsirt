@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package obligation
+package incident
 
 import (
 	"context"
@@ -34,10 +34,10 @@ type Told struct {
 	bun.BaseModel `bun:"table:told_outside,alias:tod"`
 
 	ID int64 `bun:"id,pk,autoincrement"`
-	// ExploitedHereID is the record of an attack this notice is about. A
+	// IncidentID is the record of an attack this notice is about. A
 	// cleared record and the one recorded after it are two incidents, so a
 	// notice belongs to one of them rather than to the issue.
-	ExploitedHereID int64 `bun:"incident_id,notnull"`
+	IncidentID int64 `bun:"incident_id,notnull"`
 	// WindowID is the window this notice answers, where whoever recorded it
 	// said so. Their statement: nothing here decides whether a notice met a
 	// window, and a notice naming none answers none.
@@ -103,10 +103,10 @@ const PlacesLimit = 250
 // rather than an address book.
 const RecipientLimit = 200
 
-// ErrNoSuchRecord is returned where a record of being exploited is missing or
+// ErrNoSuchRecord is returned where an incident is missing or
 // is about an issue this subject may not be told of. One error for both,
 // because telling them apart turns a record identifier into a directory.
-var ErrNoSuchRecord = refusal.New("no record of being exploited is kept there")
+var ErrNoSuchRecord = refusal.New("no incident is kept there")
 
 // RecordTold records that somebody outside was told about an attack.
 //
@@ -153,13 +153,13 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 	told := new(Told)
 	err = s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
 		*told = Told{}
-		record := new(triage.ExploitedHere)
+		record := new(triage.Incident)
 		if err := tx.NewSelect().Model(record).Where(`"eh"."id" = ?`, recordID).
 			Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNoSuchRecord
 			}
-			return fmt.Errorf("read the record of being exploited: %w", err)
+			return fmt.Errorf("read the incident: %w", err)
 		}
 		if !subject.TriagesIn(record.ProductID) {
 			return ErrNoSuchRecord
@@ -195,7 +195,7 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 			}
 		}
 		*told = Told{
-			ExploitedHereID: record.ID, WindowID: windowID,
+			IncidentID: record.ID, WindowID: windowID,
 			Recipient: recipient, ToldAt: toldAt.UTC().Truncate(time.Microsecond),
 			Said: said, RecordedBy: subject.ID,
 			RecordedAt: s.now().Truncate(time.Microsecond),
@@ -272,15 +272,15 @@ func detailsSaid(details Details) (reference, malicious *string, places []string
 // it, and both are undisclosed with an undisclosed issue, so the notices and
 // the fixes of a record are read through this one narrowing.
 func tellable(ctx context.Context, db bun.IDB, subject access.Subject,
-	recordIDs []int64) ([]triage.ExploitedHere, error) {
+	recordIDs []int64) ([]triage.Incident, error) {
 
 	if len(recordIDs) == 0 {
 		return nil, nil
 	}
-	var records []triage.ExploitedHere
+	var records []triage.Incident
 	if err := db.NewSelect().Model(&records).
 		Where(`"eh"."id" IN (?)`, bun.List(recordIDs)).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read the records of being exploited: %w", err)
+		return nil, fmt.Errorf("read the incidents: %w", err)
 	}
 	out := records[:0]
 	for _, record := range records {
@@ -311,7 +311,7 @@ func (s *Store) ToldAbout(ctx context.Context, subject access.Subject,
 // toldAbout is every notice recorded about records already narrowed to what
 // the reader may be told of, earliest told first.
 func (s *Store) toldAbout(ctx context.Context,
-	records []triage.ExploitedHere) (map[int64][]Told, error) {
+	records []triage.Incident) (map[int64][]Told, error) {
 
 	out := map[int64][]Told{}
 	if len(records) == 0 {
@@ -333,7 +333,7 @@ func (s *Store) toldAbout(ctx context.Context,
 		return nil, err
 	}
 	for _, row := range rows {
-		out[row.ExploitedHereID] = append(out[row.ExploitedHereID], row)
+		out[row.IncidentID] = append(out[row.IncidentID], row)
 	}
 	return out, nil
 }

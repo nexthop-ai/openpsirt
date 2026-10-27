@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package obligation
+package incident
 
 import (
 	"context"
@@ -34,13 +34,13 @@ import (
 type Fix struct {
 	bun.BaseModel `bun:"table:incident_fix,alias:ef"`
 
-	ID              int64      `bun:"id,pk,autoincrement"`
-	ExploitedHereID int64      `bun:"incident_id,notnull"`
-	StreamID        int64      `bun:"stream_id,notnull"`
-	NamedBy         int64      `bun:"named_by,notnull"`
-	NamedAt         time.Time  `bun:"named_at,notnull"`
-	WithdrawnBy     *int64     `bun:"withdrawn_by"`
-	WithdrawnAt     *time.Time `bun:"withdrawn_at"`
+	ID          int64      `bun:"id,pk,autoincrement"`
+	IncidentID  int64      `bun:"incident_id,notnull"`
+	StreamID    int64      `bun:"stream_id,notnull"`
+	NamedBy     int64      `bun:"named_by,notnull"`
+	NamedAt     time.Time  `bun:"named_at,notnull"`
+	WithdrawnBy *int64     `bun:"withdrawn_by"`
+	WithdrawnAt *time.Time `bun:"withdrawn_at"`
 	// LiveStreamID is the release while the naming stands, and null once it
 	// is withdrawn. Unique beside the record, so a record names a release
 	// once at a time, held by the database rather than by a check.
@@ -133,7 +133,7 @@ func (s *Store) NameFix(ctx context.Context, subject access.Subject, recordID in
 			return refusal.Errorf("%q is retired", stream.Name)
 		}
 		*fix = Fix{
-			ExploitedHereID: record.ID, StreamID: stream.ID,
+			IncidentID: record.ID, StreamID: stream.ID,
 			NamedBy: subject.ID, NamedAt: s.now().Truncate(time.Microsecond),
 			LiveStreamID: &stream.ID,
 			Release:      stream.Name, ReleaseName: catalog.Shown(stream.DisplayName, stream.Name),
@@ -218,21 +218,21 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 // (`DESIGN-database.md` § Reads a write depends on). The write changes
 // nothing, so it says nothing to a subject the reads below then refuse.
 func standingFor(ctx context.Context, tx bun.IDB, subject access.Subject,
-	recordID int64) (*triage.ExploitedHere, error) {
+	recordID int64) (*triage.Incident, error) {
 
-	if _, err := tx.NewUpdate().Model((*triage.ExploitedHere)(nil)).
+	if _, err := tx.NewUpdate().Model((*triage.Incident)(nil)).
 		Set(`"cleared_at" = "cleared_at"`).
 		Where(`"id" = ?`, recordID).Where(`"cleared_at" IS NULL`).
 		Exec(ctx); err != nil {
-		return nil, fmt.Errorf("hold the record of being exploited: %w", err)
+		return nil, fmt.Errorf("hold the incident: %w", err)
 	}
-	record := new(triage.ExploitedHere)
+	record := new(triage.Incident)
 	if err := tx.NewSelect().Model(record).Where(`"eh"."id" = ?`, recordID).
 		Scan(ctx); err != nil {
 		if database.IsNoRows(err) {
 			return nil, ErrNoSuchRecord
 		}
-		return nil, fmt.Errorf("read the record of being exploited: %w", err)
+		return nil, fmt.Errorf("read the incident: %w", err)
 	}
 	if !subject.TriagesIn(record.ProductID) {
 		return nil, ErrNoSuchRecord
@@ -255,13 +255,13 @@ func standingFor(ctx context.Context, tx bun.IDB, subject access.Subject,
 // noteFix writes a release named or withdrawn into the administrative trail,
 // in the transaction that makes it, beside the record it belongs to.
 func noteFix(ctx context.Context, tx bun.IDB, subject access.Subject,
-	record *triage.ExploitedHere, was, became *string) error {
+	record *triage.Incident, was, became *string) error {
 
 	about, err := triage.TrailAbout(ctx, tx, record.ProductID, record.VulnerabilityID)
 	if err != nil {
 		return err
 	}
-	return trail.NewStore(tx).Record(ctx, subject, trail.ExploitedHere,
+	return trail.NewStore(tx).Record(ctx, subject, trail.Incident,
 		about+", fix release", was, became)
 }
 
@@ -282,13 +282,13 @@ func (s *Store) FixesOf(ctx context.Context, subject access.Subject,
 // reader may be told of. The subject still narrows what each release's scans
 // are said to hold.
 func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
-	records []triage.ExploitedHere) (map[int64][]Fix, error) {
+	records []triage.Incident) (map[int64][]Fix, error) {
 
 	out := map[int64][]Fix{}
 	if len(records) == 0 {
 		return out, nil
 	}
-	allowed := make(map[int64]triage.ExploitedHere, len(records))
+	allowed := make(map[int64]triage.Incident, len(records))
 	ids := make([]int64, 0, len(records))
 	for _, record := range records {
 		allowed[record.ID] = record
@@ -317,7 +317,7 @@ func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
 		fix := row.Fix
 		fix.Release, fix.ReleaseName = row.Name, catalog.Shown(row.DisplayName, row.Name)
 		fix.ReleasedOn = row.On
-		out[fix.ExploitedHereID] = append(out[fix.ExploitedHereID], fix)
+		out[fix.IncidentID] = append(out[fix.IncidentID], fix)
 	}
 	for recordID, fixes := range out {
 		record := allowed[recordID]

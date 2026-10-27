@@ -1,16 +1,16 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package obligation holds what a deployment answers to after its product is
-// attacked: the windows it says it is under, the record that somebody outside
-// was told, and the shelf that watches both.
+// Package incident holds what a deployment answers to after its product is
+// attacked: the response windows it says it is under, the record that
+// somebody outside was told, and the shelf that watches both.
 //
 // Recorded, never computed. Nothing here decides whether a window applies to
 // an incident, when a regulator's clock started, or whether a notice met
 // anything. What it holds are the facts those questions are answered from:
 // when an attack became known, which windows this deployment counts, and who
 // was told what and when.
-package obligation
+package incident
 
 import (
 	"context"
@@ -188,7 +188,7 @@ func holdWindows(ctx context.Context, tx bun.IDB) error {
 	return nil
 }
 
-// Store reads and writes obligations.
+// Store reads and writes incidents' response windows, fixes and notices.
 type Store struct {
 	db  bun.IDB
 	now func() time.Time
@@ -747,5 +747,5 @@ func noteWindow(ctx context.Context, tx bun.IDB, subject access.Subject, name st
 	was, became *string) error {
 
 	return trail.NewStore(tx).Record(ctx, subject, trail.Setting,
-		"Obligation window "+name, was, became)
+		"Response window "+name, was, became)
 }

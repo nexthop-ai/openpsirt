@@ -309,12 +309,12 @@ type Finding struct {
 	// there.
 	Urgency       int64 `bun:"urgency,notnull"`
 	RankExploited bool  `bun:"urgency_exploited,notnull"`
-	// RankExploitedHere is somebody here having recorded that this product was
+	// RankIncident is somebody here having recorded that this product was
 	// attacked through the issue. Kept beside the flag above rather than
 	// folded into it: a feed's word about the world and a person's word about
 	// this product are different facts, and a report that names one of them
 	// reads the column it means.
-	RankExploitedHere bool `bun:"urgency_incident,notnull"`
+	RankIncident bool `bun:"urgency_incident,notnull"`
 	// ExploitedLearnedAt is when exploitation was learned, which is what an
 	// exploited deadline is counted from.
 	//

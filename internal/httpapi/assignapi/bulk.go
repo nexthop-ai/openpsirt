@@ -29,11 +29,11 @@ type AtComponentBody struct {
 	// Summary is the text one decision is made on. Deciding in bulk on
 	// less than deciding singly is the wrong way round, and this list
 	// narrows by the description while showing none of it.
-	Summary       string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
-	Exploited     bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	ExploitedHere bool    `json:"exploited_here,omitempty" doc:"This product records being exploited through it. A decision over several issues that sets this one aside or puts it off is refused"`
-	Likelihood    float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
-	Due           string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its occurrences here, which is the one that makes it late"`
+	Summary    string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
+	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	Incident   bool    `json:"incident,omitempty" doc:"Whether an incident stands in this product through it. A decision over several issues that sets this one aside or puts it off is refused"`
+	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
+	Due        string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its occurrences here, which is the one that makes it late"`
 }
 
 func registerBulk(api huma.API, in core.Deps) {
@@ -146,7 +146,7 @@ func registerBulk(api huma.API, in core.Deps) {
 				Severity:      finding.SeverityWord(each.SeverityCenti),
 				Occurrences:   each.Occurrences, FixedIn: each.FixedIn,
 				Summary:   each.Summary,
-				Exploited: each.Exploited, ExploitedHere: each.ExploitedHere,
+				Exploited: each.Exploited, Incident: each.Incident,
 				Likelihood: float64(each.LikelihoodPPM) / 1_000_000,
 			}
 			if due := soonest[each.VulnerabilityID]; due != nil {

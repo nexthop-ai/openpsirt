@@ -157,7 +157,7 @@
   "report": { "path": "/reports/:report", "query": ["days"] },
   "reportFlaw": { "path": "/report-a-flaw", "query": ["from", "product", "source"] },
   "disclosing": { "path": "/disclosing" },
-  "exploited": { "path": "/exploited-here", "query": ["product"] },
+  "incidents": { "path": "/incidents", "query": ["product"] },
   "advisories": { "path": "/advisories" },
   "advisory": { "path": "/advisories/:advisory" },
   "autoAssignment": { "path": "/auto-assignment" },
@@ -167,7 +167,8 @@
   "formerAccess": { "path": "/people" },
   "formerPerson": { "path": "/people/:identity" },
   "formerAssignments": { "path": "/work" },
-  "formerExploited": { "path": "/obligations" },
+  "formerExploitedHere": { "path": "/exploited-here" },
+  "formerObligations": { "path": "/obligations" },
   "formerRecord": { "path": "/audit" },
   "formerDependencies": {
     "path": "/products/:product/streams/:stream/variants/:variant/components"

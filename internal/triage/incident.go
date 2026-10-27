@@ -20,7 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// ExploitedHere is somebody's record that this product was exploited through
+// Incident is somebody's record that this product was exploited through
 // an issue.
 //
 // The one fact about exploitation that nothing computes. A feed says a
@@ -43,7 +43,7 @@ import (
 // Nothing verifies it, and nothing could. That is what makes it append-only,
 // and what makes clearing it a deliberate act with a name and a reason
 // attached.
-type ExploitedHere struct {
+type Incident struct {
 	bun.BaseModel `bun:"table:incident,alias:eh"`
 
 	ID              int64 `bun:"id,pk,autoincrement"`
@@ -87,7 +87,7 @@ type ExploitedHere struct {
 }
 
 // Standing reports whether this record is the one in force.
-func (e ExploitedHere) Standing() bool { return e.ClearedAt == nil }
+func (e Incident) Standing() bool { return e.ClearedAt == nil }
 
 // earliestKnown is the earliest year a moment may be recorded in.
 //
@@ -105,27 +105,27 @@ const earliestKnown = 2000
 // investigation.
 const GroundsLimit = markdown.MaxBytes
 
-// ErrAlreadyExploitedHere is returned where a record already stands about an
+// ErrIncidentStands is returned where a record already stands about an
 // issue in this product. Another product's record is not in the way of one.
-var ErrAlreadyExploitedHere = refusal.New(
-	"this product already records being exploited through this issue")
+var ErrIncidentStands = refusal.New(
+	"an incident already stands in this product through this issue")
 
-// ErrNoSuchExploitedHere is returned where a record is missing or is about an
+// ErrNoSuchIncident is returned where a record is missing or is about an
 // issue this subject may not be told about. One error for both, because
 // telling them apart turns a record identifier into a directory.
-var ErrNoSuchExploitedHere = refusal.New("no record of being exploited is kept there")
+var ErrNoSuchIncident = refusal.New("no incident is kept there")
 
-// ErrContradictsExploitedHere is returned where somebody states an issue does
-// not apply to a product that records being exploited through it.
-var ErrContradictsExploitedHere = refusal.New(
-	"this product records being exploited through this issue, so it cannot also " +
+// ErrContradictsIncident is returned where somebody states an issue does
+// not apply to a product an incident stands in through it.
+var ErrContradictsIncident = refusal.New(
+	"an incident stands in this product through this issue, so it cannot also " +
 		"record that the issue does not apply. Clear that record first, or record " +
 		"an outcome that is true beside it")
 
-// ErrBulkOverExploitedHere is returned where one act over many issues would
-// set aside or put off an issue this product records being exploited through.
-var ErrBulkOverExploitedHere = refusal.New(
-	"this selection reaches an issue this product records being exploited through. " +
+// ErrBulkOverIncident is returned where one act over many issues would
+// set aside or put off an issue an incident stands in this product through.
+var ErrBulkOverIncident = refusal.New(
+	"this selection reaches an issue an incident stands in this product through. " +
 		"An act over many issues does not set that aside or put it off: take it out " +
 		"of the selection and answer it at its own finding")
 
@@ -134,12 +134,12 @@ var ErrBulkOverExploitedHere = refusal.New(
 //
 // A promise to upgrade or to patch hides the finding too, and is left out:
 // the next scan checks every row it names, and a bulk promise over an attacked
-// issue is the fix arriving rather than the obligation leaving.
+// issue is the fix arriving rather than the response window's deadline leaving.
 func settingAside(outcome Outcome) bool {
 	return outcome.HidesRisk() && !outcome.Commits()
 }
 
-// RecordExploitedHere records that this product was exploited through an
+// RecordIncident records that this product was exploited through an
 // issue.
 //
 // It cannot be refused by anything already on record. A dismissal standing at
@@ -151,17 +151,17 @@ func settingAside(outcome Outcome) bool {
 // the agreement withdrawn leaves a product reading as exploited and as
 // dismissed at once, which is the state the refusal at submission exists to
 // make impossible from the other direction.
-func (s *Store) RecordExploitedHere(ctx context.Context, subject access.Subject,
+func (s *Store) RecordIncident(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64, knownAt time.Time, grounds string) (
-	*ExploitedHere, Undone, error) {
+	*Incident, Undone, error) {
 
 	var (
-		recorded *ExploitedHere
+		recorded *Incident
 		undone   Undone
 	)
 	if subject.Kind != access.Person || subject.ID == 0 {
 		return nil, undone, refusal.New(
-			"a record of being exploited is kept against whoever recorded it")
+			"an incident is kept against whoever recorded it")
 	}
 	// Triage on this product, asked before anything in the request is
 	// resolved, so a product somebody holds nothing on refuses in the same
@@ -171,7 +171,7 @@ func (s *Store) RecordExploitedHere(ctx context.Context, subject access.Subject,
 	}
 	if strings.TrimSpace(grounds) == "" {
 		return nil, undone, refusal.New(
-			"say what happened. Nothing re-checks a record of being exploited, so what " +
+			"say what happened. Nothing re-checks an incident, so what " +
 				"is written here is the whole of what the next person has")
 	}
 	if len(grounds) > GroundsLimit {
@@ -214,12 +214,12 @@ func (s *Store) RecordExploitedHere(ctx context.Context, subject access.Subject,
 			return err
 		}
 		if !told {
-			return ErrNoSuchExploitedHere
+			return ErrNoSuchIncident
 		}
 
 		now := within.now().UTC().Truncate(time.Microsecond)
 		live := vulnerabilityID
-		recorded = &ExploitedHere{
+		recorded = &Incident{
 			VulnerabilityID: vulnerabilityID, ProductID: productID,
 			KnownAt: knownAt.UTC().Truncate(time.Microsecond),
 			Grounds: grounds, RecordedBy: subject.ID, RecordedAt: now,
@@ -231,11 +231,11 @@ func (s *Store) RecordExploitedHere(ctx context.Context, subject access.Subject,
 				// refused it, which is the only thing that could: two records
 				// arriving together both walk through any check made before
 				// the write.
-				return ErrAlreadyExploitedHere
+				return ErrIncidentStands
 			}
 			return fmt.Errorf("record that this product was exploited: %w", err)
 		}
-		if err := within.noteExploitedHere(ctx, tx, subject, productID, vulnerabilityID,
+		if err := within.noteIncident(ctx, tx, subject, productID, vulnerabilityID,
 			nil, trail.Said(recorded.KnownAt.Format(time.RFC3339), true)); err != nil {
 			return err
 		}
@@ -243,7 +243,7 @@ func (s *Store) RecordExploitedHere(ctx context.Context, subject access.Subject,
 			vulnerabilityID, now); err != nil {
 			return err
 		}
-		return finding.ExploitedHereChanged(ctx, tx, productID, vulnerabilityID, true, now)
+		return finding.IncidentChanged(ctx, tx, productID, vulnerabilityID, true, now)
 	})
 	if err != nil {
 		return nil, Undone{}, err
@@ -251,7 +251,7 @@ func (s *Store) RecordExploitedHere(ctx context.Context, subject access.Subject,
 	return recorded, undone, nil
 }
 
-// ClearExploitedHere takes a record back.
+// ClearIncident takes a record back.
 //
 // An explicit act with a person and a reason on it. Nothing else clears one:
 // no scan, no rescan, no closure of the findings it was about. A record that
@@ -261,15 +261,15 @@ func (s *Store) RecordExploitedHere(ctx context.Context, subject access.Subject,
 // What it does not do is put back what recording it undid. An agreement taken
 // back is taken back; whether the dismissal was right is a question for
 // whoever answers the finding, not something this may decide on their behalf.
-func (s *Store) ClearExploitedHere(ctx context.Context, subject access.Subject, id int64,
+func (s *Store) ClearIncident(ctx context.Context, subject access.Subject, id int64,
 	because string) error {
 
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return refusal.New("clearing a record of being exploited is recorded against whoever did it")
+		return refusal.New("clearing an incident is recorded against whoever did it")
 	}
 	if strings.TrimSpace(because) == "" {
 		return refusal.New(
-			"say why. A record of being exploited is cleared by somebody deciding it was " +
+			"say why. An incident is cleared by somebody deciding it was " +
 				"wrong, and the deciding is what the next person needs")
 	}
 	if len(because) > GroundsLimit {
@@ -280,13 +280,13 @@ func (s *Store) ClearExploitedHere(ctx context.Context, subject access.Subject, 
 	}
 
 	return s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		record := new(ExploitedHere)
+		record := new(Incident)
 		if err := tx.NewSelect().Model(record).Where(`"eh"."id" = ?`, id).Scan(ctx); err != nil {
-			return database.FromRead(err, ErrNoSuchExploitedHere,
-				fmt.Sprintf("read record of being exploited %d", id))
+			return database.FromRead(err, ErrNoSuchIncident,
+				fmt.Sprintf("read incident %d", id))
 		}
 		if !subject.TriagesIn(record.ProductID) {
-			return ErrNoSuchExploitedHere
+			return ErrNoSuchIncident
 		}
 		told, err := finding.MayBeToldOfWithin(ctx, tx, subject,
 			record.ProductID, record.VulnerabilityID)
@@ -294,14 +294,14 @@ func (s *Store) ClearExploitedHere(ctx context.Context, subject access.Subject, 
 			return err
 		}
 		if !told {
-			return ErrNoSuchExploitedHere
+			return ErrNoSuchIncident
 		}
 		if !record.Standing() {
-			return ErrNoSuchExploitedHere
+			return ErrNoSuchIncident
 		}
 
 		now := within.now().UTC().Truncate(time.Microsecond)
-		res, err := tx.NewUpdate().Model((*ExploitedHere)(nil)).
+		res, err := tx.NewUpdate().Model((*Incident)(nil)).
 			Set(`"cleared_at" = ?`, now).
 			Set(`"cleared_by" = ?`, subject.ID).
 			Set(`"cleared_because" = ?`, because).
@@ -316,29 +316,29 @@ func (s *Store) ClearExploitedHere(ctx context.Context, subject access.Subject, 
 			Where(`"cleared_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("clear a record of being exploited: %w", err)
+			return fmt.Errorf("clear an incident: %w", err)
 		}
 		cleared, err := database.Affected(res)
 		if err != nil {
-			return fmt.Errorf("clear a record of being exploited: %w", err)
+			return fmt.Errorf("clear an incident: %w", err)
 		}
 		if cleared == 0 {
-			return ErrNoSuchExploitedHere
+			return ErrNoSuchIncident
 		}
-		if err := within.noteExploitedHere(ctx, tx, subject,
+		if err := within.noteIncident(ctx, tx, subject,
 			record.ProductID, record.VulnerabilityID,
 			trail.Said(record.KnownAt.UTC().Format(time.RFC3339), true), nil); err != nil {
 			return err
 		}
-		return finding.ExploitedHereChanged(ctx, tx,
+		return finding.IncidentChanged(ctx, tx,
 			record.ProductID, record.VulnerabilityID, false, now)
 	})
 }
 
-// noteExploitedHere writes the act into the administrative trail.
+// noteIncident writes the act into the administrative trail.
 //
 // In the transaction that makes it, so a failure here fails the act. Both are
-// one thing: a record of being exploited decides what the triage record may
+// one thing: an incident decides what the triage record may
 // say, and one kept with nobody's name on it is the state the trail exists to
 // prevent.
 //
@@ -346,14 +346,14 @@ func (s *Store) ClearExploitedHere(ctx context.Context, subject access.Subject, 
 // grounds. The grounds are on the record and are as long as somebody needed;
 // what a reader of the trail is asking is when this started and when it
 // stopped.
-func (s *Store) noteExploitedHere(ctx context.Context, tx bun.IDB, subject access.Subject,
+func (s *Store) noteIncident(ctx context.Context, tx bun.IDB, subject access.Subject,
 	productID, vulnerabilityID int64, was, became *string) error {
 
 	about, err := TrailAbout(ctx, tx, productID, vulnerabilityID)
 	if err != nil {
 		return err
 	}
-	return trail.NewStore(tx).Record(ctx, subject, trail.ExploitedHere, about, was, became)
+	return trail.NewStore(tx).Record(ctx, subject, trail.Incident, about, was, became)
 }
 
 // TrailAbout is what the administrative trail records a change to a record of
@@ -394,7 +394,7 @@ func TrailAbout(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int6
 // component is the one the scanner meant — and the outcomes that promise work
 // or put it off, made at the finding, are not contradicted by an attack at
 // all. Made in bulk they are one sentence over a selection, and a standing
-// record is an obligation that does not leave anybody's list that way.
+// incident is a deadline that does not leave anybody's list that way.
 //
 // Whole decisions, the way every other undo here works: the agreement is recorded
 // against the decision, so taking it back takes it back for every row. A decision
@@ -465,7 +465,7 @@ func (s *Store) unsayWhatARecordContradicts(ctx context.Context, subject access.
 }
 
 // contradicted is the decisions with a live row here, among those q reads, that a
-// record of being exploited contradicts: a decision that the issue does not
+// incident contradicts: a decision that the issue does not
 // apply, however it was made, and an act over many issues that sets this one
 // aside or puts it off.
 func (s *Store) contradicted(ctx context.Context, q *bun.SelectQuery, productID,
@@ -550,41 +550,41 @@ func (s *Store) overMany(ctx context.Context, decision Decision) (bool, error) {
 	return true, nil
 }
 
-// standsExploitedHere reports the issues this product records being exploited
+// standsIncident reports the issues an incident stands in this product
 // through, among the ones named.
 //
 // Asked inside the transaction a decision is written in. Read before it opened,
 // the answer would describe a world a retry has left behind — and the thing it
 // decides is whether the decision may be written at all.
-func standsExploitedHere(ctx context.Context, tx bun.IDB, productID int64,
+func standsIncident(ctx context.Context, tx bun.IDB, productID int64,
 	issues []int64) (map[int64]bool, error) {
 
-	return finding.ExploitedHere(ctx, tx, productID, issues)
+	return finding.Incident(ctx, tx, productID, issues)
 }
 
-// refuseIfExploitedHere turns away a set of proposals that a standing record
-// of this product being exploited refuses, at submission. refuseExploitedHere
+// refuseIfIncident turns away a set of proposals that a standing record
+// of this product being exploited refuses, at submission. refuseIncident
 // holds which decisions those are.
 //
 // Recording it the other way round is allowed and does something different —
 // the record lands and the decision goes back to the queue — because a fact
 // cannot be refused and a decision can.
-func (s *Store) refuseIfExploitedHere(ctx context.Context, decision *Decision,
+func (s *Store) refuseIfIncident(ctx context.Context, decision *Decision,
 	proposals []Proposal) error {
 
 	occurrences := make([]Occurrence, 0, len(proposals))
 	for _, p := range proposals {
 		occurrences = append(occurrences, p.Occurrence)
 	}
-	return s.refuseExploitedHere(ctx, decision, occurrences)
+	return s.refuseIncident(ctx, decision, occurrences)
 }
 
-// refuseIfExploitedHereOn is the same refusal asked of a decision's stored rows.
+// refuseIfIncidentOn is the same refusal asked of a decision's stored rows.
 //
 // Approving writes no decision occurrence, so it does not meet the refusal where rows
 // are written. A decision proposed before a record arrived and agreed to after it
 // is refused here, so no product reads as exploited and as dismissed at once.
-func (s *Store) refuseIfExploitedHereOn(ctx context.Context, decision *Decision,
+func (s *Store) refuseIfIncidentOn(ctx context.Context, decision *Decision,
 	rows []DecisionOccurrence) error {
 
 	occurrences := make([]Occurrence, 0, len(rows))
@@ -593,7 +593,7 @@ func (s *Store) refuseIfExploitedHereOn(ctx context.Context, decision *Decision,
 			ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
 		})
 	}
-	return s.refuseExploitedHere(ctx, decision, occurrences)
+	return s.refuseIncident(ctx, decision, occurrences)
 }
 
 // settingAsideOutcomes is every outcome settingAside admits, for a query.
@@ -607,14 +607,14 @@ func settingAsideOutcomes() []Outcome {
 	return out
 }
 
-// refuseExploitedHere is the rule itself, over wherever a decision lands.
+// refuseIncident is the rule itself, over wherever a decision lands.
 //
 // Two rules share the lookup. A decision that the issue does not apply is
 // refused however it was made, because it contradicts the record. An act over
 // many issues that sets one aside or puts it off is refused because a
-// standing record is an obligation somebody may be answering to, and one
+// standing incident is a deadline somebody may be answering to, and one
 // sentence over a selection is not how that leaves anybody's list.
-func (s *Store) refuseExploitedHere(ctx context.Context, decision *Decision, occurrences []Occurrence) error {
+func (s *Store) refuseIncident(ctx context.Context, decision *Decision, occurrences []Occurrence) error {
 	if decision == nil {
 		return nil
 	}
@@ -651,21 +651,21 @@ func (s *Store) refuseExploitedHere(ctx context.Context, decision *Decision, occ
 		for id := range issues {
 			wanted = append(wanted, id)
 		}
-		standing, err := standsExploitedHere(ctx, s.db, productID, wanted)
+		standing, err := standsIncident(ctx, s.db, productID, wanted)
 		if err != nil {
 			return err
 		}
 		if len(standing) > 0 {
 			if contradicts {
-				return ErrContradictsExploitedHere
+				return ErrContradictsIncident
 			}
-			return ErrBulkOverExploitedHere
+			return ErrBulkOverIncident
 		}
 	}
 	return nil
 }
 
-// ExploitedHereAt is every record kept about one issue in one product, newest
+// IncidentAt is every record kept about one issue in one product, newest
 // first, cleared ones among them.
 //
 // Cleared records are part of the answer rather than history to be hidden:
@@ -682,17 +682,17 @@ func (s *Store) refuseExploitedHere(ctx context.Context, decision *Decision, occ
 // Unpaged, because the set is what a product has been attacked through with
 // one issue. A deployment holding more of those than a page has a problem no
 // paging would help with.
-func (s *Store) ExploitedHereAt(ctx context.Context, subject access.Subject,
-	productID, vulnerabilityID int64) ([]ExploitedHere, error) {
+func (s *Store) IncidentAt(ctx context.Context, subject access.Subject,
+	productID, vulnerabilityID int64) ([]Incident, error) {
 
 	told, err := finding.MayBeToldOfWithin(ctx, s.db, subject, productID, vulnerabilityID)
 	if err != nil {
 		return nil, err
 	}
 	if !told {
-		return nil, ErrNoSuchExploitedHere
+		return nil, ErrNoSuchIncident
 	}
-	var kept []ExploitedHere
+	var kept []Incident
 	err = s.db.NewSelect().Model(&kept).
 		Where(`"eh"."product_id" = ?`, productID).
 		Where(finding.FiledUnder(filed.ExploitedIssue), vulnerabilityID).

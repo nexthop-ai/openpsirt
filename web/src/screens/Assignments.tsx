@@ -11,7 +11,7 @@ import { mayOf, useWho } from "../app/session";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { Severity, Exploited, Incident } from "../ui/Severity";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
@@ -493,7 +493,7 @@ function Held({
                       {row.vulnerability}
                     </Link>{" "}
                     {row.occurrence && <span className="hint">lead</span>}{" "}
-                    <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
+                    <Incident when={row.incident} /> <Exploited when={row.exploited} />
                   </td>
                   <td>
                     <span className="id">{row.component}</span>{" "}

@@ -84,9 +84,8 @@ const (
 	DisplacedDecisionOccurrence DisplacedKind = "decision"
 	// DisplacedRating is a rating claim in one product.
 	DisplacedRating DisplacedKind = "rating"
-	// DisplacedAttack is a record of the product being exploited through the
-	// issue.
-	DisplacedAttack DisplacedKind = "exploited-here"
+	// DisplacedIncident is an incident in the product through the issue.
+	DisplacedIncident DisplacedKind = "incident"
 )
 
 // settleDecisions leaves one live decision at each occurrence of the merged
@@ -238,7 +237,7 @@ func (v *Vulnerabilities) supersede(ctx context.Context, set []liveDecision, mer
 
 // settleRecords holds what a product said about the absorbed issue under the
 // issue it is read as: its rating in force, its tags, and the rating claim and
-// the record of being attacked that stand there.
+// the incident that stand there.
 //
 // Where the kept issue already holds its own rating in force or tag in that
 // product, its own stays and the absorbed issue's goes: both are derived or
@@ -366,7 +365,7 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 	if err := v.settleAttacks(ctx, kept, gone, mergeID, now, why); err != nil {
 		return err
 	}
-	// A record of being attacked that now stands for the kept issue marks
+	// An incident that now stands for the kept issue marks
 	// every one of its findings in that product.
 	var attacked []int64
 	if err := v.db.NewSelect().TableExpr(`"incident"`).
@@ -376,7 +375,7 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		return fmt.Errorf("read where the kept issue was attacked: %w", err)
 	}
 	for _, product := range attacked {
-		if err := ExploitedHereChanged(ctx, v.db, product, kept, true, now); err != nil {
+		if err := IncidentChanged(ctx, v.db, product, kept, true, now); err != nil {
 			return err
 		}
 	}
@@ -549,7 +548,7 @@ func settleStanding[T any](rows []T, product, id func(T) int64, outranks func(a,
 	return nil
 }
 
-// standingAttack is a record of being attacked that holds its key, as a merge
+// standingAttack is an incident that holds its key, as a merge
 // settles it.
 type standingAttack struct {
 	ID         int64     `bun:"id"`
@@ -568,7 +567,7 @@ func (a standingAttack) outranks(other standingAttack) bool {
 	return a.ID > other.ID
 }
 
-// settleAttacks leaves one record of being attacked standing per product
+// settleAttacks leaves one incident standing per product
 // about the merged issue, held under the issue it is read as.
 //
 // Every standing record has the same standing, so where each issue held one
@@ -585,7 +584,7 @@ func (v *Vulnerabilities) settleAttacks(ctx context.Context, kept, gone, mergeID
 		Where(`"live_vulnerability_id" IN (?, ?)`, kept, gone).
 		OrderExpr(`"id"`).
 		Scan(ctx, &standing); err != nil {
-		return fmt.Errorf("read the records of being attacked through the merged issue: %w", err)
+		return fmt.Errorf("read the incidents through the merged issue: %w", err)
 	}
 	retire := func(a, winner standingAttack) error {
 		product := a.ProductID
@@ -595,15 +594,15 @@ func (v *Vulnerabilities) settleAttacks(ctx context.Context, kept, gone, mergeID
 			Set(`"cleared_because" = ?`, why.because).
 			Set(`"live_vulnerability_id" = NULL`).
 			Where(`"id" = ?`, a.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("clear record %d of being attacked, which a merge superseded: %w", a.ID, err)
+			return fmt.Errorf("clear incident %d, which a merge superseded: %w", a.ID, err)
 		}
 		if err := v.trailSuperseded(ctx, why, product,
-			"exploited here, known "+a.KnownAt.UTC().Format(time.RFC3339)); err != nil {
+			"incident, known "+a.KnownAt.UTC().Format(time.RFC3339)); err != nil {
 			return err
 		}
 		if !a.KnownAt.Equal(winner.KnownAt) {
 			v.displaced = append(v.displaced, Displaced{
-				Kind: DisplacedAttack, ProductID: product,
+				Kind: DisplacedIncident, ProductID: product,
 				RecordID: a.ID, StandingID: winner.ID, MergeID: mergeID,
 			})
 		}
@@ -616,7 +615,7 @@ func (v *Vulnerabilities) settleAttacks(ctx context.Context, kept, gone, mergeID
 		if _, err := v.db.NewUpdate().TableExpr(`"incident"`).
 			Set(`"live_vulnerability_id" = ?`, kept).
 			Where(`"id" = ?`, winner.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("hold record %d of being attacked under the issue it is read as: %w",
+			return fmt.Errorf("hold incident %d under the issue it is read as: %w",
 				winner.ID, err)
 		}
 		return nil

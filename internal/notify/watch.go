@@ -18,8 +18,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
@@ -182,8 +182,8 @@ type sweep struct {
 	// reach is what each person may do with each product, from the two
 	// above.
 	reach map[int64]map[int64]acts
-	// shelved is the obligation shelf once a kind has read it.
-	shelved *[]obligation.Entry
+	// shelved is the incident shelf once a kind has read it.
+	shelved *[]incident.Entry
 }
 
 // tell makes what each person is told of one kind exactly what they are
@@ -260,9 +260,9 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		}, "what is about to disclose"},
 		// A window after an attack on a product, running and then passed,
 		// with nobody outside recorded as told.
-		{ObligationOpen, s.windowsOpen, "which windows after an attack are running"},
-		{ObligationNear, s.windowsNear, "which windows after an attack are about to end"},
-		{ObligationPassed, s.windowsPassed, "which windows after an attack have passed"},
+		{ResponseWindowOpen, s.windowsOpen, "which windows after an attack are running"},
+		{ResponseWindowNear, s.windowsNear, "which windows after an attack are about to end"},
+		{ResponseWindowPassed, s.windowsPassed, "which windows after an attack have passed"},
 		// A VEX publisher changing what they said about something a standing
 		// decision cited.
 		{StatementRevised, s.statementsRevised, "what a publisher changed"},

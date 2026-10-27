@@ -522,7 +522,7 @@ func (s *Store) write(ctx context.Context, decision *Decision, proposals []Propo
 			proposals[i].Occurrence.VulnerabilityID = issue
 		}
 	}
-	if err := s.refuseIfExploitedHere(ctx, decision, proposals); err != nil {
+	if err := s.refuseIfIncident(ctx, decision, proposals); err != nil {
 		return nil, err
 	}
 	now := s.now().Truncate(time.Microsecond)

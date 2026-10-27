@@ -773,10 +773,10 @@ type Owned struct {
 	Version       string `bun:"version"`
 	// Purl is the component's package identifier, which what tells it from
 	// another component of the same name and version is read out of.
-	Purl          string `bun:"-"`
-	Severity      string `bun:"severity"`
-	Exploited     bool   `bun:"exploited"`
-	ExploitedHere bool   `bun:"incident"`
+	Purl      string `bun:"-"`
+	Severity  string `bun:"severity"`
+	Exploited bool   `bun:"exploited"`
+	Incident  bool   `bun:"incident"`
 	// Product is the name that addresses it, and ProductName the one shown.
 	Product     string `bun:"product"`
 	ProductName string `bun:"-"`
@@ -987,7 +987,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		Builds          int       `bun:"builds"`
 		Urgency         int64     `bun:"urgency"`
 		Exploited       int       `bun:"exploited"`
-		ExploitedHere   int       `bun:"incident"`
+		Incident        int       `bun:"incident"`
 		Occurrences     int       `bun:"places"`
 		Occurrence      string    `bun:"place"`
 		Total           int       `bun:"total"`
@@ -1010,7 +1010,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
 		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross+` AS "incident"`).
+		ColumnExpr(incidentAcross+` AS "incident"`).
 		// The oldest occurrence decides, as it does everywhere else here: a
 		// group open for a month with one occurrence added yesterday has been
 		// somebody's problem for a month, and a maximum made it read as a day
@@ -1092,7 +1092,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.S
 			ProductID: head.ProductID,
 			Urgency:   head.Urgency, Occurrences: head.Occurrences, Builds: head.Builds,
 			Undisclosed: head.Undisclosed, OpenedAt: head.OpenedAt, Occurrence: head.Occurrence,
-			Exploited: head.Exploited == 1, ExploitedHere: head.ExploitedHere == 1,
+			Exploited: head.Exploited == 1, Incident: head.Incident == 1,
 		}
 		if issue, held := named[head.VulnerabilityID]; held {
 			issue = issue.RatedIn(rated[RatedKey{

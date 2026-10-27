@@ -11,7 +11,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -32,7 +32,7 @@ func registerFixes(api huma.API, in core.Deps) {
 			"a tag the record names. A tag with no stated release date starts nothing.\n\n" +
 			"A branch, a retired tag and a cleared record are refused with 422, a tag the " +
 			"product does not have with 422, and a tag the record already names with 409.",
-		Tags: []string{"Obligations"}, DefaultStatus: http.StatusCreated,
+		Tags: []string{"Incidents"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "The product is the record's own, not one in the path.",
 		core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
@@ -42,7 +42,7 @@ func registerFixes(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		store := obligation.NewStore(in.DB.DB)
+		store := incident.NewStore(in.DB.DB)
 		fix, err := store.NameFix(ctx, subject, input.ID, input.Body.Release)
 		if err != nil {
 			return nil, refusedFix(in, err)
@@ -58,17 +58,17 @@ func registerFixes(api huma.API, in core.Deps) {
 		}
 		// Read back as the record's fixes are, so the state of the tag's
 		// scans is answered the same way here as on the record.
-		fixes, err := store.FixesOf(ctx, subject, []int64{fix.ExploitedHereID})
+		fixes, err := store.FixesOf(ctx, subject, []int64{fix.IncidentID})
 		if err != nil {
 			in.Log().ErrorContext(ctx, "a named release could not be read back",
 				"fix", fix.ID, "error", err)
 		}
-		for _, one := range fixes[fix.ExploitedHereID] {
+		for _, one := range fixes[fix.IncidentID] {
 			if one.ID == fix.ID {
 				*fix = one
 			}
 		}
-		return &struct{ Body core.FixBody }{Body: core.FixBodies([]obligation.Fix{*fix}, people)[0]}, nil
+		return &struct{ Body core.FixBody }{Body: core.FixBodies([]incident.Fix{*fix}, people)[0]}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -81,7 +81,7 @@ func registerFixes(api huma.API, in core.Deps) {
 			"where none is stated. Recorded in the administrative trail.\n\n" +
 			"A naming already withdrawn, or never made, answers 404. A cleared record is " +
 			"refused with 422.",
-		Tags: []string{"Obligations"}, DefaultStatus: http.StatusNoContent,
+		Tags: []string{"Incidents"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "The product is the record's own, not one in the path.",
 		core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID  int64 `path:"id"`
@@ -91,7 +91,7 @@ func registerFixes(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if err := obligation.NewStore(in.DB.DB).WithdrawFix(ctx, subject, input.ID,
+		if err := incident.NewStore(in.DB.DB).WithdrawFix(ctx, subject, input.ID,
 			input.Fix); err != nil {
 			return nil, refusedFix(in, err)
 		}
@@ -102,11 +102,11 @@ func registerFixes(api huma.API, in core.Deps) {
 // refusedFix answers a store's refusal to name or withdraw a fix release.
 func refusedFix(in core.Deps, err error) error {
 	switch {
-	case errors.Is(err, obligation.ErrNoSuchRecord):
-		return noSuchExploitedHere()
-	case errors.Is(err, obligation.ErrNoSuchFix):
+	case errors.Is(err, incident.ErrNoSuchRecord):
+		return noSuchIncident()
+	case errors.Is(err, incident.ErrNoSuchFix):
 		return huma.Error404NotFound("this record names no such release as carrying the fix")
-	case errors.Is(err, obligation.ErrFixNamed):
+	case errors.Is(err, incident.ErrFixNamed):
 		return huma.Error409Conflict("this record already names that release as carrying the fix")
 	}
 	return core.RefusedDecision(in.Logger, err)

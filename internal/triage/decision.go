@@ -480,8 +480,8 @@ func (s *Store) approveDecision(ctx context.Context, subject access.Subject, dec
 		return nil, ErrNothingToApprove
 	}
 	// Refused before anybody agrees to it. A decision that the issue does not
-	// apply, written before a record of this product being exploited through
-	// it arrived, is a decision the record contradicts — and agreeing to it is
+	// apply, written before an incident in this product through it arrived,
+	// is a decision the incident contradicts — and agreeing to it is
 	// what would put the finding out of sight.
 	//
 	// Asked of the rows being agreed to rather than all of them, so an
@@ -493,7 +493,7 @@ func (s *Store) approveDecision(ctx context.Context, subject access.Subject, dec
 			agreeing = append(agreeing, row)
 		}
 	}
-	if err := s.refuseIfExploitedHereOn(ctx, decision, agreeing); err != nil {
+	if err := s.refuseIfIncidentOn(ctx, decision, agreeing); err != nil {
 		return nil, err
 	}
 	// Compared against whoever wrote the words being agreed to, not only

@@ -72,7 +72,7 @@ func Kinds() []Kind {
 		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
 		LeadHandedOff, LeadMoved, LeadReopened, RuleOutgrown, RuleWaiting,
-		ObligationOpen, ObligationNear, ObligationPassed,
+		ResponseWindowOpen, ResponseWindowNear, ResponseWindowPassed,
 	}
 }
 
@@ -139,7 +139,7 @@ const (
 	// is revisited or the statement is cited no longer.
 	StatementRevised Kind = "statement-revised"
 
-	// ObligationOpen is a window this deployment declared, running from the
+	// ResponseWindowOpen is a window this deployment declared, running from the
 	// moment an attack on a product became known, with no notice outside
 	// recorded against it.
 	//
@@ -149,18 +149,18 @@ const (
 	// It clears when a notice names the window, when the record is cleared,
 	// or when the window is retired — and when the end arrives, at which point
 	// the other opens.
-	ObligationOpen Kind = "response-window-open"
-	// ObligationNear is the same window once the warning it names has come
+	ResponseWindowOpen Kind = "response-window-open"
+	// ResponseWindowNear is the same window once the warning it names has come
 	// and its end has not, still with no notice recorded against it.
 	//
 	// Beside the one raised when the record stands rather than instead of it.
 	// A day's window and a fortnight's want warnings of different sizes, so
 	// each window says its own, and one that says none raises none.
-	ObligationNear Kind = "response-window-near"
-	// ObligationPassed is the same window after its end, still with no
+	ResponseWindowNear Kind = "response-window-near"
+	// ResponseWindowPassed is the same window after its end, still with no
 	// notice recorded against it. Both halves are facts; whether anybody owed
 	// anything is not the tool's answer to give.
-	ObligationPassed Kind = "response-window-passed"
+	ResponseWindowPassed Kind = "response-window-passed"
 
 	// The four things that are wrong because nothing has happened.
 	//
@@ -209,7 +209,7 @@ const (
 	DecisionLapsed Kind = "decision-lapsed"
 	// MergeSuperseded is two decisions that disagreed meeting when a report
 	// merged the issues they were filed under: two decisions about one occurrence,
-	// two rating claims, or two records of being attacked, in one product.
+	// two rating claims, or two incidents, in one product.
 	// One stands and the other stopped standing, which is a choice the tool
 	// made rather than a person, so every triager of the product is told.
 	MergeSuperseded Kind = "merge-superseded"

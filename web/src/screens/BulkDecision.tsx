@@ -15,7 +15,7 @@ import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Crumbs } from "../ui/Crumbs";
-import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { Severity, Exploited, Incident } from "../ui/Severity";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
@@ -368,8 +368,7 @@ export function BulkDecision() {
                           <Link to={issueAt(name)} className="id">
                             {name}
                           </Link>{" "}
-                          <ExploitedHere when={issue.exploited_here} />{" "}
-                          <Exploited when={issue.exploited} />
+                          <Incident when={issue.incident} /> <Exploited when={issue.exploited} />
                           {/* What the issue says about itself. The screen
                               narrows on this text and showed none of it, so a
                               term matched rows nobody could check. */}

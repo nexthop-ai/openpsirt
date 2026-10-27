@@ -39,14 +39,14 @@ type Rank int64
 // thousand hundredths, a likelihood at most a million parts, and each of the
 // two exploitation bands is set once or not at all.
 const (
-	// exploitedHereBand is somebody here recording that this product was
+	// incidentBand is somebody here recording that this product was
 	// attacked through the issue. Above the band beside it because a person
 	// stating that we were attacked is worth more than a feed stating that
 	// somebody somewhere was, and the feed's flag says nothing about whether
 	// it reaches this product at all.
-	exploitedHereBand = 10_000_000_000_000
-	exploitedBand     = 1_000_000_000_000
-	shippedBand       = 100_000_000_000
+	incidentBand  = 10_000_000_000_000
+	exploitedBand = 1_000_000_000_000
+	shippedBand   = 100_000_000_000
 	// severityStep lifts severity above likelihood, which sits underneath it
 	// and orders things that are equally severe.
 	severityStep  = 10_000_000
@@ -71,11 +71,11 @@ type Rating struct {
 	// anybody has claimed, so a later report that does not mention it is read
 	// as a gap in that report rather than as the exploitation having stopped.
 	Exploited bool
-	// ExploitedHere says somebody recorded that this product was attacked
+	// Incident says somebody recorded that this product was attacked
 	// through it. A different fact from the one above and the only one of the
 	// two that is an incident: a feed reports the world, and no feed reports
 	// this.
-	ExploitedHere bool
+	Incident bool
 	// ScoreCenti and LikelihoodPPM are the published numbers, each the highest
 	// anybody has claimed.
 	ScoreCenti    int
@@ -117,11 +117,11 @@ func (r Rating) Score() int {
 // back out would work and would be exactly the sort of cleverness that breaks
 // silently the first time the weighting changes.
 type Ranked struct {
-	// ExploitedHere says somebody recorded that this product was attacked
+	// Incident says somebody recorded that this product was attacked
 	// through it. It outranks everything else, including the world's word:
 	// this is the incident, and the signal below it is a report about
 	// somewhere that may not be here at all.
-	ExploitedHere bool
+	Incident bool
 	// Exploited says somebody is known to be using it somewhere in the world.
 	// It outranks everything beneath it, because being used is a fact where
 	// the rest are estimates of how bad it would be.
@@ -160,8 +160,8 @@ type Ranked struct {
 // rather than a forecast and already ranks above everything.
 func (r Ranked) Rank() Rank {
 	rank := int64(0)
-	if r.ExploitedHere {
-		rank += exploitedHereBand
+	if r.Incident {
+		rank += incidentBand
 	}
 	if r.Exploited {
 		rank += exploitedBand
@@ -200,8 +200,8 @@ const exploiting = exploitedBand
 // Counted rather than aggregated as a boolean, which is the same question
 // asked portably — the four engines do not agree on a boolean aggregate.
 const (
-	exploitedAcross     = `MAX(CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END)`
-	exploitedHereAcross = `MAX(CASE WHEN "f"."urgency_incident" THEN 1 ELSE 0 END)`
+	exploitedAcross = `MAX(CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END)`
+	incidentAcross  = `MAX(CASE WHEN "f"."urgency_incident" THEN 1 ELSE 0 END)`
 )
 
 // bounded keeps a signal inside the range its place value allows.

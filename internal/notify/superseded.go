@@ -50,7 +50,7 @@ type supersededAbout struct {
 var supersededSaid = map[finding.DisplacedKind]string{
 	finding.DisplacedDecisionOccurrence: "two decisions in %s disagreed about one occurrence",
 	finding.DisplacedRating:             "two ratings of it in %s disagreed",
-	finding.DisplacedAttack:             "two records of %s being attacked through it gave different dates",
+	finding.DisplacedIncident:           "two incidents in %s through it gave different dates",
 }
 
 func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) error {

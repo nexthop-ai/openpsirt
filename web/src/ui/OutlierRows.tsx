@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Exploited, ExploitedHere, Severity } from "./Severity";
+import { Exploited, Incident, Severity } from "./Severity";
 import { Wide } from "./Wide";
 
 // One issue a bulk decision covers that does not look like the rest, as the
@@ -11,7 +11,7 @@ type Outlier = {
   severity?: string;
   vulnerability?: string;
   exploited?: boolean;
-  exploited_here?: boolean;
+  incident?: boolean;
   why?: string[] | null;
 };
 
@@ -53,8 +53,8 @@ export function OutlierRows<Row extends Outlier>({
                 <Severity word={one.severity} />
               </td>
               <td>
-                <span className="id">{one.vulnerability}</span>{" "}
-                <ExploitedHere when={one.exploited_here} /> <Exploited when={one.exploited} />
+                <span className="id">{one.vulnerability}</span> <Incident when={one.incident} />{" "}
+                <Exploited when={one.exploited} />
               </td>
               <td className="hint">{(one.why ?? []).join(", ")}</td>
             </tr>

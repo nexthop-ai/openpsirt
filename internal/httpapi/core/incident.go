@@ -4,13 +4,13 @@
 package core
 
 import (
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// ExploitedHereBody is a record that one product was exploited through an
+// IncidentBody is a record that one product was exploited through an
 // issue.
-type ExploitedHereBody struct {
+type IncidentBody struct {
 	ID            int64  `json:"id,omitempty"`
 	Vulnerability string `json:"vulnerability,omitempty" doc:"The issue this is about"`
 	// Product is who the record belongs to. Carried on every row because a
@@ -22,7 +22,7 @@ type ExploitedHereBody struct {
 	Product     string `json:"product,omitempty" doc:"The product this record belongs to, by the name an address takes"`
 	ProductName string `json:"product_name,omitempty" doc:"That product's spelling on screen"`
 	KnownAt     string `json:"known_at" format:"date-time" doc:"When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in"`
-	Grounds     string `json:"grounds" doc:"What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has"`
+	Grounds     string `json:"grounds" doc:"What happened and how it is known. Nothing re-checks an incident, so this is the whole of what a later reader has"`
 	RecordedBy  string `json:"recorded_by,omitempty" doc:"Who recorded it"`
 	RecordedAt  string `json:"recorded_at,omitempty" format:"date-time"`
 	// The clearing, where one has happened. Absent while the record stands,
@@ -49,7 +49,7 @@ type ExploitedHereBody struct {
 // serialized as a number, because a number is not an answer — nothing else
 // publishes one, and an account since removed would hand a reader something
 // they cannot act on.
-func WhoTouched(records []triage.ExploitedHere) []int64 {
+func WhoTouched(records []triage.Incident) []int64 {
 	wanted := make([]int64, 0, 2*len(records))
 	for _, record := range records {
 		wanted = append(wanted, record.RecordedBy)
@@ -60,10 +60,10 @@ func WhoTouched(records []triage.ExploitedHere) []int64 {
 	return wanted
 }
 
-func ExploitedHereBodyOf(record triage.ExploitedHere, identifier string,
-	people map[int64]string) ExploitedHereBody {
+func IncidentBodyOf(record triage.Incident, identifier string,
+	people map[int64]string) IncidentBody {
 
-	body := ExploitedHereBody{
+	body := IncidentBody{
 		ID: record.ID, Vulnerability: identifier,
 		KnownAt: Stamp(record.KnownAt),
 		Grounds: record.Grounds, RecordedBy: people[record.RecordedBy],
@@ -110,7 +110,7 @@ type FixBody struct {
 }
 
 // FixBodies is a record's named fix releases as a caller reads them.
-func FixBodies(fixes []obligation.Fix, people map[int64]string) []FixBody {
+func FixBodies(fixes []incident.Fix, people map[int64]string) []FixBody {
 	out := make([]FixBody, 0, len(fixes))
 	for _, fix := range fixes {
 		body := FixBody{
@@ -129,7 +129,7 @@ func FixBodies(fixes []obligation.Fix, people map[int64]string) []FixBody {
 }
 
 // ToldBodies is a record's notices as a caller reads them.
-func ToldBodies(told []obligation.Told, windows map[int64]string,
+func ToldBodies(told []incident.Told, windows map[int64]string,
 	people map[int64]string) []NoticeBody {
 
 	out := make([]NoticeBody, 0, len(told))
@@ -160,8 +160,8 @@ func ToldBodies(told []obligation.Told, windows map[int64]string,
 
 // WhoToldOrTouched is everybody named by a page of records, their notices and
 // the releases named on them as carrying the fix.
-func WhoToldOrTouched(records []triage.ExploitedHere,
-	told map[int64][]obligation.Told, fixes map[int64][]obligation.Fix) []int64 {
+func WhoToldOrTouched(records []triage.Incident,
+	told map[int64][]incident.Told, fixes map[int64][]incident.Fix) []int64 {
 
 	wanted := WhoTouched(records)
 	for _, each := range told {

@@ -86,7 +86,7 @@ const SAMPLES: Record<string, () => string[]> = {
     routes.reportFlawAt(odd, odd),
     routes.reportFlawAt(odd, undefined, "outside"),
   ],
-  exploitedAt: () => [routes.exploitedAt(), routes.exploitedAt(odd)],
+  incidentsAt: () => [routes.incidentsAt(), routes.incidentsAt(odd)],
   recordAt: () => [routes.recordAt({ alone: "true", outcome: odd })],
   requeried: () => [
     routes.requeried(

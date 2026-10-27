@@ -425,8 +425,8 @@ func TestTheListAcrossProductsSaysWhatIsExploited(t *testing.T) {
 			}
 			// Nothing here was recorded as used against this product, and the
 			// two must never answer for one another.
-			if row.ExploitedHere {
-				t.Errorf("%s reads as exploited here with no record kept",
+			if row.Incident {
+				t.Errorf("%s reads as an incident with none kept",
 					row.Vulnerability)
 			}
 		}

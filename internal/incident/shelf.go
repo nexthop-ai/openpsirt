@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package obligation
+package incident
 
 import (
 	"context"
@@ -15,10 +15,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// Standing is a record of being exploited that still stands, with the names a
+// Standing is an incident that still stands, with the names a
 // reader knows it by.
 type Standing struct {
-	Record triage.ExploitedHere
+	Record triage.Incident
 	// Issue is the issue as it is filed here.
 	Issue string
 	// Product is the name an address takes, and ProductName its spelling on
@@ -68,7 +68,7 @@ type Entry struct {
 	Fixes   []Fix
 }
 
-// Standings is every record of being exploited still standing that this
+// Standings is every incident still standing that this
 // subject may be told of, oldest known first.
 //
 // Narrowed record by record, each by the question that authorizes one issue
@@ -82,7 +82,7 @@ type Entry struct {
 func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standing, error) {
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var rows []struct {
-		triage.ExploitedHere `bun:"extend"`
+		triage.Incident `bun:"extend"`
 
 		Issue       string `bun:"issue"`
 		Product     string `bun:"product"`
@@ -90,7 +90,7 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 		Private     int    `bun:"private"`
 	}
 	err := s.db.NewSelect().
-		Model((*triage.ExploitedHere)(nil)).
+		Model((*triage.Incident)(nil)).
 		ColumnExpr("eh.*").
 		ColumnExpr(`"v"."identifier" AS "issue"`).
 		ColumnExpr(`"p"."name" AS "product"`).
@@ -111,7 +111,7 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 		Order("eh.known_at ASC", "eh.id ASC").
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what stands as exploited here: %w", err)
+		return nil, fmt.Errorf("read the standing incidents: %w", err)
 	}
 	out := make([]Standing, 0, len(rows))
 	for _, row := range rows {
@@ -130,7 +130,7 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 		private := row.Private == 1 && (subject.Reads(access.Private, row.ProductID) ||
 			subject.OnCase(row.ProductID, row.VulnerabilityID))
 		out = append(out, Standing{
-			Record: row.ExploitedHere, Issue: row.Issue,
+			Record: row.Incident, Issue: row.Issue,
 			Product: row.Product, ProductName: row.ProductName,
 			Private: private,
 		})
@@ -161,7 +161,7 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 	}
 	// Standings has narrowed every record already, by the same question the
 	// notices and the fixes are narrowed by.
-	records := make([]triage.ExploitedHere, 0, len(kept))
+	records := make([]triage.Incident, 0, len(kept))
 	for _, one := range kept {
 		records = append(records, one.Record)
 	}

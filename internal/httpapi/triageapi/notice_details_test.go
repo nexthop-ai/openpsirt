@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// staged is the obligation list as one person reads it, with what a window
+// staged is the incident list as one person reads it, with what a window
 // counts from and what a notice carried.
 type staged struct {
 	Items []struct {

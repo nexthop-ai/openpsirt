@@ -17,7 +17,7 @@ import { notACredential } from "../ui/noautofill";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
-import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
+import { Severity, Exploited, Incident } from "../ui/Severity";
 import { called, labeled } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
 import { issuesIn, toggled } from "./outliers";
@@ -489,9 +489,9 @@ export function Card({
             <span className="hint">Rows that do not match the shape of the decision.</span>
           </header>
           <div className="ostats">
-            {decision.outliers.exploited_here > 0 && (
+            {decision.outliers.incidents > 0 && (
               <span className="o bad">
-                <b>{decision.outliers.exploited_here}</b> attacked here
+                <b>{decision.outliers.incidents}</b> attacked here
               </span>
             )}
             <span className={`o${decision.outliers.exploited ? " bad" : ""}`}>
@@ -537,8 +537,7 @@ export function Card({
                       </td>
                       <td>
                         <span className="id">{row.vulnerability}</span>{" "}
-                        <ExploitedHere when={row.exploited_here} />{" "}
-                        <Exploited when={row.exploited} />
+                        <Incident when={row.incident} /> <Exploited when={row.exploited} />
                       </td>
                       <td className="hint">{(row.description ?? "").slice(0, 120)}</td>
                       <td className="hint">{(row.why ?? []).join(", ")}</td>

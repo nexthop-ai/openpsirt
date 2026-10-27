@@ -102,19 +102,19 @@ type CounterBody struct {
 // OutliersBody is what an approver of a bulk decision checks instead of reading
 // every row.
 type OutliersBody struct {
-	ExploitedHere int           `json:"exploited_here" doc:"Issues this product records being attacked through. Agreeing to the decision is refused while any is in it; set them aside"`
-	Exploited     int           `json:"exploited" doc:"Issues in the set known to be exploited"`
-	Severe        int           `json:"severe" doc:"Issues rated critical or high"`
-	Fixable       int           `json:"fixable" doc:"Issues a fix is available for"`
-	Unmatched     int           `json:"unmatched" doc:"Issues whose description does not carry the term the set was narrowed by"`
-	Rows          []OutlierBody `json:"rows" doc:"The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed"`
+	Incidents int           `json:"incidents" doc:"Issues an incident stands in this product through. Agreeing to the decision is refused while any is in it; set them aside"`
+	Exploited int           `json:"exploited" doc:"Issues in the set known to be exploited"`
+	Severe    int           `json:"severe" doc:"Issues rated critical or high"`
+	Fixable   int           `json:"fixable" doc:"Issues a fix is available for"`
+	Unmatched int           `json:"unmatched" doc:"Issues whose description does not carry the term the set was narrowed by"`
+	Rows      []OutlierBody `json:"rows" doc:"The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed"`
 }
 
 // OutlierBody is one issue in a bulk decision that does not look like the rest.
 type OutlierBody struct {
 	DecisionOccurrenceID  int64    `json:"decision_occurrence_id" doc:"A representative decision occurrence for this issue"`
 	DecisionOccurrenceIDs []int64  `json:"decision_occurrence_ids" doc:"Every decision occurrence for this issue, one per occurrence. Name all of them to set the issue aside when approving"`
-	ExploitedHere         bool     `json:"exploited_here,omitempty" doc:"This product records being attacked through it"`
+	Incident              bool     `json:"incident,omitempty" doc:"Whether an incident stands in this product through it"`
 	Vulnerability         string   `json:"vulnerability"`
 	Severity              string   `json:"severity,omitempty"`
 	Exploited             bool     `json:"exploited,omitempty"`

@@ -41,10 +41,10 @@ type PerBuild struct {
 	// count has a shape: forty issues and three criticals are different work.
 	BySeverity map[string]int
 	// Exploited says whether a feed reports any of them being used in the
-	// world, and ExploitedHere whether this product was recorded as attacked
+	// world, and Incident whether this product was recorded as attacked
 	// through one. The second outranks everything else about a row.
-	Exploited     bool
-	ExploitedHere bool
+	Exploited bool
+	Incident  bool
 	// Fixable is how many of them any version fixes, counted once per issue.
 	Fixable  int
 	Upgrades []Candidate
@@ -179,7 +179,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 			}
 			if counted, ok := open.counted[key]; ok {
 				row.Issues, row.Occurrences, row.DueAt = counted.Issues, counted.Occurrences, counted.DueAt
-				row.Exploited, row.ExploitedHere = counted.Exploited > 0, counted.ExploitedHere > 0
+				row.Exploited, row.Incident = counted.Exploited > 0, counted.Incident > 0
 				row.Fixable = counted.Fixable
 			}
 			if said, ok := open.promised[key]; ok {
@@ -514,12 +514,12 @@ func (s *Store) packagesAcross(ctx context.Context, targets []int64, held heldBy
 
 // counted is what is open across one fold in one build.
 type counted struct {
-	Issues        int
-	Occurrences   int
-	DueAt         *time.Time
-	Exploited     int
-	ExploitedHere int
-	Fixable       int
+	Issues      int
+	Occurrences int
+	DueAt       *time.Time
+	Exploited   int
+	Incident    int
+	Fixable     int
 }
 
 // openFolds is what is open across each fold, per build.
@@ -616,7 +616,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(exploitedHereAcross+` AS "incident"`).
+		ColumnExpr(incidentAcross+` AS "incident"`).
 		ColumnExpr(`MAX("pd"."promise") AS "promise"`).
 		Join(`LEFT JOIN (?) AS "pd" ON `+decidedOccurrenceIn(`"pd"."issue_id"`, `"pd"."occurrence_identity"`, "f"), promises).
 		Where(kinds, kindArgs...).
@@ -665,21 +665,21 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	// Scanned a column at a time, because the columns are as many as the
 	// binaries.
 	var (
-		targetOf      []int64
-		foldAt        []int
-		fixedIn       []sql.NullString
-		severalOn     []sql.NullInt64
-		band          []string
-		issues        []int
-		occurrences   []int
-		dueAt         []bun.NullTime
-		exploited     []int
-		exploitedHere []int
-		promised      []sql.NullInt64
-		onBinary      = make([][]int, len(columns))
+		targetOf    []int64
+		foldAt      []int
+		fixedIn     []sql.NullString
+		severalOn   []sql.NullInt64
+		band        []string
+		issues      []int
+		occurrences []int
+		dueAt       []bun.NullTime
+		exploited   []int
+		incident    []int
+		promised    []sql.NullInt64
+		onBinary    = make([][]int, len(columns))
 	)
 	into := []any{&targetOf, &foldAt, &fixedIn, &severalOn, &band, &issues, &occurrences, &dueAt,
-		&exploited, &exploitedHere, &promised}
+		&exploited, &incident, &promised}
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "pi"`, perIssue).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "pi"."vulnerability_id"`).
@@ -724,7 +724,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		sum.Issues += issues[i]
 		sum.Occurrences += occurrences[i]
 		sum.Exploited = max(sum.Exploited, exploited[i])
-		sum.ExploitedHere = max(sum.ExploitedHere, exploitedHere[i])
+		sum.Incident = max(sum.Incident, incident[i])
 		if due := dueAt[i].Time; !due.IsZero() && (sum.DueAt == nil || due.Before(*sum.DueAt)) {
 			sum.DueAt = &due
 		}

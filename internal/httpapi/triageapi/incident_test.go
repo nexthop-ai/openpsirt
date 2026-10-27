@@ -12,11 +12,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// A finding shows every record of its product being exploited through its
-// issue, each with the notices recorded against that record and no other, and
-// a cleared one with who cleared it and why. Verified by handing every record
-// the notices of the first: the standing record then carries one.
-func TestAFindingShowsItsRecordsOfBeingExploitedWithWhoWasTold(t *testing.T) {
+// A finding shows every incident in its product through its issue, each with
+// the notices recorded against that incident and no other, and a cleared one
+// with who cleared it and why. Verified by handing every incident the notices
+// of the first: the standing incident then carries one.
+func TestAFindingShowsItsIncidentsWithWhoWasTold(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		early := r.Declared(t, "Early warning", 24)
@@ -38,7 +38,7 @@ func TestAFindingShowsItsRecordsOfBeingExploitedWithWhoWasTold(t *testing.T) {
 		second := r.AttackedAt(t, known.Add(time.Hour))
 
 		var shown struct {
-			ExploitedHere []struct {
+			Incident []struct {
 				ID             int64  `json:"id"`
 				KnownAt        string `json:"known_at"`
 				Grounds        string `json:"grounds"`
@@ -51,24 +51,24 @@ func TestAFindingShowsItsRecordsOfBeingExploitedWithWhoWasTold(t *testing.T) {
 					WindowID  int64  `json:"window_id"`
 					Window    string `json:"window"`
 				} `json:"told"`
-			} `json:"exploited_here"`
+			} `json:"incidents"`
 		}
 		httpapitest.Read(t, r, "private-triage", httpapitest.FindingAt("CVE-2026-9999"), &shown)
-		if len(shown.ExploitedHere) != 2 {
+		if len(shown.Incident) != 2 {
 			t.Fatalf("the finding shows %d records, want 2: %+v",
-				len(shown.ExploitedHere), shown.ExploitedHere)
+				len(shown.Incident), shown.Incident)
 		}
 		byID := map[int64]int{}
-		for i, each := range shown.ExploitedHere {
+		for i, each := range shown.Incident {
 			byID[each.ID] = i
 		}
-		standing := shown.ExploitedHere[byID[second]]
+		standing := shown.Incident[byID[second]]
 		if !standing.Standing || standing.RecordedBy != "private-triage" ||
 			standing.Grounds != "A customer sent packet captures." || standing.KnownAt == "" ||
 			standing.ClearedBy != "" || len(standing.Told) != 0 {
 			t.Errorf("the standing record reads as %+v", standing)
 		}
-		cleared := shown.ExploitedHere[byID[first]]
+		cleared := shown.Incident[byID[first]]
 		if cleared.Standing || cleared.ClearedBy != "private-triage" ||
 			cleared.ClearedBecause != "The captures were of a different deployment." {
 			t.Errorf("the cleared record reads as %+v", cleared)

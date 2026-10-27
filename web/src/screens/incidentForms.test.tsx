@@ -4,8 +4,8 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ExploitedHere } from "./FindingExploited";
-import { Exploited, placesTyped } from "./Exploited";
+import { Incident } from "./FindingIncident";
+import { Incidents, placesTyped } from "./Incidents";
 import { accept, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
@@ -53,11 +53,11 @@ describe("the places a notice named", () => {
   });
 });
 
-describe("moments typed on the obligation forms", () => {
+describe("moments typed on the incident forms", () => {
   it("sends the minute typed as Known since as that minute in UTC", async () => {
     const sent = accept(() => ({ data: {}, status: 201 }));
-    mount.render(screen(<ExploitedHere product="sonic" vulnerability="CVE-2026-1" mayTriage />));
-    await press("Record exploited here");
+    mount.render(screen(<Incident product="sonic" vulnerability="CVE-2026-1" mayTriage />));
+    await press("Record an incident");
     type(mount.host().querySelector<HTMLInputElement>("#knownat"), "2026-09-20T14:00");
     type(mount.host().querySelector<HTMLTextAreaElement>("#grounds"), "A customer saw it.");
     await press("Record");
@@ -91,7 +91,7 @@ describe("moments typed on the obligation forms", () => {
       return undefined;
     });
     const sent = accept(() => ({ data: { id: 1 }, status: 201 }));
-    mount.render(screen(<Exploited />));
+    mount.render(screen(<Incidents />));
     await settle();
     await press("Record who was told");
     type(mount.host().querySelector<HTMLInputElement>("#recipient-7"), "A regulator");
@@ -134,7 +134,7 @@ describe("who was told about an attack", () => {
       }
       return undefined;
     });
-    mount.render(screen(<Exploited />));
+    mount.render(screen(<Incidents />));
     await settle();
     await press("Record who was told");
     const offered = Array.from(

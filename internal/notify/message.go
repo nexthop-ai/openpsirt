@@ -72,9 +72,9 @@ var called = map[Kind]string{
 	LeadReopened:          "A lead's dismissal was withdrawn",
 	RuleOutgrown:          "A standing rule outgrew its approval",
 	RuleWaiting:           "A standing rule is waiting for a second person",
-	ObligationOpen:        "A window after an attack is running",
-	ObligationNear:        "A window after an attack is about to end",
-	ObligationPassed:      "A window after an attack has passed",
+	ResponseWindowOpen:    "A window after an attack is running",
+	ResponseWindowNear:    "A window after an attack is about to end",
+	ResponseWindowPassed:  "A window after an attack has passed",
 
 	VulnerabilityDataStale: "The vulnerability data has stopped moving",
 	RiskUnagreed:           "Something is hidden with nobody agreeing",

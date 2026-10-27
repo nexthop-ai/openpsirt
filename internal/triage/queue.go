@@ -66,13 +66,13 @@ type Waiting struct {
 // Outliers is what an approver of a bulk decision checks instead of reading every
 // row: the handful that contradict the shape of the decision.
 type Outliers struct {
-	// ExploitedHere, Exploited, Severe, Fixable and Unmatched count the
-	// distinct issues in the decision with that property. ExploitedHere is this
-	// product's own standing record of being attacked through the issue;
+	// Incident, Exploited, Severe, Fixable and Unmatched count the
+	// distinct issues in the decision with that property. Incident is this
+	// product's own standing incident through the issue;
 	// Severe is critical or high; Unmatched is an issue whose description
 	// does not contain the term the set was narrowed by, where that term is
 	// known.
-	ExploitedHere, Exploited, Severe, Fixable, Unmatched int
+	Incident, Exploited, Severe, Fixable, Unmatched int
 	// Rows are the issues that stood out, attacked here first, then
 	// exploited, then by severity. Capped, except that no issue this product
 	// was attacked through is ever left off: agreeing to the decision is refused
@@ -89,7 +89,7 @@ type Outlier struct {
 	DecisionOccurrenceIDs []int64
 	Vulnerability         string
 	Severity              string
-	ExploitedHere         bool
+	Incident              bool
 	Exploited             bool
 	FixedIn               string
 	Description           string
@@ -553,7 +553,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisio
 	// Which of these issues each product records being attacked through.
 	attacked := map[int64]map[int64]bool{}
 	for productID, issues := range byProduct {
-		standing, err := finding.ExploitedHere(ctx, s.db, productID, issues)
+		standing, err := finding.Incident(ctx, s.db, productID, issues)
 		if err != nil {
 			return nil, err
 		}
@@ -677,11 +677,11 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 		one := Outlier{
 			DecisionOccurrenceID: occurrencesOf[issue.ID][0], DecisionOccurrenceIDs: occurrencesOf[issue.ID],
 			Vulnerability: issue.Identifier, Severity: word,
-			ExploitedHere: attacked[issue.ID], Exploited: issue.Exploited,
+			Incident: attacked[issue.ID], Exploited: issue.Exploited,
 			FixedIn: fixedIn[issue.ID], Description: clip(issue.Description, 200),
 		}
-		if one.ExploitedHere {
-			out.ExploitedHere++
+		if one.Incident {
+			out.Incident++
 			one.Why = append(one.Why, "this product was attacked through it")
 		}
 		if issue.Exploited {
@@ -708,8 +708,8 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 	// so the order is the same on every engine.
 	sort.SliceStable(candidates, func(i, j int) bool {
 		a, b := candidates[i], candidates[j]
-		if a.ExploitedHere != b.ExploitedHere {
-			return a.ExploitedHere
+		if a.Incident != b.Incident {
+			return a.Incident
 		}
 		if a.Exploited != b.Exploited {
 			return a.Exploited
@@ -721,7 +721,7 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 	})
 	// Past the cap only where the rows past it are attacked here, which sort
 	// first: those are the ones agreeing is refused over.
-	keep := max(outlierRows, out.ExploitedHere)
+	keep := max(outlierRows, out.Incident)
 	if len(candidates) > keep {
 		candidates = candidates[:keep]
 	}

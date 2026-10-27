@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// shelf is the obligation list as one person reads it.
+// shelf is the incident list as one person reads it.
 type shelf struct {
 	Items []struct {
 		ID            int64  `json:"id"`
@@ -138,8 +138,8 @@ func TestAWindowThatEndedWithNobodyToldIsSaidAsPassed(t *testing.T) {
 }
 
 func TestNoWindowIsWatchedUntilADeploymentDeclaresOne(t *testing.T) {
-	// None ships. A deployment under no obligation declares none and hears
-	// nothing; the record still stands on the shelf.
+	// None ships. A deployment under no response window declares none and
+	// hears nothing; the incident still stands on the shelf.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		r.AttackedAt(t, time.Now().UTC().Add(-30*time.Hour))
@@ -284,16 +284,16 @@ func TestTheListABulkDecisionIsPickedFromMarksAnAttackedIssue(t *testing.T) {
 		var picked struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`
-				ExploitedHere bool   `json:"exploited_here"`
+				Incident      bool   `json:"incident"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "private-triage", at, &picked)
-		if len(picked.Items) == 0 || picked.Items[0].ExploitedHere {
+		if len(picked.Items) == 0 || picked.Items[0].Incident {
 			t.Fatalf("before any record the list reads %+v", picked)
 		}
 		r.AttackedAt(t, time.Now().UTC().Add(-time.Hour))
 		httpapitest.Read(t, r, "private-triage", at, &picked)
-		if !picked.Items[0].ExploitedHere {
+		if !picked.Items[0].Incident {
 			t.Errorf("after the record the list reads %+v", picked)
 		}
 	})

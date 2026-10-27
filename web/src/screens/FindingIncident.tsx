@@ -22,9 +22,9 @@ import { useReseed } from "../ui/reseed";
 // The row the server sends, taken from the generated types rather than
 // declared here. A hand-copied shape compiles perfectly while quietly missing
 // whatever the server grew since it was written.
-type Kept = Body<"ExploitedHereBody">;
+type Kept = Body<"IncidentBody">;
 
-export function ExploitedHere({
+export function Incident({
   product,
   vulnerability,
   records,
@@ -61,7 +61,7 @@ export function ExploitedHere({
             title="Our product was attacked through this issue. Not a feed flag"
             onClick={() => setKeeping(true)}
           >
-            <Icon name="shield" size={14} /> Record exploited here
+            <Icon name="shield" size={14} /> Record an incident
           </button>
         </p>
       );
@@ -78,7 +78,7 @@ export function ExploitedHere({
 
   return (
     <div className="evblock">
-      <h4>Exploited here</h4>
+      <h4>Incidents</h4>
       {standing ? (
         <>
           <p>
@@ -86,7 +86,7 @@ export function ExploitedHere({
             {standing.recorded_by && <> · recorded by {standing.recorded_by}</>}
           </p>
           <p>{standing.grounds}</p>
-          {/* Who outside was told, recorded on the exploited-here screen. */}
+          {/* Who outside was told, recorded on the Incidents screen. */}
           {(standing.told ?? []).map((one) => (
             <p key={one.id} className="hint">
               Told {one.recipient} at {at(one.told_at)}
@@ -94,7 +94,7 @@ export function ExploitedHere({
               {one.reference && <> · {one.reference}</>}
             </p>
           ))}
-          {/* The tags named as carrying the fix, named from the obligations
+          {/* The tags named as carrying the fix, named from the Incidents
               screen. */}
           {(standing.fixes ?? [])
             .filter((fix) => !fix.withdrawn_at)
@@ -145,7 +145,7 @@ export function ExploitedHere({
 }
 
 // The one form that records an attack, drawn on the finding and on the
-// exploited-here screen. The screen asks for the product and the issue as
+// Incidents screen. The screen asks for the product and the issue as
 // well, and hands that pick in to be drawn above the form's own fields.
 export function Keep({
   product,

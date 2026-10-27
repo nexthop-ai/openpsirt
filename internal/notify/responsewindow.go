@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
@@ -34,13 +34,13 @@ import (
 // an incident is rare: a warning that waits for most of a day to pass gives
 // back the hours it exists to save.
 func (w *sweep) windowsOpen(ctx context.Context) (map[int64][]Holds, error) {
-	return w.windows(ctx, ObligationOpen)
+	return w.windows(ctx, ResponseWindowOpen)
 }
 
 // windowsNear is every window whose warning has come and whose end has not,
 // with no notice named against it.
 func (w *sweep) windowsNear(ctx context.Context) (map[int64][]Holds, error) {
-	return w.windows(ctx, ObligationNear)
+	return w.windows(ctx, ResponseWindowNear)
 }
 
 // windowsPassed is every window whose end has gone with no notice named
@@ -49,19 +49,19 @@ func (w *sweep) windowsNear(ctx context.Context) (map[int64][]Holds, error) {
 // It says the time passed and that nothing is recorded, which are both facts.
 // Whether anybody owed anything is not the tool's answer to give.
 func (w *sweep) windowsPassed(ctx context.Context) (map[int64][]Holds, error) {
-	return w.windows(ctx, ObligationPassed)
+	return w.windows(ctx, ResponseWindowPassed)
 }
 
 // shelf is every standing record with each window as it runs, read once per
 // sweep for the three kinds.
 //
 // As the deployment, which reads everything; each recipient is narrowed by
-// what they may act on. The shelf is the obligation screen's own read, so the
+// what they may act on. The shelf is the Incidents screen's own read, so the
 // screen and these alerts agree on when a window starts and ends.
-func (w *sweep) shelf(ctx context.Context) ([]obligation.Entry, error) {
+func (w *sweep) shelf(ctx context.Context) ([]incident.Entry, error) {
 	if w.shelved == nil {
-		entries, err := obligation.NewStore(w.db).Shelf(ctx,
-			access.Everything("the obligation sweep"))
+		entries, err := incident.NewStore(w.db).Shelf(ctx,
+			access.Everything("the response window sweep"))
 		if err != nil {
 			return nil, err
 		}
@@ -91,11 +91,11 @@ func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 			}
 			var verb string
 			switch {
-			case kind == ObligationPassed && due.Passed:
+			case kind == ResponseWindowPassed && due.Passed:
 				verb = "ended"
-			case kind == ObligationNear && due.Near:
+			case kind == ResponseWindowNear && due.Near:
 				verb = "ends"
-			case kind == ObligationOpen && !due.Passed:
+			case kind == ResponseWindowOpen && !due.Passed:
 				verb = "ends"
 			default:
 				continue
@@ -103,8 +103,8 @@ func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 			// The words v0.10.0 hashed, kept: an open condition is matched by
 			// this hash, and a new one would tell everybody again.
 			about := map[Kind]string{
-				ObligationOpen: "obligation-open", ObligationNear: "obligation-near",
-				ObligationPassed: "obligation-passed",
+				ResponseWindowOpen: "obligation-open", ResponseWindowNear: "obligation-near",
+				ResponseWindowPassed: "obligation-passed",
 			}[kind]
 			from := "when this became known"
 			switch {
@@ -119,7 +119,7 @@ func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 					"No notice outside is recorded against it.",
 					one.Issue, one.ProductName, due.Window.Name, from, verb,
 					minute(due.EndsAt)),
-				Link:            weblink.ExploitedHere(),
+				Link:            weblink.Incidents(),
 				Private:         one.Private,
 				ProductID:       &one.Record.ProductID,
 				VulnerabilityID: &one.Record.VulnerabilityID,

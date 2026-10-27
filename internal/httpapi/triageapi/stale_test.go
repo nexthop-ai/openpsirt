@@ -370,7 +370,7 @@ func TestAnApproverWhoEditsWhatTheyAgreedToIsNotToldTheirOwnEdit(t *testing.T) {
 	})
 }
 
-func TestARecordOfBeingExploitedIsSaidToWhoeverProposedTheDismissal(t *testing.T) {
+func TestAnIncidentIsSaidToWhoeverProposedTheDismissal(t *testing.T) {
 	// The other cause of the same telling, and the one nobody is expecting: a
 	// reviewer undoing their own batch is an exchange the proposer can see,
 	// and this is somebody recording an incident somewhere else entirely.

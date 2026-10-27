@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package obligation_test
+package incident_test
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 )
 
 // A notice keeps the reference its recipient gave it, the places it named in
@@ -24,15 +24,15 @@ func TestANoticeKeepsItsReferencePlacesAndWordOnMalice(t *testing.T) {
 		ctx := t.Context()
 		record := f.attacked(t)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, nil, "A regulator",
-			knownAt.Add(time.Hour), "Early warning.", obligation.Details{
+			knownAt.Add(time.Hour), "Early warning.", incident.Details{
 				Reference: "  CASE-2026-0042 ",
 				Places:    []string{"Ireland", " Germany", "IRELAND", "France"},
-				Malicious: obligation.MaliciousUnknown,
+				Malicious: incident.MaliciousUnknown,
 			}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, nil, "A customer",
-			knownAt.Add(2*time.Hour), "Heads up.", obligation.Details{}); err != nil {
+			knownAt.Add(2*time.Hour), "Heads up.", incident.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		shelf, err := f.store.Shelf(ctx, f.triager)
@@ -50,7 +50,7 @@ func TestANoticeKeepsItsReferencePlacesAndWordOnMalice(t *testing.T) {
 		if want := []string{"Ireland", "Germany", "France"}; !slices.Equal(first.Places, want) {
 			t.Errorf("the places read %v, want %v", first.Places, want)
 		}
-		if first.Malicious == nil || *first.Malicious != obligation.MaliciousUnknown {
+		if first.Malicious == nil || *first.Malicious != incident.MaliciousUnknown {
 			t.Errorf("what it said of malice reads %v, want unknown", first.Malicious)
 		}
 		second := told[1]
@@ -65,19 +65,19 @@ func TestANoticeKeepsItsReferencePlacesAndWordOnMalice(t *testing.T) {
 // typed name is, and a word about malice is one of the three.
 func TestANoticesDetailsAreBoundedAndMaliceIsOneOfThreeWords(t *testing.T) {
 	long := strings.Repeat("x", database.NameWidth+1)
-	many := make([]string, obligation.PlacesLimit+1)
+	many := make([]string, incident.PlacesLimit+1)
 	for i := range many {
 		many[i] = "Place " + strconv.Itoa(i)
 	}
 	cases := []struct {
 		name    string
-		details obligation.Details
+		details incident.Details
 	}{
-		{"a reference too long", obligation.Details{Reference: long}},
-		{"a place too long", obligation.Details{Places: []string{long}}},
-		{"a blank place", obligation.Details{Places: []string{"Ireland", "  "}}},
-		{"too many places", obligation.Details{Places: many}},
-		{"a word about malice nobody offered", obligation.Details{Malicious: "maybe"}},
+		{"a reference too long", incident.Details{Reference: long}},
+		{"a place too long", incident.Details{Places: []string{long}}},
+		{"a blank place", incident.Details{Places: []string{"Ireland", "  "}}},
+		{"too many places", incident.Details{Places: many}},
+		{"a word about malice nobody offered", incident.Details{Malicious: "maybe"}},
 	}
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
@@ -105,7 +105,7 @@ func TestAWindowCountingFromANoticeStartsAtTheEarliestGiven(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		notification := f.window(t, "Notification", 72)
-		final, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		final, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Final report", Hours: 24 * 30, LeadHours: ptr(48), From: &notification.ID,
 		})
 		if err != nil {
@@ -116,7 +116,7 @@ func TestAWindowCountingFromANoticeStartsAtTheEarliestGiven(t *testing.T) {
 		}
 		record := f.attacked(t)
 
-		due := func(t *testing.T) obligation.Due {
+		due := func(t *testing.T) incident.Due {
 			t.Helper()
 			shelf, err := f.store.Shelf(ctx, f.triager)
 			if err != nil {
@@ -131,7 +131,7 @@ func TestAWindowCountingFromANoticeStartsAtTheEarliestGiven(t *testing.T) {
 				}
 			}
 			t.Fatal("the window counting from a notice is not on the shelf")
-			return obligation.Due{}
+			return incident.Due{}
 		}
 
 		waiting := due(t)
@@ -142,7 +142,7 @@ func TestAWindowCountingFromANoticeStartsAtTheEarliestGiven(t *testing.T) {
 		told := knownAt.Add(50 * time.Hour)
 		for _, at := range []time.Time{told, told.Add(10 * time.Hour)} {
 			if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &notification.ID, "A regulator",
-				at, "Notification.", obligation.Details{}); err != nil {
+				at, "Notification.", incident.Details{}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -159,7 +159,7 @@ func TestAWindowCountingFromANoticeStartsAtTheEarliestGiven(t *testing.T) {
 
 		earlier := told.Add(-5 * time.Hour)
 		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &notification.ID, "A regulator",
-			earlier, "Notified, as first sent.", obligation.Details{}); err != nil {
+			earlier, "Notified, as first sent.", incident.Details{}); err != nil {
 			t.Fatal(err)
 		}
 		if moved := due(t); !moved.StartsAt.Equal(earlier) {
@@ -173,11 +173,11 @@ func TestAWindowCountingFromANoticeStartsAtTheEarliestGiven(t *testing.T) {
 // nobody gave is not counting, whatever the time, so nothing is near or past.
 func TestAWindowWaitingOnANoticeIsNeitherNearNorPast(t *testing.T) {
 	anchor := int64(1)
-	windows := []obligation.Window{
+	windows := []incident.Window{
 		{ID: anchor, Name: "Notification", Hours: 72},
 		{ID: 2, Name: "Final report", Hours: 24, LeadHours: ptr(1), FromID: &anchor},
 	}
-	due := obligation.Running(windows, 7, knownAt, nil, time.Time{}, knownAt.Add(365*24*time.Hour))
+	due := incident.Running(windows, 7, knownAt, nil, time.Time{}, knownAt.Add(365*24*time.Hour))
 	if len(due) != 2 {
 		t.Fatalf("%d windows run, want 2", len(due))
 	}
@@ -195,44 +195,44 @@ func TestAWindowWaitingOnANoticeIsNeitherNearNorPast(t *testing.T) {
 func TestAWindowCountsFromAnotherOnlyWhereThatOneAlwaysStartsIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		limited, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		limited, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Notification", Hours: 72, Products: []string{world.ProductName},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		if _, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Final report", Hours: 720, From: &limited.ID,
 		}); err == nil {
 			t.Error("a window over every product counts from one limited to a product")
 		}
-		final, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		final, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Final report", Hours: 720, From: &limited.ID, Products: []string{world.ProductName},
 		})
 		if err != nil {
 			t.Fatalf("a window over the same product was refused: %v", err)
 		}
 
-		if _, err := f.store.ChangeWindow(ctx, f.admin, limited.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, limited.ID, incident.WindowSaid{
 			Name: "Notification", Hours: 72, Products: []string{"other"},
 		}); err == nil {
 			t.Error("a window was narrowed past one counting from it")
 		}
-		if _, err := f.store.ChangeWindow(ctx, f.admin, limited.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, limited.ID, incident.WindowSaid{
 			Name: "Notification", Hours: 72, Products: []string{world.ProductName}, From: &final.ID,
 		}); err == nil {
 			t.Error("two windows count from each other")
 		}
-		if _, err := f.store.ChangeWindow(ctx, f.admin, final.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, final.ID, incident.WindowSaid{
 			Name: "Final report", Hours: 720, Products: []string{world.ProductName}, From: &final.ID,
 		}); err == nil {
 			t.Error("a window counts from itself")
 		}
-		if err := f.store.RetireWindow(ctx, f.admin, limited.ID); !errors.Is(err, obligation.ErrCountedFrom) {
+		if err := f.store.RetireWindow(ctx, f.admin, limited.ID); !errors.Is(err, incident.ErrCountedFrom) {
 			t.Errorf("retiring a window another counts from answered %v", err)
 		}
 
-		if _, err := f.store.ChangeWindow(ctx, f.admin, final.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, final.ID, incident.WindowSaid{
 			Name: "Final report", Hours: 720, Products: []string{world.ProductName},
 		}); err != nil {
 			t.Fatal(err)
@@ -242,9 +242,9 @@ func TestAWindowCountsFromAnotherOnlyWhereThatOneAlwaysStartsIt(t *testing.T) {
 		}
 		// Over the same product, so only the rule that the window counted from
 		// is in force can refuse it.
-		if _, err := f.store.ChangeWindow(ctx, f.admin, final.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, final.ID, incident.WindowSaid{
 			Name: "Final report", Hours: 720, Products: []string{world.ProductName}, From: &limited.ID,
-		}); err == nil || errors.Is(err, obligation.ErrNoSuchWindow) {
+		}); err == nil || errors.Is(err, incident.ErrNoSuchWindow) {
 			t.Errorf("a window counting from a retired one answered %v", err)
 		}
 	})
@@ -256,15 +256,15 @@ func TestALoopThroughThreeWindowsIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		a := f.window(t, "A", 24)
-		b, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{Name: "B", Hours: 24, From: &a.ID})
+		b, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{Name: "B", Hours: 24, From: &a.ID})
 		if err != nil {
 			t.Fatal(err)
 		}
-		c, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{Name: "C", Hours: 24, From: &b.ID})
+		c, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{Name: "C", Hours: 24, From: &b.ID})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.ChangeWindow(ctx, f.admin, a.ID, obligation.WindowSaid{
+		if _, err := f.store.ChangeWindow(ctx, f.admin, a.ID, incident.WindowSaid{
 			Name: "A", Hours: 24, From: &c.ID,
 		}); err == nil || !strings.Contains(err.Error(), "counting from it") {
 			t.Errorf("closing a loop through three windows answered %v", err)

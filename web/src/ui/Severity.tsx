@@ -60,14 +60,14 @@ export function Exploited({ when }: { when?: boolean }) {
 // is a feed saying the world is using this; this is a person saying it was
 // used against us, and a reader who takes one for the other has the wrong
 // answer to the only question a regulator asks. This is the louder badge.
-export function ExploitedHere({ when }: { when?: boolean }) {
+export function Incident({ when }: { when?: boolean }) {
   if (!when) return null;
   return (
     <span
       className="kev here"
       title="Somebody recorded that this product was attacked through this issue. Sorts above everything, including a feed listing it as exploited"
     >
-      Exploited here
+      Incident
     </span>
   );
 }

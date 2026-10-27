@@ -13,7 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -62,17 +62,17 @@ type NoticeSaid struct {
 	Malicious core.Malice `json:"suspected_malicious,omitempty" doc:"What the notice said about whether the attack was malicious. Left off, it said nothing"`
 }
 
-// ObligationBody is one incident on the shelf.
-type ObligationBody struct {
-	core.ExploitedHereBody
+// StandingIncidentBody is one incident on the shelf.
+type StandingIncidentBody struct {
+	core.IncidentBody
 	Undisclosed bool      `json:"undisclosed" doc:"Whether the issue is undisclosed somewhere in this product"`
 	MayTell     bool      `json:"may_tell" doc:"Whether you may record a notice about this record, and name or withdraw a tag carrying its fix"`
 	Windows     []DueBody `json:"windows" doc:"Every window in force that applies to this product, shortest first, as it runs for this incident"`
 }
 
-// ObligationsBody is every standing attack a reader may be told of.
-type ObligationsBody struct {
-	Items []ObligationBody `json:"items"`
+// IncidentsBody is every standing attack a reader may be told of.
+type IncidentsBody struct {
+	Items []StandingIncidentBody `json:"items"`
 }
 
 // WindowsBody is every window in force.
@@ -80,11 +80,11 @@ type WindowsBody struct {
 	Items []WindowBody `json:"items"`
 }
 
-func registerObligations(api huma.API, in core.Deps) {
+func registerIncidents(api huma.API, in core.Deps) {
 	huma.Register(api, core.Answering(huma.Operation{
-		OperationID: "list-obligations", Method: http.MethodGet, Path: "/v1/incidents",
+		OperationID: "list-incidents", Method: http.MethodGet, Path: "/v1/incidents",
 		Summary: "List incidents and their response windows",
-		Description: "Every standing record that a product was exploited through an issue, " +
+		Description: "Every standing incident, " +
 			"earliest known first. Each carries every window this deployment counts, as it " +
 			"runs for that incident, every notice recorded about it, and every tag named as " +
 			"carrying the fix. A window starts when the attack became known, at the first " +
@@ -93,21 +93,21 @@ func registerObligations(api huma.API, in core.Deps) {
 			"A window is answered where a notice names it. Nothing here says whether a " +
 			"notice met anything.\n\n" +
 			"Unpaged. A record you may not be told of is left out and counted nowhere.",
-		Tags: []string{"Obligations"},
+		Tags: []string{"Incidents"},
 	}, core.PerProduct, "A product you may not read contributes nothing, not even a count.",
-		core.ReadRights()...), func(ctx context.Context, _ *struct{}) (*struct{ Body ObligationsBody }, error) {
+		core.ReadRights()...), func(ctx context.Context, _ *struct{}) (*struct{ Body IncidentsBody }, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		store := obligation.NewStore(in.DB.DB)
+		store := incident.NewStore(in.DB.DB)
 		shelf, err := store.Shelf(ctx, subject)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the standing attacks could not be read", err)
 		}
-		records := make([]triage.ExploitedHere, 0, len(shelf))
-		told := map[int64][]obligation.Told{}
-		fixes := map[int64][]obligation.Fix{}
+		records := make([]triage.Incident, 0, len(shelf))
+		told := map[int64][]incident.Told{}
+		fixes := map[int64][]incident.Fix{}
 		for _, entry := range shelf {
 			records = append(records, entry.Record)
 			told[entry.Record.ID] = entry.Told
@@ -122,14 +122,14 @@ func registerObligations(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the windows could not be read", err)
 		}
-		out := &struct{ Body ObligationsBody }{}
-		out.Body.Items = make([]ObligationBody, 0, len(shelf))
+		out := &struct{ Body IncidentsBody }{}
+		out.Body.Items = make([]StandingIncidentBody, 0, len(shelf))
 		for _, entry := range shelf {
-			body := ObligationBody{
-				ExploitedHereBody: core.ExploitedHereBodyOf(entry.Record, entry.Issue, people),
-				Undisclosed:       entry.Private,
-				MayTell:           subject.TriagesIn(entry.Record.ProductID),
-				Windows:           make([]DueBody, 0, len(entry.Windows)),
+			body := StandingIncidentBody{
+				IncidentBody: core.IncidentBodyOf(entry.Record, entry.Issue, people),
+				Undisclosed:  entry.Private,
+				MayTell:      subject.TriagesIn(entry.Record.ProductID),
+				Windows:      make([]DueBody, 0, len(entry.Windows)),
 			}
 			body.Product, body.ProductName = entry.Product, entry.ProductName
 			body.Told = core.ToldBodies(entry.Told, named, people)
@@ -152,7 +152,7 @@ func registerObligations(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-obligation-windows", Method: http.MethodGet,
+		OperationID: "list-response-windows", Method: http.MethodGet,
 		Path:    "/v1/response-windows",
 		Summary: "List response windows",
 		Description: "Every window in force, shortest first. Each runs from the moment an " +
@@ -161,13 +161,13 @@ func registerObligations(api huma.API, in core.Deps) {
 			"None ships: a deployment declares the windows it answers to.\n\n" +
 			"A window limited to products you may not know exist is left out, and the " +
 			"products a window names are narrowed to those you may.",
-		Tags: []string{"Obligations"},
+		Tags: []string{"Incidents"},
 	}, core.AnyPerson, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body WindowsBody }, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		windows, err := obligation.NewStore(in.DB.DB).Windows(ctx, subject)
+		windows, err := incident.NewStore(in.DB.DB).Windows(ctx, subject)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the windows could not be read", err)
 		}
@@ -180,7 +180,7 @@ func registerObligations(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "declare-obligation-window", Method: http.MethodPost,
+		OperationID: "declare-response-window", Method: http.MethodPost,
 		Path:    "/v1/response-windows",
 		Summary: "Declare a response window",
 		Description: "Adds a window every standing attack on the products it names is " +
@@ -192,7 +192,7 @@ func registerObligations(api huma.API, in core.Deps) {
 			"naming it, as is a warning at or past the window's own length, and a from " +
 			"window that is not in force or does not apply to every product this one does, " +
 			"and from sent with from_fix.",
-		Tags: []string{"Obligations"}, DefaultStatus: http.StatusCreated,
+		Tags: []string{"Incidents"}, DefaultStatus: http.StatusCreated,
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Body WindowSaid
 	}) (*struct{ Body WindowBody }, error) {
@@ -200,7 +200,7 @@ func registerObligations(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		window, err := obligation.NewStore(in.DB.DB).DeclareWindow(ctx, subject,
+		window, err := incident.NewStore(in.DB.DB).DeclareWindow(ctx, subject,
 			windowSaid(input.Body))
 		if err != nil {
 			return nil, refusedWindow(in, err)
@@ -210,7 +210,7 @@ func registerObligations(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "change-obligation-window", Method: http.MethodPut,
+		OperationID: "change-response-window", Method: http.MethodPut,
 		Path:    "/v1/response-windows/{id}",
 		Summary: "Change a response window",
 		Description: "Restates a window in force: its name, how long it runs, its warning, " +
@@ -224,7 +224,7 @@ func registerObligations(api huma.API, in core.Deps) {
 			"that is not in force, does not apply to every product this one does or would " +
 			"start a loop, from sent with from_fix, and a product list leaving out a product " +
 			"a window starting from this one applies to.",
-		Tags: []string{"Obligations"},
+		Tags: []string{"Incidents"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body WindowSaid
@@ -233,7 +233,7 @@ func registerObligations(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		window, err := obligation.NewStore(in.DB.DB).ChangeWindow(ctx, subject, input.ID,
+		window, err := incident.NewStore(in.DB.DB).ChangeWindow(ctx, subject, input.ID,
 			windowSaid(input.Body))
 		if err != nil {
 			return nil, refusedWindow(in, err)
@@ -243,7 +243,7 @@ func registerObligations(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "retire-obligation-window", Method: http.MethodDelete,
+		OperationID: "retire-response-window", Method: http.MethodDelete,
 		Path:    "/v1/response-windows/{id}",
 		Summary: "Retire a response window",
 		Description: "Stops counting a window. Notices recorded against it keep naming it, " +
@@ -251,7 +251,7 @@ func registerObligations(api huma.API, in core.Deps) {
 			"A window already retired, or never declared, answers 404. A window another " +
 			"window in force starts from answers 409 naming that window: change or retire " +
 			"it first.",
-		Tags: []string{"Obligations"}, DefaultStatus: http.StatusNoContent,
+		Tags: []string{"Incidents"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
 	}) (*struct{}, error) {
@@ -259,7 +259,7 @@ func registerObligations(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if err := obligation.NewStore(in.DB.DB).RetireWindow(ctx, subject, input.ID); err != nil {
+		if err := incident.NewStore(in.DB.DB).RetireWindow(ctx, subject, input.ID); err != nil {
 			return nil, refusedWindow(in, err)
 		}
 		return &struct{}{}, nil
@@ -278,7 +278,7 @@ func registerObligations(api huma.API, in core.Deps) {
 			"the first such notice.\n\n" +
 			"Allowed on a cleared record, because a notice given before the clearing still " +
 			"happened.",
-		Tags: []string{"Obligations"}, DefaultStatus: http.StatusCreated,
+		Tags: []string{"Incidents"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "The product is the record's own, not one in the path.",
 		core.TriageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
@@ -297,17 +297,17 @@ func registerObligations(api huma.API, in core.Deps) {
 		if input.Body.Window != 0 {
 			window = &input.Body.Window
 		}
-		store := obligation.NewStore(in.DB.DB)
+		store := incident.NewStore(in.DB.DB)
 		told, err := store.RecordTold(ctx, subject, input.ID, window,
-			input.Body.Recipient, toldAt, input.Body.Said, obligation.Details{
+			input.Body.Recipient, toldAt, input.Body.Said, incident.Details{
 				Reference: input.Body.Reference, Places: input.Body.Places,
 				Malicious: string(input.Body.Malicious),
 			})
 		if err != nil {
 			switch {
-			case errors.Is(err, obligation.ErrNoSuchRecord):
-				return nil, noSuchExploitedHere()
-			case errors.Is(err, obligation.ErrNoSuchWindow):
+			case errors.Is(err, incident.ErrNoSuchRecord):
+				return nil, noSuchIncident()
+			case errors.Is(err, incident.ErrNoSuchWindow):
 				return nil, huma.Error422UnprocessableEntity(
 					"no window in force goes by that. Name one in force, or none")
 			}
@@ -317,7 +317,7 @@ func registerObligations(api huma.API, in core.Deps) {
 		// things for the answer, and a failure there answers with those names
 		// left blank: answered as a fault, the caller sends it again and a
 		// second notice is recorded for good.
-		byRecord := map[int64][]obligation.Told{told.ExploitedHereID: {*told}}
+		byRecord := map[int64][]incident.Told{told.IncidentID: {*told}}
 		named, err := store.WindowsNamed(ctx, subject, byRecord)
 		if err != nil {
 			in.Log().ErrorContext(ctx, "a recorded notice's window could not be named",
@@ -328,20 +328,20 @@ func registerObligations(api huma.API, in core.Deps) {
 			in.Log().ErrorContext(ctx, "who recorded a notice could not be named",
 				"notice", told.ID, "error", err)
 		}
-		return &struct{ Body core.NoticeBody }{Body: core.ToldBodies([]obligation.Told{*told}, named, people)[0]}, nil
+		return &struct{ Body core.NoticeBody }{Body: core.ToldBodies([]incident.Told{*told}, named, people)[0]}, nil
 	})
 }
 
 // refusedWindow answers a store's refusal to change a window.
 func refusedWindow(in core.Deps, err error) error {
 	switch {
-	case errors.Is(err, obligation.ErrNoSuchWindow):
+	case errors.Is(err, incident.ErrNoSuchWindow):
 		return huma.Error404NotFound("no window in force goes by that")
-	case errors.Is(err, obligation.ErrWindowNamed):
+	case errors.Is(err, incident.ErrWindowNamed):
 		return huma.Error409Conflict("a window in force already has that name")
-	case errors.Is(err, obligation.ErrCountedFrom):
+	case errors.Is(err, incident.ErrCountedFrom):
 		return huma.Error409Conflict(err.Error())
-	case errors.Is(err, obligation.ErrNoSuchProduct):
+	case errors.Is(err, incident.ErrNoSuchProduct):
 		return huma.Error422UnprocessableEntity(err.Error())
 	case errors.Is(err, access.ErrDenied):
 		return huma.Error403Forbidden("not authorized")
@@ -352,7 +352,7 @@ func refusedWindow(in core.Deps, err error) error {
 // windowFor is a window as a response carries it. What the reader may read of
 // it is decided before it arrives here: the list is narrowed by the store, and
 // a window just declared or changed by its handler, through the same rule.
-func windowFor(window obligation.Window) WindowBody {
+func windowFor(window incident.Window) WindowBody {
 	body := WindowBody{
 		ID: window.ID, Name: window.Name, Hours: window.Hours,
 		Products:   []string{},
@@ -371,8 +371,8 @@ func windowFor(window obligation.Window) WindowBody {
 
 // windowSaid is what a caller sent, as the store reads it. A warning of zero is
 // none, which is what leaving it off says.
-func windowSaid(said WindowSaid) obligation.WindowSaid {
-	out := obligation.WindowSaid{Name: said.Name, Hours: said.Hours, Products: said.Products,
+func windowSaid(said WindowSaid) incident.WindowSaid {
+	out := incident.WindowSaid{Name: said.Name, Hours: said.Hours, Products: said.Products,
 		FromFix: said.FromFix}
 	if said.From > 0 {
 		from := said.From

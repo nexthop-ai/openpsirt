@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package obligation_test
+package incident_test
 
 import (
 	"database/sql"
@@ -13,7 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -35,7 +35,7 @@ func (f *fixture) tag(t *testing.T, name string, on *time.Time) *catalog.Stream 
 }
 
 // fromFix is the window counting from the fix, as the shelf runs it.
-func (f *fixture) fromFix(t *testing.T, windowID int64) obligation.Due {
+func (f *fixture) fromFix(t *testing.T, windowID int64) incident.Due {
 	t.Helper()
 	shelf, err := f.store.Shelf(t.Context(), f.triager)
 	if err != nil {
@@ -50,7 +50,7 @@ func (f *fixture) fromFix(t *testing.T, windowID int64) obligation.Due {
 		}
 	}
 	t.Fatal("the window counting from the fix is not on the shelf")
-	return obligation.Due{}
+	return incident.Due{}
 }
 
 func day(y int, m time.Month, d int) *time.Time {
@@ -66,7 +66,7 @@ func day(y int, m time.Month, d int) *time.Time {
 func TestAWindowCountingFromTheFixStartsAtTheEarliestStatedReleaseDate(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		window, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		window, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Fix available", Hours: 72, FromFix: true,
 		})
 		if err != nil {
@@ -130,7 +130,7 @@ func TestAWindowCountingFromTheFixStartsAtTheEarliestStatedReleaseDate(t *testin
 func TestAFixReleaseStillToComeStartsNothingYet(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		window, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+		window, err := f.store.DeclareWindow(ctx, f.admin, incident.WindowSaid{
 			Name: "Fix available", Hours: 24, LeadHours: ptr(1), FromFix: true,
 		})
 		if err != nil {
@@ -158,12 +158,12 @@ func TestAFixReleaseStillToComeStartsNothingYet(t *testing.T) {
 func TestAWindowCountsFromTheFixOrANoticeNotBoth(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		notification := f.window(t, "Notification", 72)
-		if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
+		if _, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{
 			Name: "Final report", Hours: 720, From: &notification.ID, FromFix: true,
 		}); err == nil {
 			t.Error("a window counting from a notice and from the fix was declared")
 		}
-		changed, err := f.store.ChangeWindow(t.Context(), f.admin, notification.ID, obligation.WindowSaid{
+		changed, err := f.store.ChangeWindow(t.Context(), f.admin, notification.ID, incident.WindowSaid{
 			Name: "Notification", Hours: 72, FromFix: true,
 		})
 		if err != nil {
@@ -213,7 +213,7 @@ func TestAFixIsNamedInATagOfTheRecordsProductOnceAtATime(t *testing.T) {
 				t.Errorf("%s was named as carrying the fix", tc.name)
 			}
 		}
-		if _, err := f.store.NameFix(ctx, f.triager, record.ID, "v0.0.1"); !errors.Is(err, obligation.ErrNoSuchRelease) {
+		if _, err := f.store.NameFix(ctx, f.triager, record.ID, "v0.0.1"); !errors.Is(err, incident.ErrNoSuchRelease) {
 			t.Errorf("a tag nobody declared answered %v", err)
 		}
 
@@ -221,13 +221,13 @@ func TestAFixIsNamedInATagOfTheRecordsProductOnceAtATime(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.NameFix(ctx, f.triager, record.ID, world.TagName); !errors.Is(err, obligation.ErrFixNamed) {
+		if _, err := f.store.NameFix(ctx, f.triager, record.ID, world.TagName); !errors.Is(err, incident.ErrFixNamed) {
 			t.Errorf("naming the same tag twice answered %v", err)
 		}
 		if err := f.store.WithdrawFix(ctx, f.triager, record.ID, first.ID); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.WithdrawFix(ctx, f.triager, record.ID, first.ID); !errors.Is(err, obligation.ErrNoSuchFix) {
+		if err := f.store.WithdrawFix(ctx, f.triager, record.ID, first.ID); !errors.Is(err, incident.ErrNoSuchFix) {
 			t.Errorf("withdrawing a withdrawn naming answered %v", err)
 		}
 		if _, err := f.store.NameFix(ctx, f.triager, record.ID, world.TagName); err != nil {
@@ -257,23 +257,23 @@ func TestAFixIsNamedAndReadOnlyByWhoMayTriageTheProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		record := f.attacked(t)
-		if _, err := f.store.NameFix(ctx, f.outsider, record.ID, world.TagName); !errors.Is(err, obligation.ErrNoSuchRecord) {
+		if _, err := f.store.NameFix(ctx, f.outsider, record.ID, world.TagName); !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Errorf("somebody with nothing on the product naming a fix answered %v", err)
 		}
-		if _, err := f.store.NameFix(ctx, f.reader, record.ID, world.TagName); !errors.Is(err, obligation.ErrNoSuchRecord) {
+		if _, err := f.store.NameFix(ctx, f.reader, record.ID, world.TagName); !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Errorf("a reader of the product naming a fix answered %v", err)
 		}
-		if _, err := f.store.NameFix(ctx, f.triager, record.ID+1000, world.TagName); !errors.Is(err, obligation.ErrNoSuchRecord) {
+		if _, err := f.store.NameFix(ctx, f.triager, record.ID+1000, world.TagName); !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Errorf("a record nobody kept answered %v", err)
 		}
 		named, err := f.store.NameFix(ctx, f.triager, record.ID, world.TagName)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.WithdrawFix(ctx, f.reader, record.ID, named.ID); !errors.Is(err, obligation.ErrNoSuchRecord) {
+		if err := f.store.WithdrawFix(ctx, f.reader, record.ID, named.ID); !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Errorf("a reader of the product withdrawing a fix answered %v", err)
 		}
-		if err := f.store.WithdrawFix(ctx, f.outsider, record.ID, named.ID); !errors.Is(err, obligation.ErrNoSuchRecord) {
+		if err := f.store.WithdrawFix(ctx, f.outsider, record.ID, named.ID); !errors.Is(err, incident.ErrNoSuchRecord) {
 			t.Errorf("somebody with nothing on the product withdrawing a fix answered %v", err)
 		}
 		if _, err := f.store.NameFix(ctx, access.Everything("a background pass"), record.ID,
@@ -300,7 +300,7 @@ func TestAClearedRecordNamesNoFurtherFix(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := triage.NewStore(f.db.DB).ClearExploitedHere(ctx, f.triager, record.ID,
+		if err := triage.NewStore(f.db.DB).ClearIncident(ctx, f.triager, record.ID,
 			"It was a test harness."); err != nil {
 			t.Fatal(err)
 		}

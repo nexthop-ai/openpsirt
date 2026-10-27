@@ -5,7 +5,7 @@ import type { Who } from "../app/session";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Uploads } from "./Uploads";
 import { InventoryCompare } from "./InventoryCompare";
-import { Exploited } from "./Exploited";
+import { Incidents } from "./Incidents";
 import { GrantGrid } from "./GrantGrid";
 import { Home } from "./Home";
 import { Revisions, Standing } from "./FindingDecision";
@@ -66,7 +66,7 @@ describe("a secondary read that fails", () => {
 
   it("says the windows could not be read rather than that none are declared", async () => {
     failing("/v1/response-windows");
-    mount.render(screen(<Exploited />));
+    mount.render(screen(<Incidents />));
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("The windows could not be read.");
@@ -86,12 +86,12 @@ describe("a secondary read that fails", () => {
     expect(mount.host().textContent).toContain("The builds to compare could not be read.");
   });
 
-  it("says the exploited figure could not be read rather than drawing no tile", async () => {
+  it("says the incidents figure could not be read rather than drawing no tile", async () => {
     failing("/v1/incidents");
     mount.render(screen(<Home who={ANA} />));
     await settle();
     const tile = Array.from(mount.host().querySelectorAll(".kpi")).find((each) =>
-      each.textContent?.includes("Exploited here"),
+      each.textContent?.includes("Incidents"),
     );
     expect(tile).toBeDefined();
     expect(tile?.querySelector(".count-failed")).not.toBeNull();

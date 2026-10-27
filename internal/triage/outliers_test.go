@@ -50,7 +50,7 @@ func TestNoAttackedIssueIsLeftOffABulkDecisionsCard(t *testing.T) {
 			len(out.Rows), outlierRows+2)
 	}
 	for _, row := range out.Rows {
-		if !row.ExploitedHere {
+		if !row.Incident {
 			t.Errorf("%s is on the card past the cap and was not attacked here", row.Vulnerability)
 		}
 	}
@@ -77,7 +77,7 @@ func TestABulkDecisionsCardIsCappedAttackedFirstThenWorstThenByName(t *testing.T
 	if len(out.Rows) != outlierRows {
 		t.Fatalf("the card carries %d rows, want the cap of %d", len(out.Rows), outlierRows)
 	}
-	if !out.Rows[0].ExploitedHere || !out.Rows[1].ExploitedHere {
+	if !out.Rows[0].Incident || !out.Rows[1].Incident {
 		t.Errorf("the attacked issues do not lead: %s, %s",
 			out.Rows[0].Vulnerability, out.Rows[1].Vulnerability)
 	}

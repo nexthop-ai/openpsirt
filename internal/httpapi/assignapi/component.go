@@ -34,12 +34,12 @@ type PerBuildBody struct {
 	// work, and a number with nothing beside it says which is which.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Everything open across the source package here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
 	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited"`
-	// ExploitedHere is the other exploitation signal, and the one that
+	// Incident is the other exploitation signal, and the one that
 	// outranks it. Separate, because a feed's word about the world and a
 	// person's word about this product are different facts.
-	ExploitedHere bool `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of what is open here"`
-	Fixable       int  `json:"fixable" doc:"The number of open issues any version fixes, counted once per issue however many binaries carry it"`
-	Issues        int  `json:"issues" doc:"Distinct vulnerabilities open across the source package here, counted once however many binaries carry each"`
+	Incident bool `json:"incident,omitempty" doc:"Whether an incident stands in this product through any of what is open here"`
+	Fixable  int  `json:"fixable" doc:"The number of open issues any version fixes, counted once per issue however many binaries carry it"`
+	Issues   int  `json:"issues" doc:"Distinct vulnerabilities open across the source package here, counted once however many binaries carry each"`
 	// Consumers is the unit somebody acts in: one decision covers the whole
 	// fold, and what varies underneath it is the set of consumers pulling the
 	// package in.
@@ -191,7 +191,7 @@ func registerComponent(api huma.API, in core.Deps) {
 				Source: build.Source, Version: build.SourceVersion, Ecosystem: ecosystem,
 				Packages:   packages,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
-				ExploitedHere: build.ExploitedHere, Fixable: build.Fixable,
+				Incident: build.Incident, Fixable: build.Fixable,
 				Issues: build.Issues, Consumers: build.Consumers, Occurrences: build.Occurrences,
 				Upgrades: upgrades,
 				DueAt:    core.StampAt(build.DueAt), CommittedTo: core.StampAt(build.CommittedTo), UpgradeTo: build.UpgradeTo,

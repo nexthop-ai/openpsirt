@@ -36,7 +36,7 @@ func unassignedPage(rows []finding.Owned, total int) *UnassignedPage {
 	for _, row := range rows {
 		out.Body.Items = append(out.Body.Items, UnassignedBody{
 			Vulnerability: row.Vulnerability, Severity: row.Severity,
-			Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
+			Exploited: row.Exploited, Incident: row.Incident,
 			Component: row.Component, Version: row.Version,
 			Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 			Product: row.Product, ProductName: row.ProductName,
@@ -55,7 +55,7 @@ type UnassignedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty"`
 	Exploited     bool   `json:"exploited,omitempty"`
-	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"This product is recorded as having been exploited through this issue"`
+	Incident      bool   `json:"incident,omitempty" doc:"Whether an incident stands in this product through this issue"`
 	Component     string `json:"component"`
 	Version       string `json:"version"`
 	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`

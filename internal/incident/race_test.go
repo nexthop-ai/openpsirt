@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package obligation_test
+package incident_test
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
-	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/incident"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -24,14 +24,14 @@ func TestAWindowIsNotDeclaredFromOneRetiredAtTheSameTime(t *testing.T) {
 		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
 			return f.store.RetireWindow(context.Background(), f.admin, notification.ID)
 		})
-		_, declared := racing.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
+		_, declared := racing.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{
 			Name: "Final report", Hours: 720, From: &notification.ID,
 		})
 		retired := rival()
 		if declared == nil && retired == nil {
 			t.Fatal("a window was declared counting from one retired at the same time")
 		}
-		if declared == nil && !errors.Is(retired, obligation.ErrCountedFrom) {
+		if declared == nil && !errors.Is(retired, incident.ErrCountedFrom) {
 			t.Errorf("retiring a window another came to count from answered %v", retired)
 		}
 	})
@@ -43,12 +43,12 @@ func TestTwoChangesAtOnceCloseNoLoop(t *testing.T) {
 		a := f.window(t, "A", 24)
 		b := f.window(t, "B", 24)
 		racing, rival := rivalAfterRead(t, f, "response_window", "response_window", func() error {
-			_, err := f.store.ChangeWindow(context.Background(), f.admin, b.ID, obligation.WindowSaid{
+			_, err := f.store.ChangeWindow(context.Background(), f.admin, b.ID, incident.WindowSaid{
 				Name: "B", Hours: 24, From: &a.ID,
 			})
 			return err
 		})
-		_, first := racing.ChangeWindow(t.Context(), f.admin, a.ID, obligation.WindowSaid{
+		_, first := racing.ChangeWindow(t.Context(), f.admin, a.ID, incident.WindowSaid{
 			Name: "A", Hours: 24, From: &b.ID,
 		})
 		second := rival()
@@ -69,7 +69,7 @@ func TestAFixIsNotNamedOnARecordClearedAtTheSameTime(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		racing, rival := rivalAfterRead(t, f, "incident", "incident_fix", func() error {
-			return triage.NewStore(f.db.DB).ClearExploitedHere(context.Background(), f.triager,
+			return triage.NewStore(f.db.DB).ClearIncident(context.Background(), f.triager,
 				record.ID, "It was a test harness.")
 		})
 		_, named := racing.NameFix(t.Context(), f.triager, record.ID, world.TagName)
@@ -81,7 +81,7 @@ func TestAFixIsNotNamedOnARecordClearedAtTheSameTime(t *testing.T) {
 		}
 		var acts []trail.Change
 		if err := f.db.DB.NewSelect().Model(&acts).
-			Where(`"ac"."kind" = ?`, trail.ExploitedHere).
+			Where(`"ac"."kind" = ?`, trail.Incident).
 			OrderExpr(`"ac"."id"`).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}

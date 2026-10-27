@@ -69,11 +69,11 @@ type Bundle struct {
 	Urgency  int64
 	Severity string
 	// Exploited says a feed reports somebody in the world using one of these,
-	// and ExploitedHere that somebody recorded this product being attacked
+	// and Incident that somebody recorded this product being attacked
 	// through one. Different facts, so different flags: a bundle carrying the
 	// second is answering an incident.
-	Exploited     bool
-	ExploitedHere bool
+	Exploited bool
+	Incident  bool
 }
 
 // Bundles groups what is fixable by the bump that would fix it.
@@ -96,18 +96,18 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	limit = database.AList.Of(limit)
 
 	var rows []struct {
-		Fold          string `bun:"fold"`
-		Upstream      string `bun:"upstream"`
-		From          string `bun:"shipped"`
-		To            string `bun:"fixed_in"`
-		Issues        int    `bun:"issues"`
-		Occurrences   int    `bun:"places"`
-		Builds        int    `bun:"builds"`
-		Urgency       int64  `bun:"urgency"`
-		Exploited     int    `bun:"exploited"`
-		ExploitedHere int    `bun:"incident"`
-		Worst         int    `bun:"worst"`
-		Total         int    `bun:"total"`
+		Fold        string `bun:"fold"`
+		Upstream    string `bun:"upstream"`
+		From        string `bun:"shipped"`
+		To          string `bun:"fixed_in"`
+		Issues      int    `bun:"issues"`
+		Occurrences int    `bun:"places"`
+		Builds      int    `bun:"builds"`
+		Urgency     int64  `bun:"urgency"`
+		Exploited   int    `bun:"exploited"`
+		Incident    int    `bun:"incident"`
+		Worst       int    `bun:"worst"`
+		Total       int    `bun:"total"`
 	}
 	// The worst thing in the bundle, as a rank rather than as a word, because
 	// the four engines do not agree on how words order. Folded exactly the way
@@ -128,7 +128,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "incident"`).
+		ColumnExpr(overParts.incident() + ` AS "incident"`).
 		ColumnExpr(worst + ` AS "worst"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first unless somebody asks otherwise, and every order is
@@ -154,7 +154,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 			Upstream: row.Upstream, From: row.From, To: row.To,
 			Issues: row.Issues, Occurrences: row.Occurrences, Builds: row.Builds,
 			Urgency: row.Urgency, Severity: worstWord(row.Worst),
-			Exploited: row.Exploited == 1, ExploitedHere: row.ExploitedHere == 1,
+			Exploited: row.Exploited == 1, Incident: row.Incident == 1,
 		})
 	}
 	if err := s.namesIn(ctx, targets, visible, filter, bundles); err != nil {
@@ -369,13 +369,13 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	limit = database.AList.Of(limit)
 
 	var rows []struct {
-		ComponentID   int64 `bun:"component_id"`
-		Issues        int   `bun:"issues"`
-		Occurrences   int   `bun:"places"`
-		Urgency       int64 `bun:"urgency"`
-		Exploited     int   `bun:"exploited"`
-		ExploitedHere int   `bun:"incident"`
-		Total         int   `bun:"total"`
+		ComponentID int64 `bun:"component_id"`
+		Issues      int   `bun:"issues"`
+		Occurrences int   `bun:"places"`
+		Urgency     int64 `bun:"urgency"`
+		Exploited   int   `bun:"exploited"`
+		Incident    int   `bun:"incident"`
+		Total       int   `bun:"total"`
 	}
 	page := s.byComponent(targets, visible, filter).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
@@ -386,7 +386,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(overParts.occurrences() + ` AS "places"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
-		ColumnExpr(overParts.exploitedHere() + ` AS "incident"`).
+		ColumnExpr(overParts.incident() + ` AS "incident"`).
 		// The total rides on the page, as the findings list's does.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// The issue is joined only where the order needs it, the way the
@@ -439,7 +439,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	for _, row := range rows {
 		group := ComponentGroup{
 			Issues: row.Issues, Occurrences: row.Occurrences,
-			Exploited: row.Exploited == 1, ExploitedHere: row.ExploitedHere == 1,
+			Exploited: row.Exploited == 1, Incident: row.Incident == 1,
 			Urgency:    row.Urgency,
 			Upgrades:   upgrades[row.ComponentID],
 			BySeverity: bands[row.ComponentID],

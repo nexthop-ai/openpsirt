@@ -20,7 +20,7 @@ import { notACredential } from "../ui/noautofill";
 import { Pace, TREND_WEEKS, trendSaid } from "../ui/Charts";
 import { ranked, rankedLabel, rankedWhy, upgradeCount } from "../ui/ranked";
 import { ROLLED } from "../ui/severities";
-import { ExploitedHere, Severity } from "../ui/Severity";
+import { Incident, Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
 import { Wide } from "../ui/Wide";
 import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
@@ -184,7 +184,7 @@ export function Component() {
           <span className="vchip id">{here.version}</span>
           {here.ecosystem && <span className="vchip">{here.ecosystem}</span>}
           {!action && <span className="vchip ok">nothing open on it</span>}
-          <ExploitedHere when={here.exploited_here} />
+          <Incident when={here.incident} />
           {here.exploited && <span className="vchip bad">known exploited</span>}
           {worst && <Severity word={worst} />}
           {here.due_at && <span className="vchip differs">due {on(here.due_at)}</span>}

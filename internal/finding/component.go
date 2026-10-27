@@ -142,7 +142,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		FixedIn         string     `bun:"fixed_in"`
 		Description     string     `bun:"description"`
 		Exploited       int        `bun:"exploited"`
-		ExploitedHere   int        `bun:"incident"`
+		Incident        int        `bun:"incident"`
 		LikelihoodPPM   int        `bun:"likelihood_ppm"`
 		DueAt           *time.Time `bun:"due_at"`
 	}
@@ -216,7 +216,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			occurrence.FixedIn = row.FixedIn
 			occurrence.Summary = firstLineOf(row.Description)
 			occurrence.Exploited = row.Exploited == 1
-			occurrence.ExploitedHere = row.ExploitedHere == 1
+			occurrence.Incident = row.Incident == 1
 			occurrence.LikelihoodPPM = row.LikelihoodPPM
 			occurrence.DueAt = row.DueAt
 			occurrence.Occurrences = head.Occurrences
@@ -353,12 +353,12 @@ type ComponentGroup struct {
 	// taking. Most components have exactly one.
 	Upgrades []Candidate
 	// Exploited says whether a feed reports any of them being used in the
-	// world, and ExploitedHere whether this product was recorded as attacked
+	// world, and Incident whether this product was recorded as attacked
 	// through one. Either is what stops a component being put aside on the
 	// strength of its size alone.
-	Exploited     bool
-	ExploitedHere bool
-	Urgency       int64
+	Exploited bool
+	Incident  bool
+	Urgency   int64
 }
 
 // Narrowing is a bulk selection as something other than the caller's word for

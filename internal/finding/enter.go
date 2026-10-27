@@ -439,7 +439,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// attacked through ranks where that says it does. An entered finding
 		// is opened and closed by people and no scan ever touches it, so a
 		// row that missed the signal here would never pick it up.
-		attacked, err := ExploitedHere(ctx, tx, productID, []int64{vulnerabilityID})
+		attacked, err := Incident(ctx, tx, productID, []int64{vulnerabilityID})
 		if err != nil {
 			return err
 		}
@@ -503,8 +503,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// Ranked and clocked exactly as a scanned finding is, from the
 			// same signals. A finding that sorted or expired differently
 			// because a person typed it would be a second policy nobody chose.
-			ranked := Ranked{Shipped: true, ExploitedHere: attacked[row.VulnerabilityID]}
-			row.RankExploitedHere = ranked.ExploitedHere
+			ranked := Ranked{Shipped: true, Incident: attacked[row.VulnerabilityID]}
+			row.RankIncident = ranked.Incident
 			row.Urgency = int64(ranked.Rank())
 			// Rated as it is recorded, where a severity was given, which is
 			// when the clock starts. The own-product windows, and the one rule
@@ -515,7 +515,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			}
 			if carriesDeadlines[occurrence.target] {
 				row.DueAt = ownDeadline(own, severity, row.RatedAt, row.FixState,
-					false, ranked.ExploitedHere, now, nil, row.FixedAt, floor)
+					false, ranked.Incident, now, nil, row.FixedAt, floor)
 			}
 			rows = append(rows, row)
 		}

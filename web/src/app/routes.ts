@@ -257,9 +257,9 @@ export const reviewQueueAt = (
 export const reportFlawAt = (product: string, from?: string, source?: "outside") =>
   at("reportFlaw", {}, { product, from: from || undefined, source });
 
-// The Exploited here shelf, narrowed to one product where one is named.
-export const exploitedAt = (product?: string) =>
-  at("exploited", {}, { product: product || undefined });
+// The Incidents screen, narrowed to one product where one is named.
+export const incidentsAt = (product?: string) =>
+  at("incidents", {}, { product: product || undefined });
 
 // The record of decisions, asked a question.
 export const recordAt = (query?: Query) => at("record", {}, query);

@@ -12,7 +12,7 @@ import {
 } from "./FindingDecision";
 import { Assess } from "./FindingAssess";
 import { Disclose } from "./FindingDisclose";
-import { ExploitedHere } from "./FindingExploited";
+import { Incident } from "./FindingIncident";
 import { Notes } from "./FindingNotes";
 import {
   Duplicates,
@@ -34,7 +34,7 @@ import { own } from "../ui/own";
 import { at as choicesAt, unwrap, whichOf } from "../api/queries";
 import { mayOf, useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
-import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
+import { Severity, Exploited, Incident as IncidentBadge } from "../ui/Severity";
 import { Weaknesses } from "../ui/Weakness";
 import { AffectedBuilds } from "./FindingBuilds";
 import { Markdown } from "../ui/Markdown";
@@ -188,10 +188,9 @@ export function Finding() {
   const it = finding.data;
   // Whether this reader may argue about this finding, which is what the
   // controls about the finding turn on: triage at the finding's own
-  // visibility, since each is its own role. A record of being exploited here
-  // is about the product and takes triage at any visibility. Read once:
-  // asked at each control, the copies drift and one of them ends up offering a
-  // button that answers 403.
+  // visibility, since each is its own role. An incident is about the product
+  // and takes triage at any visibility. Read once: asked at each control, the
+  // copies drift and one of them ends up offering a button that answers 403.
   const here = mayOf(who.data, product);
   const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
   const occurrences = useMemo(() => it?.occurrences ?? [], [it]);
@@ -402,7 +401,7 @@ export function Finding() {
           </Link>{" "}
           in <span className="id">{it.component}</span>{" "}
           <Severity word={it.assessed || it.severity} />{" "}
-          <ExploitedHereBadge when={(it.exploited_here ?? []).some((each) => each.standing)} />{" "}
+          <IncidentBadge when={(it.incidents ?? []).some((each) => each.standing)} />{" "}
           {it.exploited && <Exploited when />}{" "}
           <span className={`state ${state.cls}`}>{state.label}</span>
         </h2>
@@ -675,10 +674,10 @@ export function Finding() {
           {/* Beside the rating, because the two are the pair a reader is
               weighing: what the world says this is worth, and whether it has
               already happened to us. */}
-          <ExploitedHere
+          <Incident
             product={product}
             vulnerability={vulnerability}
-            records={it.exploited_here ?? undefined}
+            records={it.incidents ?? undefined}
             mayTriage={!!here?.may_triage}
           />
         </div>
