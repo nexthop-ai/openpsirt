@@ -1,10 +1,10 @@
 # Ingest
 
-What happens to a scan between arrival and application.
+A scan from arrival to application: the upload, the arrival decision, storage
+and retention, and applying a scan.
 
-Satisfies REQ-03, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11,
-REQ-12, REQ-13, REQ-14, REQ-16, REQ-17, REQ-18, REQ-31, REQ-44, REQ-66,
-REQ-69.
+Satisfies REQ-03, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-12, REQ-17,
+REQ-18, REQ-21.
 
 ## Contents
 
@@ -16,27 +16,7 @@ REQ-69.
 - [Retention](#retention)
 - [Scan application](#scan-application)
 - [Concurrent scans of one build](#concurrent-scans-of-one-build)
-- [Parsing](#parsing)
-- [The formats read](#the-formats-read)
-- [Format spellings](#format-spellings)
-- [Tolerated and refused](#tolerated-and-refused)
-- [Unread fields](#unread-fields)
-- [Build-declared suppressions](#build-declared-suppressions)
 - [Scheduled rescanning](#scheduled-rescanning)
-- [Scanner warnings](#scanner-warnings)
-- [Scanner output](#scanner-output)
-- [Scanner environment](#scanner-environment)
-- [Last upload per build](#last-upload-per-build)
-- [Receipts](#receipts)
-- [Receipt cost](#receipt-cost)
-- [Document retrieval](#document-retrieval)
-- [Upload listing](#upload-listing)
-- [Administrator-supplied VEX](#administrator-supplied-vex)
-- [Supplier advisories](#supplier-advisories)
-- [Supplier directories](#supplier-directories)
-- [The offline scanner database](#the-offline-scanner-database)
-- [CVE records](#cve-records)
-- [Analyzer findings](#analyzer-findings)
 - [Limits](#limits)
 
 ## The upload
@@ -46,202 +26,139 @@ A build sends two things, in one request:
 | Part | Contents |
 |---|---|
 | Inventory | Every component that ships, with its dependency edges |
-| Suppressions | What the build says it fixed with a patch of its own, or argues does not apply |
+| Suppressions | What the build says it fixed with a patch of its own, or argues does not apply (`design-docs/ingest-claims.md` § Build-declared suppressions) |
 
-CycloneDX, SPDX 2.x and SPDX 3.x are the formats read (REQ-05): CycloneDX
-encoded as JSON or as XML, and both versions of SPDX as JSON. A document says
-which it is and the reader is chosen from that, so an upload takes any of them
-and nothing about the endpoint names one.
-
-The vulnerability data is produced here rather than sent. The inventory is
-reproducible and a vulnerability report is not, since new issues are disclosed
-daily, so a producer emitting both would have to give up one of the two
-properties. Keeping the inventory standalone lets a year-old release be
-re-scanned against today's data without rebuilding anything.
-
-Running the scan here also makes counts comparable between products. A producer
-running its own scanner measures each product with whatever version its pipeline
-installed, so a difference between two products may be only a difference in
-their build images.
-
-The model keeps room for a producer-supplied vulnerability report, and nothing
-reads one. A run records which scanner produced it and whether this deployment
-ran it, so a producer's own findings would carry their provenance. The upload
-takes an inventory and suppressions and nothing else, the reader skips a
-`vulnerabilities` array, and every run is recorded as ours.
-
-Fanning one reported issue out across every occurrence of its component is
-this deployment's work. A vulnerability report says "this package at this version"
-and stops; it never saw the graph. That step is where one line in a report
-becomes the number of decisions a person has to make.
+| Rule | Reason |
+|---|---|
+| The document says which format it is, and nothing about the endpoint names one (`design-docs/ingest-formats.md` § The formats read) | An upload takes any format read |
+| The vulnerability data is produced here, never sent (REQ-10) | An inventory is reproducible and a vulnerability report is not, so a year-old release re-scans against today's data without a rebuild |
+| The scan runs here | A producer running its own scanner measures each product with whatever version its pipeline installed, so two products' counts differ by their build images |
+| The model has room for a producer's vulnerability report, and nothing reads one | A run records which scanner produced it and whether this deployment ran it. The upload takes an inventory and suppressions only, the reader skips a `vulnerabilities` array, and every run is recorded as ours |
+| Fanning one reported issue out across every occurrence of its component is this deployment's work (REQ-17) | A report names a package at a version and never saw the graph |
+| A static analyzer's run arrives through an upload of its own | `design-docs/analysis.md` |
 
 ## Producer behavior
 
-Measured against a real producer's output rather than assumed from the
-specification.
+Measured against a real producer's output.
 
 | Observation | Consequence |
 |---|---|
-| The graph is incomplete on purpose | Edges are emitted where the producer can derive them; what it cannot resolve it records as a note. A component with no parent that is not the root is ordinary. Refusing the file rejects a legitimate scan, and synthesizing a parent reports a dependency nobody declared |
-| The shipped version is often meaningless | A locally-built package commonly carries a placeholder version, with the real identity in its pedigree |
-| Identifiers for one issue vary | The same vulnerability arrives under different schemes depending on which database matched it. That choice is a scanner's preference, so identity spans the aliases (REQ-18) |
-| Severity arrives as a word | A rating, not a vector, often with the method given as unspecified. A number is taken where the report carries one, and the feeds carry numeric scores (REQ-12) |
+| The graph is incomplete on purpose | A producer emits the edges it can derive and records the rest as a note. A component with no parent that is not the root is ordinary: the file is not refused, and no parent is synthesized |
+| The shipped version is often meaningless | A locally built package carries a placeholder version, with the real identity in its pedigree |
+| Identifiers for one issue vary | Which scheme arrives depends on which database matched, so identity spans the aliases (REQ-18) |
+| Severity arrives as a word | Often with the method given as unspecified. A number is taken where the report carries one, and the feeds carry numeric scores (REQ-12) |
+| A scanner does not read pedigree | Given a fork with its ancestor in `pedigree.ancestors`, the reference scanner matched nothing; given no pedigree and the distribution in the package identifier, it matched 43 advisories |
+| A component with no distribution context in its identifier is one nothing matches | That is invisible, never an error |
 
-A scanner does not read pedigree. Measured: given a forked package carrying its
-ancestor in `pedigree.ancestors`, the reference scanner matched nothing; given
-the same package with no pedigree at all but with its distribution named in the
-package identifier, it matched **forty-three advisories**. What it matches on is
-the identifier and the distribution context.
-
-Pedigree is kept for two other reasons: it explains a finding to whoever reads
-it, and expiry is keyed on the upstream version, because a fork's own revision
-moves for packaging reasons unrelated to whether a vulnerability is still there.
-
-Suppressions are applied here, not upstream. The build's judgment about its own
-carried patches is never refuted; what changed is where it is applied. Receiving
-results a producer already filtered made a suppressed finding simply stop
-appearing — component present, version unchanged, pedigree unchanged — which is
-indistinguishable from a scanner fault, and lands in the bucket REQ-21 makes
-unsuppressable by design.
+| Rule | Reason |
+|---|---|
+| Pedigree is kept | It explains a finding to its reader, and expiry is keyed on the upstream version, because a fork's own revision moves for packaging reasons |
+| Suppressions are applied here, never by the producer | A finding a producer filtered out stops appearing with its component, version and pedigree unchanged, which is a scanner fault's signature and the closure REQ-21 makes unsuppressable |
 
 ## Request handling
 
-One request means one authorization and one transaction. A build whose inventory
-landed and whose suppressions did not would have every carried patch reported as
-an outstanding vulnerability.
+One request is one authorization and one transaction (REQ-06): an inventory
+landing without its suppressions reports every carried patch as outstanding.
+Nothing expensive runs before a step that may refuse it.
 
-The order is chosen so nothing expensive happens before anything that might
-refuse it.
-
-| Order | Step | Placement reason |
+| Order | Step | Reason |
 |---|---|---|
-| 0 | Admission, before the form is read | The form streams to a temporary file as it is read, so the sender is authorized for the build, a declared length past the request bound is refused, and a place is held among the uploads this server reads at once, all before the first byte of it. Step 1 is asked again by the handler, which is the second statement of the rule rather than the only one |
-| 1 | Is the build declared, and may this sender file against it? | One query, naming which of product, branch or tag, or variant is missing. First, because how far behind the deployment is is not something an unauthorized sender may measure |
-| 2 | Is the backlog too deep? | The cheapest refusal once the sender is known. Deciding afterwards means storing tens of megabytes and discarding them, on a deployment already behind |
-| 3 | What does the inventory say about itself, and what does the submission hash to? | One pass over the inventory answers what it says about itself and hashes it; the claim documents are hashed beside it. Every hash covers the bytes that arrived, not a value the sender supplied |
-| 4 | The arrival decision | Below |
-| 5 | Store the documents and queue the work | One transaction. A scan row without documents is unreadable, documents without a job are work nobody picks up, and a job without either is a worker failing on something that was never there |
+| 0 | Admission, before the form is read: the sender is authorized for the build, a declared length past the request bound is refused, and a place is held among the uploads this server reads at once | The form streams to a temporary file as it is read. The handler asks step 1 again |
+| 1 | The build is declared and the sender may file against it, in one query naming which of product, branch or tag, or variant is missing (REQ-07) | An unauthorized sender may not measure how far behind the deployment is |
+| 2 | The backlog is not too deep | The cheapest refusal once the sender is known; refused later, tens of megabytes are stored and discarded on a deployment already behind |
+| 3 | One pass reads what the inventory says about itself and hashes it, and the claim documents are hashed beside it | Every hash covers the bytes that arrived, never a value the sender supplied |
+| 4 | The arrival decision | § The arrival decision |
+| 5 | The documents are stored and the work queued, in one transaction | A scan row without documents is unreadable, documents without a job are work nobody picks up, and a job without either fails on nothing |
 
 | Refused with | Condition |
 |---|---|
 | Not found | The product, branch or tag, or variant is not declared. The message names which |
 | Bad request | The build time is ahead of this deployment's clock |
-| Conflict | Something newer, or something with the same build time, is already held; or the product, branch or tag, or variant is retired |
+| Conflict | Something newer, or something with the same build time, is held; or the product, branch or tag, or variant is retired |
 | Unprocessable | The inventory could not be read at all, or more suppression documents arrived than one scan may carry |
 | Payload too large | The request is larger than twice the document bound, refused unread where it declares its length |
-| Service unavailable | Too much is already waiting to be read, or this server is already reading as many uploads as `upload.max-concurrent` allows. The second carries a time to retry after |
-
-Every refusal past authorization is recorded against the build, the ones above
-included. A refusal before it — a name not declared, a sender who may not file
-there — records nothing, so a sender who may not file against a build cannot
-write rows about it. The reason recorded for an upload that could not be read is
-what was wrong with it, which the producer is also handed among the answer's
-errors.
-
-Already held is a success, because the ordinary case is a retry after a timeout
-that had in fact succeeded.
+| Service unavailable | Too much is waiting to be read, or this server is reading as many uploads as `upload.max-concurrent` allows. The second carries a time to retry after |
 
 | Rule | Reason |
 |---|---|
-| The label on a part is not trusted | What a part is gets decided by reading it. A build pushing a file with an ordinary command-line client labels it as opaque bytes |
-| A large part is not held in memory | Parts above a few kilobytes are spilled to a temporary file for the length of the request. The deployment therefore needs a writable temporary path despite a read-only root filesystem, which the packaging provides |
-| The temporary path holds at most `upload.max-concurrent` of the largest requests | The setting bounds how many uploads one server reads at once, across the scan, attachment and import routes, and a place is held until the request is answered, because the spilled files are removed only then. Four at the shipped values, each up to 512 MiB for a scan |
-| The places are one pool for the server, shared by every sender, with no share per sender or per route | The pool is what bounds the temporary path, and that bound is per server. A sender holds a place only after it is authorized, and only until the request's read deadline, so one sender holding every place is a credential somebody issued, sending slowly on purpose |
-| An upload a sender may not make spills nothing | A pipeline key for one product, or a person holding no role on it, is refused before the form is read, in the words the handler refuses in. A product the sender may not see answers as one nobody declared |
+| Every refusal past authorization is recorded against the build; one before it records nothing | A sender who may not file against a build cannot write rows about it |
+| The reason recorded for an unreadable upload is what was wrong with it, and the producer is handed it among the answer's errors | |
+| A refusal by the request's own validation is not recorded | A missing document part or a query parameter past its bound is refused before the operation runs, before anything reads which product it names |
+| Already held is a success | The ordinary case is a retry after a timeout that had succeeded |
+| The label on a part is not trusted; reading it decides what it is | An ordinary command-line client labels a file as opaque bytes |
+| A part above a few kilobytes is spilled to a temporary file for the length of the request | The deployment needs a writable temporary path under a read-only root filesystem, which the packaging provides |
+| The temporary path holds at most `upload.max-concurrent` of the largest requests | The setting bounds the uploads one server reads at once across the scan, attachment and import routes, and a place is held until the request is answered, because the spilled files are removed then. Four at the shipped values, each up to 512 MiB for a scan |
+| The places are one pool per server, with no share per sender or route | The pool bounds the temporary path. A place is held only after authorization and only until the read deadline, so one sender holding every place is an issued credential sending slowly on purpose |
+| An upload a sender may not make spills nothing | A pipeline key for another product, or a person holding no role on it, is refused before the form is read, in the handler's words. A product the sender may not see answers as one nobody declared |
 
 ## The arrival decision
 
-Three questions answered from a scan's metadata before anything reads its
-contents. Parsing is expensive; refusing is not.
+Three questions answered from a scan's metadata before its contents are read.
 
-| Order | Question | Refusal reason |
+| Order | Question | Reason |
 |---|---|---|
-| 1 | Is the build time in the future? | Once the current scan is dated ahead, nothing legitimate is ever newer and that variant takes no further scans at all |
-| 2 | Have we already taken this submission? | Answered with success. Failing it turns a landed scan into a red build, and the usual response is retry logic that swallows errors |
-| 3 | Is it newer than what is held? | Uploads do not arrive in the order they were made. Taking an older one replaces today's picture with yesterday's, reopening closed findings with no visible symptom |
+| 1 | Is the build time in the future? | Once the current scan is dated ahead, nothing legitimate is newer and that variant takes no further scans |
+| 2 | Is this submission already held? | Answered with success. Failing it turns a landed scan into a red build, and the usual response is retry logic that swallows errors |
+| 3 | Is it newer than what is held? | Uploads arrive out of order, and an older one replaces today's picture with yesterday's, reopening closed findings with no visible symptom |
 
 | Rule | Reason |
 |---|---|
-| A submission is identified by everything in it | The inventory and the suppression documents together, each hashed as it arrived and folded together in a fixed order. Identity comes from content, and the claims are content: an inventory that has not changed, arriving beside judgments that have, is a new submission and is taken. Fingerprinting the inventory alone answered success to a build whose arguments about itself were then discarded — and the judgment that went nowhere is a finding the build had already answered coming back as noise |
-| A re-send of byte-identical documents still deduplicates | The claim digests are sorted before they are folded together, so the order the parts were sent in does not decide whether a retry is recognized |
-| An upload taken and not readable is not one we hold | Otherwise the identical bytes can never be sent again, however the reason they could not be read is put right. Such a submission is taken again as a new scan: the failed row and its documents are removed and the attempt is written in their place, so there is still one row per set of bytes. A failed scan the graph already names keeps its row and identifier, and its documents are replaced |
-| Equal build times are refused, unless the inventory is the one held | Two different documents claiming one build time is a coin toss over which picture is current. The same inventory at that time with different judgments beside it is not a second picture: it is the one held, with what the build argues about it changed, which is why it was sent again. The later arrival is the one in force |
-| Ordering is by build time, not arrival | A few minutes of clock skew is tolerated, because build machines are seconds out rather than hours |
-| Two uploads of one file racing to write are answered as a file already held | Both pass the check before either writes, and the loser's insert meets the other's row. The act is run again in a fresh transaction, where the check finds the row. Read in the failed one, PostgreSQL has aborted the transaction and MySQL and MariaDB read a snapshot without the row |
-| Two refusals of one build racing to write are one recorded refusal | The loser finds no row to replace and meets the other's insert. The refusal is recorded either way |
-| A document stating no build time is dated when it arrives, and the answer says so | Both formats leave the build time optional, and cyclonedx-maven writes none. The arrival is the only order such a build has. Dated as the zero time it would be older than every real one, so the first would be taken and every later scan of that variant refused as not newer |
-| Timestamps are rounded to what the database keeps | Go carries nanoseconds and no supported engine stores them, so without rounding a value written and read back is fractionally *older* than the one in memory: a scan compares as newer than itself, and a second file claiming the same build time is accepted. A latent fault on every engine, exposed by one and passed by the others on timing luck |
+| A submission is identified by everything in it: the inventory and the suppression documents, each hashed as it arrived, folded in a fixed order (REQ-08) | The claims are content. An unchanged inventory beside changed judgments is a new submission and is taken; otherwise the build's arguments about itself are discarded behind a success |
+| The claim digests are sorted before they are folded | The order the parts were sent in does not decide whether a retry is recognized |
+| A submission taken and unreadable is not held: the same bytes are taken again as a new scan, the failed row and its documents removed and the attempt written in their place | Otherwise the bytes can never be sent again once the fault is fixed. One row per set of bytes remains |
+| A failed scan the graph already names keeps its row and identifier, and its documents are replaced | |
+| Equal build times are refused, unless the inventory is the one held; then the later arrival is in force | Two documents at one build time is a coin toss over which is current. The same inventory with different judgments is the picture held, re-argued |
+| Ordering is by build time, never arrival, with a few minutes of clock skew tolerated | Build machines are seconds out, not hours |
+| Two uploads of one file racing to write are answered as a file already held: the loser's insert meets the other's row, and the act runs again in a fresh transaction, where the check finds it | Read in the failed transaction, PostgreSQL has aborted it and MySQL and MariaDB read a snapshot without the row |
+| Two refusals of one build racing to write are one recorded refusal | The loser finds no row to replace and meets the other's insert |
+| A document stating no build time is dated when it arrives, and the answer says so | Both formats leave it optional and cyclonedx-maven writes none. Dated as the zero time, the first is taken and every later scan of the variant refused as not newer |
+| Timestamps are rounded to what the database keeps | No engine stores nanoseconds, so unrounded a value read back is older than the one in memory: a scan compares as newer than itself, and a second file claiming the same build time is accepted |
 
 ## Document storage
 
-Documents live in the database. More than one replica runs, so a file on the
-receiving node is not there for whoever takes the work, and an object store is
-optional by requirement, so ingest cannot make it mandatory.
+Documents live in the database: several replicas run (REQ-03), so a file on
+the receiving node is not there for the worker, and an object store is
+optional.
 
 | Rule | Reason |
 |---|---|
-| Content is split across rows | A single value of tens of megabytes runs into a maximum packet size on two of the four engines, and that limit is server configuration rather than anything a client can discover. Bounded rows stay inside every default in circulation and let a document be read as a stream |
-| Every statement is bounded, not only the one carrying a document | One real image opens tens of thousands of graph rows and produces over three hundred thousand findings. Sent as one statement each, those are tens of megabytes of SQL, which two engines refuse outright and all four hold in memory |
-| A membership test over a long list is split and OR-ed | A condition cannot be issued in pieces the way a write can, and a subtree or the aliases of a build's dismissals is thousands of identifiers. Split, each piece stays inside what all four accept |
-| The hash is computed from the bytes as they are stored | A hash the sender supplied describes the file they meant to send |
+| Content is split across rows | A value of tens of megabytes passes the maximum packet size on two of the four engines, a server setting no client can discover. Bounded rows fit every default in circulation and read as a stream |
+| Every statement is bounded, not only the one carrying a document | One real image opens tens of thousands of graph rows and over 300,000 findings. One statement each is tens of megabytes of SQL, which two engines refuse and all four hold in memory |
+| A membership test over a long list is split and OR-ed | A condition cannot be issued in pieces as a write can, and a subtree or the aliases of a build's dismissals is thousands of identifiers |
+| The hash is computed from the bytes as stored | A sender's hash describes the file they meant to send |
+| Fixed-width character columns are not used | They blank-pad on some engines, so a hash read back carries trailing spaces and fails an exact match |
 
 ## Retention
 
+Nightly scans are transient; tagged releases are kept and fetched back
+(REQ-09).
+
 | Stream kind | Contents | Reason |
 |---|---|---|
-| Nightly branch | Deleted once read | The next night supersedes it, and keeping them grows storage with the calendar rather than with what is tracked |
-| Tagged release | Inventory and suppressions both kept | Re-scanning years later needs what it contained *and* what the build had already argued about its carried patches. Keeping only the first would undo every one of those arguments on the next re-scan |
+| Nightly branch | Deleted once read | The next night supersedes it, and keeping them grows storage with the calendar |
+| Tagged release | Inventory and suppressions both kept | A re-scan years later needs what it contained and what the build argued about its carried patches; without the second, the next re-scan undoes every argument |
 
-The record of what arrived outlives the contents: kind, size, and the hash of
-the bytes as received. A re-parse means asking the build to send the file again,
-which is the whole recovery path, and without the hash the second copy is taken
-on trust. An upload whose contents are gone would otherwise read back as one
-that arrived with nothing.
-
-A document whose contents were released answers 410, not 404. On screen, one
-still held is a link and one released is not: a link answering 410 is a control
-that looks like it works.
-
-A document is read back one part at a time rather than in one snapshot, so one
-released while it is read runs out of parts before its size. The stream then
-ends in an error rather than cleanly: the background reader fails the read
-instead of parsing part of a document as all of it, and a download already
-answered 200 ends short of the length it declared and is logged. The error is a
-fault, and the parser passes a failed read beneath it through as one, so the
-producer's receipt carries the fixed sentence rather than a refusal of bytes
-that arrived whole.
+| Rule | Reason |
+|---|---|
+| The record of what arrived outlives the contents: kind, size, and the hash of the bytes as received | Recovery is asking the build to send the file again, and the hash checks the second copy. Without the record, an upload whose contents are gone reads as one that arrived with nothing |
+| A document whose contents were released answers 410; on screen, one held is a link and one released is not | A link answering 410 is a control that looks like it works |
+| A document is read back a part at a time, so one released while it is read ends in an error: the background reader fails the read, and a download already answered 200 ends short of its declared length and is logged | Part of a document is never parsed as all of it |
+| That error is a fault, and the parser passes a failed read beneath it through as one | The receipt carries the fixed sentence, never a refusal of bytes that arrived whole |
 
 ## Scan application
 
 A worker claims the scan, reads its documents, and applies what they describe.
-Every replica does both; a separate worker deployment would be a second thing to
-run and get wrong for an installation this size.
 
-The suppression documents are read here even though applying them waits on the
-scan itself. A document that cannot be read is a fault in what the build sent,
-and finding that out while the producer still has the build in front of them is
-worth more than finding out later. What the build argued is stored against the
-build rather than the scan, because it is what the next vulnerability scan
-has to apply, and by then the documents may be gone.
-
-The scan job is queued in the transaction that applies the scan, so the graph
-and the work to scan it commit together. A full backlog does not fail the read:
-the periodic pass queues the scan once the queue drains. A branch's documents
-are let go after the apply commits, and a failure there is logged and leaves the
-scan applied.
-
-A failure is recorded against the scan, not only against the job. A job that
-keeps retrying is visible only to whoever operates the deployment, which is the
-wrong person to be the only one who knows.
-
-A read cut short by a shutdown is not recorded against the scan. Nothing is
-wrong with the document, and marking it failed would leave the receipt saying so
-after a retry had stored it.
-
-The queue is polled. A notification mechanism exists on one of the four engines
-and nothing portable replaces it, so an idle reader asks again after a few
-seconds. A queue that is not empty drains at the speed of the work rather than
-the speed of the poll.
+| Rule | Reason |
+|---|---|
+| Every replica serves requests and works the queue | A separate worker deployment is a second thing to run |
+| The suppression documents are read here, though applying them waits on the vulnerability scan | An unreadable one is a fault in what the build sent, found while the producer has the build in front of them |
+| What the build argued is stored against the build, not the scan | The next vulnerability scan applies it, when the documents may be gone |
+| The scan job is queued in the transaction that applies the scan | The graph and the work to scan it commit together. A full backlog does not fail the read: the periodic pass queues the scan once the queue drains |
+| A branch's documents are released after the apply commits, and a failure there is logged and leaves the scan applied | |
+| A failure is recorded against the scan as well as the job | A retrying job is visible only to the operator |
+| A read cut short by a shutdown is not recorded against the scan | Nothing is wrong with the document, and the mark would outlive the retry that stored it |
+| The queue is polled: an idle reader asks again after a few seconds, and a queue that is not empty drains at the speed of the work | A notification mechanism exists on one engine and nothing portable replaces it |
 
 ## Concurrent scans of one build
 
@@ -250,1124 +167,33 @@ them up.
 
 | Hazard | Guard |
 |---|---|
-| A scan reaches the reader after a newer one has been applied | An overtaken scan is not applied, and that is recorded rather than treated as a failure. Applying it would replace today's picture with yesterday's and reopen everything the newer one closed |
-| Newer means the later build time, and at one build time the later arrival | The reader asks in the order the newest scan is chosen in. A build re-sent at one build time with different judgments, whose first read failed, is applied on its retry |
-| Scan identifiers are read as time | The graph stamps every interval with the identifier of the scan that opened or closed it, so scans are applied in identifier order. A scan with a lower identifier than the one the build last applied is set aside as overtaken, and a failed submission sent again gets a new identifier. A job still waiting to read a scan that was replaced this way is set aside the same way |
-| A newer scan arrives while an older one is parsed | Asked again in the transaction that applies, after the build row is taken, as well as before the parse. A parse takes minutes, and the answer read before it describes a build that has moved |
-| The newer one may not have been read yet, and may then fail | Once a scan has failed for the last time, the newest that still stands is read again, where the build does not already show it and nothing is on its way to reading it. A scan can be read more than once, and the latest reading is what its receipt reports |
-| A read fails and its retry succeeds | The failed attempt marks the scan failed, so its receipt says so while the retry waits. The attempt that applies it makes it accepted again, clears the failure, and makes it the newest the build holds, in the transaction that applies it. The scan it overtook is not read again while a retry is to come: it would be applied first and reopen what the newer one closes |
-| Two applies for one build interleaving | Applying takes the build row first — an ordinary update, so every engine takes the lock and the second worker waits. Both would otherwise read the same open rows, compute the same difference and write it |
-
-## Parsing
-
-The header is read separately from the contents. Everything the arrival decision
-turns on is answered by a pass that skips the contents. Parsing a file about to
-be refused is work nobody asked for, and on the largest producer it is most of
-the cost of taking the file. Skipping is not free — the reference producer sorts
-its keys, putting tens of thousands of components ahead of the metadata — but
-walking past a value is far cheaper than building something from it.
-
-Read as a stream, and bounded in every dimension a producer controls, all
-settable per read: document size, component count, file count, edge count,
-claim count, nesting depth, and how many documents may arrive with one scan.
-Edges need their own bound, because a thousand components can declare a
-million edges between them.
-
-| Rule | Reason |
-|---|---|
-| The depth bound is why the document is walked rather than decoded | Decoding has no depth limit anyone can set, so a file nested far enough to exhaust the process would be discovered by running out of memory. Nesting is bounded everywhere, including inside the parts nothing reads |
-| A document of exactly the size bound is read | The reader asks for one byte past the bound before refusing, so the end of the file is told apart from more of it |
-| An oversized document is refused as oversized | Truncating it and letting the reader fail reports a malformed file, which sends whoever sees the message looking at their build instead of at the limit. This holds for a third party's VEX document as well, which was read to the limit and handed on: over-sized became malformed, and the digest recorded was over the part that fitted |
-| The component bound is charged where a component is read, not where one is recorded | Charged at the recording, the header pass — which records nothing — counted none of them, so a document putting its components inside the root component's own nested array was walked in full during a read that happens inside the upload request, with only the size bound saying how many there could be. The same document read whole was refused. A bound that holds on one of two paths through the same parser is a bound somebody routes around |
-| The header pass holds nothing it walked past | Charging the walk is what stops a document nobody could have meant; holding nothing is what keeps the pass cheap for the documents that are fine, and this pass runs inside the upload request, so what it holds is held per concurrent upload. It was charging and holding: the count was the fix and the retention was not |
-| A suppression document's product identifiers are charged against the component bound | The claim bound counts claims, and one claim names any number of products — so a document holding a single statement that lists millions of identifiers was inside every bound in force, and the map holding them was charged against nothing |
-| A CycloneDX document's license entries are charged against ten times the component bound, with a refusal of their own | Each is kept, so one component could otherwise hold as many as the byte bound allows. A real component states one to three, and the real switch images average under one. The claim bound would refuse a large image that makes no claim, naming the wrong setting |
-| The claim bound is spent across a scan's documents rather than per document | Every other bound is per document, and a scan carries as many as a build attaches. Passed whole to each, a producer sending fifty each inside the limit made this hold fifty times what the limit allows |
-| The claim bound counts the claims a document returns | A CSAF vulnerability returns one claim per status its products are listed under, so a count of vulnerabilities lets one document return several times the bound and overspend what a scan's other documents have left |
-| How many documents arrive with one scan is bounded too | It is what makes every per-document bound mean something: without it they are multiplied by a number nothing decides |
-
-| Rule | Reason |
-|---|---|
-| The file's own identifiers resolve edges and are then discarded | Those names are the producer's, and nothing guarantees they are stable between builds or consistent between producers. The test replaces every identifier in a real document and asserts the components, identities and graph are unchanged |
-| Two components sharing one identifier are refused | Every edge naming it would be a coin toss |
-| Nesting becomes an edge | A component containing components is the producer stating what is assembled from what. For some producers it is the only structure stated |
-| An edge whose ends resolve to one component is dropped and counted | Content-derived identity can discover that two of a document's identifiers describe the same component. The producer could not have known, so it is not a producer error, and storing it would be a component depending on itself |
-
-## The formats read
-
-Three vocabularies for two formats, sharing one reader. What a vocabulary knows is which keys its format uses
-and what they mean; how a component is deduplicated, how an edge is resolved
-and where a bound is charged are the reader's, and neither half knows the
-other's business (REQ-05).
-
-| Rule | Reason |
-|---|---|
-| **The document chooses the reader, never the request** | An endpoint taking a format parameter is a parameter a build sets wrong, and the answer is then a refusal about the parameter rather than about the file |
-| **A top-level key is read by the format that owns it**, before the document has necessarily said which format it is | The declaration arrives in no guaranteed position: a producer sorting its keys puts SPDX's packages ahead of its own `spdxVersion`. Requiring the declaration first would refuse documents that are well formed |
-| **The formats claim no key in common**, which a test asserts rather than a reader assuming | A key claimed twice would make the routing a coin toss, and it is a property of the tables rather than of anything checkable while reading |
-| **Which vocabulary read each key is recorded**, and a document that used two is refused | The keys being disjoint is not on its own enough. A handler writes to the document before anything has checked what the document is, and both formats state an identity — so a file carrying both keys is stored under whichever came last, which is a different identity for the same bytes depending only on how its producer sorted them |
-| **A document declaring no format is refused** | A fragment, a hand-edited file, or something else entirely whose keys happen to look familiar. Guessing from the contents is what the declaration exists to make unnecessary |
-| **Half a declaration is not a declaration** | CycloneDX states its format and its version in two keys, and either alone leaves the other unstated. An unstated version is a version this was not written against, which is what the by-name refusal is for |
-| **A major version is read only where it has been written against** | Refused by name where it is read, so a file that was never going to be read is dropped before the rest of it is walked |
-
-SPDX 2.2 and 2.3 are one vocabulary. The later revision adds fields and
-adds nothing this reads, so one reader covers both and a document stating
-either is read.
-
-SPDX 3.x is a third vocabulary rather than a branch in the second. It
-shares no key path with 2.x: a document is a context and one flat graph of
-typed elements — packages, files, relationships, people, tools, licenses and
-the document's own record in one array, in no stated order. Three vocabularies
-and one reader is what the seam was for.
-
-| Difference | What it costs |
-|---|---|
-| **An element announces what it is in a field that may arrive after the fields it governs** | An element is read into one neutral shape and interpreted when it closes. That is what a component read from either other format already does, and it holds one element rather than a document, so the walk stays bounded |
-| **The header is inside the contents** | A document's creation record is one entry of the same array its packages are in. The header read therefore walks the whole graph and builds nothing from it, which is as cheap as this format allows rather than as cheap as the others are |
-| **A document carries several creation records** | Anything it imported brought its own. The one the document points at is the document's; where it points at nothing, none stands in and the upload is dated when it arrives. An imported document's time does not move between builds, so standing it in would have every later scan of that build refused as not newer |
-| **A file carries several document elements** | A file inlining a document it imported carries that document's element too. The file's own is the one element no other names in its imports, and its identifier, creation record and roots are the document's. Several elements the imports leave unsettled are refused, because the last one read is an accident of order. An inventory element is the imported document's, and names none of the build's roots, where an import names it, where the imported document names it as a root, or where every root it names is the imported document's and none is the file's own |
-| **A creation record may be written in place** | The format lets an element carry its creation record as an object where it would otherwise point at one. Written on the document, its time is the document's; written on any other element, it dates nothing unless it carries an identifier, and then it is the record every reference to that identifier names. Its version is checked as a referred-to record's is |
-| **One relationship states a list of ends** | The edge bound is charged per end rather than per relationship, as each is read |
-| **An element does not say what it is until it has been read** | Every entry is charged against the component bound on the way in, because what a bound stops is the walk; the ones that turn out to be paths hand that charge back and take the file bound instead, and a relationship hands it back for the edge bound its ends were charged against. A relationship stating no end is charged nothing there and keeps its component charge. So the walk is bounded throughout and the bounds are still sized the way they differ |
-| **Identifiers are absolute** | Nothing here depends on their shape. Every one but the document's own resolves the document to itself and is discarded, which is what the other formats' in-file identifiers are for too |
-
-A path and a package may not share an identifier, and this format states
-both in one array — so the check runs where a package is bound and where a path
-is recorded, since which of the two a producer writes first is its business.
-
-The version is stated in two places and either will do. The context carries
-it, and so does every creation record; a producer need not emit the first. Read
-from one place only, a document stating it in the other would be refused as
-saying nothing.
-
-### CycloneDX encoded as XML
-
-CycloneDX defines two encodings, and its Maven plugin — the producer an XML
-inventory most likely comes from — writes both by default. The XML one is a
-second walk over the same reader rather than a fourth vocabulary. The elements
-and attributes it reads are where the schema puts the facts the JSON keys hold,
-and everything a fact means once it is read — which of two suppliers wins, how
-licenses combine, what a patch claims, where a bound is charged — is the JSON
-reader's, called from the XML walk. So the two encodings of one build read as
-one build, and a test holds the Maven plugin's two encodings of one build to
-that.
-
-Where the XML encoding puts things differently: a component's identifier
-within the file and its kind are attributes, `bom-ref` and `type`; the
-document's identity is the `serialNumber` attribute of the top-level element;
-and what a component depends on is a `dependency` element nested inside its
-own, each naming one by its `ref` attribute, rather than a list of identifiers.
-
-| Rule | Reason |
-|---|---|
-| **The encoding is told from the document's first character** | For the reason the format is: the content type a pipeline sends is whatever its HTTP client defaults to. JSON opens with a brace and XML with an angle bracket, after layout and, in XML, a byte-order mark |
-| **The declaration is the top-level element's namespace** | `http://cyclonedx.org/schema/bom/1.6` states the format and its revision at once, so there is no half a declaration to refuse, and it cannot arrive late. A top-level element in any other namespace is refused by name — SPDX's RDF encoding among them, which turned up once in 41 public inventories, as a conversion |
-| **An element in another namespace is walked past** | It is an extension, whatever it is called: a component a producer defines in a namespace of its own is not one the format defines. Version 1.1 stated dependencies through an extension of that kind, so a 1.1 document reads with its components and without its edges |
-| **A document type declaration is refused where it is met** | It is where XML defines entities, and an entity is how a document makes its reader fetch a file or a URL, or expand a few hundred bytes into gigabytes by defining each entity as ten of the one before. The decoder does neither, but no producer writes a declaration into an inventory, and a reader that never accepts one cannot be talked into processing one by a later change to the decoder or to how it is set up |
-| **UTF-8 only** | A document declaring another encoding is refused rather than translated. Every producer seen writes UTF-8 |
-| **The same bounds, charged at the same points** | Size, depth, components, edges, licenses and claims, through the functions the JSON walk charges them through. Depth is counted per element, inside elements nothing reads as well |
-| **A dependency nested in a nested dependency is an edge from the one it is nested in** | The schema nests the element in itself without saying where that stops, and that is the only reading the nesting has. How deep it goes is the depth bound's business |
-| **A NUL is refused, where the JSON reader drops one** | XML forbids the character, written or by reference, so a document carrying one is not XML. JSON allows it |
-| **An element's text is trimmed** | A producer laying its document out may put the text on lines of its own, and the layout is not the value |
-| **What the decoder says is bounded like anything else quoted** | Its complaints quote the document: a whole element name, an entity's, the encoding or version a declaration names. Passed on as they were, a 1 MiB element name came back as a refusal of about the same size |
-
-## Format spellings
-
-The internal shape is the same from either, because it is the shape the graph
-is stored in rather than either format's. What differs is where a producer put
-each fact.
-
-| Fact | CycloneDX | SPDX 2.x | SPDX 3.x |
-|---|---|---|---|
-| The document's own identity | `serialNumber` | `documentNamespace` | the document element's own identifier |
-| When the producer made it | `metadata.timestamp` | `creationInfo.created` | the creation record the document points at |
-| What the document is about | the component under `metadata`, stated inline | an identifier pointing at one of the packages | identifiers on the document or inventory element, and `describes` |
-| What ships | `components` | `packages` | graph entries typed as a package |
-| A component's identity within the file | `bom-ref` | `SPDXID` | `spdxId` |
-| The version | `version` | `versionInfo` | `software_packageVersion` |
-| The package identifier and the database key | fields of the component | external references, by type | a field of the package, or external identifiers by type |
-| Structure | `dependencies`, and one component nested in another | relationships, stated either way round | relationships, stated one way round |
-| A dependency's scope | a component's `scope` | the relationship type: build, development, runtime, optional, test | a `scope` on the relationship |
-| What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` or `descendantOf` |
-| What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** | **cannot be stated** |
-| That a component is a container image | `type` of `container` | `primaryPackagePurpose` of `CONTAINER` | `software_primaryPurpose` of `container` |
-
-Whether a component is a container image is read from the format only where
-it carries no package identifier, because the identifier's type decides where
-there is one. An image is identified by its name (REQ-08), as
-`design-docs/data-model.md` § Container images holds.
-
-The scoped SPDX 2 relationships place their target. `BUILD_DEPENDENCY_OF`,
-`DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF` are
-edges carrying what the producer called them; only `TEST_DEPENDENCY_OF` places
-nothing, which is the exception the third version's `test` scope gets too. What
-the word means, and what nothing may read into it, is in `design-docs/findings-components.md` § Declared dependency scope.
-
-A component reached only by one of those four has a consumer, so its
-occurrence identity is the one a consumer gives it and a decision keyed on the component
-alone does not cover it. A database that took SPDX 2 inventories under an
-earlier build is recreated rather than migrated, here as everywhere below 1.0
-(REQ-76), so recreation is the
-answer to both.
-
-The root is resolved at the end rather than where it is named. One format
-states it inline with everything it says about it; the other points at a
-package that may not have been read yet. A document pointing at several things
-has no single root — the tracked unit stands in, as it does for a document
-naming none — because picking one of them states a hierarchy the producer did
-not.
-
-What the document called that component is kept on the scan. The root is
-stored by name alone, because a package identifier carries the version, the
-root's version moves every build, and the root's identity moving takes every
-edge hanging off it with it. So the declared identifier is kept as a fact about
-the document, beside its serial and what the inventory was made of, and never as
-an identity.
-
-It is what a published advisory offers a reader to match a release against, and
-only what the producer wrote can serve: an identifier helps only if it appears
-on both sides, and one invented here appears on ours. So it is read off the
-document rather than off the resolved graph, which is the same condition stated
-once — where the document named nothing, what stands in is the tracked unit,
-and that is ours. A declared root carrying no package identifier keeps nothing
-for the same reason.
-
-What is counted is what the pointers resolve to, not how many there are. A
-format offers more than one place to state the root — a list beside the
-contents, and a relationship saying the same thing — and a producer that fills
-in both has named one component twice rather than two components. Counting the
-statements reads that as several roots and leaves the document with none, so a
-document that said the same thing twice would be read as though it had said
-nothing.
-
-The first of each identifier stands. A real producer emits eight spellings
-of one database key, differing in where it put a hyphen, and nothing here can
-say which spelling an advisory used. Taking the first is the same answer
-everything downstream has already been given, rather than a preference invented
-here.
-
-The words for nothing are nothing. SPDX requires several fields to be
-present and offers `NOASSERTION` and `NONE` for a producer with no value for
-one. Taken literally a package carries the version `NOASSERTION`, which a
-person reads as a version and a scanner tries to match.
-
-### Structural relationships
-
-SPDX states a hundred and forty kinds of relationship and most of them are not
-a dependency graph: what generated a file, what a document amends, what a
-package was evidenced by. The test applied is whether the relationship says one
-component is part of another in the sense the graph is walked in — the same
-question a CycloneDX `dependsOn` answers.
-
-| Read as | Types |
-|---|---|
-| An edge | `CONTAINS`, `CONTAINED_BY`, `DEPENDS_ON`, `DEPENDENCY_OF`, `DYNAMIC_LINK`, `STATIC_LINK`, `HAS_PREREQUISITE`, `PREREQUISITE_FOR`, `RUNTIME_DEPENDENCY_OF`, `OPTIONAL_DEPENDENCY_OF`, `PROVIDED_DEPENDENCY_OF`, `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF` |
-| What the document is about | `DESCRIBES` and `DESCRIBED_BY`, between the document and a package |
-| What a component was derived from | `ANCESTOR_OF` and `DESCENDANT_OF` |
-| Nothing | Everything else |
-
-A type stated either way round is the same edge. A producer may say a
-program contains a library or that the library is contained by the program, and
-the graph does not have two shapes.
-
-What built something is not what shipped. A build tool, a development tool and
-a test dependency are statements about the build rather than about what is in
-the product, so none of them places a component under another. The
-component is still held and still counted as sitting under nothing, which is
-the same treatment CycloneDX build tooling gets by arriving under `formulation`
-rather than beside the contents.
-
-A derivation is a pointer rather than a description, which is what makes it
-weaker than the other format's pedigree: it can only name something the
-document also describes. It fills in an upstream nothing else stated and never
-replaces one, and it is charged against the claim bound rather than the edge
-bound, because an unbounded array of them is the same hazard under a different
-name.
-
-The third version drops the reversed spellings, so a type is an edge or it
-is not and there is no direction to get wrong.
-
-| Read as | Types |
-|---|---|
-| An edge | `contains`, `dependsOn`, `hasDynamicLink`, `hasStaticLink`, `hasPrerequisite`, `hasOptionalComponent`, `hasOptionalDependency`, `hasProvidedDependency` |
-| What the document is about | `describes` |
-| What a component was derived from | `ancestorOf`, `descendantOf` |
-| Nothing | Everything else |
-
-### Lifecycle scopes
-
-The third version annotates a relationship with the phase it matters in —
-build, design, development, runtime, test or other. The specification does not
-say that any of them means the target does not ship, and inferring it is the
-one judgment in this area the format leaves to a reader.
-
-| Scope | Read as |
-|---|---|
-| `test` | Places nothing. The target is still held and still counted as sitting under nothing, which is the same treatment `TEST_DEPENDENCY_OF` gets in the second version |
-| Everything else | Places its target under the element the relationship is stated from |
-
-Reading `build` as "does not ship" is wrong for every compiled language: a
-crate or a module linked into a binary is stated as a build-phase dependency
-and is inside what the product ships. The two errors are not equal, and
-`Limits` says what that costs.
-
-### Files are not components
-
-A file is a path rather than a package: nothing matches a vulnerability against
-one, and a scan of a real image catalogs five files for every package it found.
-Holding them would grow the graph with nodes no finding can ever hang off.
-
-The identifiers are kept even so. The structure a producer states is mostly
-between a package and the files it installed — 91 of the 125 relationships in
-the fixture — and an edge naming one has to be dropped knowingly. Dropped
-without knowing, it reads as a graph with a hole in it, and a count meant to say
-the producer's derivation changed moves instead with how much file detail the
-producer was configured to emit. So the two are counted apart.
-
-They are bounded apart from components, and the ceiling was set by
-measurement rather than by analogy. A real scan catalogs 4,964 files against 89
-packages on one image and 21,643 against 480 on another — forty-five to
-fifty-six files per package — so a switch operating system's 6,866 packages
-would arrive with something above 300,000 files. Charged against the component
-ceiling of 100,000 that is a real inventory refused; raised until it fits, the
-component bound has stopped bounding components. They also cost very different
-amounts to hold: 133 bytes for a path against 766 for a component, because a
-path is only the identifier and a component is a described thing.
-
-## Tolerated and refused
-
-The specification requires very little, and producers differ enormously in what
-they fill in. A document that is valid and sparse is not a broken one.
-
-| Tolerated | Behavior |
-|---|---|
-| The document names no component of its own | What the scan was filed against stands in. The root is excluded from identity and expiry anyway |
-| A component states no version | Kept and counted. What it costs is matching, and it ships either way. Counted once over the deduplicated inventory rather than as each statement is read: a document naming the same unversioned component in ten relationships describes one component that ships without a version, and where a second description does state one the count is asked about the combination, which is what is stored |
-| An edge names something the document never describes | Dropped and counted. The missing component is not invented |
-| An edge names a file rather than a package | Dropped and counted separately. A file is below the level anything here tracks |
-| An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |
-| A relationship naming what a build is about, stated by anything other than the document | Left out. Taken as a root claim, any element could make itself the build's root and re-parent the whole inventory under it |
-| The third version's version written with the second's prefix, `SPDX-3.0.1` | Read as `3.0.1`. The format states a bare semantic version; a producer carrying the second version's habit over writes the prefix, and it names the format the reader already is. A fourth major version with the prefix is still refused |
-| A control character in a component's name, version, package identifier or what it was built from, written or escaped | Dropped before the component is identified. Names and versions are joined into keys with control characters as separators, so one carrying a separator reads as another component, or two version pairs share one key. A name of control characters alone is a component with no name |
-| Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
-
-Two things a document states twice are resolved once it has closed rather than
-as they are read, because key order is the producer's choice and which of two
-fields wins must not be: who supplied a component, which two of the three
-vocabularies state two ways each, and what a component was built from.
-
-The counts matter as much as the tolerance. Each is a number that should be
-stable build to build, so a change says the producer changed.
-
-| Refused | Reason |
-|---|---|
-| Neither format, or a major version not written against | A reader that guesses eventually guesses wrong on a file that looks close enough |
-| Keys from two formats | Whichever handler ran last has already written over the other's answer, and nothing here can say which half the producer meant. The same rule for a suppression document, where reading half of one dropped the other half's claims without a word |
-| Half of one format's declaration | An unstated version is a version this was not written against |
-| A file and a component sharing one identifier | The same coin toss two components sharing one is refused for, and worse: the edge resolves to the component and invents a dependency nobody stated |
-| A component with no name | It cannot be identified, so it cannot be tracked |
-| Two components sharing one identifier | Every edge naming it is ambiguous |
-| A build time nothing can read | The build time orders scans against each other |
-| Past any of the bounds | A broken or hostile file has to fail rather than exhaust the process |
-| Anything but whitespace after the top-level value, in an inventory, a suppression document or an advisory — or in an XML inventory, anything but layout and comments after the top-level element | Two documents written one after the other read as the first, and an inventory missing what the second held reads as a product that shrank |
-| A document type declaration in an XML inventory | See [CycloneDX encoded as XML](#cyclonedx-encoded-as-xml) |
-
-Reading is all or nothing. A partial inventory is indistinguishable from a
-product that shrank, and acting on one closes findings that are still somebody's
-problem. This concerns a *failed parse* rather than producer variation.
-
-Everything a refusal quotes back came from the file, so what it quotes is bounded
-in length: an error is one of the few places a scan file's contents reach a
-person.
-
-## Unread fields
-
-A field nobody reads because it was considered and a field nobody reads because
-nobody noticed it look identical in the code.
-
-Every key path the recorded documents contain is written down, with what is done
-with it: acted on, or seen and deliberately left alone. A document containing a
-path that list does not have fails the check. The reverse is checked too — a
-path the reader acts on that no recorded document contains is a branch nothing
-exercises.
-
-This checks the recorded documents, not what is accepted. The reader itself
-ignores anything it does not recognize.
-
-A minor revision of the format is read, and a fixture shows it. The reader
-checks the major version and refuses what it has not been written against, so
-anything within that major version parses — which accepts every revision by
-construction rather than by evidence. A reference producer that moves while
-every fixture states the older revision leaves the inventory this deployment's
-own image carries untested against the reader that reads it.
-
-The fixture is the document the image ships, read through the same reader,
-asserting the parts a revision can move: the root, the component count, the
-edges, and the package identifiers the graph is keyed on. Each key path it
-brings is one more thing to decide about.
-
-## Build-declared suppressions
-
-A build's claims arrive two ways, and they are not equally precise.
-
-| Source | Precision |
-|---|---|
-| On the component | A patch in a component's pedigree recording which vulnerability it fixes. It arrives attached to the thing it is about |
-| In a document of its own | Statements naming what they apply to by package identifier: one version, every version of a package, or a whole source tree |
-
-Only one of the two formats can carry the first. SPDX has a
-relationship saying a file is a patch for a package and no way to say which
-vulnerability that patch resolves, so an inventory in that format carries no
-claims and a build with carried patches states them in a document of its own.
-Deriving the link from the patch's filename would report a suppression nobody
-made.
-
-So the format a scan arrived in is carried out of the reader, because what
-a claim is closed by is difference: a claim the build no longer argues is a
-claim the build withdrew. That reading only holds where the build had somewhere
-to argue it. A scan whose format cannot attach a claim to a component says
-nothing about carried patches whether or not they are still carried, so
-closing on its silence would have a product's first scan in the other format
-close every claim it held at once and reopen every finding they suppressed,
-with nothing saying why.
-
-A claim of an origin the scan could not have stated is left open and counted,
-so the receipt says how many were carried forward rather than restated. A claim
-the scan *could* have stated and did not is still closed, or the difference
-stops meaning anything at all.
-
-Both are read into one shape with the origin recorded, because the second can
-point at something that cannot be resolved and the first cannot.
-
-A claim keeps the name of what it is about as the producer spelled it, which is
-what a screen shows, and beside it the name folded. A name somebody types to
-narrow what a build carries is folded the same way and compared exactly, so it
-matches in any capitals on every engine, a capital outside ASCII included.
-
-The vocabulary is kept rather than translated. A build saying "we carry the fix"
-and one saying "the vulnerable code is never reached" make different claims. Two
-of the four statuses remove a finding from what somebody has to look at; the
-other two say the build looked.
-
-A carried patch reports as fixed. The vulnerable code was there and a patch
-resolved it, which is not the same statement as the vulnerability never having
-applied. Only what a patch *claims* is read: a patch names a vulnerability in
-its own name or in a header saying what it fixes.
-
-| Matching rule | Reason |
-|---|---|
-| A package identifier is compared as identity reduces it: qualifiers and subpath dropped, escapes decoded, scheme and type lowercased | A claim is written as the package and the version, and the same package in an inventory carries the architecture it was built for. One real image carries the same version as `2.3.2-2%2Bb1` and `2.3.2-2+b1` |
-| A claim naming no version covers every version | The format says so, and it is how a build states something about whatever it ships |
-| A claim naming a version reaches a component stating that version beside an identifier that names none | An inventory may state the version outside the identifier |
-| An OpenVEX product with subcomponents is a claim about the subcomponents | The product is what shipped and the subcomponents are what the statement is about. This deployment's own export states every claim that way. A product with none is the thing the statement is about |
-| A subcomponent is read only as a package identifier | Anything else names a component and no version, which would cover every version of that name and every fork of it. A product whose subcomponents are all of that kind is a claim about nothing |
-| A claim against a source tree matches a component of that name, or a fork of one | The build knows which packages came out of a tree and this deployment does not |
-| A source tree is named either way it can be named | As a bare name where the document carried no package identifier, and as a package identifier of the generic type where it carried one. The two are the same claim and are matched the same |
-| A generic identifier names its package by the last segment | A namespace before it is compared only where the component is itself a generic identifier carrying one. A distribution's namespace names the distribution rather than the source tree, and a component with no namespace says nothing either way |
-| A source tree named with a version is matched on it, against the component's own version and against what it was built from | A stated version is a version the build stated. Read as covering every version, a claim about one release suppresses a live finding on another |
-| A claim is matched at every occurrence of its component, within the product it names | The fan-out is ours either way. The next table holds what the product changes |
-
-A claim is placed by the product it names its subject as shipping inside.
-
-| The product is | The claim applies |
-|---|---|
-| Named by nothing, or the build's root, or nothing the build ships | Across the whole build. A root is stored by its name alone, so it is never a component the claim is placed beneath |
-| A component of the build, at the version the claim names | At an occurrence where every route up the tree runs through that component, at any depth, and never on the component itself. An occurrence reached through the product and outside it is not answered: the build spoke about what it shipped inside the product |
-| A component of the build at another version, or named at no version | Nowhere, and the claim is counted as reaching nothing. A claim about one release of a product says nothing about another |
-
-A claim stores the product with the subject: its package identifier, its name
-and its version. A claim about zlib inside curl and one about every zlib are two
-claims, and a claim naming no product keys as it did before a product was
-stored, so a claim recorded earlier keeps its row until the build restates it
-with its product.
-
-A claim attached to a scan is stored with the package identifier, the name and
-the version it states outside the identifier. A claim that names no package and
-states its version only as a branch covers that version of the name and no
-other: a statement that acme-fw 4.2 is not affected leaves a finding on acme-fw
-5.0 open, however many scans send the same file.
-
-| Stored version | |
-|---|---|
-| The version is part of the claim's identity where one is stated outside the package identifier | A claim about 4.2 and one about 5.0 are two claims. A version inside the identifier is already part of the identity through it and is not stored again. A claim stating no version keys as it did before a version was stored. A claim stating its version only as a branch has a new identity, so each such claim closes and reopens once, on the first scan after the upgrade |
-| The carried patches read names the version beside the subject | "acme-fw 4.2". A status shown without the version reads as a claim about whatever ships |
-| The reasoning is part of the claim's identity where the claim gives one | A build that changes only its explanation closes the claim it made and opens the new one, so the carried patches keep both. A claim giving none keys as it did before. The v0.9.0 upgrade keys every stored claim this way, so none closes and reopens on the first scan after it |
-
-A claim that matched nothing is reported, not dropped. A build's judgment that
-went nowhere means a finding it already answered comes back as noise. The
-producer's automatically-extracted claims name source trees rather than
-packages, so this is the ordinary case.
-
-| Choice | Reason |
-|---|---|
-| A claim naming an unreadable status refuses the document | A claim that cannot be acted on is one the build believes it made |
-| A claim with no justification is kept rather than refused | The format requires one for a single status, and what to do about an unjustified claim is a triage question |
-| Both shapes read into one thing, with the origin recorded | They differ in precision rather than meaning |
-| Only a security claim is read from a patch | A patch resolves defects and improvements as readily as vulnerabilities |
+| A scan reaches the reader after a newer one is applied | It is not applied, and is recorded as overtaken, never as a failure. Applied, it would reopen everything the newer one closed |
+| Which is newer | The later build time, and at one build time the later arrival, asked in the order the newest scan is chosen in. A build re-sent at one build time with different judgments, whose first read failed, is applied on its retry |
+| Scans out of identifier order | The graph stamps every interval with the scan that opened or closed it, so scans are applied in identifier order. A scan with a lower identifier than the build last applied is set aside as overtaken, a failed submission sent again gets a new identifier, and a job still waiting to read a scan replaced this way is set aside too |
+| A newer scan arrives while an older one is parsed | Asked again in the applying transaction after the build row is taken, as well as before the parse. A parse takes minutes |
+| The newer one is unread, and then fails | Once a scan fails for the last time, the newest that still stands is read again, where the build does not show it and nothing is on its way to reading it. A scan can be read more than once, and its receipt reports the latest reading |
+| A read fails and its retry succeeds | The failed attempt marks the scan failed, so its receipt says so while the retry waits. The applying attempt makes it accepted, clears the failure, and makes it the build's newest, in the transaction that applies it. The scan it overtook is not read again while a retry is to come, or it would be applied first and reopen what the newer one closes |
+| Two applies for one build interleave | Applying takes the build row first, by an ordinary update, so every engine locks and the second worker waits. Both would otherwise compute and write the same difference |
 
 ## Scheduled rescanning
 
-An inventory arriving queues one scan and nothing asks for the next, so a release
-built a year ago has the same components it always had and a different answer
-every month — and it is the build an advisory published this morning is most
-likely to be about.
-
-A pass queues a scan for every build holding an inventory not scanned within the
-interval.
-
-| It does not | Reason |
-|---|---|
-| Scan a build with no inventory | A run that found nothing against a build that has nothing is an empty answer reading exactly like a clean one |
-| Queue a second scan for a build already waiting | The pass looks far more often than anything is due, because the interval is a setting an administrator may shorten. What is already queued is compared as identifiers rather than joined: a job's reference is text and a build's identifier is a number, and converting one inside a query has no spelling the four engines agree on |
-| Ask for more than a slice at a time | A deployment tracking many builds would fill the queue in one pass and push arriving inventories behind work that is not urgent |
-| Fail when the queue is full | It stops. What is due stays due, and a full queue is a fact about how much is in flight |
+A release built a year ago keeps its components and gets a different answer
+every month, so a pass queues a scan for every build holding an inventory not
+scanned within the interval (REQ-10).
 
 | Rule | Reason |
 |---|---|
-| One replica asks, settled by a lease (`design-docs/queue.md`) | Two reading the same list at the same moment would both see the same build as due, because the check that nothing is queued is made when the list is read |
-| The interval is a setting, shipping at a day | The databases the scanner reads are published daily |
-| This does not discover | The component list still comes from the build. What changes between one scan and the next is what is known about those components |
-
-## Scanner warnings
-
-Read only when the scanner fails, warnings discard the case that matters: a run
-that answers and states that its answer is coarse. They are recorded on the
-run, kept apart from the failure, and travel with the receipt.
-
-Today it captures nothing. A scan runs over an inventory written here from the
-components held — name, version, package identifier and CPE — not over the
-document that arrived. The scanner is told far less than the producer said, so
-the warnings it would raise about a producer's document it has no grounds to
-raise about ours.
-
-The case that prompted this: given the producer's document, the scanner reports
-that Go binaries carry no function symbols and it is falling back to module
-granularity; given ours it says nothing, because ours carries no notion of a
-binary. The findings are the same either way. Recorded rather than fixed, because
-carrying a producer's metadata as far as the scanner changes what an inventory is
-here.
-
-Two things reported per match are kept, as evidence for the question REQ-13
-asks:
-
-| Kept | Use |
-|---|---|
-| The version range the match fired on, from the detail its kind was decided by | For a distribution's package reached by identifier it names no packaging revision and so cannot see a backported fix. Read beside the version that ships, a range naming no revision is the whole argument in a line |
-| The body of data that answered | Finer than the two words the match kind records |
-
-Both are kept as the scanner wrote them and **never parsed**. Deciding whether a
-version falls inside a range needs an ordering per ecosystem.
-
-## Scanner output
-
-The scanner runs as a subprocess of the process serving the API, and its report
-is read into that process. It is bounded the way a scan file is, from the same
-budget, and every bound is configurable.
-
-| Bounded | Rule |
-|---|---|
-| The report's size | Past the ceiling the run fails. It is not read in part: half a report reads as a product that stopped having problems, which is the failure every other rule here exists to prevent |
-| What the scanner said while running | Past the ceiling the beginning is dropped and the end kept, and the run stands. A scanner with a lot to say still scanned, and one that failed says why on its last lines |
-| How many matches one report states | Charged as each match is read rather than after the array, because what a bound stops is the walk |
-| How many addresses one match points at | Bounded separately, because the two multiply: a report inside the match ceiling is still a report of one match pointing at everything |
-| One execution's wall-clock time | A scanner that has stopped making progress fails as a run that failed rather than holding a worker. It stays below the ceiling on one hold (`design-docs/queue.md`), and the process refuses to start where it does not |
-
-A report's size is components × matches × references, and a producer controls
-the first factor by uploading a scan file — so nothing about it is bounded by
-anything this deployment chose unless it is bounded here.
-
-### Ratings a report carries
-
-A report states several ratings of one issue, from different sources and under
-different generations of the scheme.
-
-| Rule | |
-|---|---|
-| One rating per generation is kept: the worst any report states that has both a score and a vector | The worst is the one answer that is the same whatever order the reports arrived in. A version 3 and a version 4 rating are two judgments, so neither generation is the one thrown away |
-| The issue's number is the newest generation's rating, copied whole | It is what a screen shows beside its scheme and what the order ranks by, so the number, vector, version and publisher are one rating. A higher rating under an older generation is held beside it and does not move it. The issue's findings are ranked again when the number moves |
-| A rating is kept whole | Number, vector, version, publisher and rank come from one rating, so the vector never explains a number somebody else published |
-| A number with no vector is not a rating | It raises the issue's number to the worst claimed only on an issue that holds no rating |
-| A rating whose generation nothing states is not held beside the others | A version 2 vector names no scheme and a report states its version beside one. Filed under a guess, it would stand in for a generation it may not be |
-| The generation is recorded beside the number | Two generations are scorable and their numbers are not comparable. Left off, a number is placed by guessing at its vector |
-| A number is taken as the hundredths it states | Rounded rather than cut: 8.2 is 819.999… hundredths as a float |
-| The number is the publisher's, recorded as given | Recomputing it would replace what somebody published with an answer to a different question |
-
-Both generations arrive, and they arrive differently. Of 5,037 issues published
-in a two-week window, 1,939 carry a rating: 1,245 under version 3 alone, 167
-under version 4 alone, and 527 under both. So a report holding two generations
-of one rating is ordinary rather than a transitional case.
-
-| Shape | |
-|---|---|
-| A version 3 vector carries the base metrics alone | None of the 1,838 version 3 ratings those 1,772 issues carry states a temporal or environmental metric |
-| A version 4 vector carries every metric the scheme has, with a placeholder where nothing was stated | 694 of 694 |
-| Where a version 4 vector states an exploit maturity, the number published beside it is not a base score | 163 of 694. The field is still the one a producer calls the base score, and the value is that metric applied to it |
-
-Scoring here is over the base metrics, so a number worked out from a recorded
-version 4 vector is the base score and differs from the publisher's wherever
-exploitation was claimed. Nothing recomputes a recorded rating, which is what
-keeps the two from being mistaken for each other.
-
-Publishers also disagree with the scheme's own reference calculator. Of the 531
-version 4 ratings claiming nothing about exploitation, 528 score exactly as
-published and 3 differ by a tenth — and on all three the reference agrees with
-this implementation rather than with the published number.
-
-A scanned estate holds the same mixture, weighted toward what was published
-earlier. Across 6,883 issues, 4,959 carry a vector: 4,815 under version 3, 143
-under version 4, and one under version 2, which nothing here scores. Seven of
-the 143 state an exploit maturity. The remaining 1,924 issues carry no vector,
-and a severity word is all there is to rank them by.
-
-## Scanner environment
-
-The scanner is somebody else's program reading somebody else's inventory, and
-it starts helpers of its own. It is given only what it needs of this process's
-environment.
-
-| Given | Why |
-|---|---|
-| Where to find programs, home and scratch space, the time zone | What any program needs to run |
-| The certificate bundle and the proxy, in either case | What reaching its vulnerability data needs |
-| Every variable under the scanner's own prefix | Its own settings, which an operator sets for it |
-| Its check for a newer release of itself, off | A request on every run to its publisher's host, which nobody configured and an air-gapped deployment cannot reach. An operator who sets it is left alone |
-
-| Not given | Why |
-|---|---|
-| Anything else, this deployment's settings included | They hold the database address with its password, the sign-in client secrets, the mail password and the object store's keys, none of which the scanner needs, and what it is not handed it cannot disclose |
-
-## Last upload per build
-
-Every other failure here is loud. Silence is the failure that is not: a build
-nothing files against reports no new findings, closes nothing, fails nothing, and
-every number about it holds still.
-
-Every declared build is reported with when a scan last arrived, **longest-silent
-first**, and whether that is longer ago than the deployment allows. An
-alphabetical list buries the one that stopped among the ones that are fine.
-
-| Rule | Reason |
-|---|---|
-| A build nothing has ever been filed against is reported too, measured from declaration | A pipeline pointed at a name nobody declared is refused loudly; a build declared and never pointed at anything fails silently |
-| How long counts as quiet is a setting, shipping at a week | Long enough that a nightly build missing one night is not an alert, short enough that a pipeline switched off is noticed in the week it happened |
-| How long counts as quiet is a whole number of days, refused otherwise | The scanning screen states it in days and flags a build against that number. A value already stored between two days is read as the later whole day everywhere it is read, so the screen and the alert agree |
-| A release out of support is never reported as quiet (REQ-52) | It is still listed and still states how long it has been: "not scanned, and that is fine" and "not listed" are different answers |
-| Only a scan that could be read counts as having been heard from | A build whose upload is taken nightly and fails to parse nightly is exactly what this report is for. Counting the arrival drew it as perfectly quiet, on the one report whose subject is that silence must not look like health |
-| An upload turned away is recorded against the build, and the report says when and why | Quiet says nothing arrived. It does not say whether anybody tried, and those are different faults with different people to tell: a pipeline nobody wired up, against one failing nightly and reporting success to its own log. A refusal never becomes a scan, so without a row of its own the producer was told and the deployment was not |
-| One refusal per build, replaced | A producer retrying a document nothing can read writes one a minute. What a report asks is whether this build is being refused now, not for a history of it |
-| Recording a refusal is best-effort, and that is the one place it belongs | It is a note about something that already failed. Failing the failure would turn a refusal the producer needs to read into a fault they cannot |
-| It is a person's question | A pipeline key reads the receipts of a build it may upload to and nothing more |
-
-## Receipts
-
-The acceptance a build received was issued before anything was read, so it cannot
-carry the answer, and a build that never checks again goes green on a file
-nothing could read.
-
-What was filed against a build can be asked for, newest first, each reporting how
-far it got: taken and not yet read, read and awaiting a vulnerability scan,
-done, or refused with the reason. A key reads every upload to a build it may
-upload to, whichever sender filed it (REQ-44).
-
-| Rule | Reason |
-|---|---|
-| A sender is recorded as a key or a person, and its identifier | A key's name is unique only among keys in force, so a new key may hold a withdrawn one's name, and a key may share a name with a person. Recorded as a name, the receipt would credit an upload to a sender that never made it |
-| A key reads every receipt of a build it may upload to, whoever sent it | A rotated key, or a second key on one build, re-sends what another sender already sent, and the answer to the re-send is the first upload's scan. Read back by sender, that answer named a scan its receiver could not read |
-| Which builds a key reads is decided in the store, from the subject | A narrowing a handler passes in is one the next handler forgets. A key pinned to one release or one variant reads that build's receipts and refuses every other build's, and a product-wide key reads every build of its product |
-| A read whose job died is failed on the receipt, in fixed words | The scan row is not always marked: marking it can be what failed. The job's last error is whatever failed, a dropped connection's address included, and a refusal reaches the receipt through the scan row |
-
-The four states are this deployment's, not the queue's. Reading and scanning are
-two jobs with different rhythms, and a producer has no business knowing which
-queue its work is sitting in.
-
-Which run answers an upload is a rule rather than a lookup, because a run covers
-a build rather than an upload: the earliest successful run to finish after
-that upload was parsed. A run that failed answers it only while nothing has
-succeeded since. Taking the earliest run to finish after parsing whatever
-became of it, a scanner that falls over once poisons every receipt already
-waiting on it, permanently.
-
-What each run changed is counted when asked for rather than stored, from the
-runs the findings already point at, as issues at components rather than occurrences.
-The count is attributed to the newest upload that run covered and omitted from
-the rest, because one fact repeated down three rows reads as three changes. Only
-an upload that was read counts as covered, by arrival order: one that failed or
-is still being read carries no run, and the count attributed to it would appear
-on no receipt.
-
-Which run produced a finding is recorded on it (REQ-13): the one that opened it
-and the one that closed it, with the scanner and vulnerability-database versions
-of each run on every receipt item. A feed shipping bad data for a week is
-corrected afterwards, and the work done on the strength of it has to be found.
-
-| Rule | Reason |
-|---|---|
-| The run that opened it, not the newest | A later run finding the same thing does not reopen a finding |
-| The versions go on every receipt the run answers | They are a property of the run rather than a change it made. A page of receipts spanning a scanner upgrade is what somebody reads that screen to notice |
-| Absent rather than invented where there is no run | A finding a person recorded (REQ-19) was produced by nobody, and one whose run has been pruned is still a finding |
-
-Two numbers are kept once a scan has been read: how many components the
-inventory described, and how many of them anything placed in the graph. The
-pair, not either alone — a component nothing places is ordinary, but a document
-that places *none* is a list rather than a graph, whose every finding will be
-individually correct and unable to answer "why is this here".
-
-Three more are worked out when a receipt is read: how many names the inventory
-gained, lost and holds at different versions since the upload before it.
-`design-docs/data-model.md` § Inventory delta holds what is compared. A build that
-expected to move three dependencies and moved two hundred has had a base image
-change under it or a lockfile regenerated, and nothing else on a receipt says
-so.
-
-A key that reads no findings is told this. It is arithmetic over the documents
-that key sent, in the same class as the two numbers above it. The comparison is
-against what the build held before that upload, whoever sent it: two keys
-sending for one variant are describing one artifact.
-
-Which names moved is a listing of its own, reached on the same terms as the
-receipt carrying the counts. An upload that moved much of a build is also told
-to whoever may read the product, on the terms `design-docs/notifications.md` § An
-inventory that moved sharply holds: the telling is worked out once the writes
-have committed, and a message that cannot be composed is logged rather than
-failing an upload whose inventory is stored.
-
-## Receipt cost
-
-A page of receipts reads the receipts, what each run on it opened and closed,
-the documents each upload sent, what each upload changed in the inventory, and
-the last run. The counts are the cost: each is the distinct issues at
-components among the findings naming a run, and every other read is a few
-milliseconds.
-
-| Rule | |
-|---|---|
-| The counts read the findings of the page's runs, through an index on each run column | The build's other findings are not read. Unindexed, the count read every finding the build ever had, open or closed, so it grew with the calendar |
-| Each index carries every column the count reads | The count is answered from the index without the table |
-| A page whose runs opened most of the build reads most of the build | A build's first scan opens all of its findings, so until fifty scans have followed it, the page holds the run that opened everything. Every engine reads that run's rows; what remains is the distinct count over them |
-
-Measured on the full-size switch image (`internal/sbom/testdata`) built
-nightly, with twenty issues arriving a night. The first night opens 241,279
-findings, 11,751 issues at components. Two histories:
-
-| Shape | Packages moving a night | Issues at components opened and closed a night | Findings after a year |
-|---|---:|---:|---:|
-| Quiet | A thousandth | About 20 opened, under 1 closed | 480,243 |
-| Restamped | A hundredth | About 350 opened, 330 closed | 1,159,943 |
-
-The restamped shape is what a build accumulated while its container images
-changed identity with every build.
-
-The page of fifty, first read discarded, best of three, in ms. Each cell is
-without the indexes and with them, on one engine at a time.
-
-| Engine | Shape | Night 1 | Night 30 | Night 365 |
-|---|---|---:|---:|---:|
-| PostgreSQL | Quiet | 103 / 81 | 125 / 58 | 145 / 20 |
-| PostgreSQL | Restamped | 108 / 71 | 284 / 308 | 510 / 74 |
-| MySQL | Quiet | 256 / 45 | 268 / 84 | 23 / 23 |
-| MySQL | Restamped | 233 / 47 | 1,075 / 262 | 2,923 / 515 |
-| MariaDB | Quiet | 83 / 50 | 111 / 90 | 18 / 19 |
-| MariaDB | Restamped | 86 / 49 | 382 / 260 | 730 / 160 |
-| SQLite | Quiet | 923 / 13 | 921 / 28 | 1,804 / 19 |
-| SQLite | Restamped | 914 / 17 | 1,952 / 67 | 4,984 / 60 |
-
-| Reading | |
-|---|---|
-| Night 30, restamped, PostgreSQL | Every finding of the build was opened by a run on the page, 458,895 rows. The planner reads the table, and the distinct count over them is the cost on both sides |
-| Night 365, quiet, MySQL and MariaDB | Without the indexes both read the runs' few rows through the index their foreign key carries |
-| Night 365, restamped, MySQL | Each count reads the other run column's index with the build alone as its prefix, every finding of the build, from the index rather than the table. A sixth of the cost without the indexes |
-
-A deployment of twelve builds of the image, 3,497,476 findings, one build at
-its tenth night with every container image changing identity each night:
-about 1,050 issues at components opened and 1,000 closed a night, 11,300
-findings each way. The page holds the run that opened the build.
-
-| Count read through | Page | What the count reads |
-|---|---:|---|
-| No run index | 253 ms | 17,927 table pages, the build's every finding |
-| The run indexes, before a vacuum | 185 ms | 348,715 index entries and 301,897 table rows |
-| The run indexes, after a vacuum | 67 ms | The same entries, no table row |
-
-| Rule | |
-|---|---|
-| An index-only read depends on the visibility map | A finding written since the last vacuum is read from the table. The finding table is vacuumed after a fiftieth of it changes (`design-docs/database.md` § Indexes) |
-
-A night costs up to 7 percent more with the two indexes, averaged over the year: 3.75 s and
-3.83 s on PostgreSQL in the restamped shape, 3.39 s and 3.42 s in the quiet
-one. `make measure` re-runs both shapes.
-
-## Document retrieval
-
-A tag's documents are retained so a release can be re-scanned later. With
-nothing to return one, "send me the SBOM you scanned for v2.4" is answered from
-the build system, which is the copy that may have moved since.
-
-| Rule | Reason |
-|---|---|
-| The bytes as they arrived, not parsed and not re-serialized | The hash on the receipt covers what was received, so anything rewritten on the way out would fail the check the hash exists for |
-| Named through the scan it belongs to | Whoever may read the receipt may read what it describes. A document identifier resolving on its own would be a second way in that has to remember the same rule |
-| Narrowed in the store, not the handler | A key reads what was filed on a build it may upload to, and the two endpoints cannot come to differ |
-| Named by its encoding, `.xml` or `.json` | Told from its first character by the reader's own rule, before anything is sent. A copy named for the other encoding is misread by any tool that goes by the extension |
-
-## Upload listing
-
-A build takes four kinds of upload, each at a path of its own because each
-takes a different body and answers a different receipt.
-
-| Kind | Sent to | Listed by |
-|---|---|---|
-| SBOM | The build | Its receipts (§ Receipts) |
-| Static analysis run, as SARIF | The build | Its runs (`design-docs/analysis.md`) |
-| VEX document | The product | Its uploads, below |
-| Supplier advisory | The product, by upload or by a supplier's feed | Its uploads, below |
-
-One read lists every kind for a build, with how many of each are held and what
-became of the newest. It reads each kind's own list, a page of one, so each
-kind's rule for who reads it applies unchanged.
-
-| Status | SBOM | Static analysis run | VEX document, supplier advisory |
-|---|---|---|---|
-| In progress | Taken, being read or scanned | Queued, or waiting for the build's inventory | — |
-| Completed | Scanned | Applied, or kept beside a run built later | Its statements recorded |
-| Failed | Taken and unusable, with the reason | Unreadable, or its tool did not run, with the reason | — |
-| Refused | The last upload turned away, where it came after the newest one taken | The same, per series | Turned away, with the reason |
-
-| Rule | |
-|---|---|
-| A kind the caller may not read is left out | A pipeline key reads the SBOMs and the runs of a build it may send to. A person reads the runs where they read internal findings in the product, which is where those results open |
-| An SBOM or a run turned away is the newest only where it came after the newest one taken | It is recorded once per build, or per series, and replaced by the next; an older refusal says nothing about the upload that followed it |
-| The count is what the kind's own list holds | An SBOM or a run turned away is not counted, because only the last of each is kept. A VEX document or a supplier advisory turned away is listed, and counted |
-
-### Document uploads
-
-Every VEX document and supplier advisory that arrives for a product is recorded
-as it arrives, taken or turned away. What it says is in its statements; the
-record holds the rest.
-
-| Recorded | |
-|---|---|
-| The kind, the publisher and the name the publisher gave it | As far as the document was read. Empty where it was turned away first |
-| The file name a client gave, or the address a feed fetched it from | |
-| The digest of what arrived | SHA-256 of the bytes, for a fetched advisory as for an upload. Absent where it was turned away before it was read whole |
-| Who uploaded it, or which supplier's feed fetched it | One of the two. The sender is spelled as a scan's is, so a key and a person are never the same sender |
-| When it arrived | |
-| Completed or refused, and what the sender was told where it was refused | |
-| How many statements it recorded and how many earlier ones it set aside | As it was taken. A fact about that moment, so it is stored |
-
-| Rule | |
-|---|---|
-| One row per arrival, never replaced | An administrator uploads by hand, and a feed steps past a document once it has read or refused it. Nothing retries on a timer the way a pipeline sending an inventory does |
-| A taken document is recorded in the transaction that records its statements | The record and the statements cannot disagree about whether it was taken |
-| A refusal is recorded wherever the upload is turned away once its sender is admitted | By the form bound before the operation runs, by the reader, and by the checks on the publisher and the name. An answer of 500 or above is this deployment failing, and is not recorded as a refusal. That includes a request shed because the deployment is receiving as many uploads as it takes |
-| A document a feed fetched is recorded where it said something about a component this product ships, set aside something an earlier copy said, or arrived whole and was refused | A distribution lists tens of thousands of advisories about nothing a product here ships |
-| A feed's refusal is a document that arrived whole and was stepped over | Malformed, misshapen, or mismatching the digest its publisher serves, with the publisher and the name where it was parsed that far |
-| A document a feed could not fetch whole is not recorded | Withdrawn, refused by the publisher, past the size bound, or at an address the client turns away. Nothing arrived, and the supplier's own record says what stopped the pass. A statement set listed beside the advisories is left alone and not recorded either |
-| A trusted upstream's documents are not recorded here | They are read on a schedule, from the upstream (`design-docs/upstream.md`) |
-
-### Document lists
-
-The VEX documents and the supplier advisories of a product are each a list of
-these records.
-
-| Rule | |
-|---|---|
-| Every arrival is a row, newest first | Taken and turned away alike |
-| A row names who uploaded it, or the supplier whose feed fetched it | A person by sign-in identity and display name, a key by name |
-| The newest taken upload of a document is marked current | A document is the key a later upload replaces on: a publisher's VEX document, or one advisory by its publisher and the name the publisher gave it. What the current one said is what stands |
-| Read by a person who may know the product exists | The rule the SBOM receipts hold for a person. A pipeline key sends inventories and reads none of these. Decided in the store |
-
-## Administrator-supplied VEX
-
-VEX statements arrive by administrator upload (REQ-31), as a conforming VEX or
-CSAF-VEX document and nothing else. Both are read into the same claim: one puts
-the status on a statement and the other in which list a product identifier
-appears in, and what a publisher is telling this deployment does not depend on
-which file they wrote it in.
-
-| Rule | Reason |
-|---|---|
-| A CSAF product identifier is resolved through the tree that defines it | It is somebody else's key, not a name. The tree may arrive after the claims referring to it, so identifiers are collected as they are read and resolved once the document closes. An identifier the tree never defines is dropped, and a claim left pointing at nothing is refused |
-| A composite identifier is resolved through the relationship that made it, down to the package, and the product it relates to is kept beside it | A distribution names a product as a package inside a platform, and the claims point at the composite. The package is the half a component here can be, and the product is what places a supplier's statement in a build. All five relationship categories the format defines read the same way: the reference names the thing and what it relates to names the context |
-| An OpenVEX product with subcomponents is kept beside each subcomponent | The subcomponents are what the statement is about and the product is what they ship inside, so a statement about zlib inside a product is not a statement about every zlib |
-| A CSAF *advisory* is refused here and read by the supplier-advisory path | Each is read under what the document around the claims means, and what a later upload of it replaces differs |
-| The reader is the one the build's own suppressions go through | One parser rather than one per distribution's format keeps the hostile-input surface to a size somebody can reason about |
-| A document is digested as it streams, and one past the size bound is refused for its size before any parse error is reported | The reader reads to the end of the file, so a document it takes has passed the digest whole, and a document cut off at the bound fails as malformed when its size is the honest answer |
-| Who published a document, and an advisory's own name, are held without control or format characters, whether the request, the uploaded file's name or the document gave them | Both are shown wherever the evidence is, and a right-to-left override in either reads reversed there |
-| Uploading again from the same publisher sets aside what they no longer say rather than deleting it | What an approval was granted on the strength of has to stay readable. The document's digest is kept with every statement, so a revision can be noticed |
-| The same document uploaded again writes nothing where it reads as what stands, and replaces what stands where it reads differently | The digest is of the bytes. A reader that derives a different name or target from the same bytes has changed what the statements say, and uploading again is how rows stored under the earlier reading are brought up to date |
-| A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is a statement about `frr` |
-| The product a component ships inside is stored as its package identifier, its name folded the same way, and the version it was stated at | The name is what a product is found by in a build, and the version is what a statement is applied at |
-| What a statement names its supplier's product as is stored with it: a component inside a named product, a product named alone by no package identifier, or nothing | Only a statement read this way places anything, so one recorded before the product was read, and a package named alone, close nothing |
-| A claim a later document repeats word for word, placing the supplier's product where it stood, keeps its row and takes the later document's digest, and the moment it was said again. A row recorded before its product was read keeps its row for the same claim placed anywhere, and takes where it is placed now | A superseded claim tells every approved decision citing it that the publisher changed what they published, and repeated, they did not. A claim moved to another release of the product is a change, and what an approval was granted on stays readable as it was. A fetched advisory's digest covers which of its claims were kept as well as its bytes, so the same advisory read again differs in digest whenever the product ships something it did not |
-
-What is done with the statements is not an ingest question. A statement whose
-product is a build's root is that build's own claim (REQ-11), a supplier's
-statement about its own product closes the finding at every occurrence inside that
-product (REQ-31), and every other statement is evidence and a prefill.
-`design-docs/triage.md` § Evidence from publishers holds the three.
-
-## Supplier advisories
-
-A supplier's CSAF security advisory arrives by administrator upload, on a path
-of its own, and lands where a VEX document lands (REQ-31): evidence and a
-prefill, and where it states the publisher's own product is not affected, a
-closure at every occurrence inside that product. It is a document about the
-publisher's own flaws, and the products it names are components this product
-ships.
-
-| Rule | Reason |
-|---|---|
-| The profile is checked in both directions | A VEX document read here would be superseded under a name it does not carry, and an advisory read as a VEX document would take a publisher's announcement about their own flaws as claims about what a build ships. Each refusal names the path that does take the document |
-| An advisory is replaced by the name its publisher gave it | A statement set is a publisher's whole answer and is replaced as one. An advisory is one announcement among the hundreds a publisher issues, so keyed on the publisher alone each new one would set aside every other one on record |
-| Neither kind touches the other | One publisher issues both, and a sweep on the publisher alone would have a statement set set aside every advisory of theirs |
-| An advisory that names no publisher or carries no tracking identifier is refused | Whose judgment it is decides what it supersedes and whose name stands beside it, and the tracking identifier is the key a revision replaces. Both are mandatory in the format |
-| Every product-status list the format defines is read, at the versions it names | Two of the eight are the only status a real advisory carries. What is not read is the range a list implies — that everything after a first fixed version is fixed — because the document enumerates the versions it is about and nothing else |
-| Words are attached to the products they name, by identifier or by group | The format lets either say which products a flag, a remediation or a threat is about, and they mean the same thing. Read only the first and a remediation scoped by a group falls through to the words written about the status at large, so an upgrade instruction lands on a claim the document never made |
-| A group is expanded once the document is closed | The tree defining it may come after the words naming it. Words scoped by a group are about what the group holds, and a group holding nothing scopes them to no product |
-| A CVE is the issue's name wherever the document states it, and every other identifier is an alias | The producer chooses the key order. Where no CVE is stated, the first other identifier is the name |
-| The claims come back in the order the document stated them | A map has no first. Which of several sentences stands for a claim, which order its products are carried in and which order the claims are written would otherwise be whatever the runtime chose, so the same bytes uploaded twice would store different reasoning under a digest saying nothing moved |
-| A version stated as a branch is the version the claim is about | A publisher that states no package identifier states the version as the branch its product sits in. Dropped, a claim about one release of an appliance answers for every release of it, and the screen has no version to show beside the status |
-| A claim naming a version offers a prefill only at that version | An advisory exists to name the version that carries the fix, which is not the version shipped here. Offered against another, the control comes prefilled with a claim the publisher never made, with their name on it |
-| The claim is shown at every version regardless, with the version it was about | Which versions a publisher spoke about is what a triager reading the evidence wants, and a status shown without it reads as the opposite of what it says |
-| Words that name the products they are about reach the claim those products are under | An advisory's remediation names the packages to upgrade and lists those same packages as fixed. Read by category alone, the one sentence worth having lands on an affected claim the document never made |
-
-A publisher names its products in one of three shapes, and all three are read
-with the version each states: a package with a package identifier, a package
-composed into a platform by a relationship, and a product named and nothing
-more. The third is the ordinary
-case for an equipment vendor, whose advisories carry no package identifier
-anywhere, and it resolves the way a claim against a source tree does — a
-component of that name is the one meant.
-
-A CSAF document is held to two bounds.
-
-| Bound | What it charges |
-|---|---|
-| The component bound | Each distinct identifier the document states, once however often it is named |
-| Ten times the component bound | Each entry the reader keeps: a product defined, a group, a group member, a product listed under a status by each claim, a product or group a sentence names, an alias, and every member a group reference stands for when it is expanded |
-
-A justification naming no product is not an entry. A claim keeps the last one
-it gives, so a document repeating it holds one.
-
-Measured on a real distribution advisory about a kernel: 794 distinct product
-identifiers, mentioned 220,088 times — 341 issues over 279 composed products,
-each listed under a status and again in the remediation about it. The first
-bound is nowhere near, and the second is a fifth spent. The same file is 27 MB
-against a size default of 256 MB. An entry held costs about 170 bytes, so the
-second bound at its default is about 170 MB. A group reference is charged what
-it expands into: without that, one group of fifty thousand products referenced
-four thousand times is two hundred million entries from under a megabyte.
-
-One distribution VEX document about a single issue composes 1,669 of its 1,669
-product identifiers through relationships, so a reader that resolves only
-through the tree refuses the whole document.
-
-The claims one document states are written in batches, because that advisory is
-95,139 of them and the caller is waiting on the answer. A row at a time it takes
-27.9 seconds on PostgreSQL, 10.0 on MariaDB, 9.0 on MySQL and 7.3 on SQLite; in
-batches, 5.4, 1.2, 1.4 and 1.3. Revising the same advisory — every claim set
-aside and written again — is 6.1, 3.1, 3.0 and 2.2.
-
-## Supplier directories
-
-A supplier's advisories are read on the scan schedule, from an address an
-administrator configured, and land where an uploaded one lands (REQ-31). The
-address is the publisher's CSAF provider description, which names the feeds the
-documents are listed in — the same three files this deployment writes when it
-publishes its own (`design-docs/remediation.md`).
-
-The deliberate act is choosing the publisher. An upload is somebody deciding
-that one document is worth reading, and a publisher issues hundreds a year:
-which of them is about a component a build here ships is not knowable until the
-document has been read.
-
-| Rule | Reason |
-|---|---|
-| Off unless a supplier is configured | Naming one is the switch. A second setting beside an empty list would be two ways to say the same thing, and a deployment that cannot reach out loses a publisher's judgment, as evidence and as what it would close |
-| A supplier is configured against one product | That is what a claim is recorded against, so a supplier feeding two products is two rows, each read and withdrawn on its own |
-| Withdrawing a supplier removes nothing they said | Their claims are evidence an approval may have been granted on the strength of. What withdrawal stops is the reading |
-| A supplier is matched by name without regard to capitals, and a product out of use takes none | Two spellings of one name are one supplier, on every engine, because the stored value is lowered rather than an engine asked to fold. A product taken out of use accepts no scan, so what a supplier would be read against is a build list nothing adds to — and nothing lists the product, so nothing could withdraw the supplier either |
-| Only claims naming a component the product ships are recorded | A publisher's feed is about their whole catalog. One real advisory about a kernel carries 95,139 claims, so a deployment taking them whole would store a supplier's catalog rather than evidence about its own |
-| What the product ships is read as the pass runs, so a component that arrives later has no evidence behind it | An advisory read before a build first shipped the component it names is not read again: the mark has passed it. The evidence for that component arrives with the publisher's next advisory about it, and the one already issued is taken by uploading it |
-| A new supplier is read from a window before it was configured, a year unless a deployment says otherwise | A distribution's feed lists every advisory they have ever issued, so the whole of it is tens of thousands of requests at somebody else's service. A window drains at the per-pass bound; one older than it is taken by uploading it |
-| A supplier taken up again at the same address resumes where it stopped, no further back than that window | It takes what was issued while it was away and nothing it already read. Taken up at another address it starts where a new one does, since nothing at that address has been read |
-| A document is compared against the digest its publisher serves beside it | What was fetched and what the publisher says they published can differ — a cut transfer, a mirror behind, a file replaced — and recorded, it stands as their judgment. A mismatch is about the document, so the pass steps over it, and that revision is not read again until the publisher stamps it again. Mismatches are counted apart and logged per supplier, because a publisher whose digests keep disagreeing otherwise reads as healthy |
-| A document is read before its digest is asked for | A statement set listed beside the advisories is set aside whatever its digest says, and a distribution lists tens of thousands of them |
-| The digest a feed entry names is the one read; otherwise the file beside the document | The format puts it at the document's address with the algorithm's suffix, and a feed entry may name it outright. One https address per algorithm is taken from an entry, which bounds what one entry can ask for |
-| Both SHA-256 and SHA-512 are read, and whichever answered is asked for first after | Publishers split between them, and each serves one kind beside every document, so the one a publisher does not serve is asked for once a pass |
-| A publisher serving no digest is read unchecked | The format asks for one of its trusted providers only. A refusal, a page in place of a digest, a redirect, a host an administrator excluded, or nothing at all means none is served; a publisher that cannot be reached for the digest, or that answers it with a rate limit, holds the mark, the way it does for a document. After two documents in a row with none beside them, the rest of the pass does not ask |
-| A VEX document in the same feed is left alone | A publisher's statement set replaces their whole answer for a product. Setting that aside is a judgment, and a pass on a timer makes none — it is taken by uploading it |
-| One replica reaches out, settled by a lease | The politeness the pass keeps to is a rate per deployment rather than per replica, and three replicas each keeping to it would be three times the traffic at a publisher's expense |
-| The lease is taken again as the pass runs, between suppliers and before each document | A document is up to three requests with a timeout each — itself and two digest files — so one supplier's pass outlasts a lease sized for the interval, and a slow publisher handing the pass to a second replica mid-flight is what a lease exists to prevent. A pass that loses the lease leaves the supplier due |
-| Bounded per supplier per wake, and a supplier that filled its bound stays due | A publisher having a busy week is not a reason to make a hundred requests of them in a minute. Left to the interval instead, the bound would be per day, and a publisher issuing more in a day than one pass takes would fall further behind every day |
-| Both shapes the format defines are read, at the labels that travel | A publisher serves a feed or a directory of documents, and the largest publisher of these serves only the second — so a reader that knows one takes the other's description, finds nothing, and reports that it worked. Only the labels a publisher serves to everybody are read: one that has to be arranged answers a refusal on every pass |
-| How many places a publisher may point at is bounded | Nothing in the format bounds it, and a description within the size bound can name tens of thousands of addresses — which is a pass running for hours and outliving the lease that says it is the one reading |
-| A listing refused the same way on every pass does not stop the others | A publisher serving a restricted label beside a public one is ordinary, and failing the supplier on the first means the public one is never reached |
-| A listing that could not be reached holds the mark | The mark is shared by every listing. Moved on the strength of the others, it passes everything the unreached listing named before it, and those entries are never read |
-| A stamp far in the future is not read | The mark moves forward only, so one entry stamped in 2099 would carry it past everything issued between now and then — and the fetch succeeds, so the supplier reads as healthy while it takes nothing |
-| A document that cannot be read is stepped over; a publisher that cannot be reached holds the mark | The two are different facts. A document refused the same way every time — withdrawn and answering 404, larger than what is read, malformed, or an address the client turns away itself: a redirect, a host an administrator excluded by name, a port other than https — would otherwise stop the supplier for ever. A publisher that cannot be reached has not shown what is behind the mark, so the mark stays. A name resolving inside this network or into an excluded network is read as unreachable: a filtering resolver or a split view answers that way until it is corrected |
-| A rate limit, a request timeout and "too early" hold the mark | Each asks to be asked again. A publisher's content delivery network answers them for a whole pass, and stepped over, every document in it is lost |
-| A document answered "not authorized" or "forbidden" is stepped over, and the attempt is recorded as failed | A document the publisher restricted answers this way on every pass, so holding on it stops the supplier for ever. A bot filter answers it too, so stepping over it silently loses advisories while the supplier reads as healthy. The address and the answer are kept as what stopped the attempt, and the last read that worked does not move |
-| A listing answered "not authorized" or "forbidden" beside one that reads is stepped over, and the attempt is not recorded as failed | A directory carries no label to leave a restricted one out by, and a publisher lists one directory per label, so a restricted one answers this way on every pass. Recorded as failed, the supplier never reads as answering again. A supplier none of whose listings could be read fails |
-| A listing or document whose address cannot be made into a request is stepped over | It is refused the same way on every pass, so holding on it stops the supplier for ever |
-| The mark is a moment and the address read at it | A publisher stamps a batch with one moment, and a date-only stamp gives a whole day the same one. On the moment alone, a pass that stopped inside such a group would skip the rest of it for ever |
-| A listing's moment is read to the microsecond, the precision the mark is stored at | Compared finer, the entry the mark was taken from is never equal to it: it is read again every pass, and a batch sharing one moment past what a pass takes never drains |
-| A pass cut short by shutdown writes how far it reached and leaves the supplier due, with no failure recorded | Written with the pass's own context, the write fails as the process stops, and everything read is fetched again on the next start. Recorded as a finished read, the rest waits a day; recorded as a failure, a healthy publisher reads as unreachable |
-| What identifies a recording is the document and what was kept of it | The store treats a document whose digest it already holds as one that changes nothing. For a fetched document the bytes are not the whole of what decides which claims get written — what the product ships that day is the other half — so keyed on the bytes alone, uploading the same advisory once a build ships a component the fetch narrowed away writes nothing and reports success |
-| A document is recorded even where nothing was kept | That write is the only thing that sets aside what an earlier revision of the same advisory said. Skipped, a publisher correcting one by dropping the component we ship leaves the old claim standing as evidence |
-| Whether a supplier is still configured is asked inside the write | A pass takes minutes, and one withdrawn during it would go on fetching and recording — which is the request leaving this deployment that withdrawing it was meant to stop |
-| A supplier that could not be read does not stop the next | One publisher unreachable says nothing about another, and a pass that stopped at the first would leave every supplier after it unread for as long as that one stayed down |
-| Two moments are recorded: the last attempt, and the last one that worked | An attempt that failed still happened. One moment moving on every attempt reads as a supplier answering fine right up to the failure it is reporting, so how long one has been unreachable is the gap between them |
-| A supplier unread for longer than a set time is raised with administrators | One that stopped answering looks exactly like one that published nothing. Measured from the last read that worked, or from when it was configured where none has, and never shorter than two scan intervals, since a supplier is read once each. `design-docs/notifications.md` holds the condition |
-| What stopped an attempt is kept bounded | The text carries a publisher's own address and a server's own reason phrase, neither of which they have agreed to bound. Unbounded, the write fails on two of the four engines, which leaves the attempt unrecorded and the supplier fetched again on every wake |
-| A feed entry nobody can date is left alone | It cannot be placed against the mark, so taking it would mean taking it again on every pass for ever |
-| Five publishers with a public CSAF provider description are offered as a fill for the form, and none is configured | Red Hat, SUSE, Cisco, Siemens and NCSC-NL. Choosing the publisher and the product is the deliberate act, so a preset fills the name and the address and the administrator adds it. One the product already reads, by name or by address, is not offered |
-| A claim is recorded as the administrator who configured the supplier | Configuring one is the act that admitted this publisher's judgment, and it is the only decision anybody made. Nothing chose the individual document, which is the whole difference from an upload |
-
-What a year costs was measured against five publishers on 2026-09-23, by
-reading their listings and sampling their documents. Each wake takes twenty
-documents from a supplier and wakes every five minutes, so one supplier drains
-at up to 5,760 a day.
-
-| Publisher | Shape | Listed in a year | Listed in 30 days | Drains in | Digest served |
-|---|---|---|---|---|---|
-| Red Hat, advisories | Directory | 28,984 | 10,596 | 17 days, both directories together | SHA-256 |
-| Red Hat, VEX | Directory | 68,238 | 7,614 | | SHA-256 |
-| SUSE, advisories | Directory | 42,268 | 33,438 | About 7 days, from a second host | SHA-256 |
-| Cisco | Directory | 1,229 | 155 | About 5 hours | SHA-512 |
-| NCSC-NL | Directory | 503 | 75 | About 2 hours | SHA-512 |
-| Siemens | Feed | 178 | 18 | About 45 minutes | SHA-512 |
-
-A publisher restamps an entry every time it revises the document, so a year's
-listing is mostly revisions: 25,743 of Red Hat's 28,984 advisory entries fall
-in the last 90 days. A distribution's steady state is a few hundred entries a
-day, well inside the bound. The rest of the limits hold with room: the largest
-listing is 3.7 MB against 64 MB, and sampled documents run to a median of 55 KB
-and a largest of 5.2 MB for Red Hat's advisories, against 256 MB. A Red Hat
-document arrives in a quarter of a second, so a pass is the pause between
-requests and little else. Red Hat's VEX directory is listed beside its
-advisories, and every document in it is fetched and then set aside, because
-nothing in a directory says which profile its documents are.
-
-SUSE describes itself on `www.suse.com` and serves its directory from
-`ftp.suse.com`. No description is served on the second host.
-
-| Rule | |
-|---|---|
-| The hosts a description, its feeds and their entries name are followed | A publisher serving its description from a web site and its directory from a download host is ordinary. A feed entry, its self link and its digest links may each name another host again |
-| A document named relative to its feed or list is read where it resolves | Resolved against the listing's own address, the way a link on the publisher's page is |
-| Only the https port, and no user in an address | The addresses come from a publisher's document, and one naming every port on a host would make the pass a port probe |
-| A host is a plain name or address | A host written in another script is mapped by the lookup to a host the excluded names would have caught |
-| Every request refuses an address inside this network and one an administrator excluded | Checked on the address a name resolved to, at the moment of connecting, so a public name pointing inward gains nothing (REQ-69). The excluded list is the one repository fetches read |
-| https only, and no redirect followed | A redirect is somebody other than the description naming where to go |
-| A budget of its own rather than the interactive one | That one is sized for somebody watching a blank page: at ten seconds a document too large to arrive inside it could not be fetched at all, however many times it was tried |
-
-What it reads lands where an upload lands. A supplier's statement that its own
-product is not affected closes the finding inside that product at the next
-scan (REQ-31), and everything else is evidence beside a finding and a prefill
-for a decision, never a decision itself. The configuration that admitted the
-publisher is the choice behind either.
-
-## The offline scanner database
-
-Produced by a build target rather than described in a document (REQ-12). A
-requirement whose only implementation is a configuration variable and
-instructions somebody follows by hand is one the operator who most needs it
-discovers broken.
-
-`make scanner-db` writes a bundle and its checksum.
-
-| Rule | Reason |
-|---|---|
-| Built with the scanner the image carries, not whatever is installed on the machine | The format is the scanner's, so a bundle built by a different version may not load, and the version that produced a finding is part of what the finding means |
-| Verified before it is declared | The target runs that same scanner against the bundle with the network off and auto-update refused, which is the configuration on the far side of the gap |
-| The verification is a target of its own | So it can be run on the far side. "It built" and "it loads where it has to" are different claims |
-
-## CVE records
-
-What a scan narrows its matches with is a snapshot of CVE records, kept on disk
-beside the scanner's data and read whole (REQ-12, REQ-31).
-`design-docs/findings-closure.md` § CVE record ranges holds what a scan does with it.
-
-| Source | |
-|---|---|
-| The CVE List | The public body of every CVE record, published as a repository whose hourly releases each carry an archive of every record as it stood at a midnight |
-| The archive read | The day's own, from the newest release; the release tagged for midnight carries the day before's instead, which is read where the day's is absent |
-| What is kept | Each record with an unaffected line it can order, in any container, whole: 22,481 of 402,541 on 2026-10-07, in a 534 KB snapshot |
-| What the snapshot describes | The newest moment any record read was updated, kept or not and withdrawn or not: a record withdrawn, or changed so it no longer narrows, changes what the snapshot does. A run records it as the snapshot it read |
-
-| Rule | Reason |
-|---|---|
-| A connected deployment fetches it, checking hourly | The same arrangement as the scanner's own data. A fetch reads the newest release from where its page redirects, rather than from the repository host's API, which answers sixty unauthenticated requests an hour per address |
-| Only the repository host and the two hosts it hands a download to are reached, and the one redirect a download takes is followed only to those | Every other outbound request goes to a host the application names (REQ-69) |
-| An air-gapped deployment is carried a snapshot | `make cve-records` fetches one with the binary the image carries and reads it back before declaring it. On the far side it is copied into the directory, with fetching turned off |
-| An archive downloaded some other way is read into the same place | `openpsirt records import`, for a deployment whose route out is not this one |
-| The snapshot is replaced by a rename | A scan reads the old file or the new one, never half of either |
-| A snapshot that cannot be read is an error, never no records | A damaged bundle read as none would close nothing and say so nowhere |
-| A record in the archive that cannot be read is left out, and the snapshot is built from the rest | Failing the archive on one record keeps the last snapshot for as long as that record stands, and the last snapshot goes on closing findings on what records said before they changed. Left out, the record narrows nothing, which is the conservative outcome. How many were left out, and the first, are logged; an archive in which no record could be read builds nothing |
-| A moment of update with no offset is read as UTC | The record format allows one and defines it so |
-| Kept on the scanner's volume | Each replica's own on scratch space, and one shared where the replicas mount one claim; the rename keeps that safe |
-| Scratch files older than two hours are removed at the start of a fetch | A fetch killed part way leaves an archive of hundreds of megabytes on the volume. A fetch takes minutes, so one younger than that may be an import still being written |
-
-| Bound | |
-|---|---|
-| The download | 8 GiB, against 622 MB on 2026-10-07, and removed when it passes the bound |
-| The archive inside it | 8 GiB, written to disk before it is read, and removed once it is |
-| Files in an archive | Four million, counted by walking the archive's directory before the archive is opened, because opening it holds every entry in memory. The count is of entries walked, never the count the directory states |
-| One record in an archive | 16 MiB |
-| Records in a snapshot | A million |
-| One record in a snapshot | 4 MiB, encoded as the snapshot writes it |
-| A snapshot | 128 MiB decompressed, against 534 KB compressed on 2026-10-07. The bound is on what reading it holds in memory, and a bundle carried in is a file from outside |
-
-| Rule | Reason |
-|---|---|
-| Writing a snapshot refuses what reading one refuses, a snapshot with no moment included | A snapshot no scan can read stalls every scan, and the fetcher, finding it unreadable, fetches and writes it again every hour |
-| What an archive keeps is counted against the snapshot's bounds as it is read | What it keeps is held in memory until it is written |
-| A build past a bound fails before the rename | The snapshot held stays the last one that could be read, and the failure is logged |
-
-## Analyzer findings
-
-A static analyzer's run arrives as SARIF through an upload of its own, read
-within bounds of its own; `design-docs/analysis.md` holds the whole of it. Findings
-from a fuzzer are intended scope and **are not built** (REQ-14).
-
-| Decision | Reason |
-|---|---|
-| Scoped to a product, a release and a variant | A finding that cannot say which build it is about cannot be compared release to release |
-| SARIF is the interchange the deployment reads | It is what the analyzers already emit. Native output would mean one reader per tool with nothing in common, so a tool's native format is read by the upload client (`design-docs/analysis.md` § Upload client) |
-| Some sources are pulled rather than pushed | A hosted analyzer has its own store and no reason to call this deployment. Pulling is **not built** |
-| Identity is computed here, never taken from the producer | An analyzer's identifier for a result is stable until the tool is upgraded or the file is reformatted, and a finding whose identity moves reopens as new |
-| The bounded JSON reading an inventory uses is shared with the SARIF reader | One implementation of size, depth and token limits for every document read here |
+| A build with no inventory is not scanned | An empty answer reads exactly like a clean one |
+| A build already waiting is not queued again | The pass looks far more often than anything is due, since an administrator may shorten the interval |
+| What is queued is compared as identifiers, never joined | A job's reference is text and a build's identifier a number, and no conversion inside a query is spelled alike on the four engines |
+| A pass queues a slice at a time | A deployment tracking many builds would fill the queue in one pass and push arriving inventories behind work that is not urgent |
+| A full queue stops the pass, and what is due stays due | A full queue is a fact about how much is in flight, not a failure |
+| One replica asks, settled by a lease (`design-docs/queue.md`) | Two reading the list at once would both see a build as due |
+| The interval is a setting, shipping at a day | The scanner's databases are published daily |
+| Nothing is discovered | The component list comes from the build; what moves between scans is what is known about it |
 
 ## Limits
 
 | Limit | Detail |
 |---|---|
-| An upload refused by the request's own validation is not recorded | A missing document part, or a query parameter past its bound, is refused before the operation runs and before anything reads which product it names |
-| Document uploads begin at v0.11.0 | A database upgraded from v0.10.0 has statements and no record of the uploads that made them. Who uploaded those is in the history of administrative changes. The lists, and an empty tab on the Uploads screen, say that earlier uploads are not listed and their statements still apply |
-| The list of uploads is per build, with the product's documents on every build of it | The SBOM and SARIF paths name a build, and the other two name a product. A product-wide list of every build's uploads is not built |
-| A day's whole archive is downloaded to keep half a megabyte of it | 622 MB on 2026-10-07. The List's hourly files of what changed are not read: a day's delay is what the scanner's own data has, and a second path to keep right has not been measured as worth it |
-| A deployment reaching the internet only through a proxy fetches no CVE records | The guarded client dials directly, so the check on the address it connects to is a check on the host it reaches. Such a deployment imports an archive instead |
-| A build dated on arrival is ordered by when it was sent, not when it was made | An older undated document sent late is taken as the newest. Documents that state a time are ordered by it, so this reaches only producers that state none |
-| The bounds are set from what reading costs, not from what a document looks like | An edge holds about half a kilobyte of heap while being read and a component about one and a third, so round numbers several times the largest real producer — two million edges, a quarter of a million components — accept a document taking about 1.3 GB, past what the chart ships as a limit. Such a file is guaranteed to kill the process, in the background reader that runs after the upload is answered 202. The budget is about 250 MB for one document, which is the server's share of the pod rather than the whole of it — the scanner is a second process in the same cgroup — and a test measures the per-unit cost with a wide bound |
-| The reader's bounds are configuration, not constants | A defaults function every deployment runs unchanged is a constant with extra steps |
-| A component's name is folded on the way in, into a column of its own | The four engines do not fold alike outside ASCII: a VEX statement about a component named with any letter outside it matches on three engines and not the fourth, so which engine a deployment runs decides whether the publisher's judgment reaches the finding. Folding on write also leaves the index usable. A statement's component is folded the same way and cut to the same width, so a name past the width matches rather than being refused by three of the engines |
-| So is an issue's identifier, and every name it goes by | Comparing through `LOWER` puts a function on the indexed side, and the plan scans the whole vulnerability table and the whole alias table once per statement — thirty seconds where the answer should take a fraction of one |
-| Only the first ancestor supplies upstream identity | Anything further back is history, and a scanner matches against the fork point |
-| Fixed-width character columns are not used | They blank-pad on some engines, so a hash read back carries trailing spaces that make an exact-match lookup fail |
-| A component with no distribution context in its identifier is one nothing will match | And that is invisible rather than an error |
-| The well-known publishers' addresses are shipped in the interface | They are the publishers' own and move when a publisher reorganizes its site. Each answered without a redirect on 2026-09-30; one that moves fails its first read and is raised the way any unreadable supplier is. Debian publishes no CSAF provider description, so a Debian-based product has no preset to take |
-
-A lifecycle scope is read the way that keeps a component, and the
-two errors it sits between are not equal. Keeping too much adds something to
-triage, which somebody sees and acts on; dropping too much removes a finding
-nobody ever learns about. Measured against the format's own example 11: its
-three dependencies are stated unscoped in the second version and scoped `build`
-in the third, which is one application described twice — so read as not
-shipping, that document loses every component it has.
-
-The third version is read against the specification's documents and no
-producer's output. Nothing this deployment ingests emits it, and the scanner
-shipped here emits 2.3 and tag-value. The fixtures are hand-written and small
-by construction, so which shapes a real producer uses is not evidence anything
-here has.
+| A build dated on arrival is ordered by when it was sent | An older undated document sent late is taken as the newest. Documents stating a time are ordered by it |

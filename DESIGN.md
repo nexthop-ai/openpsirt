@@ -18,14 +18,28 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | [findings-reports](design-docs/findings-reports.md) | Vulnerability reports worked as cases | report reference, reporter, received date, acknowledgement, the case, correspondence, notes, judgment, report rule, dispositions, rulings, duplicates, unanswered |
 | [findings-queries](design-docs/findings-queries.md) | How finding lists and totals are read | page statements, decision state filters, two-level grouping, covering index, product totals, across products, deadline rewrites, receipts pairing |
 | [findings-measurements](design-docs/findings-measurements.md) | Benchmark runs behind the findings rules | fan-out cost, batched updates, decision state timings, two-level timings, a year of nightly scans |
-| [kinds](design-docs/kinds.md) | Kinds of finding and what each declares | issue kinds, name resolution, consumers, runs and series, source locations |
+| [kinds](design-docs/kinds.md) | Kinds of finding and what each declares | issue kinds, name resolution, consumers, inclusion, runs and series, sightings, source locations |
 
 ## Intake
 
 | Document | Covers | Terms |
 |---|---|---|
-| [ingest](design-docs/ingest.md) | A scan from arrival to application | upload, arrival decision, document storage, retention, formats read, scanner output, receipts, administrator VEX, supplier advisories, offline scanner database, CVE records |
-| [analysis](design-docs/analysis.md) | Static analyzer runs uploaded as SARIF | run contents, placement, code finding triage, code finding queue, weakness families, flaw records, third-party code, upload client |
+| [ingest](design-docs/ingest.md) | A scan from arrival to application | upload, producer behavior, request handling, admission, refusals, arrival decision, submission identity, build time, document storage, retention, scan application, overtaken scans, scheduled rescanning |
+| [ingest-parsing](design-docs/ingest-parsing.md) | How an inventory is read, within bounds | header pass, bounds, component bound, claim bound, file identifiers, edges, tolerated, refused, all or nothing, unread fields |
+| [ingest-formats](design-docs/ingest-formats.md) | The inventory formats and where each states each fact | CycloneDX JSON and XML, SPDX 2.x, SPDX 3.x, format declaration, format spellings, structural relationships, lifecycle scopes, files, the root |
+| [ingest-claims](design-docs/ingest-claims.md) | What builds and publishers claim, and how claims meet components | build-declared suppressions, carried patches, claim matching, product placement, stored claims, administrator VEX, CSAF VEX, OpenVEX, supplier advisories, CSAF bounds, name folding |
+| [ingest-suppliers](design-docs/ingest-suppliers.md) | Supplier advisories read on a schedule | supplier directories, provider description, presets, the pass, lease, the mark, digests, outbound requests, unreadable supplier |
+| [ingest-scanner](design-docs/ingest-scanner.md) | The scanner, its report and its offline data | scanner environment, scanner output, report bounds, ratings kept, CVSS generations, scanner warnings, offline scanner database, CVE records, snapshot |
+| [ingest-receipts](design-docs/ingest-receipts.md) | What is read back about uploads | last upload per build, quiet builds, receipts, receipt states, answering run, receipt counts, document retrieval, upload listing, document uploads |
+| [ingest-measurements](design-docs/ingest-measurements.md) | Measurements behind the ingest rules | receipt cost, run indexes, supplier directory volume, claim writes, rating mixture |
+| [analysis](design-docs/analysis.md) | Static analyzer runs uploaded as SARIF | SARIF upload, bounds, run contents, dropped results, run parameters, comparable, run application, sharp drop, analysis receipts |
+| [analysis-matching](design-docs/analysis-matching.md) | How results pair with code findings across runs and builds | keys, whole key, unprinted key, probable pairing, layers, carrying, fingerprint change, salt |
+| [analysis-source](design-docs/analysis-source.md) | Where a code finding is, and the source shown with it | placement, repository settings, hosts, source links, snippets, rule documentation, evidence, third-party code |
+| [analysis-triage](design-docs/analysis-triage.md) | Decisions about code findings | code finding triage, outcomes, dismissal reasons, fixed code findings, suppression rules, code finding states, code finding assignment, end of life |
+| [analysis-queue](design-docs/analysis-queue.md) | How code findings are listed, ordered and counted | code finding queue, order, queue file, code findings by series, weakness families, tiers, grouped code findings |
+| [analysis-flaws](design-docs/analysis-flaws.md) | A code finding recorded as a flaw | flaw records, flaw record offer, disclosure inclusion, withdrawn flaw record, fixed in, code finding collaborators |
+| [analysis-client](design-docs/analysis-client.md) | The upload client run beside an analyzer | openpsirt-upload, formats read, clang plist, cppcheck XML, paths, repositories, fingerprints, salt, contents sent, sending, distribution |
+| [analysis-measurements](design-docs/analysis-measurements.md) | Measurements behind the analyzer rules | producer output, bound defaults, compression |
 | [upstream](design-docs/upstream.md) | Trusting a forked project's published VEX | trusted upstreams, statements applied, offers for review, declined statements |
 
 ## Triage and remediation
