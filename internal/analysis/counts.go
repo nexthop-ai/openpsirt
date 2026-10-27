@@ -20,7 +20,7 @@ type SeriesCount struct {
 	// Series is the series' name, as its producer first sent it.
 	Series string
 	// ByState counts the series' leads in each state, every state named and
-	// zero where none stands there. Waiting is the open ones whose claim waits
+	// zero where none stands there. Waiting is the open ones whose decision waits
 	// for a second person, and Ruled the dismissed ones a standing rule
 	// covers. A lead on two builds in two states counts in both, as the queue
 	// counts it.

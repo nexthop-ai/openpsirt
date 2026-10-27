@@ -26,11 +26,11 @@ func TestWhoMayReachWhat(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		// A lead handed off as a flaw and kept internal, so its collaborators
 		// are a list to reach.
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		var (
-			lead      = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+			lead      = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 			flawLead  = "/v1/products/mine/issues/" + flaw + "/code-finding"
-			theirLead = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/code-findings/" + place
+			theirLead = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 		)
 		const (
 			leads      = "/v1/products/mine/code-findings"
@@ -268,7 +268,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"internal-reader", http.MethodPost, leadRules, http.StatusForbidden},
 
 			// One lead's evidence is read where its visibility is, and a lead
-			// nobody may read there answers as a place holding nothing.
+			// nobody may read there answers as an occurrence holding nothing.
 			{"", http.MethodGet, lead, http.StatusUnauthorized},
 			{"internal-reader", http.MethodGet, lead, http.StatusOK},
 			{"internal-triager", http.MethodGet, lead, http.StatusOK},
@@ -281,7 +281,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"outsider", http.MethodGet, lead, http.StatusNotFound},
 			{"admin", http.MethodGet, lead, http.StatusNotFound},
 			{"internal-reader", http.MethodGet, theirLead, http.StatusNotFound},
-			// A lead handed off as a flaw takes no judgment, which its readers
+			// A lead handed off as a flaw takes no decision, which its readers
 			// are told, since its evidence says it was handed off. Closing one
 			// as fixed is internal triage, and a reader who does not hold it is
 			// answered as though nothing were open to close.
@@ -367,9 +367,9 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"admin", http.MethodGet, people, http.StatusOK},
 			{"admin", http.MethodGet, keys, http.StatusOK},
 
-			// Your own lapsed claims are a list anybody here may ask for, and
+			// Your own lapsed decisions are a list anybody here may ask for, and
 			// answers only what they may act on. Who may re-affirm them is
-			// pinned with a real claim beside the act's own tests.
+			// pinned with a real decision beside the act's own tests.
 			{"reader", http.MethodGet, "/v1/to-reaffirm", http.StatusOK},
 			{"triager", http.MethodGet, "/v1/to-reaffirm", http.StatusOK},
 			{"", http.MethodGet, "/v1/to-reaffirm", http.StatusUnauthorized},
@@ -462,7 +462,7 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 			"/v1/keys",
 			// A pipeline has no owner for a token to be a live reference to.
 			"/v1/tokens",
-			// Nor anything to argue about: a build server has no judgment.
+			// Nor anything to argue about: a build server makes no decision.
 			"/v1/review-queue",
 			// Nor when anything was last scanned. A key reads back what it
 			// sent; when a build was last scanned by anybody is a fact about

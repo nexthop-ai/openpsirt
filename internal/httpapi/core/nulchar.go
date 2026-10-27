@@ -83,8 +83,8 @@ func nulIn(v any, at string) (string, bool) {
 		return at, HoldsNUL(value)
 	case []any:
 		for i, each := range value {
-			if place, found := nulIn(each, fmt.Sprintf("%s[%d]", at, i)); found {
-				return place, true
+			if occurrence, found := nulIn(each, fmt.Sprintf("%s[%d]", at, i)); found {
+				return occurrence, true
 			}
 		}
 	case map[string]any:
@@ -97,8 +97,8 @@ func nulIn(v any, at string) (string, bool) {
 			if HoldsNUL(key) {
 				return "a key in " + at, true
 			}
-			if place, found := nulIn(value[key], at+"."+key); found {
-				return place, true
+			if occurrence, found := nulIn(value[key], at+"."+key); found {
+				return occurrence, true
 			}
 		}
 	}

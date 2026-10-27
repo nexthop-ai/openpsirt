@@ -188,11 +188,11 @@ func (r Ranked) Rank() Rank {
 // the weighting is allowed to move.
 const exploiting = exploitedBand
 
-// How a grouping asks whether any of its places carries each exploitation
+// How a grouping asks whether any of its occurrences carries each exploitation
 // signal.
 //
 // Spelled once, because the two are asked together wherever a list groups
-// places and every site that wrote one of them by hand is a site that can
+// occurrences and every site that wrote one of them by hand is a site that can
 // write the wrong column. A grouping cannot read the flags off the packed
 // number: both bands lift it, so a threshold answers "some exploitation" where
 // these name which.

@@ -27,7 +27,7 @@ func TestAnybodyIsHandedOnlyWhatIsPublished(t *testing.T) {
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 
 		// A flaw of ours in the published product, recorded and undisclosed.
 		_, flaw, err := w.findings.Enter(ctx, w.proposer, finding.Entering{
@@ -109,7 +109,7 @@ func TestAnUndisclosedFlawsNameIsNotPublishedAsAnotherIssuesAlias(t *testing.T) 
 			t.Fatal(err)
 		}
 		w.decide(w.Target, "CVE-2026-3001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()
 		all := w.everything()
@@ -134,7 +134,7 @@ func TestThePublishedDocumentsAreReadOnlyAsAnybody(t *testing.T) {
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()
 		if _, err := w.documents.Listed(t.Context(), w.proposer, "all"); !errors.Is(err, access.ErrDenied) {

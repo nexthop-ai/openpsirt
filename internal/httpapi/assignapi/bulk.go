@@ -24,16 +24,16 @@ import (
 type AtComponentBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty" doc:"The severity the report gives it"`
-	Places        int    `json:"places" doc:"The number of places in this build it sits at"`
+	Occurrences   int    `json:"occurrences" doc:"The number of occurrences of it in this build"`
 	FixedIn       string `json:"fixed_in,omitempty" doc:"The version the report says fixes it, where it names one"`
-	// Summary is the text one judgment is made on. Deciding in bulk on
+	// Summary is the text one decision is made on. Deciding in bulk on
 	// less than deciding singly is the wrong way round, and this list
 	// narrows by the description while showing none of it.
 	Summary       string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
 	Exploited     bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	ExploitedHere bool    `json:"exploited_here,omitempty" doc:"This product records being exploited through it. A judgment over several issues that sets this one aside or puts it off is refused"`
+	ExploitedHere bool    `json:"exploited_here,omitempty" doc:"This product records being exploited through it. A decision over several issues that sets this one aside or puts it off is refused"`
 	Likelihood    float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
-	Due           string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its places here, which is the one that makes it late"`
+	Due           string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its occurrences here, which is the one that makes it late"`
 }
 
 func registerBulk(api huma.API, in core.Deps) {
@@ -43,13 +43,13 @@ func registerBulk(api huma.API, in core.Deps) {
 			"/components/{component}/issues",
 		Summary: "List the issues open against one component",
 		Description: "Returns the distinct issues open against this component in this build, " +
-			"most urgent first, with how many places each sits at, the version that fixes " +
-			"it where the report names one, and what one judgment about it would be made " +
+			"most urgent first, with how many occurrences each has, the version that fixes " +
+			"it where the report names one, and what one decision about it would be made " +
 			"on: what the issue says about itself, whether anybody is known to be " +
 			"exploiting it, the published estimate, and the earliest deadline among its " +
-			"places here.\n\n" +
+			"occurrences here.\n\n" +
 			"`contains` matches the text of a report. It narrows a list; it is not part of any " +
-			"claim made afterwards.",
+			"decision made afterwards.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
@@ -68,9 +68,9 @@ func registerBulk(api huma.API, in core.Deps) {
 			// holds. The two limits are what sizing an answer needs:
 			// how many issues one action may answer, and how many
 			// findings it may write.
-			Findings   int `json:"findings"`
-			IssueLimit int `json:"issue_limit" doc:"The number of issues one answer here may cover"`
-			PlaceLimit int `json:"place_limit" doc:"The number of findings one answer here may write"`
+			Findings        int `json:"findings"`
+			IssueLimit      int `json:"issue_limit" doc:"The number of issues one answer here may cover"`
+			OccurrenceLimit int `json:"occurrence_limit" doc:"The number of findings one answer here may write"`
 		}
 	}, error) {
 		subject, _, err := core.Triaging(ctx, in)
@@ -110,22 +110,22 @@ func registerBulk(api huma.API, in core.Deps) {
 
 		out := &struct {
 			Body struct {
-				Items      []AtComponentBody `json:"items"`
-				Total      int               `json:"total"`
-				Findings   int               `json:"findings"`
-				IssueLimit int               `json:"issue_limit" doc:"The number of issues one answer here may cover"`
-				PlaceLimit int               `json:"place_limit" doc:"The number of findings one answer here may write"`
+				Items           []AtComponentBody `json:"items"`
+				Total           int               `json:"total"`
+				Findings        int               `json:"findings"`
+				IssueLimit      int               `json:"issue_limit" doc:"The number of issues one answer here may cover"`
+				OccurrenceLimit int               `json:"occurrence_limit" doc:"The number of findings one answer here may write"`
 			}
 		}{}
 		out.Body.Findings = reaching
-		out.Body.IssueLimit, out.Body.PlaceLimit = bounds.Review, bounds.Places
-		// One row per issue. AtComponent returns every place, because that is
-		// what a decision is written against; this list is what somebody picks
-		// from, and the place count is the useful part of it.
+		out.Body.IssueLimit, out.Body.OccurrenceLimit = bounds.Review, bounds.Occurrences
+		// One row per issue. AtComponent returns every occurrence, because that
+		// is what a decision is written against; this list is what somebody
+		// picks from, and the occurrence count is the useful part of it.
 		out.Body.Items = make([]AtComponentBody, 0, len(at))
-		// The deadline is the earliest among the places, which is the one
+		// The deadline is the earliest among the occurrences, which is the one
 		// that makes the issue late — so the rows are walked for it rather
-		// than the first place being taken as the answer.
+		// than the first occurrence being taken as the answer.
 		soonest := map[int64]*time.Time{}
 		for _, each := range at {
 			if each.DueAt == nil {
@@ -144,7 +144,7 @@ func registerBulk(api huma.API, in core.Deps) {
 			row := AtComponentBody{
 				Vulnerability: named[each.VulnerabilityID],
 				Severity:      finding.SeverityWord(each.SeverityCenti),
-				Places:        each.Places, FixedIn: each.FixedIn,
+				Occurrences:   each.Occurrences, FixedIn: each.FixedIn,
 				Summary:   each.Summary,
 				Exploited: each.Exploited, ExploitedHere: each.ExploitedHere,
 				Likelihood: float64(each.LikelihoodPPM) / 1_000_000,
@@ -159,26 +159,26 @@ func registerBulk(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "decide-together", Method: http.MethodPost,
+		OperationID: "decide-in-bulk", Method: http.MethodPost,
 		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 			"/components/{component}/bulk-decision",
 		Summary: "Record a bulk decision",
-		Description: "Records the same claim against every issue you name: one outcome, one " +
-			"justification, one reasoning, and a separate decision for every place each issue " +
-			"sits at, each keyed and expiring on its own.\n\n" +
-			"You name the issues; the places are resolved here. `selected_by` says how you " +
-			"narrowed the list and is recorded with every claim, so \"how were these chosen\" " +
-			"has an answer later — but it is never the claim. The reasoning has to hold for " +
+		Description: "Records the same decision against every issue you name: one outcome, one " +
+			"justification, one reasoning, applied separately at every occurrence of each " +
+			"issue, each keyed and expiring on its own.\n\n" +
+			"You name the issues; the occurrences are resolved here. `selected_by` says how you " +
+			"narrowed the list and is recorded with the decision, so \"how were these chosen\" " +
+			"has an answer later — but it is never the decision. The reasoning has to hold for " +
 			"every issue in the list, since \"these matched a word\" is not a defense anybody " +
 			"would accept.\n\n" +
 			"`contains` is the same question an approver can re-run. Send the text you " +
-			"narrowed the candidate list by; the claim records how many issues that narrowing " +
-			"reaches, read here, against how many you named. Equal, the claim is exactly what " +
+			"narrowed the candidate list by; the decision records how many issues that narrowing " +
+			"reaches, read here, against how many you named. Equal, the decision is exactly what " +
 			"that narrowing returns; far apart, the sentence does not describe the set.\n\n" +
 			"Always needs a second person to agree, whatever the outcome.\n\n" +
-			"A place a live decision already covers refuses the whole claim, naming that " +
-			"decision. Send `skip_decided` to leave those places out instead; `skipped` lists " +
-			"each one with the decision standing there. Where every place is covered, nothing " +
+			"An occurrence a live decision already covers refuses the whole request, naming that " +
+			"decision. Send `skip_decided` to leave those occurrences out instead; `skipped` lists " +
+			"each one with the decision standing there. Where every occurrence is covered, nothing " +
 			"is recorded and the request is refused.\n\n" +
 			"Bounded twice, over what the names resolve to: by how many issues one answer may " +
 			"cover, set under `triage.review-issues`, and by how many findings it may write, " +
@@ -191,22 +191,22 @@ func registerBulk(api huma.API, in core.Deps) {
 		Component string `path:"component"`
 		core.ComponentQuery
 		Body struct {
-			Vulnerabilities []string           `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this claim covers, by name"`
-			SelectedBy      string             `json:"selected_by" minLength:"1" maxLength:"500" doc:"The narrowing, in your own words. Recorded, and never part of the claim"`
+			Vulnerabilities []string           `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this decision covers, by name"`
+			SelectedBy      string             `json:"selected_by" minLength:"1" maxLength:"500" doc:"The narrowing, in your own words. Recorded, and never part of the decision"`
 			Contains        string             `json:"contains,omitempty" maxLength:"200" doc:"The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two"`
 			Outcome         core.OutcomeInBulk `json:"outcome"`
 			Justification   core.Justification `json:"justification,omitempty" doc:"Required when it does not apply"`
 			DeferredUntil   string             `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
-			FixedVersion    string             `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them"`
+			FixedVersion    string             `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the decision has to hold for all of them"`
 			Reasoning       string             `json:"reasoning" minLength:"1" doc:"The reasoning, holding for every issue named"`
-			SkipDecided     bool               `json:"skip_decided,omitempty" doc:"Leave out every place a live decision already covers, and list them in the response. Left out, a selection covering one is refused, naming the decision"`
+			SkipDecided     bool               `json:"skip_decided,omitempty" doc:"Leave out every occurrence a live decision already covers, and list them in the response. Left out, a selection covering one is refused, naming the decision"`
 		}
 	}) (*struct {
 		Body struct {
-			ClaimID  int64         `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-			Recorded int           `json:"recorded"`
-			IDs      []int64       `json:"ids"`
-			Skipped  []SkippedBody `json:"skipped,omitempty" doc:"The places left out because a live decision already covers them, where skip_decided was sent"`
+			DecisionID int64         `json:"decision_id" doc:"The decision this action made, which is what the review queue lists and what is approved"`
+			Recorded   int           `json:"recorded"`
+			IDs        []int64       `json:"ids"`
+			Skipped    []SkippedBody `json:"skipped,omitempty" doc:"The occurrences left out because a live decision already covers them, where skip_decided was sent"`
 		}
 	}, error) {
 		subject, store, err := core.Triaging(ctx, in)
@@ -249,7 +249,7 @@ func registerBulk(api huma.API, in core.Deps) {
 			}
 			if seen[id] {
 				// The same issue named twice, or named once by each of two
-				// aliases. Both are one claim.
+				// aliases. Both count once.
 				continue
 			}
 			seen[id] = true
@@ -262,11 +262,11 @@ func registerBulk(api huma.API, in core.Deps) {
 				"no issue is filed under " + strings.Join(clipped(unknown), ", "))
 		}
 
-		// The places are resolved inside the write, not here. Reading
+		// The occurrences are resolved inside the write, not here. Reading
 		// them first and passing them in would authorize this against
 		// rows as they stood before the transaction, and would let a
-		// caller's selection decide which places a decision lands on.
-		claimID, recorded, skipped, err := store.Together(ctx, subject, triage.TogetherAt{
+		// caller's selection decide which occurrences a decision lands on.
+		decisionID, recorded, skipped, err := store.BulkDecision(ctx, subject, triage.BulkDecisionAt{
 			TargetID: target, ComponentID: component, VulnerabilityIDs: issues,
 			Contains: input.Body.Contains, SkipDecided: input.Body.SkipDecided,
 		}, triage.Proposal{
@@ -279,7 +279,7 @@ func registerBulk(api huma.API, in core.Deps) {
 			By:            subject.ID,
 			// Always. One person answering hundreds of findings in one action
 			// is the case a second pair of eyes exists for, and the short
-			// deferral that stands on its own is a claim about one finding.
+			// deferral that stands on its own is a decision about one finding.
 			NeedsApproval: true,
 		}, triage.Bounds{})
 		if err != nil {
@@ -292,13 +292,13 @@ func registerBulk(api huma.API, in core.Deps) {
 
 		out := &struct {
 			Body struct {
-				ClaimID  int64         `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-				Recorded int           `json:"recorded"`
-				IDs      []int64       `json:"ids"`
-				Skipped  []SkippedBody `json:"skipped,omitempty" doc:"The places left out because a live decision already covers them, where skip_decided was sent"`
+				DecisionID int64         `json:"decision_id" doc:"The decision this action made, which is what the review queue lists and what is approved"`
+				Recorded   int           `json:"recorded"`
+				IDs        []int64       `json:"ids"`
+				Skipped    []SkippedBody `json:"skipped,omitempty" doc:"The occurrences left out because a live decision already covers them, where skip_decided was sent"`
 			}
 		}{}
-		out.Body.ClaimID = claimID
+		out.Body.DecisionID = decisionID
 		out.Body.Recorded = len(recorded)
 		out.Body.IDs = recorded
 		if out.Body.Skipped, err = skippedBodies(ctx, in, skipped); err != nil {
@@ -308,16 +308,16 @@ func registerBulk(api huma.API, in core.Deps) {
 	})
 }
 
-// SkippedBody is a place a bulk judgment left out, and the decision that
-// already covers it.
+// SkippedBody is an occurrence a bulk decision left out, and the decision
+// that already covers it.
 type SkippedBody struct {
-	Vulnerability string          `json:"vulnerability"`
-	Place         string          `json:"place" doc:"Where it sits, as the decision names it"`
-	Decision      int64           `json:"decision" doc:"The decision standing there"`
-	State         core.ClaimState `json:"state" doc:"How far that decision has got"`
+	Vulnerability      string             `json:"vulnerability"`
+	Occurrence         string             `json:"occurrence" doc:"Where it sits, as the decision names it"`
+	DecisionOccurrence int64              `json:"decision_occurrence" doc:"The decision occurrence standing there"`
+	State              core.DecisionState `json:"state" doc:"How far that decision has got"`
 }
 
-// skippedBodies names what a bulk judgment left out, by the issues' names.
+// skippedBodies names what a bulk decision left out, by the issues' names.
 func skippedBodies(ctx context.Context, in core.Deps, skipped []triage.Skipped) ([]SkippedBody, error) {
 	if len(skipped) == 0 {
 		return nil, nil
@@ -333,8 +333,8 @@ func skippedBodies(ctx context.Context, in core.Deps, skipped []triage.Skipped) 
 	out := make([]SkippedBody, 0, len(skipped))
 	for _, each := range skipped {
 		out = append(out, SkippedBody{
-			Vulnerability: named[each.VulnerabilityID], Place: each.PlaceIdentity,
-			Decision: each.DecisionID, State: core.ClaimState(each.State),
+			Vulnerability: named[each.VulnerabilityID], Occurrence: each.OccurrenceIdentity,
+			DecisionOccurrence: each.DecisionOccurrenceID, State: core.DecisionState(each.State),
 		})
 	}
 	return out, nil

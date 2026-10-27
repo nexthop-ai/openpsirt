@@ -296,7 +296,7 @@ func critical(t *testing.T, db *database.DB, targetID int64, identifier, severit
 	row := &finding.Finding{
 		TargetID: targetID, Kind: finding.Vulnerable, Visibility: access.Public,
 		VulnerabilityID: ids[identifier], ComponentID: componentID,
-		PlaceIdentity: "place-of-" + identifier, OpenedAt: now,
+		OccurrenceIdentity: "place-of-" + identifier, OpenedAt: now,
 	}
 	if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -409,7 +409,7 @@ func TestTheWatchTellsAdministratorsWhenSomethingIsHiddenWithNobodyAgreeing(t *t
 		if body == "" {
 			t.Fatal("a dismissal stands with nobody agreeing and nobody was told")
 		}
-		if !strings.Contains(body, "One judgment") {
+		if !strings.Contains(body, "One decision") {
 			t.Errorf("the alert says %q, want it to count what stands", body)
 		}
 		// The fact and a link. The rows are what the report is for, and this is
@@ -443,22 +443,22 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 	// The typed models rather than maps of column names, so the generated key
 	// comes back the way bun returns one. Asking the driver for it works on
 	// one engine and is unsupported on another.
-	claim := &triage.Claim{
-		Kind: triage.FindingClaim, ProposedBy: who.ID, ProposedAt: now,
+	decision := &triage.Decision{
+		Kind: triage.FindingDecision, ProposedBy: who.ID, ProposedAt: now,
 		Outcome: triage.NotApplicable, Justification: &reason,
 	}
-	if _, err := db.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+	if _, err := db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	key := "live"
-	decision := &triage.Decision{
-		ClaimID: claim.ID, ProductID: productID,
-		VulnerabilityID: interned["CVE-2026-7777"],
-		PlaceIdentity:   "openssl", Visibility: access.Public,
+	occurrence := &triage.DecisionOccurrence{
+		DecisionID: decision.ID, ProductID: productID,
+		VulnerabilityID:    interned["CVE-2026-7777"],
+		OccurrenceIdentity: "openssl", Visibility: access.Public,
 		NeedsApproval: true, State: triage.Approved, LiveKey: &key,
 		ProposedBy: who.ID, ProposedAt: now,
 	}
-	if _, err := db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
+	if _, err := db.DB.NewInsert().Model(occurrence).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -517,7 +517,7 @@ func TestAnExploitedIssueOnAReleaseIsToldWhateverItsRating(t *testing.T) {
 	})
 }
 
-// A place a supplier's statement answers on some routes is open for the rest
+// An occurrence a supplier's statement answers on some routes is open for the rest
 // and is not work, so nobody is told about it.
 func TestACriticalASupplierAnswersIsNotTold(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
@@ -536,7 +536,7 @@ func TestACriticalASupplierAnswersIsNotTold(t *testing.T) {
 		}
 		sweep(t, db)
 		if told := openFor(t, db, triager, notify.CriticalOnRelease); len(told) != 0 {
-			t.Errorf("the triager was told %q about a place a supplier answers", told)
+			t.Errorf("the triager was told %q about an occurrence a supplier answers", told)
 		}
 	})
 }

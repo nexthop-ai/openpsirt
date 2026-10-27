@@ -23,7 +23,7 @@ import (
 type Upgrade struct {
 	ProductID int64
 	// Component is what moves. Coverage is the component rather than a version
-	// pair: an upgrade is a claim that moving the package answers what is open
+	// pair: an upgrade is a decision that moving the package answers what is open
 	// on it, and the next scan says which of that was true.
 	Component string
 	// Version is the source version the promise is about, where one build
@@ -42,7 +42,7 @@ type Upgrade struct {
 	// or a team, in the column that already holds one — a team is a
 	// perfectly good holder of an upgrade, and often the right one,
 	// because moving a package is a piece of work a queue tracks rather
-	// than a judgment one person makes.
+	// than a decision one person makes.
 	//
 	// Recorded in the same transaction as the promise, so a promise nobody
 	// is carrying and a holder with no promise are both impossible.
@@ -55,8 +55,8 @@ type Upgrade struct {
 
 // PlanUpgrade records moving a component as the answer to what is open on it.
 //
-// One act, one claim, one decision per issue — the same shape a bulk
-// judgment takes, because a bump answers many issues at once and
+// One act, one decision, one row per issue — the same shape a bulk
+// decision takes, because a bump answers many issues at once and
 // answering them one at a time is what the grouping exists to avoid.
 //
 // Gated on where the date lands rather than on the outcome alone. A
@@ -66,7 +66,7 @@ type Upgrade struct {
 // Worked out here rather than by the caller, because the deadline is a fact
 // about the set this resolves and the caller does not have it.
 //
-// It takes no bound. A bulk judgment takes one and this does not, and the
+// It takes no bound. A bulk decision takes one and this does not, and the
 // difference is reversibility rather than size: nothing re-checks a dismissal,
 // so one sentence answering a thousand findings has to stay a size a reviewer
 // can follow, while the next scan re-checks every row a promise names.
@@ -115,7 +115,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// Only the builds this is promised for. An upgrade of one stream says
 		// nothing about another, which is the whole reason the target is per
 		// build.
-		reaching, err := findings.PlacesOnComponentWithin(ctx, tx, subject, up.ProductID,
+		reaching, err := findings.OccurrencesOnComponentWithin(ctx, tx, subject, up.ProductID,
 			wanted, up.Component, up.Version)
 		if err != nil {
 			return err
@@ -131,20 +131,20 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// mediums are in it.
 		var binding *time.Time
 		for _, at := range reaching {
-			for _, place := range at.Places {
-				if place.DueAt == nil {
+			for _, occurrence := range at.Occurrences {
+				if occurrence.DueAt == nil {
 					continue
 				}
-				if binding == nil || place.DueAt.Before(*binding) {
-					binding = place.DueAt
+				if binding == nil || occurrence.DueAt.Before(*binding) {
+					binding = occurrence.DueAt
 				}
 			}
 		}
 		gated := commitmentGated(&up.By, binding)
 
 		type standsAt struct {
-			vulnerability                        int64
-			place, componentUpstream, consumerUp string
+			vulnerability                             int64
+			occurrence, componentUpstream, consumerUp string
 		}
 		proposals := make([]Proposal, 0, len(reaching))
 		written := make(map[standsAt]int, len(reaching))
@@ -153,25 +153,25 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		for _, at := range reaching {
 			issues[at.VulnerabilityID] = true
 			components[at.ComponentID] = true
-			for _, place := range at.Places {
-				key := standsAt{place.VulnerabilityID, place.PlaceIdentity,
-					place.ComponentUpstream, place.ConsumerUpstream}
+			for _, occurrence := range at.Occurrences {
+				key := standsAt{occurrence.VulnerabilityID, occurrence.OccurrenceIdentity,
+					occurrence.ComponentUpstream, occurrence.ConsumerUpstream}
 				if already, seen := written[key]; seen {
 					// The stricter visibility of the two, for the reason a
-					// bundle takes it: one place decided once.
-					if place.Visibility == access.Private {
-						proposals[already].Place.Visibility = access.Private
+					// bundle takes it: one occurrence decided once.
+					if occurrence.Visibility == access.Private {
+						proposals[already].Occurrence.Visibility = access.Private
 					}
 					continue
 				}
 				written[key] = len(proposals)
 				proposals = append(proposals, Proposal{
-					Place: Place{
-						ProductID: place.ProductID, VulnerabilityID: place.VulnerabilityID,
-						PlaceIdentity: place.PlaceIdentity, Visibility: place.Visibility,
-						ComponentUpstream: place.ComponentUpstream,
-						ConsumerUpstream:  place.ConsumerUpstream,
-						OnTag:             place.OnTag,
+					Occurrence: Occurrence{
+						ProductID: occurrence.ProductID, VulnerabilityID: occurrence.VulnerabilityID,
+						OccurrenceIdentity: occurrence.OccurrenceIdentity, Visibility: occurrence.Visibility,
+						ComponentUpstream: occurrence.ComponentUpstream,
+						ConsumerUpstream:  occurrence.ConsumerUpstream,
+						OnTag:             occurrence.OnTag,
 					},
 					Outcome:       UpgradeNeeded,
 					UpgradeTo:     up.To,
@@ -179,12 +179,12 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 					Binding:       binding,
 					Reasoning:     up.Reasoning,
 					By:            subject.ID,
-					SeverityCenti: place.SeverityCenti,
+					SeverityCenti: occurrence.SeverityCenti,
 					NeedsApproval: gated,
 				})
 			}
 		}
-		// Every check a bulk judgment makes except the bound. A promise to
+		// Every check a bulk decision makes except the bound. A promise to
 		// upgrade is not bounded: the cap is there so that one sentence
 		// answering a thousand findings stays a size a reviewer can follow,
 		// and nothing re-checks a dismissal afterwards — while the next scan
@@ -192,7 +192,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// record false, because the bump closes what it closes.
 		//
 		// One kernel bump in a real image reaches 4,485 findings across 44,016
-		// places, and a cumulative bundle reaches 243,945. Bounded at the
+		// occurrences, and a cumulative bundle reaches 243,945. Bounded at the
 		// shipped two thousand, the highest-value action in the data was
 		// refused by a factor of twenty-two, and the only escape offered was
 		// raising a setting that guards the dismissal path this one has
@@ -208,17 +208,17 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		out.Waiting = gated
 
 		// One act, one argument: every proposal here promises the same
-		// version by the same date, and what varies per place is the versions
+		// version by the same date, and what varies per occurrence is the versions
 		// it was made against and whether a second person has to agree.
 		// Made on every build the promise names: each was chosen.
 		first := proposals[0]
 		first.MadeOn = up.Builds
-		claim, err := within.newClaim(ctx, FindingClaim, subject.ID, nil, "", first)
+		decision, err := within.newDecision(ctx, FindingDecision, subject.ID, nil, "", first)
 		if err != nil {
 			return err
 		}
-		out.ClaimID = claim.ID
-		out.Decisions, err = within.proposeUnkeyed(ctx, claim, proposals)
+		out.DecisionID = decision.ID
+		out.Occurrences, err = within.proposeUnkeyed(ctx, decision, proposals)
 		if err != nil {
 			return err
 		}
@@ -235,7 +235,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 			}
 			committed[at.ComponentID] = true
 			n, err := findings.CommitWithin(ctx, tx, subject, up.ProductID,
-				at.ComponentID, up.To, &up.By, &claim.ID, wanted, retired)
+				at.ComponentID, up.To, &up.By, &decision.ID, wanted, retired)
 			if err != nil {
 				return err
 			}
@@ -246,7 +246,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// no owner, and the screen that records it is the screen that knows
 		// who the owner is.
 		if up.HoldBy != nil {
-			// Read in this transaction, so a place recorded undisclosed since
+			// Read in this transaction, so an occurrence recorded undisclosed since
 			// the promise was asked for is part of what the holder is asked
 			// about.
 			if up.Admits != nil {
@@ -280,14 +280,14 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 // agreed to "8.5.0 by 8 October"; a coordinator quietly rewriting either half
 // would leave the agreement standing over a promise nobody read, which is the
 // failure REQ-28 exists to prevent — so this goes through the same act revising
-// the words does: every agreement on the claim is withdrawn and every row of it
+// the words does: every agreement on the decision is withdrawn and every row of it
 // returns to the queue.
 //
 // The reasoning is required, and it is the history. Saying why a date moved
 // is what a second person has to read, and the revisions are where "what we
 // said in October" survives being changed in November. A promise moved with no
 // sentence attached is a promise nobody can audit.
-func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID int64,
+func (s *Store) Repromise(ctx context.Context, subject access.Subject, decisionID int64,
 	to string, by time.Time, reasoning string) ([]ForPerson, bool, error) {
 
 	if strings.TrimSpace(reasoning) == "" {
@@ -305,13 +305,13 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 	var moved bool
 	err = database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
-		claim, rows, err := within.claimRows(ctx, subject, claimID, mayDecideOn)
+		decision, rows, err := within.decisionRows(ctx, subject, decisionID, mayDecideOn)
 		if err != nil {
 			return err
 		}
-		if !claim.Outcome.Commits() {
-			return refusal.Errorf("that claim is %s, and only a promised upgrade or patch has a "+
-				"date to move", claim.Outcome)
+		if !decision.Outcome.Commits() {
+			return refusal.Errorf("that decision is %s, and only a promised upgrade or patch has a "+
+				"date to move", decision.Outcome)
 		}
 		for _, row := range rows {
 			if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
@@ -320,9 +320,9 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		}
 		moving := strings.TrimSpace(to)
 		switch {
-		case claim.Outcome == UpgradeNeeded && moving == "":
+		case decision.Outcome == UpgradeNeeded && moving == "":
 			return refusal.Errorf("say which version this is moving to")
-		case claim.Outcome == PatchNeeded && moving != "":
+		case decision.Outcome == PatchNeeded && moving != "":
 			return refusal.Errorf("a promised patch has no version to move to; name only the date")
 		}
 		when := by.UTC()
@@ -331,7 +331,7 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 				when.Format(time.DateOnly))
 		}
 
-		// The gate again, over what the claim covers now. Moving the date is
+		// The gate again, over what the decision covers now. Moving the date is
 		// moving the thing the gate is about, so a promise first made inside
 		// the deadline and then pushed years out would otherwise stay
 		// recorded as needing nobody — in force, suppressing everything it
@@ -344,9 +344,9 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		// Whether the version or the date moves, or only the words do. The
 		// agreements are withdrawn either way; what their holders are told
 		// names which.
-		moved = orEmpty(claim.UpgradeTo) != moving ||
-			claim.CommittedTo == nil || !claim.CommittedTo.Equal(when)
-		gated, err := within.regate(ctx, tx, findings, subject, *claim, rows, when)
+		moved = orEmpty(decision.UpgradeTo) != moving ||
+			decision.CommittedTo == nil || !decision.CommittedTo.Equal(when)
+		gated, err := within.regate(ctx, tx, findings, subject, *decision, rows, when)
 		if err != nil {
 			return err
 		}
@@ -354,81 +354,81 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		if moving != "" {
 			version = &moving
 		}
-		if _, err := tx.NewUpdate().Model((*Claim)(nil)).
+		if _, err := tx.NewUpdate().Model((*Decision)(nil)).
 			Set(`"upgrade_to" = ?`, version).
 			Set(`"committed_to" = ?`, when).
-			Where(`"id" = ?`, claimID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, decisionID).Exec(ctx); err != nil {
 			return fmt.Errorf("change what was promised: %w", err)
 		}
-		// The commitments this claim wrote, moved with it. One row per build
+		// The commitments this decision wrote, moved with it. One row per build
 		// and fold, so changing the version a release is moving to is one
 		// update however many findings it covers.
 		if _, err := tx.NewUpdate().Table("upgrade").
 			Set(`"to_version" = ?`, moving).
 			Set(`"committed_to" = ?`, when).
-			Where(`"decision_id" = ?`, claimID).Exec(ctx); err != nil {
+			Where(`"decision_id" = ?`, decisionID).Exec(ctx); err != nil {
 			return fmt.Errorf("change what the releases are waiting on: %w", err)
 		}
 		// Written with the revision rather than after it, because the two are
 		// one act: a row back in the queue that still says it needs nobody is
 		// a row the queue does not list.
-		if _, err := tx.NewUpdate().Model((*Decision)(nil)).
+		if _, err := tx.NewUpdate().Model((*DecisionOccurrence)(nil)).
 			Set(`"needs_approval" = ?`, gated).
-			Where(`"decision_id" = ?`, claimID).Exec(ctx); err != nil {
+			Where(`"decision_id" = ?`, decisionID).Exec(ctx); err != nil {
 			return fmt.Errorf("record whether the changed promise needs agreement: %w", err)
 		}
 		// Last, because it is what returns the rows to the queue: an approver
 		// meeting it again is reading a promise that has changed.
-		revised, err := within.revise(ctx, subject, claimID, reasoning)
+		revised, err := within.revise(ctx, subject, decisionID, reasoning)
 		if err != nil {
 			return err
 		}
 		withdrawn = revised.Withdrawn
 		return nil
 	})
-	// Named after the transaction, as a revision's refusal is: the claim
-	// standing at the place is read once nothing here holds it.
-	var taken *placeTaken
+	// Named after the transaction, as a revision's refusal is: the decision
+	// standing at the occurrence is read once nothing here holds it.
+	var taken *occurrenceTaken
 	if errors.As(err, &taken) {
-		return withdrawn, moved, s.alreadyDecided(ctx, ErrAlreadyDecided, taken.places)
+		return withdrawn, moved, s.alreadyDecided(ctx, ErrAlreadyDecided, taken.occurrences)
 	}
 	return withdrawn, moved, err
 }
 
 // regate works out whether a changed promise needs a second person, from what
-// the claim covers rather than from what it covered when it was made.
+// the decision covers rather than from what it covered when it was made.
 //
-// The places come from the claim's own rows. An upgrade's builds come from the
+// The occurrences come from the decision's own rows. An upgrade's builds come from the
 // commitments it wrote, which are what says where the promise applies. A
 // patch writes none, so its builds are the ones holding an open finding the
-// claim covers now, by the match that names the builds a queue card lists. The
-// deadline is then the earliest among the findings still open at those places
+// decision covers now, by the match that names the builds a queue card lists. The
+// deadline is then the earliest among the findings still open at those occurrences
 // in those builds.
 func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
-	subject access.Subject, claim Claim, rows []Decision, by time.Time) (bool, error) {
+	subject access.Subject, decision Decision, rows []DecisionOccurrence, by time.Time) (bool, error) {
 
 	if len(rows) == 0 {
 		return true, nil
 	}
 	var targets []int64
-	if claim.Outcome == UpgradeNeeded {
+	if decision.Outcome == UpgradeNeeded {
 		if err := tx.NewSelect().Table("upgrade").
 			ColumnExpr(`DISTINCT "target_id"`).
-			Where(`"decision_id" = ?`, claim.ID).Scan(ctx, &targets); err != nil {
+			Where(`"decision_id" = ?`, decision.ID).Scan(ctx, &targets); err != nil {
 			return false, fmt.Errorf("read which releases this was promised for: %w", err)
 		}
 	} else if err := tx.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtPlace("f")).
+		Where(finding.DecisionAtOccurrence("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(`DISTINCT "f"."target_id"`).
-		Where(`"de"."decision_id" = ?`, claim.ID).
+		Where(`"de"."decision_id" = ?`, decision.ID).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.VersionCarry, "f")).
@@ -437,13 +437,13 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 		Scan(ctx, &targets); err != nil {
 		return false, fmt.Errorf("read which builds this promise covers: %w", err)
 	}
-	places := make([]finding.At, 0, len(rows))
+	occurrences := make([]finding.At, 0, len(rows))
 	for _, row := range rows {
-		places = append(places, finding.At{
-			VulnerabilityID: row.VulnerabilityID, PlaceIdentity: row.PlaceIdentity,
+		occurrences = append(occurrences, finding.At{
+			VulnerabilityID: row.VulnerabilityID, OccurrenceIdentity: row.OccurrenceIdentity,
 		})
 	}
-	binding, err := findings.DeadlineAt(ctx, tx, subject, rows[0].ProductID, targets, places)
+	binding, err := findings.DeadlineAt(ctx, tx, subject, rows[0].ProductID, targets, occurrences)
 	if err != nil {
 		return false, err
 	}

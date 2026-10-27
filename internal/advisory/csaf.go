@@ -242,7 +242,7 @@ type Issued struct {
 // never shipped the thing at all — and those are opposite answers, one of them
 // the one a reader is hoping for.
 //
-// A release whose every open place is covered by an approved decision that
+// A release whose every open occurrence is covered by an approved decision that
 // the flaw does not apply is known not affected, with the reason on a flag.
 type Status struct {
 	KnownAffected    []string `json:"known_affected,omitempty"`

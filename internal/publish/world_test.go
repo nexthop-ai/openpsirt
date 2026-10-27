@@ -153,8 +153,8 @@ func (w *world) report(target *catalog.Target, found ...reported) {
 	}
 }
 
-// claim is what one claim says.
-type claim struct {
+// decision is what one decision says.
+type decision struct {
 	outcome       triage.Outcome
 	justification triage.Justification
 	mitigation    string
@@ -162,13 +162,13 @@ type claim struct {
 	fixedVersion  string
 	committedTo   *time.Time
 	deferredUntil *time.Time
-	// waiting leaves a claim that needs a second person without one.
+	// waiting leaves a decision that needs a second person without one.
 	waiting bool
 }
 
-// decide records a claim at every open place of an issue in one component of
+// decide records a decision at every open occurrence of an issue in one component of
 // a build, and has the second person agree to it where it needs one.
-func (w *world) decide(target *catalog.Target, issue string, component graph.Described, said claim) {
+func (w *world) decide(target *catalog.Target, issue string, component graph.Described, said decision) {
 	w.t.Helper()
 	ctx := w.t.Context()
 	vulnerability, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, issue)
@@ -183,25 +183,25 @@ func (w *world) decide(target *catalog.Target, issue string, component graph.Des
 		Where(`"c"."name" = ?`, component.Name).
 		Where(`"f"."closed_at" IS NULL`).
 		Scan(ctx); err != nil || len(open) == 0 {
-		w.t.Fatalf("%s is open at %d places of %s: %v", issue, len(open), component.Name, err)
+		w.t.Fatalf("%s is open at %d occurrences of %s: %v", issue, len(open), component.Name, err)
 	}
 	var proposals []triage.Proposal
 	placed := map[string]bool{}
 	for _, one := range open {
-		// One place holds every version of a name it ever shipped, so two
+		// One occurrence holds every version of a name it ever shipped, so two
 		// findings of one issue may share it.
-		if placed[one.PlaceIdentity] {
+		if placed[one.OccurrenceIdentity] {
 			continue
 		}
-		placed[one.PlaceIdentity] = true
-		at, err := w.findings.PlaceFor(ctx, w.proposer, target.ID, vulnerability, one.PlaceIdentity)
+		placed[one.OccurrenceIdentity] = true
+		at, err := w.findings.OccurrenceFor(ctx, w.proposer, target.ID, vulnerability, one.OccurrenceIdentity)
 		if err != nil {
 			w.t.Fatal(err)
 		}
 		proposals = append(proposals, triage.Proposal{
-			Place: triage.Place{
+			Occurrence: triage.Occurrence{
 				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
+				OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
 				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 				OnTag: at.OnTag,
 			},
@@ -217,7 +217,7 @@ func (w *world) decide(target *catalog.Target, issue string, component graph.Des
 		w.t.Fatal(err)
 	}
 	if recorded[0].NeedsApproval && !said.waiting {
-		if _, err := w.decisions.ApproveClaim(ctx, w.approver, recorded[0].ClaimID, "", nil, ""); err != nil {
+		if _, err := w.decisions.ApproveDecision(ctx, w.approver, recorded[0].DecisionID, "", nil, ""); err != nil {
 			w.t.Fatal(err)
 		}
 	}

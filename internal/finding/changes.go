@@ -14,7 +14,7 @@ import (
 
 // Change is what one run of the scanner altered.
 //
-// Counted as issues at components rather than as places, which is how every
+// Counted as issues at components rather than as occurrences, which is how every
 // other number in this tool counts. A component reached twenty ways carries
 // the same issue twenty times, so counting rows reports how much the
 // dependency graph shares rather than how much changed — the mistake that

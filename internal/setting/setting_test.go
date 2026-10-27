@@ -79,10 +79,10 @@ func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 		// A count the same way: nothing, or nothing positive, is the default.
 		// Read as written, a zero cap refuses every bulk act it bounds.
 		for _, bad := range []string{"lots", "", "-5", "0"} {
-			if _, _, err := s.Change(ctx, setting.TogetherCap, bad); err != nil {
+			if _, _, err := s.Change(ctx, setting.BulkDecisionCap, bad); err != nil {
 				t.Fatal(err)
 			}
-			got, err := s.Count(ctx, setting.TogetherCap, 100)
+			got, err := s.Count(ctx, setting.BulkDecisionCap, 100)
 			if err != nil {
 				t.Fatalf("%q: %v", bad, err)
 			}
@@ -120,7 +120,7 @@ func TestASettingThatCannotBeReadIsNotReportedAsUnset(t *testing.T) {
 		if _, err := s.Duration(stopped, setting.DeferralThreshold, time.Hour); err == nil {
 			t.Error("a reader was handed a default in place of a failure")
 		}
-		if _, err := s.Count(stopped, setting.TogetherCap, 100); err == nil {
+		if _, err := s.Count(stopped, setting.BulkDecisionCap, 100); err == nil {
 			t.Error("a reader was handed a default in place of a failure")
 		}
 	})

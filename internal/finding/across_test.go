@@ -52,8 +52,8 @@ func TestOneIssueInTwoBuildsIsOneRowAcrossThemAndSaysHowMany(t *testing.T) {
 		if total != 1 || len(one) != 1 {
 			t.Fatalf("one build reads %d rows of %d, want one", len(one), total)
 		}
-		if one[0].Places != 1 {
-			t.Errorf("one build counts %d places, want the one it holds", one[0].Places)
+		if one[0].Occurrences != 1 {
+			t.Errorf("one build counts %d occurrences, want the one it holds", one[0].Occurrences)
 		}
 		// A build's own list draws the way down and says nothing about other
 		// builds, because there is nothing to say: the selection is this one.
@@ -73,8 +73,8 @@ func TestOneIssueInTwoBuildsIsOneRowAcrossThemAndSaysHowMany(t *testing.T) {
 				len(both), total)
 		}
 		row := both[0]
-		if row.Places != 2 {
-			t.Errorf("the row counts %d places, want one in each build", row.Places)
+		if row.Occurrences != 2 {
+			t.Errorf("the row counts %d occurrences, want one in each build", row.Occurrences)
 		}
 		if row.Builds != 2 {
 			t.Errorf("the row says %d builds hold it, want 2", row.Builds)
@@ -120,8 +120,8 @@ func TestAGroupOnlyOneBuildHoldsSaysSoAcrossTheProduct(t *testing.T) {
 				t.Errorf("%s says %d builds hold it, want the one that does",
 					row.Vulnerability, row.Builds)
 			}
-			if row.Places != 1 {
-				t.Errorf("%s counts %d places, want 1", row.Vulnerability, row.Places)
+			if row.Occurrences != 1 {
+				t.Errorf("%s counts %d occurrences, want 1", row.Vulnerability, row.Occurrences)
 			}
 		}
 	})

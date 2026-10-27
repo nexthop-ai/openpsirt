@@ -33,7 +33,7 @@ type LateBody struct {
 	StreamName   string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Variant      string `json:"variant"`
 	VariantName  string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
-	Places       int    `json:"places" doc:"The number of places in that build this sits at"`
+	Occurrences  int    `json:"occurrences" doc:"The number of occurrences in that build this sits at"`
 	AssignedTo   string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
 	AssignedName string `json:"assigned_to_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	Due          string `json:"due" doc:"The date it is due"`
@@ -47,13 +47,13 @@ func registerDue(api huma.API, in core.Deps) {
 		Description: "Returns open findings whose deadline falls within `days`, where nobody has " +
 			"recorded a decision, across every product you can see.\n\n" +
 			"A deadline that has been answered is not on this list. A dismissal takes a finding " +
-			"off the clock, because the claim is that it will not be fixed, and a deferral " +
+			"off the clock, because the decision is that it will not be fixed, and a deferral " +
 			"replaces the deadline with its own date. What is left is time passing with nothing " +
 			"said.\n\n" +
 			"The window comes from how urgent a finding is. Being known-exploited has its own " +
 			"and it is the shortest, whatever the severity says. Anything the reports did not " +
 			"rate takes the medium window.\n\n" +
-			"One row per issue at a component, however many places it sits at. `days_left` is " +
+			"One row per issue at a component, however many occurrences it sits at. `days_left` is " +
 			"negative once something is overdue.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
@@ -120,7 +120,7 @@ func lateBodies(ctx context.Context, in core.Deps, rows []finding.Late, now time
 			Stream: row.Stream, Variant: row.Variant,
 			StreamName:  row.StreamName,
 			VariantName: row.VariantName,
-			Places:      row.Places,
+			Occurrences: row.Occurrences,
 			Due:         row.Due.UTC().Format(time.DateOnly),
 			// Rounded down, not toward zero. Truncation reports something
 			// twelve hours overdue as having zero days left, which reads as

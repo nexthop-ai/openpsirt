@@ -39,7 +39,7 @@ func (r *Reach) ScannedInsideAcme(t *testing.T, hash string, outsideToo bool) {
 // ScannedInsideAcmeAt is ScannedInsideAcme with Y at a version of the caller's
 // choosing, and with what the build argues about what it ships.
 func (r *Reach) ScannedInsideAcmeAt(t *testing.T, hash, version string, outsideToo bool,
-	claims []sbom.Suppression) {
+	decisions []sbom.Suppression) {
 
 	t.Helper()
 	acmeY := graph.Described{Purl: "pkg:generic/acme-y@" + version, Name: "acme-y", Version: version}
@@ -59,7 +59,7 @@ func (r *Reach) ScannedInsideAcmeAt(t *testing.T, hash, version string, outsideT
 			graph.Dependency{Parent: SeededRoot, Child: curl}, graph.Dependency{Parent: curl, Child: zlib})
 	}
 	target, scan := r.Shipped(t, SeededBuild, hash, snap)
-	r.Argued(t, target, scan, claims)
+	r.Argued(t, target, scan, decisions)
 	r.Ran(t, target, []finding.Reported{{
 		Issue: finding.Named{
 			Identifier: "CVE-2022-37434", Severity: "critical",

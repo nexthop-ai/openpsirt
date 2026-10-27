@@ -77,7 +77,7 @@ func TestHowAMatchWasMadeIsKeptAndCanBeAskedFor(t *testing.T) {
 			t.Errorf("the unconfirmed list holds %q", only[0].Vulnerability)
 		}
 
-		// The place carries where its own match came from, which the issue
+		// The occurrence carries where its own match came from, which the issue
 		// cannot: one issue reached through two ecosystems has two answers.
 		at, err := f.store.Detail(t.Context(), who, f.target,
 			f.issue(t, "CVE-2026-UNCONFIRMED"), f.componentID(t, swss.Name))

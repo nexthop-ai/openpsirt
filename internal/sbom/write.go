@@ -25,7 +25,7 @@ import (
 //
 // Only what identifies a component is written. A scanner matches on identity,
 // not on structure; the structure is ours, and it is what turns one reported
-// issue into the places it occupies.
+// issue into the occurrences it occupies.
 //
 // The product itself is left out. It is not a package any database has heard
 // of, and including it invites a match on a name that happens to collide.

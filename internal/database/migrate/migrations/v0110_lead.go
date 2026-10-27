@@ -87,7 +87,7 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "rule_family_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
 		)` + t.suffix,
 
-		// A confirmed lead recorded as a flaw, by its place in a product.
+		// A confirmed lead recorded as a flaw, by its occurrence in a product.
 		`CREATE TABLE "lead_handoff" (
 			"id"               ` + t.id + `,
 			"product_id"       ` + t.ref + ` NOT NULL,

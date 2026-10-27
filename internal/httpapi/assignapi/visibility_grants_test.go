@@ -142,7 +142,7 @@ func TestProductWideTriageIsHeldByTheUndisclosedHalfAlone(t *testing.T) {
 // Agreeing is answered at one visibility: reading there, with the approver
 // capability or triage there. The session says so per visibility, and the
 // approval itself is refused and accepted on the same terms.
-func TestAgreeingIsAnsweredAtTheClaimsOwnVisibility(t *testing.T) {
+func TestAgreeingIsAnsweredAtTheDecisionsOwnVisibility(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		hidden := r.Embargoed(t)
@@ -191,12 +191,12 @@ func TestAgreeingIsAnsweredAtTheClaimsOwnVisibility(t *testing.T) {
 
 		if got := httpapitest.AsPerson(t, r, "split-triager", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", disclosed), `{}`); got.Code != http.StatusNotFound {
-			t.Errorf("triage of undisclosed work agreeing to a disclosed claim answered %d: %s",
+			t.Errorf("triage of undisclosed work agreeing to a disclosed decision answered %d: %s",
 				got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "split-triager", http.MethodPost,
 			fmt.Sprintf("/v1/decisions/%d/approval", undisclosed), `{}`); got.Code != http.StatusOK {
-			t.Errorf("triage of undisclosed work agreeing to an undisclosed claim answered %d: %s",
+			t.Errorf("triage of undisclosed work agreeing to an undisclosed decision answered %d: %s",
 				got.Code, got.Body.String())
 		}
 	})

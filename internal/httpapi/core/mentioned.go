@@ -19,8 +19,8 @@ import (
 // told they were named in it.
 //
 // The four things that decide it, rather than the row one of the callers
-// happens to hold. A mention in a claim's comment is about a place and a
-// mention in an issue's note is about an issue in a product, and both resolve
+// happens to hold. A mention in a decision's comment is about an occurrence and
+// a mention in an issue's note is about an issue in a product, and both resolve
 // to one set: the names typed that may read the thing being written about, at
 // its visibility.
 type MentionTarget struct {
@@ -28,7 +28,8 @@ type MentionTarget struct {
 	VulnerabilityID int64
 	Visibility      access.Visibility
 	// About is the notification's own name for the thing, in a few words: the
-	// start of a place identity for a claim, the issue's name for a note.
+	// start of an occurrence identity for a decision, the issue's name for a
+	// note.
 	About string
 }
 
@@ -63,16 +64,16 @@ type MentionsBody struct {
 // stored would be sacrificing the wrong half. A failure reports every name as
 // reaching nobody, because none of them was told.
 func TellMentioned(ctx context.Context, in Deps, subject access.Subject,
-	store *triage.Store, claimID int64, body string) []string {
+	store *triage.Store, decisionID int64, body string) []string {
 
 	if len(markdown.Mentions(body)) == 0 {
 		return nil
 	}
-	// Any row of the claim answers for what the text is about: a claim is one
-	// action in one product, and who may be told is decided at the visibility
-	// of what it is about. The first row is the one every other reader of the
-	// claim is shown as its representative.
-	_, rows, err := store.ReadClaim(ctx, subject, claimID)
+	// Any row of the decision answers for what the text is about: a decision
+	// is one action in one product, and who may be told is decided at the
+	// visibility of what it is about. The first row is the one every other
+	// reader of the decision is shown as its representative.
+	_, rows, err := store.ReadDecision(ctx, subject, decisionID)
 	if err != nil || len(rows) == 0 {
 		in.Log().WarnContext(ctx, "could not tell who was named", "error", err)
 		return markdown.Mentions(body)
@@ -81,8 +82,8 @@ func TellMentioned(ctx context.Context, in Deps, subject access.Subject,
 		ProductID:       rows[0].ProductID,
 		VulnerabilityID: rows[0].VulnerabilityID,
 		Visibility:      rows[0].Visibility,
-		About:           rows[0].PlaceIdentity[:min(8, len(rows[0].PlaceIdentity))],
-	}, body, weblink.Claim(claimID))
+		About:           rows[0].OccurrenceIdentity[:min(8, len(rows[0].OccurrenceIdentity))],
+	}, body, weblink.Decision(decisionID))
 	if err != nil {
 		in.Log().WarnContext(ctx, "could not tell who was named", "error", err)
 	}

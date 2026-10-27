@@ -33,7 +33,7 @@ type Applier struct {
 	db  *database.DB
 	now func() time.Time
 	// drops is told of each applied run that dropped sharply, and lapses of
-	// whose claims on leads a run lapsed, once its transaction has committed.
+	// whose decisions on leads a run lapsed, once its transaction has committed.
 	drops  func(context.Context, Drop)
 	lapses func(context.Context, []triage.ForPerson)
 }
@@ -65,7 +65,7 @@ func (a *Applier) TellingDrops(tell func(context.Context, Drop)) *Applier {
 	return a
 }
 
-// TellingLapses has the applier tell the proposers of the claims on leads a
+// TellingLapses has the applier tell the proposers of the decisions on leads a
 // run lapsed, on the terms TellingDrops tells.
 func (a *Applier) TellingLapses(tell func(context.Context, []triage.ForPerson)) *Applier {
 	a.lapses = tell
@@ -82,7 +82,7 @@ type Receipt struct {
 	SharpDrop           bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers"`
 	Probable            int            `json:"probable,omitempty" doc:"Results paired with a lead on its function or its nearest line rather than its whole key"`
 	Inherited           int            `json:"inherited,omitempty" doc:"Results new to the build carried from a lead of the branch it was cut from"`
-	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the place of a lead on the build that was closed"`
+	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the occurrence of a lead on the build that was closed"`
 	Uncompared          int            `json:"uncompared,omitempty" doc:"Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set"`
 	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build"`
 	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"`
@@ -402,7 +402,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	// Marked before the run reads a hand-off or writes a lead's source: a
 	// disclosure or a move of a lead it describes waits for it, or reads
 	// again.
-	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, freshPlaces(set.ID, fresh, from), again); err != nil {
+	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, freshOccurrences(set.ID, fresh, from), again); err != nil {
 		return "", err
 	}
 	opened, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
@@ -503,7 +503,7 @@ func comparedTo(ctx context.Context, store *series.Store, run *series.Run, open 
 	return kept, uncompared, nil
 }
 
-// lapseProbable lapses the claims dismissing each lead this run paired only
+// lapseProbable lapses the decisions dismissing each lead this run paired only
 // probably, on its function or its nearest line, whether it was a lead open on
 // the build or one carried from elsewhere.
 func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map[int64]Keyed,
@@ -515,24 +515,24 @@ func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map
 			ids = append(ids, id)
 		}
 	}
-	var places []string
+	var occurrences []string
 	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var some []string
 		if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
 			Where(`"f"."id" IN (?)`, bun.List(batch)).Scan(ctx, &some); err != nil {
-			return fmt.Errorf("read the places of leads paired probably: %w", err)
+			return fmt.Errorf("read the occurrences of leads paired probably: %w", err)
 		}
-		places = append(places, some...)
+		occurrences = append(occurrences, some...)
 		return nil
 	}); err != nil {
 		return triage.Lapsed{}, err
 	}
 	for _, c := range from {
 		if !strong(c.on) {
-			places = append(places, c.place)
+			occurrences = append(occurrences, c.occurrence)
 		}
 	}
-	return triage.LapseLeads(ctx, tx, productID, places, now)
+	return triage.LapseLeads(ctx, tx, productID, occurrences, now)
 }
 
 // printsOf is what a run's results are fingerprinted with: the scheme each

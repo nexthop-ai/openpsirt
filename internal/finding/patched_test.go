@@ -23,7 +23,7 @@ import (
 func (f *fixture) claimed(t *testing.T, claims ...sbom.Suppression) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
-	if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
+	if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -275,7 +275,7 @@ func TestAFindingRecordedClosedOnArrivalIsNeitherOpenedNorFixed(t *testing.T) {
 }
 
 func TestTwoReportsOfOneIssueAgreeOnWhetherItIsPatched(t *testing.T) {
-	// One issue reported under two names reaches the same place twice. The
+	// One issue reported under two names reaches the same occurrence twice. The
 	// claim names only one of them, so the second report is not covered, and
 	// what decides the finding is the report that stands.
 	each(t, func(t *testing.T, f *fixture) {
@@ -307,7 +307,7 @@ func TestAFindingWhosePatchWasDroppedInABumpSaysWhereItCameFrom(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin); err != nil {
+		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -334,7 +334,7 @@ func TestABumpOntoAPatchedVersionClosesAsPatched(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{
+		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnlNew, sbom.FromPedigree),
 		}, everyOrigin); err != nil {
 			t.Fatal(err)
@@ -361,7 +361,7 @@ func TestABumpOntoAPatchedVersionClosesAsPatched(t *testing.T) {
 }
 
 func TestAPatchReturningAfterTheComponentLeftIsRecordedAgain(t *testing.T) {
-	// What is already recorded is the latest row at a place, never any row.
+	// What is already recorded is the latest row at an occurrence, never any row.
 	// Patched, then dropped, then removed, then back with the patch: the
 	// latest row says removed, so the patch is recorded again.
 	each(t, func(t *testing.T, f *fixture) {

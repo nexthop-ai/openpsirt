@@ -13,7 +13,7 @@ import (
 
 // LeadCollaborator is one person granted one handed-off lead in one product.
 //
-// The grant is on the pair of product and place, as a case collaborator's is
+// The grant is on the pair of product and occurrence, as a case collaborator's is
 // on the pair of product and issue. It reads the lead's evidence and nothing
 // else of the product, at the internal and private visibilities, and only
 // while the lead's flaw is undisclosed: disclosure ends it, kept lead or
@@ -22,14 +22,14 @@ import (
 type LeadCollaborator struct {
 	bun.BaseModel `bun:"table:lead_collaborator,alias:lc"`
 
-	ID            int64  `bun:"id,pk,autoincrement"`
-	ProductID     int64  `bun:"product_id,notnull"`
-	PlaceIdentity string `bun:"occurrence_identity,notnull"`
-	PersonID      int64  `bun:"person_id,notnull"`
-	AddedBy       int64  `bun:"added_by,notnull"`
-	AddedAt       time.Time
-	RemovedBy     *int64     `bun:"removed_by"`
-	RemovedAt     *time.Time `bun:"removed_at"`
+	ID                 int64  `bun:"id,pk,autoincrement"`
+	ProductID          int64  `bun:"product_id,notnull"`
+	OccurrenceIdentity string `bun:"occurrence_identity,notnull"`
+	PersonID           int64  `bun:"person_id,notnull"`
+	AddedBy            int64  `bun:"added_by,notnull"`
+	AddedAt            time.Time
+	RemovedBy          *int64     `bun:"removed_by"`
+	RemovedAt          *time.Time `bun:"removed_at"`
 	// LivePerson carries the person again while the grant stands and is null
 	// once it is withdrawn, so the database holds one live grant per person
 	// per lead.
@@ -47,22 +47,22 @@ func LeadGrantVisibilities() []Visibility { return append([]Visibility(nil), lea
 
 // AddToLead brings somebody onto one lead, and reports whether it did. Adding
 // somebody already on it reports false and changes nothing.
-func (s *Store) AddToLead(ctx context.Context, productID int64, placeIdentity string, personID,
+func (s *Store) AddToLead(ctx context.Context, productID int64, occurrenceIdentity string, personID,
 	by int64) (bool, error) {
 
 	row := &LeadCollaborator{
-		ProductID: productID, PlaceIdentity: placeIdentity, PersonID: personID,
+		ProductID: productID, OccurrenceIdentity: occurrenceIdentity, PersonID: personID,
 		AddedBy: by, AddedAt: s.now().Truncate(time.Microsecond),
 		LivePerson: &personID,
 	}
 	return s.insertOnce(ctx, "bring them onto that lead", row,
 		func(ctx context.Context) (bool, error) {
-			return s.onLead(ctx, productID, placeIdentity, personID)
+			return s.onLead(ctx, productID, occurrenceIdentity, personID)
 		})
 }
 
 // RemoveFromLead withdraws a lead grant, keeping the row.
-func (s *Store) RemoveFromLead(ctx context.Context, productID int64, placeIdentity string,
+func (s *Store) RemoveFromLead(ctx context.Context, productID int64, occurrenceIdentity string,
 	personID, by int64) error {
 
 	now := s.now().Truncate(time.Microsecond)
@@ -71,7 +71,7 @@ func (s *Store) RemoveFromLead(ctx context.Context, productID int64, placeIdenti
 		Set(`"removed_by" = ?`, by).
 		Set(`"live_person_id" = ?`, nil).
 		Where(`"product_id" = ?`, productID).
-		Where(`"occurrence_identity" = ?`, placeIdentity).
+		Where(`"occurrence_identity" = ?`, occurrenceIdentity).
 		Where(`"person_id" = ?`, personID).
 		Where(`"live_person_id" IS NOT NULL`).
 		Exec(ctx)
@@ -82,11 +82,11 @@ func (s *Store) RemoveFromLead(ctx context.Context, productID int64, placeIdenti
 }
 
 // LeadRows is the standing grants on one lead, oldest first.
-func (s *Store) LeadRows(ctx context.Context, productID int64, placeIdentity string) ([]LeadCollaborator, error) {
+func (s *Store) LeadRows(ctx context.Context, productID int64, occurrenceIdentity string) ([]LeadCollaborator, error) {
 	var rows []LeadCollaborator
 	err := s.db.NewSelect().Model(&rows).
 		Where(`"lc"."product_id" = ?`, productID).
-		Where(`"lc"."occurrence_identity" = ?`, placeIdentity).
+		Where(`"lc"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(`"lc"."live_person_id" IS NOT NULL`).
 		OrderExpr(`"lc"."added_at", "lc"."id"`).
 		Scan(ctx)
@@ -96,7 +96,7 @@ func (s *Store) LeadRows(ctx context.Context, productID int64, placeIdentity str
 	return rows, nil
 }
 
-// LeadsOf is every lead one person is granted, as places per product. Read
+// LeadsOf is every lead one person is granted, as occurrences per product. Read
 // where a person becomes a subject, beside their cases.
 func (s *Store) LeadsOf(ctx context.Context, personID int64) (map[int64][]string, error) {
 	var rows []LeadCollaborator
@@ -113,19 +113,19 @@ func (s *Store) LeadsOf(ctx context.Context, personID int64) (map[int64][]string
 	}
 	leads := map[int64][]string{}
 	for _, row := range rows {
-		leads[row.ProductID] = append(leads[row.ProductID], row.PlaceIdentity)
+		leads[row.ProductID] = append(leads[row.ProductID], row.OccurrenceIdentity)
 	}
 	return leads, nil
 }
 
 // onLead says whether one person's grant on one lead stands.
-func (s *Store) onLead(ctx context.Context, productID int64, placeIdentity string,
+func (s *Store) onLead(ctx context.Context, productID int64, occurrenceIdentity string,
 	personID int64) (bool, error) {
 
 	on, err := s.db.NewSelect().Model((*LeadCollaborator)(nil)).
 		Column("lc.id").
 		Where(`"lc"."product_id" = ?`, productID).
-		Where(`"lc"."occurrence_identity" = ?`, placeIdentity).
+		Where(`"lc"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(`"lc"."person_id" = ?`, personID).
 		Where(`"lc"."live_person_id" IS NOT NULL`).
 		Exists(ctx)

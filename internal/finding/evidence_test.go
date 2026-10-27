@@ -12,15 +12,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// A reader's view of a finding, worked out from its places.
+// A reader's view of a finding, worked out from its occurrences.
 //
 // The two rules here are asked of different populations and reading them the
 // same way is the mistake: what a scanner matched on is one line of its report
-// written to every place, so any place answers — and whether anything is
-// undisclosed is a question about all of them, because one undisclosed place
-// among fifty makes the whole of it undisclosed for anybody deciding what may
-// be said about it.
-func TestDisclosureIsAskedOfEveryPlaceAndTheMatchOfAny(t *testing.T) {
+// written to every occurrence, so any occurrence answers — and whether anything
+// is undisclosed is a question about all of them, because one undisclosed
+// occurrence among fifty makes the whole of it undisclosed for anybody deciding
+// what may be said about it.
+func TestDisclosureIsAskedOfEveryOccurrenceAndTheMatchOfAny(t *testing.T) {
 	soon := time.Now().UTC().Add(48 * time.Hour)
 	later := soon.Add(30 * 24 * time.Hour)
 	rows := []evidenceRow{
@@ -44,20 +44,20 @@ func TestDisclosureIsAskedOfEveryPlaceAndTheMatchOfAny(t *testing.T) {
 	evidence := evidenceFrom(rows, issue, graph.Component{Name: "curl"}, nil, nil, nil)
 
 	if !evidence.Undisclosed {
-		t.Error("a fold with one undisclosed place among three reads as disclosed")
+		t.Error("a fold with one undisclosed occurrence among three reads as disclosed")
 	}
 	// The soonest, because that is the date the whole of it is bound by.
 	if evidence.DiscloseAt == nil || !evidence.DiscloseAt.Equal(soon) {
-		t.Errorf("the disclosure date is %v, want the soonest of the places", evidence.DiscloseAt)
+		t.Errorf("the disclosure date is %v, want the soonest of the occurrences", evidence.DiscloseAt)
 	}
-	// Off the first place, which is the same line of the report as the rest.
+	// Off the first occurrence, which is the same line of the report as the rest.
 	if evidence.Matched != Matched("identifier") || evidence.MatchedFrom != "nvd" {
 		t.Errorf("what the scanner matched on came back as %q from %q",
 			evidence.Matched, evidence.MatchedFrom)
 	}
 }
 
-// A fold of one public place says nothing is undisclosed, which is the other
+// A fold of one public occurrence says nothing is undisclosed, which is the other
 // direction and the one a wrong reading of the rule above would also pass.
 func TestAFoldWithNothingUndisclosedSaysSo(t *testing.T) {
 	rows := []evidenceRow{
@@ -67,116 +67,117 @@ func TestAFoldWithNothingUndisclosedSaysSo(t *testing.T) {
 	evidence := evidenceFrom(rows, Vulnerability{Identifier: "CVE-2026-2"},
 		graph.Component{Name: "curl"}, nil, nil, nil)
 	if evidence.Undisclosed {
-		t.Error("a fold whose every place is public reads as undisclosed")
+		t.Error("a fold whose every occurrence is public reads as undisclosed")
 	}
 	if evidence.DiscloseAt != nil {
 		t.Errorf("a disclosure date was invented: %v", evidence.DiscloseAt)
 	}
 }
 
-// An inventory that describes one consumer twice — as the source package and
-// as the distribution's package, two components by content and one pair of
-// names — leaves two rows sharing one place. A place is what a decision is
-// keyed on, so the screen reads one row, with the way down of whichever of the
-// two the graph could walk.
-func TestTwoRowsSharingOnePlaceReadAsOnePlace(t *testing.T) {
-	place := PlaceIdentity("linux-image", "opennsl-modules")
+// An inventory that describes one consumer twice — as the source package and as
+// the distribution's package, two components by content and one pair of names —
+// leaves two rows sharing one occurrence. An occurrence is what a decision is
+// recorded at, so the screen reads one row, with the way down of whichever of
+// the two the graph could walk.
+func TestTwoRowsSharingOneOccurrenceReadAsOneOccurrence(t *testing.T) {
+	occurrence := OccurrenceIdentity("linux-image", "opennsl-modules")
 	unplaced, walkable := int64(20), int64(21)
 	rows := []evidenceRow{
 		// The copy nothing placed: the walk up from the first of the two
 		// reaches nothing, so that row alone would read as unplaced.
 		{
-			PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules",
 			ComponentID: 10, ConsumerID: &unplaced,
 		},
 		{
-			PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+			OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules",
 			ComponentID: 10, ConsumerID: &walkable,
 		},
 	}
 	chains := map[int64][]graph.Step{
 		walkable: {{Name: "sonic-broadcom"}, {Name: "host-image"}, {Name: "opennsl-modules"}},
 	}
-	places := placesOf(rows, chains, map[int64]graph.Step{10: {Version: "6.12.41-1"}}, nil)
+	occurrences := occurrencesOf(rows, chains, map[int64]graph.Step{10: {Version: "6.12.41-1"}}, nil)
 
-	if len(places) != 1 {
-		t.Fatalf("%d places for one pair of names, want 1", len(places))
+	if len(occurrences) != 1 {
+		t.Fatalf("%d occurrences for one pair of names, want 1", len(occurrences))
 	}
-	if got := len(places[0].Chain); got != 4 {
+	if got := len(occurrences[0].Chain); got != 4 {
 		t.Fatalf("the way down is %d steps, want the walkable one of the two", got)
 	}
-	if last := places[0].Chain[3]; last.Name != "linux-image" || last.Version != "6.12.41-1" {
-		t.Errorf("the way down ends at %q %q, want the component this place is",
+	if last := occurrences[0].Chain[3]; last.Name != "linux-image" || last.Version != "6.12.41-1" {
+		t.Errorf("the way down ends at %q %q, want the component this occurrence is",
 			last.Name, last.Version)
 	}
 }
 
-// The build's own argument covers a place only where it covers every row the
-// key folds: a VEX statement about one of two components of the same name is
-// not a statement about the place a decision is recorded against.
-func TestAPlaceIsSuppressedOnlyWhereEveryRowOfItIs(t *testing.T) {
-	place := PlaceIdentity("linux-image", "opennsl-modules")
+// The build's own argument covers an occurrence only where it covers every row
+// the key folds: a VEX statement about one of two components of the same name
+// is not a statement about the occurrence a decision is recorded against.
+func TestAnOccurrenceIsSuppressedOnlyWhereEveryRowOfItIs(t *testing.T) {
+	occurrence := OccurrenceIdentity("linux-image", "opennsl-modules")
 	unplaced, walkable := int64(20), int64(21)
 	rows := []evidenceRow{
-		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+		{OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules",
 			ComponentID: 10, ConsumerID: &unplaced, Suppressed: true},
-		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
+		{OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules",
 			ComponentID: 10, ConsumerID: &walkable, Suppressed: false},
 	}
-	places := placesOf(rows, nil, nil, nil)
-	if len(places) != 1 {
-		t.Fatalf("%d places for one pair of names, want 1", len(places))
+	occurrences := occurrencesOf(rows, nil, nil, nil)
+	if len(occurrences) != 1 {
+		t.Fatalf("%d occurrences for one pair of names, want 1", len(occurrences))
 	}
-	if places[0].Suppressed {
-		t.Error("a place reads as argued away by the build where only one of its rows is")
+	if occurrences[0].Suppressed {
+		t.Error("an occurrence reads as argued away by the build where only one of its rows is")
 	}
 }
 
-// A decision stands at a place, and the rows of a place need not hold the same
-// versions: a decision is keyed on the place and expires on the versions, so it
-// matches one row and not its twin. Keeping the first row's answer dropped a
-// claim somebody had just made and offered the place again.
-func TestAClaimStandingOnEitherRowStandsAtThePlace(t *testing.T) {
-	place := PlaceIdentity("linux-image", "opennsl-modules")
-	decision, claim := int64(7), int64(3)
+// A decision stands at an occurrence, and the rows of an occurrence need not
+// hold the same versions: a decision occurrence is keyed on the occurrence and
+// expires on the versions, so it matches one row and not its twin. Keeping the
+// first row's answer dropped a decision somebody had just made and offered the
+// occurrence again.
+func TestADecisionStandingOnEitherRowStandsAtTheOccurrence(t *testing.T) {
+	occurrence := OccurrenceIdentity("linux-image", "opennsl-modules")
+	row, decision := int64(7), int64(3)
 	rows := []evidenceRow{
-		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules"},
+		{OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules"},
 		{
-			PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
-			Decision: &decision, Claim: &claim,
+			OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules",
+			DecisionOccurrence: &row, Decision: &decision,
 		},
 	}
-	places := placesOf(rows, nil, nil, nil)
-	if len(places) != 1 {
-		t.Fatalf("%d places for one pair of names, want 1", len(places))
+	occurrences := occurrencesOf(rows, nil, nil, nil)
+	if len(occurrences) != 1 {
+		t.Fatalf("%d occurrences for one pair of names, want 1", len(occurrences))
 	}
-	if places[0].Decision == nil || *places[0].Decision != decision {
-		t.Error("a place whose second row carries the standing claim reads as undecided")
+	if occurrences[0].DecisionOccurrence == nil || *occurrences[0].DecisionOccurrence != row {
+		t.Error("an occurrence whose second row carries the standing decision reads as undecided")
 	}
-	if places[0].Claim == nil || *places[0].Claim != claim {
-		t.Error("the claim the decision is a row of was not carried with it")
+	if occurrences[0].Decision == nil || *occurrences[0].Decision != decision {
+		t.Error("the decision the decision occurrence is a row of was not carried with it")
 	}
 }
 
 // Lowest identifier, so two engines returning the rows in either order answer
 // the same way.
 func TestWhereBothRowsAreDecidedTheEarlierDecisionAnswers(t *testing.T) {
-	place := PlaceIdentity("linux-image", "opennsl-modules")
+	occurrence := OccurrenceIdentity("linux-image", "opennsl-modules")
 	later, earlier := int64(9), int64(4)
-	laterClaim, earlierClaim := int64(9), int64(4)
+	laterDecision, earlierDecision := int64(9), int64(4)
 	rows := []evidenceRow{
-		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
-			Decision: &later, Claim: &laterClaim},
-		{PlaceIdentity: place, Component: "linux-image", Consumer: "opennsl-modules",
-			Decision: &earlier, Claim: &earlierClaim},
+		{OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules",
+			DecisionOccurrence: &later, Decision: &laterDecision},
+		{OccurrenceIdentity: occurrence, Component: "linux-image", Consumer: "opennsl-modules",
+			DecisionOccurrence: &earlier, Decision: &earlierDecision},
 	}
-	places := placesOf(rows, nil, nil, nil)
-	if places[0].Decision == nil || *places[0].Decision != earlier {
-		t.Errorf("the place reads decision %s, want the lowest identifier",
-			numbered(places[0].Decision))
+	occurrences := occurrencesOf(rows, nil, nil, nil)
+	if occurrences[0].DecisionOccurrence == nil || *occurrences[0].DecisionOccurrence != earlier {
+		t.Errorf("the occurrence reads decision occurrence %s, want the lowest identifier",
+			numbered(occurrences[0].DecisionOccurrence))
 	}
-	if places[0].Claim == nil || *places[0].Claim != earlierClaim {
-		t.Error("the claim came from a different row than the decision did")
+	if occurrences[0].Decision == nil || *occurrences[0].Decision != earlierDecision {
+		t.Error("the decision came from a different row than the decision occurrence did")
 	}
 }
 

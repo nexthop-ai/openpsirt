@@ -64,7 +64,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		OperationID: "assess-issue", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/issues/{issue}/assessment",
 		Summary: "Record what a product thinks of an issue, as against what was published",
-		Description: "Recorded against the issue, not against a place, and against one " +
+		Description: "Recorded against the issue, not against an occurrence, and against one " +
 			"product. A published rating being wrong, or a report being disputed, is one " +
 			"statement about the vulnerability in this product — true in every build of it, " +
 			"including builds it has not reached yet, and it does not stop being true " +
@@ -104,7 +104,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that issue could not be looked up", core.NoSuchIssue)
 		}
-		claim, err := finding.NewStore(in.DB.DB).Assess(ctx, subject, product.ID, issue,
+		decision, err := finding.NewStore(in.DB.DB).Assess(ctx, subject, product.ID, issue,
 			string(input.Body.Severity), input.Body.Reasoning)
 		if err != nil {
 			// Exactly what an unused name answers. An issue somebody may not
@@ -120,8 +120,8 @@ func registerAssessment(api huma.API, in core.Deps) {
 			}
 			return nil, core.Asked(in.Logger, err)
 		}
-		outgrown(ctx, in, claim.ProductID, claim.VulnerabilityID)
-		body := assessmentBody(*claim, input.Vulnerability, subject.ID)
+		outgrown(ctx, in, decision.ProductID, decision.VulnerabilityID)
+		body := assessmentBody(*decision, input.Vulnerability, subject.ID)
 		body.Product, body.ProductName = product.Name, catalog.Shown(product.DisplayName, product.Name)
 		return &struct{ Body AssessmentBody }{Body: body}, nil
 	})
@@ -146,7 +146,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		claim, err := finding.NewStore(in.DB.DB).Agree(ctx, subject, input.ID)
+		decision, err := finding.NewStore(in.DB.DB).Agree(ctx, subject, input.ID)
 		if err != nil {
 			if errors.Is(err, finding.ErrNoSuchAssessment) {
 				return nil, core.NoSuchAssessment()
@@ -156,8 +156,8 @@ func registerAssessment(api huma.API, in core.Deps) {
 			}
 			return nil, core.Asked(in.Logger, err)
 		}
-		outgrown(ctx, in, claim.ProductID, claim.VulnerabilityID)
-		return &struct{ Body AssessmentBody }{Body: assessmentBody(*claim, "", subject.ID)}, nil
+		outgrown(ctx, in, decision.ProductID, decision.VulnerabilityID)
+		return &struct{ Body AssessmentBody }{Body: assessmentBody(*decision, "", subject.ID)}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -232,7 +232,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 			within = product.ID
 		}
 		store := finding.NewStore(in.DB.DB)
-		claims, named, total, err := store.Assessments(ctx, subject, within, string(input.State),
+		decisions, named, total, err := store.Assessments(ctx, subject, within, string(input.State),
 			input.Limit, input.Offset)
 		if err != nil {
 			if errors.Is(err, access.ErrDenied) {
@@ -242,7 +242,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		}
 		// The name of each rating's product, read once for the page rather
 		// than per row.
-		products, shown, err := productsNamed(ctx, in, claims)
+		products, shown, err := productsNamed(ctx, in, decisions)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what these ratings belong to could not be read", err)
 		}
@@ -250,9 +250,9 @@ func registerAssessment(api huma.API, in core.Deps) {
 		// question about a decision not yet taken, and asking it of every
 		// historical claim would buy nothing. Asked once for the page.
 		var waiting []int64
-		for _, claim := range claims {
-			if claim.State == finding.AssessmentProposed && claim.NeedsApproval {
-				waiting = append(waiting, claim.ID)
+		for _, decision := range decisions {
+			if decision.State == finding.AssessmentProposed && decision.NeedsApproval {
+				waiting = append(waiting, decision.ID)
 			}
 		}
 		would, err := store.WhatAgreeingWouldDo(ctx, subject, waiting)
@@ -261,15 +261,15 @@ func registerAssessment(api huma.API, in core.Deps) {
 		}
 		out := &core.ListOutput[AssessmentBody]{}
 		out.Body.Total = total
-		out.Body.Items = make([]AssessmentBody, 0, len(claims))
-		for _, claim := range claims {
-			body := assessmentBody(claim, named[claim.VulnerabilityID], subject.ID)
-			body.Product = products[claim.ProductID]
-			body.ProductName = shown[claim.ProductID]
-			if claim.State == finding.AssessmentProposed && claim.NeedsApproval {
+		out.Body.Items = make([]AssessmentBody, 0, len(decisions))
+		for _, decision := range decisions {
+			body := assessmentBody(decision, named[decision.VulnerabilityID], subject.ID)
+			body.Product = products[decision.ProductID]
+			body.ProductName = shown[decision.ProductID]
+			if decision.State == finding.AssessmentProposed && decision.NeedsApproval {
 				// A claim that stopped being readable between the list and
 				// this read is left off rather than failing the whole page.
-				consequence, known := would[claim.ID]
+				consequence, known := would[decision.ID]
 				if !known {
 					continue
 				}
@@ -305,14 +305,14 @@ func assessmentBody(a finding.Assessment, identifier string, asking int64) Asses
 // takes. One field spelled two ways by two operations hands a client "SONiC"
 // where "sonic" was wanted.
 func productsNamed(ctx context.Context, in core.Deps,
-	claims []finding.Assessment) (called, shown map[int64]string, err error) {
+	decisions []finding.Assessment) (called, shown map[int64]string, err error) {
 
-	if len(claims) == 0 {
+	if len(decisions) == 0 {
 		return map[int64]string{}, map[int64]string{}, nil
 	}
-	ids := make([]int64, 0, len(claims))
-	for _, claim := range claims {
-		ids = append(ids, claim.ProductID)
+	ids := make([]int64, 0, len(decisions))
+	for _, decision := range decisions {
+		ids = append(ids, decision.ProductID)
 	}
 	products := catalog.NewStore(in.DB.DB)
 	if called, err = products.ProductsCalled(ctx, ids); err != nil {
@@ -322,10 +322,10 @@ func productsNamed(ctx context.Context, in core.Deps,
 	return called, shown, err
 }
 
-// outgrown lapses the claims a change to the rating in force in one product
+// outgrown lapses the decisions a change to the rating in force in one product
 // has risen past, and tells whoever made them (REQ-25).
 //
-// Reported and not fatal. The rating is recorded and correct, and a claim this
+// Reported and not fatal. The rating is recorded and correct, and a decision this
 // fails to mark stands until the next scan with the issue open sweeps again.
 // Whoever the sweep did name is told even when it failed after naming them:
 // their rows lapsed and were committed.

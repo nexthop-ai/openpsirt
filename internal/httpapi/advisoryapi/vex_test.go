@@ -41,12 +41,12 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 		}
 
 		// One dismissal, agreed to by a second person.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		// And one deferral, which must not appear as anything.
 		later, _ := r.Claimed(t, "triager", "CVE-2026-1000", "linux-image",
 			`{"outcome":"deferred","deferred_until":"2030-01-01",`+
 				`"reasoning":"Waiting on the vendor's next image."}`)
-		for _, id := range []int64{claim, later} {
+		for _, id := range []int64{decision, later} {
 			r.Agreed(t, id)
 		}
 
@@ -105,8 +105,8 @@ func TestAVEXDocumentCarriesNothingNobodyHasAnnounced(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		hidden := r.Embargoed(t)
-		claim, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
-		r.AgreedBy(t, "private-dispatcher", claim)
+		decision, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
+		r.AgreedBy(t, "private-dispatcher", decision)
 
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 		var doc struct {
@@ -162,8 +162,8 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 
 		var doc struct {
 			Statements []struct {
@@ -201,16 +201,16 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 	})
 }
 
-func TestADismissalAtOnePlaceIsStatedAboutThatPlaceAndNeverTheBuild(t *testing.T) {
-	// A finding is an issue at a place, and a component commonly sits at
-	// many. Stated about the build, one dismissal agreed at one place speaks
+func TestADismissalAtOneOccurrenceIsStatedAboutThatOccurrenceAndNeverTheBuild(t *testing.T) {
+	// A finding is an issue at an occurrence, and a component commonly sits at
+	// many. Stated about the build, one dismissal agreed at one occurrence speaks
 	// for a component still open at all the others: a machine-readable claim
 	// of "not affected" about something that is affected, published to every
 	// customer running a scanner against the image. Stated with what pulls
 	// the component in as the product, it says what was agreed and no more.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedAtTwoPlaces(t)
-		dismissedAtOnePlace(t, r, map[string]bool{
+		r.ScannedAtTwoOccurrences(t)
+		dismissedAtOneOccurrence(t, r, map[string]bool{
 			"pkg:deb/debian/libswsscommon@1.0.0": true, "pkg:deb/debian/libteam5@1.31": true,
 		})
 	})
@@ -222,7 +222,7 @@ func TestADismissalBeneathAnImageNamesTheImageAsTheBuildStampedIt(t *testing.T) 
 	// product is the image as this build stamped it.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedInTwoImages(t)
-		dismissedAtOnePlace(t, r, map[string]bool{
+		dismissedAtOneOccurrence(t, r, map[string]bool{
 			"pkg:oci/docker-swss@master.7-abc?arch=amd64":  true,
 			"pkg:oci/docker-teamd@master.7-abc?arch=amd64": true,
 		})
@@ -234,29 +234,29 @@ func TestADismissalOfAnImagesOwnIssueNamesTheImageAsTheBuildStampedIt(t *testing
 	// image, and a reader matches it at the stamp the build shipped.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedInTwoImages(t)
-		var places struct {
-			Places []struct {
-				Place string `json:"place"`
-			} `json:"places"`
+		var occurrences struct {
+			Occurrences []struct {
+				Occurrence string `json:"occurrence"`
+			} `json:"occurrences"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9998/components/docker-swss", &places)
-		if len(places.Places) != 1 {
-			t.Fatalf("the image's own issue sits at %d places, want one", len(places.Places))
+			"/findings/CVE-2026-9998/components/docker-swss", &occurrences)
+		if len(occurrences.Occurrences) != 1 {
+			t.Fatalf("the image's own issue sits at %d occurrences, want one", len(occurrences.Occurrences))
 		}
 		one := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9998/occurrences/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
+				"/findings/CVE-2026-9998/occurrences/"+occurrences.Occurrences[0].Occurrence+"/decision", httpapitest.Dismissal)
 		if one.Code != http.StatusCreated {
 			t.Fatalf("deciding the image's issue answered %d: %s", one.Code, one.Body.String())
 		}
 		var made struct {
-			ClaimID int64 `json:"claim_id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(one.Body.Bytes(), &made); err != nil {
 			t.Fatal(err)
 		}
-		r.Agreed(t, made.ClaimID)
+		r.Agreed(t, made.DecisionID)
 
 		var doc struct {
 			Statements []struct {
@@ -288,38 +288,38 @@ func TestADismissalOfAnImagesOwnIssueNamesTheImageAsTheBuildStampedIt(t *testing
 	})
 }
 
-// dismissedAtOnePlace agrees a dismissal of CVE-2026-9999 at the first of its
-// places, and checks the build's document states it once, about libnl inside
+// dismissedAtOneOccurrence agrees a dismissal of CVE-2026-9999 at the first of its
+// occurrences, and checks the build's document states it once, about libnl inside
 // one of the consumers given.
-func dismissedAtOnePlace(t *testing.T, r *httpapitest.Reach, consumers map[string]bool) {
+func dismissedAtOneOccurrence(t *testing.T, r *httpapitest.Reach, consumers map[string]bool) {
 	t.Helper()
 	const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
-	// The issue sits at more than one place in this component.
-	var places struct {
-		Places []struct {
-			Place string `json:"place"`
-		} `json:"places"`
+	// The issue sits at more than one occurrence in this component.
+	var occurrences struct {
+		Occurrences []struct {
+			Occurrence string `json:"occurrence"`
+		} `json:"occurrences"`
 	}
-	httpapitest.Read(t, r, "triager", httpapitest.FindingAt("CVE-2026-9999"), &places)
-	if len(places.Places) < 2 {
-		t.Fatalf("the fixture holds this issue at %d places, so there is nothing "+
-			"to prove", len(places.Places))
+	httpapitest.Read(t, r, "triager", httpapitest.FindingAt("CVE-2026-9999"), &occurrences)
+	if len(occurrences.Occurrences) < 2 {
+		t.Fatalf("the fixture holds this issue at %d occurrences, so there is nothing "+
+			"to prove", len(occurrences.Occurrences))
 	}
 
-	// Agreed at one place only.
+	// Agreed at one occurrence only.
 	one := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 		"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
+			"/findings/CVE-2026-9999/occurrences/"+occurrences.Occurrences[0].Occurrence+"/decision", httpapitest.Dismissal)
 	if one.Code != http.StatusCreated {
-		t.Fatalf("deciding one place answered %d: %s", one.Code, one.Body.String())
+		t.Fatalf("deciding one occurrence answered %d: %s", one.Code, one.Body.String())
 	}
 	var made struct {
-		ClaimID int64 `json:"claim_id"`
+		DecisionID int64 `json:"decision_id"`
 	}
 	if err := json.Unmarshal(one.Body.Bytes(), &made); err != nil {
 		t.Fatal(err)
 	}
-	r.Agreed(t, made.ClaimID)
+	r.Agreed(t, made.DecisionID)
 
 	var doc struct {
 		Statements []struct {
@@ -343,12 +343,12 @@ func dismissedAtOnePlace(t *testing.T, r *httpapitest.Reach, consumers map[strin
 		stated++
 		if !consumers[each.Products[0].ID] ||
 			each.Products[0].Subcomponents[0].ID != "pkg:deb/debian/libnl-3-200@3.7.0" {
-			t.Errorf("a component dismissed at one place of several is stated about %s, "+
+			t.Errorf("a component dismissed at one occurrence of several is stated about %s, "+
 				"want the libnl one consumer pulls in", each.Products[0].ID)
 		}
 	}
 	if stated != 1 {
-		t.Errorf("%d statements about the issue, want the one place agreed", stated)
+		t.Errorf("%d statements about the issue, want the one occurrence agreed", stated)
 	}
 }
 
@@ -404,8 +404,8 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 
 		// Something for the document to carry, so that what is measured is a
 		// refusal rather than an empty answer either way.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 		var doc struct {
 			Statements []any `json:"statements"`
 		}
@@ -414,7 +414,7 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 			t.Fatal("the document says nothing, so a refusal proves nothing")
 		}
 
-		// A judgment on the embargoed issue, which is what the collaborator is
+		// A decision on the embargoed issue, which is what the collaborator is
 		// brought in to argue about and the thing their grant does reach.
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/"+
@@ -483,8 +483,8 @@ func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarg
 		// Two dismissals agreed to, so a ceiling of one is past rather than
 		// reached.
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
-			claim, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
-			r.Agreed(t, claim)
+			decision, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
+			r.Agreed(t, decision)
 		}
 		for _, method := range []string{http.MethodGet, http.MethodPost} {
 			at := httpapitest.ABuild
@@ -518,10 +518,10 @@ func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
 
 		const stops = "The service is bound to the management VLAN only."
 		const argued = "Checked the build flags and the exposed sockets."
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image",
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image",
 			`{"outcome":"not-applicable","justification":"inline_mitigations_already_exist",`+
 				`"mitigation":"`+stops+`","reasoning":"`+argued+`"}`)
-		r.Agreed(t, claim)
+		r.Agreed(t, decision)
 
 		var doc struct {
 			Statements []struct {
@@ -549,7 +549,7 @@ func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing
 	// never. The format has a status for exactly this and a field for what to
 	// do instead, and the second is why the first is publishable at all.
 	//
-	// On every engine. The new arm of the join — a claim that will not be
+	// On every engine. The new arm of the join — a decision that it will not be
 	// fixed, joined only where it says what to do instead — is what decides
 	// whether such a flaw is published at all, and it is the half a comparison
 	// against an empty string is most likely to answer differently on.
@@ -588,7 +588,7 @@ func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing
 		if one.Vulnerability.Name != "CVE-2026-9999" {
 			t.Fatalf("the statement is about %q", one.Vulnerability.Name)
 		}
-		// Affected rather than dismissed, which is what the claim says: the
+		// Affected rather than dismissed, which is what the decision says: the
 		// flaw is there and it is staying.
 		if one.Status != "affected" {
 			t.Errorf("a flaw that will not be fixed reads as %q", one.Status)
@@ -615,10 +615,10 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image",
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image",
 			`{"outcome":"mismatched","justification":"component_not_present",`+
 				`"reasoning":"The advisory is about an unrelated project of a similar name."}`)
-		r.Agreed(t, claim)
+		r.Agreed(t, decision)
 
 		var doc struct {
 			Statements []struct {
@@ -638,13 +638,13 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 			t.Errorf("a wrong match publishes as %q", doc.Statements[0].Status)
 		}
 		if doc.Statements[0].Justification != "component_not_present" {
-			t.Errorf("the statement carries %q, want the reason the claim stated",
+			t.Errorf("the statement carries %q, want the reason the decision stated",
 				doc.Statements[0].Justification)
 		}
 
 		// The component moves to a version nobody decided anything about. A
-		// judgment about risk would be gone from this document; this one is
-		// a claim about the match, and the match is as wrong as it was.
+		// decision about risk would be gone from this document; this one is
+		// a decision about the match, and the match is as wrong as it was.
 		if _, err := r.DB.DB.NewUpdate().Table("component").
 			Set(`"version" = ?`, "5.11").
 			Set(`"upstream_version" = ?`, "5.11").
@@ -677,8 +677,8 @@ func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		httpapitest.RecordedIssuance(t, r, "triager")
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
-			claim, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
-			r.Agreed(t, claim)
+			decision, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
+			r.Agreed(t, decision)
 		}
 		var listed struct {
 			Changed *bool             `json:"changed"`
@@ -740,7 +740,7 @@ func TestAVEXDocumentSaysNothingFixedAboutAComponentNoLongerShipped(t *testing.T
 	})
 }
 
-func TestAVEXDocumentSaysNothingFixedWhileAPlaceIsOpen(t *testing.T) {
+func TestAVEXDocumentSaysNothingFixedWhileAnOccurrenceIsOpen(t *testing.T) {
 	// A statement names a component by name and package identifier, which can
 	// be more than one component. The kernel at a second version the patch
 	// does not reach is open against the issue, and "fixed" beside it would
@@ -785,19 +785,19 @@ func TestAVEXDocumentIsOrderedByIssueWhateverOrderItWasDecidedIn(t *testing.T) {
 	})
 }
 
-func TestAnAlreadyFixedClaimPublishesAsFixed(t *testing.T) {
+func TestAnAlreadyFixedDecisionPublishesAsFixed(t *testing.T) {
 	// The version shipping here carries the fix, which the format calls
 	// fixed. Published as not affected, it would say the flaw never reached
 	// the build.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image",
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image",
 			`{"outcome":"already-fixed","fixed_version":"5.10.0-27",`+
 				`"reasoning":"The vendor backported the fix into this kernel."}`)
-		r.Agreed(t, claim)
+		r.Agreed(t, decision)
 		got := r.VexStatements(t)
 		if len(got) != 1 || got[0][1] != "fixed" {
-			t.Errorf("an already-fixed claim published as %v, want one fixed statement", got)
+			t.Errorf("an already-fixed decision published as %v, want one fixed statement", got)
 		}
 	})
 }
@@ -812,11 +812,11 @@ func TestAComponentWithNoPackageIdentifierIsNamedByItsName(t *testing.T) {
 		r.PatchedRows(t, `UPDATE "component" SET "purl" = NULL WHERE "name" = 'linux-image'`)
 		r.PatchedRows(t, `UPDATE "graph_node" SET "purl" = NULL
 			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 		got := r.VexStatements(t)
 		if len(got) != 1 || got[0][2] != "linux-image" {
-			t.Errorf("an agreed claim on a component with no identifier names %v, want linux-image", got)
+			t.Errorf("an agreed decision on a component with no identifier names %v, want linux-image", got)
 		}
 	})
 }
@@ -844,8 +844,8 @@ func TestAVEXStatementNamesTheComponentAsThisBuildStatedIt(t *testing.T) {
 		const stated = "pkg:deb/debian/linux-image@5.10?distro=debian-13"
 		r.PatchedRows(t, `UPDATE "graph_node" SET "purl" = '`+stated+`'
 			WHERE "component_id" IN (SELECT "id" FROM "component" WHERE "name" = 'linux-image')`)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 
 		var doc struct {
 			Statements []struct {

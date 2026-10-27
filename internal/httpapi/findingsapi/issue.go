@@ -24,11 +24,11 @@ type SightingBody struct {
 	Variant     string        `json:"variant"`
 	Component   string        `json:"component"`
 	Version     string        `json:"version"`
-	Places      int           `json:"places" doc:"The number of times that component sits in that build carrying this issue"`
+	Occurrences int           `json:"occurrences" doc:"The number of times that component sits in that build carrying this issue"`
 	State       core.Standing `json:"state,omitempty" doc:"The decision state here, by the definition the findings list uses"`
 	Undisclosed bool          `json:"undisclosed,omitempty"`
 	Recorded    bool          `json:"recorded,omitempty" doc:"Whether this is a flaw recorded in our own product rather than an issue a scanner reported"`
-	Due         string        `json:"due,omitempty" doc:"The earliest deadline among its places"`
+	Due         string        `json:"due,omitempty" doc:"The earliest deadline among its occurrences"`
 	FixedIn     string        `json:"fixed_in,omitempty"`
 }
 
@@ -70,8 +70,8 @@ func registerIssue(api huma.API, in core.Deps) {
 		Summary: "List findings for one issue across every product",
 		Description: "Every build that carries this issue, across every product you may see, " +
 			"with how far it has been decided in each.\n\n" +
-			"One row per build and component, not per place: the same component in two " +
-			"builds is two things somebody ships, and sixty places of it in one build is one " +
+			"One row per build and component, not per occurrence: the same component in two " +
+			"builds is two things somebody ships, and sixty occurrences of it in one build is one " +
 			"piece of work with a count.\n\n" +
 			"Narrowed the way every other read is, per product and per visibility. A page " +
 			"that spans products is exactly where filtering afterwards gets forgotten, and " +
@@ -173,7 +173,7 @@ func registerIssue(api huma.API, in core.Deps) {
 				Product: row.Product, ProductName: row.ProductName,
 				Stream: row.Stream, Variant: row.Variant,
 				Component: row.Component, Version: row.Version,
-				Places: row.Places, State: core.Standing(row.State),
+				Occurrences: row.Occurrences, State: core.Standing(row.State),
 				Undisclosed: row.Undisclosed, Recorded: row.Recorded, FixedIn: row.FixedIn,
 			}
 			if row.DueAt != nil {

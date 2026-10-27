@@ -175,7 +175,7 @@ func claimsAreMovedV090(t *testing.T, ctx context.Context, db *database.DB, w cl
 	}
 
 	// The next scan restating every claim finds each one held.
-	applied, err := world.RecordClaims(ctx, db.DB, w.declared.Target.ID, w.rec.ID, w.claims,
+	applied, err := world.RecordDecisions(ctx, db.DB, w.declared.Target.ID, w.rec.ID, w.claims,
 		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true})
 	if err != nil {
 		t.Fatal(err)

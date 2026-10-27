@@ -168,7 +168,7 @@ func TestAFixedEntrySaysWhichVersionItMovedTo(t *testing.T) {
 	// The pair of versions exists only while the scan is being applied —
 	// the component that carried the issue is gone from the inventory the
 	// moment the run is over — so it is written on close, the same way the
-	// version a place arrived from is written on the way in.
+	// version an occurrence arrived from is written on the way in.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		carried := []finding.Reported{found("CVE-2026-1", libnl)}

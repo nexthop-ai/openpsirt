@@ -36,7 +36,7 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 			t.Fatal(err)
 		}
 
-		// A second product, scanned, holding the same issue at a place of
+		// A second product, scanned, holding the same issue at an occurrence of
 		// its own and disclosed there.
 		cat := catalog.NewStore(f.db.DB)
 		other, err := cat.DeclareProduct(ctx, "switchd", "Switch Daemon")
@@ -63,7 +63,7 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 		if _, err := f.db.DB.NewInsert().Model(&finding.Finding{
 			TargetID: target.ID, Kind: finding.Vulnerable, Visibility: access.Public,
 			VulnerabilityID: issue, ComponentID: f.componentID(t, swss.Name),
-			PlaceIdentity: finding.PlaceIdentity(swss.Name, ""), OpenedAt: time.Now().UTC(),
+			OccurrenceIdentity: finding.OccurrenceIdentity(swss.Name, ""), OpenedAt: time.Now().UTC(),
 			OpenedRunID: &run,
 		}).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -234,16 +234,16 @@ func TestTheRecordingProductsReleaseNoteAndComponentCarryTheScoreItRecorded(t *t
 			t.Errorf("the release note scores the recorded flaw %d, want 980", noted)
 		}
 
-		places, _, _, err := f.store.AtComponent(ctx, reader, f.target, f.componentID(t, swss.Name), "", 50, 0)
+		occurrences, _, _, err := f.store.AtComponent(ctx, reader, f.target, f.componentID(t, swss.Name), "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(places) == 0 {
+		if len(occurrences) == 0 {
 			t.Fatal("the component lists nothing, so this checked nothing")
 		}
-		for _, place := range places {
-			if place.SeverityCenti != 980 {
-				t.Errorf("the component scores the recorded flaw %d, want 980", place.SeverityCenti)
+		for _, occurrence := range occurrences {
+			if occurrence.SeverityCenti != 980 {
+				t.Errorf("the component scores the recorded flaw %d, want 980", occurrence.SeverityCenti)
 			}
 		}
 	})

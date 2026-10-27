@@ -60,10 +60,10 @@ var corroborated = `EXISTS (SELECT 1 FROM "analysis_result" AS "ag"
 // Kin is another lead on a lead's build that is the same flaw, or possibly
 // is.
 type Kin struct {
-	Place string
-	Rule  string
-	Path  string
-	Line  *int
+	Occurrence string
+	Rule       string
+	Path       string
+	Line       *int
 	// Same is whether it is the same flaw rather than possibly so.
 	Same bool
 }
@@ -81,11 +81,11 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	}
 	reach := finding.LeadReach(subject, productID)
 	var rows []struct {
-		Place string `bun:"occurrence_identity"`
-		Rule  string `bun:"rule"`
-		Path  string `bun:"last_path"`
-		Line  *int   `bun:"last_line"`
-		Same  int    `bun:"same"`
+		Occurrence string `bun:"occurrence_identity"`
+		Rule       string `bun:"rule"`
+		Path       string `bun:"last_path"`
+		Line       *int   `bun:"last_line"`
+		Same       int    `bun:"same"`
 	}
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
@@ -107,21 +107,21 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	}
 	out := make([]Kin, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, Kin{Place: r.Place, Rule: r.Rule, Path: r.Path, Line: r.Line, Same: r.Same == 1})
+		out = append(out, Kin{Occurrence: r.Occurrence, Rule: r.Rule, Path: r.Path, Line: r.Line, Same: r.Same == 1})
 	}
 	return out, nil
 }
 
-// Member is a lead one judgment about another lead also answers.
+// Member is a lead one decision about another lead also answers.
 type Member struct {
 	VulnerabilityID int64             `bun:"vulnerability_id"`
-	Place           string            `bun:"occurrence_identity"`
+	Occurrence      string            `bun:"occurrence_identity"`
 	Visibility      access.Visibility `bun:"visibility"`
 }
 
 // Unanswered is the leads on a lead's build that are the same flaw as it and
 // that nothing answers yet, where the subject may read them: open, under no
-// live claim, waiting or not, covered by no standing rule, not handed off, and
+// live decision, waiting or not, covered by no standing rule, not handed off, and
 // seen in a release still in support. A lead already answered keeps its own
 // answer, and a lead past its end of life is kept as it stands.
 func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Member, error) {
@@ -134,7 +134,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		return nil, err
 	}
 	// The lead asked about is under "g" and each of its kin under "f", so
-	// that the claim and the rule are asked of the kin. Which leads are one
+	// that the decision and the rule are asked of the kin. Which leads are one
 	// flaw does not depend on which of the two is asked about.
 	var out []Member
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
@@ -167,7 +167,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 		}).
 		OrderExpr(`"f"."occurrence_identity" ASC`).
 		Scan(ctx, &out); err != nil {
-		return nil, fmt.Errorf("read the leads one judgment about lead %d answers: %w", leadID, err)
+		return nil, fmt.Errorf("read the leads one decision about lead %d answers: %w", leadID, err)
 	}
 	return out, nil
 }

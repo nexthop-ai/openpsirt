@@ -19,7 +19,7 @@ import (
 // how many columns an equality matches rather than by how many rows lie
 // behind it. On a demo holding 361,429 findings, a review-queue statement
 // took 4.0 s walking 297,405 of one component's findings when an index on
-// the place reached the few it wanted in 0.6 ms, and the list of what is
+// the occurrence reached the few it wanted in 0.6 ms, and the list of what is
 // running out took 2.5 s where it takes 0.13 s. The servers keep statistics
 // current on their own as rows change, so on them this does nothing; a start
 // asks them once through AnalyzeEveryTable.
@@ -87,7 +87,7 @@ const lockWait = "1"
 // and MariaDB, because a table the upgrade rebuilds is analyzed as it is
 // rebuilt and every other table keeps what it had. A v0.7.0 demo upgraded to
 // v0.9.0's schema on MySQL 8.4 held 7,746 issues and 2 products under
-// estimates of none, beside an accurate 2,202 decisions; the planner put the
+// estimates of none, beside an accurate 2,202 decision occurrences; the planner put the
 // issues and products first as a cross product, and the decision audit ran
 // for more than four hours. Analyzed, the same statement takes 5 ms. Every
 // table of that database analyzes in 140 ms.

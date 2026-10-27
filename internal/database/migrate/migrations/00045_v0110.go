@@ -55,7 +55,7 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     notes, a log of correspondence with its reporter and a record of who
 //     held it, and the acknowledgement is the first message sent. A routing
 //     rule may place reports. The report beside a flaw recorded by hand
-//     carries the flaw's summary as its claim.
+//     carries the flaw's summary as its reported problem.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	if err := renameV0110(ctx, tx); err != nil {
 		return err

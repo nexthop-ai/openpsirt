@@ -39,7 +39,7 @@ func TestAStatementAboutOneVersionDoesNotSuppressAnother(t *testing.T) {
 		} {
 			f.shipped(t, graph.Snapshot{Root: root, Components: []graph.Described{step.shipping},
 				Dependencies: []graph.Dependency{{Parent: root, Child: step.shipping}}})
-			if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+			if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan,
 				[]sbom.Suppression{statement}, everyOrigin); err != nil {
 				t.Fatal(err)
 			}
@@ -77,7 +77,7 @@ func TestAVersionInsideAPackageIdentifierIsNotStoredAgain(t *testing.T) {
 	// reopen on the next scan.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
+		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{{
 				Vulnerability: "CVE-2026-8", Status: sbom.NotAffected,
 				Justification: "vulnerable_code_not_present",

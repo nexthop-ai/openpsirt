@@ -625,7 +625,7 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 		hook := webhookWorld(t, db, "chat", notify.Everything)
 		store, signal, admin := hook.store, hook.signal, hook.admin
 		held := []notify.Holds{{
-			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
+			About: "risk-unagreed", Body: "A decision stands with nobody agreeing.",
 			Link: "/reports/approval-quality",
 		}}
 
@@ -671,7 +671,7 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 		held := []notify.Holds{{
-			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
+			About: "risk-unagreed", Body: "A decision stands with nobody agreeing.",
 			Link: "/reports/approval-quality",
 		}}
 

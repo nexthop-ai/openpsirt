@@ -27,7 +27,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 
 		// Issues that rank differently, and some that rank the same, so the
 		// order is decided by every term in turn: urgency, then how many
-		// places, then the identifiers.
+		// occurrences, then the identifiers.
 		reports := []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
 			found("CVE-2026-3", swss), found("CVE-2026-4", teamd),
@@ -48,11 +48,11 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 		type key struct{ issue, component int64 }
 		type group struct {
 			key
-			places   int
-			urgency  int64
-			consumer map[int64]bool
-			direct   bool
-			fixed    bool
+			occurrences int
+			urgency     int64
+			consumer    map[int64]bool
+			direct      bool
+			fixed       bool
 		}
 		grouped := map[key]*group{}
 		for _, row := range rows {
@@ -62,7 +62,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 				g = &group{key: k, consumer: map[int64]bool{}, fixed: true}
 				grouped[k] = g
 			}
-			g.places++
+			g.occurrences++
 			if row.Urgency > g.urgency {
 				g.urgency = row.Urgency
 			}
@@ -115,8 +115,8 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 				if a.urgency != b.urgency {
 					return a.urgency > b.urgency
 				}
-				if a.places != b.places {
-					return a.places > b.places
+				if a.occurrences != b.occurrences {
+					return a.occurrences > b.occurrences
 				}
 				if a.issue != b.issue {
 					return a.issue < b.issue
@@ -181,8 +181,8 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 			{"beneath nothing", finding.Filter{Beneath: &nowhere}, func(*group) bool { return false }},
 			{"beneath one", finding.Filter{Beneath: &swssID},
 				func(g *group) bool { return g.component == swssID || g.consumer[swssID] }},
-			{"undecided", finding.Filter{States: []finding.ClaimStanding{"undecided"}}, func(*group) bool { return true }},
-			{"agreed", finding.Filter{States: []finding.ClaimStanding{"agreed"}}, func(*group) bool { return false }},
+			{"undecided", finding.Filter{States: []finding.DecisionStanding{"undecided"}}, func(*group) bool { return true }},
+			{"agreed", finding.Filter{States: []finding.DecisionStanding{"agreed"}}, func(*group) bool { return false }},
 		}
 		for _, c := range cases {
 			want := expect(c.keep)
@@ -227,7 +227,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 			filter finding.Filter
 		}{
 			{"everything", finding.Filter{}},
-			{"undecided", finding.Filter{States: []finding.ClaimStanding{"undecided"}}},
+			{"undecided", finding.Filter{States: []finding.DecisionStanding{"undecided"}}},
 		} {
 			got, total, err := f.store.Groups(t.Context(), who, f.scope, 2, len(want), c.filter)
 			if err != nil {
@@ -252,9 +252,9 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 				if names[k.issue] != g.Vulnerability || components[k.component] != g.Component {
 					continue
 				}
-				if g.Places != expected.places || g.Urgency != expected.urgency {
-					t.Errorf("%s in %s: %d places at urgency %d, wanted %d at %d",
-						g.Vulnerability, g.Component, g.Places, g.Urgency, expected.places, expected.urgency)
+				if g.Occurrences != expected.occurrences || g.Urgency != expected.urgency {
+					t.Errorf("%s in %s: %d occurrences at urgency %d, wanted %d at %d",
+						g.Vulnerability, g.Component, g.Occurrences, g.Urgency, expected.occurrences, expected.urgency)
 				}
 				if g.Exploited != finding.Exploiting(expected.urgency) {
 					t.Errorf("%s in %s: exploited %v disagrees with its urgency", g.Vulnerability, g.Component, g.Exploited)
@@ -271,7 +271,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 	})
 }
 
-// A group holding one undisclosed place among any number of public ones is
+// A group holding one undisclosed occurrence among any number of public ones is
 // undisclosed.
 //
 // It was derived as a maximum of the visibility word, on the belief that
@@ -280,11 +280,11 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 // catch, and the list drew no embargo marker on a row holding a finding
 // nobody has announced. Somebody reads the row, sees nothing, and repeats it
 // outside the deployment.
-func TestOneUndisclosedPlaceMakesTheWholeGroupUndisclosed(t *testing.T) {
+func TestOneUndisclosedOccurrenceMakesTheWholeGroupUndisclosed(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// One issue at a package two things pull in, so the fold holds two
-		// places — and one of them is not disclosed.
+		// occurrences — and one of them is not disclosed.
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(ctx, f.target, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
@@ -310,7 +310,7 @@ func TestOneUndisclosedPlaceMakesTheWholeGroupUndisclosed(t *testing.T) {
 			t.Fatalf("the fold read as %d groups, want the one it is: %+v", len(groups), groups)
 		}
 		if !groups[0].Undisclosed {
-			t.Error("a group holding an undisclosed place read as disclosed, so the list " +
+			t.Error("a group holding an undisclosed occurrence read as disclosed, so the list " +
 				"would show no embargo marker on it")
 		}
 	})

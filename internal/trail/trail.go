@@ -50,7 +50,7 @@ const (
 	Routing Kind = "routing"
 	// LeadRule is a standing rule that dismisses static analysis leads:
 	// proposed, approved or retired. Not a Routing: it decides what a lead
-	// is, which is a judgment, where a routing rule decides who is asked.
+	// is, which is a decision, where a routing rule decides who is asked.
 	LeadRule Kind = "lead-rule"
 	// Alias is another identifier an issue answers to. Deployment-wide and
 	// permanent: from the moment it is recorded, a scan of any product
@@ -72,8 +72,8 @@ const (
 	Catalog Kind = "catalog"
 	// ExploitedHere is somebody recording that a product was exploited
 	// through an issue, or clearing that record. Not a triage decision: it is a fact
-	// about an incident rather than a judgment about a finding, and what it
-	// does is decide what the triage record may say — a claim that the issue
+	// about an incident rather than a decision about a finding, and what it
+	// does is decide what the triage record may say — a decision that the issue
 	// does not apply is refused while it stands, and one already agreed to
 	// has its agreement taken back. That is the same kind of act as an alias,
 	// and it belongs beside one.
@@ -84,7 +84,7 @@ const (
 	// reading on the product, so who was let in and when is exactly what
 	// is asked afterwards.
 	Case Kind = "case"
-	// Merge is a judgment a report's merge of two issues took out of force
+	// Merge is a record a report's merge of two issues took out of force
 	// because another stood in its place in the same product: a rating claim
 	// withdrawn, or a record of being attacked cleared. Nobody chose which of
 	// the two stands, so what the product lost is asked about afterwards.

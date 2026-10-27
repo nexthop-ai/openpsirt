@@ -12,13 +12,13 @@ import (
 )
 
 // The reports that reduce their findings before counting them: the trend,
-// what is aging, what each release holds. Each groups the places first and
+// what is aging, what each release holds. Each groups the occurrences first and
 // joins what it counts by to what is left, so these pin that the reduction
 // keeps what the count needs.
 
-// placesOf is the open findings of one issue in the fixture's build, keyed by
-// the name of the consumer each sits under.
-func (f *fixture) placesOf(t *testing.T, identifier string) map[string]finding.Finding {
+// occurrencesOf is the open findings of one issue in the fixture's build, keyed
+// by the name of the consumer each sits under.
+func (f *fixture) occurrencesOf(t *testing.T, identifier string) map[string]finding.Finding {
 	t.Helper()
 	issue := f.issueID(t, identifier)
 	var consumers []struct {
@@ -43,37 +43,37 @@ func (f *fixture) placesOf(t *testing.T, identifier string) map[string]finding.F
 	return out
 }
 
-// decidedAt writes a decision of this product at one place, keyed on the
-// versions given, live where key is not empty.
+// decidedAt writes a decision occurrence of this product at one occurrence,
+// keyed on the versions given, live where key is not empty.
 func (f *fixture) decidedAt(t *testing.T, by int64, at finding.Finding, state, component, consumer, key string) {
 	t.Helper()
 	f.decision(t, decisionRow{
-		By: by, Issue: at.VulnerabilityID, Place: at.PlaceIdentity, State: state,
+		By: by, Issue: at.VulnerabilityID, Occurrence: at.OccurrenceIdentity, State: state,
 		Component: &component, Consumer: &consumer, Key: key,
 	})
 }
 
-func TestAnIssueAgingInTwoBucketsIsUndecidedOnlyInTheBucketWhosePlacesNobodyAnswered(t *testing.T) {
-	// An issue counts in every bucket it has a place in, and whether it is
-	// answered is asked of the places in that bucket. Answered at the old
-	// place and not at the new, it is undecided among the new and not among
+func TestAnIssueAgingInTwoBucketsIsUndecidedOnlyInTheBucketWhoseOccurrencesNobodyAnswered(t *testing.T) {
+	// An issue counts in every bucket it has an occurrence in, and whether it is
+	// answered is asked of the occurrences in that bucket. Answered at the old
+	// occurrence and not at the new, it is undecided among the new and not among
 	// the old.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		f.foundOnLibnl(t)
-		places := f.placesOf(t, "CVE-2026-1")
+		occurrences := f.occurrencesOf(t, "CVE-2026-1")
 		now := time.Now().UTC()
 		for name, opened := range map[string]time.Time{
 			swss.Name:  now.Add(-2 * 24 * time.Hour),
 			teamd.Name: now.Add(-120 * 24 * time.Hour),
 		} {
 			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set(`"opened_at" = ?`, opened).Where(`"id" = ?`, places[name].ID).Exec(ctx); err != nil {
+				Set(`"opened_at" = ?`, opened).Where(`"id" = ?`, occurrences[name].ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
-		f.decidedAt(t, f.somebodyElse(t), places[teamd.Name], "approved", libnl.Version, teamd.Version, "old-place")
+		f.decidedAt(t, f.somebodyElse(t), occurrences[teamd.Name], "approved", libnl.Version, teamd.Version, "old-occurrence")
 
 		got, err := f.store.Remediation(ctx, f.holding(t, access.PublicRead),
 			f.wholeProduct(), time.Time{}, time.Time{})
@@ -102,8 +102,8 @@ func TestAnIssueAgingInTwoBucketsIsUndecidedOnlyInTheBucketWhosePlacesNobodyAnsw
 	})
 }
 
-func TestATrendReadsTheProductsOwnRatingOfAnIssueOpenAtManyPlaces(t *testing.T) {
-	// The places are reduced before the rating is joined, so the rating has
+func TestATrendReadsTheProductsOwnRatingOfAnIssueOpenAtManyOccurrences(t *testing.T) {
+	// The occurrences are reduced before the rating is joined, so the rating has
 	// to be the product's own as well as the published one when it arrives.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -117,7 +117,7 @@ func TestATrendReadsTheProductsOwnRatingOfAnIssueOpenAtManyPlaces(t *testing.T) 
 		}
 		last := points[len(points)-1]
 		if last.Open != 2 || last.BySeverity["critical"] != 1 || last.BySeverity["high"] != 1 {
-			t.Errorf("two issues at two places each, one rated critical here: open %d, split %v",
+			t.Errorf("two issues at two occurrences each, one rated critical here: open %d, split %v",
 				last.Open, last.BySeverity)
 		}
 	})

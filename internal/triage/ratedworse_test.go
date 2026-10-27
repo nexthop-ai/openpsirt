@@ -12,14 +12,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// openAt opens the fixture's issue at a place in a build of the fixture's
-// product, and answers with the place a decision covering it is made at.
-func (f *fixture) openAt(t *testing.T, identity string) triage.Place {
+// openAt opens the fixture's issue at an occurrence in a build of the fixture's
+// product, and answers with the occurrence a decision covering it is made at.
+func (f *fixture) openAt(t *testing.T, identity string) triage.Occurrence {
 	t.Helper()
 	in := f.build(t, f.product, "rated-"+identity)
 	f.finds(t, in, f.component(t, "lib-"+identity, "1.2.3"), identity, access.Public)
 	at := f.at()
-	at.PlaceIdentity = identity
+	at.OccurrenceIdentity = identity
 	at.ConsumerUpstream = ""
 	return at
 }
@@ -35,11 +35,11 @@ func (f *fixture) rateIssue(t *testing.T, centi int) {
 }
 
 func TestARiseWithinABandLapsesNothing(t *testing.T) {
-	// A rescoring inside a band is the same judgment about the same issue.
+	// A rescoring inside a band is the same decision about the same issue.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		agreed := f.judged(t, f.openAt(t, "band"), 710)
-		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		f.rateIssue(t, 890)
@@ -53,13 +53,13 @@ func TestARiseWithinABandLapsesNothing(t *testing.T) {
 	})
 }
 
-func TestARiseIntoAHigherBandLapsesAgreedAndProposedClaims(t *testing.T) {
-	// Proposed as well as approved: agreed to afterwards, a claim made against
+func TestARiseIntoAHigherBandLapsesAgreedAndProposedDecisions(t *testing.T) {
+	// Proposed as well as approved: agreed to afterwards, a decision made against
 	// the lower rating would stand on a baseline that is already wrong.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		agreed := f.judged(t, f.openAt(t, "agreed"), 710)
-		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		proposed := f.judged(t, f.openAt(t, "proposed"), 710)
@@ -71,7 +71,7 @@ func TestARiseIntoAHigherBandLapsesAgreedAndProposedClaims(t *testing.T) {
 		}
 		for name, id := range map[string]int64{"agreed": agreed.ID, "proposed": proposed.ID} {
 			if state := f.stateOf(t, id); state != triage.LapsedState {
-				t.Errorf("the %s claim is %q after high became critical", name, state)
+				t.Errorf("the %s decision is %q after high became critical", name, state)
 			}
 		}
 		if len(lapsed.Told) != 1 || !lapsed.Told[0].RatedWorse || lapsed.Told[0].Rows != 2 {
@@ -80,14 +80,14 @@ func TestARiseIntoAHigherBandLapsesAgreedAndProposedClaims(t *testing.T) {
 	})
 }
 
-func TestAClaimAboutAnUnratedIssueIsMeasuredFromMedium(t *testing.T) {
+func TestADecisionAboutAnUnratedIssueIsMeasuredFromMedium(t *testing.T) {
 	// Unknown is not harmless, and not the lowest either: the way a deadline
 	// reads an unrated issue.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.rateIssue(t, 0)
 		agreed := f.judged(t, f.openAt(t, "unrated"), 0)
-		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		f.rateIssue(t, 500)
@@ -95,24 +95,24 @@ func TestAClaimAboutAnUnratedIssueIsMeasuredFromMedium(t *testing.T) {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, agreed.ID); state != triage.Approved {
-			t.Errorf("rating an unrated issue medium left the claim %q", state)
+			t.Errorf("rating an unrated issue medium left the decision %q", state)
 		}
 		f.rateIssue(t, 750)
 		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{}); err != nil {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, agreed.ID); state != triage.LapsedState {
-			t.Errorf("rating an unrated issue high left the claim %q", state)
+			t.Errorf("rating an unrated issue high left the decision %q", state)
 		}
 	})
 }
 
-func TestARiseLeavesAClaimItDoesNotBearOn(t *testing.T) {
+func TestARiseLeavesADecisionItDoesNotBearOn(t *testing.T) {
 	// Absent code is not dangerous at any severity.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		absent, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.openAt(t, "absent"), Outcome: triage.NotApplicable,
+			Occurrence: f.openAt(t, "absent"), Outcome: triage.NotApplicable,
 			Justification: triage.CodeNotPresent,
 			Reasoning:     "The driver is not built.", By: f.proposer,
 			SeverityCenti: 300, NeedsApproval: true,
@@ -120,7 +120,7 @@ func TestARiseLeavesAClaimItDoesNotBearOn(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := agreeTo(ctx, f.store, f.reviewer, absent.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, absent.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		f.rateIssue(t, 980)
@@ -128,17 +128,17 @@ func TestARiseLeavesAClaimItDoesNotBearOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, absent.ID); state != triage.Approved {
-			t.Errorf("a claim that the code is absent is %q after low became critical", state)
+			t.Errorf("a decision that the code is absent is %q after low became critical", state)
 		}
 	})
 }
 
 func TestARiseInAnotherProductLapsesNothingHere(t *testing.T) {
-	// Narrowed to one product, the sweep leaves another's claims alone.
+	// Narrowed to one product, the sweep leaves another's decisions alone.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		agreed := f.judged(t, f.openAt(t, "elsewhere"), 300)
-		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		f.rateIssue(t, 980)
@@ -148,19 +148,19 @@ func TestARiseInAnotherProductLapsesNothingHere(t *testing.T) {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, agreed.ID); state != triage.Approved {
-			t.Errorf("a sweep of another product left this claim %q", state)
+			t.Errorf("a sweep of another product left this decision %q", state)
 		}
 	})
 }
 
 func TestARiseLapsesNothingThatCoversNothingOpen(t *testing.T) {
-	// A claim covering nothing is not one anybody relies on. Lapsed for a
+	// A decision covering nothing is not one anybody relies on. Lapsed for a
 	// rating, its proposer would be told the finding is open again when none
 	// is, and re-affirming it would find nothing to re-make.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		agreed := f.judged(t, f.at(), 300)
-		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		f.rateIssue(t, 980)
@@ -168,53 +168,53 @@ func TestARiseLapsesNothingThatCoversNothingOpen(t *testing.T) {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, agreed.ID); state != triage.Approved {
-			t.Errorf("a claim covering nothing open is %q after it was rated worse", state)
+			t.Errorf("a decision covering nothing open is %q after it was rated worse", state)
 		}
 	})
 }
 
-func TestARiseLeavesAClaimThatHidesNothingOrIsAboutIdentity(t *testing.T) {
+func TestARiseLeavesADecisionThatHidesNothingOrIsAboutIdentity(t *testing.T) {
 	// "This affects us" is only strengthened by a rise, and a wrong match is
-	// not a judgment about risk.
+	// not a decision about risk.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		var made []*triage.Decision
+		var made []*triage.DecisionOccurrence
 		for identity, outcome := range map[string]triage.Outcome{
 			"affected": triage.Affected, "mismatched": triage.Mismatched,
 		} {
 			p := triage.Proposal{
-				Place: f.openAt(t, identity), Outcome: outcome,
+				Occurrence: f.openAt(t, identity), Outcome: outcome,
 				Reasoning: "Judged at the old rating.", By: f.proposer,
 				SeverityCenti: 300, NeedsApproval: true,
 			}
 			if outcome == triage.Mismatched {
 				p.Justification = triage.ComponentNotPresent
 			}
-			decision, err := f.store.Propose(ctx, f.triager, p)
+			occurrence, err := f.store.Propose(ctx, f.triager, p)
 			if err != nil {
 				t.Fatalf("%s: %v", identity, err)
 			}
-			if err := agreeTo(ctx, f.store, f.reviewer, decision.ClaimID, ""); err != nil {
+			if err := agreeTo(ctx, f.store, f.reviewer, occurrence.DecisionID, ""); err != nil {
 				t.Fatalf("%s: %v", identity, err)
 			}
-			made = append(made, decision)
+			made = append(made, occurrence)
 		}
 		f.rateIssue(t, 980)
 		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{}); err != nil {
 			t.Fatal(err)
 		}
-		for _, decision := range made {
-			if state := f.stateOf(t, decision.ID); state == triage.LapsedState {
-				t.Errorf("decision %d lapsed after a rise, and the rise bears on nothing it says",
-					decision.ID)
+		for _, occurrence := range made {
+			if state := f.stateOf(t, occurrence.ID); state == triage.LapsedState {
+				t.Errorf("decision occurrence %d lapsed after a rise, and the rise bears on nothing it says",
+					occurrence.ID)
 			}
 		}
 	})
 }
 
-func TestAScanOfOneProductLapsesAClaimInAnother(t *testing.T) {
+func TestAScanOfOneProductLapsesADecisionInAnother(t *testing.T) {
 	// An issue is one row for the deployment. A build in one product raising
-	// its rating outgrows a claim another product made about it, so the sweep
+	// its rating outgrows a decision another product made about it, so the sweep
 	// after a scan asks about the issues the build has open in any product.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -223,9 +223,9 @@ func TestAScanOfOneProductLapsesAClaimInAnother(t *testing.T) {
 		f.finds(t, there, f.component(t, "lib-theirs", "1.2.3"), "place-theirs", access.Public)
 		who := f.holding(t, "their-triager", map[int64][]access.Role{other: {access.PublicTriage}})
 		at := f.at()
-		at.ProductID, at.PlaceIdentity, at.ConsumerUpstream = other, "place-theirs", ""
+		at.ProductID, at.OccurrenceIdentity, at.ConsumerUpstream = other, "place-theirs", ""
 		theirs, err := f.store.Propose(ctx, who, triage.Proposal{
-			Place: at, Outcome: triage.NotApplicable,
+			Occurrence: at, Outcome: triage.NotApplicable,
 			Justification: triage.CodeNotReachableByAdversary,
 			Reasoning:     "Nothing an attacker sends reaches it.", By: who.ID,
 			SeverityCenti: 300, NeedsApproval: true,
@@ -241,13 +241,13 @@ func TestAScanOfOneProductLapsesAClaimInAnother(t *testing.T) {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, theirs.ID); state != triage.LapsedState {
-			t.Errorf("a claim in another product is %q after a scan here rated its issue worse", state)
+			t.Errorf("a decision in another product is %q after a scan here rated its issue worse", state)
 		}
 	})
 }
 
-func TestASiblingClaimAtAnotherVersionReplacesNothing(t *testing.T) {
-	// Two streams at two versions hold sibling claims at one place, keyed
+func TestASiblingDecisionAtAnotherVersionReplacesNothing(t *testing.T) {
+	// Two streams at two versions hold sibling decisions at one occurrence, keyed
 	// apart by the versions. One lapsing leaves it the proposer's to
 	// re-affirm, whichever was made later.
 	each(t, func(t *testing.T, f *fixture) {
@@ -258,12 +258,12 @@ func TestASiblingClaimAtAnotherVersionReplacesNothing(t *testing.T) {
 		f.finds(t, current, f.component(t, "lib-sibling-next", "1.2.4"), "place-sibling", access.Public)
 
 		at := f.at()
-		at.PlaceIdentity, at.ConsumerUpstream = "place-sibling", ""
+		at.OccurrenceIdentity, at.ConsumerUpstream = "place-sibling", ""
 		first := f.judged(t, at, 300)
 		at.ComponentUpstream = "1.2.4"
 		second := f.judged(t, at, 300)
 		if second.ID < first.ID {
-			t.Fatal("the sibling was not written after the claim it stands beside")
+			t.Fatal("the sibling was not written after the decision it stands beside")
 		}
 		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"state" = ?`, triage.LapsedState).Set(`"ended_at" = ?`, time.Now().UTC()).
@@ -275,8 +275,8 @@ func TestASiblingClaimAtAnotherVersionReplacesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if total != 1 || len(listed) != 1 || listed[0].Claim.ID != first.ClaimID {
-			t.Errorf("listed %d of %d, want the lapsed claim beside its standing sibling",
+		if total != 1 || len(listed) != 1 || listed[0].Decision.ID != first.DecisionID {
+			t.Errorf("listed %d of %d, want the lapsed decision beside its standing sibling",
 				len(listed), total)
 		}
 	})
@@ -291,10 +291,10 @@ func (f *fixture) holdUnder(t *testing.T, findingID, issue int64) {
 	}
 }
 
-func TestARiseLapsesAClaimUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t *testing.T) {
-	// A claim stays filed under the name it was made against when that name
+func TestARiseLapsesADecisionUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t *testing.T) {
+	// A decision stays filed under the name it was made against when that name
 	// merges into another, and the findings it covers are then held under
-	// the other. A claim at a place whose finding moved to an unrelated issue
+	// the other. A decision at an occurrence whose finding moved to an unrelated issue
 	// covers nothing, however the names line up.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -306,21 +306,21 @@ func TestARiseLapsesAClaimUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t *t
 			t.Fatal(err)
 		}
 		in := f.build(t, f.product, "rated-merged")
-		claims := map[string]int64{}
+		decisions := map[string]int64{}
 		held := map[string]int64{}
-		for _, place := range []string{"merged", "moved-away"} {
-			row := f.finds(t, in, f.component(t, "lib-"+place, "1.2.3"), place, access.Public)
+		for _, occurrence := range []string{"merged", "moved-away"} {
+			row := f.finds(t, in, f.component(t, "lib-"+occurrence, "1.2.3"), occurrence, access.Public)
 			f.holdUnder(t, row, filed)
 			at := f.at()
-			at.VulnerabilityID, at.PlaceIdentity, at.ConsumerUpstream = filed, place, ""
-			decision := f.judged(t, at, 300)
-			if err := agreeTo(ctx, f.store, f.reviewer, decision.ClaimID, ""); err != nil {
+			at.VulnerabilityID, at.OccurrenceIdentity, at.ConsumerUpstream = filed, occurrence, ""
+			judged := f.judged(t, at, 300)
+			if err := agreeTo(ctx, f.store, f.reviewer, judged.DecisionID, ""); err != nil {
 				t.Fatal(err)
 			}
-			claims[place], held[place] = decision.ID, row
+			decisions[occurrence], held[occurrence] = judged.ID, row
 		}
 		// The name merges into the fixture's issue, which now holds the
-		// finding at the first place. The second place's finding is another
+		// finding at the first occurrence. The second occurrence's finding is another
 		// issue's.
 		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
 			Where(`"id" = ?`, filed).Exec(ctx); err != nil {
@@ -333,12 +333,12 @@ func TestARiseLapsesAClaimUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t *t
 		if _, err := f.store.LapseRatedWorse(ctx, triage.RatedWorseWhere{OpenIn: in.target}); err != nil {
 			t.Fatal(err)
 		}
-		if state := f.stateOf(t, claims["merged"]); state != triage.LapsedState {
-			t.Errorf("a claim under the merged name is %q after the issue it is read as was rated worse",
+		if state := f.stateOf(t, decisions["merged"]); state != triage.LapsedState {
+			t.Errorf("a decision under the merged name is %q after the issue it is read as was rated worse",
 				state)
 		}
-		if state := f.stateOf(t, claims["moved-away"]); state != triage.Approved {
-			t.Errorf("a claim whose finding is another issue's is %q after a rise, and it covers nothing",
+		if state := f.stateOf(t, decisions["moved-away"]); state != triage.Approved {
+			t.Errorf("a decision whose finding is another issue's is %q after a rise, and it covers nothing",
 				state)
 		}
 	})

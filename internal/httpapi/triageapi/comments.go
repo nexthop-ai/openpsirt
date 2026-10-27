@@ -12,16 +12,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
-// The words people put on a claim, and the revisions before them.
+// The words people put on a decision, and the revisions before them.
 //
 // Their own subject: everything in triage_read.go is about decisions and
-// claims, and this is about text and its revisions.
+// their occurrences, and this is about text and its revisions.
 func registerComments(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-claim-comments", Method: http.MethodGet,
+		OperationID: "list-decision-comments", Method: http.MethodGet,
 		Path:    "/v1/decisions/{id}/comments",
 		Summary: "List comments on a decision",
-		Description: "Returns the comments on a claim, oldest first, with who wrote each and " +
+		Description: "Returns the comments on a decision, oldest first, with who wrote each and " +
 			"when. A comment that has been edited also carries when it was last changed.\n\n" +
 			"Comments are separate from the justification and never affect an approval.",
 		Tags: []string{"Triage"},
@@ -67,11 +67,11 @@ func registerComments(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		claimID, err := store.Reword(ctx, subject, input.ID, input.Body.Body)
+		decisionID, err := store.Reword(ctx, subject, input.ID, input.Body.Body)
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
-		dropped := core.TellMentioned(ctx, in, subject, store, claimID, input.Body.Body)
+		dropped := core.TellMentioned(ctx, in, subject, store, decisionID, input.Body.Body)
 		return &struct{ Body core.MentionsBody }{Body: core.MentionsBody{NotNotified: dropped}}, nil
 	})
 
@@ -107,10 +107,10 @@ func registerComments(api huma.API, in core.Deps) {
 	})
 }
 
-// DecisionsOutput is a page of decisions, with how many there are behind it.
+// DecisionsOutput is a page of decision occurrences, with how many there are behind it.
 type DecisionsOutput struct {
 	Body struct {
-		Items []core.DecisionDetail `json:"items"`
-		Total int                   `json:"total"`
+		Items []core.DecisionOccurrenceDetail `json:"items"`
+		Total int                             `json:"total"`
 	}
 }

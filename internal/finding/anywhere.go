@@ -123,7 +123,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 	}
 
-	// readable is the open places this subject may read, in the releases
+	// readable is the open occurrences this subject may read, in the releases
 	// asked for, with the build and its stream joined.
 	readable := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if len(filter.Workable.Kinds) == 1 {
@@ -181,8 +181,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 		return q
 	}
-	// narrow is every condition on a place, for the statement over the page's
-	// own rows (see Filter.ofPage).
+	// narrow is every condition on an occurrence, for the statement over the
+	// page's own rows (see Filter.ofPage).
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = withRating(readable(q).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`), rating.OnStream).
@@ -192,18 +192,18 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`)
 		return filter.ofPage(lined(q, `"f"."urgency" >= ?`, int64(exploiting)))
 	}
-	// grouped is the page's grouping in two levels (see twolevel.go). The
-	// first groups each product's places by issue and component, and by
-	// whether they carry an exploitation signal, which is the one thing about
-	// a place the line reads; the second reads the issue, its rating and the
-	// product's line once per partial group rather than once per place, keeps
-	// what the line admits, and groups on the fold. A partial group is wholly
-	// on one side of the line, so everything counted after it is counted over
-	// exactly the places the one-level statement admits.
+	// grouped is the page's grouping in two levels (see twolevel.go). The first
+	// groups each product's occurrences by issue and component, and by whether
+	// they carry an exploitation signal, which is the one thing about an
+	// occurrence the line reads; the second reads the issue, its rating and the
+	// product's line once per partial group rather than once per occurrence,
+	// keeps what the line admits, and groups on the fold. A partial group is
+	// wholly on one side of the line, so everything counted after it is counted
+	// over exactly the occurrences the one-level statement admits.
 	grouped := func() *bun.SelectQuery {
 		rows := readable(s.db.NewSelect())
-		// A condition on the rating in force is asked of each place, so where
-		// one is asked the rating is joined below the grouping as well.
+		// A condition on the rating in force is asked of each occurrence, so
+		// where one is asked the rating is joined below the grouping as well.
 		if len(filter.severities()) > 0 || filter.Reassessed {
 			rows = withRating(rows, rating.OnStream)
 		}
@@ -232,7 +232,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Fold            string `bun:"fold"`
 		ComponentID     int64  `bun:"component_id"`
-		Places          int    `bun:"places"`
+		Occurrences     int    `bun:"places"`
 		Urgency         int64  `bun:"urgency"`
 		Total           int    `bun:"total"`
 	}
@@ -246,7 +246,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
-		ColumnExpr(overParts.places() + ` AS "places"`).
+		ColumnExpr(overParts.occurrences() + ` AS "places"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`)
 	if key != "" {
 		page = page.ColumnExpr(key + ` AS "sort_key"`)
@@ -323,18 +323,18 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
-		// One undisclosed place makes the group undisclosed, counted rather
+		// One undisclosed occurrence makes the group undisclosed, counted rather
 		// than aggregated over the word — a maximum of the word returns
 		// "public" for a mixed group, which is the one case it matters for.
 		ColumnExpr(`SUM(CASE WHEN "f"."visibility" = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
 		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
-		// Both ends, because a group whose places disagree is mixed and a
+		// Both ends, because a group whose occurrences disagree is mixed and a
 		// minimum alone answers with one of the disagreeing values.
 		ColumnExpr(`MIN("f"."fix_state") AS "fix_state_least"`).
 		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
-		// How many places a person recorded, which is what says an unrated
+		// How many occurrences a person recorded, which is what says an unrated
 		// group is waiting on a rating rather than off the clock.
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN(COALESCE("f"."matched", '')) AS "matched"`).
@@ -346,7 +346,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// The decision state of each, spelled once for every list
 	// that asks (see decided.go). Across products the row names its own.
 	body = decisionCounts(body, `"st"."product_id"`, nil,
-		claimWaiting, claimApproved, claimLapsed, claimSentBack).
+		decisionWaiting, decisionApproved, decisionLapsed, decisionSentBack).
 		Where(`"st"."product_id" IN (?)`, bun.List(within)).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).

@@ -27,7 +27,7 @@ import (
 //
 // A third layer beside the build's own claims and our decisions: evidence, and
 // a prefill. A supplier's statement that its own product is not affected is
-// also applied, by the run, at the places that product occupies (REQ-31).
+// also applied, by the run, at the occurrences that product occupies (REQ-31).
 type Statement struct {
 	bun.BaseModel `bun:"table:vex_statement,alias:ss"`
 
@@ -258,7 +258,7 @@ func (s Statement) Prefills() (outcome string, offers bool) {
 		return OutcomeAlreadyFixed, true
 	}
 	// Under investigation offers nothing: it is a publisher saying they do not
-	// know yet, and a prefill from it would be a judgment nobody made.
+	// know yet, and a prefill from it would be a decision nobody made.
 	return "", false
 }
 

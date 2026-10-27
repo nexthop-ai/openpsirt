@@ -54,33 +54,34 @@ func FiledUnder(column filed.Column) string { return filed.Under(column) }
 // placeholder.
 func FiledUnderAny(column filed.Column) string { return filed.UnderAny(column) }
 
-// Decisions is every decision `de` beside `dv`, the issue it was filed under.
+// Decisions is every decision occurrence `de` beside `dv`, the issue it was
+// filed under.
 //
-// A decision is related to a finding through `dv.issue_id`, because the issue
-// a decision was filed under may since have merged into the one the finding
-// holds. Written as a join, so every engine reaches the decisions of a finding
-// through an index on each side.
+// A decision occurrence is related to a finding through `dv.issue_id`, because
+// the issue a decision occurrence was filed under may since have merged into
+// the one the finding holds. Written as a join, so every engine reaches the
+// decision occurrences of a finding through an index on each side.
 const Decisions = `"vulnerability" AS "dv" JOIN "decision_occurrence" AS "de" ON "de"."vulnerability_id" = "dv"."id"`
 
-// LiveKey is what a live decision is a claim about, hashed: the product, the
-// issue, the place, and both upstream versions it was made against — or the
-// place alone, where the claim stands at any version.
+// LiveKey is what a live decision occurrence is about, hashed: the product, the
+// issue, the occurrence, and both upstream versions it was made against — or
+// the occurrence alone, where the decision stands at any version.
 //
 // Hashed rather than stored as its parts, because it exists to be compared for
 // equality under a unique index and nothing ever reads it back. The versions
-// are trimmed the way they are everywhere else, so a claim written with spaces
-// around a version collides with one written without.
+// are trimmed the way they are everywhere else, so a decision written with
+// spaces around a version collides with one written without.
 //
 // The two shapes cannot collide. A key over three fields and a key over five
-// are different strings before they are hashed, so a correction and a claim
-// about a place that states no version at all stay apart.
-func LiveKey(productID, issueID int64, place, componentUpstream, consumerUpstream string,
+// are different strings before they are hashed, so a correction and a decision
+// about an occurrence that states no version at all stay apart.
+func LiveKey(productID, issueID int64, occurrence, componentUpstream, consumerUpstream string,
 	anyVersion bool) string {
 
 	parts := []string{
 		strconv.FormatInt(productID, 10),
 		strconv.FormatInt(issueID, 10),
-		place,
+		occurrence,
 	}
 	if !anyVersion {
 		parts = append(parts, strings.TrimSpace(componentUpstream), strings.TrimSpace(consumerUpstream))
@@ -89,9 +90,9 @@ func LiveKey(productID, issueID int64, place, componentUpstream, consumerUpstrea
 	return hex.EncodeToString(sum[:])
 }
 
-// DecisionIssue joins `dv`, the issue a decision `de` was filed under, to a
-// query that starts from the decisions. The issue it is read as is
-// `dv.issue_id`.
+// DecisionIssue joins `dv`, the issue a decision occurrence `de` was filed
+// under, to a query that starts from the decision occurrences. The issue it is
+// read as is `dv.issue_id`.
 const DecisionIssue = `JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`
 
 // SameIssue is the condition that the finding issue column holds the issue a
@@ -256,7 +257,7 @@ func (v *Vulnerabilities) merging(ctx context.Context, rows []int64, names []str
 // is written up and the signals that rank it. What was observed of it moves
 // too, which is its findings. What people recorded against it stays filed
 // under it and is read as the issue kept through the issue the absorbed row
-// states. Where a judgment under each name now stands in one product, the one
+// states. Where a record under each name now stands in one product, the one
 // with more standing stays and the other stops standing: settleDecisions and
 // settleRecords hold the rules.
 func (v *Vulnerabilities) absorb(ctx context.Context, kept int64, gone Vulnerability, names []string) error {
@@ -394,14 +395,14 @@ func (v *Vulnerabilities) describeGaps(ctx context.Context, kept int64, gone Vul
 
 // moveFindings files the absorbed issue's findings under the issue kept.
 //
-// A place in a build open under both issues is one finding held twice. The one
-// open longer stays open, since it carries the history of the place, and the
-// other closes as a record that duplicates an issue already tracked. Where
-// only the one that closes was assigned, the one that stays takes its
-// assignment, so the work stays in the queue it was in.
+// An occurrence in a build open under both issues is one finding held twice.
+// The one open longer stays open, since it carries the history of the
+// occurrence, and the other closes as a record that duplicates an issue already
+// tracked. Where only the one that closes was assigned, the one that stays
+// takes its assignment, so the work stays in the queue it was in.
 //
-// Scanned findings alone. A finding a person entered shares a place with a
-// scanned one by design, and is closed only by a person.
+// Scanned findings alone. A finding a person entered shares an occurrence with
+// a scanned one by design, and is closed only by a person.
 func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vulnerability, now time.Time) error {
 	var open []Finding
 	if err := v.db.NewSelect().Model(&open).
@@ -430,7 +431,7 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 				Set(`"assigned_to" = ?`, *f.AssignedTo).
 				Set(`"assigned_at" = ?`, f.AssignedAt).
 				Where(`"f"."id" = ?`, stays.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("carry the assignment of a place held twice under %s: %w",
+				return fmt.Errorf("carry the assignment of an occurrence held twice under %s: %w",
 					gone.Identifier, err)
 			}
 			stays.AssignedTo, stays.AssignedAt = f.AssignedTo, f.AssignedAt
@@ -450,7 +451,7 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 			Set(`"stated_by" = NULL`).
 			Set(`"closed_note" = ?`, "Held twice once "+gone.Identifier+" merged into the issue it is.").
 			Where(`"f"."id" IN (?)`, bun.List(twice)).Exec(ctx); err != nil {
-			return fmt.Errorf("close a place held twice under %s: %w", gone.Identifier, err)
+			return fmt.Errorf("close an occurrence held twice under %s: %w", gone.Identifier, err)
 		}
 	}
 	// Every finding under the absorbed issue moves, whatever its kind: one

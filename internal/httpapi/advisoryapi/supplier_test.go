@@ -106,7 +106,7 @@ func TestASuppliersStatementClosesTheFindingAndIsPublishedOnlyWhenAsked(t *testi
 			t.Errorf("the document with suppliers went out as %+v, want its first revision", gone.Items)
 		}
 
-		// The same zlib pulled in outside Y as well: one place of it is open,
+		// The same zlib pulled in outside Y as well: one occurrence of it is open,
 		// so the document says nothing about it.
 		r.ScannedInsideAcme(t, "outside-too", true)
 		if _, said := statementsAbout(t, r, "with-suppliers"); len(said) != 0 {
@@ -143,10 +143,10 @@ func TestASuppliersJustificationTheFormatDoesNotDefineIsLeftOut(t *testing.T) {
 	})
 }
 
-// A person who disagrees with a supplier marks the place affected through the
+// A person who disagrees with a supplier marks the occurrence affected through the
 // ordinary route, while the statement has it closed, and the next scan opens it
 // again.
-func TestAPlaceASupplierClosedCanBeMarkedAffectedAndOpensAgain(t *testing.T) {
+func TestAnOccurrenceASupplierClosedCanBeMarkedAffectedAndOpensAgain(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
@@ -195,10 +195,10 @@ func TestTheDocumentWithSuppliersDropsWhatWasWithdrawn(t *testing.T) {
 	})
 }
 
-// After Y moves to a release the supplier speaks for too, the place holds two
+// After Y moves to a release the supplier speaks for too, the occurrence holds two
 // rows closed by statements. Marking it affected is about the one standing
 // now, and the next scan opens it.
-func TestMarkingAffectedAfterTheProductMovedReachesThePlaceAsItStandsNow(t *testing.T) {
+func TestMarkingAffectedAfterTheProductMovedReachesTheOccurrenceAsItStandsNow(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
@@ -228,9 +228,9 @@ func TestMarkingAffectedAfterTheProductMovedReachesThePlaceAsItStandsNow(t *test
 	})
 }
 
-// A place a supplier's statement closed and the build later patched is
+// An occurrence a supplier's statement closed and the build later patched is
 // patched: the document says fixed, and nothing about what the supplier said.
-func TestAPlaceTheBuildLaterPatchedIsSaidOnlyAsFixed(t *testing.T) {
+func TestAnOccurrenceTheBuildLaterPatchedIsSaidOnlyAsFixed(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())

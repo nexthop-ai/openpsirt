@@ -15,7 +15,7 @@ import (
 // and this is the identity the two private-only roles exist for.
 func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		hidden := r.Embargoed(t)
 
 		// The product's own list, and the two that span products, which
@@ -77,7 +77,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 		// they triage in, and the finding is not one they may read.
 		made := httpapitest.AsPerson(t, r, "embargo-triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
+				"/findings/CVE-2026-9999/occurrences/"+occurrence+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"The parser is never reached."}`)
 		httpapitest.RefusedWith(t, made, http.StatusNotFound)

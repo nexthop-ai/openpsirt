@@ -44,7 +44,7 @@ const signalTimeout = 15 * time.Second
 //
 // Mail alone reaches a person who is already looking. Every comparable tool
 // reaches a chat channel and a tracker, and without one a fix target is a wish
-// and an approver discovers a claim by opening the queue. One signed HTTP
+// and an approver discovers a decision by opening the queue. One signed HTTP
 // request gives Slack, a tracker driven by automation and paging without an
 // adapter for any of them, and Teams through a workflow built in its tenant.
 // That is what the channel interface was for, reached more cheaply than by
@@ -392,7 +392,7 @@ const (
 
 // deliver sends one notification to one destination, once.
 func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (outcome, error) {
-	claimed, err := s.claim(ctx, to, row)
+	claimed, err := s.decision(ctx, to, row)
 	if err != nil || claimed == 0 {
 		return already, err
 	}
@@ -438,15 +438,15 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 // on another that took the lease — leaves it alone rather than sending the
 // same thing beside it. One that failed, or whose sender stopped, is taken
 // again.
-func (s *Signal) claim(ctx context.Context, to Outbound, row Notification) (int64, error) {
+func (s *Signal) decision(ctx context.Context, to Outbound, row Notification) (int64, error) {
 	key := about(row)
 	now := s.now().UTC().Truncate(time.Microsecond)
 
-	claim := &Delivery{
+	decision := &Delivery{
 		OutboundID: to.ID, About: key, NotificationID: row.ID,
 		Attempts: 1, AttemptedAt: &now, FirstSeen: now,
 	}
-	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
+	if _, err := s.db.NewInsert().Model(decision).Exec(ctx); err != nil {
 		// Only the unique index means somebody has this one. A lost
 		// connection or a lock timeout is a failure and is reported as one;
 		// read as "already claimed", a sweep during an outage reports nothing
@@ -504,9 +504,9 @@ func (s *Signal) claim(ctx context.Context, to Outbound, row Notification) (int6
 		if taken == 0 {
 			return 0, nil
 		}
-		claim.ID = held.ID
+		decision.ID = held.ID
 	}
-	return claim.ID, nil
+	return decision.ID, nil
 }
 
 // inFlight is how long an attempt that has neither gone nor failed is taken to

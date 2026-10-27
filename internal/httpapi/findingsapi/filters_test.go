@@ -156,7 +156,7 @@ func TestTheFiltersATriagerReachesFor(t *testing.T) {
 			t.Errorf("one issue has no fix and the filter found %d", got)
 		}
 		// And the two together, which is the question somebody
-		// assembling a day's work actually asks: what needs a judgment
+		// assembling a day's work actually asks: what needs a decision
 		// rather than a bump is "nothing released or upstream
 		// declined", and one value could not ask it.
 		if got := count(t, "fix_state=none&fix_state=wont-fix"); got != 1 {
@@ -293,7 +293,7 @@ func TestAssignedToMeMeansMineOrMyTeams(t *testing.T) {
 
 func TestTheOutcomeFilterAnswersForWhatStandsNotWhatWasProposed(t *testing.T) {
 	// A request for what has been dismissed is a request for this deployment's
-	// answer is. A claim still waiting for a second person is not an answer
+	// answer is. A decision still waiting for a second person is not an answer
 	// yet, and counting it as one lets a single person put their own proposal
 	// into the number the question was asked about.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -309,21 +309,21 @@ func TestTheOutcomeFilterAnswersForWhatStandsNotWhatWasProposed(t *testing.T) {
 			return page.Total
 		}
 
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		if got := dismissed(t); got != 0 {
 			t.Errorf("a dismissal nobody has agreed to answers the outcome "+
 				"filter with %d rows, want none", got)
 		}
 
-		r.Agreed(t, claim)
+		r.Agreed(t, decision)
 		if got := dismissed(t); got != 1 {
 			t.Errorf("an agreed dismissal answers the outcome filter with %d rows, want the one", got)
 		}
 	})
 }
 
-func TestAWithdrawnClaimLeavesTheFindingAsWorkAgain(t *testing.T) {
-	// A claim that has been taken back says nothing about the place, so the
+func TestAWithdrawnDecisionLeavesTheFindingAsWorkAgain(t *testing.T) {
+	// A decision that has been taken back says nothing about the occurrence, so the
 	// finding is undecided again — the state words have to partition the list
 	// or a row falls out of every one of them and out of the count above it,
 	// and nothing ever offers it as work again.
@@ -344,27 +344,27 @@ func TestAWithdrawnClaimLeavesTheFindingAsWorkAgain(t *testing.T) {
 		}
 
 		if u, w, a, l, all := buckets(t); u+w+a+l != all {
-			t.Fatalf("before anything is claimed the buckets are %d+%d+%d+%d of %d",
+			t.Fatalf("before anything is decided the buckets are %d+%d+%d+%d of %d",
 				u, w, a, l, all)
 		}
 
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		if u, w, a, l, all := buckets(t); u+w+a+l != all {
-			t.Errorf("with a claim waiting the buckets are %d+%d+%d+%d of %d",
+			t.Errorf("with a decision waiting the buckets are %d+%d+%d+%d of %d",
 				u, w, a, l, all)
 		}
 
 		if gone := httpapitest.AsPerson(t, r, "triager", http.MethodDelete,
-			fmt.Sprintf("/v1/decisions/%d", claim), ""); gone.Code >= 300 {
+			fmt.Sprintf("/v1/decisions/%d", decision), ""); gone.Code >= 300 {
 			t.Fatalf("withdrawing answered %d: %s", gone.Code, gone.Body.String())
 		}
 		u, w, a, l, all := buckets(t)
 		if u+w+a+l != all {
-			t.Errorf("after the claim was taken back the buckets are %d+%d+%d+%d of %d",
+			t.Errorf("after the decision was taken back the buckets are %d+%d+%d+%d of %d",
 				u, w, a, l, all)
 		}
 		if u != all {
-			t.Errorf("a finding whose only claim was withdrawn reports %d undecided of %d",
+			t.Errorf("a finding whose only decision was withdrawn reports %d undecided of %d",
 				u, all)
 		}
 	})
@@ -376,7 +376,7 @@ func TestEveryRowIsReachableBySomeFixState(t *testing.T) {
 	// no filter value named, so those rows belonged to none of the buckets.
 	//
 	// And the list answers per issue and component *across* builds, so a group
-	// whose places disagree has no single answer to give. Asked for one state
+	// whose occurrences disagree has no single answer to give. Asked for one state
 	// the question is unanimity; a group that is fixed in one build and not in
 	// another answered neither, and was a row no value of this filter could
 	// list — the same hole one level up.
@@ -424,7 +424,7 @@ func TestEveryRowIsReachableBySomeFixState(t *testing.T) {
 			t.Error("nothing is reachable as unknown, so this proves nothing")
 		}
 		if got := count(t, "fix_state=mixed"); got == 0 {
-			t.Error("nothing is reachable as mixed, so the group whose places " +
+			t.Error("nothing is reachable as mixed, so the group whose occurrences " +
 				"disagree is not being exercised")
 		}
 	})

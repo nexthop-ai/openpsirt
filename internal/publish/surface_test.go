@@ -87,9 +87,9 @@ func publishedWorld(t *testing.T, f *fixture.World) (*world, string) {
 	w.shipped()
 	w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
 	w.decide(w.Target, "CVE-2026-1001", openssl,
-		claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 	w.decide(w.Target, "CVE-2026-1002", libnl,
-		claim{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
+		decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 	named, _ := w.issued(true)
 	w.publishes(w.Product, true)
 	w.write()
@@ -524,7 +524,7 @@ func TestTheSurfaceReadsOnlyTheProductsThatPublishNow(t *testing.T) {
 		w.ship(target, root, edge{root, zlib})
 		w.report(target, reported{"CVE-2026-2001", zlib})
 		w.decide(target, "CVE-2026-2001", zlib,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(other, true)
 		w.write()
 		s := surfaceOver(w, 1000, nil)

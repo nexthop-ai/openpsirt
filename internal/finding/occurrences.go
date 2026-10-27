@@ -40,7 +40,7 @@ func (i inventory) nameOf(consumerID int64) string {
 // unchanged, and the scanner no longer reporting it — is the case that must
 // never be quietly dropped.
 //
-// The version returned alongside is what the place moved to. It is available
+// The version returned alongside is what the occurrence moved to. It is available
 // only here, because the component that carried the issue is gone from the
 // inventory the moment this run is over, so anything asking later has one
 // version and not two — which is why a release note could say a component was
@@ -177,9 +177,9 @@ func openComponents(ctx context.Context, db bun.IDB, targetID int64) (inventory,
 // consumers maps a component to everything that directly pulled it in.
 type consumers map[int64][]int64
 
-// of returns where a component sits. A component nothing leads to still has a
-// place — itself — because it ships whether or not the producer could say what
-// pulled it in.
+// of returns where a component sits. A component nothing leads to still has an
+// occurrence — itself — because it ships whether or not the producer could say
+// what pulled it in.
 func (c consumers) of(componentID int64) []int64 {
 	if at, held := c[componentID]; held {
 		return at
@@ -187,14 +187,15 @@ func (c consumers) of(componentID int64) []int64 {
 	return []int64{0}
 }
 
-// openPlaces reads every place in a variant.
-func openPlaces(ctx context.Context, db bun.IDB, targetID int64) (consumers, error) {
-	return placeEdges(ctx, db, targetID, 0)
+// openOccurrences reads every occurrence in a variant.
+func openOccurrences(ctx context.Context, db bun.IDB, targetID int64) (consumers, error) {
+	return occurrenceEdges(ctx, db, targetID, 0)
 }
 
-// sits is one place a component occupies: what pulls it in, by identifier and
-// by name. A component sitting directly under the build is pulled in by
-// nothing and its consumer has no name, for the reason PlaceIdentity gives.
+// sits is one occurrence of a component occupies: what pulls it in, by
+// identifier and by name. A component sitting directly under the build is
+// pulled in by nothing and its consumer has no name, for the reason
+// OccurrenceIdentity gives.
 type sits struct {
 	consumerID int64
 	consumer   string
@@ -204,12 +205,12 @@ type sits struct {
 // that pulls it in.
 //
 // For a finding somebody records by hand: a person names a component and the
-// places are derived from the build's own graph, exactly as a scan's are. A
-// component can sit in more than one place at once, which is why the answer is
-// a list — and which is why a form asking "where does it sit" could not
-// express it.
+// occurrences are derived from the build's own graph, exactly as a scan's are.
+// A component can sit at more than one occurrence at once, which is why the
+// answer is a list — and which is why a form asking "where does it sit" could
+// not express it.
 func sittingsOf(ctx context.Context, db bun.IDB, targetID, componentID int64) ([]sits, error) {
-	at, err := placeEdges(ctx, db, targetID, componentID)
+	at, err := occurrenceEdges(ctx, db, targetID, componentID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,11 +219,11 @@ func sittingsOf(ctx context.Context, db bun.IDB, targetID, componentID int64) ([
 	if err != nil {
 		return nil, err
 	}
-	places := make([]sits, 0, len(ids))
+	occurrences := make([]sits, 0, len(ids))
 	for _, id := range ids {
-		places = append(places, sits{consumerID: id, consumer: names[id]})
+		occurrences = append(occurrences, sits{consumerID: id, consumer: names[id]})
 	}
-	return places, nil
+	return occurrences, nil
 }
 
 // componentNames names components by identifier, leaving out the one that is
@@ -256,12 +257,13 @@ func componentNames(ctx context.Context, db bun.IDB, ids []int64) (map[int64]str
 	return names, nil
 }
 
-// placeEdges reads where things sit in a variant, all of them or one of them.
+// occurrenceEdges reads where things sit in a variant, all of them or one of
+// them.
 //
 // A component under the product itself is recorded as being under nothing: the
 // product's name differs per variant, so keying on it would stop the same
-// place being recognized across them.
-func placeEdges(ctx context.Context, db bun.IDB, targetID, componentID int64) (consumers, error) {
+// occurrence being recognized across them.
+func occurrenceEdges(ctx context.Context, db bun.IDB, targetID, componentID int64) (consumers, error) {
 	var edges []struct {
 		ChildComponentID  int64 `bun:"child_component_id"`
 		ParentComponentID int64 `bun:"parent_component_id"`

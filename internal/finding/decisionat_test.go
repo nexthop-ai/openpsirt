@@ -14,16 +14,16 @@ import (
 	"testing"
 )
 
-// samePlace matches two rows compared by place identity, in either order, with
-// or without quotes around either side, capturing both aliases.
-var samePlace = regexp.MustCompile(`"?(\w+)"?\."?occurrence_identity"?\s*=\s*"?(\w+)"?\."?occurrence_identity\b`)
+// sameOccurrence matches two rows compared by occurrence identity, in either
+// order, with or without quotes around either side, capturing both aliases.
+var sameOccurrence = regexp.MustCompile(`"?(\w+)"?\."?occurrence_identity"?\s*=\s*"?(\w+)"?\."?occurrence_identity\b`)
 
 // decidedIssue matches a finding's issue compared with the issue a decision is
 // read as, in either order.
 var decidedIssue = regexp.MustCompile(`"?\bdv"?\."?issue_id"?\s*=\s*"?\w+"?\."?vulnerability_id\b|` +
 	`"?\w+"?\."?vulnerability_id"?\s*=\s*"?dv"?\."?issue_id\b`)
 
-// notADecisionAtAFinding is the place comparisons that are not a decision
+// notADecisionAtAFinding is the occurrence comparisons that are not a decision
 // correlated to a finding, by file and by the pair of aliases compared, with
 // what each compares.
 var notADecisionAtAFinding = map[string]map[[2]string]string{
@@ -31,38 +31,38 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"f", "fs"}: "two sightings of one lead, in the product bound",
 	},
 	"analysis/handoff.go": {
-		{"lh", "od"}: "a decision about a lead handed off as a flaw, at its place in its own product",
+		{"lh", "od"}: "a decision about a lead handed off as a flaw, at its occurrence in its own product",
 	},
 	"analysis/queue.go": {
-		{"f", "fo"}: "two rows of one build at one place",
+		{"f", "fo"}: "two rows of one build at one occurrence",
 	},
 	"analysis/state.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
+		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product bound",
 	},
 	"finding/handoff.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
+		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product bound",
 	},
 	"finding/assign.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product of its stream",
+		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product of its stream",
 	},
 	"finding/disclaim.go": {
-		{"f", "lt"}: "two rows of one build at one place",
+		{"f", "lt"}: "two rows of one build at one occurrence",
 	},
 	"finding/register.go": {
-		{"d3", "de"}: "a decision against another of its product at its place",
-		{"d2", "de"}: "a decision against another of its product at its place",
+		{"d3", "de"}: "a decision against another of its product at its occurrence",
+		{"d2", "de"}: "a decision against another of its product at its occurrence",
 	},
 	"finding/routing.go": {
 		{"f", "fs"}: "two rows of one lead in the product bound",
 	},
 	"notify/stale.go": {
-		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product of its stream",
+		{"f", "lh"}: "a lead handed off as a flaw, at its occurrence in the product of its stream",
 	},
-	"triage/claim.go": {
-		{"de", "lh"}: "a decision about a lead handed off as a flaw, at its place in its own product",
+	"triage/decision.go": {
+		{"de", "lh"}: "a decision about a lead handed off as a flaw, at its occurrence in its own product",
 	},
 	"triage/reaffirm_many.go": {
-		{"de", "newer"}: "a decision against another of its product at its place",
+		{"de", "newer"}: "a decision against another of its product at its occurrence",
 	},
 }
 
@@ -75,7 +75,7 @@ func pairOf(a, b string) [2]string {
 	return [2]string{a, b}
 }
 
-// correlation is one place comparison or decided-issue comparison found in a
+// correlation is one occurrence comparison or decided-issue comparison found in a
 // line of source.
 type correlation struct {
 	at    string
@@ -84,13 +84,13 @@ type correlation struct {
 }
 
 // correlationsSpelledOut is every comparison in Go source that correlates a
-// decision with a finding by hand, or compares two rows by place, with where
+// decision with a finding by hand, or compares two rows by occurrence, with where
 // it is as "file:line".
 func correlationsSpelledOut(name, source string) []correlation {
 	var found []correlation
 	for i, line := range strings.Split(source, "\n") {
 		at := name + ":" + strconv.Itoa(i+1)
-		for _, match := range samePlace.FindAllStringSubmatch(line, -1) {
+		for _, match := range sameOccurrence.FindAllStringSubmatch(line, -1) {
 			found = append(found, correlation{at: at, pair: pairOf(match[1], match[2])})
 		}
 		if decidedIssue.MatchString(line) {
@@ -118,7 +118,7 @@ func TestTheDetectorFindsACorrelationSpelledOut(t *testing.T) {
 	}
 	composed := []string{
 		"WHERE `+DecisionAt(\"?\")+`",
-		"WHERE `+finding.DecisionAtPlace(\"f\")+`",
+		"WHERE `+finding.DecisionAtOccurrence(\"f\")+`",
 		"ColumnExpr(`dv.issue_id AS \"vulnerability_id\"`)",
 		`JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`,
 		`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "ri"."issue_id"`,
@@ -132,9 +132,9 @@ func TestTheDetectorFindsACorrelationSpelledOut(t *testing.T) {
 }
 
 func TestEveryDecisionIsCorrelatedToItsFindingThroughOneSpelling(t *testing.T) {
-	// A place identity carries no product, so a copy of the correlation that
-	// drops the product matches a decision made in every other product that
-	// ships the same component. One spelling is what keeps a copy from
+	// An occurrence identity carries no product, so a copy of the correlation
+	// that drops the product matches a decision made in every other product
+	// that ships the same component. One spelling is what keeps a copy from
 	// drifting that way.
 	root := filepath.Join("..")
 	examined, compared := 0, 0
@@ -183,7 +183,7 @@ func TestEveryDecisionIsCorrelatedToItsFindingThroughOneSpelling(t *testing.T) {
 		t.Fatal("no Go source was found, so this checked nothing")
 	}
 	if compared == 0 {
-		t.Fatal("no place comparison was found anywhere, so the detector read nothing")
+		t.Fatal("no occurrence comparison was found anywhere, so the detector read nothing")
 	}
 	for _, at := range found {
 		t.Errorf("%s correlates a decision to a finding by hand; compose finding.DecisionAt or its family", at)
@@ -198,7 +198,7 @@ func TestEveryDecisionIsCorrelatedToItsFindingThroughOneSpelling(t *testing.T) {
 	}
 	sort.Strings(stale)
 	for _, each := range stale {
-		t.Errorf("%s is listed as compared by place and no longer is; remove it from the list", each)
+		t.Errorf("%s is listed as compared by occurrence and no longer is; remove it from the list", each)
 	}
 }
 

@@ -46,10 +46,10 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 		r.PatchedRows(t, `UPDATE "series_run" SET "third_party" = '["src/vendor/zlib"]'
 			WHERE "series_id" IN (SELECT "id" FROM "series" WHERE "name" = 'cppcheck/default')`)
 
-		placeOf := map[string]string{}
+		occurrenceOf := map[string]string{}
 		var rows []struct {
-			Place string `bun:"occurrence_identity"`
-			Path  string `bun:"path"`
+			Occurrence string `bun:"occurrence_identity"`
+			Path       string `bun:"path"`
 		}
 		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
@@ -58,21 +58,21 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			t.Fatal(err)
 		}
 		for _, row := range rows {
-			placeOf[row.Path] = row.Place
+			occurrenceOf[row.Path] = row.Occurrence
 		}
 		for path, want := range map[string]struct {
 			prefix string
 			third  bool
 		}{shallow: {"src/vendor/zlib", true}, deep: {"src/vendor/zlib", true}, own: {"src", false}} {
-			place := placeOf[path]
-			if place == "" {
-				t.Fatalf("no lead was opened at %s: %v", path, placeOf)
+			occurrence := occurrenceOf[path]
+			if occurrence == "" {
+				t.Fatalf("no lead was opened at %s: %v", path, occurrenceOf)
 			}
-			if got := evidenceAs(t, r, "internal-reader", place); got.ThirdParty != want.third {
+			if got := evidenceAs(t, r, "internal-reader", occurrence); got.ThirdParty != want.third {
 				t.Errorf("the lead at %s says third-party: %v; want %v", path, got.ThirdParty, want.third)
 			}
 			var offer findingsapi.HandoffOfferBody
-			httpapitest.Read(t, r, "lead-handler", leadAt(place)+"/flaw", &offer)
+			httpapitest.Read(t, r, "lead-handler", leadAt(occurrence)+"/flaw", &offer)
 			if offer.Prefix != want.prefix || offer.ThirdParty != want.third {
 				t.Errorf("the offer for %s is the prefix %q, third-party %v; want %q, %v",
 					path, offer.Prefix, offer.ThirdParty, want.prefix, want.third)
@@ -122,11 +122,11 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			}
 		}
 
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(placeOf[deep])+"/decision",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(occurrenceOf[deep])+"/decision",
 			`{"outcome":"confirmed","reasoning":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(placeOf[deep])+"/flaw",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrenceOf[deep])+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -134,11 +134,11 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 		// Learned for the declared path rather than the deeper lead's
 		// directory, so a lead nearer the top of the vendored code is
 		// offered it.
-		httpapitest.Read(t, r, "lead-handler", leadAt(placeOf[shallow])+"/flaw", &offer)
+		httpapitest.Read(t, r, "lead-handler", leadAt(occurrenceOf[shallow])+"/flaw", &offer)
 		if first := offer.Suggestions[0]; first.From != "confirmed" || first.Component != "zlib" {
 			t.Errorf("the shallower vendored lead was offered %+v first; want zlib, as its prefix was confirmed", first)
 		}
-		httpapitest.Read(t, r, "lead-handler", leadAt(placeOf[own])+"/flaw", &offer)
+		httpapitest.Read(t, r, "lead-handler", leadAt(occurrenceOf[own])+"/flaw", &offer)
 		if first := offer.Suggestions[0]; first.From == "confirmed" {
 			t.Errorf("a lead outside the vendored code was offered %+v first", first)
 		}
@@ -177,22 +177,22 @@ func TestTheLeadQueueReadsThirdPartyFromTheNewestRunThatSawTheLead(t *testing.T)
 		if !seen {
 			t.Fatalf("the queue lists no lead at %s: %+v", vendored, listed.Items)
 		}
-		if got := evidenceAs(t, r, "internal-reader", placeAt(t, r, vendored)); got.ThirdParty {
+		if got := evidenceAs(t, r, "internal-reader", occurrenceAt(t, r, vendored)); got.ThirdParty {
 			t.Errorf("the lead at %s says third-party from an older run; the newest run declared nothing", vendored)
 		}
 	})
 }
 
-// placeAt is the place identity of the newest lead at a path.
-func placeAt(t *testing.T, r *httpapitest.Reach, path string) string {
+// occurrenceAt is the occurrence identity of the newest lead at a path.
+func occurrenceAt(t *testing.T, r *httpapitest.Reach, path string) string {
 	t.Helper()
-	var place string
+	var occurrence string
 	if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		ColumnExpr(`"f"."occurrence_identity"`).
 		Where(`"ar"."path" = ?`, path).Where(`"f"."kind" = ?`, kind.Analysis).
-		OrderExpr(`"f"."id" DESC`).Limit(1).Scan(t.Context(), &place); err != nil {
+		OrderExpr(`"f"."id" DESC`).Limit(1).Scan(t.Context(), &occurrence); err != nil {
 		t.Fatal(err)
 	}
-	return place
+	return occurrence
 }

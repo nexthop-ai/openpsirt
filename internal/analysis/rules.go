@@ -373,7 +373,7 @@ func ruleIn(ctx context.Context, tx bun.IDB, productID, ruleID int64) (*leadRule
 }
 
 // coverage is the open leads each of the rules names in the product that the
-// subject may read, counted by place, whether or not the rule is approved.
+// subject may read, counted by occurrence, whether or not the rule is approved.
 func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
 	ids []int64) (map[int64]int, error) {
 

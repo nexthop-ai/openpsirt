@@ -16,27 +16,27 @@ import (
 )
 
 type Lapsed struct {
-	// Rows is how many decisions stopped applying.
+	// Rows is how many rows stopped applying.
 	Rows int64
 	// Told is who to tell, once each.
 	Told []ForPerson
 }
 
-// Lapse marks the decisions this target's contents have moved out from under.
+// Lapse marks the rows this target's contents have moved out from under.
 //
-// A decision is stored against the upstream versions it was made about. When
+// A row is stored against the upstream versions it was made about. When
 // those versions move it stops applying, and that much is automatic, because
 // what applies is matched on the versions. What is not automatic is anybody
 // finding out. Without this the finding simply reappears as though nobody had
 // ever looked at it, with the reasoning stranded on a row nothing points at —
-// which is the outcome that keeping the old decision exists to prevent.
+// which is the outcome that keeping the old row exists to prevent.
 //
 // Run after a scan records what it found, because that is when the versions
-// have just changed. It is one statement rather than one per place: a real
-// image holds tens of thousands of places, and a sweep costing a write per
-// place is a sweep somebody turns off.
+// have just changed. It is one statement rather than one per occurrence: a real
+// image holds tens of thousands of occurrences, and a sweep costing a write per
+// occurrence is a sweep somebody turns off.
 //
-// A decision covering nothing in the product is not lapsed. A component
+// A row covering nothing in the product is not lapsed. A component
 // that is gone altogether closed its findings and there is nothing to ask
 // anybody about, where a component still present at a different version is
 // exactly the question somebody has to answer again.
@@ -44,23 +44,23 @@ type Lapsed struct {
 // And covering is asked of the product, not of this build. A decision is a
 // lookup shared by every build whose code matches it: one release stream
 // moving to a new version while another still ships the old one leaves the
-// decision covering the other, and a judgment about code that is still there
+// decision covering the other, and a decision about code that is still there
 // is not one anybody needs to make again. It lapses when the last build
 // holding its versions moves — which the sweep of that build finds, because a
-// sweep still asks only about the places this build has open.
+// sweep still asks only about the occurrences this build has open.
 //
-// Only this build's product is swept. A place is a pair of names, and the same
+// Only this build's product is swept. An occurrence is a pair of names, and the same
 // pair sits in other products; their decisions are theirs. Lapsed is what one
 // sweep found the code had moved out from under, and who is waiting to hear
 // about it.
 //
 // A lapse is the other outcome a proposer is told about: it hands the work
-// back to them, having taken a judgment they made out of force, and nothing
+// back to them, having taken a decision they made out of force, and nothing
 // they did caused it.
 func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
-	// Every open finding of this target at the decision's place, with the
-	// versions it currently has — stated the same way the decision was written
-	// against them, from the same expression, so that a decision cannot lapse
+	// Every open finding of this target at the row's occurrence, with the
+	// versions it currently has — stated the same way the row was written
+	// against them, from the same expression, so that a row cannot lapse
 	// on one path and stand on the other.
 	openHere := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().
@@ -71,10 +71,10 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."closed_at" IS NULL`).
 			Apply(ofKinds(kind.VersionCarry, "f")).
-			Where(finding.DecisionAtPlace("f"))
+			Where(finding.DecisionAtOccurrence("f"))
 	}
 
-	// Any open finding in the decision's product, in any build, still at the
+	// Any open finding in the row's product, in any build, still at the
 	// versions it was decided about.
 	stillCovered := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().
@@ -87,20 +87,20 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where(`"st"."product_id" = "de"."product_id"`).
 			Where(`"f"."closed_at" IS NULL`).
 			Apply(ofKinds(kind.VersionCarry, "f")).
-			Where(finding.DecisionAtPlace("f")).
+			Where(finding.DecisionAtOccurrence("f")).
 			Where(finding.VersionsMatch)
 	}
 
 	// Still found here, at versions that are not the ones this was decided
 	// about, and no longer found at those versions anywhere in the product.
 	// Absent and empty are the same answer on the finding's side, so a
-	// decision recorded against no version matches a component stating none.
+	// row recorded against no version matches a component stating none.
 	lapsable := func(db bun.IDB) *bun.SelectQuery {
-		return db.NewSelect().Model((*Decision)(nil)).
+		return db.NewSelect().Model((*DecisionOccurrence)(nil)).
 			Join(finding.DecisionIssue).
 			ColumnExpr(`"de"."id"`).
 			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
-			// A claim about the match rather than about the version does not
+			// A decision about the match rather than about the version does not
 			// stop applying when the version moves. A bump does not make a
 			// wrong match right, and lapsing one would hand the same wrong
 			// match back at every point release.
@@ -134,7 +134,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	// A row this sweep lapsed leaves the lapsable set unless somebody revises
 	// it in between, so the sweep ends at the pass that marks none — or at a
 	// pass that read fewer than a batch, which read every row lapsable at
-	// that moment. Asking again then reads every decision in the product
+	// that moment. Asking again then reads every row in the product
 	// once more to find only what changed since, which the next sweep finds.
 	out := Lapsed{}
 	var all []int64
@@ -161,7 +161,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			// The rows this pass lapsed, read back inside the same act. The
 			// identifiers are this pass's own, so nothing another sweep marked
 			// is in it.
-			if err := tx.NewSelect().Model((*Decision)(nil)).
+			if err := tx.NewSelect().Model((*DecisionOccurrence)(nil)).
 				ColumnExpr(`"de"."id"`).
 				Where(`"de"."id" IN (?)`, bun.List(ids)).
 				Where(`"de"."state" = ?`, LapsedState).
@@ -188,16 +188,16 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	return out, err
 }
 
-// markLapsed marks these decisions as lapsed at a moment and answers how many
+// markLapsed marks these rows as lapsed at a moment and answers how many
 // it matched.
 //
 // The live key is released for the same reason a withdrawal releases it: the
-// judgment no longer covers what is there, and somebody has to be able to
+// decision no longer covers what is there, and somebody has to be able to
 // decide about what is there now. Only a proposed or approved row is marked,
 // so a row another sweep, a withdrawal or an approval moved in between is not
 // counted here as well.
 func markLapsed(ctx context.Context, tx bun.IDB, ids []int64, moment time.Time) (int64, error) {
-	result, err := tx.NewUpdate().Model((*Decision)(nil)).
+	result, err := tx.NewUpdate().Model((*DecisionOccurrence)(nil)).
 		Set(`"state" = ?`, LapsedState).
 		Set(`"ended_at" = ?`, moment).
 		Set(`"live_key" = ?`, nil).
@@ -210,28 +210,28 @@ func markLapsed(ctx context.Context, tx bun.IDB, ids []int64, moment time.Time) 
 	return database.Affected(result)
 }
 
-// LapseLeads marks lapsed the claims dismissing a lead at these places of a
+// LapseLeads marks lapsed the decisions dismissing a lead at these occurrences of a
 // product, because a run paired each lead only probably: on its function or
-// its nearest line, rather than on its whole key. The judgment was about the
+// its nearest line, rather than on its whole key. The decision was about the
 // result as it was keyed, and a weaker pairing is a guess that the result is
 // the same one, so somebody re-affirms it.
 //
-// A claim confirming a lead stands: it says the flaw is real, and a weaker
+// A decision confirming a lead stands: it says the flaw is real, and a weaker
 // pairing does not make it less so.
 //
 // Written inside the transaction that records the pairing, so a pairing is
-// never recorded with the claim on it left standing. Who proposed each is
+// never recorded with the decision on it left standing. Who proposed each is
 // returned for the caller to tell once the transaction commits.
-func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, places []string, moment time.Time) (Lapsed, error) {
+func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, occurrences []string, moment time.Time) (Lapsed, error) {
 	var out Lapsed
-	if len(places) == 0 {
+	if len(occurrences) == 0 {
 		return out, nil
 	}
 	var lapsed []int64
-	for start := 0; start < len(places); start += database.BatchSize {
-		batch := places[start:min(start+database.BatchSize, len(places))]
+	for start := 0; start < len(occurrences); start += database.BatchSize {
+		batch := occurrences[start:min(start+database.BatchSize, len(occurrences))]
 		var ids []int64
-		if err := tx.NewSelect().Model((*Decision)(nil)).
+		if err := tx.NewSelect().Model((*DecisionOccurrence)(nil)).
 			Join(`JOIN "decision" AS "lc" ON "lc"."id" = "de"."decision_id"`).
 			ColumnExpr(`"de"."id"`).
 			Where(`"de"."product_id" = ?`, productID).
@@ -239,14 +239,14 @@ func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, places []strin
 			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 			Where(`"lc"."outcome" IN (?, ?)`, Dismissed, NotSecurity).
 			Scan(ctx, &ids); err != nil {
-			return out, fmt.Errorf("read the claims on leads paired probably: %w", err)
+			return out, fmt.Errorf("read the decisions on leads paired probably: %w", err)
 		}
 		if len(ids) == 0 {
 			continue
 		}
 		n, err := markLapsed(ctx, tx, ids, moment.Truncate(time.Microsecond))
 		if err != nil {
-			return out, fmt.Errorf("lapse the claims on leads paired probably: %w", err)
+			return out, fmt.Errorf("lapse the decisions on leads paired probably: %w", err)
 		}
 		out.Rows += n
 		lapsed = append(lapsed, ids...)

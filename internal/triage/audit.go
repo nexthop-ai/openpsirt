@@ -18,15 +18,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// Judged is one judgment as an auditor reads it: what was decided, about what,
+// AuditedOccurrence is one decision occurrence as an auditor reads it: what was decided, about what,
 // on whose say-so, agreed to by whom, and when each of those happened.
 //
-// Assembled rather than looked up one decision at a time. The question an
+// Assembled rather than looked up one decision occurrence at a time. The question an
 // auditor asks is about a period and a product — "show me every dismissal we
 // made this year" — and a screen that answered it by opening each row would be
 // one they read by clicking a hundred times.
-type Judged struct {
-	Decision
+type AuditedOccurrence struct {
+	DecisionOccurrence
 	// Reasoning is the words the standing approval was given for. Where
 	// the text has been revised since, the approval was withdrawn by that
 	// act , so what is shown and what was agreed to cannot drift apart.
@@ -41,7 +41,7 @@ type Judged struct {
 	// Product is the name that addresses it, and ProductName the one shown.
 	Product, ProductName string
 	// ProposedByName and Approvals are the separation-of-duties record: who
-	// made the claim, and who agreed to it. Two different people is the whole
+	// made the decision, and who agreed to it. Two different people is the whole
 	// control, so both names are carried rather than a count.
 	ProposedByName string
 	Approvals      []Agreed
@@ -57,20 +57,20 @@ type Agreed struct {
 	// it : what somebody agreed to and then stopped agreeing to is exactly
 	// what an audit is looking for.
 	WithdrawnAt *time.Time
-	// Carried says the agreement was carried onto this claim from an earlier
+	// Carried says the agreement was carried onto this decision from an earlier
 	// one rather than given for it. A re-affirmation states its own
 	// reasoning and stands on the agreement its predecessor had, so the
-	// person named read the earlier claim's words — reporting it as a fresh
+	// person named read the earlier decision's words — reporting it as a fresh
 	// agreement said they had read these.
 	Carried bool
 }
 
-// Standing reports whether this judgment applies now.
+// Standing reports whether this decision applies now.
 //
-// The row's own reading of what Filter.InForce asks of the record. A claim
+// The row's own reading of what Filter.InForce asks of the record. A decision
 // that needs nobody stands while it is proposed, which is what the two of them
 // have to agree about.
-func (j Judged) Standing() bool {
+func (j AuditedOccurrence) Standing() bool {
 	if j.LiveKey == nil {
 		return false
 	}
@@ -83,7 +83,9 @@ func (j Judged) Standing() bool {
 //
 // Read from the names rather than trusted: an audit that reported the rule as
 // satisfied because the rule exists would be reporting on itself.
-func (j Judged) BySomebodyElse() bool { return bySomebodyElse(j.Approvals, j.ProposedByName) }
+func (j AuditedOccurrence) BySomebodyElse() bool {
+	return bySomebodyElse(j.Approvals, j.ProposedByName)
+}
 
 // bySomebodyElse reports whether an agreement still standing is held by
 // somebody other than the proposer.
@@ -96,21 +98,21 @@ func bySomebodyElse(approvals []Agreed, proposer string) bool {
 	return false
 }
 
-// aboutTheSamePlaces narrows to what a judgment was about: one issue, one
+// aboutTheSameOccurrences narrows to what a decision was about: one issue, one
 // component, one build.
 //
-// All three are reached through the findings at the place, because a decision
-// names a place rather than a component and names no build at all — it is
-// keyed on the product, the issue and the place, so that it carries across the
-// releases that share the code. A judgment about something since removed
+// All three are reached through the findings at the occurrence, because a decision
+// names an occurrence rather than a component and names no build at all — it is
+// keyed on the product, the issue and the occurrence, so that it carries across the
+// releases that share the code. A decision about something since removed
 // still names what it was about, which is what an audit asks for.
 //
 // Written once because the record's page and its file both narrow this way,
 // and a filter applied by one of them and not the other is a list somebody
 // reads as narrowed.
-func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *bun.SelectQuery {
+func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filter) *bun.SelectQuery {
 	if f.Issue != "" {
-		// The name the issue is filed under, which is the issue the decision
+		// The name the issue is filed under, which is the issue the row
 		// is read as: one filed under an issue that merged into it answers
 		// to the name that stands. Typed, so matched on the folded name.
 		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS "iv"`+
@@ -127,12 +129,12 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 			append([]any{graph.Folded(f.Component)}, args...)...)
 	}
 	// One build, with the build's own product required to be the one that
-	// made the judgment: a place identity carries no product, so the match
-	// alone would answer with another product's judgment about the same code.
+	// made the decision: an occurrence identity carries no product, so the match
+	// alone would answer with another product's decision about the same code.
 	//
 	// Narrowed by what this reader may see, like the rows themselves: an
-	// undisclosed finding is what puts a place in a build, and a judgment
-	// matching through one is a judgment matched by something not shown.
+	// undisclosed finding is what puts an occurrence in a build, and a decision
+	// matching through one is a decision matched by something not shown.
 	if f.TargetID != 0 {
 		mayRead, readArgs := readableFindingsOn(subject, "bf", `"de"."product_id"`)
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
@@ -154,7 +156,7 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 }
 
 // auditedBy is the narrowing the record takes, written once for the page of
-// decisions, the page of claims and the file, so none of them answers a
+// decision occurrences, the page of decisions and the file, so none of them answers a
 // question the others do not.
 func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.SelectQuery) *bun.SelectQuery {
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -163,21 +165,21 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 			q = q.Where(`"de"."product_id" IN (?)`, bun.List(f.ProductIDs))
 		}
 		if len(f.Outcomes) > 0 {
-			// Asked of the claim, which is where what a judgment says lives.
+			// Asked of the decision, which is where what a decision says lives.
 			q = q.Where(`EXISTS (SELECT 1 FROM "decision" AS "oc"`+
 				` WHERE "oc"."id" = "de"."decision_id" AND "oc"."outcome" IN (?))`, bun.List(f.Outcomes))
 		}
 		if len(f.States) > 0 {
 			q = q.Where(`"de"."state" IN (?)`, bun.List(f.States))
 		}
-		// What applies now, which is the same condition Judged.Standing
-		// reports off a row: a claim still holding its key, agreed to or
+		// What applies now, which is the same condition AuditedOccurrence.Standing
+		// reports off a row: a decision still holding its key, agreed to or
 		// standing without needing agreement.
 		if f.InForce {
 			standing, held := finding.InForce()
 			q = q.Where(`"de"."live_key" IS NOT NULL`).Where(standing, held...)
 		}
-		// The period is the proposal's date, not the approval's. A judgment
+		// The period is the proposal's date, not the approval's. A decision
 		// belongs to when it was made; dating it by its agreement would move
 		// it out of the period it was argued in whenever an approval came
 		// late, which is the ordinary case.
@@ -211,77 +213,77 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 				` WHERE "ap"."decision_id" = "de"."decision_id" AND "ap"."withdrawn_at" IS NULL`+
 				` AND "ape"."identity" = ?)`, f.Approver)
 		}
-		q = aboutTheSamePlaces(q, subject, f)
+		q = aboutTheSameOccurrences(q, subject, f)
 		return q
 	}
 }
 
-// AuditCount counts the judgments Audit would list, narrowed the same way.
+// AuditCount counts the decisions Audit would list, narrowed the same way.
 func (s *Store) AuditCount(ctx context.Context, subject access.Subject, f Filter,
 	from, to time.Time) (int, error) {
 
-	total, err := auditedBy(subject, f, from, to)(s.db.NewSelect().Model((*Decision)(nil))).Count(ctx)
+	total, err := auditedBy(subject, f, from, to)(s.db.NewSelect().Model((*DecisionOccurrence)(nil))).Count(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("count the judgments made: %w", err)
+		return 0, fmt.Errorf("count the decisions made: %w", err)
 	}
 	return int(total), nil
 }
 
-// Audit returns the judgments made in a period, newest first, with everything
+// Audit returns the decisions made in a period, newest first, with everything
 // needed to read one without opening it.
 //
 // Narrowed by what the reader may see, like everything else here. An auditor
-// holding one product's findings sees that product's judgments; nothing about
+// holding one product's findings sees that product's decisions; nothing about
 // this view is exempt from the visibility rules, because a report that showed
 // more than the screens it summarizes would be a way around them.
 func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
-	from, to time.Time, limit, offset int) ([]Judged, int, error) {
+	from, to time.Time, limit, offset int) ([]AuditedOccurrence, int, error) {
 
 	limit = database.InBulk.Of(limit)
 	narrow := auditedBy(subject, f, from, to)
 
-	total, err := narrow(s.db.NewSelect().Model((*Decision)(nil))).Count(ctx)
+	total, err := narrow(s.db.NewSelect().Model((*DecisionOccurrence)(nil))).Count(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("count the judgments made: %w", err)
+		return nil, 0, fmt.Errorf("count the decisions made: %w", err)
 	}
 
-	var decisions []Decision
-	if err := narrow(s.db.NewSelect().Model(&decisions)).Relation("Claim").
+	var occurrences []DecisionOccurrence
+	if err := narrow(s.db.NewSelect().Model(&occurrences)).Relation("Decision").
 		Order("de.id DESC").Limit(int64(limit)).Offset(int64(offset)).Scan(ctx); err != nil {
-		return nil, 0, fmt.Errorf("read the judgments made: %w", err)
+		return nil, 0, fmt.Errorf("read the decisions made: %w", err)
 	}
-	if len(decisions) == 0 {
+	if len(occurrences) == 0 {
 		return nil, int(total), nil
 	}
 
-	reasoning, err := s.currentReasoning(ctx, decisions)
+	reasoning, err := s.currentReasoning(ctx, occurrences)
 	if err != nil {
 		return nil, 0, err
 	}
-	if err := s.withholdPartReasoning(ctx, subject, decisions, reasoning); err != nil {
+	if err := s.withholdPartReasoning(ctx, subject, occurrences, reasoning); err != nil {
 		return nil, 0, err
 	}
-	proposers := make([]int64, 0, len(decisions))
-	for _, decision := range decisions {
-		proposers = append(proposers, decision.ProposedBy)
+	proposers := make([]int64, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		proposers = append(proposers, occurrence.ProposedBy)
 	}
-	agreed, named, err := s.agreedAndNamed(ctx, claimsOf(decisions), proposers)
+	agreed, named, err := s.agreedAndNamed(ctx, decisionsOf(occurrences), proposers)
 	if err != nil {
 		return nil, 0, err
 	}
-	about, err := s.aboutEach(ctx, decisions)
+	about, err := s.aboutEach(ctx, occurrences)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	out := make([]Judged, 0, len(decisions))
-	for _, decision := range decisions {
-		row := Judged{
-			Decision: decision, Reasoning: reasoning[decision.ID],
-			ProposedByName: named[decision.ProposedBy],
-			Approvals:      agreed[decision.ClaimID],
+	out := make([]AuditedOccurrence, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		row := AuditedOccurrence{
+			DecisionOccurrence: occurrence, Reasoning: reasoning[occurrence.ID],
+			ProposedByName: named[occurrence.ProposedBy],
+			Approvals:      agreed[occurrence.DecisionID],
 		}
-		if what, held := about[decision.ID]; held {
+		if what, held := about[occurrence.ID]; held {
 			row.Issue, row.Component, row.Version = what.Issue, what.Component, what.Version
 			row.Consumer, row.Product, row.ProductName = what.Consumer, what.Product, what.ProductName
 		}
@@ -290,30 +292,30 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 	return out, int(total), nil
 }
 
-// withholdPartReasoning drops the reasoning of each decision whose claim holds a
+// withholdPartReasoning drops the reasoning of each row whose decision holds a
 // row this subject may not read.
 func (s *Store) withholdPartReasoning(ctx context.Context, subject access.Subject,
-	decisions []Decision, reasoning map[int64]string) error {
+	occurrences []DecisionOccurrence, reasoning map[int64]string) error {
 
-	hidden, err := s.partlyHidden(ctx, subject, claimsOf(decisions))
+	hidden, err := s.partlyHidden(ctx, subject, decisionsOf(occurrences))
 	if err != nil {
 		return err
 	}
-	for _, decision := range decisions {
-		if hidden[decision.ClaimID] {
-			delete(reasoning, decision.ID)
+	for _, occurrence := range occurrences {
+		if hidden[occurrence.DecisionID] {
+			delete(reasoning, occurrence.ID)
 		}
 	}
 	return nil
 }
 
-// agreedAndNamed reads every agreement on these claims and the sign-in
+// agreedAndNamed reads every agreement on these decisions and the sign-in
 // identity of everybody involved, the proposers given included.
 //
 // Every approval for the page in one statement, not one per row. A year of
-// judgments is a page of a hundred, and a query each would make the cost of the
+// decisions is a page of a hundred, and a query each would make the cost of the
 // report a count of rows rather than a count of pages.
-func (s *Store) agreedAndNamed(ctx context.Context, claims, proposers []int64) (
+func (s *Store) agreedAndNamed(ctx context.Context, decisions, proposers []int64) (
 	map[int64][]Agreed, map[int64]string, error) {
 
 	people := map[int64]bool{}
@@ -321,9 +323,9 @@ func (s *Store) agreedAndNamed(ctx context.Context, claims, proposers []int64) (
 		people[id] = true
 	}
 	var approvals []Approval
-	if len(claims) > 0 {
+	if len(decisions) > 0 {
 		if err := s.db.NewSelect().Model(&approvals).
-			Where(`"decision_id" IN (?)`, bun.List(claims)).
+			Where(`"decision_id" IN (?)`, bun.List(decisions)).
 			Order("decision_id ASC", "id ASC").Scan(ctx); err != nil {
 			return nil, nil, fmt.Errorf("read who agreed: %w", err)
 		}
@@ -335,9 +337,9 @@ func (s *Store) agreedAndNamed(ctx context.Context, claims, proposers []int64) (
 	if err != nil {
 		return nil, nil, err
 	}
-	agreed := make(map[int64][]Agreed, len(claims))
+	agreed := make(map[int64][]Agreed, len(decisions))
 	for _, approval := range approvals {
-		agreed[approval.ClaimID] = append(agreed[approval.ClaimID], Agreed{
+		agreed[approval.DecisionID] = append(agreed[approval.DecisionID], Agreed{
 			By: named[approval.ApprovedBy], At: approval.ApprovedAt,
 			WithdrawnAt: approval.WithdrawnAt,
 			Carried:     approval.CarriedFrom != nil,
@@ -382,7 +384,7 @@ func (s *Store) PeopleNamed(ctx context.Context, wanted []int64) (map[int64]stri
 	return named, nil
 }
 
-// what one decision was about, in the words a reader knows it by.
+// what one decision occurrence was about, in the words a reader knows it by.
 type what struct {
 	Issue     string
 	Component string
@@ -394,48 +396,48 @@ type what struct {
 	ProductName string
 }
 
-// aboutEach names what each decision was about, for the whole page at once.
+// aboutEach names what each decision occurrence was about, for the whole page at once.
 //
-// A decision stores the place as a hash of names rather than the names, so
-// what it was about is recovered from a finding at that place. Findings in
-// any state, not only open ones: a judgment about something that has since
+// A row stores the occurrence as a hash of names rather than the names, so
+// what it was about is recovered from a finding at that occurrence. Findings in
+// any state, not only open ones: a decision about something that has since
 // been fixed or removed is exactly what an audit asks for, and joining only
 // open findings would leave the oldest and most interesting rows unnamed.
 //
 // The earliest matching finding, so the answer is stable between reads rather
 // than moving as rows open and close underneath it. One finding, chosen
 // first, and all five names read off it: a minimum per column over the
-// matching set is five independent answers, so a decision matching findings at
+// matching set is five independent answers, so a row matching findings at
 // two components produced a row naming a component, a version and a consumer
 // that never appeared together.
 //
-// The earliest finding of every decision is found in one grouped read, and
+// The earliest finding of every row is found in one grouped read, and
 // the names are joined to it afterwards. A minimum correlated into the join
 // condition is evaluated once for every row the join reaches it with, which is
-// once per decision only while the planner starts from the decisions. Over a
+// once per row only while the planner starts from the decision occurrences. Over a
 // v0.7.0 demo upgraded on MySQL 8.4, with the issues and products estimated as
 // empty, the planner started from a cross product of the issues, the products
-// and the issues again, and a page of 100 decisions ran for more than four
+// and the issues again, and a page of 100 rows ran for more than four
 // hours; the grouped read took 0.61 s over the same estimates, and 5 ms once
 // they were refreshed.
-func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]what, error) {
-	keys := make([]int64, 0, len(decisions))
-	for _, decision := range decisions {
-		keys = append(keys, decision.ID)
+func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence) (map[int64]what, error) {
+	keys := make([]int64, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		keys = append(keys, occurrence.ID)
 	}
 	var rows []struct {
-		DecisionID  int64  `bun:"decision_occurrence_id"`
-		Issue       string `bun:"issue"`
-		Component   string `bun:"component"`
-		Version     string `bun:"version"`
-		Consumer    string `bun:"consumer"`
-		Product     string `bun:"product"`
-		ProductName string `bun:"product_name"`
+		DecisionOccurrenceID int64  `bun:"decision_occurrence_id"`
+		Issue                string `bun:"issue"`
+		Component            string `bun:"component"`
+		Version              string `bun:"version"`
+		Consumer             string `bun:"consumer"`
+		Product              string `bun:"product"`
+		ProductName          string `bun:"product_name"`
 	}
 	earliest := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(finding.DecisionIssue).
-		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionAtPlace("f2")).
+		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionAtOccurrence("f2")).
 		Join(`JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"`).
 		Join(`JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"`).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
@@ -462,11 +464,11 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what these judgments were about: %w", err)
+		return nil, fmt.Errorf("read what these decisions were about: %w", err)
 	}
 	about := make(map[int64]what, len(rows))
 	for _, row := range rows {
-		about[row.DecisionID] = what{
+		about[row.DecisionOccurrenceID] = what{
 			Issue: row.Issue, Component: row.Component, Version: row.Version,
 			Consumer: row.Consumer, Product: row.Product, ProductName: row.ProductName,
 		}

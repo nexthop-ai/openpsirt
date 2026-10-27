@@ -159,7 +159,7 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	// Reduced on the finding alone, and the issue and its rating joined to
 	// what is left: inside one product an issue has one band, so the pair
 	// carries it without the band in the key, and joining first reads the
-	// issue's row once per place only to fold the copies away.
+	// issue's row once per occurrence only to fold the copies away.
 	kinds, args := kind.Statistics.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).

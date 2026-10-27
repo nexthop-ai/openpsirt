@@ -54,12 +54,12 @@ type Bundle struct {
 	// bundle keyed on an upstream readable — somebody declaring a curl bump
 	// should see which packages it moves.
 	Components []string
-	// Issues is how many distinct vulnerabilities the bump closes, Places how
-	// many findings those sit at, and Builds how many builds of the selection
-	// hold any of it.
-	Issues int
-	Places int
-	Builds int
+	// Issues is how many distinct vulnerabilities the bump closes, Occurrences
+	// how many findings those sit at, and Builds how many builds of the
+	// selection hold any of it.
+	Issues      int
+	Occurrences int
+	Builds      int
 	// In names those builds, which is what a declaration is offered against:
 	// a bump is declared for releases, and the ones worth offering are the
 	// ones that have it.
@@ -78,8 +78,8 @@ type Bundle struct {
 
 // Bundles groups what is fixable by the bump that would fix it.
 //
-// Presentation, like every other grouping here. One act still writes one
-// decision per component and per place; this only says which rows a
+// Presentation, like every other grouping here. One act still writes a
+// row at every occurrence of every component; this only says which rows a
 // person is answering at once.
 //
 // Only what has a fix: a bundle is a version to move to, so a finding with no
@@ -101,7 +101,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		From          string `bun:"shipped"`
 		To            string `bun:"fixed_in"`
 		Issues        int    `bun:"issues"`
-		Places        int    `bun:"places"`
+		Occurrences   int    `bun:"places"`
 		Builds        int    `bun:"builds"`
 		Urgency       int64  `bun:"urgency"`
 		Exploited     int    `bun:"exploited"`
@@ -124,7 +124,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		ColumnExpr(PerFold(SourceVersion) + ` AS "shipped"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
-		ColumnExpr(overParts.places() + ` AS "places"`).
+		ColumnExpr(overParts.occurrences() + ` AS "places"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
@@ -152,7 +152,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		bundles = append(bundles, Bundle{
 			Fold:     row.Fold,
 			Upstream: row.Upstream, From: row.From, To: row.To,
-			Issues: row.Issues, Places: row.Places, Builds: row.Builds,
+			Issues: row.Issues, Occurrences: row.Occurrences, Builds: row.Builds,
 			Urgency: row.Urgency, Severity: worstWord(row.Worst),
 			Exploited: row.Exploited == 1, ExploitedHere: row.ExploitedHere == 1,
 		})
@@ -206,13 +206,13 @@ func (s *Store) countBumps(ctx context.Context, targets []int64,
 }
 
 // bumps is the fix-bundle list's grouping in two levels. The first groups the
-// open places that name a fix by component, issue, build and the version that
-// fixes it, narrowed as the findings list holds them; the second joins the
-// component and groups by fold and version. The bump is the second level's
-// key and everything it reports decomposes over the first: places are summed,
+// open occurrences that name a fix by component, issue, build and the version
+// that fixes it, narrowed as the findings list holds them; the second joins the
+// component and groups by fold and version. The bump is the second level's key
+// and everything it reports decomposes over the first: occurrences are summed,
 // and the issues and the builds are distinct counts over far fewer rows.
 func (s *Store) bumps(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
-	inner := placeHeads(openRows(s.db, targets, visible)).
+	inner := occurrenceHeads(openRows(s.db, targets, visible)).
 		// A bundle is a version to move to.
 		Where(`"f"."fixed_in" IS NOT NULL`).
 		Where(`"f"."fixed_in" <> ?`, "").
@@ -286,13 +286,13 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 		versions = append(versions, bundle.To)
 	}
 	// The folds' components are read first and named as a list. The first
-	// level then groups the places on the component, the build and the
+	// level then groups the occurrences on the component, the build and the
 	// version alone, and the fold is read from the component after: a
 	// component has one fold, so the groups are the same. Named as a list,
-	// PostgreSQL estimates the places from the components' own statistics
+	// PostgreSQL estimates the occurrences from the components' own statistics
 	// and hashes them into groups, where joined to the component it expected
-	// 690 places a worker for 90,467 and sorted them on disk: 166 ms against
-	// 287 ms for the kernel's fold, 271,400 places in two builds.
+	// 690 occurrences a worker for 90,467 and sorted them on disk: 166 ms against
+	// 287 ms for the kernel's fold, 271,400 occurrences in two builds.
 	var components []int64
 	if err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
@@ -371,7 +371,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	var rows []struct {
 		ComponentID   int64 `bun:"component_id"`
 		Issues        int   `bun:"issues"`
-		Places        int   `bun:"places"`
+		Occurrences   int   `bun:"places"`
 		Urgency       int64 `bun:"urgency"`
 		Exploited     int   `bun:"exploited"`
 		ExploitedHere int   `bun:"exploited_here"`
@@ -383,7 +383,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		// list shows and therefore what hiding this component would remove
 		// from it. The first level holds one row per issue.
 		ColumnExpr(`COUNT(*) AS "issues"`).
-		ColumnExpr(overParts.places() + ` AS "places"`).
+		ColumnExpr(overParts.occurrences() + ` AS "places"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
 		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
@@ -391,7 +391,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// The issue is joined only where the order needs it, the way the
 		// findings list does it, and after the first level has grouped the
-		// places to one row per issue.
+		// occurrences to one row per issue.
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if by, known := order[filter.SortBy]; known && by.issue {
 				return q.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
@@ -438,7 +438,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	groups := make([]ComponentGroup, 0, len(rows))
 	for _, row := range rows {
 		group := ComponentGroup{
-			Issues: row.Issues, Places: row.Places,
+			Issues: row.Issues, Occurrences: row.Occurrences,
 			Exploited: row.Exploited == 1, ExploitedHere: row.ExploitedHere == 1,
 			Urgency:    row.Urgency,
 			Upgrades:   upgrades[row.ComponentID],
@@ -484,7 +484,7 @@ func (s *Store) countByComponent(ctx context.Context, targets []int64,
 }
 
 // byComponent is the by-component view's grouping in two levels: the open
-// places of the selection grouped by component and issue, narrowed as the
+// occurrences of the selection grouped by component and issue, narrowed as the
 // findings list holds them, and those grouped again by component. A distinct
 // count of issues per component is then a count of rows, which is what keeps
 // the second level small. Everything the first level reads is in finding's
@@ -492,11 +492,11 @@ func (s *Store) countByComponent(ctx context.Context, targets []int64,
 func (s *Store) byComponent(targets []int64, visible []access.Visibility,
 	filter Filter) *bun.SelectQuery {
 
-	inner := placeHeads(openRows(s.db, targets, visible)).
+	inner := occurrenceHeads(openRows(s.db, targets, visible)).
 		ColumnExpr(`"f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id"`)
-	// The two orders that read an aggregate of the places, carried up under
+	// The two orders that read an aggregate of the occurrences, carried up under
 	// the column's own name so the expression the order names reads the same.
 	switch filter.SortBy {
 	case ByAge:
@@ -531,8 +531,8 @@ const (
 	// the "what should I do this afternoon" order: on a seeded image one
 	// kernel bump closed 4,485 of 8,377 open findings.
 	BundlesByIssues BundleSortKey = "issues"
-	// BundlesByPlaces is how many findings those sit at.
-	BundlesByPlaces BundleSortKey = "places"
+	// BundlesByOccurrences is how many findings those sit at.
+	BundlesByOccurrences BundleSortKey = "occurrences"
 	// BundlesByBuilds is how many builds of the selection hold any of it,
 	// which is what says whether one bump is a release-wide job.
 	BundlesByBuilds BundleSortKey = "builds"
@@ -548,12 +548,12 @@ var bundleOrder = map[BundleSortKey]struct {
 	expr    string
 	nothing bool
 }{
-	BundlesByUrgency:  {expr: "urgency"},
-	BundlesBySeverity: {expr: "worst"},
-	BundlesByIssues:   {expr: "issues"},
-	BundlesByPlaces:   {expr: "places"},
-	BundlesByBuilds:   {expr: "builds"},
-	BundlesByDeadline: {expr: `MIN("f"."due_at")`, nothing: true},
+	BundlesByUrgency:     {expr: "urgency"},
+	BundlesBySeverity:    {expr: "worst"},
+	BundlesByIssues:      {expr: "issues"},
+	BundlesByOccurrences: {expr: "places"},
+	BundlesByBuilds:      {expr: "builds"},
+	BundlesByDeadline:    {expr: `MIN("f"."due_at")`, nothing: true},
 }
 
 // BundleSortKeys are the orders somebody may ask this list for, in the order
@@ -566,7 +566,7 @@ var bundleOrder = map[BundleSortKey]struct {
 func BundleSortKeys() []BundleSortKey {
 	return []BundleSortKey{
 		BundlesByUrgency, BundlesBySeverity, BundlesByIssues,
-		BundlesByPlaces, BundlesByBuilds, BundlesByDeadline,
+		BundlesByOccurrences, BundlesByBuilds, BundlesByDeadline,
 	}
 }
 
@@ -621,7 +621,7 @@ func componentOrder(filter Filter) string {
 // question — but the row says what the weight is made of.
 //
 // Distinct issues, like the count beside it, so the parts sum to the whole
-// rather than to the number of places.
+// rather than to the number of occurrences.
 func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 	visible []access.Visibility, filter Filter) (map[int64]map[string]int, error) {
 
@@ -634,8 +634,8 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 		Issues      int    `bun:"issues"`
 	}
 	// The issues open against each component, once each, and only then the
-	// rating: a rating is per issue, so reading it for every place would read
-	// it again for every place the issue sits at.
+	// rating: a rating is per issue, so reading it for every occurrence would
+	// read it again for every occurrence the issue sits at.
 	pairs := openRows(s.db, targets, visible).
 		ColumnExpr(`"f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
@@ -707,13 +707,13 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
 		// A finding with nothing to move to contributes no upgrade. It is not
 		// absent from the view — it is a row with an empty column, which is
-		// the population that needs a judgment rather than a bump.
+		// the population that needs a decision rather than a bump.
 		Where(`"f"."fixed_in" IS NOT NULL`).
 		Where(`"f"."fixed_in" <> ?`, "").
 		// Grouped to one row per issue rather than per version string, because
 		// a version has to be read out of that string before it can be counted
 		// — and grouped rather than plain because the narrowing asks questions
-		// of the places under an issue, which are aggregates.
+		// of the occurrences under an issue, which are aggregates.
 		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."fixed_in"`)
 	if err := filter.asListed(s.db, query, targets, visible).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where each component could go: %w", err)

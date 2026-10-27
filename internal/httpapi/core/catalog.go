@@ -73,7 +73,7 @@ type ProductBody struct {
 	// than always done, and a pointer so that "nobody asked" and "none open"
 	// are different answers — a screen drawing an unasked-for count as zero
 	// reports a clean product.
-	Open *int `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
+	Open *int `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every occurrence. Absent unless counts were asked for"`
 	// LastScanAt is absent where nothing has ever been filed against any of
 	// this product's builds.
 	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived for any of its builds"`
@@ -153,7 +153,7 @@ type StreamBody struct {
 	// Open and LastScanAt, for the same reason the product list carries them:
 	// a line that has stopped being built looks identical to a healthy one
 	// until somebody opens it.
-	Open       *int   `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
+	Open       *int   `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every occurrence. Absent unless counts were asked for"`
 	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived for any build of it"`
 	// EndOfLife is the date support ends and whether this release stated it.
 	// Absent with Inherited set means it follows its product; absent with
@@ -175,7 +175,7 @@ type VariantBody struct {
 	// saying no. An unclassified artifact should rank as though it ships,
 	// which means the default is yes and silence must not read as a denial.
 	CustomerFacing *bool `json:"customer_facing,omitempty" doc:"Whether this reaches customers. Defaults to yes"`
-	Open           *int  `json:"open,omitempty" doc:"Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for"`
+	Open           *int  `json:"open,omitempty" doc:"Issues open against it here, counted at components rather than at every occurrence. Absent unless counts were asked for"`
 	// Retired is absent while a variant is in use, which is every row of the
 	// product's own list. It is set on a release's list, which keeps naming
 	// what the release was built as after the variant is taken out of use.

@@ -22,10 +22,10 @@ import (
 // The notes people write about an issue in a product, and their earlier
 // revisions.
 //
-// Apart from the claim comments beside them, because they hang off different
-// things: a comment is about one argument at one place, and a note is about
-// the issue here. Merging them is not available — a claim is keyed on a place
-// and a note on an issue, so they cannot become one record.
+// Apart from the decision comments beside them, because they hang off
+// different things: a comment is about one argument at one occurrence, and a
+// note is about the issue here. Merging them is not available — a decision is
+// keyed on its occurrences and a note on an issue, so they cannot become one record.
 func registerIssueNotes(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-issue-notes", Method: http.MethodGet,
@@ -34,16 +34,16 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 		Description: "Returns the notes written about this issue in this product, oldest " +
 			"first, with who wrote each and when. A note that has been edited also carries " +
 			"when it was last changed.\n\n" +
-			"A note records no judgment and changes nothing: not what ranks, not a deadline, " +
+			"A note records no decision and changes nothing: not what ranks, not a deadline, " +
 			"not a triage line. It is context for whoever decides.\n\n" +
 			"It is about the issue in this product, not about one component. A row in the " +
 			"findings list is one issue at one source package, and one issue is often several " +
 			"rows — so a note kept against a row would be written on one of them and hidden " +
-			"from the rest. What is about a judgment at a place is a comment on that claim " +
+			"from the rest. What is about a decision at an occurrence is a comment on that decision " +
 			"instead.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers where you may read a finding of this issue in this product, at its "+
-		"visibility — an issue with one undisclosed place here is undisclosed for this. "+
+		"visibility — an issue with one undisclosed occurrence here is undisclosed for this. "+
 		"Anywhere else it answers as an issue that is not there."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
@@ -68,14 +68,14 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 		Path:    "/v1/products/{product}/issues/{issue}/notes",
 		Summary: "Add a note to an issue in a product",
 		Description: "Adds a markdown note about this issue in this product. It records no " +
-			"judgment: nothing about what ranks, what a deadline is, or what the product " +
+			"decision: nothing about what ranks, what a deadline is, or what the product " +
 			"triages changes because somebody wrote one.\n\n" +
 			"This is the way to leave something for whoever decides without deciding. A " +
-			"comment hangs off a claim; a note does not, so nothing has to be judged before " +
+			"comment hangs off a decision; a note does not, so nothing has to be judged before " +
 			"anything can be said.\n\n" +
 			"It reaches every build of the product and does not lapse when a version moves. " +
 			"Something true of one copy and not another — \"we do not call that function in " +
-			"the vendored build\" — is about a place, and belongs on the claim there.\n\n" +
+			"the vendored build\" — is about an occurrence, and belongs on the decision there.\n\n" +
 			"A name written after an `@` is told, where that person may read what the note is " +
 			"about; the response lists the names that reached nobody.\n\n" +
 			"The text is markdown and is validated before it is stored; a 422 names the line " +

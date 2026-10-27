@@ -20,14 +20,14 @@ import (
 )
 
 func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
-	// A version moved, which is exactly what made the old judgment stop
+	// A version moved, which is exactly what made the old decision stop
 	// applying — so what travels is the thinking, and somebody still has
 	// to look at the new code.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		agreed := f.agreed(t, f.at())
-		// The line the judgment was made on, and a second one holding the same
-		// place at a version that moved.
+		// The line the decision was made on, and a second one holding the same
+		// occurrence at a version that moved.
 		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
 		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
 
@@ -35,8 +35,8 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(offered.Moved) != 1 || offered.Moved[0].DecisionID != agreed.ID {
-			t.Fatalf("the new line was offered %+v, want the one judgment whose version moved",
+		if len(offered.Moved) != 1 || offered.Moved[0].DecisionOccurrenceID != agreed.ID {
+			t.Fatalf("the new line was offered %+v, want the one decision whose version moved",
 				offered.Moved)
 		}
 
@@ -49,22 +49,22 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 			t.Fatalf("carried %d, want 1", carried)
 		}
 
-		// A claim waiting for somebody lands, carrying the old words.
+		// A decision waiting for somebody lands, carrying the old words.
 		rows, _, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var found bool
 		for _, row := range rows {
-			if row.Decision.PlaceIdentity == agreed.PlaceIdentity &&
-				row.Decision.ID != agreed.ID {
+			if row.DecisionOccurrence.OccurrenceIdentity == agreed.OccurrenceIdentity &&
+				row.DecisionOccurrence.ID != agreed.ID {
 				found = true
-				if row.Decision.State != triage.Proposed {
-					t.Errorf("a carried judgment arrived as %q, want one waiting for agreement",
-						row.Decision.State)
+				if row.DecisionOccurrence.State != triage.Proposed {
+					t.Errorf("a carried decision arrived as %q, want one waiting for agreement",
+						row.DecisionOccurrence.State)
 				}
 				if row.Reasoning == "" {
-					t.Error("a carried judgment arrived with no reasoning to start from")
+					t.Error("a carried decision arrived with no reasoning to start from")
 				}
 			}
 		}
@@ -74,30 +74,30 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 	})
 }
 
-// Two findings at one place on the new line, each holding its own pair of
+// Two findings at one occurrence on the new line, each holding its own pair of
 // versions. The component version and the consumer version a carried
-// judgment is keyed on come from the same one of them: a pair drawn half from
-// each is a key no finding holds, and the carried claim would answer nothing.
-func TestACarriedPlaceTakesBothVersionsFromOneFinding(t *testing.T) {
+// decision is keyed on come from the same one of them: a pair drawn half from
+// each is a key no finding holds, and the carried decision would answer nothing.
+func TestACarriedOccurrenceTakesBothVersionsFromOneFinding(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		agreed := f.agreed(t, f.at())
 		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
 		next := f.anotherLine(t, "202411", "1.2.4", "9.0")
-		f.placeAt(t, "202411", next, "2.0", "4.5.6")
+		f.occurrenceAt(t, "202411", next, "2.0", "4.5.6")
 
 		offered, err := f.store.WouldCarry(ctx, f.triager, was, next)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(offered.Moved) != 1 || offered.Moved[0].Now != "1.2.4" {
-			t.Fatalf("the new line was offered %+v, want the judgment moving to 1.2.4", offered.Moved)
+			t.Fatalf("the new line was offered %+v, want the decision moving to 1.2.4", offered.Moved)
 		}
 		if _, err := f.store.Carry(ctx, f.triager, was, next,
 			[]int64{agreed.ID}, triage.DefaultBounds()); err != nil {
 			t.Fatal(err)
 		}
-		var landed triage.Decision
+		var landed triage.DecisionOccurrence
 		if err := f.db.DB.NewSelect().Model(&landed).
 			Where(`"de"."id" <> ?`, agreed.ID).
 			OrderExpr(`"de"."id" DESC`).Limit(1).Scan(ctx); err != nil {
@@ -111,29 +111,29 @@ func TestACarriedPlaceTakesBothVersionsFromOneFinding(t *testing.T) {
 			consumer = *landed.ConsumerUpstreamVersion
 		}
 		if component != "1.2.4" || consumer != "9.0" {
-			t.Errorf("the carried judgment is keyed at %s under %s, want 1.2.4 under 9.0, the pair one finding holds",
+			t.Errorf("the carried decision is keyed at %s under %s, want 1.2.4 under 9.0, the pair one finding holds",
 				component, consumer)
 		}
 	})
 }
 
-// The preview reads the same one finding's pair. Two findings at the place,
-// each holding one of the judgment's versions and not the other: a pair drawn
-// half from each is the judgment's own key, and the judgment would read as
+// The preview reads the same one finding's pair. Two findings at the occurrence,
+// each holding one of the decision's versions and not the other: a pair drawn
+// half from each is the decision's own key, and the decision would read as
 // already applying and never be offered.
 func TestACrossedPairIsNotReadAsAlreadyApplying(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.agreed(t, f.at())
 		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
 		next := f.anotherLine(t, "202411", "1.2.3", "9.0")
-		f.placeAt(t, "202411", next, "2.0", "4.5.6")
+		f.occurrenceAt(t, "202411", next, "2.0", "4.5.6")
 
 		offered, err := f.store.WouldCarry(t.Context(), f.triager, was, next)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if offered.Applying != 0 || len(offered.Moved) != 1 {
-			t.Fatalf("offered %+v with %d already applying, want the judgment offered as moved",
+			t.Fatalf("offered %+v with %d already applying, want the decision offered as moved",
 				offered.Moved, offered.Applying)
 		}
 	})
@@ -146,13 +146,13 @@ func TestAPromiseIsCarriedWithItsDateAndVersion(t *testing.T) {
 		ctx := t.Context()
 		by := time.Now().UTC().Add(30 * 24 * time.Hour).Truncate(time.Second)
 		promised, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.PatchNeeded, CommittedTo: &by,
+			Occurrence: f.at(), Outcome: triage.PatchNeeded, CommittedTo: &by,
 			Reasoning: "Patching the parser out.", By: f.proposer, NeedsApproval: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := agreeTo(ctx, f.store, f.reviewer, promised.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, promised.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		was := f.anotherLineOf(t, catalog.Branch, "main", "1.2.3", "4.5.6")
@@ -166,9 +166,9 @@ func TestAPromiseIsCarriedWithItsDateAndVersion(t *testing.T) {
 		if carried != 1 {
 			t.Fatalf("carried %d, want 1", carried)
 		}
-		var landed triage.Claim
+		var landed triage.Decision
 		if err := f.db.DB.NewSelect().Model(&landed).
-			Where(`"cl"."id" <> ?`, promised.ClaimID).
+			Where(`"cl"."id" <> ?`, promised.DecisionID).
 			OrderExpr(`"cl"."id" DESC`).Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -179,20 +179,20 @@ func TestAPromiseIsCarriedWithItsDateAndVersion(t *testing.T) {
 }
 
 func TestAPromisedUpgradeIsPlannedAgainRatherThanCarried(t *testing.T) {
-	// An upgrade records what each release it names is waiting on. A claim
-	// carried onto one place writes none of that, so a moved upgrade is
+	// An upgrade records what each release it names is waiting on. A decision
+	// carried onto one occurrence writes none of that, so a moved upgrade is
 	// counted apart and refused if named.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		by := time.Now().UTC().Add(30 * 24 * time.Hour).Truncate(time.Second)
 		promised, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.UpgradeNeeded, UpgradeTo: "1.3.0", CommittedTo: &by,
+			Occurrence: f.at(), Outcome: triage.UpgradeNeeded, UpgradeTo: "1.3.0", CommittedTo: &by,
 			Reasoning: "Moving the package forward.", By: f.proposer, NeedsApproval: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := agreeTo(ctx, f.store, f.reviewer, promised.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, promised.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		was := f.anotherLineOf(t, catalog.Branch, "main", "1.2.3", "4.5.6")
@@ -214,7 +214,7 @@ func TestAPromisedUpgradeIsPlannedAgainRatherThanCarried(t *testing.T) {
 }
 
 func TestOnlyWhatTheNewLineWasOfferedMayBeCarried(t *testing.T) {
-	// A judgment that already applies has nothing to agree to, and one
+	// A decision that already applies has nothing to agree to, and one
 	// covering nothing here has nothing to apply to. Refused rather than
 	// skipped: a caller that got the set wrong should hear so.
 	each(t, func(t *testing.T, f *fixture) {
@@ -236,13 +236,13 @@ func TestOnlyWhatTheNewLineWasOfferedMayBeCarried(t *testing.T) {
 		// not-offered return in Carry.
 		if _, err := f.store.Carry(ctx, f.triager, was, same,
 			[]int64{agreed.ID}, triage.DefaultBounds()); !errors.Is(err, triage.ErrNotOffered) {
-			t.Errorf("a judgment that already applies was not refused as unoffered: %v", err)
+			t.Errorf("a decision that already applies was not refused as unoffered: %v", err)
 		}
 	})
 }
 
 func TestCarryingIsBoundedByTheIssuesAReviewerReads(t *testing.T) {
-	// Every judgment carried waits for a second person, so the reviewer's
+	// Every decision carried waits for a second person, so the reviewer's
 	// issue limit holds. Two issues against a limit of one is refused, and
 	// the same two under a limit of two go through, so the count is what
 	// refused it.
@@ -270,7 +270,7 @@ func TestCarryingIsBoundedByTheIssuesAReviewerReads(t *testing.T) {
 	})
 }
 
-// alsoCarries puts a second issue at the fixture's place on each line, beside
+// alsoCarries puts a second issue at the fixture's occurrence on each line, beside
 // the first.
 func (f *fixture) alsoCarries(t *testing.T, issue int64, targets ...int64) {
 	t.Helper()
@@ -296,15 +296,15 @@ func TestSomebodyWhoMayNotDecideHereCarriesNothing(t *testing.T) {
 		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
 		if _, err := f.store.Carry(t.Context(), f.onlooker, was, next,
 			[]int64{agreed.ID}, triage.DefaultBounds()); err == nil {
-			t.Error("somebody who may not decide here carried a judgment")
+			t.Error("somebody who may not decide here carried a decision")
 		}
 	})
 }
 
-func TestAJudgmentIsNotCarriedOntoAPlaceUndisclosedToItsCarrier(t *testing.T) {
-	// The visibility a carried judgment is written at is the new line's. A
-	// triager of disclosed work carrying a disclosed judgment onto a line
-	// where the place is undisclosed would write on work they may not argue
+func TestADecisionIsNotCarriedOntoAnOccurrenceUndisclosedToItsCarrier(t *testing.T) {
+	// The visibility a carried decision is written at is the new line's. A
+	// triager of disclosed work carrying a disclosed decision onto a line
+	// where the occurrence is undisclosed would write on work they may not argue
 	// about, so it is neither offered nor written.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -322,30 +322,30 @@ func TestAJudgmentIsNotCarriedOntoAPlaceUndisclosedToItsCarrier(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(offered.Moved) != 0 {
-			t.Errorf("a place undisclosed on the new line was offered: %+v", offered.Moved)
+			t.Errorf("an occurrence undisclosed on the new line was offered: %+v", offered.Moved)
 		}
 		// Refused as not offered: the offer is narrowed inside the same
 		// transaction, so the visibility check on the written proposal is a
 		// backstop this cannot reach.
 		if _, err := f.store.Carry(ctx, f.triager, was, next,
 			[]int64{agreed.ID}, triage.DefaultBounds()); !errors.Is(err, triage.ErrNotOffered) {
-			t.Errorf("a judgment carried onto a place undisclosed to its carrier answered %v", err)
+			t.Errorf("a decision carried onto an occurrence undisclosed to its carrier answered %v", err)
 		}
-		written, err := f.db.DB.NewSelect().Model((*triage.Decision)(nil)).
+		written, err := f.db.DB.NewSelect().Model((*triage.DecisionOccurrence)(nil)).
 			Where(`"visibility" = ?`, access.Private).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if written != 0 {
-			t.Errorf("%d undisclosed decisions were written by somebody who may not argue them", written)
+			t.Errorf("%d undisclosed rows were written by somebody who may not argue them", written)
 		}
 	})
 }
 
-// anotherLine declares a build of this product holding the fixture's own place
+// anotherLine declares a build of this product holding the fixture's own occurrence
 // at the given versions, and returns its target.
 //
-// A carry is about two lines holding the same place at different versions, so
+// A carry is about two lines holding the same occurrence at different versions, so
 // a test of it needs findings on both — the decision alone says nothing about
 // where it would land.
 func (f *fixture) anotherLine(t *testing.T, stream, component, consumer string) int64 {
@@ -354,7 +354,7 @@ func (f *fixture) anotherLine(t *testing.T, stream, component, consumer string) 
 }
 
 // anotherLineOf is anotherLine for a stream of the given kind. A dated
-// judgment is refused on a tag, so carrying one needs a branch.
+// decision is refused on a tag, so carrying one needs a branch.
 func (f *fixture) anotherLineOf(t *testing.T, kind catalog.Kind, stream, component, consumer string) int64 {
 	t.Helper()
 	ctx := t.Context()
@@ -375,12 +375,12 @@ func (f *fixture) anotherLineOf(t *testing.T, kind catalog.Kind, stream, compone
 	if err != nil {
 		t.Fatalf("target: %v", err)
 	}
-	f.placeAt(t, stream, target.ID, component, consumer)
+	f.occurrenceAt(t, stream, target.ID, component, consumer)
 	return target.ID
 }
 
-// placeAt records one open finding at the fixture's place, at these versions.
-func (f *fixture) placeAt(t *testing.T, stream string, target int64, component, consumer string) {
+// occurrenceAt records one open finding at the fixture's occurrence, at these versions.
+func (f *fixture) occurrenceAt(t *testing.T, stream string, target int64, component, consumer string) {
 	t.Helper()
 	ctx := t.Context()
 	carrier := &graph.Component{
@@ -401,26 +401,26 @@ func (f *fixture) placeAt(t *testing.T, stream string, target int64, component, 
 	row := &finding.Finding{
 		TargetID: target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 		Visibility: access.Public, ComponentID: carrier.ID, ConsumerID: &holder.ID,
-		PlaceIdentity: f.at().PlaceIdentity, Urgency: 1, OpenedAt: time.Now().UTC(),
+		OccurrenceIdentity: f.at().OccurrenceIdentity, Urgency: 1, OpenedAt: time.Now().UTC(),
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatalf("record a finding: %v", err)
 	}
 }
 
-// Carrying a judgment onto a new line goes through the same validation every
+// Carrying a decision onto a new line goes through the same validation every
 // other write does.
 //
-// The place a carried claim is about records whether the new line is a tag,
-// so the rule that refuses a dated judgment on a release built once applies
-// here as it does to a claim written by hand. A dated promise about a release
+// The occurrence a carried decision is about records whether the new line is a tag,
+// so the rule that refuses a dated decision on a release built once applies
+// here as it does to a decision written by hand. A dated promise about a release
 // that cannot change is exactly the case that rule exists to refuse.
-func TestCarryingADatedJudgmentOntoATagIsRefused(t *testing.T) {
+func TestCarryingADatedDecisionOntoATagIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		soon := time.Now().UTC().Add(30 * 24 * time.Hour)
 		if _, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
 			Reasoning: "Not this sprint.", By: f.proposer,
 		}); err != nil {
 			t.Fatal(err)
@@ -437,7 +437,7 @@ func TestCarryingADatedJudgmentOntoATagIsRefused(t *testing.T) {
 				len(offered.Postponed))
 		}
 		if _, err := f.store.Carry(ctx, f.triager, was, next,
-			[]int64{offered.Postponed[0].DecisionID}, triage.DefaultBounds()); err == nil {
+			[]int64{offered.Postponed[0].DecisionOccurrenceID}, triage.DefaultBounds()); err == nil {
 			t.Fatal("a deferral was carried onto a release that was built once")
 		} else if !strings.Contains(err.Error(), "built once") {
 			t.Errorf("it was refused, but not for being a tag: %v", err)
@@ -445,19 +445,19 @@ func TestCarryingADatedJudgmentOntoATagIsRefused(t *testing.T) {
 	})
 }
 
-// And a judgment whose date has already gone by is not offered at all, and is
+// And a decision whose date has already gone by is not offered at all, and is
 // counted as past its date.
 //
-// A carried judgment keeps its date rather than having it quietly moved
-// forward, so carrying one that has run out writes a claim that is finished
+// A carried decision keeps its date rather than having it quietly moved
+// forward, so carrying one that has run out writes a decision that is finished
 // the moment it lands — and offering it is offering something the act behind
 // the button turns down.
-func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
+func TestADecisionThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		soon := time.Now().UTC().Add(30 * 24 * time.Hour)
 		ran, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
+			Occurrence: f.at(), Outcome: triage.Deferred, DeferredUntil: &soon,
 			Reasoning: "Not this sprint.", By: f.proposer,
 		})
 		if err != nil {
@@ -469,7 +469,7 @@ func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
 		// The date arrives, moved here rather than waited for.
 		if _, err := f.db.DB.NewUpdate().Table("decision").
 			Set(`"deferred_until" = ?`, time.Now().UTC().Add(-time.Hour)).
-			Where(`"id" = ?`, ran.ClaimID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, ran.DecisionID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -480,17 +480,17 @@ func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
 		if len(offered.Postponed) != 0 {
 			t.Errorf("a deferral that has run out was offered: %+v", offered.Postponed)
 		}
-		// Counted as past its date, not as covering nothing: its place is
+		// Counted as past its date, not as covering nothing: its occurrence is
 		// on the new line, and the finding there is left with no answer.
 		if offered.Expired != 1 || offered.Absent != 0 {
-			t.Errorf("a deferral past its date at a place the line holds counts as %d expired, "+
+			t.Errorf("a deferral past its date at an occurrence the line holds counts as %d expired, "+
 				"%d absent; want 1 and 0", offered.Expired, offered.Absent)
 		}
 	})
 }
 
-func TestACarriedClaimRecordsHowBadTheIssueIsNow(t *testing.T) {
-	// The baseline a later rise is measured from. Without it a carried claim
+func TestACarriedDecisionRecordsHowBadTheIssueIsNow(t *testing.T) {
+	// The baseline a later rise is measured from. Without it a carried decision
 	// reads as made about an unrated issue, and a rating into high lapses it
 	// though nothing was rated worse since it was carried.
 	each(t, func(t *testing.T, f *fixture) {
@@ -506,12 +506,12 @@ func TestACarriedClaimRecordsHowBadTheIssueIsNow(t *testing.T) {
 		}
 		var baseline *int
 		if err := f.db.DB.NewSelect().Table("decision_occurrence").Column("severity_centi").
-			Where(`"occurrence_identity" = ?`, agreed.PlaceIdentity).Where(`"id" <> ?`, agreed.ID).
+			Where(`"occurrence_identity" = ?`, agreed.OccurrenceIdentity).Where(`"id" <> ?`, agreed.ID).
 			Scan(ctx, &baseline); err != nil {
 			t.Fatal(err)
 		}
 		if baseline == nil || *baseline != 750 {
-			t.Errorf("the carried claim's baseline is %v, want the rating in force, 750", baseline)
+			t.Errorf("the carried decision's baseline is %v, want the rating in force, 750", baseline)
 		}
 	})
 }
@@ -547,7 +547,7 @@ func TestAnUnsetLimitIsTheDeploymentsSetting(t *testing.T) {
 
 func TestACorrectionWhoseVersionMovedIsAlreadyApplying(t *testing.T) {
 	// A correction stands at any version, so it reaches the new line however
-	// far the version moved, and carrying it would be refused as the place
+	// far the version moved, and carrying it would be refused as the occurrence
 	// already decided.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -555,7 +555,7 @@ func TestACorrectionWhoseVersionMovedIsAlreadyApplying(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := agreeTo(ctx, f.store, f.reviewer, corrected.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, corrected.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")

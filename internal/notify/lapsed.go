@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// Lapses tells people that a judgment of theirs has stopped applying.
+// Lapses tells people that a decision of theirs has stopped applying.
 //
 // One of the two outcomes a proposer still hears about by message rather than
 // by looking. Approval is silent because it is what they asked for; a lapse is
@@ -31,7 +31,7 @@ func Lapses(db *bun.DB, logger *slog.Logger) func(context.Context, []triage.ForP
 		for _, one := range told {
 			if err := NewStore(db).Tell(ctx, Lapse(one)); err != nil && logger != nil {
 				logger.Error("could not say that a decision lapsed",
-					"person", one.PersonID, "decision", one.DecisionID, "error", err)
+					"person", one.PersonID, "decision_occurrence", one.DecisionOccurrenceID, "error", err)
 			}
 		}
 	}
@@ -39,15 +39,15 @@ func Lapses(db *bun.DB, logger *slog.Logger) func(context.Context, []triage.ForP
 
 // Lapse is what one person is told about the rows of theirs that lapsed.
 //
-// A link to the claims that are theirs to re-affirm rather than to one of the
-// rows: a version bump lapses many claims at once, and the work is re-affirming
+// A link to the decisions that are theirs to re-affirm rather than to one of the
+// rows: a version bump lapses many decisions at once, and the work is re-affirming
 // all of them.
 func Lapse(one triage.ForPerson) Telling {
 	what := "A decision of yours"
 	if one.Rows > 1 {
 		what = fmt.Sprintf("%d decisions of yours", one.Rows)
 	}
-	why := " stopped applying: the code it was a claim about has moved."
+	why := " stopped applying: the code it was about has moved."
 	again := " The finding is open again, and re-affirming it is yours to do."
 	switch {
 	case one.RatedWorse:
@@ -57,7 +57,7 @@ func Lapse(one triage.ForPerson) Telling {
 		again = " The lead is open again, and re-affirming it is yours to do."
 	}
 	return Telling{
-		PersonID: one.PersonID, Kind: ClaimLapsed,
+		PersonID: one.PersonID, Kind: DecisionLapsed,
 		Body: what + why + again,
 		Link: weblink.ReviewQueueReaffirm(),
 		// As careful as the most careful row.

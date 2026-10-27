@@ -105,7 +105,7 @@ func namedRoutes() []namedRoute {
 	}
 }
 
-// Each route is asked on a build of its own: the two components share a place,
+// Each route is asked on a build of its own: the two components share an occurrence,
 // so a decision recorded through one route stands against the next.
 func TestEveryRouteNamingAFindingsComponentTakesTheNamespace(t *testing.T) {
 	for _, route := range namedRoutes() {
@@ -196,7 +196,7 @@ func TestTheListsLinkingToAFindingSayWhichComponentItIs(t *testing.T) {
 					want, unassigned.Body.String())
 			}
 		}
-		// A claim, so the list of decisions has one to name; and the work
+		// A decision, so the list of decision occurrences has one to name; and the work
 		// handed to the triager, so their own tree has something in it.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			finding+"/decision?version=3.7.0&ecosystem=deb&namespace=sonic",
@@ -222,9 +222,9 @@ func TestTheListsLinkingToAFindingSayWhichComponentItIs(t *testing.T) {
 			t.Errorf("what blocks a release does not say which component a row is: %+v", readiness)
 		}
 		for _, list := range []struct{ what, who, path, want string }{
-			// A claim and a blocking row stand for a place, which both
+			// A decision occurrence and a blocking row stand for an occurrence, which both
 			// components share, so each names one of them.
-			{"the decisions", "triager", "/v1/decision-occurrences?product=mine", `"namespace":"`},
+			{"the decision occurrences", "triager", "/v1/decision-occurrences?product=mine", `"namespace":"`},
 
 			{"the tree of one's own work", "triager", build + "/components/mine", ""},
 		} {

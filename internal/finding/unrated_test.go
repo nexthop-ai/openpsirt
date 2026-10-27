@@ -14,7 +14,7 @@ import (
 //
 // The list within a product and the list across products fill one row shape
 // from two statements, and a column only one of them selects is left at zero
-// in the other. Here the column is how many of a group's places a person
+// in the other. Here the column is how many of a group's occurrences a person
 // recorded, which is what tells "nobody has rated it" apart from the reasons a
 // scanner's finding carries no deadline.
 func TestAnUnratedRecordedFlawReadsAsNotRatedAcrossProducts(t *testing.T) {

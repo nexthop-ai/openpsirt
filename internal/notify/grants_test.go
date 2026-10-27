@@ -27,13 +27,13 @@ import (
 // split is one scanned product, with the issue and the component every row
 // written here names.
 type split struct {
-	db        *database.DB
-	rights    *access.Store
-	product   int64
-	target    int64
-	issue     int64
-	component int64
-	places    int
+	db          *database.DB
+	rights      *access.Store
+	product     int64
+	target      int64
+	issue       int64
+	component   int64
+	occurrences int
 }
 
 func aSplit(t *testing.T, w *fixture.World) *split {
@@ -76,31 +76,31 @@ func (s *split) person(t *testing.T, name string, roles ...access.Role) int64 {
 	return who.ID
 }
 
-// claim writes one claim straight to the tables, with a row per place at each
+// decision writes one decision straight to the tables, with a row per occurrence at each
 // visibility, shaped by the two functions.
-func (s *split) claim(t *testing.T, by int64, public, private int,
-	argue func(*triage.Claim), place func(*triage.Decision)) {
+func (s *split) decision(t *testing.T, by int64, public, private int,
+	argue func(*triage.Decision), occurrence func(*triage.DecisionOccurrence)) {
 	t.Helper()
 	ctx := t.Context()
 	at := time.Now().UTC().Add(-10 * 24 * time.Hour).Truncate(time.Microsecond)
 	reason := string(triage.CodeNotPresent)
-	claim := &triage.Claim{
-		Kind: triage.FindingClaim, ProposedBy: by, ProposedAt: at,
+	decision := &triage.Decision{
+		Kind: triage.FindingDecision, ProposedBy: by, ProposedAt: at,
 		Outcome: triage.NotApplicable, Justification: &reason,
 	}
-	argue(claim)
-	if _, err := s.db.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+	argue(decision)
+	if _, err := s.db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	write := func(visibility access.Visibility) {
-		s.places++
-		row := &triage.Decision{
-			ClaimID: claim.ID, ProductID: s.product, VulnerabilityID: s.issue,
-			PlaceIdentity: fmt.Sprintf("place-%d", s.places), Visibility: visibility,
+		s.occurrences++
+		row := &triage.DecisionOccurrence{
+			DecisionID: decision.ID, ProductID: s.product, VulnerabilityID: s.issue,
+			OccurrenceIdentity: fmt.Sprintf("place-%d", s.occurrences), Visibility: visibility,
 			NeedsApproval: true, State: triage.Proposed,
 			ProposedBy: by, ProposedAt: at,
 		}
-		place(row)
+		occurrence(row)
 		if _, err := s.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -117,14 +117,14 @@ func (s *split) claim(t *testing.T, by int64, public, private int,
 // enough ago to count as sitting there.
 func (s *split) queued(t *testing.T, team *access.Team, visibility access.Visibility) {
 	t.Helper()
-	s.places++
+	s.occurrences++
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	routed := now.Add(-5 * 24 * time.Hour)
 	row := &finding.Finding{
 		TargetID: s.target, Kind: finding.Vulnerable, VulnerabilityID: s.issue,
 		Visibility: visibility, ComponentID: s.component,
-		PlaceIdentity: fmt.Sprintf("place-%d", s.places),
-		OpenedAt:      now, AssignedTo: &team.PartyID, AssignedAt: &routed,
+		OccurrenceIdentity: fmt.Sprintf("place-%d", s.occurrences),
+		OpenedAt:           now, AssignedTo: &team.PartyID, AssignedAt: &routed,
 	}
 	if _, err := s.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
 		t.Fatal(err)
@@ -174,7 +174,7 @@ func saying(bodies []string, phrases ...string) []string {
 	return found
 }
 
-func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
+func TestADecisionWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		s := aSplit(t, w)
@@ -183,19 +183,19 @@ func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 		privateTriager := s.person(t, "private-triager", access.PrivateTriage, access.Approver)
 		publicReader := s.person(t, "public-reader", access.PublicRead, access.Approver)
 		both := s.person(t, "both", access.PublicRead, access.PrivateRead, access.Approver)
-		// A triager may approve somebody else's claim, capability or not.
+		// A triager may approve somebody else's decision, capability or not.
 		triager := s.person(t, "triager", access.PublicTriage, access.PrivateTriage)
 		undisclosedTriager := s.person(t, "undisclosed-triager", access.PrivateTriage)
 		// Reading both and triaging one is not agreeing to the other half.
 		halfTriager := s.person(t, "half-triager", access.PublicRead, access.PrivateTriage)
 
-		// Told apart by size: a disclosed claim over one place, an undisclosed
+		// Told apart by size: a disclosed decision over one occurrence, an undisclosed
 		// one over two, and one over three mixing both.
-		waiting := func(*triage.Claim) {}
-		asked := func(*triage.Decision) {}
-		s.claim(t, proposer, 1, 0, waiting, asked)
-		s.claim(t, proposer, 0, 2, waiting, asked)
-		s.claim(t, proposer, 1, 2, waiting, asked)
+		waiting := func(*triage.Decision) {}
+		asked := func(*triage.DecisionOccurrence) {}
+		s.decision(t, proposer, 1, 0, waiting, asked)
+		s.decision(t, proposer, 0, 2, waiting, asked)
+		s.decision(t, proposer, 1, 2, waiting, asked)
 		sweep(t, db)
 
 		all := []string{"covers 1 location", "covers 2 locations", "covers 3 locations"}
@@ -212,7 +212,7 @@ func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 			{"a triager of undisclosed work alone", undisclosedTriager, all[1:2]},
 			{"a triager of one half reading the other", halfTriager, all[1:2]},
 		} {
-			bodies := openFor(t, db, want.id, notify.ClaimWaiting)
+			bodies := openFor(t, db, want.id, notify.DecisionWaiting)
 			if got := saying(bodies, all...); strings.Join(got, "; ") != strings.Join(want.told, "; ") ||
 				len(bodies) != len(want.told) {
 				t.Errorf("%s was told %q, want %q", want.who, bodies, want.told)
@@ -221,7 +221,7 @@ func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	})
 }
 
-func TestAClaimAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
+func TestADecisionAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		s := aSplit(t, w)
@@ -235,16 +235,16 @@ func TestAClaimAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
 		internalApprover := s.person(t, "internal-approver", access.InternalRead, access.Approver)
 
 		// A dismissal waiting on a second person, and one sent back and
-		// left, each at one internal place.
-		dismissed := func(c *triage.Claim) {
+		// left, each at one internal occurrence.
+		dismissed := func(c *triage.Decision) {
 			reason := string(triage.FalsePositive)
 			c.Outcome, c.Justification = triage.Dismissed, &reason
 		}
 		back := time.Now().UTC().Add(-7 * 24 * time.Hour).Truncate(time.Microsecond)
-		internal := func(d *triage.Decision) { d.Visibility = access.Internal }
-		returned := func(d *triage.Decision) { d.Visibility, d.SentBackAt = access.Internal, &back }
-		s.claim(t, proposer, 1, 0, dismissed, internal)
-		s.claim(t, proposer, 1, 0, dismissed, returned)
+		internal := func(d *triage.DecisionOccurrence) { d.Visibility = access.Internal }
+		returned := func(d *triage.DecisionOccurrence) { d.Visibility, d.SentBackAt = access.Internal, &back }
+		s.decision(t, proposer, 1, 0, dismissed, internal)
+		s.decision(t, proposer, 1, 0, dismissed, returned)
 		sweep(t, db)
 
 		for _, want := range []struct {
@@ -253,10 +253,10 @@ func TestAClaimAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
 			kind notify.Kind
 			told int
 		}{
-			{"the internal approver", internalApprover, notify.ClaimWaiting, 1},
+			{"the internal approver", internalApprover, notify.DecisionWaiting, 1},
 			{"the proposer", proposer, notify.SentBackWaiting, 1},
-			{"the proposer", proposer, notify.ClaimWaiting, 0},
-			{"an approver of undisclosed work", privateApprover, notify.ClaimWaiting, 0},
+			{"the proposer", proposer, notify.DecisionWaiting, 0},
+			{"an approver of undisclosed work", privateApprover, notify.DecisionWaiting, 0},
 			{"an approver of undisclosed work", privateApprover, notify.SentBackWaiting, 0},
 			{"the internal approver", internalApprover, notify.SentBackWaiting, 0},
 		} {
@@ -278,30 +278,30 @@ func TestAClaimAboutALeadIsToldToItsInternalAudienceAlone(t *testing.T) {
 	})
 }
 
-func TestAProposerWhoReadsOnlyPartOfAClaimIsNotToldItIsTheirTurn(t *testing.T) {
+func TestAProposerWhoReadsOnlyPartOfADecisionIsNotToldItIsTheirTurn(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		s := aSplit(t, w)
 		privateOnly := s.person(t, "private-only", access.PrivateTriage)
 		both := s.person(t, "both", access.PublicTriage, access.PrivateTriage)
 
-		sentBack := func(*triage.Claim) {}
+		sentBack := func(*triage.Decision) {}
 		back := time.Now().UTC().Add(-7 * 24 * time.Hour).Truncate(time.Microsecond)
-		returned := func(d *triage.Decision) { d.SentBackAt = &back }
+		returned := func(d *triage.DecisionOccurrence) { d.SentBackAt = &back }
 
 		until := time.Now().UTC().Add(2 * 24 * time.Hour).Truncate(time.Microsecond)
-		deferred := func(c *triage.Claim) {
+		deferred := func(c *triage.Decision) {
 			c.Outcome, c.Justification, c.DeferredUntil = triage.Deferred, nil, &until
 		}
-		standing := func(d *triage.Decision) {
-			key := fmt.Sprintf("live-%d", s.places)
+		standing := func(d *triage.DecisionOccurrence) {
+			key := fmt.Sprintf("live-%d", s.occurrences)
 			d.State, d.LiveKey = triage.Approved, &key
 		}
 
-		// Each claim mixes a disclosed place with an undisclosed one.
+		// Each decision mixes a disclosed occurrence with an undisclosed one.
 		for _, by := range []int64{privateOnly, both} {
-			s.claim(t, by, 1, 1, sentBack, returned)
-			s.claim(t, by, 1, 1, deferred, standing)
+			s.decision(t, by, 1, 1, sentBack, returned)
+			s.decision(t, by, 1, 1, deferred, standing)
 		}
 		sweep(t, db)
 
@@ -310,7 +310,7 @@ func TestAProposerWhoReadsOnlyPartOfAClaimIsNotToldItIsTheirTurn(t *testing.T) {
 				t.Errorf("a proposer reading only the undisclosed half was told %s: %q", kind, told)
 			}
 			if told := openFor(t, db, both, kind); len(told) != 1 {
-				t.Errorf("a proposer reading every place was told %s %d times, want 1: %q",
+				t.Errorf("a proposer reading every occurrence was told %s %d times, want 1: %q",
 					kind, len(told), told)
 			}
 		}
@@ -384,9 +384,9 @@ func TestATeamQueueReachesEachMemberAtTheVisibilityTheyRead(t *testing.T) {
 }
 
 // One issue in one component is one piece of work in a queue, however its
-// places differ in visibility, and the queue is undisclosed where any of them
+// occurrences differ in visibility, and the queue is undisclosed where any of them
 // is.
-func TestAnIssueAtPlacesOfBothVisibilitiesIsOnePieceOfQueuedWork(t *testing.T) {
+func TestAnIssueAtOccurrencesOfBothVisibilitiesIsOnePieceOfQueuedWork(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		ctx := t.Context()

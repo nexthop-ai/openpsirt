@@ -40,11 +40,11 @@ type PerBuildBody struct {
 	ExploitedHere bool `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of what is open here"`
 	Fixable       int  `json:"fixable" doc:"The number of open issues any version fixes, counted once per issue however many binaries carry it"`
 	Issues        int  `json:"issues" doc:"Distinct vulnerabilities open across the source package here, counted once however many binaries carry each"`
-	// Consumers is the unit somebody acts in: one judgment covers the whole
+	// Consumers is the unit somebody acts in: one decision covers the whole
 	// fold, and what varies underneath it is the set of consumers pulling the
 	// package in.
-	Consumers int `json:"consumers" doc:"The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted"`
-	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the ceiling on one action is measured against"`
+	Consumers   int `json:"consumers" doc:"The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted"`
+	Occurrences int `json:"occurrences" doc:"The number of times those sit somewhere in this build. What the ceiling on one action is measured against"`
 	// Upgrades are the versions this build could move to.
 	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets"`
 	DueAt    string             `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`
@@ -192,7 +192,7 @@ func registerComponent(api huma.API, in core.Deps) {
 				Packages:   packages,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
 				ExploitedHere: build.ExploitedHere, Fixable: build.Fixable,
-				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
+				Issues: build.Issues, Consumers: build.Consumers, Occurrences: build.Occurrences,
 				Upgrades: upgrades,
 				DueAt:    core.StampAt(build.DueAt), CommittedTo: core.StampAt(build.CommittedTo), UpgradeTo: build.UpgradeTo,
 			})
@@ -211,9 +211,9 @@ type PlanUpgradeBody struct {
 	// can be promised a different version in another release, which is the
 	// ordinary case.
 	Builds    []BuildName `json:"builds" minItems:"1" maxItems:"2000" doc:"The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version"`
-	Reasoning string      `json:"reasoning" minLength:"1" doc:"The reason this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"`
+	Reasoning string      `json:"reasoning" minLength:"1" doc:"The reason this is the answer here. Required like every other decision: what an auditor reads is the reasoning, not the outcome"`
 	// Person is who carries it. A team as readily as a person: moving a
-	// package is work a queue tracks rather than a judgment one person
+	// package is work a queue tracks rather than a decision one person
 	// makes.
 	Person string `json:"person,omitempty" doc:"The party carrying it, by sign-in identity. Leave both out and it is held by nobody"`
 	Team   string `json:"team,omitempty" doc:"A team carrying it, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
@@ -221,17 +221,17 @@ type PlanUpgradeBody struct {
 
 // PlannedUpgradeBody is the record of one act.
 type PlannedUpgradeBody struct {
-	ClaimID    int64 `json:"claim_id" doc:"The one claim the whole upgrade was recorded under"`
-	Decisions  int   `json:"decisions" doc:"Places answered"`
-	Issues     int   `json:"issues" doc:"Distinct vulnerabilities it covers"`
-	Targets    int   `json:"targets" doc:"Build-level intents recorded, which is what the pending upgrades screen reads"`
-	Components int   `json:"components" doc:"The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
+	DecisionID  int64 `json:"decision_id" doc:"The one decision the whole upgrade was recorded under"`
+	Occurrences int   `json:"occurrences" doc:"Occurrences answered"`
+	Issues      int   `json:"issues" doc:"Distinct vulnerabilities it covers"`
+	Targets     int   `json:"targets" doc:"Build-level intents recorded, which is what the pending upgrades screen reads"`
+	Components  int   `json:"components" doc:"The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
 	// Waiting says a second person has to agree, which happens when the date
 	// is past the earliest deadline among what this covers.
 	Waiting bool `json:"waiting" doc:"Whether this needs a second person. True when the date is past the earliest deadline among what it covers, because that defers the worst thing in it"`
 	// Held is how many findings were handed to whoever is carrying it. A
-	// different number from the decisions: assignment is product-wide and a
-	// decision is per place.
+	// different number from the occurrences answered: assignment is
+	// product-wide and a decision applies per occurrence.
 	Held int `json:"held,omitempty" doc:"Findings handed to whoever is carrying this. Product-wide, like every assignment, because who moves the package on one release is who moves it on the next"`
 }
 
@@ -250,7 +250,7 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		Description: "Answers everything open against a component in the releases named, in one " +
 			"act: each is recorded as `upgrade-needed`, carrying the version it moves to and " +
 			"the date the work will be done.\n\n" +
-			"Coverage is the component, not a version pair. Moving to 3.5.2 is a claim " +
+			"Coverage is the component, not a version pair. Moving to 3.5.2 states " +
 			"that it answers what is open on the package — including findings recorded as " +
 			"fixed in 3.5.0 — and the next scan says which of that was true. Deciding it " +
 			"from the versions would need an ordering per ecosystem this does not have.\n\n" +
@@ -258,13 +258,13 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 			"earliest deadline among what this covers, it stands on its own: nothing is " +
 			"hidden for longer than the policy already allowed. Past it, the promise defers " +
 			"the worst thing it covers and it waits for approval. The response says which.\n\n" +
-			"Not bounded, unlike a bulk judgment: this one writes as many rows as the " +
+			"Not bounded, unlike a bulk decision: this one covers as many occurrences as the " +
 			"component has open findings in the releases named.\n\n" +
 			"Saying who carries it is part of the act, not a second one: name a `person` " +
 			"or a `team`, and every finding the promise covers is handed to them in the same " +
 			"transaction, so a promise nobody is carrying and a holder with no promise are " +
 			"both impossible. A team is a perfectly good holder — moving a package is work a " +
-			"queue tracks rather than a judgment one person makes — and it stays unheld until " +
+			"queue tracks rather than a decision one person makes — and it stays unheld until " +
 			"somebody on it takes it. The handover is product-wide like every other, because " +
 			"the promise is per build and who is carrying the work is not.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
@@ -306,7 +306,7 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		}
 
 		// No limit read, because this one is not bounded. The setting bounds
-		// a bulk judgment, which nothing re-checks; the next scan re-checks
+		// a bulk decision, which nothing re-checks; the next scan re-checks
 		// every row a promise names.
 		done, err := store.PlanUpgrade(ctx, subject, triage.Upgrade{
 			ProductID: product.ID, Component: input.Component, Version: input.Body.Version,
@@ -319,7 +319,7 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 			})
 		}
 		return &struct{ Body PlannedUpgradeBody }{Body: PlannedUpgradeBody{
-			ClaimID: done.ClaimID, Decisions: done.Decisions,
+			DecisionID: done.DecisionID, Occurrences: done.Occurrences,
 			Issues: done.Issues, Targets: done.Targets, Components: done.Components,
 			Waiting: done.Waiting, Held: done.Held,
 		}}, nil

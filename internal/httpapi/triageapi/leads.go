@@ -19,19 +19,19 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// LeadDecisionBody is a judgment about a lead.
+// LeadDecisionBody is a decision about a lead.
 type LeadDecisionBody struct {
 	Outcome   core.LeadOutcome `json:"outcome" doc:"What the lead is: dismissed, not a security issue, or confirmed as a real flaw"`
 	Reason    core.LeadReason  `json:"reason,omitempty" doc:"Why it is dismissed. Required when it is, and refused otherwise"`
 	Reasoning string           `json:"reasoning" minLength:"1" doc:"The reasoning, in markdown. Somebody else has to agree with a dismissal"`
 }
 
-// leadDecisionPath is the judgment about one lead, addressed by its place on
+// leadDecisionPath is the decision about one lead, addressed by its occurrence on
 // one build. A rule's name holds a slash, so the lead is addressed by its
-// place alone rather than under its issue.
+// occurrence alone rather than under its issue.
 const leadDecisionPath = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision"
 
-// errLeadClosed refuses a judgment about a lead somebody stated was fixed.
+// errLeadClosed refuses a decision about a lead somebody stated was fixed.
 var errLeadClosed = errors.New("closed")
 
 func registerLeadDecisions(api huma.API, in core.Deps) {
@@ -45,17 +45,17 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			"`approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.\n\n" +
 			"The decision covers the code finding on every stream and variant it is seen on, and every code finding " +
 			"another analyzer reports as the same flaw on the build that nothing answers yet, as one " +
-			"claim agreed to once. A code finding that " +
+			"decision agreed to once. A code finding that " +
 			"is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw " +
 			"is refused with 409, because its flaw is judged instead.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Place   string `path:"occurrence" doc:"The lead's place identity"`
-		Body    LeadDecisionBody
-	}) (*struct{ Body core.DecisionBody }, error) {
+		Product    string `path:"product"`
+		Stream     string `path:"stream"`
+		Variant    string `path:"variant"`
+		Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
+		Body       LeadDecisionBody
+	}) (*struct{ Body core.DecisionOccurrenceBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -68,7 +68,7 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		lead, err := finding.NewStore(in.DB.DB).LeadAt(ctx, subject, target.ID, input.Place)
+		lead, err := finding.NewStore(in.DB.DB).LeadAt(ctx, subject, target.ID, input.Occurrence)
 		if err == nil && lead.ClosedAt != nil {
 			err = errLeadClosed
 		}
@@ -79,9 +79,9 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
 		}
 		first := triage.Proposal{
-			Place: triage.Place{
+			Occurrence: triage.Occurrence{
 				ProductID: named.ProductID, VulnerabilityID: lead.VulnerabilityID,
-				PlaceIdentity: lead.PlaceIdentity, Visibility: lead.Visibility, Kind: kind.Analysis,
+				OccurrenceIdentity: lead.OccurrenceIdentity, Visibility: lead.Visibility, Kind: kind.Analysis,
 			},
 			Outcome:       triage.Outcome(input.Body.Outcome),
 			Justification: triage.Justification(input.Body.Reason),
@@ -89,10 +89,10 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			By:            subject.ID,
 			MadeOn:        []int64{target.ID},
 		}
-		// One claim over the lead and every lead that is the same flaw and
-		// that nothing answers yet, worked out where the claim is written.
-		decision, err := store.ProposeGrouped(ctx, subject, first, func(ctx context.Context, tx bun.IDB) ([]triage.Place, error) {
-			// Asked where the claim is written: a hand-off landing first
+		// One decision over the lead and every lead that is the same flaw and
+		// that nothing answers yet, worked out where the decision is written.
+		occurrence, err := store.ProposeGrouped(ctx, subject, first, func(ctx context.Context, tx bun.IDB) ([]triage.Occurrence, error) {
+			// Asked where the decision is written: a hand-off landing first
 			// makes the lead its flaw's.
 			if err := analysis.Answerable(ctx, tx, subject, named.ProductID, lead); err != nil {
 				return nil, err
@@ -101,13 +101,13 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			if err != nil {
 				return nil, err
 			}
-			places := make([]triage.Place, 0, len(kin))
+			occurrences := make([]triage.Occurrence, 0, len(kin))
 			for _, k := range kin {
-				also := first.Place
-				also.VulnerabilityID, also.PlaceIdentity, also.Visibility = k.VulnerabilityID, k.Place, k.Visibility
-				places = append(places, also)
+				also := first.Occurrence
+				also.VulnerabilityID, also.OccurrenceIdentity, also.Visibility = k.VulnerabilityID, k.Occurrence, k.Visibility
+				occurrences = append(occurrences, also)
 			}
-			return places, nil
+			return occurrences, nil
 		})
 		switch {
 		case errors.Is(err, analysis.ErrHandedOff), errors.Is(err, finding.ErrLeadPastEndOfLife):
@@ -118,9 +118,9 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
-		body := core.DecisionBodyOf(*decision)
+		body := core.DecisionOccurrenceBodyOf(*occurrence)
 		body.Reasoning = input.Body.Reasoning
-		return &struct{ Body core.DecisionBody }{Body: body}, nil
+		return &struct{ Body core.DecisionOccurrenceBody }{Body: body}, nil
 	})
 }
 
@@ -141,14 +141,14 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 			"that analyzed it: an applied, comparable run built at or after the first run that did not " +
 			"see the code finding, which the code finding's evidence names as `not_seen_run`. Any other run is refused " +
 			"with 422.\n\n" +
-			"A code finding seen again opens anew at the same place.",
+			"A code finding seen again opens anew at the same occurrence.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Place   string `path:"occurrence" doc:"The lead's place identity"`
-		Body    struct {
+		Product    string `path:"product"`
+		Stream     string `path:"stream"`
+		Variant    string `path:"variant"`
+		Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
+		Body       struct {
 			Because string `json:"because" minLength:"1" doc:"What fixed it, in markdown"`
 			FixedIn int64  `json:"fixed_in" minimum:"1" doc:"The run whose build fixed it"`
 		}
@@ -165,7 +165,7 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		done, err := finding.NewStore(in.DB.DB).FixLead(ctx, subject, target.ID, input.Place, input.Body.Because,
+		done, err := finding.NewStore(in.DB.DB).FixLead(ctx, subject, target.ID, input.Occurrence, input.Body.Because,
 			input.Body.FixedIn)
 		switch {
 		case errors.Is(err, finding.ErrStillSeen), errors.Is(err, finding.ErrLeadPastEndOfLife):

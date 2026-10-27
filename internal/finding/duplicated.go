@@ -29,12 +29,12 @@ type duplicateStart struct {
 }
 
 // startOf works out the date a duplicate ruling over these reports gives the
-// flaw's undisclosed places in one product, or nothing where it gives none.
+// flaw's undisclosed occurrences in one product, or nothing where it gives none.
 //
 // Counted from when the earliest claim from outside arrived, or was recorded
 // where it does not say, plus the disclosure window: the reporter publishes on
 // their own clock, which started when they told us (REQ-37). A claim found here
-// starts nothing. Nothing either where every place already ends on that date
+// starts nothing. Nothing either where every occurrence already ends on that date
 // or earlier, because an earlier end is one somebody is already held to.
 //
 // Read on the handle it is given, so a ruling asks it inside the transaction
@@ -76,7 +76,7 @@ func startOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 	start.at = start.at.Add(window).Truncate(time.Microsecond)
 
 	later, err := db.NewSelect().Model((*Finding)(nil)).
-		Apply(flawPlaces(productID, vulnerabilityID)).
+		Apply(flawOccurrences(productID, vulnerabilityID)).
 		Where(`"disclose_at" IS NULL OR "disclose_at" > ?`, start.at).
 		Exists(ctx)
 	if err != nil {
@@ -92,13 +92,13 @@ func startOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 	return start, nil
 }
 
-// flawPlaces narrows findings to a flaw's undisclosed open places in one
-// product: the places a duplicate ruling dates.
+// flawOccurrences narrows findings to a flaw's undisclosed open occurrences in
+// one product: the occurrences a duplicate ruling dates.
 //
 // A flaw recorded here and nothing a scan found. A scanned issue is published
 // by whoever published the advisory it matched, so no reporter is counting
 // down to it here.
-func flawPlaces(productID, vulnerabilityID int64) func(*bun.SelectQuery) *bun.SelectQuery {
+func flawOccurrences(productID, vulnerabilityID int64) func(*bun.SelectQuery) *bun.SelectQuery {
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where(HeldAs("vulnerability_id"), vulnerabilityID).
 			Where(`"kind" = ?`, Entered).
@@ -109,12 +109,12 @@ func flawPlaces(productID, vulnerabilityID int64) func(*bun.SelectQuery) *bun.Se
 }
 
 // flawEnds is where a flaw's embargo ends in one product now, or nothing where
-// no place has a date.
+// no occurrence has a date.
 func flawEnds(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (*time.Time, error) {
 	var dated []time.Time
 	if err := db.NewSelect().Model((*Finding)(nil)).
 		ColumnExpr(`"disclose_at"`).
-		Apply(flawPlaces(productID, vulnerabilityID)).
+		Apply(flawOccurrences(productID, vulnerabilityID)).
 		Where(`"disclose_at" IS NOT NULL`).
 		OrderExpr(`"disclose_at" DESC`).
 		Limit(1).
@@ -128,8 +128,8 @@ func flawEnds(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64)
 	return &ends, nil
 }
 
-// dateFlaw writes an end onto a flaw's undisclosed places in one product,
-// or clears it where there is none. Only places ending later than it, or not
+// dateFlaw writes an end onto a flaw's undisclosed occurrences in one product,
+// or clears it where there is none. Only occurrences ending later than it, or not
 // at all, where earlier says so: the rule a ruling dates by.
 func dateFlaw(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 	until *time.Time, earlier bool) error {
@@ -212,11 +212,11 @@ func waitsAsShortening(ctx context.Context, db bun.IDB, moved *Movement) (bool, 
 // The end is worked out again from the embargo's own record rather than taken
 // from the ruling's movement alone. A person's extension or shortening sets an
 // end, and a ruling moves it earlier only; replayed without every withdrawn
-// ruling, the record says where the embargo would stand had those rulings
-// never been made. Where that is where it stands now, the ruling set nothing
-// that is still in force and nothing moves. Where it differs, the places take
-// it, which may be no date at all, and the withdrawal is recorded as a
-// movement naming the ruling.
+// ruling, the record says where the embargo would stand had those rulings never
+// been made. Where that is where it stands now, the ruling set nothing that is
+// still in force and nothing moves. Where it differs, the occurrences take it,
+// which may be no date at all, and the withdrawal is recorded as a movement
+// naming the ruling.
 func duplicateUndated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 	personID int64, now time.Time) error {
 
@@ -258,7 +258,7 @@ func duplicateUndated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 
 	standing := replayed(record, gone)
 	placed, err := tx.NewSelect().Model((*Finding)(nil)).
-		Apply(flawPlaces(ruling.ProductID, issue)).
+		Apply(flawOccurrences(ruling.ProductID, issue)).
 		Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("read whether the flaw is still undisclosed: %w", err)

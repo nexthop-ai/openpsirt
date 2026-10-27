@@ -145,17 +145,17 @@ func asText(row finding.Disposed) string {
 		met = fmt.Sprint(*row.Met)
 	}
 	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s",
-		row.Vulnerability, row.Severity, row.Component, row.Version, row.Place,
+		row.Vulnerability, row.Severity, row.Component, row.Version, row.Occurrence,
 		row.State, row.Outcome, row.Justification, row.ProposedBy, at(row.ProposedAt),
 		row.ApprovedBy, at(row.ApprovedAt), at(&row.OpenedAt), at(row.ClosedAt), met)
 }
 
-// A lapsed judgment is part of the record, and the register says so.
+// A lapsed decision is part of the record, and the register says so.
 //
 // The join asked for a live decision, and a lapse nulls the live key in the
-// same statement that marks it — so the place reported as never decided and
+// same statement that marks it — so the occurrence reported as never decided and
 // the register lost who proposed and who approved it, which is what a
-// compliance reader comes here for. The findings list calls the same place
+// compliance reader comes here for. The findings list calls the same occurrence
 // lapsed, so the two surfaces disagreed about one build.
 func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
@@ -176,15 +176,15 @@ func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
 		}
 		var found *finding.Disposed
 		for i, row := range rows {
-			if row.Place == decided {
+			if row.Occurrence == decided {
 				found = &rows[i]
 			}
 		}
 		if found == nil {
-			t.Fatalf("the place the decision was about is not in the register: %+v", rows)
+			t.Fatalf("the occurrence the decision was about is not in the register: %+v", rows)
 		}
 		if found.State != "lapsed" {
-			t.Errorf("a place whose judgment lapsed reads as %q", found.State)
+			t.Errorf("an occurrence whose decision lapsed reads as %q", found.State)
 		}
 		if found.ProposedBy == "" || found.ApprovedBy == "" {
 			t.Errorf("the register lost who decided it: proposed by %q, approved by %q",
@@ -196,8 +196,8 @@ func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
 	})
 }
 
-// decidedAndLapsed puts an agreed judgment on a finding's place and then lets
-// it lapse, and answers with the place it was about.
+// decidedAndLapsed puts an agreed decision on a finding's occurrence and then
+// lets it lapse, and answers with the occurrence it was about.
 //
 // Written here rather than through the triage store because a lapse is what
 // the store does when the code moves, and what is being measured is what the
@@ -208,36 +208,36 @@ func (f *fixture) decidedAndLapsed(t *testing.T, at finding.Finding) string {
 	ctx := t.Context()
 	now := time.Now().UTC().Truncate(time.Microsecond)
 
-	claim := &triage.Claim{
-		Kind: triage.FindingClaim, ProposedBy: 1, ProposedAt: now,
+	decision := &triage.Decision{
+		Kind: triage.FindingDecision, ProposedBy: 1, ProposedAt: now,
 		Outcome: triage.WontFix,
 	}
-	if _, err := f.db.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+	if _, err := f.db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	revision := &triage.Revision{
-		ClaimID: claim.ID, Ordinal: 1, Body: "Not worth the churn.",
+		DecisionID: decision.ID, Ordinal: 1, Body: "Not worth the churn.",
 		WrittenBy: 1, WrittenAt: now,
 	}
 	if _, err := f.db.DB.NewInsert().Model(revision).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.db.DB.NewUpdate().Model((*triage.Claim)(nil)).
-		Set(`"revision_id" = ?`, revision.ID).Where(`"id" = ?`, claim.ID).Exec(ctx); err != nil {
+	if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
+		Set(`"revision_id" = ?`, revision.ID).Where(`"id" = ?`, decision.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.DB.NewInsert().Model(&triage.Approval{
-		ClaimID: claim.ID, RevisionID: revision.ID, ApprovedBy: 2, ApprovedAt: now,
+		DecisionID: decision.ID, RevisionID: revision.ID, ApprovedBy: 2, ApprovedAt: now,
 	}).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	// Lapsed: the state a sweep writes when the last build holding the
 	// versions moves on, which nulls the live key in the same statement.
 	f.decision(t, decisionRow{
-		By: 1, Claim: claim.ID, Issue: at.VulnerabilityID, Place: at.PlaceIdentity,
+		By: 1, Decision: decision.ID, Issue: at.VulnerabilityID, Occurrence: at.OccurrenceIdentity,
 		State: string(triage.LapsedState), ProposedAt: now, Ended: &now,
 	})
-	return at.PlaceIdentity
+	return at.OccurrenceIdentity
 }
 
 func TestTheRegisterCarriesWhyAPersonClosedSomething(t *testing.T) {
@@ -310,7 +310,7 @@ func TestAStateWordTheRegisterDoesNotKnowKeepsNothing(t *testing.T) {
 			t.Fatal("the fixture's register is empty, so this checks nothing")
 		}
 		nonsense, err := f.store.RegisterPage(t.Context(), who, f.target,
-			finding.Registering{States: []finding.ClaimStanding{"whatever"}}, 50, 0)
+			finding.Registering{States: []finding.DecisionStanding{"whatever"}}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -321,14 +321,14 @@ func TestAStateWordTheRegisterDoesNotKnowKeepsNothing(t *testing.T) {
 	})
 }
 
-// A place reads once in the register, whatever history it carries.
+// An occurrence reads once in the register, whatever history it carries.
 //
 // Decision rows are never deleted: a withdrawal or a lapse clears the live key
 // and leaves the row. The register reports the one decision on the record — the
-// live one, or the latest lapsed one where nothing is live — so a place claimed
-// again after a withdrawal is one row, waiting, and not also a second row
-// reading as undecided.
-func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
+// live one, or the latest lapsed one where nothing is live — so an occurrence
+// proposed again after a withdrawal is one row, waiting, and not also a second
+// row reading as undecided.
+func TestAnOccurrenceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -339,16 +339,16 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		withdrawn := finding.PlaceIdentity(swss.Name, "")
-		lapsed := finding.PlaceIdentity(teamd.Name, "")
+		withdrawn := finding.OccurrenceIdentity(swss.Name, "")
+		lapsed := finding.OccurrenceIdentity(teamd.Name, "")
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), withdrawn, "withdrawn", swss.Version, "")
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), withdrawn, "proposed", swss.Version, "again")
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-2"), lapsed, "approved", teamd.Version, "anew")
-		// Lapsed, claimed again and lapsed again, with nothing live: the
+		// Lapsed, proposed again and lapsed again, with nothing live: the
 		// latest lapse is the record.
-		twice := finding.PlaceIdentity(libnl.Name, swss.Name)
+		twice := finding.OccurrenceIdentity(libnl.Name, swss.Name)
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
 
@@ -362,25 +362,25 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 		}
 		states := map[string][]string{}
 		for _, row := range rows {
-			states[row.Place] = append(states[row.Place], string(row.State))
+			states[row.Occurrence] = append(states[row.Occurrence], string(row.State))
 		}
 		if got := states[withdrawn]; len(got) != 1 || got[0] != "waiting" {
-			t.Errorf("a place withdrawn and claimed again reads %v, want one row waiting", got)
+			t.Errorf("an occurrence withdrawn and proposed again reads %v, want one row waiting", got)
 		}
 		if got := states[lapsed]; len(got) != 1 || got[0] != "agreed" {
-			t.Errorf("a place lapsed and agreed again reads %v, want one row agreed", got)
+			t.Errorf("an occurrence lapsed and agreed again reads %v, want one row agreed", got)
 		}
 		if got := states[twice]; len(got) != 1 || got[0] != "lapsed" {
-			t.Errorf("a place lapsed twice with nothing live reads %v, want one row lapsed", got)
+			t.Errorf("an occurrence lapsed twice with nothing live reads %v, want one row lapsed", got)
 		}
 		undecided, total, err := f.store.Register(ctx, who, f.target,
-			finding.Registering{States: []finding.ClaimStanding{"undecided"}}, 50, 0)
+			finding.Registering{States: []finding.DecisionStanding{"undecided"}}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, row := range undecided {
-			if row.Place == withdrawn || row.Place == lapsed {
-				t.Errorf("undecided lists %s, which a live decision answers", row.Place)
+			if row.Occurrence == withdrawn || row.Occurrence == lapsed {
+				t.Errorf("undecided lists %s, which a live decision answers", row.Occurrence)
 			}
 		}
 		if total != len(undecided) {
@@ -389,8 +389,8 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 	})
 }
 
-// The register says what the findings list says about a place a live decision
-// was keyed on at other versions: nothing stands there.
+// The register says what the findings list says about an occurrence a live
+// decision was keyed on at other versions: nothing stands there.
 func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -412,7 +412,7 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 		who := f.holding(t, access.PublicRead)
 		somebody := f.somebodyElse(t)
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
-			finding.PlaceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
+			finding.OccurrenceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
 
 		reads := func(target int64, want string) {
 			t.Helper()
@@ -424,7 +424,7 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 				t.Fatalf("build %d's register reads %+v (total %d), want one row %q", target, rows, total, want)
 			}
 			if want == "undecided" && (rows[0].Outcome != "" || rows[0].ProposedBy != "") {
-				t.Errorf("build %d's register names a judgment that does not cover it: %+v", target, rows[0])
+				t.Errorf("build %d's register names a decision that does not cover it: %+v", target, rows[0])
 			}
 		}
 		reads(f.target, "agreed")
@@ -432,10 +432,10 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 	})
 }
 
-// A finding two live decisions cover reads once: a claim keyed on its versions
-// and a correction, which covers the place at any version. The register names
-// the one the finding's screen names — the correction once it is in force, and
-// the older claim before that.
+// A finding two live decisions cover reads once: a decision keyed on its
+// versions and a correction, which covers the occurrence at any version. The
+// register names the one the finding's screen names — the correction once it is
+// in force, and the older decision before that.
 func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -443,11 +443,11 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 		f.applied(t, found("CVE-2026-1", swss))
 		who := f.holding(t, access.PublicRead)
 		somebody := f.somebodyElse(t)
-		issue, place := f.issueID(t, "CVE-2026-1"), finding.PlaceIdentity(swss.Name, "")
-		f.decided(t, somebody, issue, place, "approved", swss.Version, "keyed")
+		issue, occurrence := f.issueID(t, "CVE-2026-1"), finding.OccurrenceIdentity(swss.Name, "")
+		f.decided(t, somebody, issue, occurrence, "approved", swss.Version, "keyed")
 		f.decision(t, decisionRow{
-			By: somebody, Claim: claimSaying(t, f.db, somebody, "mismatched"),
-			Issue: issue, Place: place, State: "proposed",
+			By: somebody, Decision: decisionSaying(t, f.db, somebody, "mismatched"),
+			Issue: issue, Occurrence: occurrence, State: "proposed",
 			Component: ptr("0.9.0"), Key: "anywhere",
 		})
 
@@ -459,24 +459,24 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 			}
 			var here []finding.Disposed
 			for _, row := range rows {
-				if row.Place == place {
+				if row.Occurrence == occurrence {
 					here = append(here, row)
 				}
 			}
 			if len(here) != 1 || total != len(rows) {
-				t.Fatalf("%s: the place reads %d times, total %d of %d rows", because,
+				t.Fatalf("%s: the occurrence reads %d times, total %d of %d rows", because,
 					len(here), total, len(rows))
 			}
 			if here[0].Outcome != outcome {
-				t.Errorf("%s: the place reads %q, want %q", because, here[0].Outcome, outcome)
+				t.Errorf("%s: the occurrence reads %q, want %q", because, here[0].Outcome, outcome)
 			}
 		}
-		reads("a correction waiting beside an agreed claim", "not-applicable")
+		reads("a correction waiting beside an agreed decision", "not-applicable")
 		if _, err := f.db.DB.NewUpdate().Table("decision_occurrence").Set(`"state" = ?`, "approved").
 			Where(`"live_key" = ?`, "anywhere").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		reads("a correction in force beside an agreed claim", "mismatched")
+		reads("a correction in force beside an agreed decision", "mismatched")
 	})
 }
 

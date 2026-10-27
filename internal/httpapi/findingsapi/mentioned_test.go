@@ -19,20 +19,20 @@ func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
 	// is exactly whoever the editor would have offered — from the same
 	// query, so the two cannot come to disagree.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 
-		// A claim to hang comments off.
+		// A decision to hang comments off.
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
+				"/findings/CVE-2026-9999/occurrences/"+occurrence+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"The parser is never reached."}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("proposing answered %d: %s", made.Code, made.Body.String())
 		}
 		var claimed struct {
-			ID      int64 `json:"id"`
-			ClaimID int64 `json:"claim_id"`
+			ID         int64 `json:"id"`
+			DecisionID int64 `json:"decision_id"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &claimed); err != nil {
 			t.Fatal(err)
@@ -41,7 +41,7 @@ func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
 		// A comment naming a colleague who reads this product, and one naming
 		// somebody who does not exist at all.
 		said := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/decisions/"+httpapitest.Itoa(claimed.ClaimID)+"/comments",
+			"/v1/decisions/"+httpapitest.Itoa(claimed.DecisionID)+"/comments",
 			`{"body":"@reader could you look at this? @nobody-at-all too, and @triager wrote it."}`)
 		if said.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
@@ -86,14 +86,14 @@ func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
 func TestAMentionOnUndisclosedWorkReachesNobodyWhoMayNotSeeIt(t *testing.T) {
 	// The disclosure this rule exists to prevent: being told you were named on
 	// a finding is being told the finding exists. Two people are named on a
-	// claim about undisclosed work: one who reads it is told, and one who
+	// decision about undisclosed work: one who reads it is told, and one who
 	// reads only what is disclosed is told nothing.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		flaw := r.Embargoed(t)
-		claim, _ := r.Claimed(t, "private-triage", flaw, "libnl-3-200", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "private-triage", flaw, "libnl-3-200", httpapitest.Dismissal)
 		said := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/decisions/"+httpapitest.Itoa(claim)+"/comments",
+			"/v1/decisions/"+httpapitest.Itoa(decision)+"/comments",
 			`{"body":"@reader and @private, could you look at the management socket?"}`)
 		if said.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
@@ -151,11 +151,11 @@ func TestAMentionThatReachedNobodyIsReportedBack(t *testing.T) {
 	// telling them apart would answer "can this person see undisclosed
 	// work" one comment at a time.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
-		_, claim := r.DecidedAt(t, place)
+		occurrence := r.Scanned(t)
+		_, decision := r.DecidedAt(t, occurrence)
 
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", decision),
 			`{"body":"@private-triage and @nobody-is-called-this, what do you think?"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())
@@ -174,7 +174,7 @@ func TestAMentionThatReachedNobodyIsReportedBack(t *testing.T) {
 		// A comment naming only people who can read it says nothing, so the
 		// report is a report rather than noise on every write.
 		quiet := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", decision),
 			`{"body":"@private-triage one more thing."}`)
 		if quiet.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", quiet.Code, quiet.Body.String())
@@ -197,8 +197,8 @@ func TestNamesPastTheMentionCapAreReportedRatherThanDiscarded(t *testing.T) {
 	// finding nobody has announced, that notification is the only signal the
 	// people named get that they were called into it.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
-		_, claim := r.DecidedAt(t, place)
+		occurrence := r.Scanned(t)
+		_, decision := r.DecidedAt(t, occurrence)
 
 		var named strings.Builder
 		named.WriteString("@private-triage")
@@ -206,7 +206,7 @@ func TestNamesPastTheMentionCapAreReportedRatherThanDiscarded(t *testing.T) {
 			fmt.Fprintf(&named, " @nobody-%d", i)
 		}
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/comments", claim),
+			fmt.Sprintf("/v1/decisions/%d/comments", decision),
 			`{"body":"`+named.String()+` what do you think?"}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body.String())

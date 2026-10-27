@@ -17,25 +17,25 @@ import (
 
 // The case against agreeing.
 //
-// An approver is shown the claim and the reasoning and nothing that argues
+// An approver is shown the decision and the reasoning and nothing that argues
 // against them, which is the rubber stamp the queue's whole shape was
 // written against — so this is a weakness in a control rather than a card
 // layout. The material already exists: the finding's own detail carries the
-// decisions made elsewhere and what else sits at the place. What was missing
-// is putting it where the judgment is made rather than a page away from it.
+// decisions made elsewhere and what else sits at the occurrence. What was missing
+// is putting it where the decision is made rather than a page away from it.
 //
-// Two counts and no argument. It does not say a claim is wrong — nothing
+// Two counts and no argument. It does not say a decision is wrong — nothing
 // here can know that — it says what a careful reader would go and look up, so
 // that not looking is a choice rather than an omission.
 
-// Counter is what argues against a claim, in numbers.
+// Counter is what argues against a decision, in numbers.
 type Counter struct {
 	// Elsewhere is what has already been agreed about this same issue at other
-	// places, by outcome. A dismissal here where six places called it affected
+	// occurrences, by outcome. A dismissal here where six occurrences called it affected
 	// is the case worth a second look.
 	Elsewhere map[string]int
-	// Undecided is how many other issues sit undecided at the same place. A
-	// claim in a run of forty is a different thing from a claim on its own:
+	// Undecided is how many other issues sit undecided at the same occurrence. A
+	// decision in a run of forty is a different thing from a decision on its own:
 	// it is usually right and it is also how a run gets waved through.
 	Undecided int
 }
@@ -43,24 +43,24 @@ type Counter struct {
 // Said reports whether there is anything to say at all.
 func (c Counter) Said() bool { return len(c.Elsewhere) > 0 || c.Undecided > 0 }
 
-// counters reads both, for a whole page of claims at once.
+// counters reads both, for a whole page of decisions at once.
 //
-// One statement each rather than one per card: a page of fifty claims read a
+// One statement each rather than one per card: a page of fifty decisions read a
 // row at a time is a hundred round trips before the queue draws, which is the
 // shape that makes a card carry less than it should.
 func (s *Store) counters(ctx context.Context, subject access.Subject,
-	representatives []Decision) (map[int64]Counter, error) {
+	representatives []DecisionOccurrence) (map[int64]Counter, error) {
 
 	out := map[int64]Counter{}
 	if len(representatives) == 0 {
 		return out, nil
 	}
 	issues := make([]int64, 0, len(representatives))
-	places := make([]string, 0, len(representatives))
+	occurrences := make([]string, 0, len(representatives))
 	products := make([]int64, 0, len(representatives))
 	for _, row := range representatives {
 		issues = append(issues, row.VulnerabilityID)
-		places = append(places, row.PlaceIdentity)
+		occurrences = append(occurrences, row.OccurrenceIdentity)
 		products = append(products, row.ProductID)
 	}
 
@@ -69,26 +69,26 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 	// proposals here would let two people in a queue agree with each other
 	// by being counted at each other.
 	//
-	// The claim's own place is not excluded, and that is deliberate. A
-	// place identity is a pair of names with no product in it, so
-	// excluding by place alone would drop a decision in *another* product
+	// The decision's own occurrence is not excluded, and that is deliberate. An
+	// occurrence identity is a pair of names with no product in it, so
+	// excluding by occurrence alone would drop a decision in *another* product
 	// that happens to ship the same pair — which is exactly the
-	// counter-evidence worth having. Nothing of the claim's own can be
+	// counter-evidence worth having. Nothing of the decision's own can be
 	// counted here anyway: it is in the queue, so it is proposed, and one
-	// live decision per place means the place it sits at holds no approved
+	// live decision per occurrence means the occurrence it sits at holds no approved
 	// one.
 	var agreed []struct {
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Outcome         string `bun:"outcome"`
-		Places          int    `bun:"places"`
+		Occurrences     int    `bun:"places"`
 	}
-	// Counted by the issue each decision is read as, so what was agreed under
+	// Counted by the issue each row is read as, so what was agreed under
 	// a name that merged into this issue counts as agreed about it.
 	issueOf, err := finding.IssuesOf(ctx, s.db, issues)
 	if err != nil {
 		return nil, err
 	}
-	elsewhere := s.db.NewSelect().Model((*Decision)(nil)).
+	elsewhere := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 		Join(finding.DecisionIssue).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
@@ -106,16 +106,16 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		if byIssue[row.VulnerabilityID] == nil {
 			byIssue[row.VulnerabilityID] = map[string]int{}
 		}
-		byIssue[row.VulnerabilityID][row.Outcome] += row.Places
+		byIssue[row.VulnerabilityID][row.Outcome] += row.Occurrences
 	}
 
-	// open is how much else at the same place nobody has answered, by the
-	// same test every screen uses for "undecided": no live claim covering
+	// open is how much else at the same occurrence nobody has answered, by the
+	// same test every screen uses for "undecided": no live decision covering
 	// it at the versions the code holds now.
 	var open []struct {
-		ProductID int64  `bun:"product_id"`
-		Place     string `bun:"occurrence_identity"`
-		Issues    int    `bun:"issues"`
+		ProductID  int64  `bun:"product_id"`
+		Occurrence string `bun:"occurrence_identity"`
+		Issues     int    `bun:"issues"`
 	}
 	undecided := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -128,14 +128,14 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
-		Where(`"f"."occurrence_identity" IN (?)`, bun.List(places)).
+		Where(`"f"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 		Where(`"st"."product_id" IN (?)`, bun.List(products)).
-		// The issue before the decision, and CROSS JOIN ... WHERE is what fixes
-		// that order on SQLite: the decision is then reached through its index
-		// on product, issue and place. Joined the other way, SQLite reads every
-		// decision in the product once per finding at the place — 1.0 s for a
-		// kernel place carrying 6,000 issues in a product holding 3,060
-		// decisions, against 0.016 s this way.
+		// The issue before the decision occurrence, and CROSS JOIN ... WHERE is what fixes
+		// that order on SQLite: the row is then reached through its index
+		// on product, issue and occurrence. Joined the other way, SQLite reads every
+		// row in the product once per finding at the occurrence — 1.0 s for a
+		// kernel occurrence carrying 6,000 issues in a product holding 3,060
+		// rows, against 0.016 s this way.
 		Where(`NOT EXISTS (SELECT 1 FROM "vulnerability" AS "dv"
 			CROSS JOIN "decision_occurrence" AS "de"
 			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
@@ -148,15 +148,15 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Scan(ctx, &open); err != nil {
 		return nil, fmt.Errorf("read what else is undecided there: %w", err)
 	}
-	byPlace := map[string]int{}
+	byOccurrence := map[string]int{}
 	for _, row := range open {
-		byPlace[fmt.Sprintf("%d %s", row.ProductID, row.Place)] = row.Issues
+		byOccurrence[fmt.Sprintf("%d %s", row.ProductID, row.Occurrence)] = row.Issues
 	}
 
 	for _, row := range representatives {
 		out[row.ID] = Counter{
 			Elsewhere: byIssue[issueOf[row.VulnerabilityID]],
-			Undecided: byPlace[fmt.Sprintf("%d %s", row.ProductID, row.PlaceIdentity)],
+			Undecided: byOccurrence[fmt.Sprintf("%d %s", row.ProductID, row.OccurrenceIdentity)],
 		}
 	}
 	return out, nil

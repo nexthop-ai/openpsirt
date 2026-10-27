@@ -50,19 +50,19 @@ type SuggestionBody struct {
 	Unanalyzed []LeadBuild   `json:"unanalyzed" doc:"The builds holding the component that the lead's series never analyzed"`
 }
 
-// NoteBody is one piece of writing on a claim about a lead.
+// NoteBody is one piece of writing on a decision about a lead.
 type NoteBody struct {
-	Claim   int64  `json:"claim" doc:"The claim it was written on"`
-	Comment bool   `json:"comment,omitempty" doc:"Whether it is a comment. Otherwise it is a revision of the claim's reasoning"`
-	Body    string `json:"body" doc:"What was written, in markdown"`
-	Written string `json:"written" format:"date-time"`
+	Decision int64  `json:"decision" doc:"The decision it was written on"`
+	Comment  bool   `json:"comment,omitempty" doc:"Whether it is a comment. Otherwise it is a revision of the decision's reasoning"`
+	Body     string `json:"body" doc:"What was written, in markdown"`
+	Written  string `json:"written" format:"date-time"`
 }
 
 // AuthorBody is one person who wrote about a lead, with what they wrote.
 type AuthorBody struct {
 	Identity string     `json:"identity"`
 	Name     string     `json:"name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Notes    []NoteBody `json:"notes" doc:"The revisions of reasoning and the comments they wrote on claims about the lead, oldest first"`
+	Notes    []NoteBody `json:"notes" doc:"The revisions of reasoning and the comments they wrote on decisions about the lead, oldest first"`
 }
 
 // AnalyzerSaidBody is one message the analyzer wrote at a path.
@@ -74,7 +74,7 @@ type AnalyzerSaidBody struct {
 // DisclosesBody is what moving a lead into its flaw's case discloses with the
 // flaw.
 type DisclosesBody struct {
-	Authors  []AuthorBody       `json:"authors" doc:"Everybody who wrote reasoning or a comment on a claim about the lead or the leads linked with it, with what each wrote, as you read the claims"`
+	Authors  []AuthorBody       `json:"authors" doc:"Everybody who wrote reasoning or a comment on a decision about the lead or the leads linked with it, with what each wrote, as you read the decisions"`
 	Paths    []string           `json:"paths" doc:"Every path the lead names"`
 	Said     []AnalyzerSaidBody `json:"said" doc:"Every message the analyzer wrote at those paths"`
 	Snippets int                `json:"snippets" doc:"The number of source snippets disclosed with the flaw. Zero where none is"`
@@ -88,20 +88,20 @@ type HandoffOfferBody struct {
 	Suggestions []SuggestionBody `json:"suggestions" doc:"The components offered, most likely first. The build itself is always last"`
 	Prefix      string           `json:"prefix,omitempty" doc:"The path a confirmed component is remembered for: the repository or declared third-party path the lead is in, or its directory"`
 	ThirdParty  bool             `json:"third_party,omitempty" doc:"Whether the lead is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted"`
-	Together    int              `json:"together" doc:"The number of other leads linked to the flaw with this one: the leads its confirming claim covers. A move moves them with it"`
+	Together    int              `json:"together" doc:"The number of other leads linked to the flaw with this one: the leads its confirming decision covers. A move moves them with it"`
 	Discloses   DisclosesBody    `json:"discloses" doc:"What moving the lead, and the leads linked with it, into the flaw's case discloses when the flaw is disclosed"`
 }
 
 // HandedOffBody is the record of a lead handed off.
 type HandedOffBody struct {
-	Identifier string `json:"identifier" doc:"The identifier the flaw was filed under"`
-	Component  string `json:"component" doc:"The component in the build that carries it"`
-	Builds     int    `json:"builds" doc:"The number of builds it was recorded against"`
-	Places     int    `json:"places" doc:"The number of findings of the flaw that opened"`
-	Moved      bool   `json:"moved" doc:"Whether the lead moved into the flaw's case"`
+	Identifier  string `json:"identifier" doc:"The identifier the flaw was filed under"`
+	Component   string `json:"component" doc:"The component in the build that carries it"`
+	Builds      int    `json:"builds" doc:"The number of builds it was recorded against"`
+	Occurrences int    `json:"occurrences" doc:"The number of findings of the flaw that opened"`
+	Moved       bool   `json:"moved" doc:"Whether the lead moved into the flaw's case"`
 }
 
-// leadPath is one lead, addressed by its place on one build.
+// leadPath is one lead, addressed by its occurrence on one build.
 const leadPath = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}"
 
 // leadAt is the reader, the build and the product a route about one lead
@@ -159,16 +159,16 @@ func registerHandoff(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
 		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Place   string `path:"occurrence" doc:"The lead's place identity"`
+		Product    string `path:"product"`
+		Stream     string `path:"stream"`
+		Variant    string `path:"variant"`
+		Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
 	}) (*struct{ Body HandoffOfferBody }, error) {
 		at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
-		offer, err := analysis.Propose(ctx, in.DB.DB, at.subject, at.named.ProductID, input.Place)
+		offer, err := analysis.Propose(ctx, in.DB.DB, at.subject, at.named.ProductID, input.Occurrence)
 		if err != nil {
 			return nil, refusedHandoff(in, err)
 		}
@@ -195,7 +195,7 @@ func registerHandoff(api huma.API, in core.Deps) {
 		Summary: "Record a confirmed code finding as a flaw",
 		Description: "Records a confirmed code finding as a flaw in this product, found here and " +
 			"undisclosed, through the same path as `POST /v1/products/{product}/findings`, and " +
-			"links the code finding to it, with every other code finding the claim confirming it covers.\n\n" +
+			"links the code finding to it, with every other code finding the decision confirming it covers.\n\n" +
 			"`builds` is the whole set the flaw is recorded against. `component` names what " +
 			"carries it, as the builds name it, and is remembered for the code finding's prefix so the next " +
 			"code finding under it is offered the same; leave it out for the build itself.\n\n" +
@@ -206,11 +206,11 @@ func registerHandoff(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
 		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Place   string `path:"occurrence" doc:"The lead's place identity"`
-		Body    struct {
+		Product    string `path:"product"`
+		Stream     string `path:"stream"`
+		Variant    string `path:"variant"`
+		Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
+		Body       struct {
 			Builds    []LeadBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
 			Component string      `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Ecosystem string      `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
@@ -246,7 +246,7 @@ func registerHandoff(api huma.API, in core.Deps) {
 			targets = append(targets, target.ID)
 		}
 		done, err := analysis.HandOff(ctx, in.DB.DB, subject, analysis.Handing{
-			ProductID: at.named.ProductID, PlaceIdentity: input.Place, Move: input.Body.Move,
+			ProductID: at.named.ProductID, OccurrenceIdentity: input.Occurrence, Move: input.Body.Move,
 			Flaw: finding.Entering{
 				TargetIDs: targets, Component: input.Body.Component,
 				Ecosystem: input.Body.Ecosystem, Namespace: input.Body.Namespace,
@@ -258,7 +258,7 @@ func registerHandoff(api huma.API, in core.Deps) {
 			return nil, refusedHandoff(in, err)
 		}
 		if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadHandedOff,
-			ProductID: at.named.ProductID, Place: input.Place, By: subject.ID}); err != nil {
+			ProductID: at.named.ProductID, Occurrence: input.Occurrence, By: subject.ID}); err != nil {
 			in.Log().Error("could not say that a lead was handed off", "error", err)
 		}
 		return &struct {
@@ -266,36 +266,36 @@ func registerHandoff(api huma.API, in core.Deps) {
 			Body   HandedOffBody
 		}{Status: http.StatusCreated, Body: HandedOffBody{
 			Identifier: done.Identifier, Component: done.Component,
-			Builds: done.Builds, Places: done.Places, Moved: input.Body.Move,
+			Builds: done.Builds, Occurrences: done.Occurrences, Moved: input.Body.Move,
 		}}, nil
 	})
 
 	moving := func(move bool) func(context.Context, *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Place   string `path:"occurrence" doc:"The lead's place identity"`
+		Product    string `path:"product"`
+		Stream     string `path:"stream"`
+		Variant    string `path:"variant"`
+		Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
 	}) (*struct{}, error) {
 		return func(ctx context.Context, input *struct {
-			Product string `path:"product"`
-			Stream  string `path:"stream"`
-			Variant string `path:"variant"`
-			Place   string `path:"occurrence" doc:"The lead's place identity"`
+			Product    string `path:"product"`
+			Stream     string `path:"stream"`
+			Variant    string `path:"variant"`
+			Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
 		}) (*struct{}, error) {
 			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 			if err != nil {
 				return nil, err
 			}
 			if move {
-				err = analysis.Move(ctx, in.DB.DB, at.subject, at.named.ProductID, input.Place, time.Now())
+				err = analysis.Move(ctx, in.DB.DB, at.subject, at.named.ProductID, input.Occurrence, time.Now())
 			} else {
-				err = analysis.Unmove(ctx, in.DB.DB, at.subject, at.named.ProductID, input.Place)
+				err = analysis.Unmove(ctx, in.DB.DB, at.subject, at.named.ProductID, input.Occurrence)
 			}
 			if err != nil {
 				return nil, refusedHandoff(in, err)
 			}
 			if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadMoved,
-				ProductID: at.named.ProductID, Place: input.Place, By: at.subject.ID, Into: move}); err != nil {
+				ProductID: at.named.ProductID, Occurrence: input.Occurrence, By: at.subject.ID, Into: move}); err != nil {
 				in.Log().Error("could not say that a lead moved", "error", err)
 			}
 			return &struct{}{}, nil
@@ -355,7 +355,7 @@ func disclosesBody(ctx context.Context, in core.Deps, d analysis.Disclosure) (Di
 		author := AuthorBody{Identity: who.Identity(a.PersonID), Name: who.Label(a.PersonID),
 			Notes: make([]NoteBody, 0, len(a.Notes))}
 		for _, n := range a.Notes {
-			author.Notes = append(author.Notes, NoteBody{Claim: n.ClaimID, Comment: n.Comment, Body: n.Body,
+			author.Notes = append(author.Notes, NoteBody{Decision: n.DecisionID, Comment: n.Comment, Body: n.Body,
 				Written: core.Stamp(n.WrittenAt)})
 		}
 		out.Authors = append(out.Authors, author)
@@ -372,26 +372,26 @@ type LeadCollaboratorBody = CollaboratorBody
 func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering) {
 	const path = leadPath + "/collaborators"
 	type leadInput = struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Place   string `path:"occurrence" doc:"The lead's place identity"`
+		Product    string `path:"product"`
+		Stream     string `path:"stream"`
+		Variant    string `path:"variant"`
+		Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
 	}
 	type personInput = struct {
-		Product  string `path:"product"`
-		Stream   string `path:"stream"`
-		Variant  string `path:"variant"`
-		Place    string `path:"occurrence" doc:"The lead's place identity"`
-		Identity string `path:"identity"`
+		Product    string `path:"product"`
+		Stream     string `path:"stream"`
+		Variant    string `path:"variant"`
+		Occurrence string `path:"occurrence" doc:"The lead's occurrence identity"`
+		Identity   string `path:"identity"`
 	}
 	// handed is the hand-off of the lead a route names, where the reader
 	// reads internal work in the product: who is on a lead is managed by its
 	// internal readers, kept or moved.
-	handed := func(ctx context.Context, db bun.IDB, at *leadAt, place string) (*finding.Handoff, error) {
-		if _, err := finding.NewStore(db).LeadAt(ctx, at.subject, at.target, place); err != nil {
+	handed := func(ctx context.Context, db bun.IDB, at *leadAt, occurrence string) (*finding.Handoff, error) {
+		if _, err := finding.NewStore(db).LeadAt(ctx, at.subject, at.target, occurrence); err != nil {
 			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
 		}
-		h, err := finding.HandoffAt(ctx, db, at.named.ProductID, place)
+		h, err := finding.HandoffAt(ctx, db, at.named.ProductID, occurrence)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "that lead could not be looked up", err)
 		}
@@ -405,8 +405,8 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 	}
 	// changing is handed asked inside the transaction granting or withdrawing,
 	// where a disclosed flaw ends the grants.
-	changing := func(ctx context.Context, tx bun.IDB, at *leadAt, place string) (*finding.Handoff, string, error) {
-		h, err := handed(ctx, tx, at, place)
+	changing := func(ctx context.Context, tx bun.IDB, at *leadAt, occurrence string) (*finding.Handoff, string, error) {
+		h, err := handed(ctx, tx, at, occurrence)
 		if err != nil {
 			return nil, "", err
 		}
@@ -433,11 +433,11 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 			if err != nil {
 				return nil, err
 			}
-			h, err := handed(ctx, in.DB.DB, at, input.Place)
+			h, err := handed(ctx, in.DB.DB, at, input.Occurrence)
 			if err != nil {
 				return nil, err
 			}
-			rows, err := access.NewStore(in.DB.DB).LeadRows(ctx, at.named.ProductID, h.PlaceIdentity)
+			rows, err := access.NewStore(in.DB.DB).LeadRows(ctx, at.named.ProductID, h.OccurrenceIdentity)
 			if err != nil {
 				return nil, core.WentWrong(in.Logger, "who is on this lead could not be read", err)
 			}
@@ -472,14 +472,14 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				var name string
 				var err error
-				if h, name, err = changing(ctx, tx, at, input.Place); err != nil {
+				if h, name, err = changing(ctx, tx, at, input.Occurrence); err != nil {
 					return err
 				}
 				rights := access.NewStore(tx)
 				if person, err = core.PersonNamed(ctx, a.Logger, rights, input.Identity); err != nil {
 					return err
 				}
-				if added, err = rights.AddToLead(ctx, at.named.ProductID, h.PlaceIdentity, person.ID,
+				if added, err = rights.AddToLead(ctx, at.named.ProductID, h.OccurrenceIdentity, person.ID,
 					at.subject.ID); err != nil {
 					return core.WentWrong(in.Logger, "they could not be granted the lead", err)
 				}
@@ -505,14 +505,14 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 				PersonID: person.ID, Kind: notify.BroughtIn,
 				Body: "You have been granted the static analysis lead behind " + flaw[h.VulnerabilityID] +
 					" in " + at.named.Product + ". You can read its evidence, and nothing else of that product.",
-				Link:    weblink.Lead(at.named.Product, at.named.Stream, at.named.Variant, h.PlaceIdentity),
+				Link:    weblink.Lead(at.named.Product, at.named.Stream, at.named.Variant, h.OccurrenceIdentity),
 				Private: true,
 				// The flaw, so somebody on its case reads the line as well as
 				// somebody reading the product's undisclosed work, and the
 				// lead, so the person granted it alone does.
 				ProductID:       &at.named.ProductID,
 				VulnerabilityID: &h.VulnerabilityID,
-				Concerns:        notify.ConcerningLead(at.named.ProductID, h.PlaceIdentity),
+				Concerns:        notify.ConcerningLead(at.named.ProductID, h.OccurrenceIdentity),
 			}, "person", person.Identity)
 			return &struct{}{}, nil
 		})
@@ -531,7 +531,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 				return nil, err
 			}
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-				h, name, err := changing(ctx, tx, at, input.Place)
+				h, name, err := changing(ctx, tx, at, input.Occurrence)
 				if err != nil {
 					return err
 				}
@@ -540,7 +540,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 				if err != nil {
 					return err
 				}
-				switch err := rights.RemoveFromLead(ctx, at.named.ProductID, h.PlaceIdentity, person.ID,
+				switch err := rights.RemoveFromLead(ctx, at.named.ProductID, h.OccurrenceIdentity, person.ID,
 					at.subject.ID); {
 				case errors.Is(err, access.ErrNothingMatched):
 					return huma.Error404NotFound("they do not hold this lead")

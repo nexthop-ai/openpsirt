@@ -44,7 +44,7 @@ func (l Level) column() (string, bool) {
 
 // OpenBy counts what is open at each product, branch or variant.
 //
-// Counted as issues at components rather than as places, which is what the
+// Counted as issues at components rather than as occurrences, which is what the
 // findings list counts and what a catalog row has to agree with. A component
 // reached twenty ways carries the same issue twenty times, so counting rows
 // makes a product look twenty times worse than the list somebody opens next.

@@ -73,14 +73,14 @@ func TestTwoSourceVersionsInOneBuildAreTwoEntriesAndOnePromiseEach(t *testing.T)
 			t.Fatalf("%d entries for two source versions: %+v", len(builds), builds)
 		}
 
-		_, err = f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
+		_, err = f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
 			[]int64{f.target}, "libcurl4t64", "")
 		var several *graph.Ambiguous
 		if !errors.As(err, &several) || len(several.Choices) != 2 {
 			t.Fatalf("a promise naming no version reached %v, want a refusal offering both", err)
 		}
 
-		reached, err := f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
+		reached, err := f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
 			[]int64{f.target}, "curl", "8.5.0-2")
 		if err != nil {
 			t.Fatal(err)
@@ -124,7 +124,7 @@ func TestAnUndisclosedFindingOnASiblingBinaryCountsForTheSourcePackage(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(builds) != 1 || builds[0].Issues != 1 || builds[0].Places != 1 {
+		if len(builds) != 1 || builds[0].Issues != 1 || builds[0].Occurrences != 1 {
 			t.Errorf("a reader of disclosed work reads %+v, want the disclosed issue alone", builds)
 		}
 	})
@@ -146,13 +146,13 @@ func TestANameResolvesToWhatTheBuildsAskedAboutShip(t *testing.T) {
 		hide(t, f, libnlNew)
 		both := f.holding(t, access.PublicTriage, access.PrivateTriage)
 
-		reached, err := f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, both, f.productID,
+		reached, err := f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, both, f.productID,
 			[]int64{other}, libnl.Name, "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(reached) != 1 {
-			t.Errorf("a promise for the second build reached %d places, want its one", len(reached))
+			t.Errorf("a promise for the second build reached %d occurrences, want its one", len(reached))
 		}
 		withheld, err := f.store.WithheldOnComponent(t.Context(), both, f.productID,
 			[]int64{other}, libnl.Name, "")
@@ -178,13 +178,13 @@ func TestABlankNameReachesNothing(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicTriage)
 		for _, blank := range []string{"", " "} {
-			reached, err := f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
+			reached, err := f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
 				[]int64{f.target}, blank, "")
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(reached) != 0 {
-				t.Errorf("%q reached %d places", blank, len(reached))
+				t.Errorf("%q reached %d occurrences", blank, len(reached))
 			}
 		}
 	})
@@ -213,7 +213,7 @@ func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
 
 		seen := &statements{}
 		f.hook(seen)
-		reached, err := f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
+		reached, err := f.store.OccurrencesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
 			[]int64{f.target}, "libcurl4t64", "")
 		if err != nil {
 			t.Fatal(err)

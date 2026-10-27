@@ -23,27 +23,27 @@ import (
 
 // One decision covering everything at one component.
 //
-// A distinct act with its own resolution: the places are worked out from a
+// A distinct act with its own resolution: the occurrences are worked out from a
 // component and a build rather than named, the bounds are on how many issues
 // a reviewer reads and how many findings are written, and what comes back is
-// one claim however many it reached.
+// one decision however many it reached.
 
-// DefaultTogetherCap is how many places one answer about one issue may cover
+// DefaultBulkDecisionCap is how many occurrences one answer about one issue may cover
 // when nobody has set a limit, read from where the setting itself is declared.
-const DefaultTogetherCap = setting.DefaultTogetherCap
+const DefaultBulkDecisionCap = setting.DefaultBulkDecisionCap
 
-// allowed is what every proposal in a bulk judgment has to satisfy before
+// allowed is what every proposal in a bulk decision has to satisfy before
 // any of them is written.
 //
 // Checked over the whole set first, because refusing halfway is the failure
 // these actions exist to avoid — and the bound is on the rows about to be
 // written rather than on what a caller named, since one name expands into as
-// many places as the issue sits at.
+// many occurrences as the issue sits at.
 //
 // Called inside the transaction that writes them, so the limit is the one in
 // force when the rows land and a retry reads it again.
 func (s *Store) allowed(ctx context.Context, subject access.Subject, proposals []Proposal) error {
-	cap, err := setting.NewStore(s.db).Count(ctx, setting.TogetherCap, DefaultTogetherCap)
+	cap, err := setting.NewStore(s.db).Count(ctx, setting.BulkDecisionCap, DefaultBulkDecisionCap)
 	if err != nil {
 		return fmt.Errorf("read how many findings one action may write: %w", err)
 	}
@@ -58,9 +58,9 @@ func (s *Store) allowed(ctx context.Context, subject access.Subject, proposals [
 // (REQ-27): a new answer about many issues, a re-confirmation of answers that
 // lapsed, and answers carried onto another line.
 //
-// Issues are counted where places are not, because a reviewer reads issues: a
-// kernel issue sits at about 45 places, so a limit of 2,000 places is 44
-// issues. Places are bounded separately, by a ceiling that guards the write
+// Issues are counted where occurrences are not, because a reviewer reads issues: a
+// kernel issue sits at about 45 occurrences, so a limit of 2,000 occurrences is 44
+// issues. Occurrences are bounded separately, by a ceiling that guards the write
 // rather than the reader.
 //
 // A limit left at zero is the deployment's setting, read inside the
@@ -72,15 +72,15 @@ type Bounds struct {
 	// Agreed is how many issues an act may answer where nothing in it does:
 	// every row carries an agreement already given.
 	Agreed int
-	// Places is how many findings any such act may write.
-	Places int
+	// Occurrences is how many findings any such act may write.
+	Occurrences int
 }
 
 // DefaultBounds is the shipped limits, for where nobody has said.
 func DefaultBounds() Bounds {
 	return Bounds{
 		Review: setting.DefaultReviewIssues, Agreed: setting.DefaultAgreedIssues,
-		Places: setting.DefaultWriteCeiling,
+		Occurrences: setting.DefaultWriteCeiling,
 	}
 }
 
@@ -94,8 +94,8 @@ func (b Bounds) orDefaults() Bounds {
 	if b.Agreed <= 0 {
 		b.Agreed = shipped.Agreed
 	}
-	if b.Places <= 0 {
-		b.Places = shipped.Places
+	if b.Occurrences <= 0 {
+		b.Occurrences = shipped.Occurrences
 	}
 	return b
 }
@@ -119,7 +119,7 @@ func (b Bounds) within(ctx context.Context, db bun.IDB) (Bounds, error) {
 	}{
 		{setting.ReviewIssues, setting.DefaultReviewIssues, &b.Review},
 		{setting.AgreedIssues, setting.DefaultAgreedIssues, &b.Agreed},
-		{setting.WriteCeiling, setting.DefaultWriteCeiling, &b.Places},
+		{setting.WriteCeiling, setting.DefaultWriteCeiling, &b.Occurrences},
 	} {
 		if *each.into > 0 {
 			continue
@@ -140,18 +140,18 @@ func (b Bounds) check(proposals []Proposal) error {
 	issues := map[[2]int64]bool{}
 	review := false
 	for _, p := range proposals {
-		issues[[2]int64{p.Place.ProductID, p.Place.VulnerabilityID}] = true
+		issues[[2]int64{p.Occurrence.ProductID, p.Occurrence.VulnerabilityID}] = true
 		review = review || p.NeedsApproval
 	}
 	return b.counted(len(issues), len(proposals), review)
 }
 
 // counted is check over counts already taken.
-func (b Bounds) counted(issues, places int, review bool) error {
+func (b Bounds) counted(issues, occurrences int, review bool) error {
 	b = b.orDefaults()
-	if places > b.Places {
+	if occurrences > b.Occurrences {
 		return refusal.Errorf("that is %d findings and one action here writes at most %d: narrow "+
-			"the selection, or raise the limit deliberately", places, b.Places)
+			"the selection, or raise the limit deliberately", occurrences, b.Occurrences)
 	}
 	if review && issues > b.Review {
 		return refusal.Errorf("that is %d issues and a second person is asked to read at most %d "+
@@ -175,7 +175,7 @@ func (b Bounds) counted(issues, places int, review bool) error {
 // the bump closes what it closes. The distinction is reversibility, not size.
 func permitted(subject access.Subject, proposals []Proposal, now time.Time) error {
 	for _, p := range proposals {
-		if !mayDecideOn(subject, p.Place.ProductID, p.Place.VulnerabilityID, visibilityOf(p.Place)) {
+		if !mayDecideOn(subject, p.Occurrence.ProductID, p.Occurrence.VulnerabilityID, visibilityOf(p.Occurrence)) {
 			return ErrNotTheirs
 		}
 		if err := p.valid(now); err != nil {
@@ -188,10 +188,10 @@ func permitted(subject access.Subject, proposals []Proposal, now time.Time) erro
 	return nil
 }
 
-// TogetherAt names what one judgment covers: some issues, and the build and
+// BulkDecisionAt names what one decision covers: some issues, and the build and
 // component they sit at.
 //
-// The places themselves are not named. A caller free to name a place would be
+// The occurrences themselves are not named. A caller free to name an occurrence would be
 // choosing which decisions apply where, and would be naming rows it read
 // before this ran — so they are resolved here, inside the transaction that
 // writes.
@@ -199,72 +199,72 @@ func permitted(subject access.Subject, proposals []Proposal, now time.Time) erro
 // The component names a fold, not a package. Naming any binary of a source
 // package reaches all of them, which is the grain the list somebody picked from
 // already shows and the grain a bump is done at: one vim row on that list is
-// four packages at sixty-one places, and keyed on one binary it took four
-// claims and four approvals to answer what reads as one thing.
-type TogetherAt struct {
+// four packages at sixty-one occurrences, and keyed on one binary it took four
+// decisions and four approvals to answer what reads as one thing.
+type BulkDecisionAt struct {
 	TargetID         int64
 	ComponentID      int64
 	VulnerabilityIDs []int64
 	// Contains is the text the candidate list was narrowed by, empty where it
 	// was not. Re-run here rather than believed: what is recorded beside the
-	// claimant's prose is how many issues that narrowing reaches, against how
+	// proposer's prose is how many issues that narrowing reaches, against how
 	// many were named.
 	Contains string
-	// SkipDecided leaves out every place a live decision already covers,
-	// where the claimant asked for that. Unset, a selection covering one is
+	// SkipDecided leaves out every occurrence a live decision already covers,
+	// where the proposer asked for that. Unset, a selection covering one is
 	// refused whole, naming the decision, because it is a selection somebody
 	// should look at again.
 	SkipDecided bool
 }
 
-// Skipped is a place a bulk judgment left out because a live decision already
-// covers it, and the decision that does.
+// Skipped is an occurrence a bulk decision left out because a live decision already
+// covers it, and the row that does.
 type Skipped struct {
-	VulnerabilityID int64
-	PlaceIdentity   string
-	DecisionID      int64
-	State           State
+	VulnerabilityID      int64
+	OccurrenceIdentity   string
+	DecisionOccurrenceID int64
+	State                State
 }
 
-// resolved is a place a judgment is about to be written against, with how bad
+// resolved is an occurrence a decision is about to be written against, with how bad
 // the issue there is judged to be.
 type resolved struct {
-	Place
+	Occurrence
 	SeverityCenti int
 }
 
-// Together records the same judgment against many issues at one component.
+// BulkDecision records the same decision against many issues at one component.
 //
-// The transpose of grouping. One issue across many places is what a decision
+// The transpose of grouping. One issue across many occurrences is what a decision
 // already covers; a component carrying thousands of issues — a kernel, most of
 // them in drivers a given image never builds — has no answer at all, and
 // without one the choices are answering two thousand findings individually,
 // which nobody does, or hiding them, which is refused.
 //
 // One outcome, one justification, one reasoning, one approval, and a separate
-// record per issue and per place. Each is keyed and expires on its own,
+// record per issue and per occurrence. Each is keyed and expires on its own,
 // which is what makes one action across many findings defensible rather than a
-// blanket claim — and covering every place is what stops it reporting that it
+// blanket decision — and covering every occurrence is what stops it reporting that it
 // answered a consumer it left open.
 //
 // Everything authorization turns on is read inside the transaction that writes
 // . Which product these sit in, and whether any of them is undisclosed, decide
-// whether this person may make the claim at all; read before the transaction,
+// whether this person may make the decision at all; read before the transaction,
 // they would be answers about a database that has since moved.
 //
 // Bounded twice, over what this actually resolves to rather than the names
 // typed: by how many issues a second person is asked to read, and by how many
 // findings one action may write.
 //
-// What is skipped where the claimant asked for places already decided to be
-// left out is said rather than dropped: a claim covering less than was
-// selected is one the claimant has to be able to see is smaller, and which
-// decision stands at each place is where they go next.
-func (s *Store) Together(ctx context.Context, subject access.Subject, at TogetherAt,
-	p Proposal, bounds Bounds) (claimID int64, recorded []int64, skipped []Skipped, err error) {
+// What is skipped where the proposer asked for occurrences already decided to be
+// left out is said rather than dropped: a decision covering less than was
+// selected is one the proposer has to be able to see is smaller, and which
+// decision stands at each occurrence is where they go next.
+func (s *Store) BulkDecision(ctx context.Context, subject access.Subject, at BulkDecisionAt,
+	p Proposal, bounds Bounds) (decisionID int64, recorded []int64, skipped []Skipped, err error) {
 
 	if len(at.VulnerabilityIDs) == 0 {
-		return 0, nil, nil, refusal.Errorf("nothing was selected, so there is nothing to claim")
+		return 0, nil, nil, refusal.Errorf("nothing was selected, so there is nothing to decide")
 	}
 	if p.By != subject.ID {
 		return 0, nil, nil, refusal.Errorf("a decision is recorded as made by whoever made it")
@@ -279,37 +279,37 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 	err = s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		// Cleared on every attempt. A retry re-runs this against a database
 		// that has moved, and carrying identifiers over from the attempt that
-		// failed would report claims that no longer exist.
+		// failed would report decisions that no longer exist.
 		recorded = recorded[:0]
 		attempted = nil
 		skipped = nil
-		claimID = 0
+		decisionID = 0
 
 		// The fold, resolved inside the transaction that writes like
 		// everything else this turns on. The list somebody picked from folds
 		// the source package, so keying the write on one binary of it wrote a
-		// judgment covering part of what the screen said it covered.
+		// decision covering part of what the screen said it covered.
 		fold, err := finding.InTheFold(ctx, tx, at.ComponentID)
 		if err != nil {
 			return err
 		}
 
-		places, err := placesWithin(ctx, tx, subject, at, fold)
+		occurrences, err := occurrencesWithin(ctx, tx, subject, at, fold)
 		if err != nil {
 			return err
 		}
-		if len(places) == 0 {
+		if len(occurrences) == 0 {
 			return fmt.Errorf("%w against that component", ErrNothingOpen)
 		}
 		if at.SkipDecided {
-			if places, skipped, err = within.leavingDecided(ctx, places); err != nil {
+			if occurrences, skipped, err = within.leavingDecided(ctx, occurrences); err != nil {
 				return err
 			}
-			if len(places) == 0 {
+			if len(occurrences) == 0 {
 				return ErrAllDecided
 			}
 		}
-		// Bounded over what is about to be written: the places resolved,
+		// Bounded over what is about to be written: the occurrences resolved,
 		// less any skipped, and the issues they sit under. Always the
 		// reviewer's issue limit, because this always goes to a second
 		// person.
@@ -317,11 +317,11 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		if err != nil {
 			return err
 		}
-		if err := limits.counted(issuesIn(places), len(places), true); err != nil {
+		if err := limits.counted(issuesIn(occurrences), len(occurrences), true); err != nil {
 			return err
 		}
 
-		// The narrowing as something other than the claimant's word for it,
+		// The narrowing as something other than the proposer's word for it,
 		// re-run against the same rows the write is about to land on.
 		narrowing, err := finding.NarrowedWithin(ctx, tx, subject, at.TargetID, fold,
 			at.Contains, len(at.VulnerabilityIDs))
@@ -332,34 +332,34 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		// Made on the build the selection was made in.
 		claimed := p
 		claimed.MadeOn = []int64{at.TargetID}
-		claim, err := within.newClaimNarrowed(ctx, TogetherClaim, subject.ID, nil,
+		decision, err := within.newDecisionNarrowed(ctx, BulkDecision, subject.ID, nil,
 			p.SelectedBy, &narrowing, claimed)
 		if err != nil {
 			return err
 		}
-		claimID = claim.ID
-		each := make([]Proposal, 0, len(places))
-		for _, place := range places {
-			if !mayDecide(subject, place.ProductID, visibilityOf(place.Place)) {
+		decisionID = decision.ID
+		each := make([]Proposal, 0, len(occurrences))
+		for _, occurrence := range occurrences {
+			if !mayDecide(subject, occurrence.ProductID, visibilityOf(occurrence.Occurrence)) {
 				return ErrNotTheirs
 			}
 			one := p
-			one.Place = place.Place
-			one.SeverityCenti = place.SeverityCenti
+			one.Occurrence = occurrence.Occurrence
+			one.SeverityCenti = occurrence.SeverityCenti
 			if err := one.valid(s.now()); err != nil {
 				return err
 			}
 			each = append(each, one)
 		}
 		attempted = each
-		// One live claim per combination of code holds here too. A selection
+		// One live decision per combination of code holds here too. A selection
 		// covering something already decided is a selection somebody should
 		// look at again rather than one to write around, and the sentinel is
 		// carried out whole so the refusal outside can name which decision
 		// stands. Replaced here with "something in this selection is already
 		// decided", it tells a reader holding five hundred rows nothing they
 		// can act on.
-		made, err := within.proposeAll(ctx, claim, each)
+		made, err := within.proposeAll(ctx, decision, each)
 		if err != nil {
 			return err
 		}
@@ -369,41 +369,41 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return nil
 	})
 	if err != nil {
-		return 0, nil, nil, s.alreadyDecided(ctx, err, placesOf(attempted))
+		return 0, nil, nil, s.alreadyDecided(ctx, err, occurrencesOf(attempted))
 	}
-	return claimID, recorded, skipped, nil
+	return decisionID, recorded, skipped, nil
 }
 
-// ErrAllDecided says a bulk judgment asked to skip what is decided found
-// nothing else to claim.
-var ErrAllDecided = refusal.New("a live decision already covers every place selected")
+// ErrAllDecided says a bulk decision asked to skip what is decided found
+// nothing else to decide.
+var ErrAllDecided = refusal.New("a live decision already covers every occurrence selected")
 
-// leavingDecided splits the places into those nothing stands at and those a
-// live decision covers, naming the decision.
+// leavingDecided splits the occurrences into those nothing stands at and those a
+// live decision covers, naming the row.
 //
-// Asked in one statement over both keys a place can be held under, the
-// question Undecided asks, so a place this keeps is one the unique index will
+// Asked in one statement over both keys an occurrence can be held under, the
+// question Undecided asks, so an occurrence this keeps is one the unique index will
 // accept. Two proposals arriving together can still both pass it, and the
 // index refuses the second as it would without skipping.
-func (s *Store) leavingDecided(ctx context.Context, places []resolved) ([]resolved,
+func (s *Store) leavingDecided(ctx context.Context, occurrences []resolved) ([]resolved,
 	[]Skipped, error) {
 
-	keys := make([]string, 0, len(places)*2)
-	for _, at := range places {
-		keys = append(keys, liveKeysFor(at.Place)...)
+	keys := make([]string, 0, len(occurrences)*2)
+	for _, at := range occurrences {
+		keys = append(keys, liveKeysFor(at.Occurrence)...)
 	}
 	type row struct {
 		ID      int64  `bun:"id"`
 		LiveKey string `bun:"live_key"`
 		State   State  `bun:"state"`
 	}
-	// In chunks, because two keys per place across a kernel selection is a
+	// In chunks, because two keys per occurrence across a kernel selection is a
 	// statement past what an engine accepts in one packet.
 	var standing []row
 	for from := 0; from < len(keys); from += database.BatchSize {
 		chunk := keys[from:min(from+database.BatchSize, len(keys))]
 		var some []row
-		if err := s.db.NewSelect().Model((*Decision)(nil)).
+		if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 			ColumnExpr(`"de"."id", "de"."live_key", "de"."state"`).
 			Where(`"de"."live_key" IN (?)`, bun.List(chunk)).
 			Scan(ctx, &some); err != nil {
@@ -411,17 +411,17 @@ func (s *Store) leavingDecided(ctx context.Context, places []resolved) ([]resolv
 		}
 		standing = append(standing, some...)
 	}
-	// The earliest decision at a key is the one named, as a refusal names it.
+	// The earliest row at a key is the one named, as a refusal names it.
 	sort.Slice(standing, func(i, j int) bool { return standing[i].ID < standing[j].ID })
 	held := make(map[string]int, len(standing))
 	for i := len(standing) - 1; i >= 0; i-- {
 		held[standing[i].LiveKey] = i
 	}
-	left := make([]resolved, 0, len(places))
+	left := make([]resolved, 0, len(occurrences))
 	var skipped []Skipped
-	for _, at := range places {
+	for _, at := range occurrences {
 		found := -1
-		for _, key := range liveKeysFor(at.Place) {
+		for _, key := range liveKeysFor(at.Occurrence) {
 			if i, ok := held[key]; ok && (found < 0 || i < found) {
 				found = i
 			}
@@ -431,46 +431,46 @@ func (s *Store) leavingDecided(ctx context.Context, places []resolved) ([]resolv
 			continue
 		}
 		skipped = append(skipped, Skipped{
-			VulnerabilityID: at.VulnerabilityID, PlaceIdentity: at.PlaceIdentity,
-			DecisionID: standing[found].ID, State: standing[found].State,
+			VulnerabilityID: at.VulnerabilityID, OccurrenceIdentity: at.OccurrenceIdentity,
+			DecisionOccurrenceID: standing[found].ID, State: standing[found].State,
 		})
 	}
 	return left, skipped, nil
 }
 
-// issuesIn is how many distinct issues a set of places sits under.
-func issuesIn(places []resolved) int {
+// issuesIn is how many distinct issues a set of occurrences sits under.
+func issuesIn(occurrences []resolved) int {
 	issues := map[[2]int64]bool{}
-	for _, at := range places {
+	for _, at := range occurrences {
 		issues[[2]int64{at.ProductID, at.VulnerabilityID}] = true
 	}
 	return len(issues)
 }
 
-// placesWithin reads every open place the named issues occupy at one
+// occurrencesWithin reads every open occurrence the named issues occupy at one
 // component, in the transaction that is about to write against them.
 //
-// Narrowed to what this subject may read, like every other query here. A claim
-// therefore covers every place the person making it can see, and the places
+// Narrowed to what this subject may read, like every other query here. A decision
+// therefore covers every occurrence the person making it can see, and the occurrences
 // they cannot are left open for whoever can — which is the ordinary division
 // of work rather than a gap. The alternative, refusing the whole action
 // because something undisclosed sits at the same component, answers a person
 // who picked from the list they were shown with a bare "not found" and no way
 // to tell why.
-func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
-	at TogetherAt, fold []int64) ([]resolved, error) {
+func occurrencesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
+	at BulkDecisionAt, fold []int64) ([]resolved, error) {
 
 	var rows []struct {
-		ProductID         int64  `bun:"product_id"`
-		VulnerabilityID   int64  `bun:"vulnerability_id"`
-		PlaceIdentity     string `bun:"occurrence_identity"`
-		Visibility        string `bun:"visibility"`
-		ComponentUpstream string `bun:"component_upstream"`
-		ConsumerUpstream  string `bun:"consumer_upstream"`
-		Published         string `bun:"published_severity"`
-		Assessed          string `bun:"assessed_severity"`
-		ScoreCenti        int    `bun:"score_centi"`
-		OnTag             int    `bun:"on_tag"`
+		ProductID          int64  `bun:"product_id"`
+		VulnerabilityID    int64  `bun:"vulnerability_id"`
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+		Visibility         string `bun:"visibility"`
+		ComponentUpstream  string `bun:"component_upstream"`
+		ConsumerUpstream   string `bun:"consumer_upstream"`
+		Published          string `bun:"published_severity"`
+		Assessed           string `bun:"assessed_severity"`
+		ScoreCenti         int    `bun:"score_centi"`
+		OnTag              int    `bun:"on_tag"`
 	}
 	query := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -489,7 +489,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		// The three parts of a rating rather than the published score alone.
-		// The baseline stored with a claim is what a re-affirmation compares
+		// The baseline stored with a decision is what a re-affirmation compares
 		// today's rating against, so storing the published number where this
 		// product has rated the issue lower left the comparison asking whether
 		// the severity had risen past a figure nobody was working to.
@@ -513,21 +513,21 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		return nil, fmt.Errorf("read where these issues sit: %w", err)
 	}
 
-	places := make([]resolved, 0, len(rows))
+	occurrences := make([]resolved, 0, len(rows))
 	for _, row := range rows {
-		places = append(places, resolved{
-			Place: Place{
+		occurrences = append(occurrences, resolved{
+			Occurrence: Occurrence{
 				ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
-				PlaceIdentity:     row.PlaceIdentity,
-				Visibility:        access.AsVisibility(row.Visibility),
-				ComponentUpstream: row.ComponentUpstream,
-				ConsumerUpstream:  row.ConsumerUpstream,
-				OnTag:             row.OnTag == 1,
+				OccurrenceIdentity: row.OccurrenceIdentity,
+				Visibility:         access.AsVisibility(row.Visibility),
+				ComponentUpstream:  row.ComponentUpstream,
+				ConsumerUpstream:   row.ConsumerUpstream,
+				OnTag:              row.OnTag == 1,
 			},
 			SeverityCenti: finding.Rating{
 				Published: row.Published, Assessed: row.Assessed, ScoreCenti: row.ScoreCenti,
 			}.Score(),
 		})
 	}
-	return places, nil
+	return occurrences, nil
 }

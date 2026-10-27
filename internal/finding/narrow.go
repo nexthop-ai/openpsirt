@@ -100,25 +100,25 @@ type Filter struct {
 	// one would reach decisions made anywhere in the deployment.
 	Across bool
 	// ProductID is which product the query narrows inside, set by the store
-	// rather than by a caller. A place identity carries no product, so
-	// anything correlating a place to a decision has to supply one or it
+	// rather than by a caller. An occurrence identity carries no product, so
+	// anything correlating an occurrence to a decision has to supply one or it
 	// matches every product in the deployment.
 	ProductID int64
-	// decidedIssues is the only issues a group can be filed under and pass
-	// the filter, set by the store where some condition every passing group
-	// meets needs a decision of some kind at one of its places: the issues of
-	// those decisions, read before the list is. Nil asks nothing, and
-	// empty answers nothing.
+	// decidedIssues is the only issues a group can be filed under and pass the
+	// filter, set by the store where some condition every passing group meets
+	// needs a decision of some kind at one of its occurrences: the issues of
+	// those decisions, read before the list is. Nil asks nothing, and empty
+	// answers nothing.
 	decidedIssues []int64
-	// placedIssues is the issues of every decision in the products that can
-	// mark a place, set by the store where the filter asks how far a group
-	// has been decided and a group can pass with no decision. The decided
-	// places are read among them alone. Nil asks nothing, and empty answers
-	// nothing.
+	// placedIssues is the issues of every decision occurrence in the products
+	// that can mark an occurrence, set by the store where the filter asks how
+	// far a group has been decided and a group can pass with no decision. The
+	// decided occurrences are read among them alone. Nil asks nothing, and
+	// empty answers nothing.
 	placedIssues []int64
-	// decidedApart says the places are read without the decision table
-	// joined: the first level counts the decided places beside itself, and a
-	// page's rows belong to groups the conditions over a group already chose.
+	// decidedApart says the occurrences are read without the decision table
+	// joined: the first level counts the decided occurrences beside itself, and
+	// a page's rows belong to groups the conditions over a group already chose.
 	decidedApart bool
 	// Ecosystems keeps components of these package kinds — deb, golang,
 	// pypi. Read from the package identifier rather than stored beside it,
@@ -142,12 +142,12 @@ type Filter struct {
 	// an answer: nothing ranks by it, nothing prefills an outcome from it, and
 	// nothing is hidden by it unless somebody asks for it here.
 	//
-	// Asked of the component's incoming edges in the build, not of the place.
-	// A component reached from two consumers scoped differently
-	// answers to both words, because the pair of columns a place is cannot be
-	// compared against a set the same way on four engines. What it costs is
-	// stated where the filter is: it is a question about a component in a
-	// build rather than about one route to it.
+	// Asked of the component's incoming edges in the build, not of the
+	// occurrence. A component reached from two consumers scoped differently
+	// answers to both words, because the pair of columns an occurrence is
+	// cannot be compared against a set the same way on four engines. What it
+	// costs is stated where the filter is: it is a question about a component
+	// in a build rather than about one route to it.
 	DeclaredAs []string
 	// Beneath keeps what sits at a component or anywhere under it, by the
 	// component's identifier: the same walk over the build's edges the
@@ -158,30 +158,31 @@ type Filter struct {
 	// by a caller, for the same reason ProductID is: the walk beneath a
 	// component is a walk over one build's edges.
 	TargetID int64
-	// State keeps groups by how far they have been decided. A group is an
-	// issue in a component across every place it sits, and its places can
-	// be in different states, so what a group's state *is* had to be
+	// State keeps groups by how far they have been decided. A group is an issue
+	// in a component across every occurrence it sits at, and its occurrences
+	// can be in different states, so what a group's state *is* had to be
 	// chosen:
 	//
-	//   undecided  no place has a decision of any kind
-	//   waiting    a claim stands proposed at a place and nobody has agreed
-	//   agreed     every place is answered by a standing decision
+	//   undecided  no occurrence has a decision of any kind
+	// waiting    a decision stands proposed at an occurrence and nobody has
+	// agreed
+	//   agreed     every occurrence is answered by a standing decision
 	//   lapsed     a decision here stopped applying and nothing replaced it
 	//
 	// Partly answered is deliberately not a state of its own: the row
-	// already says "12 places · 3 answered", which is the more useful form
+	// already says "12 occurrences · 3 answered", which is the more useful form
 	// of the same fact, and a fifth word would be a filter for a number
 	// people can read.
 	//
 	// A set rather than one word. "Undecided or waiting on approval" is
 	// the working list of a triager who wants everything not yet settled, and
 	// a single value could not ask it.
-	States []ClaimStanding
+	States []DecisionStanding
 	// Outcomes keeps groups a standing decision of one of these kinds covers —
 	// the way to ask "what have we dismissed", which States cannot answer:
-	// "agreed" says a judgment stands, not which judgment. Read against what
+	// "agreed" says a decision stands, not which decision. Read against what
 	// stands now, so a dismissal withdrawn last year does not answer for its
-	// place.
+	// occurrence.
 	Outcomes []string
 	// Assigned keeps groups by who is dealing with them, in the words
 	// Assignees lists. A findings list that cannot say "mine" makes somebody
@@ -250,7 +251,7 @@ type Filter struct {
 	// about. HasFix above is the same question asked as a flag and is kept
 	// because it is what the screen's own control has always sent; this
 	// answers the two it cannot — nothing released, and upstream declining
-	// to fix, which is the population that needs a judgment rather than a
+	// to fix, which is the population that needs a decision rather than a
 	// bump. Those two are one question asked together often enough that a
 	// single value could not ask it.
 	FixStates []FixState
@@ -286,15 +287,15 @@ type Filter struct {
 	// Any of them rather than all of them: the words are a person's own
 	// filing, and asking for two of somebody's labels means "either pile".
 	Tags []string
-	// SentBack keeps groups where a live claim is with its author, which is
+	// SentBack keeps groups where a live decision is with its author, which is
 	// the row a proposer is looking for and cannot ask for today.
 	SentBack bool
-	// Claim keeps what sits at a place one claim wrote a row for, and
-	// ClaimStates narrows those rows to the ones in these states. Zero is no
-	// narrowing, and the states mean nothing without a claim. It is how a
-	// claim that stopped applying opens what now sits where it was.
-	Claim       int64
-	ClaimStates []string
+	// Decision keeps what sits at an occurrence one decision wrote a row for,
+	// and DecisionStates narrows those rows to the ones in these states. Zero
+	// is no narrowing, and the states mean nothing without a decision. It is
+	// how a decision that stopped applying opens what now sits where it was.
+	Decision       int64
+	DecisionStates []string
 	// DiffersBetweenBuilds keeps groups that are open in some builds of the
 	// selection and not others — the rows a comparison is about. Meaningless
 	// where the selection is one build, and ignored there rather than
@@ -425,14 +426,15 @@ func (f Filter) ofRows() Filter {
 // Under a filter needing a decision, q is grouped on the component and the
 // issue among its keys, and its groups are restricted to the kept groups after
 // it has grouped (see amongKept). Under any other condition over a group, the
-// kept groups are joined to q's finding rows. A filter that reads the decisions
-// and can pass with none, such as undecided, keeps them in the list's two
-// levels (see listed). A filter that reads no decision keeps them in one level:
-// the planner cannot estimate how many groups a condition over a group keeps,
-// and over two levels of grouping it guesses a tenth of what it guesses over
-// one, 186 groups where 7,742 are kept. Joined back to the finding rows on that
-// guess it read the kernel's 271,000 rows once per kept group, and did not
-// finish in two minutes where the one-level form hashes the join in 2 s.
+// kept groups are joined to q's finding rows. A filter that reads the decision
+// occurrences and can pass with none, such as undecided, keeps them in the
+// list's two levels (see listed). A filter that reads no decision keeps them in
+// one level: the planner cannot estimate how many groups a condition over a
+// group keeps, and over two levels of grouping it guesses a tenth of what it
+// guesses over one, 186 groups where 7,742 are kept. Joined back to the finding
+// rows on that guess it read the kernel's 271,000 rows once per kept group, and
+// did not finish in two minutes where the one-level form hashes the join in 2
+// s.
 func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
@@ -462,17 +464,16 @@ func (f Filter) keepsAfterGrouping() bool {
 // among its keys, read as "listed", to the groups whose issue and fold the
 // findings list keeps.
 //
-// The kept groups are the list's own two-level statement, asked as a
-// membership test of the statement's groups rather than joined to its finding
-// rows, and the fold is read from the component by its key. On PostgreSQL the
-// groups have no index to probe, so an estimate of 279 kept groups where 1,753
-// pass cannot become a walk of a component's rows once per group: that walk
-// took 185 s for the lapsed fix bundles. On MariaDB the membership test is
-// materialized once. A grouped table joined on its grouping keys is instead
-// worked out again for every row it is joined to: the one-level kept groups,
-// joined that way to the open places, had built the decision table again for
-// 10,572 places after 55 s for the components waiting, and gave no answer in
-// three minutes.
+// The kept groups are the list's own two-level statement, asked as a membership
+// test of the statement's groups rather than joined to its finding rows, and
+// the fold is read from the component by its key. On PostgreSQL the groups have
+// no index to probe, so an estimate of 279 kept groups where 1,753 pass cannot
+// become a walk of a component's rows once per group: that walk took 185 s for
+// the lapsed fix bundles. On MariaDB the membership test is materialized once.
+// A grouped table joined on its grouping keys is instead worked out again for
+// every row it is joined to: the one-level kept groups, joined that way to the
+// open occurrences, had built the decision table again for 10,572 occurrences
+// after 55 s for the components waiting, and gave no answer in three minutes.
 func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
@@ -490,12 +491,13 @@ func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
 // one fold, for a statement to select its columns from.
 //
 // A filter asking how far a group has been decided reads the list's own
-// two-level statement, which counts the decided places beside its first
-// level. Joined to every open place instead, the decision table is built from
-// every decision of the product, and MariaDB gave no answer in 985 s for the
-// component view of what is undecided among 425,680 open rows with 3,060
-// decisions, against 2.6 s in two levels. A filter needing a decision also
-// narrows both sides to the issues the decisions name (see decidedIssuesFor).
+// two-level statement, which counts the decided occurrences beside its first
+// level. Joined to every open occurrence instead, the decision table is built
+// from every decision occurrence of the product, and MariaDB gave no answer in
+// 985 s for the component view of what is undecided among 425,680 open rows
+// with 3,060 decision occurrences, against 2.6 s in two levels. A filter
+// needing a decision also narrows both sides to the issues the decision
+// occurrences name (see decidedIssuesFor).
 func (f Filter) listed(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
 	if f.asksDecided() {
 		return f.folded(db, openRows(db, targets, visible), issueAndComponent).GroupExpr(GroupedOn)
@@ -514,36 +516,36 @@ func (f Filter) listed(db bun.IDB, targets []int64, visible []access.Visibility)
 // engine has to read the row to find the key to join on, whether or not any
 // filter uses the joined table.
 //
-// Severity is a condition on a row and the fix is a condition on the group,
-// so they land in different clauses. Putting either in the other place is
-// wrong rather than slow: a fix known at one place and not another would drop
-// the places that lack it out of the count, and a group would report a size
-// smaller than it is.
+// Severity is a condition on a row and the fix is a condition on the group, so
+// they land in different clauses. Putting either in the other place is wrong
+// rather than slow: a fix known at one occurrence and not another would drop
+// the occurrences that lack it out of the count, and a group would report a
+// size smaller than it is.
 func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	return f.narrowGroups(f.narrowRows(q), overRows)
 }
 
 // ofPage narrows a statement over the groups of a page the store has already
-// chosen to the places those groups were counted over: every condition on a
-// place, and no condition over a group. The groups were kept by those in the
-// statement that chose the page, and a group the statement reads that is not
-// on the page is dropped by the caller.
+// chosen to the occurrences those groups were counted over: every condition on
+// an occurrence, and no condition over a group. The groups were kept by those
+// in the statement that chose the page, and a group the statement reads that is
+// not on the page is dropped by the caller.
 //
 // So the decision table is not built here. Built for the page's issues and
-// joined to its places, PostgreSQL estimated the places at one row and built
-// the table once per place: 87 s for a page of fifty undecided high issues
-// with 133,549 decisions, against 35 ms without it.
+// joined to its occurrences, PostgreSQL estimated the occurrences at one row
+// and built the table once per occurrence: 87 s for a page of fifty undecided
+// high issues with 133,549 decision occurrences, against 35 ms without it.
 func (f Filter) ofPage(q *bun.SelectQuery) *bun.SelectQuery {
 	f.decidedApart = true
 	return f.narrowRows(q)
 }
 
-// narrowRows applies the half of the filter that is asked of each place: the
-// WHERE clauses, and the joins they read.
+// narrowRows applies the half of the filter that is asked of each occurrence:
+// the WHERE clauses, and the joins they read.
 func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.decidedIssues != nil {
-		// A condition on the issue, which every place of a group shares: it
-		// drops whole groups, and only groups the conditions over a group
+		// A condition on the issue, which every occurrence of a group shares:
+		// it drops whole groups, and only groups the conditions over a group
 		// drop anyway.
 		q = f.amongDecidedIssues(q, `"f"."vulnerability_id"`)
 	}
@@ -628,10 +630,10 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 				Where(`"ge"."closed_scan_id" IS NULL`).
 				Where(`"ge"."kind" IN (?)`, bun.List(words)))
 	}
-	// The component holding it. A place records the one that pulls it in, so
-	// asking what is inside a container is asking for places whose consumer is
-	// that container — and what the build holds directly is the places with
-	// none.
+	// The component holding it. An occurrence records the one that pulls it in,
+	// so asking what is inside a container is asking for occurrences whose
+	// consumer is that container — and what the build holds directly is the
+	// occurrences with none.
 	if f.UnderTheBuild {
 		q = q.Where(`"f"."consumer_id" IS NULL`)
 	} else if under := strings.TrimSpace(f.Under); under != "" {
@@ -669,17 +671,17 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// filter that changed the counts it narrows would be worse than a slow
 	// one.
 	q = f.sayingIt(q)
-	// A row-level condition: a group is in the list when any of its places is
-	// covered by a claim saying what was asked.
+	// A row-level condition: a group is in the list when any of its occurrences
+	// is covered by a claim saying what was asked.
 	if says := trimmed(f.BuildSays); len(says) > 0 {
 		q = q.Where(`"f"."claimed_by" IN (SELECT "sup"."id" FROM "suppression" AS "sup"
 			WHERE "sup"."status" IN (?))`, bun.List(says))
 	}
 	if f.OpenedByRun > 0 {
 		// A row-level condition rather than one over the group: a group is in
-		// the list when any of its places was opened by that run, which is
+		// the list when any of its occurrences was opened by that run, which is
 		// what "what this run opened" means — one issue at a component can
-		// appear at a place this run found and at forty it did not.
+		// appear at an occurrence this run found and at forty it did not.
 		q = q.Where(`"f"."opened_run_id" = ?`, f.OpenedByRun)
 	}
 	if f.ProposedAfter != nil {
@@ -744,19 +746,19 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// The same condition the row's own count is computed from, so the
 		// filter and the row cannot disagree about what is with its author.
 		where, args := f.product()
-		q = q.Where(standsAs(where, claimSentBack),
-			append(append([]any{}, args...), claimSentBack.args...)...)
+		q = q.Where(standsAs(where, decisionSentBack),
+			append(append([]any{}, args...), decisionSentBack.args...)...)
 	}
-	if f.Claim > 0 {
-		// A condition on a row: a place either held one of the claim's rows
-		// or did not, so a group keeps the places that did.
+	if f.Decision > 0 {
+		// A condition on a row: an occurrence either held one of the decision's
+		// rows or did not, so a group keeps the occurrences that did.
 		where, args := f.product()
 		held := `EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."decision_id" = ?
 			  AND "dc"."product_id" = ` + where + `
 			  AND ` + DecisionFiledAt("dc", "f")
-		asked := append([]any{f.Claim}, args...)
-		if states := trimmed(f.ClaimStates); len(states) > 0 {
+		asked := append([]any{f.Decision}, args...)
+		if states := trimmed(f.DecisionStates); len(states) > 0 {
 			held += ` AND "dc"."state" IN (?)`
 			asked = append(asked, bun.List(states))
 		}
@@ -776,8 +778,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 }
 
 // narrowGroups applies the half of the filter that is asked of a group — one
-// issue at one fold — as HAVING clauses, spelled at the grain g names: over
-// the places themselves, or over the partial groups the two-level form reads.
+// issue at one fold — as HAVING clauses, spelled at the grain g names: over the
+// occurrences themselves, or over the partial groups the two-level form reads.
 // The conditions are the same at either grain; only the aggregates that reach
 // them differ.
 func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
@@ -790,26 +792,26 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	}
 	if f.HasFix {
 		// Unanimity, like the fix-state filter below, which the documentation
-		// above calls the same question asked as a flag. A minimum skips
-		// nulls, so one place with a fixed version admitted the whole group —
-		// and a fold covering a package with a fix and one without answered
-		// yes to this, no to fix_state=fixed and yes to fix_state=mixed:
-		// three answers to one question.
+		// above calls the same question asked as a flag. A minimum skips nulls,
+		// so one occurrence with a fixed version admitted the whole group — and
+		// a fold covering a package with a fix and one without answered yes to
+		// this, no to fix_state=fixed and yes to fix_state=mixed: three answers
+		// to one question.
 		q = q.Having(`MIN("f"."fixed_in") IS NOT NULL AND MIN("f"."fixed_in") <> ?`+
-			" AND "+g.places()+" = "+g.withFix(), "")
+			" AND "+g.occurrences()+" = "+g.withFix(), "")
 	}
 	if f.Unconfirmed {
-		// One place answers for the group. A group is an issue at a component,
-		// every place of it comes from the same line of a scanner's report,
-		// and the applier writes that line to all of them — so they cannot
-		// disagree, and an aggregate guarding against it would be a condition
-		// nothing can make false.
+		// One occurrence answers for the group. A group is an issue at a
+		// component, every occurrence of it comes from the same line of a
+		// scanner's report, and the applier writes that line to all of them —
+		// so they cannot disagree, and an aggregate guarding against it would
+		// be a condition nothing can make false.
 		q = q.Having(`MIN("f"."matched") = ?`, ByIdentifier)
 	}
-	// The party dealing with it. Set for the whole group at once, so a group
-	// is held when its places are — asked as MIN and MAX rather than as one
-	// row, because a group whose places disagree is not "mine" and saying so
-	// would hand somebody work that is half theirs. Several answers OR
+	// The party dealing with it. Set for the whole group at once, so a group is
+	// held when its occurrences are — asked as MIN and MAX rather than as one
+	// row, because a group whose occurrences disagree is not "mine" and saying
+	// so would hand somebody work that is half theirs. Several answers OR
 	// together, and each keeps its own meaning inside the OR — which is why
 	// they are assembled as one condition rather than applied one at a time.
 	// Applied one at a time they would AND, and "mine or nobody's" would be a
@@ -825,8 +827,8 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		q = q.Having(`MAX("f"."closed_at") > ?`, *f.ClosedAfter)
 	}
 	if f.OpenedBefore != nil {
-		// The oldest place decides: a group open here for a month with one
-		// place added yesterday has been somebody's problem for a month.
+		// The oldest occurrence decides: a group open here for a month with one
+		// occurrence added yesterday has been somebody's problem for a month.
 		q = q.Having(`MIN("f"."opened_at") < ?`, *f.OpenedBefore)
 	}
 	if f.Overdue {
@@ -835,10 +837,10 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		q = q.Having(`MIN("f"."due_at") IS NOT NULL AND MIN("f"."due_at") < ?`, *f.DueBefore)
 	}
 	q = f.whatUpstreamDid(q, g)
-	// The places a promised upgrade covers, or the ones none does. A condition
-	// over the group rather than over a place, like every other decision
-	// predicate here: a group is planned when a promise reaches it, and
-	// unplanned when none reaches any of it.
+	// The occurrences a promised upgrade covers, or the ones none does. A
+	// condition over the group rather than over an occurrence, like every other
+	// decision predicate here: a group is planned when a promise reaches it,
+	// and unplanned when none reaches any of it.
 	if f.Planned != PlannedEither {
 		if f.Planned == PlannedOnly {
 			q = q.Having(g.decided("planned") + " > 0")
@@ -897,8 +899,9 @@ const onThisRowsBranch = `(SELECT "tg0"."stream_id" FROM "target" AS "tg0"` +
 // narrows has the component joined under a known name.
 //
 // Both conditions are placed on the rows rather than as a HAVING, because the
-// question is about a place: a group open on two branches keeps the places
-// where its variant is alone with it and drops the places where it is not.
+// question is about an occurrence: a group open on two branches keeps the
+// occurrences where its variant is alone with it and drops the occurrences
+// where it is not.
 func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.AcrossVariants == AnyVariants || len(f.Targets) == 0 {
 		return q
@@ -945,18 +948,18 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 // whatUpstreamDid keeps only the groups upstream has done one of these about.
 //
 // A condition on the group rather than on a row, for the reason the fix flag
-// is: a state known at one place and not another would drop the places that
-// lack it and report a group smaller than it is.
+// is: a state known at one occurrence and not another would drop the
+// occurrences that lack it and report a group smaller than it is.
 //
-// That leaves the group whose places genuinely disagree, and it has its own
-// word. Asked for one state, unanimity is the question; asked for "mixed",
+// That leaves the group whose occurrences genuinely disagree, and it has its
+// own word. Asked for one state, unanimity is the question; asked for "mixed",
 // the question is the opposite one — and a group that answered neither was a
 // row no value of this filter could list, which is what a filter presented as
 // covering what upstream did must not have.
 //
 // Several states asked at once are one condition holding an OR, and each keeps
 // its own meaning inside it: "nothing released or upstream declined" is the
-// population that needs a judgment rather than a bump, and it is two words for
+// population that needs a decision rather than a bump, and it is two words for
 // one question.
 func (f Filter) whatUpstreamDid(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	states := f.fixStates()
@@ -979,25 +982,26 @@ func (f Filter) whatUpstreamDid(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 
 // Who is dealing with a group, as a findings list asks it.
 const (
-	// HeldByMe is mine or a team I am on, at every place.
+	// HeldByMe is mine or a team I am on, at every occurrence.
 	HeldByMe = "me"
-	// HeldBySomebody is held at every place, by anybody.
+	// HeldBySomebody is held at every occurrence, by anybody.
 	HeldBySomebody = "somebody"
-	// HeldByNobody is held at no place.
+	// HeldByNobody is held at no occurrence.
 	HeldByNobody = "nobody"
 )
 
 // Assignees is every word a findings list asks who is dealing with a group in.
 func Assignees() []string { return []string{HeldByMe, HeldBySomebody, HeldByNobody} }
 
-// heldBy keeps only the groups whose places are held by who was asked about.
+// heldBy keeps only the groups whose occurrences are held by who was asked
+// about.
 //
 // One condition holding an OR rather than several applied in turn: "mine or
 // whatever nobody has picked up" is one question, and applied one at a time
 // these would AND and answer with nothing.
 //
-// A condition on the group, so "mine" means every place held and every one of
-// them by one of my names. A group split between me and somebody else is not
+// A condition on the group, so "mine" means every occurrence held and every one
+// of them by one of my names. A group split between me and somebody else is not
 // mine, and saying it is would hand somebody work that is half theirs.
 func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	asked := trimmed(f.Assigned)
@@ -1011,7 +1015,7 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		case HeldByNobody:
 			says = append(says, g.held()+" < 1")
 		case HeldBySomebody:
-			says = append(says, g.held()+" >= "+g.places())
+			says = append(says, g.held()+" >= "+g.occurrences())
 		case HeldByMe:
 			// Mine or my team's, everywhere the phrase appears. A subject
 			// holding no party names nobody, so the phrase contributes
@@ -1020,7 +1024,7 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 			if len(f.HeldBy) == 0 {
 				continue
 			}
-			says = append(says, "("+g.held()+" >= "+g.places()+
+			says = append(says, "("+g.held()+" >= "+g.occurrences()+
 				" AND "+g.heldLeast()+" IN (?) AND "+g.heldMost()+" IN (?))")
 			args = append(args, bun.List(f.HeldBy), bun.List(f.HeldBy))
 		}

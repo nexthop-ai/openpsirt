@@ -386,9 +386,9 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 			[]finding.Reported{bad}); err != nil {
 			t.Fatal(err)
 		}
-		// One of the two places undisclosed, so a public reader sees a smaller
-		// number rather than none — with everything hidden the check below
-		// could only fail by returning something it should not.
+		// One of the two occurrences undisclosed, so a public reader sees a
+		// smaller number rather than none — with everything hidden the check
+		// below could only fail by returning something it should not.
 		one := f.open(t)[0]
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"visibility" = ?`, access.Private).
@@ -406,13 +406,13 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 
 		public := f.agreeing(t, who, claim.ID)
 		if public.Findings != 1 || public.OffTheList != 1 {
-			t.Errorf("a public reader was told %+v, want the one place they may see", public)
+			t.Errorf("a public reader was told %+v, want the one occurrence they may see", public)
 		}
 
 		everything := f.holding(t, access.PublicTriage, access.PrivateRead)
 		all := f.agreeing(t, everything, claim.ID)
 		if all.Findings != 2 || all.OffTheList != 2 {
-			t.Errorf("a reader who may see both was told %+v, want both places", all)
+			t.Errorf("a reader who may see both was told %+v, want both occurrences", all)
 		}
 	})
 }

@@ -206,7 +206,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 
 // piecesNamed resolves the rows somebody picked to the issues they name.
 //
-// Resolved the way a bulk claim's names are. A name nothing is filed under is
+// Resolved the way a bulk decision's names are. A name nothing is filed under is
 // refused by name, because a person who picked it from a list wants to know
 // which row went wrong rather than bisect the selection — and a name filed
 // only where this person may not look is refused in the same words.

@@ -37,7 +37,7 @@ type InspectedBody struct {
 
 // OfferBody is one statement an upstream offers for review.
 type OfferBody struct {
-	Statement     int64  `json:"statement" doc:"The statement, by its identifier. Pass as from_statement when proposing a claim from it"`
+	Statement     int64  `json:"statement" doc:"The statement, by its identifier. Pass as from_statement when proposing a decision from it"`
 	Finding       int64  `json:"finding" doc:"The open finding it speaks about"`
 	Product       string `json:"product" doc:"The product the finding is in, by name"`
 	Stream        string `json:"stream" doc:"The branch or tag of the build the finding is in"`
@@ -134,7 +134,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"The upstream is read again on the interval upstream.every names. A statement it " +
 			"publishes as holding for anybody shipping a component closes the findings of that " +
 			"issue on that component, at the version it names, the next time a build is " +
-			"scanned, unless somebody here decided about the place. It closes only where it says " +
+			"scanned, unless somebody here decided about the occurrence. It closes only where it says " +
 			"not affected or fixed. A statement that depends on the upstream's own build is " +
 			"offered for review and closes nothing.\n\n" +
 			"The fingerprint must be the one the upstream names now, which inspecting it " +
@@ -249,7 +249,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 		Description: "The statements the upstreams of the products here publish that depend on " +
 			"their own build, beside each open finding they speak about: the same issue, at a " +
 			"component of the same name and version. None of these closes anything by itself. " +
-			"Propose a claim from one, passing it as from_statement, or decline it.\n\n" +
+			"Propose a decision from one, passing it as from_statement, or decline it.\n\n" +
 			"A finding somebody here has decided about, or a statement somebody declined, is " +
 			"not listed. At most 200, oldest statement first.",
 		Tags: []string{"Triage"},
@@ -338,7 +338,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"offered for review. The product's builds are queued to be scanned again, which " +
 			"opens what it closed. Recorded in the administrative trail.\n\n" +
 			"Only a statement an upstream published may be declined; another is refused with " +
-			"422; answer a supplier's statement by proposing a claim about the place. A " +
+			"422; answer a supplier's statement by proposing a decision about the occurrence. A " +
 			"statement in a product the caller does not triage is answered 404.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
 	}, core.AnyPerson, "", core.DisclosureTriageRights()...), declineHandler(in, true))

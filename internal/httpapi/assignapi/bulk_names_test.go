@@ -16,20 +16,20 @@ import (
 // Answered differently, one guess at a time enumerates which embargoed issues
 // the deployment holds.
 
-func TestAManyNamedClaimAnswersAnUnseenIssueAsAnUnknownOne(t *testing.T) {
+func TestAManyNamedDecisionAnswersAnUnseenIssueAsAnUnknownOne(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		r.AlsoHolds(t, "theirs", "master", "mellanox", "CVE-2027-4242")
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/components/linux-image/bulk-decision"
-		claim := func(name string) (int, string) {
+		decision := func(name string) (int, string) {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 				`{"vulnerabilities":["CVE-2026-9999","`+name+`"],"outcome":"wont-fix",`+
 					`"selected_by":"the drivers","reasoning":"Not built for this image."}`)
 			return got.Code, got.Body.String()
 		}
-		held, heldSaid := claim("CVE-2027-4242")
-		nobody, nobodySaid := claim("CVE-2027-0000")
+		held, heldSaid := decision("CVE-2027-4242")
+		nobody, nobodySaid := decision("CVE-2027-0000")
 		if held != http.StatusNotFound || nobody != http.StatusNotFound {
 			t.Fatalf("an unseen name answered %d and an unknown one %d, want 404 for both", held, nobody)
 		}

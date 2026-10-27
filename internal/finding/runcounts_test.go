@@ -12,14 +12,15 @@ import (
 
 // What a run opened and closed is counted as issues at components, at the
 // visibilities the reader may see, the same on a page of receipts as on the
-// run's own screen. A run of another build counts nothing here. Runs on every engine, because each engine plans the
-// count through the indexes on the run columns differently.
+// run's own screen. A run of another build counts nothing here. Runs on every
+// engine, because each engine plans the count through the indexes on the run
+// columns differently.
 func TestARunsCountsAreIssuesAtComponentsTheReaderMaySee(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 
-		// The first run opens an issue at a component sitting in two places,
+		// The first run opens an issue at a component at two occurrences,
 		// and one at each of two components sitting in one.
 		first := f.run(t)
 		if _, err := f.store.Apply(ctx, f.target, first, []finding.Reported{
@@ -35,8 +36,8 @@ func TestARunsCountsAreIssuesAtComponentsTheReaderMaySee(t *testing.T) {
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		// The second stops reporting both single-place issues and opens
-		// another at the component in two places.
+		// The second stops reporting both single-occurrence issues and opens
+		// another at the component at two occurrences.
 		second := f.run(t)
 		if _, err := f.store.Apply(ctx, f.target, second, []finding.Reported{
 			found("CVE-2026-1", libnl), found("CVE-2026-4", libnl),

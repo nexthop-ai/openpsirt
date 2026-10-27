@@ -34,7 +34,7 @@ const (
 	// OnStream is the product the row's stream belongs to, for a query that
 	// spans products and reads each row's own.
 	OnStream On = `"st"."product_id"`
-	// OnDecision is the product a decision was recorded in.
+	// OnDecision is the product a decision occurrence was recorded in.
 	OnDecision On = `"de"."product_id"`
 	// OnGrouped is the product column of a derived table aliased grouped,
 	// for a query that reduces its findings to one row per issue and product

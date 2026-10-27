@@ -209,7 +209,7 @@ func TestTheRegisterListsWhatTheRecordsClosedWithTheirLines(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(rows) != 2 {
-			t.Fatalf("kept %d rows, want the two places closed as unaffected", len(rows))
+			t.Fatalf("kept %d rows, want the two occurrences closed as unaffected", len(rows))
 		}
 		for _, row := range rows {
 			if row.Vulnerability != "CVE-2026-1" || row.UnaffectedBy != recordSays || row.Met != nil {

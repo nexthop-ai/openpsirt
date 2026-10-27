@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// A part of a claim that stopped without saying when leaves the moment out,
+// A part of a decision that stopped without saying when leaves the moment out,
 // and one that says when states it in UTC.
 func TestAnEndedPartWithNoMomentLeavesItOut(t *testing.T) {
 	west := time.Date(2026, time.March, 4, 20, 30, 0, 0, time.FixedZone("west", -10*60*60))

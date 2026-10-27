@@ -12,22 +12,22 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// The decision counts read from the decision side: the product page's
-// totals, built once over every decided place, and a page of the state
+// The decision counts read from the decision occurrences: the product page's
+// totals, built once over every decided occurrence, and a page of the state
 // filter, built for the page's own issues.
 
-func TestTheOverviewCountsADecidedPlaceOnceHoweverManyDecisionsReachIt(t *testing.T) {
-	// "Agreed" compares the places a standing decision covers against the
-	// places there are. Two decisions at one place are one decided place:
-	// counted as two they equal the two places, and an issue half answered
-	// reads as agreed.
+func TestTheOverviewCountsADecidedOccurrenceOnceHoweverManyDecisionsReachIt(t *testing.T) {
+	// "Agreed" compares the occurrences a standing decision covers against the
+	// occurrences there are. Two decisions at one occurrence are one decided
+	// occurrence: counted as two they equal the two occurrences, and an issue
+	// half answered reads as agreed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		f.foundOnLibnl(t)
-		places := f.placesOf(t, "CVE-2026-1")
-		if len(places) != 2 {
-			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
+		occurrences := f.occurrencesOf(t, "CVE-2026-1")
+		if len(occurrences) != 2 {
+			t.Fatalf("the fixture put the issue at %d occurrences, want 2", len(occurrences))
 		}
 		by := f.somebodyElse(t)
 		reader := f.holding(t, access.PublicRead)
@@ -50,37 +50,37 @@ func TestTheOverviewCountsADecidedPlaceOnceHoweverManyDecisionsReachIt(t *testin
 				got.Open, got.Undecided, got.Agreed)
 		}
 
-		under := places[swss.Name]
+		under := occurrences[swss.Name]
 		f.decidedAt(t, by, under, "approved", libnl.Version, swss.Version, "first-key")
 		f.decidedAt(t, by, under, "approved", libnl.Version, swss.Version, "second-key")
 		if got := stands(); got.Undecided != 0 || got.Agreed != 0 {
-			t.Errorf("two decisions at one of two places: undecided %d, agreed %d; want 0 and 0",
+			t.Errorf("two decisions at one of two occurrences: undecided %d, agreed %d; want 0 and 0",
 				got.Undecided, got.Agreed)
 		}
 
-		f.decidedAt(t, by, places[teamd.Name], "approved", libnl.Version, teamd.Version, "third-key")
+		f.decidedAt(t, by, occurrences[teamd.Name], "approved", libnl.Version, teamd.Version, "third-key")
 		if got := stands(); got.Agreed != 1 {
-			t.Errorf("a decision at every place: agreed %d, want 1", got.Agreed)
+			t.Errorf("a decision at every occurrence: agreed %d, want 1", got.Agreed)
 		}
 	})
 }
 
 func TestTheOverviewCountsADecisionOnlyAtTheVersionItWasMadeAgainst(t *testing.T) {
-	// A live claim covers a place at the versions it was keyed on. One made
-	// against another version of the library says nothing about this one, so
-	// the issue is still undecided here.
+	// A live decision covers an occurrence at the versions it was keyed on. One
+	// made against another version of the library says nothing about this one,
+	// so the issue is still undecided here.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
 		f.foundOnLibnl(t)
-		places := f.placesOf(t, "CVE-2026-1")
-		f.decidedAt(t, f.somebodyElse(t), places[swss.Name], "approved", libnlNew.Version, swss.Version, "elsewhere")
+		occurrences := f.occurrencesOf(t, "CVE-2026-1")
+		f.decidedAt(t, f.somebodyElse(t), occurrences[swss.Name], "approved", libnlNew.Version, swss.Version, "elsewhere")
 		_, whole, err := f.store.HowItStands(ctx, f.holding(t, access.PublicRead), f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if whole.Undecided != 1 || whole.Agreed != 0 {
-			t.Errorf("a decision about %s at a place holding %s: undecided %d, agreed %d; want 1 and 0",
+			t.Errorf("a decision about %s at an occurrence holding %s: undecided %d, agreed %d; want 1 and 0",
 				libnlNew.Version, libnl.Version, whole.Undecided, whole.Agreed)
 		}
 	})
@@ -103,12 +103,12 @@ func TestEachRowOfALapsedPageSaysItLapsed(t *testing.T) {
 		}
 		by := f.somebodyElse(t)
 		// Two lapsed and one agreed, so the page has rows it must leave out.
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-1")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-2")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-3")[swss.Name], "approved", libnl.Version, swss.Version, "agreed")
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-1")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-2")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-3")[swss.Name], "approved", libnl.Version, swss.Version, "agreed")
 
 		reader := f.holding(t, access.PublicTriage)
-		lapsed := finding.Filter{States: []finding.ClaimStanding{finding.StandingLapsed}}
+		lapsed := finding.Filter{States: []finding.DecisionStanding{finding.StandingLapsed}}
 		for _, page := range []struct {
 			what string
 			read func(offset int) ([]finding.Group, int, error)
@@ -144,12 +144,12 @@ func TestEachRowOfALapsedPageSaysItLapsed(t *testing.T) {
 	})
 }
 
-func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryPlaceInBothIsAnswered(t *testing.T) {
+func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryOccurrenceInBothIsAnswered(t *testing.T) {
 	// The product's totals fold the build rows by issue and component, so the
-	// decided places of a group in two builds are added together before they
-	// are compared with its places. One decision at a place both builds hold
-	// answers both places, so the issue is agreed in each build and in the
-	// product; the second issue is undecided in all three.
+	// decided occurrences of a group in two builds are added together before
+	// they are compared with its occurrences. One decision at an occurrence
+	// both builds hold answers both occurrences, so the issue is agreed in each
+	// build and in the product; the second issue is undecided in all three.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
@@ -162,7 +162,7 @@ func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryPlaceInBothIsAnswered(t
 			t.Fatal(err)
 		}
 		by := f.somebodyElse(t)
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-1")[swss.Name], "approved", libnl.Version, swss.Version, "both")
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-1")[swss.Name], "approved", libnl.Version, swss.Version, "both")
 		builds, whole, err := f.store.HowItStands(ctx, f.holding(t, access.PublicRead), f.productID)
 		if err != nil {
 			t.Fatal(err)
@@ -185,13 +185,13 @@ func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryPlaceInBothIsAnswered(t
 
 func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing.T) {
 	// One issue at one component in two builds, under a different consumer in
-	// each, so the two builds hold two places of one group. The first build's
-	// place is answered and not yet due; the second's is unanswered and past
-	// its deadline. Each build row says its own half. The product's group is
-	// open and overdue, because its earliest deadline has passed, and neither
-	// undecided nor agreed, because one place is answered and the other is
-	// not. Whatever order the rows arrive in, a fold reading one build's row
-	// alone, or the later deadline, answers otherwise.
+	// each, so the two builds hold two occurrences of one group. The first
+	// build's occurrence is answered and not yet due; the second's is
+	// unanswered and past its deadline. Each build row says its own half. The
+	// product's group is open and overdue, because its earliest deadline has
+	// passed, and neither undecided nor agreed, because one occurrence is
+	// answered and the other is not. Whatever order the rows arrive in, a fold
+	// reading one build's row alone, or the later deadline, answers otherwise.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
@@ -220,7 +220,7 @@ func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing
 				t.Fatal(err)
 			}
 		}
-		f.decidedAt(t, f.somebodyElse(t), f.placesOf(t, "CVE-2026-1")[swss.Name],
+		f.decidedAt(t, f.somebodyElse(t), f.occurrencesOf(t, "CVE-2026-1")[swss.Name],
 			"approved", libnl.Version, swss.Version, "first-build")
 
 		builds, whole, err := f.store.HowItStands(ctx, f.holding(t, access.PublicRead), f.productID)
@@ -244,8 +244,8 @@ func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing
 	})
 }
 
-func TestADecisionKeyedOnAConsumerVersionCoversNoPlaceWithoutAConsumer(t *testing.T) {
-	// A place with no consumer holds the empty consumer version. A live
+func TestADecisionKeyedOnAConsumerVersionCoversNoOccurrenceWithoutAConsumer(t *testing.T) {
+	// An occurrence with no consumer holds the empty consumer version. A live
 	// decision keyed on no consumer version covers it, and one keyed on a
 	// consumer version says nothing about it. Asked of the list's own
 	// statement, the state filter and the product's totals, which compare the
@@ -260,7 +260,7 @@ func TestADecisionKeyedOnAConsumerVersionCoversNoPlaceWithoutAConsumer(t *testin
 		at := map[int64]finding.Finding{}
 		for _, row := range f.open(t) {
 			if row.ConsumerID != nil {
-				t.Fatalf("the fixture put %s under a consumer, so this checks nothing", row.PlaceIdentity)
+				t.Fatalf("the fixture put %s under a consumer, so this checks nothing", row.OccurrenceIdentity)
 			}
 			at[row.VulnerabilityID] = row
 		}
@@ -274,18 +274,18 @@ func TestADecisionKeyedOnAConsumerVersionCoversNoPlaceWithoutAConsumer(t *testin
 		if err != nil {
 			t.Fatal(err)
 		}
-		states := map[string]finding.ClaimStanding{}
+		states := map[string]finding.DecisionStanding{}
 		for _, group := range groups {
 			states[group.Vulnerability] = group.State
 		}
 		if states["CVE-2026-1"] != finding.StandingUndecided || states["CVE-2026-2"] != finding.StandingAgreed {
 			t.Errorf("the rows read %v, want CVE-2026-1 undecided and CVE-2026-2 agreed", states)
 		}
-		for _, state := range []finding.ClaimStanding{finding.StandingUndecided, finding.StandingAgreed} {
-			want := map[finding.ClaimStanding]string{
+		for _, state := range []finding.DecisionStanding{finding.StandingUndecided, finding.StandingAgreed} {
+			want := map[finding.DecisionStanding]string{
 				finding.StandingUndecided: "CVE-2026-1", finding.StandingAgreed: "CVE-2026-2",
 			}[state]
-			filter := finding.Filter{States: []finding.ClaimStanding{state}}
+			filter := finding.Filter{States: []finding.DecisionStanding{state}}
 			for what, read := range map[string]func() ([]finding.Group, int, error){
 				"one product": func() ([]finding.Group, int, error) {
 					return f.store.Groups(ctx, reader, f.scope, 50, 0, filter)

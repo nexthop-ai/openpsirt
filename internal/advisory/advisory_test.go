@@ -387,8 +387,8 @@ func (f *fixture) alsoIn(t *testing.T, identifier string, target int64) {
 	row := &finding.Finding{
 		TargetID: target, Kind: finding.Entered, Visibility: access.Private,
 		VulnerabilityID: issueID, ComponentID: componentID,
-		PlaceIdentity: finding.PlaceIdentity(carrier.Name, ""),
-		OpenedAt:      now,
+		OccurrenceIdentity: finding.OccurrenceIdentity(carrier.Name, ""),
+		OpenedAt:           now,
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatal(err)

@@ -34,7 +34,7 @@ func TestAScanAppliedAgainAfterALostCommitCountsOnce(t *testing.T) {
 	f.shipped(t, twoConsumers())
 	f.foundOnLibnl(t)
 
-	// Reported by nothing, so every place closes with no reason given.
+	// Reported by nothing, so every occurrence closes with no reason given.
 	quiet := f.run(t)
 	race.Arm(1)
 	applied, err := f.store.Apply(ctx, f.target, quiet, nil)
@@ -45,7 +45,7 @@ func TestAScanAppliedAgainAfterALostCommitCountsOnce(t *testing.T) {
 		t.Fatal("the application committed nothing, so no attempt was retried and this checks nothing")
 	}
 	if applied.Closed != 2 || applied.Unexplained != 2 {
-		t.Errorf("closed %d, %d of them unexplained; want the 2 places, counted once", applied.Closed, applied.Unexplained)
+		t.Errorf("closed %d, %d of them unexplained; want the 2 occurrences, counted once", applied.Closed, applied.Unexplained)
 	}
 }
 

@@ -122,12 +122,12 @@ func TestWhatIsOpenIsReportedPerBuild(t *testing.T) {
 		for _, r := range releases {
 			by[r.Stream] = r
 		}
-		// Two issues at one component is two rows on the findings list, not
-		// the six places they sit at. Counting places is the mistake the trend
-		// chart already made and recorded.
+		// Two issues at one component is two rows on the findings list, not the
+		// six occurrences they sit at. Counting occurrences is the mistake the
+		// trend chart already made and recorded.
 		if got := by["master"].Open; got != 2 {
 			t.Errorf("master reports %d open, expected 2 — one per issue at a "+
-				"component, not one per place", got)
+				"component, not one per occurrence", got)
 		}
 		if got := by["202411"].Open; got != 1 {
 			t.Errorf("202411 reports %d open, expected 1", got)

@@ -25,10 +25,10 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	// The distribution label is decided from every place of the issue here,
+	// The distribution label is decided from every occurrence of the issue here,
 	// not from the one a reader sees first: a document saying TLP:WHITE about
-	// an issue with an undisclosed place is the one that travels furthest.
-	// A reader who may not see every place is refused by byName before this
+	// an issue with an undisclosed occurrence is the one that travels furthest.
+	// A reader who may not see every occurrence is refused by byName before this
 	// is reached, since listing the advisory and refusing its document would
 	// say undisclosed work exists; the refusal here holds the document to
 	// the same rule wherever it is generated from.

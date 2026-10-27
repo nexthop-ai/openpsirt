@@ -147,7 +147,7 @@ const exportPage = 200
 //
 // The server bounds a response by how long the whole of it takes, which is
 // right for a request that answers and wrong for one that streams: a real
-// build's disposition register is a quarter of a million places, and it
+// build's disposition register is a quarter of a million occurrences, and it
 // arrives cut off in the middle of a row at exactly five minutes, with no
 // marker, because the connection is closed under the handler rather than a
 // write failing. A file that simply stops is a file somebody reads as
@@ -162,7 +162,7 @@ const exportStall = 2 * time.Minute
 //
 // A reader that takes a page every two minutes keeps exportStall from ever
 // firing, and the cursor, with its connection, is held for as long as the file
-// takes at that pace: about 41 hours for a build of 249,288 places. On SQLite
+// takes at that pace: about 41 hours for a build of 249,288 occurrences. On SQLite
 // that connection is the whole pool, so every other request waits behind it.
 // The measured file takes 1.9 seconds to read from the database, so the
 // ceiling leaves an honest download on a slow link room to finish. A file cut

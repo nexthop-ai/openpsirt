@@ -24,11 +24,11 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		claimed := f.agreed(t, f.at())
-		said, err := f.store.Say(ctx, f.triager, claimed.ClaimID, "Checked against the build log.")
+		said, err := f.store.Say(ctx, f.triager, claimed.DecisionID, "Checked against the build log.")
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Recorded after the claim was agreed, which it takes back; nothing
+		// Recorded after the decision was agreed, which it takes back; nothing
 		// here needs the agreement to stand, only the rows to be there.
 		record, _ := f.exploited(t)
 		note, err := f.store.NoteOn(ctx, f.triager, f.product, f.issue, "Upstream has a patch queued.")
@@ -36,7 +36,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 			t.Fatal(err)
 		}
 		another := f.at()
-		another.PlaceIdentity = "under-a"
+		another.OccurrenceIdentity = "under-a"
 
 		fault := new(dbtest.Fault)
 		f.hook(fault)
@@ -46,41 +46,41 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 			refusal     error
 			act         func(context.Context) error
 		}{
-			{"reading a claim whole", "decision", triage.ErrNotTheirs,
+			{"reading a decision whole", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
-					_, err := f.store.Whole(ctx, f.triager, claimed.ClaimID)
+					_, err := f.store.Whole(ctx, f.triager, claimed.DecisionID)
 					return err
 				}},
-			{"reading a claim's revisions", "decision", triage.ErrNotTheirs,
+			{"reading a decision's revisions", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
-					_, err := f.store.Revisions(ctx, f.triager, claimed.ClaimID)
+					_, err := f.store.Revisions(ctx, f.triager, claimed.DecisionID)
 					return err
 				}},
-			{"reading a decision", "decision_occurrence", triage.ErrNotTheirs,
+			{"reading a decision occurrence", "decision_occurrence", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, _, err := f.store.Read(ctx, f.triager, claimed.ID)
 					return err
 				}},
-			{"re-making a decision", "decision_occurrence", triage.ErrNotTheirs,
+			{"re-making a decision occurrence", "decision_occurrence", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
-						PreviousID: claimed.ID, Place: f.at(),
+						PreviousID: claimed.ID, Occurrence: f.at(),
 						Reasoning: "Still true.", By: f.proposer,
 					})
 					return err
 				}},
-			{"re-making a claim", "decision", triage.ErrNotTheirs,
+			{"re-making a decision", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
-					_, err := f.store.ReaffirmClaim(ctx, f.triager, triage.ReaffirmingClaim{
-						PreviousClaimID: claimed.ClaimID, Reasoning: "Still true.",
+					_, err := f.store.ReaffirmDecision(ctx, f.triager, triage.ReaffirmingDecision{
+						PreviousDecisionID: claimed.DecisionID, Reasoning: "Still true.",
 						By: f.proposer, Bounds: triage.DefaultBounds(),
 					})
 					return err
 				}},
-			{"carrying a claim to another place", "decision", triage.ErrNotTheirs,
+			{"carrying a decision to another occurrence", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
-					_, err := f.store.Extend(ctx, f.triager, claimed.ClaimID, []triage.Proposal{{
-						Place: another, Outcome: triage.NotApplicable,
+					_, err := f.store.Extend(ctx, f.triager, claimed.DecisionID, []triage.Proposal{{
+						Occurrence: another, Outcome: triage.NotApplicable,
 						Justification: triage.CodeNotInExecutePath,
 						Reasoning:     "The same code path.", By: f.proposer, NeedsApproval: true,
 					}})

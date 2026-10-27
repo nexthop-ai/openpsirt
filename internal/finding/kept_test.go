@@ -13,11 +13,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// decidedSaying records a decision at a place on a claim with one outcome.
-func (f *fixture) decidedSaying(t *testing.T, by, issueID int64, place, state, outcome, componentVersion, key string) {
+// decidedSaying records a decision with one outcome at an occurrence.
+func (f *fixture) decidedSaying(t *testing.T, by, issueID int64, occurrence, state, outcome, componentVersion, key string) {
 	t.Helper()
 	f.decision(t, decisionRow{
-		By: by, Claim: claimSaying(t, f.db, by, outcome), Issue: issueID, Place: place,
+		By: by, Decision: decisionSaying(t, f.db, by, outcome), Issue: issueID, Occurrence: occurrence,
 		State: state, Component: &componentVersion, Key: key,
 	})
 }
@@ -58,7 +58,7 @@ func TestTheViewsKeepTheListsGroupsUnderAFilterNeedingADecision(t *testing.T) {
 			fixed("CVE-2026-PLANNED", tool),
 			fixed("CVE-2026-OPEN", lib), fixed("CVE-2026-OPEN", tool),
 		)
-		at := func(component graph.Described) string { return finding.PlaceIdentity(component.Name, "") }
+		at := func(component graph.Described) string { return finding.OccurrenceIdentity(component.Name, "") }
 		somebody := f.somebodyElse(t)
 		f.decided(t, somebody, f.issue(t, "CVE-2026-CURL"), at(lib), "approved", lib.Version, "curl-lib")
 		f.decided(t, somebody, f.issue(t, "CVE-2026-LAPSED"), at(lib), "lapsed", lib.Version, "")
@@ -68,10 +68,10 @@ func TestTheViewsKeepTheListsGroupsUnderAFilterNeedingADecision(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 
 		// What each filter keeps: the issues each package carries, and how
-		// many issues and places the one bump to 8.6.0 closes.
+		// many issues and occurrences the one bump to 8.6.0 closes.
 		type kept struct {
-			components     map[string]int
-			issues, places int
+			components          map[string]int
+			issues, occurrences int
 		}
 		check := func(name string, filter finding.Filter, want kept) {
 			t.Helper()
@@ -131,10 +131,10 @@ func TestTheViewsKeepTheListsGroupsUnderAFilterNeedingADecision(t *testing.T) {
 					t.Fatalf("%s: by upgrade %+v (total %d), want the one bump", name, bundles, bumps)
 				}
 				names := slices.Sorted(maps.Keys(want.components))
-				if bundles[0].Issues != want.issues || bundles[0].Places != want.places ||
+				if bundles[0].Issues != want.issues || bundles[0].Occurrences != want.occurrences ||
 					!slices.Equal(bundles[0].Components, names) {
-					t.Errorf("%s: the bump closes %d issues at %d places in %v, want %d at %d in %v", name,
-						bundles[0].Issues, bundles[0].Places, bundles[0].Components, want.issues, want.places, names)
+					t.Errorf("%s: the bump closes %d issues at %d occurrences in %v, want %d at %d in %v", name,
+						bundles[0].Issues, bundles[0].Occurrences, bundles[0].Components, want.issues, want.occurrences, names)
 				}
 			}
 			counted, err := f.store.CountBundles(ctx, who, f.scope, filter)
@@ -143,24 +143,24 @@ func TestTheViewsKeepTheListsGroupsUnderAFilterNeedingADecision(t *testing.T) {
 			}
 		}
 
-		states := func(each ...finding.ClaimStanding) finding.Filter { return finding.Filter{States: each} }
-		check("agreed", states(finding.StandingAgreed), kept{components: map[string]int{tool.Name: 1}, issues: 1, places: 1})
-		check("lapsed", states(finding.StandingLapsed), kept{components: map[string]int{lib.Name: 1}, issues: 1, places: 1})
-		check("waiting", states(finding.StandingWaiting), kept{components: map[string]int{tool.Name: 1}, issues: 1, places: 1})
+		states := func(each ...finding.DecisionStanding) finding.Filter { return finding.Filter{States: each} }
+		check("agreed", states(finding.StandingAgreed), kept{components: map[string]int{tool.Name: 1}, issues: 1, occurrences: 1})
+		check("lapsed", states(finding.StandingLapsed), kept{components: map[string]int{lib.Name: 1}, issues: 1, occurrences: 1})
+		check("waiting", states(finding.StandingWaiting), kept{components: map[string]int{tool.Name: 1}, issues: 1, occurrences: 1})
 		check("lapsed or waiting", states(finding.StandingLapsed, finding.StandingWaiting),
-			kept{components: map[string]int{lib.Name: 1, tool.Name: 1}, issues: 2, places: 2})
+			kept{components: map[string]int{lib.Name: 1, tool.Name: 1}, issues: 2, occurrences: 2})
 		check("planned", finding.Filter{Planned: finding.PlannedOnly},
-			kept{components: map[string]int{tool.Name: 1}, issues: 1, places: 1})
+			kept{components: map[string]int{tool.Name: 1}, issues: 1, occurrences: 1})
 		check("dismissed", finding.Filter{Outcomes: []string{"not-applicable"}}, kept{})
-		check("lapsed and exploited", finding.Filter{States: []finding.ClaimStanding{finding.StandingLapsed},
+		check("lapsed and exploited", finding.Filter{States: []finding.DecisionStanding{finding.StandingLapsed},
 			Exploited: true}, kept{})
 
 		// Agreed at the fold's other package too, the fold's issue is agreed
 		// and dismissed, at both packages.
 		f.decided(t, somebody, f.issue(t, "CVE-2026-CURL"), at(tool), "approved", tool.Version, "curl-tool")
 		check("agreed at both", states(finding.StandingAgreed),
-			kept{components: map[string]int{lib.Name: 1, tool.Name: 2}, issues: 2, places: 3})
+			kept{components: map[string]int{lib.Name: 1, tool.Name: 2}, issues: 2, occurrences: 3})
 		check("dismissed at both", finding.Filter{Outcomes: []string{"not-applicable"}},
-			kept{components: map[string]int{lib.Name: 1, tool.Name: 1}, issues: 1, places: 2})
+			kept{components: map[string]int{lib.Name: 1, tool.Name: 1}, issues: 1, occurrences: 2})
 	})
 }

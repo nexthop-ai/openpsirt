@@ -21,16 +21,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// Recording one judgment about one finding, across the builds it reaches.
+// Recording one decision about one finding, across the builds it reaches.
 //
-// Its own subject: a claim's lifecycle is about the claim, and this is about
-// the finding a person is standing on — which places of it a judgment covers,
-// which other builds the same judgment is written against in the same
-// transaction, and what a refusal says about a build that could not be
-// resolved.
+// Its own subject: a decision's lifecycle is about the decision, and this is
+// about the finding a person is standing on — which occurrences of it a
+// decision covers, which other builds the same decision is written against in
+// the same transaction, and what a refusal says about a build that could not
+// be resolved.
 
-// namedTwice refuses a judgment naming one build twice.
-const namedTwice = "a build is named twice, and one judgment is recorded against it once"
+// namedTwice refuses a decision naming one build twice.
+const namedTwice = "a build is named twice, and one decision is recorded against it once"
 
 // promisedDates reads the date a deferral returns on and the date promised
 // work lands on, either of which may be absent.
@@ -54,52 +54,52 @@ func promisedDates(deferred, committed string) (until, lands *time.Time, err err
 	return until, lands, nil
 }
 
-// FindingDecisionBody is one judgment about a finding, and which of its places
-// it covers.
+// FindingDecisionBody is one decision about a finding, and which of its
+// occurrences it covers.
 type FindingDecisionBody struct {
 	Outcome       core.OutcomeOneAtATime `json:"outcome"`
 	Justification core.Justification     `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
 	Mitigation    string                 `json:"mitigation,omitempty" maxLength:"65536" doc:"The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
-	Scope         core.StatementScope    `json:"scope,omitempty" doc:"Whom a published statement made from this claim holds for: portable for anybody shipping the component at that version, build for this product's own build only. Omit to let the outcome and the reason decide. Refused on a deferral. An extension keeps the scope of the claim it carries"`
+	Scope         core.StatementScope    `json:"scope,omitempty" doc:"Whom a published statement made from this decision holds for: portable for anybody shipping the component at that version, build for this product's own build only. Omit to let the outcome and the reason decide. Refused on a deferral. An extension keeps the scope of the decision it carries"`
 	DeferredUntil string                 `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 	// CommittedTo is when a promised backport lands. An upgrade is not
 	// recorded here at all: it answers a component rather than one
 	// finding, so it is recorded from the component.
 	CommittedTo string `json:"committed_to,omitempty" doc:"The date a promised backport lands. Required for patch-needed and refused with any other"`
-	// FixedVersion is what makes the already-fixed claim checkable against
+	// FixedVersion is what makes the already-fixed decision checkable against
 	// whoever packages the component. Offered here because the outcome is
 	// offered here: an enum listing an outcome whose evidence the body
 	// cannot carry refuses every request that picks it.
 	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other"`
 	Reasoning    string `json:"reasoning" minLength:"1" doc:"The reasoning"`
-	// Places is the deliberate narrowing. Absent means every place, which
-	// is the default naming the places covered asks for.
+	// Occurrences is the deliberate narrowing. Absent means every occurrence,
+	// which is the default naming the occurrences covered asks for.
 	// Bounded like every other array a write path takes. Each entry costs a
-	// map insert and a scan of the finding's places before anything is
+	// map insert and a scan of the finding's occurrences before anything is
 	// refused, so an unbounded one is work a caller chooses the size of.
-	Places []string `json:"places,omitempty" maxItems:"2000" maxLength:"191" doc:"The places this covers, as the finding names them. Omit for all of them"`
-	// Extends names an approved claim this one carries to a new issue. The
-	// outcome and justification have to be the source's, and the places have
-	// to be ones the source sits at.
-	Extends int64 `json:"extends,omitempty" doc:"An approved claim at the same component and consumer to carry to this issue. The outcome and justification must match it; the new claim is recorded as an extension of it and still needs a second person"`
-	// Remaining decides only the places nothing stands at yet. For applying
-	// a decision to another build, where the places at matching versions
-	// are already reached by lookup and a second claim about them would be
-	// refused.
-	Remaining bool `json:"remaining,omitempty" doc:"Decide only the places nothing currently stands at, and leave the rest as they are. For applying a decision to another build, where some of its places are already reached by lookup"`
+	Occurrences []string `json:"occurrences,omitempty" maxItems:"2000" maxLength:"191" doc:"The occurrences this covers, as the finding names them. Omit for all of them"`
+	// Extends names an approved decision this one carries to a new issue. The
+	// outcome and justification have to be the source's, and the occurrences
+	// have to be ones the source sits at.
+	Extends int64 `json:"extends,omitempty" doc:"An approved decision at the same component and consumer to carry to this issue. The outcome and justification must match it; the new decision is recorded as an extension of it and still needs a second person"`
+	// Remaining decides only the occurrences nothing stands at yet. For
+	// applying a decision to another build, where the occurrences at matching
+	// versions are already reached by lookup and a second decision about them
+	// would be refused.
+	Remaining bool `json:"remaining,omitempty" doc:"Decide only the occurrences nothing currently stands at, and leave the rest as they are. For applying a decision to another build, where some of its occurrences are already reached by lookup"`
 	// FromStatement cites a VEX statement this was started from. A citation
-	// and never an application: their statement is not this claim, and the
+	// and never an application: their statement is not this decision, and the
 	// citation is what lets a later revision be noticed.
-	FromStatement int64 `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on"`
-	// Also carries the same judgment to other builds of this product, in
+	FromStatement int64 `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the decision rests on"`
+	// Also carries the same decision to other builds of this product, in
 	// the same transaction as the build in the path.
-	// Bounded: each entry costs a build resolution and a place lookup before
+	// Bounded: each entry costs a build resolution and an occurrence lookup before
 	// any cap is consulted, so a body naming every build of a product is one
 	// resolution pass per build before the transaction opens.
-	Also []AlsoBuild `json:"also,omitempty" maxItems:"2000" doc:"Other builds of this product the same judgment covers. All of it is written together or none of it is"`
+	Also []AlsoBuild `json:"also,omitempty" maxItems:"2000" doc:"Other builds of this product the same decision covers. All of it is written together or none of it is"`
 }
 
-// AlsoBuild is another build one judgment reaches, as the reach names it.
+// AlsoBuild is another build one decision reaches, as the reach names it.
 type AlsoBuild struct {
 	Stream  string `json:"stream"`
 	Variant string `json:"variant"`
@@ -109,35 +109,35 @@ type AlsoBuild struct {
 	Version string `json:"version,omitempty" doc:"The version that build ships under this name, where it ships more than one"`
 }
 
-// DecidedBody is what one judgment about a finding recorded.
+// DecidedBody is what one decision about a finding recorded.
 type DecidedBody struct {
-	ClaimID  int64 `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-	Recorded int   `json:"recorded" doc:"The number of places it was written against"`
-	Covered  int   `json:"covered" doc:"The number of findings those places hold"`
-	// Every place this judgment did not reach, whatever kept it from
+	DecisionID int64 `json:"decision_id" doc:"The decision this action made, which is what the review queue lists and what is approved"`
+	Recorded   int   `json:"recorded" doc:"The number of occurrences it covers"`
+	Covered    int   `json:"covered" doc:"The number of findings those occurrences hold"`
+	// Every occurrence this decision did not reach, whatever kept it from
 	// reaching. Not being named describes one of the two: with `remaining`
-	// it also counts places a decision reached through lookup already
+	// it also counts occurrences a decision reached through lookup already
 	// suppressed, which is deliberate — a caller deciding
 	// what is left to do wants the number that is left to do, not the
 	// number they could have named.
-	Left          int     `json:"left" doc:"Places of this finding this judgment did not reach: ones it did not name, and ones a decision already standing there covers"`
+	Left          int     `json:"left" doc:"Occurrences of this finding this decision did not reach: ones it did not name, and ones a decision already standing there covers"`
 	NeedsApproval bool    `json:"needs_approval" doc:"Whether a second person has to agree"`
 	IDs           []int64 `json:"ids"`
-	// Also is the same judgment's record in each other build named, in the
+	// Also is the same decision's record in each other build named, in the
 	// order they were named. Absent where none were.
-	Also []CoveredBuild `json:"also,omitempty" doc:"The rows this judgment wrote in each other build it reached"`
+	Also []CoveredBuild `json:"also,omitempty" doc:"What this decision covers in each other build it reached"`
 }
 
-// CoveredBuild is one judgment's record in one other build.
+// CoveredBuild is one decision's record in one other build.
 //
 // There is no per-build outcome to report, because there is no per-build
-// outcome to have: the whole judgment is written or none of it is.
+// outcome to have: the whole decision is written or none of it is.
 type CoveredBuild struct {
 	Stream   string `json:"stream"`
 	Variant  string `json:"variant"`
 	Version  string `json:"version,omitempty"`
-	Recorded int    `json:"recorded" doc:"The number of places it was written against there"`
-	Covered  int    `json:"covered" doc:"The number of findings those places hold"`
+	Recorded int    `json:"recorded" doc:"The number of occurrences it covers there"`
+	Covered  int    `json:"covered" doc:"The number of findings those occurrences hold"`
 }
 
 func registerFindingDecision(api huma.API, in core.Deps) {
@@ -146,26 +146,26 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 			"/findings/{issue}/components/{component}/decision",
 		Summary: "Record one decision about a finding, covering its occurrences",
-		Description: "Records the same claim against every place this issue occupies in this " +
-			"component. Naming `places` narrows it; leaving it out covers all of them.\n\n" +
-			"A place left out stays open. Nothing is recorded against it and nothing is " +
+		Description: "Records the same decision against every occurrence this issue has in this " +
+			"component. Naming `occurrences` narrows it; leaving it out covers all of them.\n\n" +
+			"An occurrence left out stays open. Nothing is recorded against it and nothing is " +
 			"asked about it.\n\n" +
-			"One record is written per place, each keyed and expiring on its own, so this " +
-			"reads later as the several decisions it is rather than as one.\n\n" +
-			"The ordinary approval rules apply however many places this reaches: covering " +
-			"many places does not on its own require a second person.\n\n" +
-			"Pass `also` to apply the same judgment to other builds of this product, naming " +
+			"The decision is keyed and expires at each occurrence on its own, so it reads " +
+			"later occurrence by occurrence rather than as one.\n\n" +
+			"The ordinary approval rules apply however many occurrences this reaches: covering " +
+			"many occurrences does not on its own require a second person.\n\n" +
+			"Pass `also` to apply the same decision to other builds of this product, naming " +
 			"each as the reach gives it. All of it is written in one transaction: the " +
 			"response is what every build recorded, or a refusal and nothing written " +
-			"anywhere. In those builds only the places nothing already stands at are " +
+			"anywhere. In those builds only the occurrences nothing already stands at are " +
 			"written, because the ones at matching versions are reached by lookup " +
-			"already. The claim records the build in the path and each build named in " +
+			"already. The decision records the build in the path and each build named in " +
 			"`also` as the builds it was made on, and no build it reaches by lookup.\n\n" +
-			"Pass `extends` to carry an approved claim to this issue: the source must be " +
+			"Pass `extends` to carry an approved decision to this issue: the source must be " +
 			"approved, sit at the same component under the same consumer, and the outcome and " +
-			"justification must match it. The new claim is recorded as an extension of it and " +
+			"justification must match it. The new decision is recorded as an extension of it and " +
 			"still waits for a second person. `similar` on `GET .../findings/{issue}/" +
-			"components/{component}` lists the claims that qualify.\n\n" +
+			"components/{component}` lists the decisions that qualify.\n\n" +
 			"`patch-needed` is the backport case: a fix is being carried into this build " +
 			"and the version does not move, so it requires `committed_to`, the date the work " +
 			"lands. `upgrade-needed` is not recorded here — an upgrade answers a component and " +
@@ -185,7 +185,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			return nil, err
 		}
 
-		// Every build this judgment covers, named before anything is
+		// Every build this decision covers, named before anything is
 		// written: the one in the path, and any the caller put beside
 		// it.
 		asked := append([]AlsoBuild{{
@@ -196,20 +196,20 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			return nil, err
 		}
 
-		limit, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
-			triage.DefaultTogetherCap)
+		limit, err := setting.NewStore(in.DB.DB).Count(ctx, setting.BulkDecisionCap,
+			triage.DefaultBulkDecisionCap)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the limit on one action could not be read", err)
 		}
 
 		out := &struct{ Body DecidedBody }{}
 		var proposals []triage.Proposal
-		// Each build's contribution, so the judgment can report per build
+		// Each build's contribution, so the decision can report per build
 		// once the whole of it has been written.
 		writes := make([]int, len(asked))
 		holds := make([]int, len(asked))
 		sits := 0
-		// The places the act has reached so far, charged as each build
+		// The occurrences the act has reached so far, charged as each build
 		// resolves.
 		seen := 0
 		reached := make([][]finding.Deciding, len(asked))
@@ -222,10 +222,10 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		covering := make([]int64, 0, len(asked))
 		for i, build := range asked {
 			// Only the build in the path takes the caller's narrowing. In the
-			// others the places at matching versions are already reached by
-			// lookup, and a second claim about them would be refused, so what
+			// others the occurrences at matching versions are already reached by
+			// lookup, and a second decision about them would be refused, so what
 			// is written there is whatever nothing stands at yet.
-			wanted, remaining := input.Body.Places, input.Body.Remaining
+			wanted, remaining := input.Body.Occurrences, input.Body.Remaining
 			if i > 0 {
 				wanted, remaining = nil, true
 			}
@@ -237,12 +237,12 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			// dropped, and the version and what carries the issue decide.
 			which := graph.Choice{Version: build.Version, Ecosystem: input.Ecosystem,
 				Namespace: input.Namespace}
-			places, all, target, err := placesToDecide(ctx, in, subject, store, input.Product,
+			occurrences, all, target, err := occurrencesToDecide(ctx, in, subject, store, input.Product,
 				build.Stream, build.Variant, input.Vulnerability, input.Component,
 				which, wanted, remaining)
 			if i > 0 && which.Namespace != "" && core.Answered(err) == http.StatusNotFound {
 				which.Namespace = ""
-				places, all, target, err = placesToDecide(ctx, in, subject, store, input.Product,
+				occurrences, all, target, err = occurrencesToDecide(ctx, in, subject, store, input.Product,
 					build.Stream, build.Variant, input.Vulnerability, input.Component,
 					which, wanted, remaining)
 			}
@@ -260,17 +260,17 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			if i == 0 {
 				sits = all
 			}
-			reached[i] = places
+			reached[i] = occurrences
 			covering = append(covering, target)
 
 			// Charged as each build is resolved rather than after all of
 			// them. REQ-27 bounds what is written, not what was asked for —
 			// and a request naming two thousand builds of a kernel-shaped
-			// component accumulates seven figures of places before the cap is
+			// component accumulates seven figures of occurrences before the cap is
 			// consulted, which is a small request doing a large amount of
 			// work. The refusal names the same limit the store's own check
 			// names, because it is the same limit.
-			seen += len(places)
+			seen += len(occurrences)
 			if seen > limit {
 				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
 					"that reaches more than the %d findings one action may write: "+
@@ -278,10 +278,10 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			}
 		}
 
-		for i, places := range reached {
-			for _, place := range places {
+		for i, occurrences := range reached {
+			for _, occurrence := range occurrences {
 				proposal := triage.Proposal{
-					Place:         placeOf(place),
+					Occurrence:    occurrenceOf(occurrence),
 					Outcome:       triage.Outcome(input.Body.Outcome),
 					Justification: triage.Justification(input.Body.Justification),
 					Mitigation:    input.Body.Mitigation,
@@ -289,26 +289,26 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 					FixedVersion:  input.Body.FixedVersion,
 					Reasoning:     input.Body.Reasoning,
 					By:            subject.ID,
-					SeverityCenti: place.SeverityCenti,
+					SeverityCenti: occurrence.SeverityCenti,
 					DeferredUntil: until,
 					CommittedTo:   lands,
 					BindingAcross: covering,
 					// Made on the build in the path and every build the
-					// caller named beside it. The builds the claim reaches by
+					// caller named beside it. The builds the decision reaches by
 					// lookup are not among them.
 					MadeOn: covering,
 				}
 				writes[i]++
-				holds[i] += place.Places
+				holds[i] += occurrence.Occurrences
 				proposals = append(proposals, proposal)
 			}
 		}
 
 		// One action, one transaction, however many builds it reached. Half of
-		// them written and the rest abandoned leaves a judgment recorded in
+		// them written and the rest abandoned leaves a decision recorded in
 		// some releases and not others — an act nobody performed, and one
 		// nobody can point at afterwards.
-		var recorded []*triage.Decision
+		var recorded []*triage.DecisionOccurrence
 		if input.Body.Extends != 0 {
 			recorded, err = store.Extend(ctx, subject, input.Body.Extends, proposals)
 		} else {
@@ -317,11 +317,11 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
-		for _, decision := range recorded {
-			out.Body.IDs = append(out.Body.IDs, decision.ID)
-			out.Body.ClaimID = decision.ClaimID
+		for _, occurrence := range recorded {
+			out.Body.IDs = append(out.Body.IDs, occurrence.ID)
+			out.Body.DecisionID = occurrence.DecisionID
 			// Read off what was written rather than off what was asked for.
-			out.Body.NeedsApproval = out.Body.NeedsApproval || decision.NeedsApproval
+			out.Body.NeedsApproval = out.Body.NeedsApproval || occurrence.NeedsApproval
 		}
 		if out.Body.IDs == nil {
 			out.Body.IDs = []int64{}
@@ -341,13 +341,13 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 	})
 }
 
-// placesToDecide resolves one build's places for a finding, narrowed the way
-// the caller asked for.
+// occurrencesToDecide resolves one build's occurrences for a finding, narrowed
+// the way the caller asked for.
 //
-// Returns the places to write against and the number the finding sits at
+// Returns the occurrences to write against and the number the finding sits at
 // there. The two differ whenever something was left out, and the difference
 // states how much of the finding is still open.
-func placesToDecide(ctx context.Context, in core.Deps, subject access.Subject, store *triage.Store,
+func occurrencesToDecide(ctx context.Context, in core.Deps, subject access.Subject, store *triage.Store,
 	product, stream, variant, vulnerability, component string, which graph.Choice,
 	wanted []string, remaining bool) ([]finding.Deciding, int, int64, error) {
 
@@ -356,42 +356,42 @@ func placesToDecide(ctx context.Context, in core.Deps, subject access.Subject, s
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	all, err := finding.NewStore(in.DB.DB).PlacesFor(ctx, subject, target, issue, at)
+	all, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, target, issue, at)
 	if err != nil {
-		return nil, 0, 0, core.Absent(in.Logger, err, "those places could not be looked up", core.NoSuchFinding)
+		return nil, 0, 0, core.Absent(in.Logger, err, "those occurrences could not be looked up", core.NoSuchFinding)
 	}
 	if len(all) == 0 {
 		return nil, 0, 0, core.NoSuchFinding()
 	}
 
 	// Narrowed to what was named, and a name nothing matches is refused
-	// rather than ignored: somebody who meant to cover six places and
+	// rather than ignored: somebody who meant to cover six occurrences and
 	// mistyped one should not quietly cover five.
-	places := all
+	occurrences := all
 	if len(wanted) > 0 {
 		asked := map[string]bool{}
 		for _, name := range wanted {
 			asked[name] = true
 		}
-		places = make([]finding.Deciding, 0, len(asked))
-		for _, place := range all {
-			if asked[place.PlaceIdentity] {
-				places = append(places, place)
-				delete(asked, place.PlaceIdentity)
+		occurrences = make([]finding.Deciding, 0, len(asked))
+		for _, occurrence := range all {
+			if asked[occurrence.OccurrenceIdentity] {
+				occurrences = append(occurrences, occurrence)
+				delete(asked, occurrence.OccurrenceIdentity)
 			}
 		}
 		if len(asked) > 0 {
 			return nil, 0, 0, huma.Error422UnprocessableEntity(
-				"this finding does not sit at every place you named")
+				"this finding does not sit at every occurrence you named")
 		}
 	}
 
 	if !remaining {
-		return places, len(all), target, nil
+		return occurrences, len(all), target, nil
 	}
-	ask := make([]triage.Place, 0, len(places))
-	for _, place := range places {
-		ask = append(ask, placeOf(place))
+	ask := make([]triage.Occurrence, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		ask = append(ask, occurrenceOf(occurrence))
 	}
 	left, err := store.Undecided(ctx, ask)
 	if err != nil {
@@ -399,14 +399,14 @@ func placesToDecide(ctx context.Context, in core.Deps, subject access.Subject, s
 	}
 	standing := make(map[string]bool, len(left))
 	for _, one := range left {
-		standing[one.PlaceIdentity+"\x00"+one.ComponentUpstream+"\x00"+one.ConsumerUpstream] = true
+		standing[one.OccurrenceIdentity+"\x00"+one.ComponentUpstream+"\x00"+one.ConsumerUpstream] = true
 	}
 	// Everything else is already reached by lookup: nothing to record there,
 	// and nothing wrong either. An empty answer is what says so.
 	open := make([]finding.Deciding, 0, len(left))
-	for _, place := range places {
-		if standing[place.PlaceIdentity+"\x00"+place.ComponentUpstream+"\x00"+place.ConsumerUpstream] {
-			open = append(open, place)
+	for _, occurrence := range occurrences {
+		if standing[occurrence.OccurrenceIdentity+"\x00"+occurrence.ComponentUpstream+"\x00"+occurrence.ConsumerUpstream] {
+			open = append(open, occurrence)
 		}
 	}
 	return open, len(all), target, nil
@@ -455,14 +455,14 @@ func findingAbout(ctx context.Context, in core.Deps, subject access.Subject,
 	return target.ID, issue, at, nil
 }
 
-// decidingAbout resolves the names in a path to the place a decision is made
+// decidingAbout resolves the names in a path to the occurrence a decision is made
 // about, authorized on the way.
 //
 // A build the caller cannot reach answers with the sentence every other
 // finding route gives. Naming which part of the address failed is for a
 // pipeline filing a scan; here it would tell a reader which products exist.
 func decidingAbout(ctx context.Context, in core.Deps, subject access.Subject,
-	product, stream, variant, vulnerability, place string) (*finding.Deciding, int64, error) {
+	product, stream, variant, vulnerability, occurrence string) (*finding.Deciding, int64, error) {
 	named, err := core.LocatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
 		return nil, 0, err
@@ -477,23 +477,24 @@ func decidingAbout(ctx context.Context, in core.Deps, subject access.Subject,
 		return nil, 0, err
 	}
 
-	at, err := finding.NewStore(in.DB.DB).PlaceFor(ctx, subject, target.ID, issue, place)
+	at, err := finding.NewStore(in.DB.DB).OccurrenceFor(ctx, subject, target.ID, issue, occurrence)
 	if err != nil {
-		return nil, 0, core.Absent(in.Logger, err, "that place could not be looked up", core.NoSuchFinding)
+		return nil, 0, core.Absent(in.Logger, err, "that occurrence could not be looked up", core.NoSuchFinding)
 	}
 	return at, target.ID, nil
 }
 
-// placeOf is the place a decision is about, as the finding there states it.
+// occurrenceOf is the occurrence a decision is about, as the finding there
+// states it.
 //
-// One spelling for every route. Whether the place sits in a tag build is read
+// One spelling for every route. Whether the occurrence sits in a tag build is read
 // from the finding rather than supplied, and a route that leaves it out makes
 // a dated outcome on a release built once, which the store refuses on every
 // other route.
-func placeOf(d finding.Deciding) triage.Place {
-	return triage.Place{
+func occurrenceOf(d finding.Deciding) triage.Occurrence {
+	return triage.Occurrence{
 		ProductID: d.ProductID, VulnerabilityID: d.VulnerabilityID,
-		PlaceIdentity: d.PlaceIdentity, Visibility: d.Visibility,
+		OccurrenceIdentity: d.OccurrenceIdentity, Visibility: d.Visibility,
 		ComponentUpstream: d.ComponentUpstream, ConsumerUpstream: d.ConsumerUpstream,
 		OnTag: d.OnTag,
 	}

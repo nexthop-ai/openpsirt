@@ -344,13 +344,13 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 	})
 }
 
-func TestAGroupWhosePlacesDisagreeSaysSo(t *testing.T) {
+func TestAGroupWhoseOccurrencesDisagreeSaysSo(t *testing.T) {
 	// A row is an issue at a component across the builds that ship it, and
 	// asking what upstream did is asking about the whole of that. Where the
 	// builds disagree there is no single answer, which is what the mixed state
 	// is for — the filter selected exactly that set and every row it returned
 	// claimed a definite state, with a version taken from whichever of the
-	// disagreeing places sorted first.
+	// disagreeing occurrences sorted first.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())

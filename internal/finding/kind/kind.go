@@ -28,8 +28,8 @@ const (
 	// Entered is a flaw somebody recorded here, usually before anybody
 	// outside knows about it. No scan reports it and no scan closes it.
 	Entered Kind = "entered"
-	// Analysis is one result a static analyzer reported in our own code, at
-	// one place, tracked across builds: a lead. It is unconfirmed, and most
+	// Analysis is one result a static analyzer reported in our own code, at one
+	// occurrence, tracked across builds: a lead. It is unconfirmed, and most
 	// are false positives.
 	Analysis Kind = "analysis"
 )
@@ -45,8 +45,8 @@ const (
 	// deployment minted.
 	Flaw Issue = "flaw"
 	// Rule is an analyzer's rule. Every result the rule reports is a finding
-	// filed under it, so "this rule at this place" is keyed as "this issue at
-	// this place" is.
+	// filed under it, so "this rule at this occurrence" is keyed as "this issue
+	// at this occurrence" is.
 	Rule Issue = "rule"
 )
 
@@ -90,8 +90,9 @@ type Consumer string
 const (
 	// Closure is a run's sweep: what it opens, updates and closes.
 	Closure Consumer = "closure"
-	// VersionCarry is a decision lapsing when a version it was about moved
-	// (REQ-25), and a decision carried to a build whose versions match.
+	// VersionCarry is a decision occurrence lapsing when a version it was about
+	// moved (REQ-25), and a decision occurrence carried to a build whose
+	// versions match.
 	VersionCarry Consumer = "version-carry"
 	// Ranking is urgency and deadlines: what a finding's order and due date
 	// are worked out from, and the passes that rewrite them.
@@ -107,12 +108,13 @@ const (
 	// and listed as held work by the one implementation a finding is without
 	// reaching the findings lists or disclosure.
 	Assignment Consumer = "assignment"
-	// Decisions is the claims people make about findings: their rows, the
-	// reasoning and its revisions, approvals, comments on a claim, the review
-	// queue, every read of one claim, and the record of judgments and its file.
+	// Decisions is the decisions people make about findings: their occurrences,
+	// the reasoning and its revisions, approvals, comments on a decision, the
+	// review queue, every read of one decision, and the record of decisions and
+	// its file.
 	Decisions Consumer = "decisions"
 	// Inventory is the screens about what a build contains: its tree, a
-	// component and the places it sits at.
+	// component and the occurrences it sits at.
 	Inventory Consumer = "inventory"
 	// Statistics is every figure about findings: trends, comparisons of two
 	// builds, coverage, the reports and the home page's numbers.
@@ -121,9 +123,9 @@ const (
 	// list reads, then the leads of the same selection as the lead queue
 	// reads them.
 	Exports Consumer = "exports"
-	// Register is the disposition register: what was decided at every place
-	// of one build, its screen and its file. It states what a build ships,
-	// beside its VEX document, and a lead nobody has judged is not that.
+	// Register is the disposition register: what was decided at every
+	// occurrence of one build, its screen and its file. It states what a build
+	// ships, beside its VEX document, and a lead nobody has judged is not that.
 	Register Consumer = "register"
 	// VEX is the documents stating what affects a build.
 	VEX Consumer = "vex"
@@ -134,10 +136,11 @@ const (
 	// Evidence is one lead's evidence: where it is, the path the analyzer
 	// took to it, links into the source and the source kept beside it.
 	Evidence Consumer = "evidence"
-	// Leads is the lead queue: the leads a product holds, by where they
-	// stand, with how many each list leaves out, the queue's file, the leads
-	// a findings list's file carries, and the counts by analyzer series. The counts are here rather than
-	// under Statistics, which feeds the vulnerability figures.
+	// Leads is the lead queue: the leads a product holds, by where they stand,
+	// with how many each list leaves out, the queue's file, the leads a
+	// findings list's file carries, and the counts by analyzer series. The
+	// counts are here rather than under Statistics, which feeds the
+	// vulnerability figures.
 	Leads Consumer = "leads"
 )
 
@@ -154,7 +157,7 @@ func consumers() []Consumer {
 // A run's sweep covers what a scan of the inventory produces, and nothing a
 // person recorded: a flaw written by hand and swept by the first run after it
 // would be closed silently, with a reason reading as though it went away.
-// Analysis results are read by the consumers built for them, by the claims
+// Analysis results are read by the consumers built for them, by the decisions
 // about them, and by the findings lists' files, which write out everything the
 // reader may read. The vulnerability figures, documents and lists are about
 // what a build ships, and a lead nobody has judged is not that.

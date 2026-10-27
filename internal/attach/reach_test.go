@@ -17,7 +17,7 @@ import (
 )
 
 // An issue's files are listed to whoever may read the issue, at the visibility
-// its places carry, and to nobody else. An upload waiting for text that has not
+// its occurrences carry, and to nobody else. An upload waiting for text that has not
 // been saved is not on the list.
 //
 // Verified by deleting the mayReach call in ForIssue, which lists the

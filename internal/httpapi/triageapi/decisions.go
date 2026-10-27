@@ -17,71 +17,71 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// ClaimApprovalBody is the body of an approval.
-type ClaimApprovalBody struct {
+// DecisionApprovalBody is the body of an approval.
+type DecisionApprovalBody struct {
 	// Bounded to what the column holds. A name is compared for equality and
 	// never read back on its own, so it shares the width of a hash.
-	Batch string `json:"batch,omitempty" maxLength:"64" doc:"Name a batch to agree to several claims under one name, so they can be undone together. At most 64 characters"`
-	// Except sets rows aside. The remainder is approved as one claim; these go
-	// back to the proposer as a claim of their own, with the reason.
-	Except  []int64 `json:"except,omitempty" maxItems:"2000" doc:"Decisions in this claim to set aside rather than approve. They return to the proposer as a claim of their own, carrying the reason given in because"`
-	Because string  `json:"because,omitempty" doc:"The reason the rows in except are set aside, in markdown. Required when any are"`
+	Batch string `json:"batch,omitempty" maxLength:"64" doc:"Name a batch to agree to several decisions under one name, so they can be undone together. At most 64 characters"`
+	// Except sets rows aside. The remainder is approved as one decision; these go
+	// back to the proposer as a decision of their own, with the reason.
+	Except  []int64 `json:"except,omitempty" maxItems:"2000" doc:"Occurrences of this decision to set aside rather than approve, by decision occurrence identifier. They return to the proposer as a decision of their own, carrying the reason given in because"`
+	Because string  `json:"because,omitempty" doc:"The reason the occurrences in except are set aside, in markdown. Required when any are"`
 }
 
-// ClaimApprovedBody is the record of an approval.
-type ClaimApprovedBody struct {
-	Approved      int   `json:"approved" doc:"The number of decisions agreed to"`
-	ReturnedClaim int64 `json:"returned_claim,omitempty" doc:"The claim the rows set aside went into, where any were"`
+// DecisionApprovedBody is the record of an approval.
+type DecisionApprovedBody struct {
+	Approved         int   `json:"approved" doc:"The number of occurrences agreed to"`
+	ReturnedDecision int64 `json:"returned_decision,omitempty" doc:"The decision the occurrences set aside went into, where any were"`
 }
 
-func registerClaims(api huma.API, in core.Deps) {
+func registerDecisions(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "approve-claim", Method: http.MethodPost, Path: "/v1/decisions/{id}/approval",
+		OperationID: "approve-decision", Method: http.MethodPost, Path: "/v1/decisions/{id}/approval",
 		Summary: "Approve a decision",
-		Description: "Approves every waiting decision in a claim as one action, under the same " +
-			"rules each decision is approved under: not by the person who proposed it, and " +
+		Description: "Approves every occurrence of a decision still waiting, as one action, under the same " +
+			"rules each occurrence is approved under: not by the person who proposed it, and " +
 			"against the revision of the reasoning that stands now.\n\n" +
-			"Name decisions in `except` to set them aside. The rest is approved; those are " +
-			"moved into a claim of their own, marked sent back, and `because` is recorded on " +
+			"Name occurrences in `except` to set them aside. The rest is approved; those are " +
+			"moved into a decision of their own, marked sent back, and `because` is recorded on " +
 			"each as a comment — the same way sending back records a reason. The response " +
-			"names that claim.\n\n" +
-			"Pass `batch` to approve several claims under one name, undone together with " +
+			"names that decision.\n\n" +
+			"Pass `batch` to approve several decisions under one name, undone together with " +
 			"`DELETE /v1/approval-batches/{batch}`.\n\n" +
-			"Returns 404 for a claim you may not act on every row of, and 409 if you proposed it.",
+			"Returns 404 for a decision you may not act on every occurrence of, and 409 if you proposed it.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "The proposer may not approve their own.", core.ApproveRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
-		Body ClaimApprovalBody
-	}) (*struct{ Body ClaimApprovedBody }, error) {
+		Body DecisionApprovalBody
+	}) (*struct{ Body DecisionApprovedBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
-		done, err := store.ApproveClaim(ctx, subject, input.ID, input.Body.Batch,
+		done, err := store.ApproveDecision(ctx, subject, input.ID, input.Body.Batch,
 			input.Body.Except, input.Body.Because)
 		switch {
 		case errors.Is(err, triage.ErrSamePerson):
 			return nil, huma.Error409Conflict(
-				"somebody who proposed any of a claim or wrote any of its reasoning may not agree to it")
+				"somebody who proposed any of a decision or wrote any of its reasoning may not agree to it")
 		case errors.Is(err, triage.ErrNotTheirs):
-			return nil, noSuchClaim()
+			return nil, noSuchDecision()
 		case err != nil:
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
 
-		out := &struct{ Body ClaimApprovedBody }{}
+		out := &struct{ Body DecisionApprovedBody }{}
 		out.Body.Approved = done.Approved
 		if done.Returned != nil {
-			out.Body.ReturnedClaim = done.Returned.ID
+			out.Body.ReturnedDecision = done.Returned.ID
 			// The rows go back to whoever proposed them, and
 			// they should hear rather than find out. Logged on
 			// failure: the rows are returned either way.
 			core.Tell(ctx, in, "could not say that rows were set aside", notify.Telling{
 				PersonID: done.Returned.ProposedBy, Kind: notify.SentBack,
-				Body: "Part of a claim of yours was set aside: " + input.Body.Because,
+				Body: "Part of a decision of yours was set aside: " + input.Body.Because,
 				Link: weblink.ReviewQueue(),
-				// A claim covers many findings and this path
-				// holds the claim rather than any of them, so
+				// A decision covers many findings and this path
+				// holds the decision rather than any of them, so
 				// the disclosure of any one of them cannot be
 				// answered from here. Treated as though one
 				// is undisclosed: the direction to be wrong in is a link
@@ -96,19 +96,19 @@ func registerClaims(api huma.API, in core.Deps) {
 				// The product the returned rows are in, which
 				// is what a later read narrows by.
 				ProductID: &done.ReturnedIn,
-			}, "claim", input.ID)
+			}, "decision", input.ID)
 		}
 		return out, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "send-claim-back", Method: http.MethodPost, Path: "/v1/decisions/{id}/send-back",
+		OperationID: "send-decision-back", Method: http.MethodPost, Path: "/v1/decisions/{id}/send-back",
 		Summary: "Send a decision back for more",
-		Description: "Asks the author for more before agreeing to any of a claim. Every waiting " +
-			"decision in it leaves the review queue together and comes back when the author " +
+		Description: "Asks the author for more before agreeing to any of a decision. Every waiting " +
+			"occurrence of it leaves the review queue at once and comes back when the author " +
 			"revises.\n\n" +
-			"`because` is required and is recorded as a comment on each decision. Needs no " +
-			"approval of its own. You cannot send back a claim whose words are your own.",
+			"`because` is required and is recorded as a comment on the decision. Needs no " +
+			"approval of its own. You cannot send back a decision whose words are your own.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "The proposer may not approve their own.", core.ApproveRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
@@ -120,70 +120,70 @@ func registerClaims(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		back, err := store.SendBackClaim(ctx, subject, input.ID, input.Body.Because)
+		back, err := store.SendBackDecision(ctx, subject, input.ID, input.Body.Because)
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {
-				return nil, noSuchClaim()
+				return nil, noSuchDecision()
 			}
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
 		// Everybody whose words went back is told, and sent to the finding
-		// the claim is about: that is where the words are revised, where the
+		// the decision is about: that is where the words are revised, where the
 		// review queue lists what waits on an approver and leaves out what
 		// waits on its author. The decision itself stands in where no open
 		// finding the sender may read describes it any more.
-		link := weblink.Decision(back.Decision.ID)
-		if described, err := store.Describe(ctx, subject, []triage.Decision{back.Decision}); err == nil {
-			if d, ok := described[back.Decision.ID]; ok {
+		link := weblink.DecisionOccurrence(back.DecisionOccurrence.ID)
+		if described, err := store.Describe(ctx, subject, []triage.DecisionOccurrence{back.DecisionOccurrence}); err == nil {
+			if d, ok := described[back.DecisionOccurrence.ID]; ok {
 				link = weblink.Finding(d.Product, d.Stream, d.Variant,
 					d.Issue.Identifier, d.Component, d.Version)
 				// A rule names no finding page; its lead is addressed by
-				// its place.
+				// its occurrence.
 				if d.Issue.Kind == kind.Rule {
-					link = weblink.Lead(d.Product, d.Stream, d.Variant, back.Decision.PlaceIdentity)
+					link = weblink.Lead(d.Product, d.Stream, d.Variant, back.DecisionOccurrence.OccurrenceIdentity)
 				}
 			}
 		} else if err != nil {
-			in.Log().Error("could not say which finding a sent-back claim is about",
-				"error", err, "claim", input.ID)
+			in.Log().Error("could not say which finding a sent-back decision is about",
+				"error", err, "decision", input.ID)
 		}
 		{
 			author := back.Author
-			core.Tell(ctx, in, "could not say that a claim was sent back", notify.Telling{
+			core.Tell(ctx, in, "could not say that a decision was sent back", notify.Telling{
 				PersonID: author, Kind: notify.SentBack,
-				Body: "A claim of yours was sent back: " + input.Body.Because,
+				Body: "A decision of yours was sent back: " + input.Body.Because,
 				Link: link,
 				// The words an approver wrote are about the
 				// findings, so they are as private as the most
-				// careful of them. Read off the claim rather
+				// careful of them. Read off the decision rather
 				// than off its representative row: that row is
-				// chosen by identifier and a claim's rows need
+				// chosen by identifier and a decision's rows need
 				// not agree.
 				Private:  back.Undisclosed,
 				Internal: back.Internal,
 				// Off the representative row, which is a row of
-				// this claim and so names its product and its
+				// this decision and so names its product and its
 				// issue.
-				ProductID:       &back.Decision.ProductID,
-				VulnerabilityID: &back.Decision.VulnerabilityID,
-			}, "claim", input.ID, "person", author)
+				ProductID:       &back.DecisionOccurrence.ProductID,
+				VulnerabilityID: &back.DecisionOccurrence.VulnerabilityID,
+			}, "decision", input.ID, "person", author)
 		}
 		return &struct{}{}, nil
 	})
 }
 
-// registerClaimLink is where a claim's work is happening.
-func registerClaimLink(api huma.API, in core.Deps) {
+// registerDecisionLink is where a decision's work is happening.
+func registerDecisionLink(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "point-claim-elsewhere", Method: http.MethodPut,
+		OperationID: "point-decision-elsewhere", Method: http.MethodPut,
 		Path:    "/v1/decisions/{id}/elsewhere",
 		Summary: "Record where this decision's work is happening",
 		Description: "Stores a link to a ticket, a thread or a change — and sends nothing to " +
 			"it. A stored link has no egress at all, which is what makes it available to a " +
 			"deployment that has not decided to let anything out; the half that *sends* is a " +
 			"separate thing a deployment configures.\n\n" +
-			"Anybody who may argue about the claim may set it: a link is a note about where " +
-			"the conversation is rather than a judgment, and needing a second person for it " +
+			"Anybody who may argue about the decision may set it: a link is a note about where " +
+			"the conversation is rather than a decision, and needing a second person for it " +
 			"would leave it unset.\n\n" +
 			"Sent empty it is cleared. A stale link is worse than none — it sends somebody to " +
 			"a ticket that closed for a different reason.",
@@ -200,7 +200,7 @@ func registerClaimLink(api huma.API, in core.Deps) {
 		}
 		if err := store.PointAt(ctx, subject, input.ID, input.Body.Elsewhere); err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {
-				return nil, noSuchClaim()
+				return nil, noSuchDecision()
 			}
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
@@ -208,49 +208,49 @@ func registerClaimLink(api huma.API, in core.Deps) {
 	})
 }
 
-// noSuchClaim is the one answer for a claim that is not there or not yours.
-func noSuchClaim() error {
-	return huma.Error404NotFound("no such claim")
+// noSuchDecision is the one answer for a decision that is not there or not yours.
+func noSuchDecision() error {
+	return huma.Error404NotFound("no such decision")
 }
 
 // ReaffirmedBody is the record of one bulk re-affirmation.
 type ReaffirmedBody struct {
-	PreviousClaimID int64   `json:"previous_claim_id" doc:"The claim that lapsed"`
-	ClaimID         int64   `json:"claim_id" doc:"The claim this action made, which is what a second person agrees to where one is needed"`
-	Decisions       []int64 `json:"decisions"`
-	Places          int     `json:"places" doc:"The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
-	Waiting         bool    `json:"waiting" doc:"Whether a second person has to agree"`
+	PreviousDecisionID  int64   `json:"previous_decision_id" doc:"The decision that lapsed"`
+	DecisionID          int64   `json:"decision_id" doc:"The decision this action made, which is what a second person agrees to where one is needed"`
+	DecisionOccurrences []int64 `json:"decision_occurrences"`
+	Occurrences         int     `json:"occurrences" doc:"The number of occurrences it covers. One component at two versions in two builds counts twice, because a decision expires on the version"`
+	Waiting             bool    `json:"waiting" doc:"Whether a second person has to agree"`
 }
 
-// registerReaffirmClaim re-makes everything one action claimed.
-func registerReaffirmClaim(api huma.API, in core.Deps) {
+// registerReaffirmDecision re-makes everything one decision covers.
+func registerReaffirmDecision(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "reaffirm-claim", Method: http.MethodPost,
+		OperationID: "reaffirm-decision", Method: http.MethodPost,
 		Path:    "/v1/decisions/{id}/reaffirmation",
 		Summary: "Re-affirm everything one decision covers",
-		Description: "Re-makes every row of this claim that stopped applying because an " +
-			"upstream version moved, at the versions each place has now, as one act with one " +
+		Description: "Re-makes every occurrence of this decision that stopped applying because an " +
+			"upstream version moved, at the versions each occurrence has now, as one act with one " +
 			"reasoning.\n\n" +
 			"Deciding is bulk-capable and re-deciding was not. A team answering one kernel " +
-			"issue writes a decision at each of its places in one action; when the kernel " +
+			"issue writes one decision over all of its occurrences in one action; when the kernel " +
 			"moves, those lapse, and restoring them was one request each with a separately " +
 			"typed justification.\n\n" +
 			"Only the person who made the original may do this. It normally needs no second " +
 			"approver, for the reason the single form does not: two people already agreed, and " +
-			"a version upgrade is a prompt to re-check rather than a new claim.\n\n" +
-			"One act, one approval. Where any row would need approval again — nothing was " +
+			"a version upgrade is a prompt to re-check rather than a new decision.\n\n" +
+			"One act, one approval. Where any occurrence would need approval again — nothing was " +
 			"ever agreed to, or the issue is rated a band worse since it was agreed to and " +
-			"the claim is one a severity bears on — the whole act does. An approver works at the unit " +
-			"the proposer acted at. A severity bears on every claim except `already-fixed`, " +
+			"the decision is one a severity bears on — the whole act does. An approver works at the unit " +
+			"the proposer acted at. A severity bears on every decision except `already-fixed`, " +
 			"and `not-applicable` because the component or the vulnerable code is not present " +
 			"or not in the execute path.\n\n" +
 			"Bounded unless it is a promise to upgrade. The issues it covers count against " +
 			"`triage.agreed-issues` where nothing goes back to an approver, and against " +
 			"`triage.review-issues` where anything does; the findings it writes count against " +
 			"`triage.write-ceiling`.\n\n" +
-			"A lead past its end of life is not re-made, and a claim at no other place is " +
+			"A lead past its end of life is not re-made, and a decision with no other occurrence is " +
 			"refused with 409.\n\n" +
-			"A place that is open nowhere any more is not re-made, which is a finding that " +
+			"An occurrence that is open nowhere any more is not re-made, which is a finding that " +
 			"closed rather than a fault. `reasoning` is required.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.AnyPerson, "", core.TriageRights()...), func(ctx context.Context, input *struct {
@@ -265,16 +265,16 @@ func registerReaffirmClaim(api huma.API, in core.Deps) {
 		}
 		// Held to the deployment's bounds, which the store reads inside the
 		// write. Only a promise goes through unbounded, and which of the two
-		// this is comes from the claim being re-made rather than from the
+		// this is comes from the decision being re-made rather than from the
 		// request.
-		made, err := store.ReaffirmClaim(ctx, subject, triage.ReaffirmingClaim{
-			PreviousClaimID: input.ID,
-			Reasoning:       input.Body.Reasoning,
-			By:              subject.ID,
+		made, err := store.ReaffirmDecision(ctx, subject, triage.ReaffirmingDecision{
+			PreviousDecisionID: input.ID,
+			Reasoning:          input.Body.Reasoning,
+			By:                 subject.ID,
 		})
 		if err != nil {
 			if errors.Is(err, triage.ErrNotTheirs) {
-				return nil, noSuchClaim()
+				return nil, noSuchDecision()
 			}
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
@@ -282,9 +282,9 @@ func registerReaffirmClaim(api huma.API, in core.Deps) {
 	})
 }
 
-func claimBody(c triage.Claim, proposedBy, proposedByName string) ClaimBody {
-	body := ClaimBody{
-		ID: c.ID, Kind: core.ClaimKind(c.Kind), ProposedBy: proposedBy, ProposedByName: proposedByName,
+func decisionBody(c triage.Decision, proposedBy, proposedByName string) DecisionBody {
+	body := DecisionBody{
+		ID: c.ID, Kind: core.DecisionKind(c.Kind), ProposedBy: proposedBy, ProposedByName: proposedByName,
 		ProposedAt: core.Stamp(c.ProposedAt),
 		Elsewhere:  c.Elsewhere,
 	}
@@ -313,7 +313,7 @@ func outliersBody(o triage.Outliers) *OutliersBody {
 	}
 	for _, row := range o.Rows {
 		body.Rows = append(body.Rows, OutlierBody{
-			DecisionID: row.DecisionID, DecisionIDs: row.DecisionIDs,
+			DecisionOccurrenceID: row.DecisionOccurrenceID, DecisionOccurrenceIDs: row.DecisionOccurrenceIDs,
 			Vulnerability: row.Vulnerability, Severity: row.Severity,
 			ExploitedHere: row.ExploitedHere, Exploited: row.Exploited, FixedIn: row.FixedIn,
 			Description: row.Description, Why: row.Why,

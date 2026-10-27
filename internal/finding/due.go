@@ -125,7 +125,7 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // A deadline nobody can meet is not a deadline. Where upstream has released
 // nothing, and where upstream has declined, there is no version to take: the
 // clock runs and the only thing that can stop it is a person recording a
-// judgment, which is the one act the deadline exists to ask for and cannot be
+// decision, which is the one act the deadline exists to ask for and cannot be
 // the answer to. It is the statement three other rules here already make from
 // other directions — a tag that cannot change, a build past its end of life,
 // and an issue below the triage line all carry no deadline for the same reason.
@@ -226,12 +226,12 @@ type Late struct {
 	Variant     string `bun:"variant"`
 	VariantName string `bun:"variant_name"`
 	AssignedTo  *int64 `bun:"assigned_to"`
-	// Due is the earliest deadline among the places this row covers — the one
-	// that makes the whole group late.
+	// Due is the earliest deadline among the occurrences this row covers — the
+	// one that makes the whole group late.
 	Due time.Time `bun:"due"`
-	// Places is how many places this issue sits at in this component. One row
-	// covers all of them, because they are one thing to answer.
-	Places int `bun:"places"`
+	// Occurrences is how many occurrences this issue has in this component. One
+	// row covers all of them, because they are one thing to answer.
+	Occurrences int `bun:"places"`
 	// AssignedHigh and AssignedCount decide whether one name can be reported
 	// for the group. They are read and then discarded.
 	AssignedHigh  *int64 `bun:"assigned_high"`
@@ -246,17 +246,17 @@ type Late struct {
 // takes it off the clock, as SQL, with the values it binds.
 //
 // One spelling, because there were two. What is running out of time excluded
-// any live claim, so a proposal waiting for a second person took a finding off
+// any live decision, so a proposal waiting for a second person took a finding off
 // that list for as long as it sat in the queue; what each person was holding
 // excluded nothing, so the same finding still counted as overdue against
 // whoever held it. Two screens answering "is this late" differently is the
 // kind of disagreement that gets one of them ignored.
 //
-// It says what the triage package says when it asks whether a decision
-// applies to a place, and nothing else: this product's decision about this
-// issue at this place, keyed on the versions the place holds now, approved or
-// proposed by somebody whose claim needs no agreement — and a deferral only
-// until its date, after which the finding is back on the clock.
+// It says what the triage package says when it asks whether a decision applies
+// to an occurrence, and nothing else: this product's decision about this issue
+// at this occurrence, keyed on the versions the occurrence holds now, approved
+// or proposed by somebody whose decision needs no agreement — and a deferral
+// only until its date, after which the finding is back on the clock.
 //
 // The finding is `f`, its component `c` and its consumer `uc`, all joined by
 // the caller; product is the SQL naming the finding's product, which a list
@@ -290,25 +290,25 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 		args
 }
 
-// InForce is the test for a claim that is in force: agreed, or made by
-// somebody whose claim needed no agreement. The decision is `de`, joined by
-// the caller, and the values it binds come back with it.
+// InForce is the test for a decision that is in force: agreed, or made by
+// somebody whose decision needed no agreement. The decision occurrence is
+// `de`, joined by the caller, and the values it binds come back with it.
 //
-// A claim waiting for a second person is not standing. It suppresses
+// A decision waiting for a second person is not standing. It suppresses
 // nothing, answers for nothing and covers nothing in the meantime — otherwise
 // the review queue is decorative and one person dismisses a finding on their
 // own, which is the whole thing a second pair of eyes exists to prevent.
 //
-// And not one that was sent back. Only a claim needing nobody can be both
+// And not one that was sent back. Only a decision needing nobody can be both
 // sent back and standing. Its author is told it applies to nothing until it
 // is revised, so it suppresses nothing until then. Sending back
 // is not a state of its own, but it is a statement that nobody is relying on
 // this yet.
 //
-// Said in one place, because every reader asking whether a claim answers a
+// Said in one place, because every reader asking whether a decision answers a
 // finding asks this: a proposal nobody has agreed to answers nothing, in the
 // overdue figure, in a notice about a deferral ending, and everywhere else.
-// Pair it with whatever says the claim still applies — `live_key IS NOT NULL`
+// Pair it with whatever says the decision still applies — `live_key IS NOT NULL`
 // where any version will do, KeyMatches where the versions matter.
 func InForce() (string, []any) {
 	return `("de"."state" = ? OR ("de"."state" = ? AND "de"."needs_approval" = ? AND "de"."sent_back_at" IS NULL))`,
@@ -320,14 +320,14 @@ func InForce() (string, []any) {
 // list.
 //
 // Undecided only. A deadline that has been answered is not a deadline
-// running out: a dismissal takes a finding off the clock, because the claim is
+// running out: a dismissal takes a finding off the clock, because the decision is
 // that it will not be fixed, and a deferral replaces the deadline with its own
 // date. What is left is time passing with nothing said, which is the only part
 // worth interrupting somebody about.
 //
-// One row per issue at a component, not per place. A kernel flaw sitting
-// at sixty places is one thing somebody has to answer, and sixty rows of it is
-// a list with one entry in it.
+// One row per issue at a component, not per occurrence. A kernel flaw sitting
+// at sixty occurrences is one thing somebody has to answer, and sixty rows of
+// it is a list with one entry in it.
 //
 // The deadline is read rather than derived. Worked out per request it is a
 // pass over every open finding per urgency band — each band allows a different
@@ -337,7 +337,8 @@ func InForce() (string, []any) {
 //
 // A finding with no deadline is left out: nobody has rated a flaw recorded
 // here, it is below the line, it is in a release out of support or built once,
-// or it has nothing upstream to take, and NoDeadline says which. None of those is something to interrupt anybody about.
+// or it has nothing upstream to take, and NoDeadline says which. None of those
+// is something to interrupt anybody about.
 //
 // Paged because a screen reads the first page and a file reads all of them,
 // and the file is the reason the offset exists: an export
@@ -383,11 +384,11 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			Where(`"f"."due_at" IS NOT NULL`).
 			Where(`"f"."due_at" <= ?`, s.now().UTC().Add(within)).
 			// Nothing the build or a supplier already argued away, and nothing
-			// a decision takes off the clock. Not merely a claim: a proposal waiting for
-			// a second person suppresses nothing, and it took findings off
-			// this list for as long as it sat in the queue — a quarter, on
-			// one — while the same findings still counted as overdue against
-			// whoever held them.
+			// a decision takes off the clock. Not merely any decision: a
+			// proposal waiting for a second person suppresses nothing, and it
+			// took findings off this list for as long as it sat in the queue —
+			// a quarter, on one — while the same findings still counted as
+			// overdue against whoever held them.
 			Where(NotArguedAway).
 			Where("NOT "+standing, args...)
 		if !all {
@@ -396,7 +397,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		return scope.Narrow(onlyVisible(q, subject, products, all))
 	}
 	// The grouping, which decides what one row is: an issue at a component in
-	// one build, however many places it sits at there.
+	// one build, however many occurrences it has there.
 	const grouping = `"v"."identifier", "c"."name", "c"."version", "c"."purl", "f"."urgency_exploited", "p"."name", "p"."display_name", ` +
 		`"st"."name", "st"."display_name", "va"."name", "va"."display_name", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`
 
@@ -408,11 +409,11 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
 		Apply(catalog.BuildNames("p", "st", "va")).
-		// The earliest of the places this row covers, because that is the one
-		// that makes the whole group late.
+		// The earliest of the occurrences this row covers, because that is the
+		// one that makes the whole group late.
 		ColumnExpr(`MIN("f"."due_at") AS "due"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		// Named only where every place has the same person. Reporting one of
+		// Named only where every occurrence has the same person. Reporting one of
 		// several would tell somebody a finding is being dealt with when most
 		// of it is not.
 		ColumnExpr(`MIN("f"."assigned_to") AS "assigned_to"`).
@@ -438,7 +439,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		return nil, 0, fmt.Errorf("read what is running out of time: %w", err)
 	}
 	for i := range late {
-		if late[i].AssignedCount != late[i].Places || late[i].AssignedTo == nil ||
+		if late[i].AssignedCount != late[i].Occurrences || late[i].AssignedTo == nil ||
 			late[i].AssignedHigh == nil || *late[i].AssignedTo != *late[i].AssignedHigh {
 			late[i].AssignedTo = nil
 		}
@@ -677,7 +678,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							// What a scan opened. A recorded flaw is
 							// recounted on its own windows, above.
 							Where(`"kind" = ?`, Vulnerable).
-							// A place a supplier answers on some routes
+							// An occurrence a supplier answers on some routes
 							// carries no deadline.
 							Where(`"stated_by" IS NULL`).
 							Where(onClock, onClockArgs...).

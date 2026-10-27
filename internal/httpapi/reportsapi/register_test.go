@@ -19,7 +19,7 @@ func TestTheRegisterHoldsWhatNobodyHasDecided(t *testing.T) {
 	// what was *known*, decided or not. A register of only what somebody
 	// answered is the report they already have.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/register"
 		var register struct {
@@ -54,7 +54,7 @@ func TestTheRegisterHoldsWhatNobodyHasDecided(t *testing.T) {
 		// names, because two different people is the whole of the control.
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
+				"/findings/CVE-2026-9999/occurrences/"+occurrence+"/decision",
 			`{"outcome":"wont-fix","reasoning":"Not worth it here."}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
@@ -62,10 +62,10 @@ func TestTheRegisterHoldsWhatNobodyHasDecided(t *testing.T) {
 		httpapitest.Read(t, r, "triager", at, &register)
 		after := register.Items[0]
 		if after.State != "waiting" || after.Outcome != "wont-fix" {
-			t.Errorf("after a claim the register says %q/%q", after.State, after.Outcome)
+			t.Errorf("after a decision the register says %q/%q", after.State, after.Outcome)
 		}
 		if after.ProposedBy == "" {
-			t.Error("the register does not say who claimed it")
+			t.Error("the register does not say who proposed it")
 		}
 		if after.ApprovedBy != "" {
 			t.Errorf("nobody has agreed and the register names %q", after.ApprovedBy)
@@ -82,7 +82,7 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 			t.Fatalf("exporting the register answered %d: %s", got.Code, got.Body.String())
 		}
 		// It states no triage line, because it applies none. The register is
-		// every place in the build with what stands there, which is what makes
+		// every occurrence in the build with what stands there, which is what makes
 		// it answerable to an auditor — and a header saying things were left
 		// out above a file that left nothing out is worse than saying nothing,
 		// because it reads as complete about what remains.
@@ -203,9 +203,9 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 	// auditor paging a register never saw some of it and nothing said so.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		claim, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
-		r.Agreed(t, claim)
-		// A second agreement on the same claim, which is what the schema
+		decision, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
+		// A second agreement on the same decision, which is what the schema
 		// allows and what multiplied the row. Written directly, because a
 		// second approver going through the endpoint is a different subject
 		// and this is about the shape of the row rather than about who may
@@ -224,7 +224,7 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 		var whole struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`
-				Place         string `json:"place"`
+				Occurrence    string `json:"occurrence"`
 			} `json:"items"`
 			Total int `json:"total"`
 		}
@@ -235,7 +235,7 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 		}
 		seen := map[string]bool{}
 		for _, row := range whole.Items {
-			key := row.Vulnerability + " " + row.Place
+			key := row.Vulnerability + " " + row.Occurrence
 			if seen[key] {
 				t.Errorf("the register lists %q twice", key)
 			}
@@ -414,9 +414,9 @@ func TestTheRegisterNarrows(t *testing.T) {
 }
 
 // The register file's "stated by" cell carries the supplier's statement
-// that answers a place: who said it, about which product, on what grounds
+// that answers an occurrence: who said it, about which product, on what grounds
 // and in what words, as the register's list reports them.
-func TestTheRegisterFileSaysWhichSupplierAnsweredAPlace(t *testing.T) {
+func TestTheRegisterFileSaysWhichSupplierAnsweredAnOccurrence(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())

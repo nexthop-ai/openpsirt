@@ -32,7 +32,7 @@ func TestAPageOfGroupsHoldsTheRowsItsTotalCounts(t *testing.T) {
 		who := f.holding(t, access.PublicTriage)
 		later := time.Now().Add(time.Hour)
 
-		undecided := []finding.ClaimStanding{finding.StandingUndecided}
+		undecided := []finding.DecisionStanding{finding.StandingUndecided}
 		for _, asked := range []struct {
 			name   string
 			filter finding.Filter

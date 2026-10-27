@@ -236,9 +236,9 @@ func TestAComponentNamedOutsideASCIIMatchesTheSameOnEveryEngine(t *testing.T) {
 func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
 	// The binary packages one source was built at one version are one thing to
 	// a person, and the finding screen's rows are the whole fold — deliberately,
-	// so that a form recording twelve places does not show six. Who holds it
+	// so that a form recording twelve occurrences does not show six. Who holds it
 	// and what placed it asked about one component instead, so the guarantee
-	// those two state — one name for the whole group, empty where its places
+	// those two state — one name for the whole group, empty where its occurrences
 	// disagree — was a guarantee about a group they could not see. A rule that
 	// placed a third of a fold reported as no rule under one name and as the
 	// whole thing under another.
@@ -700,11 +700,11 @@ func TestARoutingRulePlacesNoHandedOffLead(t *testing.T) {
 			Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		// A place of its own, as a lead's is: the fixture's leads share the
-		// places of the vulnerabilities they were made from.
-		lead.PlaceIdentity = "lead-handed-off"
+		// An occurrence of its own, as a lead's is: the fixture's leads share the
+		// occurrences of the vulnerabilities they were made from.
+		lead.OccurrenceIdentity = "lead-handed-off"
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set(`"occurrence_identity" = ?`, lead.PlaceIdentity).Where(`"id" = ?`, lead.ID).Exec(ctx); err != nil {
+			Set(`"occurrence_identity" = ?`, lead.OccurrenceIdentity).Where(`"id" = ?`, lead.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		person, err := access.NewStore(f.db.DB).Ensure(ctx, "hander@example.com", "Hander", nil, nil)
@@ -716,7 +716,7 @@ func TestARoutingRulePlacesNoHandedOffLead(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := f.db.DB.NewInsert().Model(&finding.Handoff{
-			ProductID: f.productID, PlaceIdentity: lead.PlaceIdentity, VulnerabilityID: lead.VulnerabilityID,
+			ProductID: f.productID, OccurrenceIdentity: lead.OccurrenceIdentity, VulnerabilityID: lead.VulnerabilityID,
 			Visibility: access.Internal, HandedBy: person.ID, HandedAt: time.Now().UTC().Truncate(time.Second),
 		}).Exec(ctx); err != nil {
 			t.Fatal(err)

@@ -68,7 +68,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Older than a claim may wait.
+		// Older than a decision may wait.
 		if _, err := db.DB.NewUpdate().Model((*finding.ReportRuling)(nil)).
 			Set(`"proposed_at" = ?`, time.Now().UTC().Add(-8*24*time.Hour)).
 			Where(`"id" = ?`, ruling.ID).Exec(ctx); err != nil {
@@ -87,7 +87,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 			}
 			var out []notify.Notification
 			for _, row := range rows {
-				if row.Kind == notify.ClaimWaiting {
+				if row.Kind == notify.DecisionWaiting {
 					out = append(out, row)
 				}
 			}

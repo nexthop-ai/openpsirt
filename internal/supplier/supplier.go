@@ -13,7 +13,7 @@
 //
 // Nothing it reads closes anything. What arrives lands in the same evidence
 // layer an uploaded document lands in: shown beside a finding and offered as a
-// prefill. Applying a supplier's statement at the places its product occupies
+// prefill. Applying a supplier's statement at the occurrences its product occupies
 // is REQ-31's, and is not built. A pass
 // running on a schedule makes that easier to violate by accident than an upload
 // does, because nobody is watching each document arrive.

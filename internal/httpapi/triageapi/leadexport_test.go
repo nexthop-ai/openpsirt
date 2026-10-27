@@ -158,19 +158,19 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 }
 
 // A lead whose dismissal waits for a second person is open, and a findings
-// file holds it, as it holds a finding a claim waits on, though the queue
+// file holds it, as it holds a finding a decision waits on, though the queue
 // leaves it out.
-func TestAFindingsFileHoldsAnOpenLeadAClaimWaitsOn(t *testing.T) {
+func TestAFindingsFileHoldsAnOpenLeadADecisionWaitsOn(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		decideLead(t, r, place,
+		occurrence := httpapitest.SeededLead(t, r)
+		decideLead(t, r, occurrence,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
 		if queue := leadsOf(t, r, "internal-reader", ""); queue.Total != 0 || queue.Waiting != 1 {
 			t.Fatalf("the queue is %+v; want the lead left out as waiting, or this checks nothing", queue)
 		}
 		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv")
 		if leads := leadRowsIn(t, header, rows); len(leads) != 1 || leads[0]["issue"] != "clang-tidy/leak" {
-			t.Errorf("the findings file holds the leads %v; want the lead a claim waits on", leads)
+			t.Errorf("the findings file holds the leads %v; want the lead a decision waits on", leads)
 		}
 	})
 }

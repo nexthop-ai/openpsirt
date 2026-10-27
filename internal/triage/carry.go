@@ -18,20 +18,20 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// ErrNotOffered refuses carrying a decision the preview did not offer this
+// ErrNotOffered refuses carrying a decision occurrence the preview did not offer this
 // line: one that already applies here, or one covering nothing here.
 var ErrNotOffered = refusal.New("is not one this line was offered")
 
-// Carry takes chosen judgments onto a new line as claims waiting for
+// Carry takes chosen decisions onto a new line as decisions waiting for
 // agreement.
 //
 // It carries reasoning forward and never conclusions. Each one arrives as
-// a claim needing approval, with the words from the old line to start from
+// a decision needing approval, with the words from the old line to start from
 // rather than to start without. A version moved, which is exactly what makes
-// the old judgment stop applying — so somebody has to look at it again, and
+// the old decision stop applying — so somebody has to look at it again, and
 // what is inherited is the thinking rather than the answer.
 //
-// Only what was offered. A caller naming a decision the preview classified
+// Only what was offered. A caller naming a decision occurrence the preview classified
 // as already applying, or as covering nothing here, is choosing something it
 // was not asked about: the first has already happened and the second has
 // nothing to happen to. Both are refused rather than quietly skipped, because
@@ -49,18 +49,18 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		carried = 0
 
-		// The claims the new line inherits, read through the same rule
+		// The decisions the new line inherits, read through the same rule
 		// that shows it — so a caller cannot carry something the
 		// preview would not offer, and the two cannot come to disagree
 		// about which those are.
 		//
 		// Read inside the transaction, and this is the read that most
 		// needed to be. It decides every row written below: what each
-		// claim says, which place it is about, and whether it may be
+		// decision says, which occurrence it is about, and whether it may be
 		// carried at all. Read before the transaction began, a retry —
-		// or a first attempt that merely waited — carried a judgment
-		// somebody withdrew in the meantime, onto a line the old claim
-		// no longer applies to, with the words from a claim that has
+		// or a first attempt that merely waited — carried a decision
+		// somebody withdrew in the meantime, onto a line the old decision
+		// no longer applies to, with the words from a decision that has
 		// since been revised. The offer and the writing have to see
 		// the same database or the rule "only what was offered" is
 		// about a world that has moved.
@@ -70,20 +70,20 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 		}
 		available := make(map[int64]Inherited, len(offered.Moved)+len(offered.Postponed))
 		for _, one := range append(append([]Inherited{}, offered.Moved...), offered.Postponed...) {
-			available[one.DecisionID] = one
+			available[one.DecisionOccurrenceID] = one
 		}
 		wanted := make([]Inherited, 0, len(chosen))
 		for _, id := range chosen {
 			one, ok := available[id]
 			if !ok {
-				return fmt.Errorf("decision %d %w", id, ErrNotOffered)
+				return fmt.Errorf("decision occurrence %d %w", id, ErrNotOffered)
 			}
 			wanted = append(wanted, one)
 		}
 
-		// Bounded by the reviewer's issue limit, because every judgment
-		// carried waits for a second person. One chosen decision is one
-		// place on the new line.
+		// Bounded by the reviewer's issue limit, because every decision
+		// carried waits for a second person. One chosen row is one
+		// occurrence on the new line.
 		issues := map[string]bool{}
 		for _, one := range wanted {
 			issues[one.Vulnerability] = true
@@ -97,31 +97,31 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 		}
 
 		for _, one := range wanted {
-			// The place is read from the new line's own findings rather than
-			// copied from the old claim: the versions are what a decision is
+			// The occurrence is read from the new line's own findings rather than
+			// copied from the old decision: the versions are what a row is
 			// keyed on and they are the thing that moved, so copying them
-			// would write a claim keyed to a build it is not about.
-			place, err := within.placeOnLine(ctx, toTarget, one.DecisionID)
+			// would write a decision keyed to a build it is not about.
+			occurrence, err := within.occurrenceOnLine(ctx, toTarget, one.DecisionOccurrenceID)
 			if err != nil {
 				return err
 			}
-			old, err := within.oldClaim(ctx, one.DecisionID)
+			old, err := within.oldDecision(ctx, one.DecisionOccurrenceID)
 			if err != nil {
 				return err
 			}
 			// How bad the issue is judged to be here now, which is what a
-			// later rise is measured from. Without it a carried claim reads
+			// later rise is measured from. Without it a carried decision reads
 			// as made about an unrated issue.
-			severity, err := within.severityOf(ctx, place.ProductID, place.VulnerabilityID)
+			severity, err := within.severityOf(ctx, occurrence.ProductID, occurrence.VulnerabilityID)
 			if err != nil {
 				return err
 			}
 			proposal := Proposal{
-				Place: *place, Outcome: old.Outcome,
+				Occurrence: *occurrence, Outcome: old.Outcome,
 				Reasoning: one.Reasoning, By: subject.ID,
 				SeverityCenti: severity,
-				// Always. A judgment whose versions moved is a
-				// fresh claim about code nobody has looked at,
+				// Always. A decision whose versions moved is a
+				// fresh decision about code nobody has looked at,
 				// however confident whoever carried it was —
 				// and seeding a new line says reasoning
 				// travels and conclusions do not.
@@ -143,7 +143,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			if old.DeferredUntil != nil {
 				// Carried as it was, not extended. Somebody agreeing to this
 				// is agreeing to a date, and quietly moving it forward would
-				// be the tool making the judgment it is asking for.
+				// be the tool making the decision it is asking for.
 				until := *old.DeferredUntil
 				proposal.DeferredUntil = &until
 			}
@@ -155,25 +155,25 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 				proposal.CommittedTo = &by
 			}
 			// The same checks every other write path makes, asked of the
-			// place it lands at: the visibility there is the new line's,
+			// occurrence it lands at: the visibility there is the new line's,
 			// which may be undisclosed where the old line's was not, and a
-			// dated judgment is refused on a line built once, as it is when
-			// proposed there. The offer read above already leaves out a
-			// place the carrier may not argue about, so the visibility arm
+			// dated decision is refused on a line built once, as it is when
+			// proposed there. The offer read above already leaves out an
+			// occurrence the carrier may not argue about, so the visibility arm
 			// is a backstop no request reaches.
 			if err := permitted(subject, []Proposal{proposal}, s.now()); err != nil {
-				return fmt.Errorf("carry decision %d: %w", one.DecisionID, err)
+				return fmt.Errorf("carry decision occurrence %d: %w", one.DecisionOccurrenceID, err)
 			}
 			// The inner form, because this is already inside a transaction:
-			// carrying six judgments is one act, and half of it landing is a
+			// carrying six decisions is one act, and half of it landing is a
 			// line nobody can tell from one somebody chose that way.
-			claim, err := within.newClaim(ctx, FindingClaim, subject.ID, nil,
+			decision, err := within.newDecision(ctx, FindingDecision, subject.ID, nil,
 				"carried from another line", proposal)
 			if err != nil {
-				return fmt.Errorf("carry decision %d: %w", one.DecisionID, err)
+				return fmt.Errorf("carry decision occurrence %d: %w", one.DecisionOccurrenceID, err)
 			}
-			if _, err := within.propose(ctx, claim, proposal); err != nil {
-				return fmt.Errorf("carry decision %d: %w", one.DecisionID, err)
+			if _, err := within.propose(ctx, decision, proposal); err != nil {
+				return fmt.Errorf("carry decision occurrence %d: %w", one.DecisionOccurrenceID, err)
 			}
 			carried++
 		}
@@ -185,16 +185,16 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 	return carried, nil
 }
 
-// placeOnLine is where a carried judgment lands: the same issue at the same
-// place, at whatever versions the new line holds.
-func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*Place, error) {
+// occurrenceOnLine is where a carried decision lands: the same issue at the same
+// occurrence, at whatever versions the new line holds.
+func (s *Store) occurrenceOnLine(ctx context.Context, toTarget, occurrenceID int64) (*Occurrence, error) {
 	var row struct {
-		ProductID       int64  `bun:"product_id"`
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		PlaceIdentity   string `bun:"occurrence_identity"`
-		Visibility      string `bun:"visibility"`
-		Component       string `bun:"component_now"`
-		Consumer        string `bun:"consumer_now"`
+		ProductID          int64  `bun:"product_id"`
+		VulnerabilityID    int64  `bun:"vulnerability_id"`
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+		Visibility         string `bun:"visibility"`
+		Component          string `bun:"component_now"`
+		Consumer           string `bun:"consumer_now"`
 		// OnTag as an integer, because the four engines spell a boolean
 		// three ways and a CASE returning 1 or 0 reads the same on all of
 		// them.
@@ -207,7 +207,7 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		// The issue the decision is read as, which is the one the new line holds.
+		// The issue the row is read as, which is the one the new line holds.
 		Join(finding.DecisionIssue).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
@@ -215,37 +215,37 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
 			AS "visibility"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
 			kindArgs...)...).
 		Apply(versionsOnLine(toTarget, "component_now", "consumer_now")).
 		// A line carried onto that was built once. It is a fact about the
 		// target rather than about the decision, and the rule that refuses a
-		// dated judgment on a tag reads it.
+		// dated decision on a tag reads it.
 		ColumnExpr(`(SELECT CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END
 			FROM "target" AS "tg" JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
 			WHERE "tg"."id" = ?) AS "on_tag"`, catalog.Tag, toTarget).
-		Where(`"de"."id" = ?`, decisionID).
+		Where(`"de"."id" = ?`, occurrenceID).
 		Scan(ctx, &row)
 	if err != nil {
-		return nil, fmt.Errorf("read where a carried judgment lands: %w", err)
+		return nil, fmt.Errorf("read where a carried decision lands: %w", err)
 	}
-	return &Place{
+	return &Occurrence{
 		ProductID: row.ProductID, VulnerabilityID: row.VulnerabilityID,
-		PlaceIdentity:     row.PlaceIdentity,
-		Visibility:        access.AsVisibility(row.Visibility),
-		ComponentUpstream: row.Component, ConsumerUpstream: row.Consumer,
+		OccurrenceIdentity: row.OccurrenceIdentity,
+		Visibility:         access.AsVisibility(row.Visibility),
+		ComponentUpstream:  row.Component, ConsumerUpstream: row.Consumer,
 		OnTag: row.OnTag == 1,
 	}, nil
 }
 
-// versionsOnLine adds the versions a decision's place sits at on a line, as
+// versionsOnLine adds the versions a row's occurrence sits at on a line, as
 // the two named columns: the component's and its consumer's upstream
 // versions, empty where the line holds nothing open there.
 //
-// Both come from one finding: the first open at the place in the order both
-// versions sort as text. A decision is keyed on the pair, and a place can hold
+// Both come from one finding: the first open at the occurrence in the order both
+// versions sort as text. A row is keyed on the pair, and an occurrence can hold
 // two findings — one library vendored twice — so a minimum taken of each
 // version alone can pair versions no finding holds together. Ordered on both
 // and taken once, both columns read the same row.
@@ -255,7 +255,7 @@ func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.Se
 		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"
-			WHERE "f"."target_id" = ? AND ` + finding.DecisionAtPlace("f") + ` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND ` + finding.DecisionAtOccurrence("f") + ` AND "f"."closed_at" IS NULL
 				AND ` + kinds + `
 			ORDER BY ` + finding.ComponentUpstreamExpr + `, ` + finding.ConsumerUpstreamExpr + `
 			LIMIT 1), '')`
@@ -271,31 +271,31 @@ func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.Se
 	}
 }
 
-// oldClaim is what the judgment being carried actually said.
-func (s *Store) oldClaim(ctx context.Context, decisionID int64) (*Claim, error) {
-	row := new(Decision)
+// oldDecision is what the decision being carried actually said.
+func (s *Store) oldDecision(ctx context.Context, occurrenceID int64) (*Decision, error) {
+	row := new(DecisionOccurrence)
 	// With its argument, which is what is being carried: the row says where
-	// the old judgment landed, and the claim says what it was.
-	if err := s.db.NewSelect().Model(row).Relation("Claim").
-		Where(`"de"."id" = ?`, decisionID).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read the judgment being carried: %w", err)
+	// the old decision landed, and the decision says what it was.
+	if err := s.db.NewSelect().Model(row).Relation("Decision").
+		Where(`"de"."id" = ?`, occurrenceID).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the decision being carried: %w", err)
 	}
-	return row.Claim, nil
+	return row.Decision, nil
 }
 
 // Carried is what a new line would inherit from an existing one.
 //
 // Six buckets, because they need different things from a person. What
 // already applies needs nothing. What moved needs a fresh answer, and gets the
-// old reasoning to start from. A postponement is a scheduling judgment about a
-// release rather than a claim about code, so it is offered separately. A
-// judgment whose date has gone by sits at a place the new line still has and
+// old reasoning to start from. A postponement is a scheduling decision about a
+// release rather than a decision about code, so it is offered separately. A
+// decision whose date has gone by sits at an occurrence the new line still has and
 // cannot be carried. A promised upgrade is planned from its component. And
 // what covers nothing there is left behind.
 type Carried struct {
 	// Applying reach the new line by matching. Nothing to choose.
 	Applying int
-	// Moved held a claim at a version the new line does not have. Each comes
+	// Moved held a decision at a version the new line does not have. Each comes
 	// across as a proposal carrying the old words — never as a decision,
 	// because the version moved and the old conclusion is not a conclusion
 	// about the new code.
@@ -303,29 +303,29 @@ type Carried struct {
 	// Postponed were deferrals. "Not this sprint" was about that sprint, and
 	// carrying it silently gives a new line expiry dates nobody chose.
 	Postponed []Inherited
-	// Expired is how many sit at a place the new line still holds, as a
+	// Expired is how many sit at an occurrence the new line still holds, as a
 	// deferral or a promise whose date has gone by. Carried keeps the date,
 	// so none of them can be carried, and each leaves a finding there with
 	// no answer.
 	Expired int
 	// Upgrades is how many promised upgrades moved. An upgrade covers a
 	// component in the releases it names and records what each of them is
-	// waiting on, which a claim carried onto one place cannot write, so each
+	// waiting on, which a decision carried onto one occurrence cannot write, so each
 	// is planned again from the component.
 	Upgrades int
 	// Absent is how many cover nothing in the new line at all.
 	Absent int
 }
 
-// Inherited is one claim a new line could take on.
+// Inherited is one decision a new line could take on.
 type Inherited struct {
-	DecisionID    int64
-	Vulnerability string
-	Component     string
-	Outcome       Outcome
-	Was           string
-	Now           string
-	Reasoning     string
+	DecisionOccurrenceID int64
+	Vulnerability        string
+	Component            string
+	Outcome              Outcome
+	Was                  string
+	Now                  string
+	Reasoning            string
 	// DeferredDays is how long this has already been put off, across every
 	// line it has been carried through. The number that decides whether
 	// carrying it again is reasonable.
@@ -345,10 +345,10 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	}
 
 	// productID is which product this is about, read from the build rather
-	// than taken from the caller. Decisions are selected by product as well as
-	// by live key and place: a place is a hash of component names carrying no
+	// than taken from the caller. Rows are selected by product as well as
+	// by live key and occurrence: an occurrence is a hash of component names carrying no
 	// product, so a shared distribution package matches across products, and
-	// the reasoning of undisclosed claims elsewhere would come back.
+	// the reasoning of undisclosed decisions elsewhere would come back.
 	var productID int64
 	if err := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
@@ -371,22 +371,22 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	}
 
 	var rows []struct {
-		DecisionID    int64  `bun:"decision_occurrence_id"`
-		Vulnerability string `bun:"vulnerability"`
-		Component     string `bun:"component"`
-		Outcome       string `bun:"outcome"`
-		Was           string `bun:"was"`
-		Now           string `bun:"now_at"`
-		ConsumerWas   string `bun:"consumer_was"`
-		ConsumerNow   string `bun:"consumer_now"`
-		Reasoning     string `bun:"reasoning"`
-		StillThere    bool   `bun:"still_there"`
-		RanOut        bool   `bun:"ran_out"`
+		DecisionOccurrenceID int64  `bun:"decision_occurrence_id"`
+		Vulnerability        string `bun:"vulnerability"`
+		Component            string `bun:"component"`
+		Outcome              string `bun:"outcome"`
+		Was                  string `bun:"was"`
+		Now                  string `bun:"now_at"`
+		ConsumerWas          string `bun:"consumer_was"`
+		ConsumerNow          string `bun:"consumer_now"`
+		Reasoning            string `bun:"reasoning"`
+		StillThere           bool   `bun:"still_there"`
+		RanOut               bool   `bun:"ran_out"`
 		// Carried so a postponement can be told how long it has already run.
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		PlaceIdentity   string `bun:"occurrence_identity"`
-		// Landing is the visibility the place has on the new line, which is
-		// what a carried judgment would be written at.
+		VulnerabilityID    int64  `bun:"vulnerability_id"`
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+		// Landing is the visibility the occurrence has on the new line, which is
+		// what a carried decision would be written at.
 		Landing string `bun:"landing"`
 	}
 	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
@@ -394,7 +394,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	gKinds, gKindArgs := kindsOf(kind.VersionCarry, "g")
 	err := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		// The issue each decision is read as, which is the one the new line holds.
+		// The issue each row is read as, which is the one the new line holds.
 		Join(finding.DecisionIssue).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// The argument, which is where the outcome lives.
@@ -407,26 +407,26 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "was"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		ColumnExpr(`COALESCE("dr"."body", '') AS "reasoning"`).
-		// The new line's contents at that place, if anything.
+		// The new line's contents at that occurrence, if anything.
 		ColumnExpr(`COALESCE((SELECT MIN("c"."name") FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
 			AS "component"`, append([]any{toTarget}, kindArgs...)...).
-		// Both versions, because a decision is keyed on both: a build whose
-		// consumer alone has moved is one the claim does not reach, and the
+		// Both versions, because a row is keyed on both: a build whose
+		// consumer alone has moved is one the decision does not reach, and the
 		// finding surfaces unanswered.
 		Apply(versionsOnLine(toTarget, "now_at", "consumer_now")).
 		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer_was"`).
 		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`)
 			AS "still_there"`, append([]any{toTarget}, kindArgs...)...).
-		// The visibility the place lands at, read as placeOnLine reads it.
+		// The visibility the occurrence lands at, read as occurrenceOnLine reads it.
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtOccurrence("f")+` AND "f"."closed_at" IS NULL
 				AND `+kinds+`), '')
 			AS "landing"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
 			kindArgs...)...).
@@ -437,7 +437,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."visibility" IN (?)`, bun.List(readable)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
-			WHERE "g"."target_id" = ? AND `+finding.DecisionAtPlace("g")+` AND `+gKinds+`)`,
+			WHERE "g"."target_id" = ? AND `+finding.DecisionAtOccurrence("g")+` AND `+gKinds+`)`,
 			append([]any{fromTarget}, gKindArgs...)...).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -451,7 +451,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			carried.Absent++
 			continue
 		}
-		// A place this subject may not argue about on the new line is not
+		// An occurrence this subject may not argue about on the new line is not
 		// theirs to carry onto, and not theirs to count: the new line's
 		// contents there are undisclosed to them.
 		if !mayDecideOn(subject, productID, row.VulnerabilityID, access.AsVisibility(row.Landing)) {
@@ -462,16 +462,16 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			// The versions match, or the outcome stands at any version, so it
 			// reaches the new line by matching. Offering it would ask somebody
 			// to agree to something that has already happened, and carrying a
-			// correction is refused as the place already decided.
+			// correction is refused as the occurrence already decided.
 			carried.Applying++
 			continue
 		}
 		one := Inherited{
-			DecisionID: row.DecisionID, Vulnerability: row.Vulnerability,
+			DecisionOccurrenceID: row.DecisionOccurrenceID, Vulnerability: row.Vulnerability,
 			Component: row.Component, Outcome: Outcome(row.Outcome),
 			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
 		}
-		// Anything the write would refuse is not offered. A carried judgment
+		// Anything the write would refuse is not offered. A carried decision
 		// keeps its date rather than having it quietly moved forward, so a
 		// deferral that has already run out and a promise whose date has
 		// gone by cannot be carried at all — and offering one is offering
@@ -485,7 +485,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			continue
 		}
 		if Outcome(row.Outcome) == Deferred {
-			postponed = append(postponed, at{row.VulnerabilityID, row.PlaceIdentity})
+			postponed = append(postponed, at{row.VulnerabilityID, row.OccurrenceIdentity})
 			carried.Postponed = append(carried.Postponed, one)
 			continue
 		}
@@ -506,48 +506,48 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	return carried, nil
 }
 
-// at is one place a decision was made about.
+// at is one occurrence a decision was made about.
 type at struct {
 	vulnerability int64
-	place         string
+	occurrence    string
 }
 
-// deferredSoFarAt totals how long each of these places has been put off, in
+// deferredSoFarAt totals how long each of these occurrences has been put off, in
 // one statement rather than one per row.
 //
 // The arithmetic happens here rather than in SQL: subtracting one timestamp
 // from another and summing the result has no portable spelling, and the rows
 // are already being read.
-func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []at) (map[at]time.Duration, error) {
+func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, occurrences []at) (map[at]time.Duration, error) {
 	total := map[at]time.Duration{}
-	if len(places) == 0 {
+	if len(occurrences) == 0 {
 		return total, nil
 	}
-	issues := make([]int64, 0, len(places))
-	identities := make([]string, 0, len(places))
-	wanted := make(map[at]bool, len(places))
-	for _, place := range places {
-		if wanted[place] {
+	issues := make([]int64, 0, len(occurrences))
+	identities := make([]string, 0, len(occurrences))
+	wanted := make(map[at]bool, len(occurrences))
+	for _, occurrence := range occurrences {
+		if wanted[occurrence] {
 			continue
 		}
-		wanted[place] = true
-		issues = append(issues, place.vulnerability)
-		identities = append(identities, place.place)
+		wanted[occurrence] = true
+		issues = append(issues, occurrence.vulnerability)
+		identities = append(identities, occurrence.occurrence)
 	}
 
-	var deferrals []Decision
-	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
+	var deferrals []DecisionOccurrence
+	if err := s.db.NewSelect().Model(&deferrals).Relation("Decision").
 		Column("vulnerability_id", "occurrence_identity", "proposed_at", "state", "ended_at").
 		Where(`"de"."product_id" = ?`, productID).
 		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
 		Where(`"de"."occurrence_identity" IN (?)`, bun.List(identities)).
-		Where(`"claim"."outcome" = ?`, Deferred).
+		Where(`"decision"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones for the span they were in force, as the
 		// threshold counts them.
-		Where(`"claim"."deferred_until" IS NOT NULL`).Scan(ctx); err != nil {
+		Where(`"decision"."deferred_until" IS NOT NULL`).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how long these have been put off: %w", err)
 	}
-	// Keyed by the issue each deferral is read as, which is how the places
+	// Keyed by the issue each deferral is read as, which is how the occurrences
 	// were asked for.
 	filed := make([]int64, 0, len(deferrals))
 	for _, deferral := range deferrals {
@@ -560,7 +560,7 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 	held := spans[at]{}
 	for _, deferral := range deferrals {
 		deferral.VulnerabilityID = issueOf[deferral.VulnerabilityID]
-		key := at{deferral.VulnerabilityID, deferral.PlaceIdentity}
+		key := at{deferral.VulnerabilityID, deferral.OccurrenceIdentity}
 		// The pair of lists matches more combinations than were asked for, so
 		// what was not asked for is dropped here.
 		if !wanted[key] {

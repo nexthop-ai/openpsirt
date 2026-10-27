@@ -58,7 +58,7 @@ func scrutiny(t *testing.T, r *httpapitest.Reach, who, query string) struct {
 
 func TestRiskStandingOnOnePersonIsReportedWithWhatItClaimed(t *testing.T) {
 	// The whole point of the report. The control cannot be bypassed — the
-	// proposer may never approve their own claim — so what is worth reporting
+	// proposer may never approve their own decision — so what is worth reporting
 	// is where the rule did not apply. A short deferral is deliberately exempt
 	// and is ordinary triage one at a time; it is the pattern across a program
 	// that nothing else shows.
@@ -78,9 +78,9 @@ func TestRiskStandingOnOnePersonIsReportedWithWhatItClaimed(t *testing.T) {
 		if after.Alone[0].Outcome != "deferred" {
 			t.Errorf("what stands alone is %q, want the deferral", after.Alone[0].Outcome)
 		}
-		if after.Alone[0].Claims != 1 || after.Alone[0].Rows < 1 {
-			t.Errorf("it stands alone as %d claims over %d rows",
-				after.Alone[0].Claims, after.Alone[0].Rows)
+		if after.Alone[0].Decisions != 1 || after.Alone[0].Rows < 1 {
+			t.Errorf("it stands alone as %d decisions over %d rows",
+				after.Alone[0].Decisions, after.Alone[0].Rows)
 		}
 	})
 }
@@ -91,10 +91,10 @@ func TestWhatTwoPeopleAgreedToIsNotReportedAsStandingAlone(t *testing.T) {
 	// nothing to answer for.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decision), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -149,16 +149,16 @@ func TestScrutinyRefusesAProductTheAskerMayNotRead(t *testing.T) {
 	})
 }
 
-func TestAClaimCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
-	// A claim reaches by matching, so a build appearing afterwards is covered
+func TestADecisionCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
+	// A decision reaches by matching, so a build appearing afterwards is covered
 	// with nobody acting and nobody having agreed to the larger number. What
 	// somebody consented to is recorded at the moment of consent precisely
 	// because it cannot be recovered later; this is the section that reads the
 	// two against each other.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		claim, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 
 		// Nothing has appeared since, so nothing covers more than was agreed.
 		if out := scrutiny(t, r, "private-triage", ""); len(out.Grew) != 0 {
@@ -166,25 +166,25 @@ func TestAClaimCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 		}
 
 		// The reach the approver actually agreed to, made smaller than what the
-		// claim reaches. A second build would do this the way a deployment
+		// decision reaches. A second build would do this the way a deployment
 		// does, and what is being pinned is the comparison rather than the
 		// route by which the two came apart.
 		if _, err := r.DB.DB.NewUpdate().
 			Table("decision_approval").
 			Set(`"covered" = ?`, len(ids)-1).
-			Where(`"decision_id" = ?`, claim).
+			Where(`"decision_id" = ?`, decision).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
 		out := scrutiny(t, r, "private-triage", "")
 		if len(out.Grew) != 1 {
-			t.Fatalf("%d claims cover more than was agreed to, want the one: %+v",
+			t.Fatalf("%d decisions cover more than was agreed to, want the one: %+v",
 				len(out.Grew), out.Grew)
 		}
 		grown := out.Grew[0]
-		if grown.ClaimID != claim {
-			t.Errorf("it names claim %d, want %d", grown.ClaimID, claim)
+		if grown.DecisionID != decision {
+			t.Errorf("it names decision %d, want %d", grown.DecisionID, decision)
 		}
 		if grown.Covered != len(ids)-1 || grown.CoversNow != len(ids) {
 			t.Errorf("it reads %d agreed against %d now, want %d against %d",
@@ -202,8 +202,8 @@ func TestAnApproverNamedInConfigurationHasNotLostTheRight(t *testing.T) {
 	// administration too, and the only kind some deployments have.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
 			"/v1/people/reviewer/roles/mine/approver", ""); got.Code >= 300 {
 			t.Fatalf("withdrawing the right answered %d: %s", got.Code, got.Body.String())
@@ -240,8 +240,8 @@ func TestAPairsShareIsOfEverythingAgreed(t *testing.T) {
 		for _, each := range []struct{ who, issue string }{
 			{"triager", "CVE-2026-9999"}, {"private-triage", "CVE-2026-1000"},
 		} {
-			claim, _ := r.Claimed(t, each.who, each.issue, "linux-image", httpapitest.Dismissal)
-			r.Agreed(t, claim)
+			decision, _ := r.Claimed(t, each.who, each.issue, "linux-image", httpapitest.Dismissal)
+			r.Agreed(t, decision)
 		}
 
 		out := scrutiny(t, r, "private-triage", "?limit=1")
@@ -259,8 +259,8 @@ func TestAPairsShareIsOfEverythingAgreed(t *testing.T) {
 
 func TestAConfirmedLeadIsNoExceptionToTheSecondPersonRule(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		occurrence := httpapitest.SeededLead(t, r)
+		decideLead(t, r, occurrence, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
 		if got := scrutiny(t, r, "internal-reviewer", ""); len(got.Alone) != 0 {
 			t.Errorf("a confirmed lead is reported as standing alone: %+v", got.Alone)
 		}

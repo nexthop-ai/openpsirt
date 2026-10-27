@@ -42,12 +42,12 @@ const (
 	// string, they belonged to no filter value and thirteen findings on the
 	// reference image could not be listed by any of them.
 	FixUnknown FixState = "unknown"
-	// FixMixed is not a state a scan reports. It is what a *group* is where
-	// its places disagree, which the list has to be able to say: the list
+	// FixMixed is not a state a scan reports. It is what a *group* is where its
+	// occurrences disagree, which the list has to be able to say: the list
 	// answers per issue and component across builds, and asking what upstream
-	// did is asking about the whole group, so a group whose places differ has
-	// no single answer. Without a word for it those rows matched no value at
-	// all — the same hole the unknown state above was, one level up.
+	// did is asking about the whole group, so a group whose occurrences differ
+	// has no single answer. Without a word for it those rows matched no value
+	// at all — the same hole the unknown state above was, one level up.
 	FixMixed FixState = "mixed"
 )
 
@@ -57,8 +57,8 @@ func FixStates() []FixState {
 	return []FixState{FixedUpstream, NoFix, WontFix, FixUnknown, FixMixed}
 }
 
-// agreedFixState is what a group's places say upstream did, or FixMixed where
-// they do not agree.
+// agreedFixState is what a group's occurrences say upstream did, or FixMixed
+// where they do not agree.
 //
 // Read off both ends of the group rather than off a minimum: a minimum alone
 // answers with one of the disagreeing values, so the filter selected the mixed
@@ -71,7 +71,7 @@ func agreedFixState(least, most string) FixState {
 }
 
 // agreedFixedIn is the version upstream fixed it in, or nothing where the
-// group's places disagree about whether it did.
+// group's occurrences disagree about whether it did.
 //
 // Empty rather than the least of them: a version taken from one of two
 // disagreeing rows is a fix version attached to a group that does not have one.
@@ -139,10 +139,10 @@ const (
 	// again here. The finding opens again once a build stops declaring it.
 	Patched Closure = "patched"
 	// Unaffected means the issue's CVE record states that the upstream release
-	// this place holds is not affected, where the scanner's source matched it
-	// from a range that left that statement out (REQ-31). The closed row keeps
-	// the record's lines that said so, and the finding opens again once a run
-	// no longer reads them.
+	// this occurrence holds is not affected, where the scanner's source matched
+	// it from a range that left that statement out (REQ-31). The closed row
+	// keeps the record's lines that said so, and the finding opens again once a
+	// run no longer reads them.
 	//
 	// On the same axis as Invalid: the issue was never present in this
 	// release, so it is neither a resolution nor a disappearance, and it is in
@@ -150,7 +150,7 @@ const (
 	Unaffected Closure = "unaffected"
 	// Disclaimed means a supplier stated that its own product, at the version
 	// this build ships, is not affected, and every route up the tree from this
-	// place runs through that product (REQ-31); or an upstream this product
+	// occurrence runs through that product (REQ-31); or an upstream this product
 	// trusts stated that the component, at the version shipped, is not
 	// affected or is fixed, for anybody shipping it (REQ-84). The closed row
 	// names the statement, and the finding opens again once a run no longer
@@ -250,7 +250,7 @@ type Run struct {
 	RecordsVersion string `bun:"records_version"`
 }
 
-// Finding is a vulnerability at a place.
+// Finding is a vulnerability at an occurrence.
 type Finding struct {
 	bun.BaseModel `bun:"table:finding,alias:f"`
 
@@ -267,12 +267,13 @@ type Finding struct {
 	// product itself: the root's name differs per variant, so keying on it
 	// would break grouping the same finding across variants.
 	ConsumerID *int64 `bun:"consumer_id"`
-	// PlaceIdentity is the hashed pair of names. It is what a triage decision
-	// is keyed on, so it is stored rather than derived — a decision has to be
-	// findable without walking the graph of every variant it might reach.
-	PlaceIdentity string   `bun:"occurrence_identity,notnull"`
-	FixState      FixState `bun:"fix_state"`
-	FixedIn       string   `bun:"fixed_in"`
+	// OccurrenceIdentity is the hashed pair of names. It is what a decision
+	// occurrence is keyed on, so it is stored rather than derived — a decision
+	// occurrence has to be findable without walking the graph of every variant
+	// it might reach.
+	OccurrenceIdentity string   `bun:"occurrence_identity,notnull"`
+	FixState           FixState `bun:"fix_state"`
+	FixedIn            string   `bun:"fixed_in"`
 	// FixedAt is when that version became available. How long a fix has
 	// existed is a different question from which version carries it, and it is
 	// the one that says whether an upgrade is overdue or fresh.
@@ -335,16 +336,16 @@ type Finding struct {
 	//
 	// Held per finding rather than per group, because the rows are what
 	// everything else is keyed on — but it is set for a whole group at once,
-	// since assigning one place of an issue and not another is not something
+	// since assigning one occurrence of an issue and not another is not something
 	// anybody means to do.
 	AssignedTo *int64     `bun:"assigned_to"`
 	AssignedAt *time.Time `bun:"assigned_at"`
-	// ArrivedFrom is the upstream version this place held before, recorded
+	// ArrivedFrom is the upstream version this occurrence held before, recorded
 	// only where the version moved and the issue came with it. Its presence is
 	// the statement that somebody bumped this and the bump did not resolve it;
 	// its value is what they bumped from, so saying so needs no second query.
 	ArrivedFrom string `bun:"arrived_from"`
-	// MovedTo is the upstream version this place moved to, where moving is
+	// MovedTo is the upstream version this occurrence moved to, where moving is
 	// what closed the finding. Set on close rather than worked out later: the
 	// component that carried the issue is gone from the inventory by then, so
 	// the pair of versions exists only while the scan is being applied — the
@@ -367,7 +368,7 @@ type Finding struct {
 	MatchedIn string `bun:"matched_in"`
 	// MatchedRange is the version range the match fired on.
 	//
-	// The evidence for the judgment the match kind asks for rather than a
+	// The evidence for the decision the match kind asks for rather than a
 	// second way of making it: a range that names no packaging revision,
 	// read beside a version that has one, is the whole argument in one
 	// line. Recorded as the scanner wrote it and never parsed — comparing
@@ -490,21 +491,21 @@ type Applied struct {
 	// Merged counts issues the report showed to be one with another held
 	// separately, and merged into it.
 	Merged int
-	// Displaced is the judgments a merge took out of force because one under
+	// Displaced is the records a merge took out of force because one under
 	// the other name said something different in the same product: a live
-	// decision at the same place, a rating claim, or a record of being
+	// decision at the same occurrence, a rating claim, or a record of being
 	// attacked. The product's triagers are told.
 	Displaced []Displaced
 }
 
-// PlaceIdentity keys a component under the thing that pulled it in.
+// OccurrenceIdentity keys a component under the thing that pulled it in.
 //
 // Names only, never versions: a version in the key would lapse every decision
 // the next time anything was rebuilt. Where a component sits directly under
 // the product, its name stands alone, because the product's name differs per
-// variant and including it would stop the same place being recognized across
+// variant and including it would stop the same occurrence being recognized across
 // them.
-func PlaceIdentity(component, consumer string) string {
+func OccurrenceIdentity(component, consumer string) string {
 	basis := strings.TrimSpace(component)
 	if c := strings.TrimSpace(consumer); c != "" {
 		basis = c + "\x00" + basis
@@ -530,7 +531,7 @@ type Store struct {
 	// bring it down to a fixture rather than building a fixture up to it.
 	reach int
 	// binaryColumns is how many binaries' counts ride the pass over a source
-	// package's places, or zero for the shipped number. Carried on the store
+	// package's occurrences, or zero for the shipped number. Carried on the store
 	// so a test can bring it down to a fixture.
 	binaryColumns int
 	// draws is the source the identifiers this store issues are drawn from,

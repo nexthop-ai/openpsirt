@@ -26,7 +26,7 @@ import (
 func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 	// The identifier, description, score and aliases come from a feed, the
 	// component from a scan file, the product, stream and variant from
-	// whoever declared them, and the names beside a judgment from a sign-in.
+	// whoever declared them, and the names beside a decision from a sign-in.
 	// The document is one somebody forwards. Each is text in it: no link,
 	// image, markup, heading or list a third party opened.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -39,7 +39,7 @@ func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 			Purl: "pkg:generic/hostile@1.0", Name: "- <img src=https://evil.example/t.gif>",
 			Version: "1.0 ![x](https://evil.example/v)",
 		}
-		// A second place with a name a request path can carry, to judge.
+		// A second occurrence with a name a request path can carry, to judge.
 		plain := graph.Described{Purl: "pkg:generic/plainlib@1.0", Name: "plainlib", Version: "1.0"}
 		named := finding.Named{
 			Identifier:   identifier,
@@ -63,7 +63,7 @@ func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 				{Issue: named, Component: plain, FixState: finding.FixUnknown},
 			})
 
-		// A judgment proposed and agreed by people whose sign-in names are
+		// A decision proposed and agreed by people whose sign-in names are
 		// markup.
 		proposer, approver := "![proposer](x)", "![approver](x)"
 		located, err := catalog.NewStore(r.DB.DB).Locate(ctx, "mine", "master", "broadcom")
@@ -87,13 +87,13 @@ func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 				}
 			}
 		}
-		claim, _ := r.Claimed(t, proposer, url.PathEscape(identifier), "plainlib", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, proposer, url.PathEscape(identifier), "plainlib", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, approver, http.MethodPost,
-			"/v1/decisions/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			"/v1/decisions/"+httpapitest.Itoa(decision)+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 
-		// The build's names, renamed once the judgment no longer needs them
+		// The build's names, renamed once the decision no longer needs them
 		// in a path.
 		names := catalog.NewStore(r.DB.DB)
 		if err := names.RenameStream(ctx, located.ProductID, located.StreamID, "![stream](x)"); err != nil {
@@ -187,12 +187,12 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 			Products      int    `json:"products"`
 			Total         int    `json:"total"`
 			Items         []struct {
-				Product   string `json:"product"`
-				Stream    string `json:"stream"`
-				Variant   string `json:"variant"`
-				Component string `json:"component"`
-				Places    int    `json:"places"`
-				State     string `json:"state"`
+				Product     string `json:"product"`
+				Stream      string `json:"stream"`
+				Variant     string `json:"variant"`
+				Component   string `json:"component"`
+				Occurrences int    `json:"occurrences"`
+				State       string `json:"state"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/issues/CVE-2026-9999", &out)
@@ -200,7 +200,7 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 			t.Fatalf("the issue reads as %+v", out)
 		}
 		one := out.Items[0]
-		if one.Product != "mine" || one.Component != "libnl-3-200" || one.Places < 1 {
+		if one.Product != "mine" || one.Component != "libnl-3-200" || one.Occurrences < 1 {
 			t.Errorf("the row reads as %+v", one)
 		}
 		if one.State != "undecided" {
@@ -209,18 +209,18 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 
 		// A decision moves the state on this page too: it is the same
 		// definition the findings list uses rather than a second one.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		httpapitest.Read(t, r, "triager", "/v1/issues/CVE-2026-9999", &out)
 		if out.Items[0].State != "waiting" {
-			t.Errorf("a claim nobody has agreed to reads as %q", out.Items[0].State)
+			t.Errorf("a decision nobody has agreed to reads as %q", out.Items[0].State)
 		}
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			"/v1/decisions/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			"/v1/decisions/"+httpapitest.Itoa(decision)+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
 		httpapitest.Read(t, r, "triager", "/v1/issues/CVE-2026-9999", &out)
 		if out.Items[0].State != "agreed" {
-			t.Errorf("an approved claim reads as %q", out.Items[0].State)
+			t.Errorf("an approved decision reads as %q", out.Items[0].State)
 		}
 
 		// Nothing affected is an answer, and it is the one a customer inquiry
@@ -293,7 +293,7 @@ func TestAnIssueIsNotDescribedInTheWordsOfAFlawItsReaderMayNotRead(t *testing.T)
 		}
 		recorded := scanned
 		recorded.ID, recorded.Kind, recorded.Visibility = 0, finding.Entered, access.Private
-		recorded.PlaceIdentity = finding.PlaceIdentity("libnl-3-200", "recorded-by-hand")
+		recorded.OccurrenceIdentity = finding.OccurrenceIdentity("libnl-3-200", "recorded-by-hand")
 		if _, err := r.DB.DB.NewInsert().Model(&recorded).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -356,9 +356,9 @@ func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			"/v1/decisions/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			"/v1/decisions/"+httpapitest.Itoa(decision)+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -389,11 +389,11 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 		}
 		for _, wanted := range []string{
 			"CVE-2026-9999",
-			// The issue, its places, and the decisions.
+			// The issue, its occurrences, and the decisions.
 			"read past the end of the buffer",
 			"libnl-3-200",
 			"not-applicable",
-			// The argument the judgment rests on, which is the half a second
+			// The argument the decision rests on, which is the half a second
 			// person is checking.
 			"The driver is not built for this image.",
 			// And who agreed, because a dismissal standing on one person is
@@ -409,7 +409,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 
 		// An address a reader's machine would act on is not something to hand
 		// somebody in a document they forward. The same rule an address
-		// stored beside a claim goes through.
+		// stored beside a decision goes through.
 		if strings.Contains(written, "ms-msdt") {
 			t.Errorf("a scheme a machine acts on reached the document:\n%s", written)
 		}

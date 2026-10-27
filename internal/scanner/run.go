@@ -41,7 +41,7 @@ type Runner struct {
 	// what has been ingested, so a scanner that reached it directly would
 	// close a cycle between the two.
 	told func(context.Context, []triage.ForPerson)
-	// superseded carries the judgments a merge of two issues took out of
+	// superseded carries the decision occurrences a merge of two issues took out of
 	// force, for the same reason.
 	superseded func(context.Context, []finding.Displaced)
 	// records is the CVE record snapshot a match is narrowed with. Nil reads
@@ -60,13 +60,13 @@ type Outcome struct {
 	RunID      int64
 	Components int
 	Applied    finding.Applied
-	// Lapsed is how many judgments this scan moved out from under, and so how
+	// Lapsed is how many decision occurrences this scan moved out from under, and so how
 	// many people have something waiting for them that they did not have
 	// before.
 	Lapsed int64
 }
 
-// Telling is the instruction for claims a scan took out from under people.
+// Telling is the instruction for decisions a scan took out from under people.
 //
 // Left unset a runner tells nobody, which is what every test and every
 // single-purpose invocation wants; the deployment wires it once.
@@ -75,7 +75,7 @@ func (r *Runner) Telling(tell func(context.Context, []triage.ForPerson)) *Runner
 	return r
 }
 
-// TellingSuperseded is the instruction for judgments a merge of two issues took
+// TellingSuperseded is the instruction for decision occurrences a merge of two issues took
 // out of force because another said something different in the same product.
 func (r *Runner) TellingSuperseded(tell func(context.Context, []finding.Displaced)) *Runner {
 	r.superseded = tell
@@ -290,7 +290,7 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 		r.superseded(ctx, applied.Displaced)
 	}
 
-	// Now that the versions have moved, mark the judgments they moved out from
+	// Now that the versions have moved, mark the decision occurrences they moved out from
 	// under. A decision is matched on the versions it was made about, so one
 	// whose versions changed already stops applying — what this adds is that
 	// somebody is told, rather than the finding quietly reappearing as new
@@ -307,11 +307,11 @@ func (r *Runner) assess(ctx context.Context, targetID, runID int64, components [
 	if r.told != nil && len(lapsed.Told) > 0 {
 		r.told(ctx, lapsed.Told)
 	}
-	// And the judgments a rating this scan raised has outgrown (REQ-25). An
+	// And the decision occurrences a rating this scan raised has outgrown (REQ-25). An
 	// issue is one row for the whole deployment, so a scan of one build can
-	// raise the rating a claim in another product was made against; the issues
+	// raise the rating a decision in another product was made against; the issues
 	// asked about are the ones this build has open. Unlike a version lapse,
-	// nothing matched changes, so a claim this fails to mark stands until the
+	// nothing matched changes, so a decision this fails to mark stands until the
 	// next scan with the issue open sweeps again.
 	worse, err := triage.NewStore(r.db.DB).LapseRatedWorse(ctx,
 		triage.RatedWorseWhere{OpenIn: targetID})

@@ -65,8 +65,8 @@ func Kinds() []Kind {
 	return []Kind{
 		Assigned, Mentioned, SentBack, BuildQuiet, HoldingAbsent,
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
-		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
-		ApprovalUndone, ApprovalWithdrawn, ClaimLapsed, MergeSuperseded, BroughtIn, Disclosed,
+		DecisionWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
+		ApprovalUndone, ApprovalWithdrawn, DecisionLapsed, MergeSuperseded, BroughtIn, Disclosed,
 		Unanswered, ReportMessage, ReportSent, ReportNoted,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
@@ -131,7 +131,7 @@ const (
 	// something a standing decision cited.
 	//
 	// The decision stands: a third party's claim never becomes ours, and a
-	// publisher changing their mind does not withdraw somebody's judgment.
+	// publisher changing their mind does not withdraw somebody's decision.
 	// It says the ground moved under a dismissal approved
 	// on the strength of it, which is a condition about evidence rather
 	// than an event about a person — the same shape as a build that
@@ -166,14 +166,14 @@ const (
 	//
 	// Conditions, and they have to be: what is wrong is the absence of an
 	// event, which is the one thing no message driven by an event can ever
-	// report. Each clears by the thing happening — the claim is approved,
+	// report. Each clears by the thing happening — the decision is approved,
 	// the proposer revises, the deferral is re-made or lapses, somebody
 	// takes the work — and none of them is a thing to be dismissed.
 	//
-	// ClaimWaiting is a claim that has been waiting on a second person for
+	// DecisionWaiting is a decision that has been waiting on a second person for
 	// longer than this deployment allows.
-	ClaimWaiting Kind = "claim-waiting"
-	// SentBackWaiting is a claim an approver asked more of and nobody has
+	DecisionWaiting Kind = "claim-waiting"
+	// SentBackWaiting is a decision an approver asked more of and nobody has
 	// touched since. The queue shows it to neither of them: it is not waiting
 	// on the approver, and the proposer's tab lists what is pending.
 	SentBackWaiting Kind = "sent-back-waiting"
@@ -191,7 +191,7 @@ const (
 	QueueUntaken Kind = "queue-untaken"
 
 	// The two outcomes a proposer is told about. Events, because each is a
-	// thing that happened; the rest of what becomes of a claim is on their
+	// thing that happened; the rest of what becomes of a decision is on their
 	// own view of it, which is where approval staying silent's silence
 	// holds.
 	//
@@ -203,12 +203,12 @@ const (
 	// stopped counting. Without it they go on relying on an agreement the
 	// record no longer holds.
 	ApprovalWithdrawn Kind = "approval-withdrawn"
-	// ClaimLapsed is a judgment the code moved out from under. It hands work
+	// DecisionLapsed is a decision the code moved out from under. It hands work
 	// back to somebody who did nothing to cause it, and the alternative is the
 	// finding reappearing as though nobody had ever looked at it.
-	ClaimLapsed Kind = "claim-lapsed"
-	// MergeSuperseded is two judgments that disagreed meeting when a report
-	// merged the issues they were filed under: two decisions about one place,
+	DecisionLapsed Kind = "claim-lapsed"
+	// MergeSuperseded is two decisions that disagreed meeting when a report
+	// merged the issues they were filed under: two decisions about one occurrence,
 	// two rating claims, or two records of being attacked, in one product.
 	// One stands and the other stopped standing, which is a choice the tool
 	// made rather than a person, so every triager of the product is told.
@@ -226,7 +226,7 @@ const (
 
 	// Disclosed is an issue somebody holds becoming public in its product.
 	//
-	// An event, told to whoever holds a place of it: what they write about it
+	// An event, told to whoever holds an occurrence of it: what they write about it
 	// from here on is public, and what they wrote before now is too.
 	Disclosed Kind = "disclosed"
 
@@ -307,13 +307,13 @@ const (
 	// again, retiring it or its covering less clears it.
 	RuleOutgrown Kind = "rule-outgrown"
 	// RuleWaiting is a standing rule on leads nobody has approved, past the
-	// period a claim may wait on a second person. A condition: approving it
+	// period a decision may wait on a second person. A condition: approving it
 	// or retiring it clears it.
 	RuleWaiting Kind = "rule-waiting"
 	// RiskUnagreed is something hidden with nobody's agreement behind it.
 	//
 	// The one outcome-shaped failure the record cannot find on its own
-	// afterwards: the three claims that say no further work is needed each
+	// afterwards: the three kinds of decision that say no further work is needed each
 	// require a second person, so one standing alone means the write path was
 	// got around rather than that somebody is behind.
 	RiskUnagreed Kind = "risk-unagreed"
@@ -570,7 +570,7 @@ func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
 			if still, yes := wanted[row.About]; yes {
 				// Still true, and possibly true of more than it was. The
 				// sentence is what the condition currently says — how many
-				// pieces of work are sitting in a queue, how many places a
+				// pieces of work are sitting in a queue, how many occurrences a
 				// deferral covers — so it is rewritten whenever it moves.
 				//
 				// So is what it is about, and whether that is undisclosed:
@@ -942,7 +942,7 @@ func withheld(q *bun.SelectQuery, private, internal []int64) *bun.SelectQuery {
 // Followed through a merge, so a row about the issue their case merged into is
 // still about their case.
 //
-// A lead grant is one place in one product, and reaches the line telling its
+// A lead grant is one occurrence in one product, and reaches the line telling its
 // holder they were granted it, which is about that lead and names it.
 func onCases(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	for _, product := range subject.CaseProducts() {
@@ -952,8 +952,8 @@ func onCases(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	}
 	for _, product := range subject.LeadProducts() {
 		leads := make([]string, 0, len(subject.Leads(product)))
-		for _, place := range subject.Leads(product) {
-			leads = append(leads, ConcerningLead(product, place))
+		for _, occurrence := range subject.Leads(product) {
+			leads = append(leads, ConcerningLead(product, occurrence))
 		}
 		q = q.WhereOr(`("product_id" = ? AND "concerns" IN (?))`, product, bun.List(leads))
 	}
@@ -1111,15 +1111,15 @@ func Concerning(productID, vulnerabilityID, componentID int64) string {
 }
 
 // ConcerningLead is what a line about one handed-off lead is about: the lead
-// grant reaching it is on the place, which no issue names.
-func ConcerningLead(productID int64, placeIdentity string) string {
-	return fmt.Sprintf("lead/%d/%s", productID, placeIdentity)
+// grant reaching it is on the occurrence, which no issue names.
+func ConcerningLead(productID int64, occurrenceIdentity string) string {
+	return fmt.Sprintf("lead/%d/%s", productID, occurrenceIdentity)
 }
 
 // Withholding is the marks a telling about work holding these visibilities
 // carries: withheld where any is other than public, and internal where any is
 // internal. A reader of undisclosed work reads no internal work, so work
-// holding both is read by those who read internal work, as a claim spanning
+// holding both is read by those who read internal work, as a decision spanning
 // both is.
 func Withholding(visibilities []access.Visibility) (private, internal bool) {
 	for _, v := range visibilities {

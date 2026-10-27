@@ -43,13 +43,13 @@ type Upgrade struct {
 	// the work succeeds is a plan that goes blank exactly when it is working.
 	FromVersion string `bun:"from_version,notnull"`
 	ToVersion   string `bun:"to_version,notnull"`
-	// CommittedTo is when the work will have happened, where a judgment
+	// CommittedTo is when the work will have happened, where a decision
 	// promised a date. Absent where the plan is intent rather than a promise.
 	CommittedTo *time.Time `bun:"committed_to"`
-	// ClaimID is the claim that argued for it, where one did. A citation:
+	// DecisionID is the decision that argued for it, where one did. A citation:
 	// editing the commitment is editing what somebody agreed to, so it goes
 	// through the act that withdraws the agreement.
-	ClaimID    *int64    `bun:"decision_id"`
+	DecisionID *int64    `bun:"decision_id"`
 	DeclaredBy int64     `bun:"declared_by,notnull"`
 	DeclaredAt time.Time `bun:"declared_at,notnull"`
 }
@@ -58,7 +58,7 @@ type Upgrade struct {
 // the caller owns.
 //
 // Exported and taking a handle because promising one bump is one act that
-// writes both a judgment and a commitment for every build it reaches, and those
+// writes both a decision and a commitment for every build it reaches, and those
 // live in two packages. One act is one transaction, so the transaction has to
 // be opened once, outside both — half a bump declared is a release plan that is
 // a lie.
@@ -69,7 +69,7 @@ type Upgrade struct {
 // transaction gives: a retry runs this against a database that has moved, so a
 // build list settled beforehand describes a world that may be gone.
 func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Subject,
-	productID, componentID int64, to string, by *time.Time, claimID *int64,
+	productID, componentID int64, to string, by *time.Time, decisionID *int64,
 	wanted []int64, retired map[int64]string) (int, error) {
 
 	fold, from, err := s.foldOf(ctx, db, componentID)
@@ -78,16 +78,17 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	declared := 0
-	// Everything this claim no longer wants goes. Withdrawing a commitment is
-	// not a different kind of act from making one, and making it one produces
-	// two paths that drift. A commitment another claim argued for is that
-	// claim's to move, so it is kept: its decisions still stand on it.
+	// Everything this decision no longer wants goes. Withdrawing a commitment
+	// is not a different kind of act from making one, and making it one
+	// produces two paths that drift. A commitment another decision argued for
+	// is that decision's to move, so it is kept: its occurrences still stand
+	// on it.
 	remove := db.NewDelete().Model((*Upgrade)(nil)).
 		Where(`"fold_key" = ?`, fold).
 		Where(inThisProduct, productID)
-	if claimID != nil {
+	if decisionID != nil {
 		remove = remove.WhereGroup(" AND ", func(q *bun.DeleteQuery) *bun.DeleteQuery {
-			return q.Where(`"decision_id" IS NULL`).WhereOr(`"decision_id" = ?`, *claimID)
+			return q.Where(`"decision_id" IS NULL`).WhereOr(`"decision_id" = ?`, *decisionID)
 		})
 	} else {
 		remove = remove.Where(`"decision_id" IS NULL`)
@@ -135,13 +136,13 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		// today.
 		if have[id] {
 			// The version a release is moving to is what somebody agreed
-			// to. Where a claim argued for it, changing it here would leave
+			// to. Where a decision argued for it, changing it here would leave
 			// the agreement standing over a promise nobody read, so it is
-			// refused and the claim named — revising that is the act that
+			// refused and the decision named — revising that is the act that
 			// withdraws the agreement. Where nothing argued for it, the
 			// commitment is intent and moving it is editing one row, which is
 			// the whole reason it is one row.
-			if err := s.movedTo(ctx, db, fold, id, strings.TrimSpace(to), by, claimID); err != nil {
+			if err := s.movedTo(ctx, db, fold, id, strings.TrimSpace(to), by, decisionID); err != nil {
 				return 0, err
 			}
 			continue
@@ -149,7 +150,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		row := &Upgrade{
 			TargetID: id, FoldKey: fold,
 			FromVersion: from, ToVersion: strings.TrimSpace(to),
-			CommittedTo: by, ClaimID: claimID,
+			CommittedTo: by, DecisionID: decisionID,
 			DeclaredBy: subject.ID, DeclaredAt: now,
 		}
 		if _, err := db.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -211,18 +212,18 @@ type Planned struct {
 	// which packages move with it.
 	Components []string
 	// Issues is how many distinct issues are still open at this fold in this
-	// build — what the bump would close — and Places how many findings those
+	// build — what the bump would close — and Occurrences how many findings those
 	// sit at.
 	//
 	// Nothing is declared done. A build is clear when it stops holding what
 	// the bump answers, which the scans already say, and a chosen build that
 	// still holds it after a scan has run is a missed target.
-	Issues int
-	Places int
+	Issues      int
+	Occurrences int
 	// DeclaredAt is when the commitment was made, which is what "waiting
 	// since" means for a bump.
 	DeclaredAt time.Time
-	// By is the date the promise named, where a judgment promised one. Read
+	// By is the date the promise named, where a decision promised one. Read
 	// from the commitment, which is the record a release plan is kept in.
 	By *time.Time
 	// HeldBy is the identity or team name of the party carrying it, and
@@ -233,10 +234,10 @@ type Planned struct {
 	// State is where this stands, derived from the scans and the date and set
 	// by nobody.
 	State UpgradeState
-	// ClaimID is the claim that argued for it, where one did, so a reader can
-	// reach the argument — where the reasoning is, and where the conversation
-	// about it happens.
-	ClaimID int64
+	// DecisionID is the decision that argued for it, where one did, so a reader
+	// can reach the argument — where the reasoning is, and where the
+	// conversation about it happens.
+	DecisionID int64
 }
 
 // PendingUpgrades is everything committed for one build, by the bump that would
@@ -278,9 +279,9 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 	// wrote: a vulnerability published tonight against the same package is
 	// covered by this morning's commitment with nobody acting.
 	var open []struct {
-		Fold   string `bun:"fold"`
-		Issues int    `bun:"issues"`
-		Places int    `bun:"places"`
+		Fold        string `bun:"fold"`
+		Issues      int    `bun:"issues"`
+		Occurrences int    `bun:"places"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := s.db.NewSelect().
@@ -298,9 +299,9 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 		Scan(ctx, &open); err != nil {
 		return nil, fmt.Errorf("read what those bumps would close: %w", err)
 	}
-	counts := make(map[string]struct{ Issues, Places int }, len(open))
+	counts := make(map[string]struct{ Issues, Occurrences int }, len(open))
 	for _, row := range open {
-		counts[row.Fold] = struct{ Issues, Places int }{row.Issues, row.Places}
+		counts[row.Fold] = struct{ Issues, Occurrences int }{row.Issues, row.Occurrences}
 	}
 
 	named, err := s.packagesIn(ctx, targetID, visible, folds)
@@ -319,14 +320,14 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 			Fold: row.FoldKey, From: row.FromVersion, To: row.ToVersion,
 			DeclaredAt: row.DeclaredAt, By: row.CommittedTo,
 		}
-		if row.ClaimID != nil {
-			one.ClaimID = *row.ClaimID
+		if row.DecisionID != nil {
+			one.DecisionID = *row.DecisionID
 		}
 		if what, ok := named[row.FoldKey]; ok {
 			one.Upstream, one.Components = what.Upstream, what.Components
 		}
 		count := counts[row.FoldKey]
-		one.Issues, one.Places = count.Issues, count.Places
+		one.Issues, one.Occurrences = count.Issues, count.Occurrences
 		one.State = upgradeStanding(one, today)
 		planned = append(planned, one)
 	}
@@ -339,7 +340,7 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 // movedTo changes what a commitment is moving to, or refuses where an
 // agreement stands over it.
 func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID int64,
-	to string, by *time.Time, claimID *int64) error {
+	to string, by *time.Time, decisionID *int64) error {
 
 	var standing Upgrade
 	if err := db.NewSelect().Model(&standing).
@@ -347,22 +348,22 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what is already committed: %w", err)
 	}
-	// A commitment made by another claim is refused even where this one
-	// states the same version and date. Accepted, it stays with the claim
-	// that made it, and re-promising that claim moves this one's agreed date
-	// without this one's approver. A commitment made by the same claim is
-	// that claim writing its own promise again, which is what revising it
+	// A commitment made by another decision is refused even where this one
+	// states the same version and date. Accepted, it stays with the decision
+	// that made it, and re-promising that decision moves this one's agreed
+	// date without this one's approver. A commitment made by the same decision
+	// is that decision writing its own promise again, which is what revising it
 	// does.
-	if standing.ClaimID != nil && (claimID == nil || *claimID != *standing.ClaimID) {
+	if standing.DecisionID != nil && (decisionID == nil || *decisionID != *standing.DecisionID) {
 		return refusal.Errorf(
-			"this release is committed to %s under claim %d: revise that claim rather than "+
+			"this release is committed to %s under decision %d: revise that decision rather than "+
 				"recording a second promise about the same package",
-			standing.ToVersion, *standing.ClaimID)
+			standing.ToVersion, *standing.DecisionID)
 	}
 	if _, err := db.NewUpdate().Model((*Upgrade)(nil)).
 		Set(`"to_version" = ?`, to).
 		Set(`"committed_to" = ?`, by).
-		Set(`"decision_id" = ?`, claimID).
+		Set(`"decision_id" = ?`, decisionID).
 		Where(`"fold_key" = ?`, fold).Where(`"target_id" = ?`, targetID).Exec(ctx); err != nil {
 		return fmt.Errorf("change what this release is moving to: %w", err)
 	}
@@ -412,9 +413,9 @@ func (s *Store) packagesIn(ctx context.Context, targetID int64,
 
 // holder is who carries a fold's work, where one party carries all of it.
 type holder struct {
-	party  *int64
-	places int
-	held   int
+	party       *int64
+	occurrences int
+	held        int
 }
 
 // heldPerFold reads who is carrying what is still open under each fold.
@@ -422,11 +423,11 @@ func (s *Store) heldPerFold(ctx context.Context, targetID int64,
 	visible []access.Visibility, folds []string) (map[string]holder, error) {
 
 	var rows []struct {
-		Fold   string `bun:"fold"`
-		Least  *int64 `bun:"least_holder"`
-		Most   *int64 `bun:"most_holder"`
-		Places int    `bun:"places"`
-		Held   int    `bun:"held"`
+		Fold        string `bun:"fold"`
+		Least       *int64 `bun:"least_holder"`
+		Most        *int64 `bun:"most_holder"`
+		Occurrences int    `bun:"places"`
+		Held        int    `bun:"held"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := s.db.NewSelect().
@@ -455,8 +456,8 @@ func (s *Store) heldPerFold(ctx context.Context, targetID int64,
 	}
 	out := make(map[string]holder, len(rows))
 	for _, row := range rows {
-		one := holder{places: row.Places, held: row.Held}
-		if row.Held == row.Places && row.Least != nil && row.Most != nil && *row.Least == *row.Most {
+		one := holder{occurrences: row.Occurrences, held: row.Held}
+		if row.Held == row.Occurrences && row.Least != nil && row.Most != nil && *row.Least == *row.Most {
 			one.party = row.Least
 		}
 		out[row.Fold] = one

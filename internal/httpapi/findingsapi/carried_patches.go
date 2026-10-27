@@ -16,7 +16,7 @@ import (
 
 // CarriedClaimBody is one thing a build says it deals with itself, and how
 // long it has been saying so.
-type CarriedClaimBody struct {
+type CarriedDecisionBody struct {
 	Vulnerability string `json:"vulnerability" doc:"The identifier the build argued about, as it wrote it"`
 	Subject       string `json:"subject" doc:"The claim's subject — a package name, or its identifier where it named no name"`
 	Version       string `json:"version,omitempty" doc:"The version of the subject the claim was made about, where the document stated one outside the package identifier. The claim covers that version alone"`
@@ -72,7 +72,7 @@ func registerCarried(api huma.API, in core.Deps) {
 		Variant   string `path:"variant"`
 		Component string `query:"component" doc:"Narrow to what one package was claimed about"`
 		core.Paging
-	}) (*core.CountedListOutput[CarriedClaimBody], error) {
+	}) (*core.CountedListOutput[CarriedDecisionBody], error) {
 		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
@@ -82,11 +82,11 @@ func registerCarried(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
-		out := &core.CountedListOutput[CarriedClaimBody]{}
+		out := &core.CountedListOutput[CarriedDecisionBody]{}
 		out.Body.Total = total
-		out.Body.Items = make([]CarriedClaimBody, 0, len(rows))
+		out.Body.Items = make([]CarriedDecisionBody, 0, len(rows))
 		for _, row := range rows {
-			body := CarriedClaimBody{
+			body := CarriedDecisionBody{
 				Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 				Status: row.Status, Justification: row.Justification,
 				Statement: row.Statement, Pedigree: row.Pedigree,

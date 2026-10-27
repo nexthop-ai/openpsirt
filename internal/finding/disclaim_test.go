@@ -18,7 +18,7 @@ import (
 )
 
 // A supplier's statement that its own product is not affected closes the
-// finding at the places that product occupies (REQ-31). The fixture is the
+// finding at the occurrences inside that product (REQ-31). The fixture is the
 // issue's own example: Acme's product Y, at 4.2, bundles zlib, and Acme says Y
 // never calls the function CVE-2022-37434 is in.
 
@@ -108,7 +108,7 @@ func beside(product graph.Described) graph.Snapshot {
 }
 
 // shared is zlib under a libpng that Y pulls in and another product pulls in
-// too: one place, reached through Y and outside it.
+// too: one occurrence, reached through Y and outside it.
 func shared() graph.Snapshot {
 	return graph.Snapshot{
 		Root:       root,
@@ -184,7 +184,7 @@ func TestAnOpenFindingInsideTheProductClosesOnTheNextScan(t *testing.T) {
 	})
 }
 
-func TestAPlaceReachedOnlyThroughTheProductClosesHoweverDeep(t *testing.T) {
+func TestAnOccurrenceReachedOnlyThroughTheProductClosesHoweverDeep(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, deep())
 		f.acmeSays(t)
@@ -196,7 +196,7 @@ func TestAPlaceReachedOnlyThroughTheProductClosesHoweverDeep(t *testing.T) {
 	})
 }
 
-func TestAPlaceReachedThroughTheProductAndOutsideItStaysOpenAnswered(t *testing.T) {
+func TestAnOccurrenceReachedThroughTheProductAndOutsideItStaysOpenAnswered(t *testing.T) {
 	// One row stands for both routes. Closed, it hides the route nobody
 	// answered; open with nothing on it, it hides that the supplier answered
 	// the other.
@@ -205,12 +205,12 @@ func TestAPlaceReachedThroughTheProductAndOutsideItStaysOpenAnswered(t *testing.
 		f.acmeSays(t)
 		applied, _ := f.reported(t, found(inside, zlib))
 		if applied.Disclaimed != 0 || applied.Opened != 1 {
-			t.Errorf("disclaimed %d and opened %d, want the shared place open", applied.Disclaimed,
+			t.Errorf("disclaimed %d and opened %d, want the shared occurrence open", applied.Disclaimed,
 				applied.Opened)
 		}
 		open := f.open(t)
 		if len(open) != 1 || open[0].StatedBy == nil {
-			t.Fatalf("the shared place is %+v, want it open and answered through Y", open)
+			t.Fatalf("the shared occurrence is %+v, want it open and answered through Y", open)
 		}
 
 		// Y stops pulling in the shared libpng, so every route runs through
@@ -230,7 +230,7 @@ func TestAPlaceReachedThroughTheProductAndOutsideItStaysOpenAnswered(t *testing.
 			t.Errorf("updated %d, want the answer taken off the row", moved.Updated)
 		}
 		if open := f.open(t); len(open) != 1 || open[0].StatedBy != nil {
-			t.Errorf("a place no longer under Y is %+v, want it open with nothing answering it", open)
+			t.Errorf("an occurrence no longer under Y is %+v, want it open with nothing answering it", open)
 		}
 	})
 }
@@ -259,7 +259,7 @@ func TestTheFindingOpensAgainWhenTheProductMovesToAnotherRelease(t *testing.T) {
 			t.Errorf("opened %d once Y moved to 4.3, want the zlib inside it", applied.Opened)
 		}
 		if open := f.open(t); len(open) != 2 {
-			t.Errorf("%d open, want both zlib places", len(open))
+			t.Errorf("%d open, want both zlib occurrences", len(open))
 		}
 	})
 }
@@ -277,7 +277,7 @@ func TestAStatementNamingNoReleaseOfTheProductClosesNothing(t *testing.T) {
 		}
 		for _, row := range f.open(t) {
 			if row.StatedBy != nil {
-				t.Error("a statement naming no version answers a place")
+				t.Error("a statement naming no version answers an occurrence")
 			}
 		}
 	})
@@ -356,7 +356,7 @@ func TestAFindingClosedByAStatementPointsAtItsRevision(t *testing.T) {
 	})
 }
 
-func TestAPlaceSomebodyMarkedAffectedStaysOpen(t *testing.T) {
+func TestAnOccurrenceSomebodyMarkedAffectedStaysOpen(t *testing.T) {
 	// A disagreement with the supplier goes through the ordinary route.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -370,8 +370,8 @@ func TestAPlaceSomebodyMarkedAffectedStaysOpen(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.decision(t, decisionRow{
-			By: somebody, Claim: claimSaying(t, f.db, somebody, finding.OutcomeAffected),
-			Issue: issueID, Place: finding.PlaceIdentity(zlib.Name, acmeY.Name),
+			By: somebody, Decision: decisionSaying(t, f.db, somebody, finding.OutcomeAffected),
+			Issue: issueID, Occurrence: finding.OccurrenceIdentity(zlib.Name, acmeY.Name),
 			State: "proposed", Unreviewed: true,
 			Component: ptr(zlib.Version), Consumer: ptr(acmeY.Version), Key: "affected-here",
 		})
@@ -382,7 +382,7 @@ func TestAPlaceSomebodyMarkedAffectedStaysOpen(t *testing.T) {
 			t.Errorf("disclaimed %d where somebody said the issue applies", applied.Disclaimed)
 		}
 		if open := f.open(t); len(open) != 2 {
-			t.Errorf("%d open, want both places", len(open))
+			t.Errorf("%d open, want both occurrences", len(open))
 		}
 	})
 }
@@ -391,7 +391,7 @@ func TestAStatementTheBuildsOwnPatchAlreadyAnswersClosesNothing(t *testing.T) {
 	// The build's word about its own code is asked first.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, beside(acmeY))
-		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
+		if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
 			Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 			Targets: []sbom.Target{{Purl: zlib.Purl}},
 		}}, everyOrigin); err != nil {
@@ -400,7 +400,7 @@ func TestAStatementTheBuildsOwnPatchAlreadyAnswersClosesNothing(t *testing.T) {
 		f.acmeSays(t)
 		applied, _ := f.reported(t, found(inside, zlib))
 		if applied.Patched != 2 || applied.Disclaimed != 0 {
-			t.Errorf("patched %d and disclaimed %d, want both places patched",
+			t.Errorf("patched %d and disclaimed %d, want both occurrences patched",
 				applied.Patched, applied.Disclaimed)
 		}
 	})
@@ -424,7 +424,7 @@ func TestAStatementAboutOneComponentInsideTheProductClosesNoOther(t *testing.T) 
 	})
 }
 
-func TestAPlaceTheSupplierAnswersOnSomeRoutesIsNotRunningOut(t *testing.T) {
+func TestAnOccurrenceTheSupplierAnswersOnSomeRoutesIsNotRunningOut(t *testing.T) {
 	// Open, for the route nobody answered, and not work while it is.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, shared())
@@ -507,7 +507,7 @@ func TestAStatementAboutAComponentInsideAProductIsEvidenceOnlyBeneathIt(t *testi
 }
 
 func TestTheListFindsWhatASupplierAnsweredAndNothingElse(t *testing.T) {
-	// A statement about the zlib inside Y reaches the list through the place
+	// A statement about the zlib inside Y reaches the list through the occurrence
 	// the run answered with it, and not through every zlib in the build.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, graph.Snapshot{
@@ -526,7 +526,7 @@ func TestTheListFindsWhatASupplierAnsweredAndNothingElse(t *testing.T) {
 		f.acmeSays(t)
 		f.reported(t, found(inside, zlib))
 		who := f.holding(t, access.PublicTriage)
-		places := func(filter finding.Filter) int {
+		occurrences := func(filter finding.Filter) int {
 			t.Helper()
 			groups, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, filter)
 			if err != nil {
@@ -534,18 +534,18 @@ func TestTheListFindsWhatASupplierAnsweredAndNothingElse(t *testing.T) {
 			}
 			total := 0
 			for _, g := range groups {
-				total += g.Places
+				total += g.Occurrences
 			}
 			return total
 		}
-		if got := places(finding.Filter{}); got != 2 {
-			t.Fatalf("the list holds %d places, want the two zlib places", got)
+		if got := occurrences(finding.Filter{}); got != 2 {
+			t.Fatalf("the list holds %d occurrences, want the two zlib occurrences", got)
 		}
-		if got := places(finding.Filter{Publishers: []string{"Acme Security"}}); got != 1 {
-			t.Errorf("what Acme spoke about is %d places, want the one under the shared libpng", got)
+		if got := occurrences(finding.Filter{Publishers: []string{"Acme Security"}}); got != 1 {
+			t.Errorf("what Acme spoke about is %d occurrences, want the one under the shared libpng", got)
 		}
-		if got := places(finding.Filter{VexStatus: []string{"not_affected"}}); got != 1 {
-			t.Errorf("what a supplier called not affected is %d places, want 1", got)
+		if got := occurrences(finding.Filter{VexStatus: []string{"not_affected"}}); got != 1 {
+			t.Errorf("what a supplier called not affected is %d occurrences, want 1", got)
 		}
 	})
 }
@@ -627,8 +627,8 @@ func TestAStatementAboutAPlatformNothingHereShipsIsEvidenceByPackage(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(groups) != 1 || groups[0].Places != 2 {
-			t.Errorf("the list finds %+v by the platform's publisher, want both zlib places", groups)
+		if len(groups) != 1 || groups[0].Occurrences != 2 {
+			t.Errorf("the list finds %+v by the platform's publisher, want both zlib occurrences", groups)
 		}
 	})
 }
@@ -849,23 +849,23 @@ func TestRescanningADisclaimedBuildTouchesNoRow(t *testing.T) {
 	})
 }
 
-func TestAPlaceAnsweredOnSomeRoutesCarriesNoDeadline(t *testing.T) {
+func TestAnOccurrenceAnsweredOnSomeRoutesCarriesNoDeadline(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, shared())
 		f.reported(t, found(inside, zlib))
 		if open := f.open(t); len(open) != 1 || open[0].DueAt == nil {
-			t.Fatalf("with nothing answering it the place is %+v, want it due", open)
+			t.Fatalf("with nothing answering it the occurrence is %+v, want it due", open)
 		}
 		f.acmeSays(t)
 		f.reported(t, found(inside, zlib))
 		if open := f.open(t); len(open) != 1 || open[0].DueAt != nil {
-			t.Errorf("answered through Y the place is due %v", open[0].DueAt)
+			t.Errorf("answered through Y the occurrence is due %v", open[0].DueAt)
 		}
 	})
 }
 
 func TestADuplicateOfAnIssueASupplierAnswersEverywhereIsRefused(t *testing.T) {
-	// The place is open for the route nobody answered and is not work, so a
+	// The occurrence is open for the route nobody answered and is not work, so a
 	// report pointed at it as a duplicate reaches nobody who is looking.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -873,7 +873,7 @@ func TestADuplicateOfAnIssueASupplierAnswersEverywhereIsRefused(t *testing.T) {
 		f.acmeSays(t)
 		f.reported(t, found(inside, zlib))
 		if open := f.open(t); len(open) != 1 || open[0].StatedBy == nil {
-			t.Fatalf("the place is %+v, want it open and answered through Y", open)
+			t.Fatalf("the occurrence is %+v, want it open and answered through Y", open)
 		}
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, who, 1)
@@ -927,8 +927,8 @@ func TestARevisionRepeatingAClaimKeepsItsRow(t *testing.T) {
 	})
 }
 
-func TestNoDeadlineComesBackToAPlaceTheSupplierAnswers(t *testing.T) {
-	// Every writer of a deadline leaves the place alone: the issue becoming
+func TestNoDeadlineComesBackToAnOccurrenceTheSupplierAnswers(t *testing.T) {
+	// Every writer of a deadline leaves the occurrence alone: the issue becoming
 	// exploited, the issue rated here, and the windows changing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -938,7 +938,7 @@ func TestNoDeadlineComesBackToAPlaceTheSupplierAnswers(t *testing.T) {
 		answered := func(what string) {
 			t.Helper()
 			if open := f.open(t); len(open) != 1 || open[0].DueAt != nil {
-				t.Errorf("after %s the place is due %v", what, open[0].DueAt)
+				t.Errorf("after %s the occurrence is due %v", what, open[0].DueAt)
 			}
 		}
 		answered("the scan")
@@ -966,7 +966,7 @@ func TestNoDeadlineComesBackToAPlaceTheSupplierAnswers(t *testing.T) {
 	})
 }
 
-func TestEveryOtherClosureTakesTheSuppliersAnswerOffThePlace(t *testing.T) {
+func TestEveryOtherClosureTakesTheSuppliersAnswerOffTheOccurrence(t *testing.T) {
 	// What closed it is the reason a register reads beside it.
 	for _, c := range []struct {
 		name  string
@@ -979,7 +979,7 @@ func TestEveryOtherClosureTakesTheSuppliersAnswerOffThePlace(t *testing.T) {
 			f.reported(t, r)
 		}},
 		{"the build patches it", func(t *testing.T, f *fixture) {
-			if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
+			if _, err := world.RecordDecisions(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
 				Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 				Targets: []sbom.Target{{Purl: zlib.Purl}},
 			}}, everyOrigin); err != nil {
@@ -996,7 +996,7 @@ func TestEveryOtherClosureTakesTheSuppliersAnswerOffThePlace(t *testing.T) {
 				f.shipped(t, shared())
 				f.acmeSays(t)
 				if c.name == "its issue merges into one already open there" {
-					// The other name first, so the place it holds is the
+					// The other name first, so the occurrence it holds is the
 					// one kept, and the one the supplier answers closes.
 					f.reported(t, found("GHSA-aaaa-bbbb-cccc", zlib))
 					f.reported(t, found("GHSA-aaaa-bbbb-cccc", zlib), found(inside, zlib))

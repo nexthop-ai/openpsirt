@@ -67,7 +67,7 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	}
 	if _, err := db.DB.NewInsert().Model(&finding.Finding{
 		TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: issue,
-		Visibility: access.Public, ComponentID: component.ID, PlaceIdentity: "place-of-libfoo",
+		Visibility: access.Public, ComponentID: component.ID, OccurrenceIdentity: "place-of-libfoo",
 		OpenedAt: now, OpenedRunID: &run.ID,
 	}).Exec(ctx); err != nil {
 		return cast{}, err
@@ -722,7 +722,7 @@ func TestTheShelfDoesNotTellAPublicReaderTheIssueIsUndisclosedElsewhere(t *testi
 		}
 		hidden := open
 		hidden.ID = 0
-		hidden.PlaceIdentity = "place-of-libfoo-under-libbar"
+		hidden.OccurrenceIdentity = "place-of-libfoo-under-libbar"
 		hidden.Visibility = access.Private
 		if _, err := f.db.DB.NewInsert().Model(&hidden).Exec(ctx); err != nil {
 			t.Fatal(err)

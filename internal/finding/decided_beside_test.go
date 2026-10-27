@@ -10,9 +10,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// The state filter's decision table, counted beside the first level of the
-// list and narrowed to the issues a filter needing a decision can reach, and
-// the conditions over a group written as ranges.
+// The state filter's table of decision occurrences, counted beside the first
+// level of the list and narrowed to the issues a filter needing a decision can
+// reach, and the conditions over a group written as ranges.
 
 // listed is the total one filter answers inside one product and across
 // products, which the state filter builds in two different shapes.
@@ -30,24 +30,24 @@ func (f *fixture) listed(t *testing.T, who access.Subject, filter finding.Filter
 }
 
 func TestAStateIsCountedOverOnlyThePlacesTheOtherConditionsKeep(t *testing.T) {
-	// One issue at two places, agreed at one of them. Inside the container
-	// holding the agreed place the issue is agreed; inside the other it is
+	// One issue at two occurrences, agreed at one of them. Inside the container
+	// holding the agreed occurrence the issue is agreed; inside the other it is
 	// undecided; over both it is partly decided, which is neither. A decision
-	// counted at a place the other conditions dropped would answer the second
-	// question with the first place's agreement.
+	// counted at an occurrence the other conditions dropped would answer the
+	// second question with the first occurrence's agreement.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		f.foundOnLibnl(t)
-		places := f.placesOf(t, "CVE-2026-1")
-		if len(places) != 2 {
-			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
+		occurrences := f.occurrencesOf(t, "CVE-2026-1")
+		if len(occurrences) != 2 {
+			t.Fatalf("the fixture put the issue at %d occurrences, want 2", len(occurrences))
 		}
-		f.decidedAt(t, f.somebodyElse(t), places[swss.Name], "approved", libnl.Version, swss.Version, "agreed")
+		f.decidedAt(t, f.somebodyElse(t), occurrences[swss.Name], "approved", libnl.Version, swss.Version, "agreed")
 		who := f.holding(t, access.PublicTriage)
 
 		for _, asked := range []struct {
 			under string
-			state finding.ClaimStanding
+			state finding.DecisionStanding
 			want  int
 		}{
 			{swss.Name, finding.StandingAgreed, 1},
@@ -58,7 +58,7 @@ func TestAStateIsCountedOverOnlyThePlacesTheOtherConditionsKeep(t *testing.T) {
 			{"", finding.StandingUndecided, 0},
 		} {
 			here, across := f.listed(t, who, finding.Filter{
-				Under: asked.under, States: []finding.ClaimStanding{asked.state},
+				Under: asked.under, States: []finding.DecisionStanding{asked.state},
 			})
 			if here != asked.want || across != asked.want {
 				t.Errorf("%s under %q: %d in the product and %d across products, want %d",
@@ -87,12 +87,12 @@ func TestALapsedDecisionFiledUnderAMergedIssueFindsTheGroupOfTheIssueItMergedInt
 			Set(`"issue_id" = ?`, kept).Where(`"id" = ?`, absorbed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		at := f.placesOf(t, "CVE-2026-1")[swss.Name]
+		at := f.occurrencesOf(t, "CVE-2026-1")[swss.Name]
 		at.VulnerabilityID = absorbed
 		f.decidedAt(t, f.somebodyElse(t), at, "lapsed", libnl.Version, swss.Version, "")
 
 		here, across := f.listed(t, f.holding(t, access.PublicTriage),
-			finding.Filter{States: []finding.ClaimStanding{finding.StandingLapsed}})
+			finding.Filter{States: []finding.DecisionStanding{finding.StandingLapsed}})
 		if here != 1 || across != 1 {
 			t.Errorf("a lapsed decision filed under the absorbed issue: %d lapsed in the product"+
 				" and %d across products, want 1", here, across)
@@ -108,18 +108,18 @@ func TestSeveralStatesNeedingADecisionEachFindTheirOwnGroups(t *testing.T) {
 		f.shipped(t, through(libnl))
 		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl))
 		by := f.somebodyElse(t)
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-1")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
-		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-2")[swss.Name], "proposed", libnl.Version, swss.Version, "waiting")
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-1")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
+		f.decidedAt(t, by, f.occurrencesOf(t, "CVE-2026-2")[swss.Name], "proposed", libnl.Version, swss.Version, "waiting")
 		who := f.holding(t, access.PublicTriage)
 
 		for _, asked := range []struct {
-			states []finding.ClaimStanding
+			states []finding.DecisionStanding
 			want   int
 		}{
-			{[]finding.ClaimStanding{finding.StandingLapsed, finding.StandingWaiting}, 2},
-			{[]finding.ClaimStanding{finding.StandingWaiting, finding.StandingLapsed}, 2},
-			{[]finding.ClaimStanding{finding.StandingLapsed, finding.StandingUndecided}, 2},
-			{[]finding.ClaimStanding{finding.StandingAgreed}, 0},
+			{[]finding.DecisionStanding{finding.StandingLapsed, finding.StandingWaiting}, 2},
+			{[]finding.DecisionStanding{finding.StandingWaiting, finding.StandingLapsed}, 2},
+			{[]finding.DecisionStanding{finding.StandingLapsed, finding.StandingUndecided}, 2},
+			{[]finding.DecisionStanding{finding.StandingAgreed}, 0},
 		} {
 			here, across := f.listed(t, who, finding.Filter{States: asked.states})
 			if here != asked.want || across != asked.want {
@@ -130,12 +130,13 @@ func TestSeveralStatesNeedingADecisionEachFindTheirOwnGroups(t *testing.T) {
 	})
 }
 
-func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
-	// One issue in two builds, agreed at the place both share, and one in the
-	// first build alone and undecided. Over both builds the agreed issue is
-	// one group of two places, both answered by the one decision. Asked
+func TestAStateOverSeveralBuildsCountsEachBuildsOccurrencesOnce(t *testing.T) {
+	// One issue in two builds, agreed at the occurrence both share, and one in
+	// the first build alone and undecided. Over both builds the agreed issue is
+	// one group of two occurrences, both answered by the one decision. Asked
 	// whether a group differs between builds, the first level is keyed on the
-	// build as well, and the decided places beside it are counted per build.
+	// build as well, and the decided occurrences beside it are counted per
+	// build.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
@@ -147,34 +148,34 @@ func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		f.decidedAt(t, f.somebodyElse(t), f.placesOf(t, "CVE-2026-1")[swss.Name],
+		f.decidedAt(t, f.somebodyElse(t), f.occurrencesOf(t, "CVE-2026-1")[swss.Name],
 			"approved", libnl.Version, swss.Version, "agreed")
 		who := f.holding(t, access.PublicTriage)
 
 		for _, asked := range []struct {
-			state  finding.ClaimStanding
-			want   string
-			places int
+			state       finding.DecisionStanding
+			want        string
+			occurrences int
 		}{
 			{finding.StandingAgreed, "CVE-2026-1", 2},
 			{finding.StandingUndecided, "CVE-2026-2", 1},
 		} {
 			groups, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0,
-				finding.Filter{States: []finding.ClaimStanding{asked.state}})
+				finding.Filter{States: []finding.DecisionStanding{asked.state}})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if total != 1 || len(groups) != 1 || groups[0].Vulnerability != asked.want ||
-				groups[0].Places != asked.places {
-				t.Errorf("%s over both builds: %d groups %+v, want %s at %d places",
-					asked.state, total, groups, asked.want, asked.places)
+				groups[0].Occurrences != asked.occurrences {
+				t.Errorf("%s over both builds: %d groups %+v, want %s at %d occurrences",
+					asked.state, total, groups, asked.want, asked.occurrences)
 			}
 		}
 
 		// The agreed issue is in both builds, so it does not differ between
-		// them, and the decided places counted per build must not make it.
+		// them, and the decided occurrences counted per build must not make it.
 		_, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
-			DiffersBetweenBuilds: true, States: []finding.ClaimStanding{finding.StandingAgreed},
+			DiffersBetweenBuilds: true, States: []finding.DecisionStanding{finding.StandingAgreed},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -184,11 +185,11 @@ func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
 		}
 
 		// CVE-2026-2 is in the first build only, so it differs between them;
-		// agreed at its one place, it is the one group both conditions keep.
-		f.decidedAt(t, f.somebodyElse(t), f.placesOf(t, "CVE-2026-2")[swss.Name],
+		// agreed at its one occurrence, it is the one group both conditions keep.
+		f.decidedAt(t, f.somebodyElse(t), f.occurrencesOf(t, "CVE-2026-2")[swss.Name],
 			"approved", libnl.Version, swss.Version, "only-here")
 		groups, total, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{
-			DiffersBetweenBuilds: true, States: []finding.ClaimStanding{finding.StandingAgreed},
+			DiffersBetweenBuilds: true, States: []finding.DecisionStanding{finding.StandingAgreed},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -200,16 +201,17 @@ func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
 	})
 }
 
-func TestAnOutcomeHoldsForAGroupOnlyWhereEveryPlaceIsAnsweredThatWay(t *testing.T) {
-	// One issue at two places. Dismissed as not applicable at one of them, the
-	// group is not a dismissal; dismissed at both, it is. Each place is counted
-	// once, so two decided places compare equal to the group's two places.
+func TestAnOutcomeHoldsForAGroupOnlyWhereEveryOccurrenceIsAnsweredThatWay(t *testing.T) {
+	// One issue at two occurrences. Dismissed as not applicable at one of them,
+	// the group is not a dismissal; dismissed at both, it is. Each occurrence
+	// is counted once, so two decided occurrences compare equal to the group's
+	// two occurrences.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		f.foundOnLibnl(t)
-		places := f.placesOf(t, "CVE-2026-1")
-		if len(places) != 2 {
-			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
+		occurrences := f.occurrencesOf(t, "CVE-2026-1")
+		if len(occurrences) != 2 {
+			t.Fatalf("the fixture put the issue at %d occurrences, want 2", len(occurrences))
 		}
 		who := f.holding(t, access.PublicTriage)
 		dismissed := func(when string, want int) {
@@ -221,22 +223,23 @@ func TestAnOutcomeHoldsForAGroupOnlyWhereEveryPlaceIsAnsweredThatWay(t *testing.
 			}
 		}
 		by := f.somebodyElse(t)
-		f.decidedAt(t, by, places[swss.Name], "approved", libnl.Version, swss.Version, "under-swss")
-		dismissed("dismissed at one of two places", 0)
-		f.decidedAt(t, by, places[teamd.Name], "approved", libnl.Version, teamd.Version, "under-teamd")
-		dismissed("dismissed at both places", 1)
+		f.decidedAt(t, by, occurrences[swss.Name], "approved", libnl.Version, swss.Version, "under-swss")
+		dismissed("dismissed at one of two occurrences", 0)
+		f.decidedAt(t, by, occurrences[teamd.Name], "approved", libnl.Version, teamd.Version, "under-teamd")
+		dismissed("dismissed at both occurrences", 1)
 	})
 }
 
 func TestAGroupHalfHeldIsHeldNeitherByNobodyNorBySomebody(t *testing.T) {
-	// "Nobody" is no place held and "somebody" is every place held, asked as
-	// ranges over the count of held places. One of two places held is
-	// neither, and the ranges must not reach it from either side.
+	// "Nobody" is no occurrence held and "somebody" is every occurrence held,
+	// asked as ranges over the count of held occurrences. One of two
+	// occurrences held is neither, and the ranges must not reach it from either
+	// side.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 		f.foundOnLibnl(t)
-		places := f.placesOf(t, "CVE-2026-1")
+		occurrences := f.occurrencesOf(t, "CVE-2026-1")
 		party := &access.Party{Kind: access.APerson}
 		if _, err := f.db.DB.NewInsert().Model(party).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -259,10 +262,10 @@ func TestAGroupHalfHeldIsHeldNeitherByNobodyNorBySomebody(t *testing.T) {
 				}
 			}
 		}
-		held("no place held", 1, 0)
-		hold(places[swss.Name])
-		held("one of two places held", 0, 0)
-		hold(places[teamd.Name])
-		held("both places held", 0, 1)
+		held("no occurrence held", 1, 0)
+		hold(occurrences[swss.Name])
+		held("one of two occurrences held", 0, 0)
+		hold(occurrences[teamd.Name])
+		held("both occurrences held", 0, 1)
 	})
 }

@@ -16,15 +16,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// PlaceCovered is an issue in a component as one product of the build pulls
-// it in, where the component's places disagree and every place beneath that
-// product agrees.
+// OccurrenceCovered is an issue in a component as one product of the build
+// pulls it in, where the component's occurrences disagree and every occurrence
+// beneath that product agrees.
 //
 // A VEX document states it naming the consumer as the product and the
 // component beneath it: "zlib inside curl 8.5.0: not affected". A reader
 // applies such a statement beneath the product it names, so it is made only
 // where everything beneath that product was decided the same way.
-type PlaceCovered struct {
+type OccurrenceCovered struct {
 	VulnerabilityID int64
 	Identifier      string
 	Component       string
@@ -37,9 +37,9 @@ type PlaceCovered struct {
 	Covering
 }
 
-// coveredPlace is one open place of an issue, and whether approved, live
-// decisions agreeing on one outcome cover it.
-type coveredPlace struct {
+// coveredOccurrence is one open occurrence of an issue, and whether approved,
+// live decisions agreeing on one outcome cover it.
+type coveredOccurrence struct {
 	vulnerabilityID int64
 	identifier      string
 	componentID     int64
@@ -60,38 +60,41 @@ type statedGroup struct {
 	purl            string
 }
 
-// CoveredAtPlaces reads what a VEX document of one build states place by
-// place: the places a decision covers, in components some of whose places are
-// open and undecided or decided another way.
+// CoveredAtOccurrences reads what a VEX document of one build states occurrence
+// by occurrence: the occurrences a decision covers, in components some of whose
+// occurrences are open and undecided or decided another way.
 //
-// A place is stated only where all of these hold:
+// An occurrence is stated only where all of these hold:
 //
 //   - its consumer's package identifier names a version, because a statement
-//     naming a product at no version is about every release of it. A place
+//     naming a product at no version is about every release of it. An occurrence
 //     the build holds directly has no consumer, and so no product but the
 //     build, which a statement about the whole build names
-//   - every open place of the component beneath the consumer, at any depth, is
-//     covered with the same outcome
 //
-// Where several places beneath one consumer were decided in separate sittings,
-// the earliest decision speaks, as it does for a whole component.
-func CoveredAtPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
-	visible []access.Visibility, most int) ([]PlaceCovered, error) {
+// - every open occurrence of the component beneath the consumer, at any depth,
+// is
+//
+//	covered with the same outcome
+//
+// Where several occurrences beneath one consumer were decided in separate
+// sittings, the earliest decision speaks, as it does for a whole component.
+func CoveredAtOccurrences(ctx context.Context, db bun.IDB, productID, targetID int64,
+	visible []access.Visibility, most int) ([]OccurrenceCovered, error) {
 
-	decided, err := decidedPlaces(ctx, db, productID, targetID, visible)
+	decided, err := decidedOccurrences(ctx, db, productID, targetID, visible)
 	if err != nil || len(decided) == 0 {
 		return nil, err
 	}
-	every, err := everyPlaceOf(ctx, db, targetID, visible, decided)
+	every, err := everyOccurrenceOf(ctx, db, targetID, visible, decided)
 	if err != nil {
 		return nil, err
 	}
-	places, err := placeEdges(ctx, db, targetID, 0)
+	occurrences, err := occurrenceEdges(ctx, db, targetID, 0)
 	if err != nil {
 		return nil, err
 	}
 	children := map[int64][]int64{}
-	for child, above := range places {
+	for child, above := range occurrences {
 		for _, consumer := range above {
 			children[consumer] = append(children[consumer], child)
 		}
@@ -116,7 +119,7 @@ func CoveredAtPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 		return seen
 	}
 
-	var out []PlaceCovered
+	var out []OccurrenceCovered
 	stated := map[[2]any]bool{}
 	for g, all := range every {
 		wholly := true
@@ -152,7 +155,7 @@ func CoveredAtPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 				continue
 			}
 			stated[[2]any{g, one.consumerID}] = true
-			out = append(out, PlaceCovered{
+			out = append(out, OccurrenceCovered{
 				VulnerabilityID: one.vulnerabilityID, Identifier: one.identifier,
 				Component: one.component, Purl: one.purl,
 				Consumer: one.consumer, ConsumerPurl: one.consumerPurl,
@@ -176,8 +179,9 @@ func CoveredAtPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 	return out, nil
 }
 
-// statedPlaceColumns are what a place is read with: the issue, the component and
-// the consumer, each by the package identifier the build stated for it.
+// statedOccurrenceColumns are what an occurrence is read with: the issue, the
+// component and the consumer, each by the package identifier the build stated
+// for it.
 //
 // The build's open node for a component holds the identifier this build
 // stated; the component row is shared by every product shipping the package.
@@ -185,7 +189,7 @@ func CoveredAtPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 // stamped it with is its open image version: a product named with no version
 // is one a reader cannot match. A build holds one open node per component and
 // a node one open image version, so the joins add no row.
-func statedPlaceColumns(q *bun.SelectQuery) *bun.SelectQuery {
+func statedOccurrenceColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -210,8 +214,8 @@ func statedPlaceColumns(q *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr(`COALESCE("civ"."purl", "cn"."purl", "uc"."purl", '') AS "consumer_purl"`)
 }
 
-// statedPlace is one place as statedPlaceColumns reads it.
-type statedPlace struct {
+// statedOccurrence is one occurrence as statedOccurrenceColumns reads it.
+type statedOccurrence struct {
 	FindingID       int64  `bun:"finding_id"`
 	VulnerabilityID int64  `bun:"vulnerability_id"`
 	Identifier      string `bun:"identifier"`
@@ -223,32 +227,32 @@ type statedPlace struct {
 	ConsumerPurl    string `bun:"consumer_purl"`
 }
 
-func (r statedPlace) place() coveredPlace {
-	return coveredPlace{
+func (r statedOccurrence) occurrence() coveredOccurrence {
+	return coveredOccurrence{
 		vulnerabilityID: r.VulnerabilityID, identifier: r.Identifier,
 		componentID: r.ComponentID, component: r.Component, purl: r.Purl,
 		consumerID: r.ConsumerID, consumer: r.Consumer, consumerPurl: r.ConsumerPurl,
 	}
 }
 
-// decidedPlaces is every open place of the build a decision covers for a VEX
-// document, one row per place.
+// decidedOccurrences is every open occurrence of the build a decision covers
+// for a VEX document, one row per occurrence.
 //
-// Only places somebody decided are read here. A build holds hundreds of
-// thousands of open places, and a statement place by place is only ever about
-// a component somebody decided at least one place of.
-func decidedPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
-	visible []access.Visibility) (map[int64]coveredPlace, error) {
+// Only occurrences somebody decided are read here. A build holds hundreds of
+// thousands of open occurrences, and a statement occurrence by occurrence is
+// only ever about a component somebody decided at least one occurrence of.
+func decidedOccurrences(ctx context.Context, db bun.IDB, productID, targetID int64,
+	visible []access.Visibility) (map[int64]coveredOccurrence, error) {
 
 	var rows []struct {
-		statedPlace
+		statedOccurrence
 		Joined   int `bun:"joined"`
 		Decided  int `bun:"decided"`
 		Outcomes int `bun:"outcomes"`
 		Covering
 	}
 	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
-	q := covered(statedPlaceColumns(db.NewSelect()), productID, visible, ForStatements).
+	q := covered(statedOccurrenceColumns(db.NewSelect()), productID, visible, ForStatements).
 		ColumnExpr(`COUNT(*) AS "joined"`).
 		ColumnExpr(`COUNT("cl"."id") AS "decided"`).
 		ColumnExpr(`COUNT(DISTINCT "cl"."outcome") AS "outcomes"`).
@@ -259,11 +263,11 @@ func decidedPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 			"uc"."name", "civ"."purl", "cn"."purl", "uc"."purl"`).
 		Having(`COUNT("cl"."id") > 0`)
 	if err := q.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read the places decisions cover: %w", err)
+		return nil, fmt.Errorf("read the occurrences decisions cover: %w", err)
 	}
-	out := make(map[int64]coveredPlace, len(rows))
+	out := make(map[int64]coveredOccurrence, len(rows))
 	for _, row := range rows {
-		one := row.place()
+		one := row.occurrence()
 		one.covered = row.Decided == row.Joined && row.Outcomes == 1
 		one.Covering = row.Covering
 		out[row.FindingID] = one
@@ -271,10 +275,11 @@ func decidedPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 	return out, nil
 }
 
-// everyPlaceOf is every open place of the components the decided places are
-// in, grouped by what one statement is about, with whether each is covered.
-func everyPlaceOf(ctx context.Context, db bun.IDB, targetID int64,
-	visible []access.Visibility, decided map[int64]coveredPlace) (map[statedGroup][]coveredPlace, error) {
+// everyOccurrenceOf is every open occurrence of the components the decided
+// occurrences are in, grouped by what one statement is about, with whether each
+// is covered.
+func everyOccurrenceOf(ctx context.Context, db bun.IDB, targetID int64,
+	visible []access.Visibility, decided map[int64]coveredOccurrence) (map[statedGroup][]coveredOccurrence, error) {
 
 	wanted := map[statedGroup]bool{}
 	issues, components := map[int64]bool{}, map[int64]bool{}
@@ -283,11 +288,11 @@ func everyPlaceOf(ctx context.Context, db bun.IDB, targetID int64,
 		issues[one.vulnerabilityID] = true
 		components[one.componentID] = true
 	}
-	var rows []statedPlace
+	var rows []statedOccurrence
 	byIssue, issueArgs := database.InAnyOf(`"f"."vulnerability_id"`, keysOf(issues))
 	byComponent, componentArgs := database.InAnyOf(`"f"."component_id"`, keysOf(components))
 	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
-	if err := statedPlaceColumns(db.NewSelect()).
+	if err := statedOccurrenceColumns(db.NewSelect()).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -295,9 +300,9 @@ func everyPlaceOf(ctx context.Context, db bun.IDB, targetID int64,
 		Where(byComponent, componentArgs...).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read every place of the components decided: %w", err)
+		return nil, fmt.Errorf("read every occurrence of the components decided: %w", err)
 	}
-	out := map[statedGroup][]coveredPlace{}
+	out := map[statedGroup][]coveredOccurrence{}
 	for _, row := range rows {
 		g := statedGroup{row.VulnerabilityID, row.Component, row.Purl}
 		if !wanted[g] {
@@ -305,7 +310,7 @@ func everyPlaceOf(ctx context.Context, db bun.IDB, targetID int64,
 		}
 		one, ok := decided[row.FindingID]
 		if !ok {
-			one = row.place()
+			one = row.occurrence()
 		}
 		out[g] = append(out[g], one)
 	}

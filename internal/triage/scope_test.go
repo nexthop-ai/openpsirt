@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// Whom a statement holds for is decided by the reason where the claim states
+// Whom a statement holds for is decided by the reason where the decision states
 // nothing: that the code or the component is absent, and a match that was
 // wrong, hold for anybody shipping the component; every other reason, and
 // every outcome that is not a dismissal, holds for this build.
@@ -45,40 +45,40 @@ func TestTheReasonDecidesWhomAStatementHoldsFor(t *testing.T) {
 	}
 }
 
-// A claim stating whom its statement holds for keeps it, a re-affirmation and
+// A decision stating whom its statement holds for keeps it, a re-affirmation and
 // the rows an approver sets aside carry it, and a scope that is not one, or one
 // on a deferral, is refused.
-func TestAClaimKeepsWhomItsStatementHoldsFor(t *testing.T) {
+func TestADecisionKeepsWhomItsStatementHoldsFor(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		said := triage.Proposal{
-			Place: f.at(), Outcome: triage.NotApplicable,
+			Occurrence: f.at(), Outcome: triage.NotApplicable,
 			Justification: triage.CodeNotInExecutePath, Scope: triage.Portable,
 			Reasoning: "Never reached on any build of this component.", By: f.proposer,
 			NeedsApproval: true,
 		}
-		decision, err := f.store.Propose(ctx, f.triager, said)
+		occurrence, err := f.store.Propose(ctx, f.triager, said)
 		if err != nil {
 			t.Fatal(err)
 		}
-		claim := new(triage.Claim)
-		if err := f.db.DB.NewSelect().Model(claim).Where(`"id" = ?`, decision.ClaimID).Scan(ctx); err != nil {
+		decision := new(triage.Decision)
+		if err := f.db.DB.NewSelect().Model(decision).Where(`"id" = ?`, occurrence.DecisionID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if claim.Scope == nil || *claim.Scope != triage.Portable {
-			t.Errorf("the claim stores %v, want the scope it stated", claim.Scope)
+		if decision.Scope == nil || *decision.Scope != triage.Portable {
+			t.Errorf("the decision stores %v, want the scope it stated", decision.Scope)
 		}
 
 		another := f.at()
-		another.PlaceIdentity = "place-two"
+		another.OccurrenceIdentity = "place-two"
 		unknown := said
-		unknown.Place, unknown.Scope = another, "everybody"
+		unknown.Occurrence, unknown.Scope = another, "everybody"
 		if _, err := f.store.Propose(ctx, f.triager, unknown); !refusal.In(err) {
 			t.Errorf("a scope that is not one was taken: %v", err)
 		}
 		later := time.Now().UTC().Add(72 * time.Hour).Truncate(24 * time.Hour)
 		deferred := triage.Proposal{
-			Place: another, Outcome: triage.Deferred, DeferredUntil: &later, Scope: triage.Portable,
+			Occurrence: another, Outcome: triage.Deferred, DeferredUntil: &later, Scope: triage.Portable,
 			Reasoning: "Next sprint.", By: f.proposer,
 		}
 		if _, err := f.store.Propose(ctx, f.triager, deferred); !refusal.In(err) {
@@ -87,45 +87,45 @@ func TestAClaimKeepsWhomItsStatementHoldsFor(t *testing.T) {
 	})
 }
 
-// An extension keeps whom the claim it carries holds for: taken where it
+// An extension keeps whom the decision it carries holds for: taken where it
 // states nothing, and refused where it states something else.
 func TestAnExtensionKeepsWhomItsSourceHoldsFor(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		source, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.NotApplicable,
+			Occurrence: f.at(), Outcome: triage.NotApplicable,
 			Justification: triage.CodeNotInExecutePath, Scope: triage.Portable,
 			Reasoning: "Never reached.", By: f.proposer, NeedsApproval: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.ApproveClaim(ctx, f.reviewer, source.ClaimID, "", nil, ""); err != nil {
+		if _, err := f.store.ApproveDecision(ctx, f.reviewer, source.DecisionID, "", nil, ""); err != nil {
 			t.Fatal(err)
 		}
 		another := f.at()
 		another.VulnerabilityID = f.secondIssue(t)
 		carried := triage.Proposal{
-			Place: another, Outcome: triage.NotApplicable,
+			Occurrence: another, Outcome: triage.NotApplicable,
 			Justification: triage.CodeNotInExecutePath,
 			Reasoning:     "Same path as the last one.", By: f.proposer, NeedsApproval: true,
 		}
 		other := carried
 		other.Scope = triage.BuildSpecific
-		if _, err := f.store.Extend(ctx, f.triager, source.ClaimID,
+		if _, err := f.store.Extend(ctx, f.triager, source.DecisionID,
 			[]triage.Proposal{other}); !errors.Is(err, triage.ErrNotExtendable) {
 			t.Errorf("an extension stating another scope was taken: %v", err)
 		}
-		made, err := f.store.Extend(ctx, f.triager, source.ClaimID, []triage.Proposal{carried})
+		made, err := f.store.Extend(ctx, f.triager, source.DecisionID, []triage.Proposal{carried})
 		if err != nil {
 			t.Fatal(err)
 		}
-		claim := new(triage.Claim)
-		if err := f.db.DB.NewSelect().Model(claim).Where(`"id" = ?`, made[0].ClaimID).Scan(ctx); err != nil {
+		decision := new(triage.Decision)
+		if err := f.db.DB.NewSelect().Model(decision).Where(`"id" = ?`, made[0].DecisionID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if claim.Scope == nil || *claim.Scope != triage.Portable {
-			t.Errorf("the extension stores %v, want its source's scope", claim.Scope)
+		if decision.Scope == nil || *decision.Scope != triage.Portable {
+			t.Errorf("the extension stores %v, want its source's scope", decision.Scope)
 		}
 	})
 }

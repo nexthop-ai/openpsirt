@@ -16,11 +16,11 @@ type asked struct {
 	want                    int
 }
 
-// answered sends each request about the lead at a place in turn.
-func answered(t *testing.T, r *httpapitest.Reach, place string, cases []asked) {
+// answered sends each request about the lead at an occurrence in turn.
+func answered(t *testing.T, r *httpapitest.Reach, occurrence string, cases []asked) {
 	t.Helper()
 	for _, c := range cases {
-		got := httpapitest.AsPerson(t, r, c.who, c.method, leadAt(place)+c.path, c.body)
+		got := httpapitest.AsPerson(t, r, c.who, c.method, leadAt(occurrence)+c.path, c.body)
 		if got.Code != c.want {
 			t.Errorf("%s %s %s answered %d, want %d: %s", c.who, c.method, c.path, got.Code, c.want, got.Body)
 		}
@@ -33,7 +33,7 @@ const handOffNamingNoBuild = `{"builds":[{"stream":"nosuch","variant":"broadcom"
 
 func TestAHandOffAMoveAndAnUndoTakeBothTriageRoles(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, false)
+		occurrence, _ := httpapitest.HandedOffLead(t, r, false)
 		var cases []asked
 		// Internal triage alone, private triage alone, and internal reading.
 		for _, who := range []string{"internal-triager", "embargo-triager", "internal-reader"} {
@@ -48,14 +48,14 @@ func TestAHandOffAMoveAndAnUndoTakeBothTriageRoles(t *testing.T) {
 			asked{"lead-handler", http.MethodGet, "/flaw", "", http.StatusOK},
 			asked{"lead-handler", http.MethodDelete, "/flaw/disclosure", "", http.StatusConflict},
 		)
-		answered(t, r, place, cases)
+		answered(t, r, occurrence, cases)
 	})
 }
 
 func TestAKeptLeadsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, false)
-		answered(t, r, place, []asked{
+		occurrence, _ := httpapitest.HandedOffLead(t, r, false)
+		answered(t, r, occurrence, []asked{
 			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
 			{"internal-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
 			{"internal-triager", http.MethodDelete, "/collaborators/outsider", "", http.StatusNoContent},
@@ -68,8 +68,8 @@ func TestAKeptLeadsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
 
 func TestAnIncludedLeadsCollaboratorsAreManagedByItsInternalReaders(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLead(t, r, true)
-		answered(t, r, place, []asked{
+		occurrence, _ := httpapitest.HandedOffLead(t, r, true)
+		answered(t, r, occurrence, []asked{
 			{"internal-reader", http.MethodGet, "/collaborators", "", http.StatusOK},
 			{"internal-reader", http.MethodPut, "/collaborators/outsider", "", http.StatusNoContent},
 			// The flaw's readers read the included lead, and do not decide
@@ -87,13 +87,13 @@ func TestAnIncludedLeadsCollaboratorsAreManagedByItsInternalReaders(t *testing.T
 
 func TestNoGrantOfALeadChangesOnceItsFlawIsDisclosed(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, true)
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-			leadAt(place)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
 		}
 		disclosed(t, r, flaw)
-		answered(t, r, place, []asked{
+		answered(t, r, occurrence, []asked{
 			// Reading the disclosed lead is not managing who was granted it.
 			{"reader", http.MethodGet, "/collaborators", "", http.StatusNotFound},
 			{"reader", http.MethodPut, "/collaborators/private", "", http.StatusNotFound},

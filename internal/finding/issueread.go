@@ -75,7 +75,7 @@ func (v *Vulnerabilities) ByName(ctx context.Context, name string) (int64, error
 
 // IDsByName resolves many issues at once, by any name each is known under.
 //
-// One statement rather than one per name. A judgment covering two thousand
+// One statement rather than one per name. A decision covering two thousand
 // issues resolved one at a time is two thousand round trips before any of the
 // work starts.
 func (v *Vulnerabilities) IDsByName(ctx context.Context, names []string) (map[string]int64, error) {

@@ -74,7 +74,7 @@ func leadRulesOf(t *testing.T, r *httpapitest.Reach) map[int64]leadRuleRead {
 
 func TestAStandingRuleDismissesNothingUntilSomebodyElseApprovesIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		rule := proposeLeadRule(t, r,
 			`{"rule":"clang-tidy/leak","reason":"false_positive","reasoning":"every allocation here is pooled"}`)
 		if rule.State != "proposed" || rule.Covering != 1 {
@@ -98,7 +98,7 @@ func TestAStandingRuleDismissesNothingUntilSomebodyElseApprovesIt(t *testing.T) 
 		if len(got.Items) != 0 || got.Ruled != 1 || got.States["dismissed"] != 1 {
 			t.Fatalf("the queue is %+v; want the lead left out and counted as ruled", got)
 		}
-		if got := leadState(t, r, place); got != "dismissed" {
+		if got := leadState(t, r, occurrence); got != "dismissed" {
 			t.Errorf("the lead's evidence says %q; want dismissed", got)
 		}
 	})
@@ -380,7 +380,7 @@ func TestARuleItsToolTagsWithNoWeaknessIsRatedByTheTableHeldForIt(t *testing.T) 
 }
 
 // A standing rule nobody approves dismisses nothing, so whoever may approve it
-// is told once it has waited the period a claim waits, and never its
+// is told once it has waited the period a decision waits, and never its
 // proposer.
 func TestAStandingRuleWaitingForApprovalIsToldToWhoeverMayApproveIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -426,23 +426,23 @@ func TestAStandingRuleWaitingForApprovalIsToldToWhoeverMayApproveIt(t *testing.T
 	})
 }
 
-func TestAClaimAboutALeadOverridesTheStandingRuleDismissingIt(t *testing.T) {
+func TestADecisionAboutALeadOverridesTheStandingRuleDismissingIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		rule := proposeLeadRule(t, r,
 			`{"rule":"clang-tidy/leak","reason":"false_positive","reasoning":"every allocation here is pooled"}`)
 		approveLeadRule(t, r, rule.ID)
-		if got := leadState(t, r, place); got != "dismissed" {
+		if got := leadState(t, r, occurrence); got != "dismissed" {
 			t.Fatalf("a lead under a rule in force is %q; want dismissed", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, occurrence),
 			`{"outcome":"confirmed","reasoning":"this one is not pooled"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the confirmation answered %d: %s", got.Code, got.Body)
 		}
-		if got := leadState(t, r, place); got != "confirmed" {
+		if got := leadState(t, r, occurrence); got != "confirmed" {
 			t.Errorf("a lead confirmed under a rule dismissing it is %q; want confirmed", got)
 		}
-		if got := leadsOf(t, r, "internal-reader", "?state=confirmed"); len(got.Items) != 1 || got.Items[0].Place != place {
+		if got := leadsOf(t, r, "internal-reader", "?state=confirmed"); len(got.Items) != 1 || got.Items[0].Occurrence != occurrence {
 			t.Errorf("the confirmed leads are %+v; want the lead the rule covers", got.Items)
 		}
 	})

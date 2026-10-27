@@ -63,7 +63,7 @@ func (w *sweep) approachingDisclosure(ctx context.Context, admins []int64) (map[
 // since been set aside.
 //
 // The decision stands. A publisher changing their mind does not withdraw
-// somebody's judgment — a third party's claim never becomes ours — so this is
+// somebody's decision — a third party's claim never becomes ours — so this is
 // a condition saying the ground moved under it, not an act on the decision.
 //
 // It clears the way every other condition here clears: when the decision stops
@@ -71,14 +71,14 @@ func (w *sweep) approachingDisclosure(ctx context.Context, admins []int64) (map[
 // dismissed, because nothing here is an event.
 func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error) {
 	var rows []struct {
-		DecisionID      int64  `bun:"decision_occurrence_id"`
-		ProductID       int64  `bun:"product_id"`
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		Product         string `bun:"product"`
-		Vulnerability   string `bun:"vulnerability"`
-		Publisher       string `bun:"publisher"`
-		Undisclosed     bool   `bun:"undisclosed"`
-		Untrusted       bool   `bun:"untrusted"`
+		DecisionOccurrenceID int64  `bun:"decision_occurrence_id"`
+		ProductID            int64  `bun:"product_id"`
+		VulnerabilityID      int64  `bun:"vulnerability_id"`
+		Product              string `bun:"product"`
+		Vulnerability        string `bun:"vulnerability"`
+		Publisher            string `bun:"publisher"`
+		Undisclosed          bool   `bun:"undisclosed"`
+		Untrusted            bool   `bun:"untrusted"`
 	}
 	undisclosed, private := access.AnyWithheld(`"de"."visibility"`)
 	err := w.db.NewSelect().
@@ -125,7 +125,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		return nil, fmt.Errorf("read where a publisher changed their mind: %w", err)
 	}
 
-	// Whoever may read it and act on it, which for a claim somebody approved
+	// Whoever may read it and act on it, which for a decision somebody approved
 	// is whoever may triage that product.
 	acts := w.reach
 
@@ -149,7 +149,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 			About: identify(fmt.Sprintf("statement-revised %d %s %s",
 				row.ProductID, row.Vulnerability, row.Publisher)),
 			Body:            said,
-			Link:            weblink.Decision(row.DecisionID),
+			Link:            weblink.DecisionOccurrence(row.DecisionOccurrenceID),
 			Private:         private,
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
@@ -247,8 +247,8 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 				"and that takes time to arrange."
 		}
 		holds := Holds{
-			// One condition per place, because the link and whoever holds the
-			// work are per place.
+			// One condition per occurrence, because the link and whoever holds the
+			// work are per occurrence.
 			About: identify(about, row.Product, row.Stream, row.Variant,
 				row.Vulnerability, row.Component),
 			Body: body,

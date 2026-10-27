@@ -13,7 +13,7 @@ import (
 
 func TestAPromiseNamesOnlyBuildsOfItsOwnProduct(t *testing.T) {
 	// Planning an upgrade names builds by identifier, so a build of another
-	// product named beside this one's would write that product's places.
+	// product named beside this one's would write that product's occurrences.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		other, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")

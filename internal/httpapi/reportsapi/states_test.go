@@ -13,8 +13,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-func TestAClaimInTheRecordCountsEveryStateADecisionCanBeIn(t *testing.T) {
-	// A state the store adds joins the one-word state and can make a claim
+func TestADecisionInTheRecordCountsEveryStateAnOccurrenceCanBeIn(t *testing.T) {
+	// A state the store adds joins the one-word state and can make a decision
 	// read "mixed", so the counts beside it have to carry it too.
 	var counted []string
 	shape := reflect.TypeFor[reportsapi.StatesBody]()
@@ -27,12 +27,12 @@ func TestAClaimInTheRecordCountsEveryStateADecisionCanBeIn(t *testing.T) {
 	}
 	for _, state := range triage.States() {
 		if !slices.Contains(counted, string(state)) {
-			t.Errorf("a decision can be %q, and the record's counts have no field for it", state)
+			t.Errorf("an occurrence can be %q, and the record's counts have no field for it", state)
 		}
 	}
 	for _, name := range counted {
 		if !slices.Contains(triage.States(), triage.State(name)) {
-			t.Errorf("the record counts %q, which is no state a decision can be in", name)
+			t.Errorf("the record counts %q, which is no state an occurrence can be in", name)
 		}
 	}
 }

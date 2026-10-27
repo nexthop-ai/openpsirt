@@ -44,7 +44,7 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 			t.Fatalf("closing %s: %v", identifier, err)
 		}
 		if done.Closed != 1 {
-			t.Errorf("closed %d rows, want the one place it sits at", done.Closed)
+			t.Errorf("closed %d rows, want the one occurrence it sits at", done.Closed)
 		}
 
 		var closed struct {

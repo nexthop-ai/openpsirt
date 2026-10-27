@@ -24,9 +24,9 @@ func (f *fixture) assigned(t *testing.T) map[int64]int64 {
 	return held
 }
 
-func TestAssigningCoversEveryPlaceOfOneIssue(t *testing.T) {
+func TestAssigningCoversEveryOccurrenceOfOneIssue(t *testing.T) {
 	// A group is one issue in one component, seen from several parents.
-	// Assigning one of its places and not another is not something anybody
+	// Assigning one of its occurrences and not another is not something anybody
 	// means to do, so the whole group moves together.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
@@ -36,7 +36,7 @@ func TestAssigningCoversEveryPlaceOfOneIssue(t *testing.T) {
 		}
 		open := f.open(t)
 		if len(open) != 2 {
-			t.Fatalf("expected one issue at two places, got %d", len(open))
+			t.Fatalf("expected one issue at two occurrences, got %d", len(open))
 		}
 
 		moved, _, err := f.store.Assign(t.Context(), f.holding(t, access.PublicTriage, access.Assigner),
@@ -45,7 +45,7 @@ func TestAssigningCoversEveryPlaceOfOneIssue(t *testing.T) {
 			t.Fatal(err)
 		}
 		if moved != 2 {
-			t.Errorf("assigning covered %d places, want both", moved)
+			t.Errorf("assigning covered %d occurrences, want both", moved)
 		}
 		for id, who := range f.assigned(t) {
 			if who != 7 {
@@ -226,14 +226,14 @@ func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Two issues, one of them at two places. The total counts issues at
+		// Two issues, one of them at two occurrences. The total counts issues at
 		// components, not finding rows, which is what the list shows.
 		if total != 2 || len(nobodys) != 2 {
 			t.Errorf("%d rows and a total of %d, want 2 and 2", len(nobodys), total)
 		}
 
 		// Named, not whichever row came back first. Two components carry
-		// findings here and they hold different numbers of places, so
+		// findings here and they hold different numbers of occurrences, so
 		// indexing into an unordered read makes this assert a different
 		// thing on different runs.
 		library, err := graph.NewStore(f.db.DB).ComponentAs(t.Context(), f.target, libnl.Name, graph.Choice{})
@@ -248,15 +248,16 @@ func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 		if atTotal != 1 {
 			t.Errorf("the component holds a total of %d issues, want 1", atTotal)
 		}
-		// Every place of it, because that is what a claim is written against.
+		// Every occurrence of it, because that is what a decision is written
+		// against.
 		if len(at) != 2 {
-			t.Errorf("one issue at that component came back as %d places, want 2", len(at))
+			t.Errorf("one issue at that component came back as %d occurrences, want 2", len(at))
 		}
 	})
 }
 
 func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
-	// Variants are mostly the same thing built twice, and a judgment
+	// Variants are mostly the same thing built twice, and a decision
 	// carries no variant — so answering this on one build answers it on
 	// the other. Listed per build, importing a second variant doubled the
 	// list of what nobody is dealing with while doubling none of the work,
@@ -280,7 +281,7 @@ func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
 		if alone[0].Builds != 1 {
 			t.Errorf("one build reported as %d", alone[0].Builds)
 		}
-		places := alone[0].Places
+		occurrences := alone[0].Occurrences
 
 		second := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, second, twoConsumers())
@@ -299,11 +300,11 @@ func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
 		if both[0].Builds != 2 {
 			t.Errorf("the item covers %d builds, want 2", both[0].Builds)
 		}
-		// The places do double, and should: they are what a judgment here
+		// The occurrences do double, and should: they are what a decision here
 		// would be written against, and there are now twice as many.
-		if both[0].Places != places*2 {
-			t.Errorf("it covers %d places, want %d — twice the one build's %d",
-				both[0].Places, places*2, places)
+		if both[0].Occurrences != occurrences*2 {
+			t.Errorf("it covers %d occurrences, want %d — twice the one build's %d",
+				both[0].Occurrences, occurrences*2, occurrences)
 		}
 		// And it still names a build, because a screen has to link somewhere
 		// and an action has to name a finding.
@@ -314,10 +315,10 @@ func TestTheSameWorkInTwoVariantsIsOneItemToDealWith(t *testing.T) {
 }
 
 func TestVariantsAtDifferentVersionsAreDifferentWork(t *testing.T) {
-	// The other half of showing variants as one item: only genuine
-	// differences are broken out. A component row is one name at one version, shared
-	// by every build shipping it, so this falls out of the model rather
-	// than being decided anywhere.
+	// The other half of showing variants as one item: only genuine differences
+	// are broken out. A component row is one name at one version, shared by
+	// every build shipping it, so this falls out of the model rather than being
+	// decided anywhere.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -360,9 +361,9 @@ func TestVariantsAtDifferentVersionsAreDifferentWork(t *testing.T) {
 }
 
 func TestTheSameComponentInTwoProductsIsTwoPiecesOfWork(t *testing.T) {
-	// The limit of collapsing. A decision is a claim about one product's code,
+	// The limit of collapsing. A decision is about one product's code,
 	// so two products shipping the identical component at the identical
-	// version are two judgments — answered separately, and usually by
+	// version are two decisions — answered separately, and usually by
 	// different people.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

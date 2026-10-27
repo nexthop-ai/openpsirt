@@ -39,11 +39,11 @@ func flawClosures(t *testing.T, r *httpapitest.Reach, flaw string) []string {
 
 func TestAFlawRecordsTheLeadItWasRecordedFromWithItsOffer(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		got := flawLeadAs(t, r, "lead-handler", flaw)
-		if got.Place != place || got.Rule == "" || got.Path != "src/a.c" || got.State != "handed-off" ||
+		if got.Occurrence != occurrence || got.Rule == "" || got.Path != "src/a.c" || got.State != "handed-off" ||
 			got.Stream != "master" || got.Variant != "broadcom" {
-			t.Errorf("the flaw names its lead as %+v; want the handed-off lead at %s", got, place)
+			t.Errorf("the flaw names its lead as %+v; want the handed-off lead at %s", got, occurrence)
 		}
 		if got.Suggested.From == "" || got.HandedBy != "lead-handler" || got.HandedAt == "" || got.UndoneAt != "" {
 			t.Errorf("the flaw records its offer as %+v; want the first suggestion and who handed it off", got)
@@ -74,10 +74,10 @@ func TestTheLeadOfAFlawIsReadOnlyByWhoeverReadsBoth(t *testing.T) {
 
 func TestAFlawIsOfferedFixedWhereItsLeadIsNotReproduced(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRun(false))
 		got := flawLeadAs(t, r, "lead-handler", flaw)
-		evidence := evidenceAs(t, r, "lead-handler", place)
+		evidence := evidenceAs(t, r, "lead-handler", occurrence)
 		if len(got.FixedIn) != 1 || got.FixedIn[0].Stream != "master" ||
 			got.FixedIn[0].NotSeen.Run != evidence.NotSeenRun ||
 			got.FixedIn[0].Fixed != nil {
@@ -98,10 +98,10 @@ func TestAFlawIsOfferedFixedWhereItsLeadIsNotReproduced(t *testing.T) {
 
 func TestAnUndoneHandOffConfirmsTheLeadAgainAndTakesTheFlawBack(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, true)
-		undo := leadAt(place) + "/flaw/withdrawal"
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, true)
+		undo := leadAt(occurrence) + "/flaw/withdrawal"
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-			leadAt(place)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			leadAt(occurrence)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, undo,
@@ -113,11 +113,11 @@ func TestAnUndoneHandOffConfirmsTheLeadAgainAndTakesTheFlawBack(t *testing.T) {
 			t.Fatalf("undoing the hand-off answered %d: %s", got.Code, got.Body)
 		}
 
-		if got := evidenceAs(t, r, "internal-reader", place); got.State != "confirmed" ||
+		if got := evidenceAs(t, r, "internal-reader", occurrence); got.State != "confirmed" ||
 			got.Handoff != nil || got.At.Message != "p is leaked" {
 			t.Errorf("an internal reader reads the lead as %s %+v; want the whole lead, confirmed", got.State, got)
 		}
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "outsider", http.MethodGet, leadAt(place), ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "outsider", http.MethodGet, leadAt(occurrence), ""),
 			http.StatusNotFound)
 		if closed := flawClosures(t, r, flaw); len(closed) == 0 {
 			t.Error("the flaw has no findings")
@@ -130,14 +130,14 @@ func TestAnUndoneHandOffConfirmsTheLeadAgainAndTakesTheFlawBack(t *testing.T) {
 			}
 		}
 		origin := flawLeadAs(t, r, "lead-handler", flaw)
-		if origin.Place != place || origin.UndoneAt == "" || origin.UndoneBy != "lead-handler" ||
+		if origin.Occurrence != occurrence || origin.UndoneAt == "" || origin.UndoneBy != "lead-handler" ||
 			origin.Because != "handed off against the wrong component" {
 			t.Errorf("the flaw records its lead as %+v; want it marked undone, with why", origin)
 		}
 
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, undo,
 			`{"because":"again"}`), http.StatusConflict)
-		again := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
+		again := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(occurrence)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks on the early return"}`)
 		if again.Code != http.StatusCreated {
 			t.Fatalf("handing the lead off again answered %d: %s", again.Code, again.Body)
@@ -147,11 +147,11 @@ func TestAnUndoneHandOffConfirmsTheLeadAgainAndTakesTheFlawBack(t *testing.T) {
 
 func TestAHandOffIsNotUndoneOnceItsFlawIsDisclosed(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		occurrence, flaw := httpapitest.HandedOffLead(t, r, false)
 		disclosed(t, r, flaw)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost,
-			leadAt(place)+"/flaw/withdrawal", `{"because":"handed off by mistake"}`), http.StatusConflict)
-		if got := evidenceAs(t, r, "lead-handler", place); got.State != "handed-off" {
+			leadAt(occurrence)+"/flaw/withdrawal", `{"because":"handed off by mistake"}`), http.StatusConflict)
+		if got := evidenceAs(t, r, "lead-handler", occurrence); got.State != "handed-off" {
 			t.Errorf("a lead whose flaw is disclosed reads %s after a refused undo; want handed off", got.State)
 		}
 	})

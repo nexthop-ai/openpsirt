@@ -73,14 +73,14 @@ func TestAChurnedVersionIsNotCountedAsAFix(t *testing.T) {
 	})
 }
 
-func TestHowLongAFixTookIsCountedPerIssueAndNotPerPlace(t *testing.T) {
+func TestHowLongAFixTookIsCountedPerIssueAndNotPerOccurrence(t *testing.T) {
 	// One kernel flaw across sixty modules is one thing that was fixed. An
 	// average weighted by how far a component fans out measures the dependency
 	// graph rather than anybody's work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// The same library under two consumers, so one issue sits at two
-		// places and would be counted twice by a naive average.
+		// occurrences and would be counted twice by a naive average.
 		f.shipped(t, graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{swss, teamd, libnl},
@@ -90,13 +90,13 @@ func TestHowLongAFixTookIsCountedPerIssueAndNotPerPlace(t *testing.T) {
 			},
 		})
 		f.foundOnLibnl(t)
-		var places int
+		var occurrences int
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			ColumnExpr("COUNT(*)").Where(`"closed_at" IS NULL`).Scan(ctx, &places); err != nil {
+			ColumnExpr("COUNT(*)").Where(`"closed_at" IS NULL`).Scan(ctx, &occurrences); err != nil {
 			t.Fatal(err)
 		}
-		if places < 2 {
-			t.Fatalf("the fixture put this at %d places, want more than one", places)
+		if occurrences < 2 {
+			t.Fatalf("the fixture put this at %d occurrences, want more than one", occurrences)
 		}
 
 		now := time.Now().UTC()
@@ -109,9 +109,9 @@ func TestHowLongAFixTookIsCountedPerIssueAndNotPerPlace(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got.Fixed != 1 {
-			t.Errorf("one issue at %d places counted as %d fixes", places, got.Fixed)
+			t.Errorf("one issue at %d occurrences counted as %d fixes", occurrences, got.Fixed)
 		}
-		// Ten days, however many places it sat at.
+		// Ten days, however many occurrences it sat at.
 		for band, took := range got.TimeToFix {
 			if took < 9*24*time.Hour || took > 11*24*time.Hour {
 				t.Errorf("%s took %s, want about ten days", band, took)
@@ -196,13 +196,14 @@ func TestSomebodyWhoReadsNothingMeasuresNothing(t *testing.T) {
 	})
 }
 
-func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
-	// An issue at two places: one fixed in the window with the other still
-	// open is not fixed, one whose second place closes after the window is
-	// not fixed in it, and one whose second place closes in the window is
-	// fixed there, timed from its first place opening. One whose place in
-	// the window is out of the reader's reach is timed by what the reader
-	// reads, and its last readable place closed before the window.
+func TestAnIssueIsFixedInThePeriodItsLastOccurrenceClosed(t *testing.T) {
+	// An issue at two occurrences: one fixed in the window with the other still
+	// open is not fixed, one whose second occurrence closes after the window is
+	// not fixed in it, and one whose second occurrence closes in the window is
+	// fixed there, timed from its first occurrence opening. One whose
+	// occurrence in the window is out of the reader's reach is timed by what
+	// the reader reads, and its last readable occurrence closed before the
+	// window.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, graph.Snapshot{
@@ -234,15 +235,15 @@ func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
 		for _, issue := range []string{"CVE-2026-1", "CVE-2026-2", "CVE-2026-3", "CVE-2026-4"} {
 			f.aged(t, issue, now.Add(-30*24*time.Hour))
 		}
-		// The first: one place fixed in the window, the other open.
+		// The first: one occurrence fixed in the window, the other open.
 		closeOne(t, "CVE-2026-1", now.Add(-24*time.Hour))
-		// The second: one place fixed before the window, the other in it.
+		// The second: one occurrence fixed before the window, the other in it.
 		closeOne(t, "CVE-2026-2", now.Add(-20*24*time.Hour))
 		closeOne(t, "CVE-2026-2", now.Add(-24*time.Hour))
-		// The third: one place fixed in the window, the other after it ends.
+		// The third: one occurrence fixed in the window, the other after it ends.
 		closeOne(t, "CVE-2026-3", now.Add(-24*time.Hour))
 		closeOne(t, "CVE-2026-3", now.Add(-time.Hour))
-		// The fourth: one place fixed before the window, the other in it and
+		// The fourth: one occurrence fixed before the window, the other in it and
 		// undisclosed, so a reader of disclosed findings saw its last fix
 		// before the window.
 		closeOne(t, "CVE-2026-4", now.Add(-20*24*time.Hour))
@@ -260,7 +261,7 @@ func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got.Fixed != 1 {
-			t.Errorf("counted %d fixes, want the one issue whose last place closed in the window", got.Fixed)
+			t.Errorf("counted %d fixes, want the one issue whose last occurrence closed in the window", got.Fixed)
 		}
 		for band, took := range got.TimeToFix {
 			if took < 28*24*time.Hour || took > 30*24*time.Hour {

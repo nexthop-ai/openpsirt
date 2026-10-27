@@ -39,7 +39,7 @@ type Limits struct {
 // Set from what reading costs rather than from what a report looks like.
 //
 // A match and a finding are different units and the ceiling is on matches: one
-// match becomes as many findings as its component has places in the build, so
+// match becomes as many findings as its component has occurrences in the build, so
 // the findings a scan produced are an upper bound on the matches its report
 // stated, and usually a loose one. The largest real image measured here
 // produced 335,021 findings, so its report stated fewer matches than that —

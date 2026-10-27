@@ -39,10 +39,10 @@ type BuildStanding struct {
 	// build needs an afternoon or a week.
 	Overdue   int
 	Exploited int
-	// Undecided is how many nobody has claimed anything about, and Agreed how
-	// many are answered at every place by a standing decision — the same two
-	// words the findings list's state filter uses, by the same definition, so
-	// this page and that list cannot disagree about what "agreed" means.
+	// Undecided is how many nobody has decided anything about, and Agreed how
+	// many are answered at every occurrence by a standing decision — the same
+	// two words the findings list's state filter uses, by the same definition,
+	// so this page and that list cannot disagree about what "agreed" means.
 	Undecided int
 	Agreed    int
 }
@@ -75,26 +75,26 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	now := s.now().UTC()
 
 	// The things somebody decides about: one row per build, issue and
-	// component, with the places counted and the standing decisions counted
-	// against them. The state words below compare an approved count against
-	// the number of places, so the decisions arrive as one row per decided
-	// place (decisionsAtPlaces) rather than joined in, where a place with two
-	// decisions would count twice.
+	// component, with the occurrences counted and the standing decisions
+	// counted against them. The state words below compare an approved count
+	// against the number of occurrences, so the decisions arrive as one row per
+	// decided occurrence (decisionsAtOccurrences) rather than joined in, where
+	// an occurrence with two decisions would count twice.
 	//
 	// The one count no list carries: anything that still says something about
-	// the place. A withdrawn claim does not — it covers the place so that
-	// "lapsed" can be said, and counted as a claim it would take the finding
-	// out of the undecided figure while putting it in no other. Spelled
+	// the occurrence. A withdrawn decision does not — it covers the occurrence
+	// so that "lapsed" can be said, and counted as a decision it would take the
+	// finding out of the undecided figure while putting it in no other. Spelled
 	// through the same helper as the rest, so the version match is one
 	// expression.
-	anyClaim := decisionState{"any_claim", ` AND "de"."state" <> ?`, []any{"withdrawn"}}
+	anyDecision := decisionState{"any_claim", ` AND "de"."state" <> ?`, []any{"withdrawn"}}
 	// One row per build, issue and component. The build rows count these
 	// directly, and the product's totals fold them again by issue and
-	// component, in one pass here. The table of decided places is most of the
-	// cost of the reading, 0.7 s with 133,000 decisions on PostgreSQL, and a
-	// second statement builds it a second time. Every column folds exactly — the
-	// places and the decided places are sums, the deadline a minimum and the
-	// exploitation flag a maximum.
+	// component, in one pass here. The table of decided occurrences is most of
+	// the cost of the reading, 0.7 s with 133,000 decision occurrences on
+	// PostgreSQL, and a second statement builds it a second time. Every column
+	// folds exactly — the occurrences and the decided occurrences are sums, the
+	// deadline a minimum and the exploitation flag a maximum.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -108,20 +108,20 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		// world, and a product recorded as attacked here is a different
 		// fact that would be counted under the wrong name.
 		ColumnExpr(exploitedAcross + ` AS "exploited"`).
-		ColumnExpr(placesDecided(anyClaim)).
-		ColumnExpr(placesDecided(claimApproved))
+		ColumnExpr(occurrencesDecided(anyDecision)).
+		ColumnExpr(occurrencesDecided(decisionApproved))
 	var groups []struct {
 		TargetID        int64      `bun:"target_id"`
 		VulnerabilityID int64      `bun:"vulnerability_id"`
 		ComponentID     int64      `bun:"component_id"`
-		Places          int        `bun:"places"`
+		Occurrences     int        `bun:"places"`
 		DueAt           *time.Time `bun:"due_at"`
 		Exploited       int        `bun:"exploited"`
-		AnyClaim        int        `bun:"any_claim"`
+		AnyDecision     int        `bun:"any_claim"`
 		Approved        int        `bun:"approved_here"`
 	}
 	err = q.Join(`LEFT JOIN (?) AS "dd" ON "dd"."finding_id" = "f"."id"`,
-		decisionsAtPlaces(q, productID, anyClaim, claimApproved)).
+		decisionsAtOccurrences(q, productID, anyDecision, decisionApproved)).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -136,9 +136,9 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// build row or the product's totals by the same four rules, so the two
 	// cannot come to mean different things.
 	type thing struct {
-		places, anyClaim, approved int
-		dueAt                      *time.Time
-		exploited                  bool
+		occurrences, anyDecision, approved int
+		dueAt                              *time.Time
+		exploited                          bool
 	}
 	count := func(into *BuildStanding, one thing) {
 		into.Open++
@@ -148,10 +148,10 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		if one.exploited {
 			into.Exploited++
 		}
-		if one.anyClaim == 0 {
+		if one.anyDecision == 0 {
 			into.Undecided++
 		}
-		if one.approved == one.places {
+		if one.approved == one.occurrences {
 			into.Agreed++
 		}
 	}
@@ -160,7 +160,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	across := map[key]*thing{}
 	order := make([]key, 0, len(groups))
 	for _, group := range groups {
-		one := thing{places: group.Places, anyClaim: group.AnyClaim, approved: group.Approved,
+		one := thing{occurrences: group.Occurrences, anyDecision: group.AnyDecision, approved: group.Approved,
 			dueAt: group.DueAt, exploited: group.Exploited > 0}
 		build, held := builds[group.TargetID]
 		if !held {
@@ -176,8 +176,8 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 			order = append(order, k)
 			continue
 		}
-		sum.places += one.places
-		sum.anyClaim += one.anyClaim
+		sum.occurrences += one.occurrences
+		sum.anyDecision += one.anyDecision
 		sum.approved += one.approved
 		sum.exploited = sum.exploited || one.exploited
 		if one.dueAt != nil && (sum.dueAt == nil || one.dueAt.Before(*sum.dueAt)) {

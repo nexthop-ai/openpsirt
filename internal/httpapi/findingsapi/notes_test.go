@@ -20,7 +20,7 @@ const (
 )
 
 func TestReadingAProductDoesNotCarryWritingANoteInIt(t *testing.T) {
-	// A note records no judgment, which is the whole of what it is for — and
+	// A note records no decision, which is the whole of what it is for — and
 	// writing one is still saying something on the record about work. So the
 	// matrix is the same shape as every other write here: reading the product
 	// is not enough, and triage on it is.
@@ -224,11 +224,11 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 	// A product nobody holds answers as one nobody declared, like every other
 	// product a list narrows by.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
-		// A claim waiting on somebody, and a finding somebody holds, both in
+		occurrence := r.Scanned(t)
+		// A decision waiting on somebody, and a finding somebody holds, both in
 		// `mine`. Without them every count is zero and a lost narrowing reads
 		// the same as a working one.
-		r.Decided(t, place)
+		r.Decided(t, occurrence)
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999"+
 				"/components/libnl-3-200/assignment",
@@ -272,8 +272,8 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 		// is narrowed, so asserting through one proves nothing.
 		//
 		// This half shows that narrowing to the product holding the
-		// claim keeps it, and that a product the approver cannot act in is
-		// refused. It cannot show a claim being *excluded*, because the only
+		// decision keeps it, and that a product the approver cannot act in is
+		// refused. It cannot show a decision being *excluded*, because the only
 		// approver here holds one product — that half is shown by the holdings
 		// above, which are read by somebody holding both and narrow the same
 		// way through the same resolver.
@@ -281,7 +281,7 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 			t.Fatal("nothing waits on the approver, so narrowing the queue proves nothing")
 		}
 		if here := count("reviewer", "/v1/review-queue?product=mine"); here == 0 {
-			t.Error("narrowed to the product the claim is in, the queue answered nothing")
+			t.Error("narrowed to the product the decision is in, the queue answered nothing")
 		}
 
 		// The file a narrowed screen offers is the narrowed backlog. Taken from
@@ -301,7 +301,7 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 			t.Fatal("the unnarrowed queue export is empty, so narrowing it proves nothing")
 		}
 		if here := exported("reviewer", "?product=mine"); here == 0 {
-			t.Error("narrowed to the product holding the claim, the export is empty")
+			t.Error("narrowed to the product holding the decision, the export is empty")
 		}
 		// A product this approver holds nothing on is refused rather than
 		// silently written out whole — the same answer the list gives, because

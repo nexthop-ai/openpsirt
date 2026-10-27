@@ -12,21 +12,21 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// madeOn is the variants of the builds one claim records it was made on.
-func madeOn(t *testing.T, r *httpapitest.Reach, claim int64) []string {
+// madeOn is the variants of the builds one decision records it was made on.
+func madeOn(t *testing.T, r *httpapitest.Reach, decision int64) []string {
 	t.Helper()
 	var variants []string
 	if err := r.DB.DB.NewRaw(`SELECT "va"."name" FROM "decision_build" AS "cb"
 		JOIN "target" AS "t" ON "t"."id" = "cb"."target_id"
 		JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"
-		WHERE "cb"."decision_id" = ?`, claim).Scan(t.Context(), &variants); err != nil {
+		WHERE "cb"."decision_id" = ?`, decision).Scan(t.Context(), &variants); err != nil {
 		t.Fatal(err)
 	}
 	slices.Sort(variants)
 	return variants
 }
 
-func TestAJudgmentRecordsTheBuildOnScreenAndTheBuildsChosenBesideIt(t *testing.T) {
+func TestADecisionRecordsTheBuildOnScreenAndTheBuildsChosenBesideIt(t *testing.T) {
 	// A decision reaches every build whose versions match, so which builds
 	// somebody was looking at is recorded when it is made: the one in the
 	// path, and every one they named beside it. Nothing else.
@@ -48,13 +48,13 @@ func TestAJudgmentRecordsTheBuildOnScreenAndTheBuildsChosenBesideIt(t *testing.T
 		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
 			t.Fatal(err)
 		}
-		if made := madeOn(t, r, out.ClaimID); !slices.Equal(made, []string{"broadcom", "mellanox"}) {
-			t.Errorf("the judgment records it was made on %v, want both builds", made)
+		if made := madeOn(t, r, out.DecisionID); !slices.Equal(made, []string{"broadcom", "mellanox"}) {
+			t.Errorf("the decision records it was made on %v, want both builds", made)
 		}
 	})
 }
 
-func TestAJudgmentMadeOnOneBuildRecordsThatBuildAlone(t *testing.T) {
+func TestADecisionMadeOnOneBuildRecordsThatBuildAlone(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		r.ScannedAlso(t, "mellanox", "3.8.0")
@@ -70,8 +70,8 @@ func TestAJudgmentMadeOnOneBuildRecordsThatBuildAlone(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
 			t.Fatal(err)
 		}
-		if made := madeOn(t, r, out.ClaimID); !slices.Equal(made, []string{"broadcom"}) {
-			t.Errorf("the judgment records it was made on %v, want broadcom alone", made)
+		if made := madeOn(t, r, out.DecisionID); !slices.Equal(made, []string{"broadcom"}) {
+			t.Errorf("the decision records it was made on %v, want broadcom alone", made)
 		}
 	})
 }

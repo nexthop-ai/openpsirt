@@ -63,8 +63,8 @@ func TestAPersonPageCarriesWhatTheyHoldAndWhatTheyWereTold(t *testing.T) {
 				Withdrawn int `json:"withdrawn"`
 			} `json:"record"`
 		}
-		_, claim := r.DecidedAt(t, r.Scanned(t))
-		r.Agreed(t, claim)
+		_, decision := r.DecidedAt(t, r.Scanned(t))
+		r.Agreed(t, decision)
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, httpapitest.FindingAt("CVE-2026-9999")+"/assignment",
 			`{"person":"triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("handing the finding over answered %d: %s", got.Code, got.Body.String())

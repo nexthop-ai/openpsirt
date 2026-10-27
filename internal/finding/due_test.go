@@ -157,7 +157,7 @@ func TestWhatIsRunningOutCountsPastThePage(t *testing.T) {
 }
 
 func TestWhatIsRunningOutIsOneRowPerIssueAtAComponent(t *testing.T) {
-	// A kernel flaw at sixty places is one thing somebody has to answer.
+	// A kernel flaw at sixty occurrences is one thing somebody has to answer.
 	// Sixty rows of it is a list with one entry in it.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
@@ -167,8 +167,8 @@ func TestWhatIsRunningOutIsOneRowPerIssueAtAComponent(t *testing.T) {
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
 			t.Fatal(err)
 		}
-		if places := len(f.open(t)); places != 2 {
-			t.Fatalf("expected one issue at two places, got %d", places)
+		if occurrences := len(f.open(t)); occurrences != 2 {
+			t.Fatalf("expected one issue at two occurrences, got %d", occurrences)
 		}
 
 		late, _, err := f.store.RunningOutPage(t.Context(), f.holding(t, access.PublicTriage), finding.Scope{},
@@ -177,10 +177,10 @@ func TestWhatIsRunningOutIsOneRowPerIssueAtAComponent(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(late) != 1 {
-			t.Fatalf("one issue at two places produced %d rows", len(late))
+			t.Fatalf("one issue at two occurrences produced %d rows", len(late))
 		}
-		if late[0].Places != 2 {
-			t.Errorf("the row says %d places, want 2", late[0].Places)
+		if late[0].Occurrences != 2 {
+			t.Errorf("the row says %d occurrences, want 2", late[0].Occurrences)
 		}
 	})
 }
@@ -244,8 +244,8 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 		if held[0].Open != 1 {
 			t.Errorf("they hold %d pieces of work, want 1", held[0].Open)
 		}
-		if held[0].Places != 2 {
-			t.Errorf("what they hold covers %d findings, want 2", held[0].Places)
+		if held[0].Occurrences != 2 {
+			t.Errorf("what they hold covers %d findings, want 2", held[0].Occurrences)
 		}
 		// A high at a hundred days is seventy days past its thirty-day window.
 		// Late in the same units: the piece of work is late, not two of it.
@@ -264,9 +264,9 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 			t.Errorf("who-holds-what says %d, their own list says %d in %d rows",
 				held[0].Open, total, len(theirs))
 		}
-		if len(theirs) == 1 && theirs[0].Places != held[0].Places {
-			t.Errorf("who-holds-what says %d places, their own list says %d",
-				held[0].Places, theirs[0].Places)
+		if len(theirs) == 1 && theirs[0].Occurrences != held[0].Occurrences {
+			t.Errorf("who-holds-what says %d occurrences, their own list says %d",
+				held[0].Occurrences, theirs[0].Occurrences)
 		}
 	})
 }
@@ -274,7 +274,7 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 	// A decision that applies takes a finding off the clock — the
 	// same condition that decides whether a decision suppresses the finding
-	// at all. What is running out of time excluded any live claim, so a
+	// at all. What is running out of time excluded any live decision, so a
 	// proposal waiting for a second person took a finding off that list for
 	// as long as it sat in the queue, while what each person was holding
 	// excluded nothing and still counted it as overdue. Both are asked here,
@@ -297,9 +297,9 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		}
 		somebody := f.somebodyElse(t)
 		issueID := f.issueID(t, "CVE-2026-1")
-		place := finding.PlaceIdentity(swss.Name, "")
+		occurrence := finding.OccurrenceIdentity(swss.Name, "")
 
-		// One decision standing at the place at a time, written the way the
+		// One decision standing at the occurrence at a time, written the way the
 		// triage store writes one: keyed on the version shipping here, live.
 		record := func(state string, needsApproval bool, outcome string, until *time.Time, version string) {
 			t.Helper()
@@ -307,18 +307,18 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			// The outcome and the date it defers to are the claim's: one act
+			// The outcome and the date it defers to are the decision's: one act
 			// is one argument, and this row says where it lands.
-			claimID := claimSaying(t, f.db, somebody, outcome)
+			decisionID := decisionSaying(t, f.db, somebody, outcome)
 			if until != nil {
 				if _, err := f.db.DB.NewUpdate().TableExpr("\"decision\"").
 					Set(`"deferred_until" = ?`, until.UTC()).
-					Where(`"id" = ?`, claimID).Exec(ctx); err != nil {
+					Where(`"id" = ?`, decisionID).Exec(ctx); err != nil {
 					t.Fatalf("record when it defers to: %v", err)
 				}
 			}
 			f.decision(t, decisionRow{
-				By: somebody, Claim: claimID, Issue: issueID, Place: place, State: state,
+				By: somebody, Decision: decisionID, Issue: issueID, Occurrence: occurrence, State: state,
 				Unreviewed: !needsApproval, Component: &version, Key: "the-live-key",
 			})
 		}
@@ -347,7 +347,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			}
 		}
 		// The compliance rate reads a deferral the same way: one in force at
-		// the versions the place holds, before its date, is deferred; any
+		// the versions the occurrence holds, before its date, is deferred; any
 		// other leaves the finding overdue.
 		rated := func(deferred bool, because string) {
 			t.Helper()
@@ -365,15 +365,15 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 					because, held, late, deferred)
 			}
 		}
-		// Sending the standing claim back, which is the other way one stops
-		// applying: only a claim needing nobody can be both sent back and
+		// Sending the standing decision back, which is the other way one stops
+		// applying: only a decision needing nobody can be both sent back and
 		// standing, and while it is returned nobody is relying on it.
 		sendBack := func() {
 			t.Helper()
 			if _, err := f.db.DB.NewUpdate().TableExpr("\"decision_occurrence\"").
 				Set(`"sent_back_at" = ?`, time.Now().UTC()).
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
-				t.Fatalf("send the claim back: %v", err)
+				t.Fatalf("send the decision back: %v", err)
 			}
 		}
 		yesterday := time.Now().UTC().Add(-24 * time.Hour)
@@ -385,9 +385,9 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		record("proposed", false, "deferred", &nextMonth, swss.Version)
 		onTheClock(false, "a proposal needing no agreement applies")
 		record("approved", true, "not-applicable", nil, swss.Version)
-		onTheClock(false, "an approved claim applies")
+		onTheClock(false, "an approved decision applies")
 		record("approved", true, "not-applicable", nil, "0.9.0")
-		onTheClock(true, "an approved claim about another version does not apply here")
+		onTheClock(true, "an approved decision about another version does not apply here")
 		record("approved", true, "deferred", &nextMonth, swss.Version)
 		onTheClock(false, "a deferral applies until its date")
 		rated(true, "a deferral applies until its date")
@@ -400,7 +400,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 
 		// The rule the triage store asks when it decides whether a decision
 		// applies, asked here — because it was added to that store's own copy
-		// of the condition and to nothing else, so a claim an approver had
+		// of the condition and to nothing else, so a decision an approver had
 		// returned went on holding its finding off the clock, out of this
 		// list and out of the overdue figure, while the notice to its author
 		// said it applied to nothing until it was revised.
@@ -408,8 +408,8 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		onTheClock(false, "a deferral needing no agreement applies")
 		rated(true, "a deferral needing no agreement applies")
 		sendBack()
-		onTheClock(true, "a claim an approver sent back holds nothing off the clock")
-		rated(false, "a claim an approver sent back holds nothing off the clock")
+		onTheClock(true, "a decision an approver sent back holds nothing off the clock")
+		rated(false, "a decision an approver sent back holds nothing off the clock")
 	})
 }
 
@@ -721,13 +721,13 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 		opened := time.Now().UTC().Add(-14 * 24 * time.Hour).Truncate(time.Microsecond)
 		entered := finding.Finding{
 			TargetID: f.target, Kind: finding.Entered,
-			Visibility:      access.Public,
-			VulnerabilityID: f.interned(t, "SONIC-2026-0007"),
-			ComponentID:     f.open(t)[0].ComponentID,
-			PlaceIdentity:   "place-of-something-we-build",
-			OpenedAt:        opened,
-			RatedAt:         &opened,
-			DueAt:           ptr(opened.Add(finding.DefaultOwnWindows().High)),
+			Visibility:         access.Public,
+			VulnerabilityID:    f.interned(t, "SONIC-2026-0007"),
+			ComponentID:        f.open(t)[0].ComponentID,
+			OccurrenceIdentity: "occurrence-of-something-we-build",
+			OpenedAt:           opened,
+			RatedAt:            &opened,
+			DueAt:              ptr(opened.Add(finding.DefaultOwnWindows().High)),
 		}
 		if _, err := f.db.DB.NewInsert().Model(&entered).Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -929,7 +929,7 @@ func TestPagingWhatIsRunningOutVisitsEveryRowOnceInOneOrder(t *testing.T) {
 				row := &finding.Finding{
 					TargetID: f.target, Kind: finding.Vulnerable,
 					VulnerabilityID: interned["CVE-2026-STDLIB"], Visibility: access.Public,
-					ComponentID: component.ID, PlaceIdentity: purl,
+					ComponentID: component.ID, OccurrenceIdentity: purl,
 					OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
 					DueAt: &due,
 				}
@@ -1000,18 +1000,18 @@ func TestPagingWhatIsRunningOutPlacesRowsThatDifferOnlyInBeingExploited(t *testi
 		if _, err := f.db.DB.NewInsert().Model(component).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		// The place that is not exploited is inserted first, and a grouping
+		// The occurrence that is not exploited is inserted first, and a grouping
 		// sorted on its keys reads it first too, so an order that leaves the
 		// flag to the plan reads the rows the other way round.
 		for _, exploited := range []bool{false, true} {
-			place := purl
+			occurrence := purl
 			if exploited {
-				place += "#exploited"
+				occurrence += "#exploited"
 			}
 			row := &finding.Finding{
 				TargetID: f.target, Kind: finding.Vulnerable,
 				VulnerabilityID: interned["CVE-2026-MERGED"], Visibility: access.Public,
-				ComponentID: component.ID, PlaceIdentity: place,
+				ComponentID: component.ID, OccurrenceIdentity: occurrence,
 				OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
 				DueAt: &due, RankExploited: exploited,
 			}

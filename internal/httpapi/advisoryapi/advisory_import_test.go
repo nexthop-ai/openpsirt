@@ -180,7 +180,7 @@ func TestAnAdvisorysPrefillIsSomethingAPersonStillHasToRecord(t *testing.T) {
 	// one that fills when a person acts on it, so the assertion above is a
 	// check rather than a sentence that cannot be false.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		if got := r.Advised(t, "admin", "exsa.json",
 			httpapitest.SupplierAdvisory("EXSA-2026:1001", "known_not_affected",
 				"3.7.0")); got.Code != http.StatusCreated {
@@ -207,7 +207,7 @@ func TestAnAdvisorysPrefillIsSomethingAPersonStillHasToRecord(t *testing.T) {
 			"/findings/CVE-2026-9999/components/libnl-3-200", &said)
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
+				"/findings/CVE-2026-9999/occurrences/"+occurrence+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"The supplier says this build is not affected.",`+
 				`"from_statement":`+httpapitest.Itoa(said.Said[0].ID)+`}`)

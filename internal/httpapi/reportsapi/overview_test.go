@@ -66,7 +66,7 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 		}
 
 		// Both findings sit on one component of one build, and they are two
-		// things to decide about rather than two places.
+		// things to decide about rather than two occurrences.
 		open := read(t, "private-triage")
 		if open.Name != "mine" || open.Open != 2 || open.Undecided != 2 {
 			t.Fatalf("the product reads %+v, wanted two open and two undecided", open)
@@ -94,22 +94,22 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 			t.Errorf("somebody who may read one of the two was told %+v", public)
 		}
 
-		// The claims waiting for a second person here, counted through the same
-		// population the review queue lists — and not their own claim, which
+		// The decisions waiting for a second person here, counted through the
+		// same population the review queue lists — and not their own decision, which
 		// nobody can approve.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		if got := read(t, "reviewer"); got.Waiting != 1 {
-			t.Errorf("with a claim waiting, an approver is told %d", got.Waiting)
+			t.Errorf("with a decision waiting, an approver is told %d", got.Waiting)
 		}
 		if got := read(t, "triager"); got.Waiting != 0 {
-			t.Errorf("the proposer is told %d claims wait on them", got.Waiting)
+			t.Errorf("the proposer is told %d decisions wait on them", got.Waiting)
 		}
-		r.Agreed(t, claim)
+		r.Agreed(t, decision)
 		after := read(t, "reviewer")
 		if after.Waiting != 0 {
 			t.Errorf("after agreeing, %d still waits", after.Waiting)
 		}
-		// And the agreed one is answered at every place, by the findings
+		// And the agreed one is answered at every occurrence, by the findings
 		// list's own definition.
 		agreed := 0
 		for _, b := range after.Builds {
@@ -243,13 +243,13 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 	})
 }
 
-// The overview counts what somebody decides about, not places.
+// The overview counts what somebody decides about, not occurrences.
 //
-// A library at two places with two issues is four findings and two pieces of
+// A library at two occurrences with two issues is four findings and two pieces of
 // work. Counting rows would make a build look twice as bad as the list
 // somebody opens next — the mistake that reported 441,108 open where 5,661
 // issues were.
-func TestAProductCountsThingsToDecideRatherThanPlaces(t *testing.T) {
+func TestAProductCountsThingsToDecideRatherThanOccurrences(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedShared(t)
 		// The same two issues on the same component in a second build. The

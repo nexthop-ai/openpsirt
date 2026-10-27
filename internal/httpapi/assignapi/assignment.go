@@ -43,7 +43,7 @@ func unassignedPage(rows []finding.Owned, total int) *UnassignedPage {
 			Stream: row.Stream, Variant: row.Variant,
 			StreamName:  row.StreamName,
 			VariantName: row.VariantName,
-			Places:      row.Places, Builds: row.Builds, Place: row.Place,
+			Occurrences: row.Occurrences, Builds: row.Builds, Occurrence: row.Occurrence,
 		})
 	}
 	out.Body.Total = total
@@ -70,9 +70,9 @@ type UnassignedBody struct {
 	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
 	Variant     string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
 	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
-	Places      int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
-	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
-	Place       string `json:"place,omitempty" doc:"The place of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
+	Occurrences int    `json:"occurrences" doc:"The number of findings a decision here would be recorded against, across every build it is in"`
+	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one decision answers"`
+	Occurrence  string `json:"occurrence,omitempty" doc:"The occurrence of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
 }
 
 // HoldingBody is how much work one person has.
@@ -86,10 +86,10 @@ type HoldingBody struct {
 	Team bool `json:"team,omitempty" doc:"This is a team's queue rather than one person's work"`
 	// Open counts pieces of work — an issue in a component in a product — and
 	// not the findings they cover, so this agrees with the list behind it.
-	Open    int `json:"open" doc:"Pieces of work assigned to them: an issue in a component in a product"`
-	Places  int `json:"places" doc:"The number of findings those cover, across every build"`
-	Overdue int `json:"overdue" doc:"The number of those pieces past their deadline"`
-	Reports int `json:"reports" doc:"Open vulnerability reports they hold, in products where you read reports"`
+	Open        int `json:"open" doc:"Pieces of work assigned to them: an issue in a component in a product"`
+	Occurrences int `json:"occurrences" doc:"The number of findings those cover, across every build"`
+	Overdue     int `json:"overdue" doc:"The number of those pieces past their deadline"`
+	Reports     int `json:"reports" doc:"Open vulnerability reports they hold, in products where you read reports"`
 }
 
 // registerAssignment registers the two halves of deciding who deals with
@@ -118,7 +118,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		Description: "Records who is dealing with this issue in this component.\n\n" +
 			"It covers the product, not the build named in the path. The path says which " +
 			"finding is being looked at; what is assigned is every build of the product " +
-			"holding the same component, and every place that component sits at.\n\n" +
+			"holding the same component, and every occurrence of that component.\n\n" +
 			"Send `person` as an empty string to hand it back to nobody, which is this same " +
 			"operation rather than one of its own.\n\n" +
 			"Send `team` instead to route it to a team. That is a queue rather than a " +
@@ -182,7 +182,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// interruption.
 		var whoToTell int64
 		// admits is asked about the strictest visibility open here inside the
-		// write that hands the work over, so a place recorded undisclosed
+		// write that hands the work over, so an occurrence recorded undisclosed
 		// between the two is part of what the recipient is asked about.
 		var admits finding.Admits
 		rights := access.NewStore(in.DB.DB)
@@ -355,11 +355,11 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Summary: "List findings nobody is dealing with",
 		Description: "Returns open findings with no assignee, across every product you can see, " +
 			"most urgent first. Static analysis leads are included where you read them, one item " +
-			"per lead, with `place` set.\n\n" +
+			"per lead, with `occurrence` set.\n\n" +
 			"Deliberately not scoped to one product: work falling between people is exactly what " +
 			"hides when every screen shows one product and nobody looks at the others.\n\n" +
 			"One item per issue in a component in a product, not one per build. The same code " +
-			"built as several variants is one piece of work — a judgment is keyed on the product " +
+			"built as several variants is one piece of work — a decision is keyed on the product " +
 			"and the code rather than on the build, so answering it once answers every build " +
 			"holding the same versions. `builds` says how many that is. Where two builds ship " +
 			"different versions of the component they are different work and appear separately.",
@@ -392,7 +392,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Description: "The open findings assigned to somebody, most urgent first, in the same " +
 			"units as what nobody is dealing with: one item per issue in a component in a " +
 			"product, not one per build. The same code built several ways is one piece of " +
-			"work, and it was taken on as one. A static analysis lead is one item, with `place` " +
+			"work, and it was taken on as one. A static analysis lead is one item, with `occurrence` " +
 			"set, where you read it.\n\n" +
 			"Send `me` as the identity for your own.\n\n" +
 			"An identity nobody holds answers with an empty list rather than a 404, which is " +
@@ -478,7 +478,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Summary: "List what one team is dealing with",
 		Description: "The open findings routed to a team, most urgent first, in the same units " +
 			"as everywhere else: one item per issue in a component in a product, and one per static " +
-			"analysis lead you read, with `place` set.\n\n" +
+			"analysis lead you read, with `occurrence` set.\n\n" +
 			"Work goes to a team by standing rule and by an assignment naming one, so a team " +
 			"holds work the way a person does — and the totals list says so. This is the list " +
 			"behind that number.\n\n" +
@@ -541,7 +541,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 			"`reports` counts the open vulnerability reports each holds, in the products where " +
 			"you read reports; somebody holding only reports is listed with no findings.\n\n" +
 			"Counted in pieces of work — an issue in a component in a product, or one static " +
-			"analysis lead — which is the unit the list behind each person is in. `places` says how many findings those " +
+			"analysis lead — which is the unit the list behind each person is in. `occurrences` says how many findings those " +
 			"cover: one flaw in a kernel is one thing to answer and can be dozens of rows to " +
 			"write.\n\n" +
 			"The number worth watching is not how many findings exist but how many are waiting " +
@@ -595,7 +595,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 				Person: who[h.PartyID].Address,
 				Name:   core.LabelBeside(who[h.PartyID].Name, who[h.PartyID].Address),
 				Team:   who[h.PartyID].Team,
-				Open:   h.Open, Places: h.Places, Overdue: h.Overdue,
+				Open:   h.Open, Occurrences: h.Occurrences, Overdue: h.Overdue,
 				Reports: reports[h.PartyID],
 			})
 		}
@@ -629,7 +629,7 @@ func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
 	held, err := core.ComponentCarrying(ctx, in, subject, target.ID, issue, component, which,
 		func(err error) error {
 			// A name matching several is not a finding here: an assignment
-			// names one place, and the choices are the finding routes' answer.
+			// names one occurrence, and the choices are the finding routes' answer.
 			if errors.Is(err, graph.ErrAmbiguous) {
 				return core.NoSuchFinding()
 			}

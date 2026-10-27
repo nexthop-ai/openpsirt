@@ -10,21 +10,21 @@ import (
 )
 
 func TestTheQueueCardCarriesWhatWouldMakeAnApproverDisagree(t *testing.T) {
-	// An approver was shown the claim and the reasoning and nothing that
+	// An approver was shown the decision and the reasoning and nothing that
 	// argues against them, which is the rubber stamp the queue's shape was
 	// written against — a weakness in a control rather than a card layout.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 
-		// Something else at the same place that nobody has answered: the
+		// Something else at the same occurrence that nobody has answered: the
 		// fixture holds two issues at the one component.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 
 		var queue struct {
 			Items []struct {
-				Claim struct {
+				Decision struct {
 					ID int64 `json:"id"`
-				} `json:"claim"`
+				} `json:"decision"`
 				Counter struct {
 					Elsewhere map[string]int `json:"elsewhere"`
 					Undecided int            `json:"undecided"`
@@ -33,20 +33,20 @@ func TestTheQueueCardCarriesWhatWouldMakeAnApproverDisagree(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "reviewer", "/v1/review-queue", &queue)
 		if len(queue.Items) != 1 {
-			t.Fatalf("the queue holds %d claims", len(queue.Items))
+			t.Fatalf("the queue holds %d decisions", len(queue.Items))
 		}
 		if queue.Items[0].Counter.Undecided != 1 {
-			t.Errorf("the card says %d other issues at that place are undecided, want 1",
+			t.Errorf("the card says %d other issues at that occurrence are undecided, want 1",
 				queue.Items[0].Counter.Undecided)
 		}
 		if len(queue.Items[0].Counter.Elsewhere) != 0 {
 			t.Errorf("nothing has been agreed elsewhere yet: %+v", queue.Items[0].Counter)
 		}
 
-		// Now the other issue at the same place is agreed as affected, and a
-		// second claim about the *first* issue is made somewhere else — which
+		// Now the other issue at the same occurrence is agreed as affected, and a
+		// second decision about the *first* issue is made somewhere else — which
 		// is the material an approver is entitled to see.
-		r.Agreed(t, claim)
+		r.Agreed(t, decision)
 		second, _ := r.Claimed(t, "triager", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
 
 		// A fresh value rather than the one above: a zero count is left out of
@@ -54,9 +54,9 @@ func TestTheQueueCardCarriesWhatWouldMakeAnApproverDisagree(t *testing.T) {
 		// the old number and the test asserts against its own memory.
 		var after struct {
 			Items []struct {
-				Claim struct {
+				Decision struct {
 					ID int64 `json:"id"`
-				} `json:"claim"`
+				} `json:"decision"`
 				Counter struct {
 					Elsewhere map[string]int `json:"elsewhere"`
 					Undecided int            `json:"undecided"`
@@ -66,18 +66,18 @@ func TestTheQueueCardCarriesWhatWouldMakeAnApproverDisagree(t *testing.T) {
 		httpapitest.Read(t, r, "reviewer", "/v1/review-queue", &after)
 		var found bool
 		for _, item := range after.Items {
-			if item.Claim.ID != second {
+			if item.Decision.ID != second {
 				continue
 			}
 			found = true
 			// Nothing has been agreed about *this* issue elsewhere — the
-			// approved claim was about the other one — so the card says
+			// approved decision was about the other one — so the card says
 			// nothing rather than counting a neighbor as evidence.
 			if len(item.Counter.Elsewhere) != 0 {
 				t.Errorf("a decision about another issue was counted as one about this: %+v",
 					item.Counter)
 			}
-			// And the place is no longer full of undecided work, because the
+			// And the occurrence is no longer full of undecided work, because the
 			// other issue there has been answered.
 			if item.Counter.Undecided != 0 {
 				t.Errorf("an answered neighbor is still counted as undecided: %+v",
@@ -85,7 +85,7 @@ func TestTheQueueCardCarriesWhatWouldMakeAnApproverDisagree(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Fatalf("the second claim is not in the queue: %+v", after.Items)
+			t.Fatalf("the second decision is not in the queue: %+v", after.Items)
 		}
 	})
 }
@@ -95,7 +95,7 @@ func TestWhatWasAgreedAboutTheSameIssueElsewhereIsCounted(t *testing.T) {
 	// called affected somewhere else.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		// Two packages of *different* source packages carrying one issue. It
-		// has to be two folds: one judgment covers a whole fold, so two
+		// has to be two folds: one decision covers a whole fold, so two
 		// different answers about one issue in one fold is not a state
 		// anything can reach.
 		r.ScannedTwoSources(t)
@@ -106,15 +106,15 @@ func TestWhatWasAgreedAboutTheSameIssueElsewhereIsCounted(t *testing.T) {
 		// The other is dismissed, and its card is what an approver reads.
 		second, _ := r.Claimed(t, "triager", "CVE-2026-CURL1", "libexpat1", httpapitest.Dismissal)
 
-		counter := func(claim int64) map[string]int {
+		counter := func(decision int64) map[string]int {
 			t.Helper()
 			// A fresh value each time: a count of zero is left out of the
 			// answer, so a reused one keeps the last number decoded into it.
 			var queue struct {
 				Items []struct {
-					Claim struct {
+					Decision struct {
 						ID int64 `json:"id"`
-					} `json:"claim"`
+					} `json:"decision"`
 					Counter struct {
 						Elsewhere map[string]int `json:"elsewhere"`
 					} `json:"counter"`
@@ -122,18 +122,18 @@ func TestWhatWasAgreedAboutTheSameIssueElsewhereIsCounted(t *testing.T) {
 			}
 			httpapitest.Read(t, r, "reviewer", "/v1/review-queue", &queue)
 			for _, item := range queue.Items {
-				if item.Claim.ID == claim {
+				if item.Decision.ID == decision {
 					return item.Counter.Elsewhere
 				}
 			}
-			t.Fatalf("claim %d is not in the queue: %+v", claim, queue.Items)
+			t.Fatalf("decision %d is not in the queue: %+v", decision, queue.Items)
 			return nil
 		}
 
 		// A proposal is one person's opinion and is not counted. Otherwise two
 		// people in a queue would be counted at each other as evidence.
 		if said := counter(second); len(said) != 0 {
-			t.Errorf("an unapproved claim elsewhere was counted as evidence: %+v", said)
+			t.Errorf("an unapproved decision elsewhere was counted as evidence: %+v", said)
 		}
 
 		r.Agreed(t, first)

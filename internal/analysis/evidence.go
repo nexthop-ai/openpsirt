@@ -99,8 +99,8 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 	case err != nil:
 		return Evidence{}, fmt.Errorf("read what the run said about lead %d: %w", lead.ID, err)
 	}
-	var places []location
-	if err := db.NewSelect().Model(&places).Where(`"al"."finding_id" = ?`, lead.ID).
+	var occurrences []location
+	if err := db.NewSelect().Model(&occurrences).Where(`"al"."finding_id" = ?`, lead.ID).
 		OrderExpr(`"al"."ordinal" ASC`).Scan(ctx); err != nil {
 		return Evidence{}, fmt.Errorf("read the places lead %d names: %w", lead.ID, err)
 	}
@@ -131,7 +131,7 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 		LastCommit: sourcelink.CommitOf(link, last.SourceCommit, said.Path),
 		ThirdParty: declaredThirdParty(last, said.Path) != "",
 	}
-	for _, p := range places {
+	for _, p := range occurrences {
 		one := Located{
 			Path: p.Path, StartLine: atLeast(p.StartLine), StartColumn: atLeast(p.StartColumn),
 			EndLine: atLeast(p.EndLine), EndColumn: atLeast(p.EndColumn),

@@ -20,7 +20,7 @@ func TestADeferralIsNotCountedAsAFailure(t *testing.T) {
 	// and within a quarter people stop deferring and start letting things
 	// run late silently.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 
 		rate := func(t *testing.T, word string) struct {
 			Closed   int `json:"closed"`
@@ -85,14 +85,14 @@ func TestADeferralIsNotCountedAsAFailure(t *testing.T) {
 		until := time.Now().UTC().AddDate(0, 0, 300).Format(time.DateOnly)
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
+				"/findings/CVE-2026-9999/occurrences/"+occurrence+"/decision",
 			`{"outcome":"deferred","deferred_until":"`+until+
 				`","reasoning":"Scheduled for the next release."}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deferring answered %d: %s", made.Code, made.Body.String())
 		}
 		var proposed struct {
-			ClaimID       int64 `json:"claim_id"`
+			DecisionID    int64 `json:"decision_id"`
 			NeedsApproval bool  `json:"needs_approval"`
 		}
 		if err := json.Unmarshal(made.Body.Bytes(), &proposed); err != nil {
@@ -109,7 +109,7 @@ func TestADeferralIsNotCountedAsAFailure(t *testing.T) {
 
 		// Agreed. Now it stops being late and becomes its own number — not a
 		// success, not a failure, and visible.
-		r.Agreed(t, proposed.ClaimID)
+		r.Agreed(t, proposed.DecisionID)
 		got := rate(t, "high")
 		if got.Deferred != 1 {
 			t.Errorf("a standing deferral reports %+v, want it counted as deferred", got)
@@ -176,7 +176,7 @@ func TestTheListFiltersOnWhenThingsHappened(t *testing.T) {
 		if got := count(t, "open_under=4&opened_after="+tomorrow); got != 0 {
 			t.Errorf("an age and a date together kept %d rows, want the tighter of the two", got)
 		}
-		// Nothing has been claimed about, so nothing was proposed after
+		// Nothing has been decided about, so nothing was proposed after
 		// anything.
 		if got := count(t, "proposed_after="+yesterday); got != 0 {
 			t.Errorf("proposed since yesterday is %d rows in a fixture nobody decided", got)
@@ -218,12 +218,12 @@ func TestTheRateCountsTheSameThingTheListDoes(t *testing.T) {
 	// somebody decides about — one issue at one component — so that is
 	// what the rate counts.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedAtTwoPlaces(t)
+		r.ScannedAtTwoOccurrences(t)
 
 		var listed struct {
 			Total int `json:"total"`
 			Items []struct {
-				Places int `json:"places"`
+				Occurrences int `json:"occurrences"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/findings", &listed)
@@ -231,10 +231,10 @@ func TestTheRateCountsTheSameThingTheListDoes(t *testing.T) {
 			t.Fatalf("the findings list reports %d rows for one issue in one "+
 				"component, want one", listed.Total)
 		}
-		if listed.Items[0].Places != 2 {
-			t.Fatalf("the fixture put the issue at %d places, want two, so this "+
-				"test cannot tell a place from a thing decided about",
-				listed.Items[0].Places)
+		if listed.Items[0].Occurrences != 2 {
+			t.Fatalf("the fixture put the issue at %d occurrences, want two, so this "+
+				"test cannot tell an occurrence from a thing decided about",
+				listed.Items[0].Occurrences)
 		}
 
 		if _, err := r.DB.DB.NewUpdate().Table("finding").

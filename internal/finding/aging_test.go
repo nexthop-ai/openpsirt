@@ -12,7 +12,7 @@ import (
 )
 
 // An aging bucket says how much of it is undecided and how it splits by
-// severity. A claim waiting for a second person answers nothing, so its issue
+// severity. A decision waiting for a second person answers nothing, so its issue
 // is still undecided; an approved one stands. The split counts issues, so its
 // parts sum to the bucket.
 func TestAnAgingBucketSaysWhatIsUndecidedAndHowItSplitsBySeverity(t *testing.T) {
@@ -29,12 +29,12 @@ func TestAnAgingBucketSaysWhatIsUndecidedAndHowItSplitsBySeverity(t *testing.T) 
 
 		somebody := f.somebodyElse(t)
 		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
-			finding.PlaceIdentity(swss.Name, ""), "approved", swss.Version, "agreed")
-		// Waiting at every place the low issue sits, so that nothing but the
+			finding.OccurrenceIdentity(swss.Name, ""), "approved", swss.Version, "agreed")
+		// Waiting at every occurrence the low issue sits, so that nothing but the
 		// waiting is what leaves it undecided.
 		for i, consumer := range []string{swss.Name, teamd.Name} {
 			f.decided(t, somebody, f.issueID(t, "CVE-2026-2"),
-				finding.PlaceIdentity(libnl.Name, consumer), "proposed", libnl.Version,
+				finding.OccurrenceIdentity(libnl.Name, consumer), "proposed", libnl.Version,
 				[]string{"waiting-one", "waiting-two"}[i])
 		}
 
@@ -56,7 +56,7 @@ func TestAnAgingBucketSaysWhatIsUndecidedAndHowItSplitsBySeverity(t *testing.T) 
 			t.Fatalf("the bucket holds %d issues, want the 2 aged into it", bucket.Open)
 		}
 		if bucket.Undecided != 1 {
-			t.Errorf("%d undecided, want 1: the waiting claim answers nothing and the approved one stands",
+			t.Errorf("%d undecided, want 1: the waiting decision answers nothing and the approved one stands",
 				bucket.Undecided)
 		}
 		if len(bucket.BySeverity) != 2 || bucket.BySeverity["critical"] != 1 || bucket.BySeverity["low"] != 1 {

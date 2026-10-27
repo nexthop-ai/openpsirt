@@ -522,9 +522,9 @@ var administrativeActs = []trailedAct{
 	{
 		// Recording that this product was exploited through an issue, and
 		// clearing it again. Both decide what the triage record may say — a
-		// claim that the issue does not apply is refused while one stands —
+		// decision that the issue does not apply is refused while one stands —
 		// which is what puts them in the trail rather than in the decision
-		// record beside the claims.
+		// record beside the decisions.
 		id: "record-exploited-here", what: "this product exploited through an issue",
 		who: "private-triage", method: http.MethodPost,
 		path: "/v1/products/mine/issues/CVE-2026-9999/incidents",
@@ -627,7 +627,7 @@ var administrativeActs = []trailedAct{
 // outsideTheTrail is every registered write that leaves no row, and why.
 //
 // The trail is the layer above the triage record rather than part of it: the
-// settings, grants and dates that decide what the record says. So a judgment
+// settings, grants and dates that decide what the record says. So a decision
 // about a finding is not one of these, and neither is an act whose actor and
 // moment are already written on the thing it changed.
 //
@@ -638,21 +638,21 @@ var outsideTheTrail = map[string]string{
 	// Reads an upstream's description for somebody to confirm, and writes
 	// nothing.
 	"inspect-upstream": "writes nothing",
-	// The decision record (REQ-22). Every one of these is a triage judgment
+	// The decision record (REQ-22). Every one of these is a triage decision
 	// or an argument about one, kept beside the decision it belongs to with
 	// who made it and when.
 	"agree-assessment":             "the decision record",
 	"agree-to-disclosure-movement": "the decision record",
-	"approve-claim":                "the decision record",
+	"approve-decision":             "the decision record",
 	"assess-issue":                 "the decision record",
 	"assign-finding":               "the decision record",
 	"assign-lead":                  "the decision record",
 	"assign-matching-findings":     "the decision record",
 	"carry-decisions":              "the decision record",
-	"comment-on-claim":             "the decision record",
+	"comment-on-decision":          "the decision record",
 	"decide":                       "the decision record",
 	"decide-finding":               "the decision record",
-	"decide-together":              "the decision record",
+	"decide-in-bulk":               "the decision record",
 	"decide-lead":                  "the decision record",
 	"hand-off-lead":                "the flaw's own record, linked to the lead; a move it carries is trailed as move-lead's is",
 	"fix-lead":                     "the decision record",
@@ -663,10 +663,10 @@ var outsideTheTrail = map[string]string{
 	"shorten-disclosure":           "the decision record",
 	"note-on-issue":                "the decision record",
 	"plan-upgrade":                 "the decision record",
-	"point-claim-elsewhere":        "the decision record",
-	"reaffirm-claim":               "the decision record",
-	"reaffirm-many":                "the decision record",
+	"point-decision-elsewhere":     "the decision record",
 	"reaffirm-decision":            "the decision record",
+	"reaffirm-many":                "the decision record",
+	"reaffirm-finding-decision":    "the decision record",
 	"add-advisory-issue":           "the decision record",
 	"approve-advisory":             "the decision record",
 	"drop-advisory-issue":          "the decision record",
@@ -676,16 +676,16 @@ var outsideTheTrail = map[string]string{
 	"record-finding":               "the decision record",
 	"repromise-upgrade":            "the decision record",
 	"resolve-finding":              "the decision record",
-	"revise-claim":                 "the decision record",
-	"send-claim-back":              "the decision record",
+	"revise-decision":              "the decision record",
+	"send-decision-back":           "the decision record",
 	"start-advisory":               "the decision record",
 	"set-affected-builds":          "the decision record",
-	"split-claim":                  "the decision record",
+	"split-decision":               "the decision record",
 	"tag-finding":                  "the decision record",
 	"undo-batch":                   "the decision record",
 	"untag-finding":                "the decision record",
 	"withdraw-assessment":          "the decision record",
-	"withdraw-claim":               "the decision record",
+	"withdraw-decision":            "the decision record",
 
 	// Recorded on the thing it changed, with who and when. A second row in
 	// the trail would be a copy that can disagree with it.

@@ -102,9 +102,9 @@ func (r *Reach) Shipped(t testing.TB, b Build, hash string, snapshot graph.Snaps
 
 // Argued records what an upload argues about what it ships, with statements
 // and pedigree both stated by the build.
-func (r *Reach) Argued(t testing.TB, target, scan int64, claims []sbom.Suppression) {
+func (r *Reach) Argued(t testing.TB, target, scan int64, decisions []sbom.Suppression) {
 	t.Helper()
-	if _, err := fixture.RecordClaims(t.Context(), r.DB.DB, target, scan, claims,
+	if _, err := fixture.RecordDecisions(t.Context(), r.DB.DB, target, scan, decisions,
 		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func (r *Reach) Scan(t *testing.T, hash string, snapshot graph.Snapshot,
 // Scanned puts a build behind the handler: one component under the product,
 // with one issue reported against it. Reading what has been decided is only
 // testable against something that was found.
-func (r *Reach) Scanned(t *testing.T) (place string) {
+func (r *Reach) Scanned(t *testing.T) (occurrence string) {
 	t.Helper()
 	r.Scan(t, "read-test",
 		graph.Snapshot{
@@ -164,7 +164,7 @@ func (r *Reach) Scanned(t *testing.T) (place string) {
 		}})
 
 	// Under the product itself, the component stands alone.
-	return finding.PlaceIdentity("libnl-3-200", "")
+	return finding.OccurrenceIdentity("libnl-3-200", "")
 }
 
 // ScannedWithEvidence is a build whose one finding carries everything a report
@@ -201,20 +201,20 @@ func (r *Reach) ScannedWithEvidence(t *testing.T) {
 		}})
 }
 
-// Decided proposes a claim through the API and returns its identifier.
-func (r *Reach) Decided(t *testing.T, place string) int64 {
+// Decided proposes a decision through the API and returns its identifier.
+func (r *Reach) Decided(t *testing.T, occurrence string) int64 {
 	t.Helper()
-	id, _ := r.DecidedAt(t, place)
+	id, _ := r.DecidedAt(t, occurrence)
 	return id
 }
 
-// DecidedAt records one judgment and answers with the row it wrote and the
-// claim it belongs to. What the judgment says — and so what may be revised,
-// agreed to, commented on or withdrawn — is the claim's.
-func (r *Reach) DecidedAt(t *testing.T, place string) (decision, claim int64) {
+// DecidedAt records one decision and answers with the row it wrote and the
+// decision it belongs to. What the decision says — and so what may be revised,
+// agreed to, commented on or withdrawn — belongs to the decision, never the row.
+func (r *Reach) DecidedAt(t *testing.T, occurrence string) (row, decision int64) {
 	t.Helper()
 	path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-		"/findings/CVE-2026-9999/occurrences/%s/decision", place)
+		"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
 	got := AsPerson(t, r, "triager", http.MethodPost, path,
 		`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 			`"reasoning":"The parser is never reached: we only call the encoder."}`)
@@ -222,16 +222,16 @@ func (r *Reach) DecidedAt(t *testing.T, place string) (decision, claim int64) {
 		t.Fatalf("proposing answered %d: %s", got.Code, got.Body.String())
 	}
 	var out struct {
-		ID      int64 `json:"id"`
-		ClaimID int64 `json:"claim_id"`
+		ID         int64 `json:"id"`
+		DecisionID int64 `json:"decision_id"`
 	}
 	if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v (%s)", err, got.Body.String())
 	}
-	if out.ClaimID == 0 {
-		t.Fatalf("a judgment came back without the claim it made: %s", got.Body.String())
+	if out.DecisionID == 0 {
+		t.Fatalf("a decision came back without its identifier: %s", got.Body.String())
 	}
-	return out.ID, out.ClaimID
+	return out.ID, out.DecisionID
 }
 
 // Read makes a GET as somebody and decodes what came back.

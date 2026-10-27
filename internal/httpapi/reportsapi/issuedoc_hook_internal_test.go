@@ -3,10 +3,10 @@
 
 package reportsapi
 
-// JudgmentsShown sets how many judgments the issue document carries, and
-// answers what puts it back.
-func JudgmentsShown(n int) func() {
-	was := howManyJudgments
-	howManyJudgments = n
-	return func() { howManyJudgments = was }
+// DecisionsShown sets how many decided occurrences the issue document
+// carries, and answers what puts it back.
+func DecisionsShown(n int) func() {
+	was := howManyDecisions
+	howManyDecisions = n
+	return func() { howManyDecisions = was }
 }

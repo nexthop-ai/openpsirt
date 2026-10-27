@@ -21,7 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// FindingBody is one issue in one component, with the places it occupies.
+// FindingBody is one issue in one component, with its occurrences.
 type FindingBody struct {
 	// Product is present only where the list spans products. Inside one
 	// product every row would repeat it, and a column every row agrees
@@ -56,7 +56,7 @@ type FindingBody struct {
 	// distribution that has already fixed this looks the same as one that has
 	// not. Empty where the scanner said nothing.
 	Matched core.MatchRoute `json:"matched,omitempty" doc:"The scanner's route to this"`
-	// Places counts the consumers that pull this component in here, and
+	// Consumers counts the consumers that pull this component in here, and
 	// Answered how many of those the build has already argued about. Both
 	// ends of the way down, with the middle collapsed. Those two are what
 	// differ between sibling rows; the steps between them rarely
@@ -81,26 +81,26 @@ type FindingBody struct {
 
 	// Fold is the row's subject: the source package at the version it was
 	// built at. Two binaries of one source are one row, because deciding about
-	// them is one judgment, upgrading them is one act and routing them is one
+	// them is one decision, upgrading them is one act and routing them is one
 	// rule.
 	Fold string `json:"fold" doc:"The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from"`
 	// Packages and Consumers are the numbers a reader is shown, counted in
-	// the units they act in. Places is the unit the bulk cap is measured in
+	// the units they act in. Occurrences is the unit the bulk cap is measured in
 	// and the unit the disposition register expands to.
-	Packages  int `json:"packages" doc:"The number of binaries of the source package here. More than one means deciding on this row decides about all of them"`
-	Consumers int `json:"consumers" doc:"The number of things pulling those in here. The build itself counts as one where anything is pulled in directly"`
-	Places    int `json:"places" doc:"The number of findings under this row. The bulk cap counts these, and the disposition register expands to them, so it is not a number to reconcile with the two above"`
-	Answered  int `json:"answered,omitempty" doc:"The number of those the build has already argued do not apply"`
+	Packages    int `json:"packages" doc:"The number of binaries of the source package here. More than one means deciding on this row decides about all of them"`
+	Consumers   int `json:"consumers" doc:"The number of things pulling those in here. The build itself counts as one where anything is pulled in directly"`
+	Occurrences int `json:"occurrences" doc:"The number of findings under this row. The bulk cap counts these, and the disposition register expands to them, so it is not a number to reconcile with the two above"`
+	Answered    int `json:"answered,omitempty" doc:"The number of those the build has already argued do not apply"`
 	// State is how far we have decided this group, by the definition the
 	// state filter uses, so a row and the filter that found it agree.
-	State    core.Standing `json:"state,omitempty" doc:"The decision state: undecided when no place has a decision of any kind, waiting when a claim stands proposed and nobody has agreed, agreed when every place is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some places are approved and the rest never decided"`
-	SentBack bool          `json:"sent_back,omitempty" doc:"A live claim at one of these places is currently with its author, sent back for more"`
+	State    core.Standing `json:"state,omitempty" doc:"The decision state: undecided when no occurrence has a decision of any kind, waiting when a decision stands proposed and nobody has agreed, agreed when every occurrence is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some occurrences are approved and the rest never decided"`
+	SentBack bool          `json:"sent_back,omitempty" doc:"A live decision at one of these occurrences is currently with its author, sent back for more"`
 
 	// Opened, Due and NoDeadline are the clock on the row. The age is this
 	// finding's own rather than the year in the identifier, which the
 	// identifier already carries: an issue assigned in 2019 that first
 	// appeared here last week has been somebody's problem for a week.
-	Opened   string `json:"opened,omitempty" doc:"The earliest of these places opening here, as a date. The age a deadline relates to"`
+	Opened   string `json:"opened,omitempty" doc:"The earliest of these occurrences opening here, as a date. The age a deadline relates to"`
 	Due      string `json:"due,omitempty" doc:"The date it is due. Absent where there is none, and then no_deadline gives the reason"`
 	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue. Absent where there is no deadline"`
 	// Undisclosed says nothing here has been announced, and DiscloseAt
@@ -142,7 +142,7 @@ type FindingsOutput struct {
 		Items []FindingBody `json:"items"`
 		// Total counts the things to decide about, which is not the number of
 		// findings: one issue in one component can occupy sixty
-		// places and is one decision.
+		// occurrences and is one decision.
 		Total int `json:"total"`
 		// Hidden counts the rows the triage line keeps out, and Floor
 		// is the line itself. Stated rather than silently subtracted: a list
@@ -163,7 +163,7 @@ type ComponentFindingBody struct {
 	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
 	Namespace     string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version"`
 	Issues        int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
-	Places        int    `json:"places" doc:"The number of times those sit somewhere in the build"`
+	Occurrences   int    `json:"occurrences" doc:"The number of times those sit somewhere in the build"`
 	Exploited     bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
 	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of them"`
 	// BySeverity and Worst are the parts of the weight. Ranking by count
@@ -191,7 +191,7 @@ func registerFindings(api huma.API, in core.Deps) {
 		Path:    "/v1/products/{product}/findings",
 		Summary: "List vulnerability findings",
 		Description: "Returns one row per vulnerability-and-component pair, not one row per " +
-			"place the component appears. Each row gives the number of places it occupies and " +
+			"occurrence of the component. Each row gives the number of occurrences it has and " +
 			"how many of those the build's VEX documents already answer.\n\n" +
 			"Ordered by urgency — known-exploited first, then whether the build ships to " +
 			"customers, then severity, then likelihood. Supports limit and offset.\n\n" +
@@ -204,7 +204,7 @@ func registerFindings(api huma.API, in core.Deps) {
 			"and one there.\n\n" +
 			"`stream` and `variant` are optional and independent. With both named the list is " +
 			"one build. With either left out it answers for every build under the product " +
-			"that matches the rest: a row is still one issue in one component, its place " +
+			"that matches the rest: a row is still one issue in one component, its occurrence " +
 			"count is across every build it is in, and `builds` says how many those are. " +
 			"Across more than one build a row carries `stream` and `variant` naming one of " +
 			"them to link to, and carries no `owner`, `parent`, `middle` or `chains` — a " +
@@ -274,7 +274,7 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		VariantName: group.VariantName,
 		Tags:        group.Tags,
 		Fold:        group.Fold, Packages: group.Packages, Consumers: group.Consumers,
-		Places: group.Places, Answered: group.Answered,
+		Occurrences: group.Occurrences, Answered: group.Answered,
 		State: core.Standing(group.State), SentBack: group.SentBack,
 		Exploited: group.Exploited, ExploitedHere: group.ExploitedHere,
 		Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
@@ -306,7 +306,7 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 		Path:    "/v1/products/{product}/findings/components",
 		Summary: "List findings by component",
 		Description: "One row per component and version, with how many distinct issues are " +
-			"open against it and how many places those sit at. The level above the findings " +
+			"open against it and how many occurrences those have. The level above the findings " +
 			"list: it answers where the weight is rather than what is wrong, which is the " +
 			"question somebody asks before deciding what to read and what to put aside.\n\n" +
 			"It is also how a person finds the one package worth hiding. On a switch " +
@@ -322,7 +322,7 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 			"every key the findings list takes, read of the package rather than of one " +
 			"finding — the worst of what is open against it (`severity`, `urgency`, `epss`), " +
 			"the oldest thing in it (`age`), the soonest deadline in it (`deadline`) and how " +
-			"far it reaches (`places`) — and `asc` orders the other way.\n\n" +
+			"far it reaches (`occurrences`) — and `asc` orders the other way.\n\n" +
 			"`stream` and `variant` are optional and independent, as they are on the findings " +
 			"list: with either left out this counts across every build under the product that " +
 			"matches the rest. `beneath` is a walk over one build's edges and is refused " +
@@ -375,7 +375,7 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 				Ecosystem:  group.Ecosystem,
 				Namespace:  group.Namespace,
 				BySeverity: group.BySeverity, Worst: core.Band(group.Worst),
-				Issues: group.Issues, Places: group.Places, Exploited: group.Exploited,
+				Issues: group.Issues, Occurrences: group.Occurrences, Exploited: group.Exploited,
 				ExploitedHere: group.ExploitedHere,
 				Upgrades:      upgrades,
 			})
@@ -426,31 +426,31 @@ type BuildClaimBody struct {
 	Document      string `json:"document,omitempty" doc:"The VEX document the claim came from, where it was uploaded on its own"`
 }
 
-// SittingBody is one place a component occupies in this build.
+// SittingBody is one occurrence of a component in this build.
 type SittingBody struct {
-	Place string `json:"place" doc:"Name this when recording a decision about it"`
-	// Component is the package of the fold this place holds. A finding covers
-	// every binary one source package was built at one version, so a place
+	Occurrence string `json:"occurrence" doc:"Name this when recording a decision about it"`
+	// Component is the package of the fold this occurrence holds. A finding covers
+	// every binary one source package was built at one version, so an occurrence
 	// named only by its consumer leaves a reader unable to tell one from
 	// another.
-	Component string `json:"component" doc:"The package of the source package this place is"`
+	Component string `json:"component" doc:"The package of the source package this occurrence is"`
 	Consumer  string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 	// DeclaredAs is the producer's own word and nothing here reads it. It is
 	// not a rank input, not a prefilled outcome, and nothing is hidden by it:
 	// reading "build" as "does not ship" is wrong for every compiled language.
-	DeclaredAs string `json:"declared_as,omitempty" doc:"The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"`
-	Suppressed bool   `json:"suppressed,omitempty" doc:"The build has already argued this place away"`
-	AnsweredBy string `json:"answered_by,omitempty" doc:"The supplier whose statement answers this place on the routes that run through their product. The place stays open for the routes outside it"`
-	AnsweredIn string `json:"answered_in,omitempty" doc:"The supplier's product those routes run through"`
-	Decision   int64  `json:"decision,omitempty" doc:"The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument"`
-	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
+	DeclaredAs         string `json:"declared_as,omitempty" doc:"The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"`
+	Suppressed         bool   `json:"suppressed,omitempty" doc:"The build has already argued this occurrence away"`
+	AnsweredBy         string `json:"answered_by,omitempty" doc:"The supplier whose statement answers this occurrence on the routes that run through their product. The occurrence stays open for the routes outside it"`
+	AnsweredIn         string `json:"answered_in,omitempty" doc:"The supplier's product those routes run through"`
+	DecisionOccurrence int64  `json:"decision_occurrence,omitempty" doc:"The decision already standing at this occurrence, where one does. Not the same as suppressed, which is the build's own argument"`
+	Decision           int64  `json:"decision,omitempty" doc:"The decision that occurrence belongs to, so a decision shown on this finding can name the occurrences it covers rather than only count them"`
 	// DeferredDays is what a deferral asked for here is added to before it is
 	// measured against the threshold, so the form can say which side of it a
 	// date falls on before it is sent. Fractional, because the threshold is
 	// compared with exact durations and a whole number of days moves the line.
-	DeferredDays float64 `json:"deferred_days,omitempty" doc:"The total this place has been put off for, in days and parts of a day, across every deferral recorded about it, taken back ones included for the span they stood"`
-	// Chain is display rather than identity. A decision is keyed on the direct
-	// consumer and nothing else, which is what keeps one judgment from
+	DeferredDays float64 `json:"deferred_days,omitempty" doc:"The total this occurrence has been put off for, in days and parts of a day, across every deferral recorded about it, taken back ones included for the span they stood"`
+	// Chain is display rather than identity. A decision occurrence is keyed on the
+	// direct consumer and nothing else, which is what keeps one decision from
 	// multiplying by every route through the graph.
 	Chain []StepBody `json:"chain,omitempty" doc:"The way down to here, the build first and this component last. Empty where the inventory left the component unplaced"`
 }
@@ -536,7 +536,7 @@ type EvidenceBody struct {
 	Upstream  string        `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
 	FixState  core.FixState `json:"fix_state,omitempty"`
 	FixedIn   string        `json:"fixed_in,omitempty" doc:"The version that resolves it"`
-	// Matched is the route this place was reached by and MatchedFrom the data
+	// Matched is the route this occurrence was reached by and MatchedFrom the data
 	// that supplied it. The source sits here rather than on the issue because
 	// one issue reached through two ecosystems has two answers and the issue
 	// holds one, which is how a package from one distribution links to
@@ -563,10 +563,10 @@ type EvidenceBody struct {
 	// so this cannot be worked out again later — and without it the scanner
 	// and vulnerability database behind a finding dismissed on 3 March have no
 	// record at all.
-	Opened string `json:"opened,omitempty" doc:"The earliest of these places first appearing here, as a date"`
+	Opened string `json:"opened,omitempty" doc:"The earliest of these occurrences first appearing here, as a date"`
 	// Due and NoDeadline are the same pair the list carries. The screen
 	// somebody decides on needs both.
-	Due      string `json:"due,omitempty" doc:"The date it runs out. The earliest among its places, which is the one that makes the whole finding late"`
+	Due      string `json:"due,omitempty" doc:"The date it runs out. The earliest among its occurrences, which is the one that makes the whole finding late"`
 	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue"`
 	// The same words the list body declares, and the words the store emits.
 	// A consumer validating against the published document rejects a body
@@ -591,20 +591,20 @@ type EvidenceBody struct {
 	LatestReleasedAt string `json:"latest_released_at,omitempty" doc:"The date that version shipped"`
 	NothingSince     bool   `json:"nothing_since,omitempty" doc:"Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned"`
 
-	Places []SittingBody `json:"places"`
-	// Claimed is what the build says about the places shown, in its own
-	// words: the reason a place is marked or closed, and the workaround where
+	Occurrences []SittingBody `json:"occurrences"`
+	// Claimed is what the build says about the occurrences shown, in its own
+	// words: the reason an occurrence is marked or closed, and the workaround where
 	// the build says the flaw applies.
-	Claimed []BuildClaimBody `json:"claimed" doc:"The build's own claims covering any of the places shown, the ones that answer a place first"`
+	Claimed []BuildClaimBody `json:"claimed" doc:"The build's own claims covering any of the occurrences shown, the ones that answer an occurrence first"`
 
 	// AssignedTo is who is dealing with this, by sign-in identity. Empty means
 	// nobody — and it is the same field the assignment route writes, so the
 	// screen somebody reads a finding on is the screen they can hand it over
-	// from. Being able to record a judgment about something and not to say who
+	// from. Being able to record a decision about something and not to say who
 	// is dealing with it is a strange half of the same job.
 	//
 	// One name for the whole finding, because assignment is set for the whole
-	// group at once. Where the places somehow disagree it is left empty rather
+	// group at once. Where the occurrences somehow disagree it is left empty rather
 	// than naming one of them, which is the same rule the deadline list uses.
 	AssignedTo string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person"`
 	// RoutedBy names the standing rule that placed this, where a rule did
@@ -614,24 +614,24 @@ type EvidenceBody struct {
 
 	// Standing is the decisions in force here, so the finding is the
 	// working screen after a decision as well as before it: the live
-	// claims covering any of its places, the decisions that stopped
-	// applying with their reasoning offered back, and approved claims
-	// about other issues at the same places that may reach this one.
-	Standing []core.StandingClaimBody `json:"standing" doc:"Live claims covering any of this finding's places, newest first. A proposed one needing approval is waiting for a second person, and one needing nobody is in force"`
-	Previous []core.EarlierBody       `json:"previous" doc:"Decisions made at these places that lapsed or were withdrawn, newest first, with their reasoning"`
-	Similar  []core.SimilarBody       `json:"similar" doc:"Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five"`
+	// decisions covering any of its occurrences, the decisions that
+	// stopped applying with their reasoning offered back, and approved
+	// decisions about other issues at the same occurrences that may reach this one.
+	Standing []core.StandingDecisionBody `json:"standing" doc:"Live decisions covering any of this finding's occurrences, newest first. A proposed one needing approval is waiting for a second person, and one needing nobody is in force"`
+	Previous []core.EarlierBody          `json:"previous" doc:"Decisions made at these occurrences that lapsed or were withdrawn, newest first, with their reasoning"`
+	Similar  []core.SimilarBody          `json:"similar" doc:"Approved not-applicable decisions about other issues at the same component and consumer, which extends can carry to this one. At most five"`
 	// Elsewhere is another product's decision about this same issue at this
-	// same place. Evidence and a prefill, never an outcome: the software
+	// same occurrence. Evidence and a prefill, never an outcome: the software
 	// shipped around a component differs between products, which is the whole
-	// reason a place is a component at a position.
-	Elsewhere []core.ElsewhereBody `json:"elsewhere" doc:"Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five"`
+	// reason an occurrence is a component at a position.
+	Elsewhere []core.ElsewhereBody `json:"elsewhere" doc:"Approved decisions about this same issue at this same occurrence in another product. Evidence to read and quote, and never a decision about this product. At most five"`
 
 	// Said is the third layer beside the build's own claims and our
 	// decisions: the claims a distribution, an upstream security team or a
 	// supplier has published about this component. Evidence and a prefill. A
 	// supplier's statement about its own product is applied by the run, at
-	// the places that product occupies, and is here as the evidence for it.
-	Said []core.SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here or read from a supplier's directory. Evidence, and a prefill; a supplier's statement that its own product is not affected closes the places inside that product at the next scan"`
+	// the occurrences inside that product, and is here as the evidence for it.
+	Said []core.SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here or read from a supplier's directory. Evidence, and a prefill; a supplier's statement that its own product is not affected closes the occurrences inside that product at the next scan"`
 }
 
 func registerFindingDetail(api huma.API, in core.Deps) {
@@ -644,9 +644,9 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 			"description, the advisory, every reference the data carries with patches listed " +
 			"first, the score and what it assumes, whether it is known to be exploited and how " +
 			"likely exploitation is, the weakness classification, what upstream has done about " +
-			"it, and every place the component sits at here.\n\n" +
+			"it, and every occurrence of the component here.\n\n" +
 			"This is what a triage decision is made from, so it is gathered into one request. " +
-			"Each entry in `places` carries the `place` identity to name when recording a " +
+			"Each entry in `occurrences` carries the `occurrence` identity to name when recording a " +
 			"decision about it.\n\n" +
 			"A component name is not unique within a build. `version` says which where it ships " +
 			"at several, `ecosystem` where two share a version, and `namespace` where two share " +
@@ -696,8 +696,8 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		if err := labelPatches(ctx, in.DB.DB, body.References); err != nil {
 			return nil, core.WentWrong(in.Logger, "which branches carry the patches could not be read", err)
 		}
-		if err := putOff(ctx, in, subject, named.ProductID, issue, body.Places); err != nil {
-			return nil, core.WentWrong(in.Logger, "how long these places were put off could not be read", err)
+		if err := putOff(ctx, in, subject, named.ProductID, issue, body.Occurrences); err != nil {
+			return nil, core.WentWrong(in.Logger, "how long these occurrences were put off could not be read", err)
 		}
 		// The record kept in this product, where one stands. Read here rather
 		// than in the detail because it is the triage record's, and what it
@@ -710,10 +710,10 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 				"what this product was exploited through could not be read", err)
 		}
 
-		// The build's own places, with the versions it ships at each: what
-		// stands is matched by key, and a key carries versions a place name
-		// alone does not.
-		keyed, err := finding.NewStore(in.DB.DB).PlacesFor(ctx, subject, target.ID, issue, component)
+		// The build's own occurrences, with the versions it ships at each:
+		// what stands is matched by key, and a key carries versions an
+		// occurrence's name alone does not.
+		keyed, err := finding.NewStore(in.DB.DB).OccurrencesFor(ctx, subject, target.ID, issue, component)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "where this sits could not be read", err)
 		}
@@ -733,7 +733,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "what publishers say could not be read", err)
 		}
 		for _, one := range said {
-			// Offered for the version this place ships, because a statement
+			// Offered for the version this occurrence ships, because a statement
 			// naming a version is about that version: a publisher saying
 			// something is fixed in one is saying nothing about another.
 			// The component's own identifier where it has one, and its stated
@@ -785,10 +785,10 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		MatchedIn: e.MatchedIn, MatchedRange: e.MatchedRange, Recorded: e.Recorded,
 		LatestVersion: e.LatestVersion, NothingSince: e.NothingSince,
 		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, RoutedBy: e.RoutedBy,
-		Tags:     e.Tags,
-		Places:   make([]SittingBody, 0, len(e.Places)),
-		Claimed:  make([]BuildClaimBody, 0, len(e.Claimed)),
-		Standing: []core.StandingClaimBody{}, Previous: []core.EarlierBody{}, Similar: []core.SimilarBody{},
+		Tags:        e.Tags,
+		Occurrences: make([]SittingBody, 0, len(e.Occurrences)),
+		Claimed:     make([]BuildClaimBody, 0, len(e.Claimed)),
+		Standing:    []core.StandingDecisionBody{}, Previous: []core.EarlierBody{}, Similar: []core.SimilarBody{},
 		Elsewhere: []core.ElsewhereBody{},
 		Said:      []core.SaidBody{},
 	}
@@ -832,54 +832,54 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 	for _, link := range e.Links {
 		body.Links = append(body.Links, LinkBody{URL: link.URL, Name: link.Name})
 	}
-	for _, claim := range e.Claimed {
+	for _, decision := range e.Claimed {
 		body.Claimed = append(body.Claimed, BuildClaimBody{
-			Status: claim.Status, Justification: claim.Justification, Statement: claim.Statement,
-			Subject: claim.Subject, Version: claim.Version,
-			Within: claim.Within, WithinVersion: claim.WithinVersion,
-			Pedigree: claim.Pedigree, Publisher: claim.Publisher, Document: claim.Document,
+			Status: decision.Status, Justification: decision.Justification, Statement: decision.Statement,
+			Subject: decision.Subject, Version: decision.Version,
+			Within: decision.Within, WithinVersion: decision.WithinVersion,
+			Pedigree: decision.Pedigree, Publisher: decision.Publisher, Document: decision.Document,
 		})
 	}
-	for _, place := range e.Places {
+	for _, occurrence := range e.Occurrences {
 		sitting := SittingBody{
-			Place: place.PlaceIdentity, Component: place.Component,
-			Consumer: place.Consumer, Suppressed: place.Suppressed,
-			AnsweredBy: place.AnsweredBy, AnsweredIn: place.AnsweredIn,
-			DeclaredAs: place.DeclaredAs,
+			Occurrence: occurrence.OccurrenceIdentity, Component: occurrence.Component,
+			Consumer: occurrence.Consumer, Suppressed: occurrence.Suppressed,
+			AnsweredBy: occurrence.AnsweredBy, AnsweredIn: occurrence.AnsweredIn,
+			DeclaredAs: occurrence.DeclaredAs,
 		}
-		if place.Decision != nil {
-			sitting.Decision = *place.Decision
+		if occurrence.DecisionOccurrence != nil {
+			sitting.DecisionOccurrence = *occurrence.DecisionOccurrence
 		}
-		if place.Claim != nil {
-			sitting.Claim = *place.Claim
+		if occurrence.Decision != nil {
+			sitting.Decision = *occurrence.Decision
 		}
-		for _, step := range place.Chain {
+		for _, step := range occurrence.Chain {
 			sitting.Chain = append(sitting.Chain, StepBody{
 				Component: step.Name, Version: step.Version,
 				Ecosystem: graph.EcosystemOf(step.Purl), Namespace: graph.NamespaceOf(step.Purl),
 			})
 		}
-		body.Places = append(body.Places, sitting)
+		body.Occurrences = append(body.Occurrences, sitting)
 	}
 	return body
 }
 
-// putOff fills in how long each place has been put off for, in one read.
+// putOff fills in how long each occurrence has been put off for, in one read.
 func putOff(ctx context.Context, in core.Deps, subject access.Subject, productID,
-	vulnerabilityID int64, places []SittingBody) error {
-	if len(places) == 0 {
+	vulnerabilityID int64, occurrences []SittingBody) error {
+	if len(occurrences) == 0 {
 		return nil
 	}
-	names := make([]string, 0, len(places))
-	for _, place := range places {
-		names = append(names, place.Place)
+	names := make([]string, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		names = append(names, occurrence.Occurrence)
 	}
 	totals, err := triage.NewStore(in.DB.DB).DeferredAt(ctx, subject, productID, vulnerabilityID, names)
 	if err != nil {
 		return err
 	}
-	for i := range places {
-		places[i].DeferredDays = totals[places[i].Place].Hours() / 24
+	for i := range occurrences {
+		occurrences[i].DeferredDays = totals[occurrences[i].Occurrence].Hours() / 24
 	}
 	return nil
 }

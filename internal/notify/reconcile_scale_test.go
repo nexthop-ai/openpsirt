@@ -19,8 +19,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
-// The shape of a sweep that opens every waiting claim at once: the triage
-// bench holds 430 claims waiting on a second person in one product, and 200
+// The shape of a sweep that opens every waiting decision at once: the triage
+// bench holds 430 decisions waiting on a second person in one product, and 200
 // approvers there each hear about all of them, which is 86,000 conditions.
 const (
 	sweepPeople = 200
@@ -54,8 +54,8 @@ func TestMeasureASweepOpeningEveryWaitingClaim(t *testing.T) {
 			for i := range out {
 				out[i] = notify.Holds{
 					About: fmt.Sprintf("claim-waiting %d", i),
-					Body: fmt.Sprintf("A claim in sonic has been waiting %s for a second person. "+
-						"It covers %d places and takes effect only once somebody agrees to it.",
+					Body: fmt.Sprintf("A decision in sonic has been waiting %s for a second person. "+
+						"It covers %d occurrences and takes effect only once somebody agrees to it.",
 						waiting, i+1),
 					Link: "/review-queue",
 				}

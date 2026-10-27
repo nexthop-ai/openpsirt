@@ -60,27 +60,27 @@ func (s *matchedStatements) matching(prefix string) (count int, matched int64) {
 }
 
 // written is what an update to an open finding may have written, by issue and
-// place, for comparing two builds.
+// occurrence, for comparing two builds.
 type written struct {
-	Identifier       string     `bun:"identifier"`
-	PlaceIdentity    string     `bun:"occurrence_identity"`
-	Urgency          int64      `bun:"urgency"`
-	Exploited        bool       `bun:"urgency_exploited"`
-	Shipped          bool       `bun:"urgency_shipped"`
-	FixState         string     `bun:"fix_state"`
-	FixedIn          string     `bun:"fixed_in"`
-	FixedAt          *time.Time `bun:"fixed_at"`
-	Matched          string     `bun:"matched"`
-	MatchedFrom      string     `bun:"matched_from"`
-	MatchedIn        string     `bun:"matched_in"`
-	MatchedRange     string     `bun:"matched_range"`
-	SuppressedBy     *int64     `bun:"suppressed_by"`
-	StatedBy         *int64     `bun:"stated_by"`
-	ClaimedBy        *int64     `bun:"claimed_by"`
-	ExploitedLearned *time.Time `bun:"exploited_learned_at"`
+	Identifier         string     `bun:"identifier"`
+	OccurrenceIdentity string     `bun:"occurrence_identity"`
+	Urgency            int64      `bun:"urgency"`
+	Exploited          bool       `bun:"urgency_exploited"`
+	Shipped            bool       `bun:"urgency_shipped"`
+	FixState           string     `bun:"fix_state"`
+	FixedIn            string     `bun:"fixed_in"`
+	FixedAt            *time.Time `bun:"fixed_at"`
+	Matched            string     `bun:"matched"`
+	MatchedFrom        string     `bun:"matched_from"`
+	MatchedIn          string     `bun:"matched_in"`
+	MatchedRange       string     `bun:"matched_range"`
+	SuppressedBy       *int64     `bun:"suppressed_by"`
+	StatedBy           *int64     `bun:"stated_by"`
+	ClaimedBy          *int64     `bun:"claimed_by"`
+	ExploitedLearned   *time.Time `bun:"exploited_learned_at"`
 }
 
-// writtenIn is every open finding of one build, by issue and place.
+// writtenIn is every open finding of one build, by issue and occurrence.
 func (f *fixture) writtenIn(t *testing.T, target int64) map[[2]string]written {
 	t.Helper()
 	var rows []written
@@ -99,7 +99,7 @@ func (f *fixture) writtenIn(t *testing.T, target int64) map[[2]string]written {
 	}
 	out := map[[2]string]written{}
 	for _, row := range rows {
-		out[[2]string{row.Identifier, row.PlaceIdentity}] = row
+		out[[2]string{row.Identifier, row.OccurrenceIdentity}] = row
 	}
 	return out
 }
@@ -145,7 +145,7 @@ func TestARescanWritesEachMovedFindingWhatAFirstScanOfTheReportWould(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Four issues at the two places libnl sits.
+		// Four issues at the two occurrences libnl sits.
 		if applied.Updated != 8 {
 			t.Errorf("updated %d findings, want 8", applied.Updated)
 		}
@@ -238,7 +238,7 @@ func TestReRankingAfterAScanLeavesTheScannedBuildAsTheScanRankedIt(t *testing.T)
 }
 
 func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
-	// The latest closed row of each place is picked by two membership tests
+	// The latest closed row of each occurrence is picked by two membership tests
 	// joined by OR, which PostgreSQL and MySQL never read as a semi-join. The
 	// build, the kind
 	// and the issues are repeated on the outer read so it walks only their
@@ -279,10 +279,10 @@ func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
 
 func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *testing.T) {
 	// A feed moving the likelihood moves it for nearly every issue, each to a
-	// value of its own, and with it the order of every place each issue sits.
-	// The estimates, the scanned build's order and every other build's order
-	// are each written a statement per batch, every row taking its own value
-	// by its identifier inside the statement. A value handed to the wrong
+	// value of its own, and with it the order of every occurrence each issue
+	// sits. The estimates, the scanned build's order and every other build's
+	// order are each written a statement per batch, every row taking its own
+	// value by its identifier inside the statement. A value handed to the wrong
 	// row shows as an issue holding another's estimate, or as two builds
 	// ordering one issue differently.
 	each(t, func(t *testing.T, f *fixture) {
@@ -339,7 +339,7 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 			t.Fatal(err)
 		}
 		all := append(append([]string(nil), dated...), undated...)
-		// Every issue at the two places libnl sits.
+		// Every issue at the two occurrences libnl sits.
 		if want := 2 * len(all); applied.Updated != want {
 			t.Fatalf("updated %d findings, want %d", applied.Updated, want)
 		}

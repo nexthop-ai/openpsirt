@@ -17,23 +17,23 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// ends puts one row of a claim where a lapse leaves it: ended at a moment,
+// ends puts one row of a decision where a lapse leaves it: ended at a moment,
 // holding no live key.
-func (f *fixture) ends(t *testing.T, decisionID int64, at time.Time) {
+func (f *fixture) ends(t *testing.T, occurrenceID int64, at time.Time) {
 	t.Helper()
-	if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
+	if _, err := f.db.DB.NewUpdate().Model((*triage.DecisionOccurrence)(nil)).
 		Set(`"state" = ?`, triage.LapsedState).
 		Set(`"live_key" = ?`, nil).
 		Set(`"ended_at" = ?`, at).
-		Where(`"id" = ?`, decisionID).Exec(t.Context()); err != nil {
+		Where(`"id" = ?`, occurrenceID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// row reads one decision back as stored.
-func (f *fixture) row(t *testing.T, id int64) triage.Decision {
+// row reads one decision occurrence back as stored.
+func (f *fixture) row(t *testing.T, id int64) triage.DecisionOccurrence {
 	t.Helper()
-	var row triage.Decision
+	var row triage.DecisionOccurrence
 	if err := f.db.DB.NewSelect().Model(&row).Where(`"de"."id" = ?`, id).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -41,13 +41,13 @@ func (f *fixture) row(t *testing.T, id int64) triage.Decision {
 }
 
 func TestUndoingAnApprovalLeavesARowThatHasEndedAlone(t *testing.T) {
-	// A lapse leaves the approval standing, so the claim is still in the
+	// A lapse leaves the approval standing, so the decision is still in the
 	// batch. Returned to waiting, the lapsed row would be a proposal holding
-	// no live key, which nothing stops a contradicting claim from joining.
+	// no live key, which nothing stops a contradicting decision from joining.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		made := f.claimsMany(t, f.places("under-a", "under-b"))
-		if err := agreeTo(ctx, f.store, f.reviewer, made[0].ClaimID, "one-afternoon"); err != nil {
+		made := f.decisionsMany(t, f.occurrences("under-a", "under-b"))
+		if err := agreeTo(ctx, f.store, f.reviewer, made[0].DecisionID, "one-afternoon"); err != nil {
 			t.Fatal(err)
 		}
 		ended := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
@@ -70,102 +70,102 @@ func TestUndoingAnApprovalLeavesARowThatHasEndedAlone(t *testing.T) {
 	})
 }
 
-func TestRevivingAClaimWhosePlaceIsTakenNamesTheClaimStandingThere(t *testing.T) {
-	// Revising a withdrawn claim retakes its places. Where another claim
+func TestRevivingADecisionWhoseOccurrenceIsTakenNamesTheDecisionStandingThere(t *testing.T) {
+	// Revising a withdrawn decision retakes its occurrences. Where another decision
 	// holds one since, the refusal is the one proposing there gets.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		first := f.claims(t, f.at())
-		if _, err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+		first := f.decisions(t, f.at())
+		if _, err := f.store.Withdraw(ctx, f.triager, first.DecisionID); err != nil {
 			t.Fatal(err)
 		}
-		standing := f.claims(t, f.at())
+		standing := f.decisions(t, f.at())
 
-		_, err := f.store.Revise(ctx, f.triager, first.ClaimID, "On reflection it holds.")
+		_, err := f.store.Revise(ctx, f.triager, first.DecisionID, "On reflection it holds.")
 		if !errors.Is(err, triage.ErrAlreadyDecided) {
-			t.Fatalf("reviving onto a taken place answered %v, want it already decided", err)
+			t.Fatalf("reviving onto a taken occurrence answered %v, want it already decided", err)
 		}
-		if !strings.Contains(err.Error(), fmt.Sprintf("decision %d ", standing.ID)) {
-			t.Errorf("the refusal %q does not name decision %d", err, standing.ID)
+		if !strings.Contains(err.Error(), fmt.Sprintf("decision occurrence %d ", standing.ID)) {
+			t.Errorf("the refusal %q does not name decision occurrence %d", err, standing.ID)
 		}
 	})
 }
 
-func TestRevivingAPartlyEndedClaimNamesTheClaimAtTheTakenPlace(t *testing.T) {
-	// One place of two lapsed and another claim took it. The refusal names
-	// that claim's row, never the reviving claim's own row still standing at
-	// the other place.
+func TestRevivingAPartlyEndedDecisionNamesTheDecisionAtTheTakenOccurrence(t *testing.T) {
+	// One occurrence of two lapsed and another decision took it. The refusal names
+	// that decision's row, never the reviving decision's own row still standing at
+	// the other occurrence.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		made := f.claimsMany(t, f.places("under-a", "under-b"))
+		made := f.decisionsMany(t, f.occurrences("under-a", "under-b"))
 		f.ends(t, made[1].ID, time.Now().UTC().Truncate(time.Microsecond))
-		standing := f.claims(t, f.places("under-b")[0])
+		standing := f.decisions(t, f.occurrences("under-b")[0])
 
-		_, err := f.store.Revise(ctx, f.triager, made[0].ClaimID, "On reflection it holds.")
+		_, err := f.store.Revise(ctx, f.triager, made[0].DecisionID, "On reflection it holds.")
 		if !errors.Is(err, triage.ErrAlreadyDecided) {
-			t.Fatalf("reviving onto a taken place answered %v, want it already decided", err)
+			t.Fatalf("reviving onto a taken occurrence answered %v, want it already decided", err)
 		}
-		if !strings.Contains(err.Error(), fmt.Sprintf("decision %d ", standing.ID)) {
-			t.Errorf("the refusal %q does not name decision %d", err, standing.ID)
+		if !strings.Contains(err.Error(), fmt.Sprintf("decision occurrence %d ", standing.ID)) {
+			t.Errorf("the refusal %q does not name decision occurrence %d", err, standing.ID)
 		}
 	})
 }
 
-func TestMovingAWithdrawnPromiseOntoATakenPlaceNamesTheClaimThere(t *testing.T) {
+func TestMovingAWithdrawnPromiseOntoATakenOccurrenceNamesTheDecisionThere(t *testing.T) {
 	// Changing a promise revives it, so it meets the same refusal a revision
-	// does, and names the claim standing at the place the same way.
+	// does, and names the decision standing at the occurrence the same way.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		by := time.Now().UTC().AddDate(0, 0, 30).Truncate(time.Second)
 		promised, err := f.store.Propose(ctx, f.triager, triage.Proposal{
-			Place: f.at(), Outcome: triage.UpgradeNeeded, UpgradeTo: "2.0", CommittedTo: &by,
+			Occurrence: f.at(), Outcome: triage.UpgradeNeeded, UpgradeTo: "2.0", CommittedTo: &by,
 			Reasoning: "Moving to the release that drops the parser.", By: f.proposer,
 			NeedsApproval: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Withdraw(ctx, f.triager, promised.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, promised.DecisionID); err != nil {
 			t.Fatal(err)
 		}
-		standing := f.claims(t, f.at())
+		standing := f.decisions(t, f.at())
 
-		_, _, err = f.store.Repromise(ctx, f.triager, promised.ClaimID, "2.1", by,
+		_, _, err = f.store.Repromise(ctx, f.triager, promised.DecisionID, "2.1", by,
 			"The release moved.")
 		if !errors.Is(err, triage.ErrAlreadyDecided) {
-			t.Fatalf("moving a promise onto a taken place answered %v, want it already decided", err)
+			t.Fatalf("moving a promise onto a taken occurrence answered %v, want it already decided", err)
 		}
-		if !strings.Contains(err.Error(), fmt.Sprintf("decision %d ", standing.ID)) {
-			t.Errorf("the refusal %q does not name decision %d", err, standing.ID)
+		if !strings.Contains(err.Error(), fmt.Sprintf("decision occurrence %d ", standing.ID)) {
+			t.Errorf("the refusal %q does not name decision occurrence %d", err, standing.ID)
 		}
 	})
 }
 
-func TestAWithdrawnClaimIsNotOfferedForReaffirming(t *testing.T) {
-	// Withdrawing a partly lapsed claim leaves its lapsed row lapsed. The
-	// claim was taken back, so re-affirming it would re-make a judgment its
+func TestAWithdrawnDecisionIsNotOfferedForReaffirming(t *testing.T) {
+	// Withdrawing a partly lapsed decision leaves its lapsed row lapsed. The
+	// decision was taken back, so re-affirming it would re-make a decision its
 	// author withdrew.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		made := f.claimsMany(t, f.places("under-a", "under-b"))
+		made := f.decisionsMany(t, f.occurrences("under-a", "under-b"))
 		f.ends(t, made[1].ID, time.Now().UTC().Truncate(time.Microsecond))
-		if ok, err := f.store.Reaffirmable(ctx, f.triager, made[0].ClaimID); err != nil || !ok {
-			t.Fatalf("a partly lapsed claim reads as re-affirmable %v (%v), want true, "+
+		if ok, err := f.store.Reaffirmable(ctx, f.triager, made[0].DecisionID); err != nil || !ok {
+			t.Fatalf("a partly lapsed decision reads as re-affirmable %v (%v), want true, "+
 				"so this checks nothing", ok, err)
 		}
-		if _, err := f.store.Withdraw(ctx, f.triager, made[0].ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, made[0].DecisionID); err != nil {
 			t.Fatal(err)
 		}
 
-		if ok, err := f.store.Reaffirmable(ctx, f.triager, made[0].ClaimID); err != nil || ok {
-			t.Errorf("a withdrawn claim reads as re-affirmable %v (%v)", ok, err)
+		if ok, err := f.store.Reaffirmable(ctx, f.triager, made[0].DecisionID); err != nil || ok {
+			t.Errorf("a withdrawn decision reads as re-affirmable %v (%v)", ok, err)
 		}
 		listed, total, err := f.store.ToReaffirm(ctx, f.triager, 0, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(listed) != 0 || total != 0 {
-			t.Errorf("a withdrawn claim is listed to re-affirm: %d rows, total %d", len(listed), total)
+			t.Errorf("a withdrawn decision is listed to re-affirm: %d rows, total %d", len(listed), total)
 		}
 	})
 }
@@ -177,23 +177,23 @@ func TestASweepLapsingMoreThanOneBatchTellsEachProposerOnce(t *testing.T) {
 		ctx := t.Context()
 		in := f.build(t, f.product, "2026.03")
 		moved := f.component(t, "libfoo", "1.2.4")
-		made := f.claims(t, f.at())
+		made := f.decisions(t, f.at())
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		size := database.InBulk.Most + 1
 		findings := make([]finding.Finding, 0, size)
-		rows := make([]triage.Decision, 0, size)
+		rows := make([]triage.DecisionOccurrence, 0, size)
 		for i := range size {
-			place := fmt.Sprintf("place-%04d", i)
+			occurrence := fmt.Sprintf("place-%04d", i)
 			findings = append(findings, finding.Finding{
 				TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
-				Visibility: access.Public, ComponentID: moved, PlaceIdentity: place,
+				Visibility: access.Public, ComponentID: moved, OccurrenceIdentity: occurrence,
 				OpenedAt: now, OpenedRunID: &in.run,
 			})
 			key := fmt.Sprintf("bulk-%04d", i)
 			version := "1.2.3"
-			rows = append(rows, triage.Decision{
-				ClaimID: made.ClaimID, ProductID: f.product, VulnerabilityID: f.issue,
-				PlaceIdentity: place, Visibility: access.Public,
+			rows = append(rows, triage.DecisionOccurrence{
+				DecisionID: made.DecisionID, ProductID: f.product, VulnerabilityID: f.issue,
+				OccurrenceIdentity: occurrence, Visibility: access.Public,
 				ComponentUpstreamVersion: &version, State: triage.Proposed,
 				NeedsApproval: true, ProposedBy: made.ProposedBy, ProposedAt: now, LiveKey: &key,
 			})
@@ -222,7 +222,7 @@ func TestAProposerWhoseRowsSpanSeveralReadsIsToldOnce(t *testing.T) {
 	// A sweep lapsing more rows than one read names reads who to tell in
 	// pieces. One person is one notice however the rows fall.
 	each(t, func(t *testing.T, f *fixture) {
-		made := f.claimsMany(t, f.places("under-a", "under-b", "under-c"))
+		made := f.decisionsMany(t, f.occurrences("under-a", "under-b", "under-c"))
 		ids := []int64{made[2].ID, made[0].ID, made[1].ID}
 		told, err := f.store.ProposersOfAll(t.Context(), ids, 1)
 		if err != nil {
@@ -231,38 +231,38 @@ func TestAProposerWhoseRowsSpanSeveralReadsIsToldOnce(t *testing.T) {
 		if len(told) != 1 {
 			t.Fatalf("one proposer came back as %d entries: %+v", len(told), told)
 		}
-		if told[0].Rows != 3 || told[0].DecisionID != made[0].ID {
-			t.Errorf("told %+v, want three rows represented by decision %d", told[0], made[0].ID)
+		if told[0].Rows != 3 || told[0].DecisionOccurrenceID != made[0].ID {
+			t.Errorf("told %+v, want three rows represented by decision occurrence %d", told[0], made[0].ID)
 		}
 	})
 }
 
-func TestASimilarClaimCountsEveryIssueItCovers(t *testing.T) {
-	// A bulk claim offered as similar covers far more rows than one read
+func TestASimilarDecisionCountsEveryIssueItCovers(t *testing.T) {
+	// A bulk decision offered as similar covers far more rows than one read
 	// returns. Its issue count is over all of them.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		other := f.at()
 		other.VulnerabilityID = f.secondIssue(t)
-		other.PlaceIdentity = "under-b"
-		agreed := f.claimsMany(t, []triage.Place{other})
-		if _, err := f.store.ApproveClaim(ctx, f.reviewer, agreed[0].ClaimID, "", nil, ""); err != nil {
+		other.OccurrenceIdentity = "under-b"
+		agreed := f.decisionsMany(t, []triage.Occurrence{other})
+		if _, err := f.store.ApproveDecision(ctx, f.reviewer, agreed[0].DecisionID, "", nil, ""); err != nil {
 			t.Fatal(err)
 		}
-		// Many more rows of the same claim about the second issue, then one
+		// Many more rows of the same decision about the second issue, then one
 		// about a third, written last.
 		template := f.row(t, agreed[0].ID)
-		filler := make([]triage.Decision, 0, 601)
+		filler := make([]triage.DecisionOccurrence, 0, 601)
 		for i := range 600 {
 			row := template
 			row.ID = 0
 			row.LiveKey = nil
-			row.PlaceIdentity = fmt.Sprintf("filler-%03d", i)
+			row.OccurrenceIdentity = fmt.Sprintf("filler-%03d", i)
 			filler = append(filler, row)
 		}
 		last := template
 		last.ID, last.LiveKey = 0, nil
-		last.PlaceIdentity = "filler-last"
+		last.OccurrenceIdentity = "filler-last"
 		last.VulnerabilityID = f.anotherIssue(t, "CVE-2026-3")
 		filler = append(filler, last)
 		if _, err := f.db.DB.NewInsert().Model(&filler).Exec(ctx); err != nil {
@@ -272,26 +272,26 @@ func TestASimilarClaimCountsEveryIssueItCovers(t *testing.T) {
 		similar, err := f.store.SimilarAt(ctx, f.reviewer, f.product, f.issue,
 			[]string{"under-b"})
 		if err != nil || len(similar) != 1 {
-			t.Fatalf("the bulk claim is not offered: %+v (%v)", similar, err)
+			t.Fatalf("the bulk decision is not offered: %+v (%v)", similar, err)
 		}
 		if similar[0].Issues != 2 {
-			t.Errorf("a claim over two issues is offered as covering %d", similar[0].Issues)
+			t.Errorf("a decision over two issues is offered as covering %d", similar[0].Issues)
 		}
 	})
 }
 
-func TestWhatAPersonGotThroughIsCountedInClaims(t *testing.T) {
-	// One argument over many places is one piece of work, whether it was
+func TestWhatAPersonGotThroughIsCountedInDecisions(t *testing.T) {
+	// One argument over many occurrences is one piece of work, whether it was
 	// made, agreed to or taken back. Counted per row, a bulk proposer reads
-	// as forty-five times busier than the approver of the same claim.
+	// as forty-five times busier than the approver of the same decision.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		kept := f.claimsMany(t, f.places("under-a", "under-b", "under-c"))
-		if err := agreeTo(ctx, f.store, f.reviewer, kept[0].ClaimID, ""); err != nil {
+		kept := f.decisionsMany(t, f.occurrences("under-a", "under-b", "under-c"))
+		if err := agreeTo(ctx, f.store, f.reviewer, kept[0].DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
-		dropped := f.claimsMany(t, f.places("under-d", "under-e"))
-		if _, err := f.store.Withdraw(ctx, f.triager, dropped[0].ClaimID); err != nil {
+		dropped := f.decisionsMany(t, f.occurrences("under-d", "under-e"))
+		if _, err := f.store.Withdraw(ctx, f.triager, dropped[0].DecisionID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -304,28 +304,28 @@ func TestWhatAPersonGotThroughIsCountedInClaims(t *testing.T) {
 			got[one.Person] = one
 		}
 		if p := got["proposer"]; p.Proposed != 2 || p.Withdrawn != 1 {
-			t.Errorf("the proposer made %d claims and withdrew %d, want 2 and 1", p.Proposed, p.Withdrawn)
+			t.Errorf("the proposer made %d decisions and withdrew %d, want 2 and 1", p.Proposed, p.Withdrawn)
 		}
 		if a := got["approver"]; a.Approved != 1 {
-			t.Errorf("the approver agreed to %d claims, want 1", a.Approved)
+			t.Errorf("the approver agreed to %d decisions, want 1", a.Approved)
 		}
 	})
 }
 
-func TestAClaimThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
-	// The cap applies to the claims that grew, worst first. Taken off the
-	// oldest agreements, a claim agreed to after them never appears.
+func TestADecisionThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
+	// The cap applies to the decisions that grew, worst first. Taken off the
+	// oldest agreements, a decision agreed to after them never appears.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		in := f.build(t, f.product, "2026.03")
 		libfoo := f.component(t, "libfoo", "1.2.3")
-		for _, place := range []string{"place-a", "place-b"} {
+		for _, occurrence := range []string{"place-a", "place-b"} {
 			at := f.at()
-			at.PlaceIdentity = place
+			at.OccurrenceIdentity = occurrence
 			at.ConsumerUpstream = ""
 			f.agreed(t, at)
 		}
-		// The newer claim now reaches a finding nobody agreed to it covering.
+		// The newer decision now reaches a finding nobody agreed to it covering.
 		f.finds(t, in, libfoo, "place-b", access.Public)
 
 		scrutiny, err := f.store.Scrutinize(ctx, f.reviewer, nil, time.Time{}, time.Time{}, 1)
@@ -333,24 +333,24 @@ func TestAClaimThatGrewIsReportedHoweverManyWereAgreedToBeforeIt(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(scrutiny.Grew) != 1 || scrutiny.Grew[0].CoversNow != 1 {
-			t.Fatalf("what grew reads %+v, want the claim at place-b covering one", scrutiny.Grew)
+			t.Fatalf("what grew reads %+v, want the decision at place-b covering one", scrutiny.Grew)
 		}
 	})
 }
 
-func TestAClaimGrowsOnlyByWhatItsLiveRowsReach(t *testing.T) {
-	// A lapsed row covers nothing, so a build holding its place again is not
+func TestADecisionGrowsOnlyByWhatItsLiveRowsReach(t *testing.T) {
+	// A lapsed row covers nothing, so a build holding its occurrence again is not
 	// growth anybody has to be told about.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		places := make([]triage.Place, 0, 2)
+		occurrences := make([]triage.Occurrence, 0, 2)
 		for _, name := range []string{"place-live", "place-lapsed"} {
 			at := f.at()
-			at.PlaceIdentity, at.ConsumerUpstream = name, ""
-			places = append(places, at)
+			at.OccurrenceIdentity, at.ConsumerUpstream = name, ""
+			occurrences = append(occurrences, at)
 		}
-		made := f.claimsMany(t, places)
-		if err := agreeTo(ctx, f.store, f.reviewer, made[0].ClaimID, ""); err != nil {
+		made := f.decisionsMany(t, occurrences)
+		if err := agreeTo(ctx, f.store, f.reviewer, made[0].DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 		f.ends(t, made[1].ID, time.Now().UTC().Truncate(time.Microsecond))
@@ -364,87 +364,87 @@ func TestAClaimGrowsOnlyByWhatItsLiveRowsReach(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(scrutiny.Grew) != 1 || scrutiny.Grew[0].CoversNow != 1 {
-			t.Errorf("what grew reads %+v, want the claim covering one through its live row",
+			t.Errorf("what grew reads %+v, want the decision covering one through its live row",
 				scrutiny.Grew)
 		}
 	})
 }
 
-func TestAWithdrawnClaimReachesNothing(t *testing.T) {
-	// What a claim covers now is what it suppresses. Taken back, it
+func TestAWithdrawnDecisionReachesNothing(t *testing.T) {
+	// What a decision covers now is what it suppresses. Taken back, it
 	// suppresses nothing, however well its versions still match.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		in := f.build(t, f.product, "2026.03")
 		at := f.at()
-		at.PlaceIdentity = "place-of-libfoo"
+		at.OccurrenceIdentity = "place-of-libfoo"
 		at.ConsumerUpstream = ""
 		f.finds(t, in, f.component(t, "libfoo", "1.2.3"), "place-of-libfoo", access.Public)
-		made := f.claims(t, at)
+		made := f.decisions(t, at)
 
-		before, err := f.store.Whole(ctx, f.triager, made.ClaimID)
+		before, err := f.store.Whole(ctx, f.triager, made.DecisionID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if before.Reach.Findings != 1 || len(before.Builds) != 1 {
-			t.Fatalf("a standing claim reaches %+v in %v, want one finding in one build",
+			t.Fatalf("a standing decision reaches %+v in %v, want one finding in one build",
 				before.Reach, before.Builds)
 		}
-		if _, err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, made.DecisionID); err != nil {
 			t.Fatal(err)
 		}
-		after, err := f.store.Whole(ctx, f.triager, made.ClaimID)
+		after, err := f.store.Whole(ctx, f.triager, made.DecisionID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if after.Reach.Findings != 0 || len(after.Builds) != 0 {
-			t.Errorf("a withdrawn claim reaches %+v in %v, want nothing", after.Reach, after.Builds)
+			t.Errorf("a withdrawn decision reaches %+v in %v, want nothing", after.Reach, after.Builds)
 		}
 	})
 }
 
-func TestAWithdrawnClaimReportsWhatItReachedWhenItWasWithdrawn(t *testing.T) {
-	// Taken back, a claim reaches nothing now. What it reached then is the
-	// builds holding one of its places open at that moment: a finding closed
+func TestAWithdrawnDecisionReportsWhatItReachedWhenItWasWithdrawn(t *testing.T) {
+	// Taken back, a decision reaches nothing now. What it reached then is the
+	// builds holding one of its occurrences open at that moment: a finding closed
 	// before it and one opened after it are not part of it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		at := f.at()
-		at.PlaceIdentity = "place-of-libfoo"
+		at.OccurrenceIdentity = "place-of-libfoo"
 		at.ConsumerUpstream = ""
 		libfoo := f.component(t, "libfoo", "1.2.3")
 
 		held := f.build(t, f.product, "2026.03")
-		f.finds(t, held, libfoo, at.PlaceIdentity, access.Public)
+		f.finds(t, held, libfoo, at.OccurrenceIdentity, access.Public)
 		gone := f.build(t, f.product, "2026.02")
-		closed := f.finds(t, gone, libfoo, at.PlaceIdentity, access.Public)
+		closed := f.finds(t, gone, libfoo, at.OccurrenceIdentity, access.Public)
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"closed_at" = ?`, time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)).
 			Set(`"closed_run_id" = ?`, gone.run).
 			Where(`"id" = ?`, closed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		made := f.claims(t, at)
-		if _, err := f.store.Withdraw(ctx, f.triager, made.ClaimID); err != nil {
+		made := f.decisions(t, at)
+		if _, err := f.store.Withdraw(ctx, f.triager, made.DecisionID); err != nil {
 			t.Fatal(err)
 		}
 		later := f.build(t, f.product, "2026.04")
-		f.opened(t, f.finds(t, later, libfoo, at.PlaceIdentity, access.Public),
+		f.opened(t, f.finds(t, later, libfoo, at.OccurrenceIdentity, access.Public),
 			time.Now().UTC().Add(time.Hour))
 
-		whole, err := f.store.Whole(ctx, f.triager, made.ClaimID)
+		whole, err := f.store.Whole(ctx, f.triager, made.DecisionID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if whole.Reach.Findings != 0 || len(whole.Builds) != 0 {
-			t.Errorf("a withdrawn claim reaches %+v in %v now, want nothing", whole.Reach, whole.Builds)
+			t.Errorf("a withdrawn decision reaches %+v in %v now, want nothing", whole.Reach, whole.Builds)
 		}
 		if len(whole.Ended) != 1 {
 			t.Fatalf("ended parts %+v, want the withdrawn one alone", whole.Ended)
 		}
 		part := whole.Ended[0]
-		if part.State != triage.Withdrawn || part.Rows != 1 || part.Places != 1 {
-			t.Errorf("the withdrawn part is %+v, want one row at one place", part)
+		if part.State != triage.Withdrawn || part.Rows != 1 || part.Occurrences != 1 {
+			t.Errorf("the withdrawn part is %+v, want one row at one occurrence", part)
 		}
 		if len(part.Builds) != 1 || !strings.HasPrefix(part.Builds[0], "2026.03") {
 			t.Errorf("it reached %v when withdrawn, want 2026.03 alone", part.Builds)
@@ -455,18 +455,18 @@ func TestAWithdrawnClaimReportsWhatItReachedWhenItWasWithdrawn(t *testing.T) {
 	})
 }
 
-func TestAPartlyLapsedClaimReportsTheLapsedPartApart(t *testing.T) {
-	// One place of two lapsed. The claim still reaches the other now, and
+func TestAPartlyLapsedDecisionReportsTheLapsedPartApart(t *testing.T) {
+	// One occurrence of two lapsed. The decision still reaches the other now, and
 	// what the lapsed one reached when it lapsed is reported on its own.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		libfoo := f.component(t, "libfoo", "1.2.3")
 		in := f.build(t, f.product, "2026.03")
 		f.finds(t, in, libfoo, "under-a", access.Public)
-		made := f.claimsMany(t, f.places("under-a", "under-b"))
+		made := f.decisionsMany(t, f.occurrences("under-a", "under-b"))
 		f.ends(t, made[0].ID, time.Now().UTC().Truncate(time.Microsecond))
 
-		whole, err := f.store.Whole(ctx, f.triager, made[0].ClaimID)
+		whole, err := f.store.Whole(ctx, f.triager, made[0].DecisionID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -474,8 +474,8 @@ func TestAPartlyLapsedClaimReportsTheLapsedPartApart(t *testing.T) {
 			t.Fatalf("ended parts %+v, want the lapsed one alone", whole.Ended)
 		}
 		part := whole.Ended[0]
-		if part.State != triage.LapsedState || part.Rows != 1 || part.Places != 1 {
-			t.Errorf("the lapsed part is %+v, want one row at one place", part)
+		if part.State != triage.LapsedState || part.Rows != 1 || part.Occurrences != 1 {
+			t.Errorf("the lapsed part is %+v, want one row at one occurrence", part)
 		}
 		if len(part.Builds) != 1 || !strings.HasPrefix(part.Builds[0], "2026.03") {
 			t.Errorf("it reached %v when it lapsed, want 2026.03 alone", part.Builds)
@@ -483,29 +483,29 @@ func TestAPartlyLapsedClaimReportsTheLapsedPartApart(t *testing.T) {
 	})
 }
 
-func TestAClaimNothingEndedReportsNoEndedPart(t *testing.T) {
+func TestADecisionNothingEndedReportsNoEndedPart(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		made := f.claims(t, f.at())
-		whole, err := f.store.Whole(t.Context(), f.triager, made.ClaimID)
+		made := f.decisions(t, f.at())
+		whole, err := f.store.Whole(t.Context(), f.triager, made.DecisionID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(whole.Ended) != 0 {
-			t.Errorf("a standing claim reports ended parts %+v", whole.Ended)
+			t.Errorf("a standing decision reports ended parts %+v", whole.Ended)
 		}
 	})
 }
 
-func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
+func TestWithdrawingADecisionLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 	// A lapse records when and why a row stopped applying. Withdrawing the
-	// claim afterwards is about the rows still standing.
+	// decision afterwards is about the rows still standing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		made := f.claimsMany(t, f.places("under-a", "under-b"))
+		made := f.decisionsMany(t, f.occurrences("under-a", "under-b"))
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Second)
 		f.ends(t, made[1].ID, ended)
 
-		if _, err := f.store.Withdraw(ctx, f.triager, made[0].ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, made[0].DecisionID); err != nil {
 			t.Fatal(err)
 		}
 		if got := f.row(t, made[0].ID); got.State != triage.Withdrawn {
@@ -521,19 +521,19 @@ func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 	})
 }
 
-func TestARevivedClaimHasNoMomentItStoppedApplying(t *testing.T) {
-	// Revising a withdrawn claim brings its rows back to life, and a live row
+func TestARevivedDecisionHasNoMomentItStoppedApplying(t *testing.T) {
+	// Revising a withdrawn decision brings its rows back to life, and a live row
 	// carries no end.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		first := f.claims(t, f.at())
-		if _, err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+		first := f.decisions(t, f.at())
+		if _, err := f.store.Withdraw(ctx, f.triager, first.DecisionID); err != nil {
 			t.Fatal(err)
 		}
 		if got := f.row(t, first.ID); got.EndedAt == nil {
 			t.Fatal("the withdrawn row has no end, so this checks nothing")
 		}
-		if _, err := f.store.Revise(ctx, f.triager, first.ClaimID, "On reflection it holds."); err != nil {
+		if _, err := f.store.Revise(ctx, f.triager, first.DecisionID, "On reflection it holds."); err != nil {
 			t.Fatal(err)
 		}
 		got := f.row(t, first.ID)
@@ -546,10 +546,10 @@ func TestARevivedClaimHasNoMomentItStoppedApplying(t *testing.T) {
 	})
 }
 
-func TestAClaimWithAWithdrawnRowIsNotReaffirmedAmongMany(t *testing.T) {
-	// Withdrawing a partly lapsed claim leaves its lapsed row lapsed, and the
-	// row's finding is still open. Re-affirming many claims, and one claim
-	// whole, ask the rule the single form asks: the claim was taken back.
+func TestADecisionWithAWithdrawnRowIsNotReaffirmedAmongMany(t *testing.T) {
+	// Withdrawing a partly lapsed decision leaves its lapsed row lapsed, and the
+	// row's finding is still open. Re-affirming many decisions, and one decision
+	// whole, ask the rule the single form asks: the decision was taken back.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		at := f.selection(t)
@@ -560,36 +560,36 @@ func TestAClaimWithAWithdrawnRowIsNotReaffirmedAmongMany(t *testing.T) {
 		}
 		f.finds(t, build{target: at.TargetID, run: run}, at.ComponentID, "second-place-of-libfoo",
 			access.Public)
-		claimID, recorded, _, err := f.store.Together(ctx, f.triager, at, f.wontFix(),
+		decisionID, recorded, _, err := f.store.BulkDecision(ctx, f.triager, at, f.wontFix(),
 			triage.DefaultBounds())
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(recorded) < 2 {
-			t.Fatalf("the claim holds %d rows, want a lapsed one and a withdrawn one", len(recorded))
+			t.Fatalf("the decision holds %d rows, want a lapsed one and a withdrawn one", len(recorded))
 		}
 		f.ends(t, recorded[0], time.Now().UTC().Truncate(time.Microsecond))
-		if ok, err := f.store.Reaffirmable(ctx, f.triager, claimID); err != nil || !ok {
-			t.Fatalf("a partly lapsed claim reads as re-affirmable %v (%v), want true, "+
+		if ok, err := f.store.Reaffirmable(ctx, f.triager, decisionID); err != nil || !ok {
+			t.Fatalf("a partly lapsed decision reads as re-affirmable %v (%v), want true, "+
 				"so this checks nothing", ok, err)
 		}
-		if _, err := f.store.Withdraw(ctx, f.triager, claimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, decisionID); err != nil {
 			t.Fatal(err)
 		}
 
 		if _, err := f.store.ReaffirmMany(ctx, f.triager, triage.ReaffirmingMany{
-			ClaimIDs:  []int64{claimID},
-			Reasoning: "Still in a driver this image never loads.", By: f.proposer,
+			DecisionIDs: []int64{decisionID},
+			Reasoning:   "Still in a driver this image never loads.", By: f.proposer,
 			Bounds: triage.DefaultBounds(),
 		}); !refusal.In(err) || !strings.Contains(err.Error(), "has not lapsed") {
-			t.Errorf("a withdrawn claim was re-affirmed among many: %v", err)
+			t.Errorf("a withdrawn decision was re-affirmed among many: %v", err)
 		}
-		if _, err := f.store.ReaffirmClaim(ctx, f.triager, triage.ReaffirmingClaim{
-			PreviousClaimID: claimID,
-			Reasoning:       "Still in a driver this image never loads.", By: f.proposer,
+		if _, err := f.store.ReaffirmDecision(ctx, f.triager, triage.ReaffirmingDecision{
+			PreviousDecisionID: decisionID,
+			Reasoning:          "Still in a driver this image never loads.", By: f.proposer,
 			Bounds: triage.DefaultBounds(),
 		}); !refusal.In(err) || !strings.Contains(err.Error(), "has not lapsed") {
-			t.Errorf("a withdrawn claim was re-affirmed whole: %v", err)
+			t.Errorf("a withdrawn decision was re-affirmed whole: %v", err)
 		}
 	})
 }

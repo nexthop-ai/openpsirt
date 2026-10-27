@@ -26,9 +26,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// issuesAtAKernelPlace is how many issues one kernel place carries. A real switch
-// image carried 6,610 undecided issues at the place of one kernel claim, which
-// is what the case against that claim counts on the review queue.
+// issuesAtAKernelPlace is how many issues one kernel occurrence carries. A real
+// switch image carried 6,610 undecided issues at the occurrence of one kernel
+// decision, which is what the case against that decision counts on the review
+// queue.
 const issuesAtAKernelPlace = 6_000
 
 // The two screens a person opens first, across products: the findings list
@@ -36,8 +37,8 @@ const issuesAtAKernelPlace = 6_000
 //
 // Both read decisions against a large open set. The list asks every open row
 // whether a decision stands at it, and the queue counts what else sits
-// undecided at a claim's place. Each prints the per-product list beside it,
-// because that is the same work bound to one product, and a gap between the
+// undecided at a decision's occurrence. Each prints the per-product list beside
+// it, because that is the same work bound to one product, and a gap between the
 // two is a join order rather than a size.
 func TestMeasureTheListAcrossProducts(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -47,10 +48,11 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		other := seedAcross(t, w)
 
 		// Decisions to read: an upgrade promised over ten packages, and one
-		// claim at a kernel place waiting for a second person. The kernel is a
-		// second build of the same product, so the claim is counted against
-		// the promises' decisions, and the promises are planned over the build
-		// without it. Planning over the kernel is measured on its own, below.
+		// decision at a kernel occurrence waiting for a second person. The
+		// kernel is a second build of the same product, so the decision is
+		// counted against the promises' occurrences, and the promises are
+		// planned over the build without it. Planning over the kernel is
+		// measured on its own, below.
 		person, err := access.NewStore(db.DB).Ensure(ctx, "triager", "A triager", nil, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -130,7 +132,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			Where(`"f"."closed_at" IS NULL`).Scan(ctx, &open); err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("%d open rows, %d promised decisions and one kernel claim", open, promised)
+		t.Logf("%d open rows, %d promised decisions and one kernel decision", open, promised)
 		dbtest.SettleStatistics(t, db)
 
 		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_MEASURE_SLOW")}
@@ -236,7 +238,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		if len(page) > 0 {
 			undecided = page[0].Counter.Undecided
 		}
-		t.Logf("review queue, first card %s (%d waiting, %d undecided beside the claim)",
+		t.Logf("review queue, first card %s (%d waiting, %d undecided beside the decision)",
 			time.Since(at).Round(time.Millisecond), waiting, undecided)
 	})
 }
@@ -244,11 +246,11 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 // Planning an upgrade in the build that carries the kernel, beside that build's
 // findings list.
 //
-// Planning resolves every place it covers in one read and then writes a
-// decision at each. The read is timed on its own, on the statistics the load
-// left and again once they are refreshed, because a large scan leaves the
-// server's statistics behind the table until its own refresh reaches it. The
-// acts are timed whole: a small package on both, and the kernel once, after
+// Planning resolves every occurrence it covers in one read and then writes a
+// decision occurrence at each. The read is timed on its own, on the statistics
+// the load left and again once they are refreshed, because a large scan leaves
+// the server's statistics behind the table until its own refresh reaches it.
+// The acts are timed whole: a small package on both, and the kernel once, after
 // the refresh, since its act commits. Each is bounded rather than left to run.
 func TestMeasurePlanningOverAKernel(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -283,11 +285,11 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 			}
 			switch {
 			case bounded.Err() != nil:
-				t.Logf("the kernel's places, %-11s unfinished after %s", statistics, took.Round(time.Second))
+				t.Logf("the kernel's occurrences, %-11s unfinished after %s", statistics, took.Round(time.Second))
 			case err != nil:
 				t.Fatal(err)
 			default:
-				t.Logf("the kernel's places, %-11s %9s (%d)", statistics, took.Round(time.Millisecond), places)
+				t.Logf("the kernel's occurrences, %-11s %9s (%d)", statistics, took.Round(time.Millisecond), places)
 			}
 		}
 		plan := func(statistics, component string) {
@@ -307,7 +309,7 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 			case err != nil:
 				t.Fatalf("planning %s: %v", component, err)
 			default:
-				t.Logf("planning %-9s %-11s %9s (%d decisions over %d issues)", component, statistics,
+				t.Logf("planning %-9s %-11s %9s (%d occurrences over %d issues)", component, statistics,
 					took.Round(time.Millisecond), done.Decisions, done.Issues)
 			}
 		}

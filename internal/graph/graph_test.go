@@ -100,7 +100,7 @@ var (
 )
 
 // tree is the graph used by most of these tests: the product depends on curl
-// and openssl, and curl depends on openssl too. openssl sits at two places and
+// and openssl, and curl depends on openssl too. openssl sits at two occurrences and
 // is still one node — the graph is a graph.
 func tree() graph.Snapshot {
 	return graph.Snapshot{
@@ -471,12 +471,12 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// One issue at openssl, open at two places — which is ordinary: a
-		// finding is a component at a place, and openssl sits under two.
+		// One issue at openssl, open at two occurrences — which is ordinary: a
+		// finding is a component at an occurrence, and openssl sits under two.
 		issue := f.anIssue(t, "CVE-2026-SSL")
 		componentID := f.componentNamed(t, openssl.Name)
-		for _, place := range []string{"under-curl", "under-root"} {
-			f.opens(t, issue, componentID, place)
+		for _, occurrence := range []string{"under-curl", "under-root"} {
+			f.opens(t, issue, componentID, occurrence)
 		}
 
 		found, err := f.store.Search(ctx, everyone(f), f.targetID, "ssl", 10)
@@ -488,7 +488,7 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 		}
 		if found[0].Findings != 1 {
 			t.Errorf("the search says %d findings, and one issue is open there — it is "+
-				"counting the places", found[0].Findings)
+				"counting the occurrences", found[0].Findings)
 		}
 
 		// The count in the header and the list beside it answer about the
@@ -513,7 +513,7 @@ func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
 	// then by name, counting only the issues the reader may read — an
 	// undisclosed issue neither adds to a count nor lifts a component up the
 	// list for somebody who reads disclosed work alone. A component at two
-	// places is one answer with one count.
+	// occurrences is one answer with one count.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		libssl := at("libssl", "3.0.11")
@@ -647,20 +647,20 @@ func (f *fixture) componentNamed(t *testing.T, name string) int64 {
 	return id
 }
 
-// opens puts one disclosed finding of an issue at one place of a component.
-func (f *fixture) opens(t *testing.T, issue, componentID int64, place string) {
+// opens puts one disclosed finding of an issue at one occurrence of a component.
+func (f *fixture) opens(t *testing.T, issue, componentID int64, occurrence string) {
 	t.Helper()
-	f.opensAs(t, issue, componentID, place, access.Public)
+	f.opensAs(t, issue, componentID, occurrence, access.Public)
 }
 
-// opensAs puts one finding of an issue at one place of a component, at a
+// opensAs puts one finding of an issue at one occurrence of a component, at a
 // visibility.
-func (f *fixture) opensAs(t *testing.T, issue, componentID int64, place string,
+func (f *fixture) opensAs(t *testing.T, issue, componentID int64, occurrence string,
 	visibility access.Visibility) {
 	t.Helper()
 	row := &finding.Finding{
 		TargetID: f.targetID, Kind: finding.Vulnerable, VulnerabilityID: issue,
-		Visibility: visibility, ComponentID: componentID, PlaceIdentity: place,
+		Visibility: visibility, ComponentID: componentID, OccurrenceIdentity: occurrence,
 		OpenedAt: time.Now().UTC().Truncate(time.Microsecond),
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
@@ -888,11 +888,11 @@ func TestTheListCanAskWhatAProducerCalledSomethingAndNothingElseReadsIt(t *testi
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(detail.Places) != 1 {
-			t.Fatalf("the finding sits at %d places, want 1", len(detail.Places))
+		if len(detail.Occurrences) != 1 {
+			t.Fatalf("the finding sits at %d occurrences, want 1", len(detail.Occurrences))
 		}
-		if got := detail.Places[0].DeclaredAs; got != "build" {
-			t.Errorf("the place says the producer called it %q, want %q", got, "build")
+		if got := detail.Occurrences[0].DeclaredAs; got != "build" {
+			t.Errorf("the occurrence says the producer called it %q, want %q", got, "build")
 		}
 	})
 }

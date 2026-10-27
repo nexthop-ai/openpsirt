@@ -29,7 +29,7 @@ type BucketBody struct {
 	// argued and dismissed is a tidy record, and a bucket with four criticals
 	// nobody has read is a backlog.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"The same count by how the issues were rated. 'unrated' is what nobody scored"`
-	Undecided  int            `json:"undecided" doc:"The number nobody has said anything about. A claim waiting for a second person is not an answer"`
+	Undecided  int            `json:"undecided" doc:"The number nobody has said anything about. A decision waiting for a second person is not an answer"`
 }
 
 // RemediationOutput is how fast things are being fixed.
@@ -37,11 +37,11 @@ type RemediationOutput struct {
 	Body struct {
 		// Fixed and Opened are in the same unit deliberately, so the two can be
 		// read against each other.
-		Fixed  int `json:"fixed" doc:"Distinct issues whose last open place closed by a fix in the window"`
+		Fixed  int `json:"fixed" doc:"Distinct issues whose last open occurrence closed by a fix in the window"`
 		Opened int `json:"opened" doc:"Distinct issues that appeared in it"`
 		// TimeToFix is by the severity a thing was rated, in hours. Absent for
 		// a rating nothing closed at, because a zero would read as instant.
-		TimeToFix map[string]float64 `json:"time_to_fix,omitempty" doc:"Average hours an issue fixed in the window was open for, from its first place opening to its last place closing, by severity. A severity nothing was fixed at is absent rather than zero"`
+		TimeToFix map[string]float64 `json:"time_to_fix,omitempty" doc:"Average hours an issue fixed in the window was open for, from its first occurrence opening to its last occurrence closing, by severity. A severity nothing was fixed at is absent rather than zero"`
 		Aging     []BucketBody       `json:"aging" doc:"Everything open now, by how long it has been. About now whatever period was asked for"`
 		// The period these cover, said back, so a figure is never read apart
 		// from the window it was worked out over.
@@ -50,14 +50,14 @@ type RemediationOutput struct {
 	}
 }
 
-// RepeatBody is one place that keeps being put off.
+// RepeatBody is one occurrence that keeps being put off.
 type RepeatBody struct {
 	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
 	ProductName   string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty"`
-	Place         string `json:"place" doc:"Names the place rather than describing it: what it is called depends on the build, and this is not about one build"`
+	Occurrence    string `json:"occurrence" doc:"Names the occurrence rather than describing it: what it is called depends on the build, and this is not about one build"`
 	Times         int    `json:"times" doc:"The number of times it has been put off"`
 	TotalDays     int    `json:"total_days" doc:"The total it has been put off for"`
 	Standing      bool   `json:"standing,omitempty" doc:"A deferral is in force now. Something put off three times and since decided is history; the same thing still being put off is the pattern"`
@@ -78,8 +78,8 @@ func registerRemediation(api huma.API, in core.Deps) {
 			"A closure counts as a fix only where the issue went away. An upgrade that carried " +
 			"the issue into the next version, and a finding a scanner stopped reporting, are " +
 			"not counted.\n\n" +
-			"Counted in issues, not in places. An issue is fixed in the period its last " +
-			"place closed by a fix, and not while any place of it you may see is open.\n\n" +
+			"Counted in issues, not in occurrences. An issue is fixed in the period its last " +
+			"occurrence closed by a fix, and not while any occurrence of it you may see is open.\n\n" +
 			"Asked for neither a period nor a window, this is the last 30 days.",
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
@@ -126,17 +126,17 @@ func registerRemediation(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-repeated-deferrals", Method: http.MethodGet, Path: "/v1/deferrals/repeated",
 		Summary: "List repeated deferrals",
-		Description: "Places deferred more than once, most-deferred first, with how long they " +
+		Description: "Occurrences deferred more than once, most-deferred first, with how long they " +
 			"have been put off for in total.\n\n" +
 			"The cumulative threshold already refuses a further deferral past a point, one item " +
 			"at a time. What it cannot show is the shape across everything: one item deferred " +
-			"three times is a judgment, and forty of them is a policy nobody wrote down.\n\n" +
-			"Counted over the judgments rather than the findings they cover, so the order is not " +
+			"three times is a decision, and forty of them is a policy nobody wrote down.\n\n" +
+			"Counted over the decisions rather than the findings they cover, so the order is not " +
 			"decided by how far a component spreads through an image.",
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
-		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"The number of deferrals that makes something worth listing. One is an ordinary judgment"`
+		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"The number of deferrals that makes something worth listing. One is an ordinary decision"`
 		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset  int    `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*core.ListOutput[RepeatBody], error) {
@@ -173,16 +173,16 @@ func registerRemediation(api huma.API, in core.Deps) {
 		OperationID: "export-repeated-deferrals", Method: http.MethodGet,
 		Path:    "/v1/deferrals/repeated.{format}",
 		Summary: "Export repeated deferrals",
-		Description: "The same list as a file: places deferred more than once, most-deferred " +
+		Description: "The same list as a file: occurrences deferred more than once, most-deferred " +
 			"first, with how long they have been put off for in total.\n\n" +
 			"What the screen shows is a shape rather than a page — one item deferred three " +
-			"times is a judgment and forty of them is a policy nobody wrote down — and the " +
+			"times is a decision and forty of them is a policy nobody wrote down — and the " +
 			"file is what that goes into a review as.",
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format  string `path:"format" enum:"csv,json"`
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
-		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"The number of deferrals that makes something worth listing. One is an ordinary judgment"`
+		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"The number of deferrals that makes something worth listing. One is an ordinary decision"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -201,7 +201,7 @@ func registerRemediation(api huma.API, in core.Deps) {
 			What:  "repeated deferrals",
 			About: []core.Stated{{Label: "deferred at least", Value: strconv.Itoa(input.AtLeast) + " times"}},
 			Header: []string{
-				"product", "product_name", "issue", "severity", "place", "times",
+				"product", "product_name", "issue", "severity", "occurrence", "times",
 				"total_days", "standing", "last_until",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -213,7 +213,7 @@ func registerRemediation(api huma.API, in core.Deps) {
 				written := make([][]string, 0, len(rows))
 				for _, row := range repeatBodies(rows) {
 					written = append(written, []string{
-						row.Product, row.ProductName, row.Vulnerability, row.Severity, row.Place,
+						row.Product, row.ProductName, row.Vulnerability, row.Severity, row.Occurrence,
 						strconv.Itoa(row.Times), strconv.Itoa(row.TotalDays),
 						strconv.FormatBool(row.Standing), row.LastUntil,
 					})
@@ -234,7 +234,7 @@ func repeatBodies(rows []triage.Repeated) []RepeatBody {
 		item := RepeatBody{
 			Product: row.Product, ProductName: row.ProductName,
 			Vulnerability: row.Vulnerability, Severity: row.Severity,
-			Place: row.PlaceIdentity, Times: row.Times,
+			Occurrence: row.OccurrenceIdentity, Times: row.Times,
 			TotalDays: int(math.Round(row.TotalDays)),
 			Standing:  row.Standing,
 		}

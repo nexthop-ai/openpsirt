@@ -239,7 +239,7 @@ func TestNewestIsTheMostRecentlyBuilt(t *testing.T) {
 	})
 }
 
-func TestTheBuildInForceIsTheJudgmentsThatArrivedLast(t *testing.T) {
+func TestTheBuildInForceIsTheDecisionsThatArrivedLast(t *testing.T) {
 	// One build re-sent with different judgments beside it is two
 	// submissions at one build time, so which one the picture stands on
 	// cannot be left to whichever row the engine hands back first.

@@ -141,7 +141,7 @@ func digest(parts ...string) string {
 	return hex.EncodeToString(sum.Sum(nil))
 }
 
-// identity is the place a result first seen in a series is minted at. Matching
+// identity is the occurrence a result first seen in a series is minted at. Matching
 // carries it to every later sighting, so a decision keyed on it reaches each
 // build the result is seen in.
 func identity(seriesID int64, k string) string {

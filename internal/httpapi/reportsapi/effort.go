@@ -20,17 +20,17 @@ type SpentBody struct {
 	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
 	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	Component   string `json:"component" doc:"The subject of the judgments, by name. Empty where nothing in any build carries the place any more"`
-	// Claims is the unit somebody works in — one argument, however many rows
-	// it wrote — and Decisions how many places those reached.
-	Claims    int `json:"claims" doc:"Arguments made about it in the period"`
-	Decisions int `json:"decisions" doc:"Places those reached"`
-	People    int `json:"people" doc:"The number of different people who argued about it"`
-	// Promised is the upgrades that came out of them, counted as claims for
+	Component   string `json:"component" doc:"The subject of the decisions, by name. Empty where nothing in any build carries the occurrence any more"`
+	// Decisions is the unit somebody works in — one argument, however many
+	// occurrences it covers — and Occurrences how many those reached.
+	Decisions   int `json:"decisions" doc:"Arguments made about it in the period"`
+	Occurrences int `json:"occurrences" doc:"Occurrences those reached"`
+	People      int `json:"people" doc:"The number of different people who argued about it"`
+	// Promised is the upgrades that came out of them, counted as decisions for
 	// the same reason.
-	Promised  int `json:"promised" doc:"Claims that promised work: an upgrade or a backport"`
-	Dismissed int `json:"dismissed" doc:"Claims that argued it away"`
-	Deferred  int `json:"deferred" doc:"Claims that put it off"`
+	Promised  int `json:"promised" doc:"Decisions that promised work: an upgrade or a backport"`
+	Dismissed int `json:"dismissed" doc:"Decisions that argued it away"`
+	Deferred  int `json:"deferred" doc:"Decisions that put it off"`
 }
 
 // registerEffort answers where the work went.
@@ -38,21 +38,21 @@ func registerEffort(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-effort", Method: http.MethodGet, Path: "/v1/effort",
 		Summary: "Report where triage effort went",
-		Description: "What the judgments in a period were about, most argued first: which " +
-			"component in which product, how many arguments were made, how many places they " +
+		Description: "What the decisions in a period were about, most argued first: which " +
+			"component in which product, how many arguments were made, how many occurrences they " +
 			"reached, how many people made them, and what came out of them.\n\n" +
-			"Counted in claims, not in the rows they wrote. A claim is one person's act; " +
-			"counting its rows measures how far a component fans out through an image. Both " +
+			"Counted in decisions, not in the occurrences they cover. A decision is one person's act; " +
+			"counting its occurrences measures how far a component fans out through an image. Both " +
 			"numbers come back.\n\n" +
-			"Dated by when a judgment was proposed. Asked for neither a period nor a window, " +
+			"Dated by when a decision was proposed. Asked for neither a period nor a window, " +
 			"this is the last 90 days.\n\n" +
 			"Takes the same period and scope the other reports do, and is narrowed by what " +
 			"you may see.",
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.Period
-		Product string `query:"product" doc:"Limit to judgments made in one product, by name"`
-		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, by team name"`
+		Product string `query:"product" doc:"Limit to decisions made in one product, by name"`
+		Team    string `query:"team" doc:"Limit to decisions this team's members proposed, by team name"`
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The most rows to return"`
 		Offset  int    `query:"offset" minimum:"0" doc:"How many rows to skip, in the order the report is sorted"`
 	}) (*core.OverPeriod[SpentBody], error) {
@@ -80,7 +80,7 @@ func registerEffort(api huma.API, in core.Deps) {
 			out.Body.Items = append(out.Body.Items, SpentBody{
 				Product: row.Product, ProductName: row.ProductName,
 				Component: row.Component,
-				Claims:    row.Claims, Decisions: row.Decisions, People: row.People,
+				Decisions: row.Decisions, Occurrences: row.Occurrences, People: row.People,
 				Promised: row.Promised, Dismissed: row.Dismissed, Deferred: row.Deferred,
 			})
 		}

@@ -46,13 +46,13 @@ type Measures struct {
 	// a queue of the same size is a different place depending on whether
 	// things sit in it for a day or a quarter.
 	ToDecide []Spread
-	// ToAgree is how long a claim waited for a second person, per severity.
+	// ToAgree is how long a decision waited for a second person, per severity.
 	// The other half of the same story — a fast decision that waits three
 	// weeks for agreement is not a fast decision.
 	ToAgree []Spread
 	// Throughput is what each person got through in the window.
 	Throughput []Worked
-	// SentBack is how many claims an approver asked more of in the window.
+	// SentBack is how many decisions an approver asked more of in the window.
 	//
 	// Counted for the deployment rather than per person, because the record
 	// does not hold who sent one back — only that it was, and the reason,
@@ -96,9 +96,9 @@ type Spread struct {
 // have.
 type Worked struct {
 	Person string
-	// Proposed is claims they made, Approved ones they agreed to, and
+	// Proposed is decisions they made, Approved ones they agreed to, and
 	// Withdrawn ones they took back. There is no send-back count here: the
-	// record holds that a claim was sent back and not by whom.
+	// record holds that a decision was sent back and not by whom.
 	Proposed  int
 	Approved  int
 	Withdrawn int
@@ -130,20 +130,20 @@ const measuredAtMost = 5000
 // A manager asking how their own people are doing reads their team's figures
 // rather than the deployment's.
 type Measuring struct {
-	// Products keeps judgments made in these products.
+	// Products keeps decisions made in these products.
 	Products []int64
-	// People keeps judgments these people proposed — a team, resolved to
+	// People keeps decisions these people proposed — a team, resolved to
 	// its members by whoever asked.
 	//
 	// By the proposer for both waits, including the wait for a second person:
-	// a claim belongs to whoever argued it, which is the rule the record of
-	// judgments already dates by. Narrowed by the approver instead, a team's
-	// "time to agree" would be about claims its people agreed to for somebody
+	// a decision belongs to whoever argued it, which is the rule the record of
+	// decisions already dates by. Narrowed by the approver instead, a team's
+	// "time to agree" would be about decisions its people agreed to for somebody
 	// else.
 	People []int64
 }
 
-// narrow applies it to a query over the decision, aliased de, keyed on
+// narrow applies it to a query over the decision occurrence, aliased de, keyed on
 // whoever proposed.
 func (m Measuring) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	return m.by(q, `"de"."proposed_by"`)
@@ -151,7 +151,7 @@ func (m Measuring) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 
 // by is the same, for a count keyed on somebody else — an agreement is the
 // approver's work, and a team's throughput is what each of its people did
-// rather than what was done to the claims they wrote.
+// rather than what was done to the decisions they wrote.
 func (m Measuring) by(q *bun.SelectQuery, person string) *bun.SelectQuery {
 	if len(m.Products) > 0 {
 		q = q.Where(`"de"."product_id" IN (?)`, bun.List(m.Products))
@@ -185,7 +185,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		ApprovedAt *time.Time `bun:"approved_at"`
 	}
 	// The finding half of the join is narrowed on the ON clause rather than in
-	// WHERE. A place is a pair of names with no product in it, so the match
+	// WHERE. An occurrence is a pair of names with no product in it, so the match
 	// alone reaches other products' findings and findings this reader may not
 	// see; and moving either condition to WHERE would turn the outer join into
 	// an inner one and flatten the figures the LEFT JOIN is there to keep.
@@ -201,12 +201,12 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	}
 	q := s.db.NewSelect().
 		TableExpr(finding.Decisions).
-		// The finding this was a claim about, for when it was first seen and
-		// how it was rated. Joined on the same three columns a decision is
-		// matched by, and left-joined: a claim about a place that has since
+		// The finding this was a decision about, for when it was first seen and
+		// how it was rated. Joined on the same three columns a row is
+		// matched by, and left-joined: a decision about an occurrence that has since
 		// closed still happened, and dropping it would make the figures
 		// flatter exactly where work was finished.
-		Join(`LEFT JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")+` `+sameProduct, onArgs...).
+		Join(`LEFT JOIN "finding" AS "f" ON `+finding.DecisionAtOccurrence("f")+` `+sameProduct, onArgs...).
 		Join(`LEFT JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// Rated as the product that made the decision rates it, which is the
 		// band every other surface groups this issue under. Read from the
@@ -220,9 +220,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		ColumnExpr(`MIN("de"."proposed_at") AS "proposed_at"`).
 		ColumnExpr(`MIN("da"."approved_at") AS "approved_at"`).
 		Where(`"de"."proposed_at" < ?`, until).
-		// One observation per claim and band. A claim writes a row per
-		// place and is agreed to once, so counted per row one claim over
-		// four hundred places is four hundred waits for one agreement.
+		// One observation per decision and band. A decision writes a row per
+		// occurrence and is agreed to once, so counted per row one decision over
+		// four hundred occurrences is four hundred waits for one agreement.
 		GroupExpr(`"de"."decision_id", ` + rating.EffectiveExpr).
 		OrderExpr(`MIN("de"."proposed_at") DESC`).
 		Limit(measuredAtMost + 1)
@@ -245,9 +245,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		// scanner's "unknown" and no rating at all are the same state, and
 		// two lines for it is two names for one nothing.
 		band := finding.BandOf(row.Severity)
-		// A decision proposed before the finding was first seen is not a
+		// A row proposed before the finding was first seen is not a
 		// negative wait; it is a row whose finding has since been replaced by
-		// a later one at the same place. Dropped rather than clamped, because
+		// a later one at the same occurrence. Dropped rather than clamped, because
 		// a zero here would be read as "answered at once".
 		if !row.OpenedAt.IsZero() && row.ProposedAt.After(row.OpenedAt) {
 			toDecide[band] = append(toDecide[band], row.ProposedAt.Sub(row.OpenedAt))
@@ -265,13 +265,13 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	}
 	out.Throughput = worked
 
-	// The claims that came back. Sending a claim back is the approver's other
-	// answer and nothing counted it, so a queue that is moving because claims
+	// The decisions that came back. Sending a decision back is the approver's other
+	// answer and nothing counted it, so a queue that is moving because decisions
 	// are good and one that is moving because nobody reads them looked alike.
 	back := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
-		// Counted per claim: sending a claim back marks every row of it, and
-		// approving with exceptions moves the rows it returns into a claim of
-		// their own, so the distinct claims are the send-backs.
+		// Counted per decision: sending a decision back marks every row of it, and
+		// approving with exceptions moves the rows it returns into a decision of
+		// their own, so the distinct decisions are the send-backs.
 		ColumnExpr(`COUNT(DISTINCT "de"."decision_id") AS "number"`).
 		Where(`"de"."sent_back_at" IS NOT NULL`).
 		Where(`"de"."sent_back_at" < ?`, until)
@@ -287,7 +287,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 // throughput is what each person got through in the window.
 //
 // Three counts from two tables, keyed on the person rather than joined into
-// one statement: a claim proposed, one withdrawn and an agreement given are
+// one statement: a decision proposed, one withdrawn and an agreement given are
 // different rows in different places, and one query counting them together
 // would multiply them. How much came back is counted for the deployment
 // rather than per person, so it is read beside these rather than among them.
@@ -318,10 +318,10 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		return nil
 	}
 
-	// Proposed and withdrawn are both read off the decision. Withdrawn is
-	// dated by the proposal for the same reason the audit is: a claim belongs
-	// to the window it was argued in. Both count claims, as agreements do: a
-	// claim writes a row per place and is one piece of work.
+	// Proposed and withdrawn are both read off the row. Withdrawn is
+	// dated by the proposal for the same reason the audit is: a decision belongs
+	// to the window it was argued in. Both count decisions, as agreements do: a
+	// decision writes a row per occurrence and is one piece of work.
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 			ColumnExpr(`"de"."proposed_by" AS "person"`).
@@ -347,8 +347,8 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	// work: an approver's week is the week they approved in.
 	if err := count(func() *bun.SelectQuery {
 		// Counted distinctly, because the join is one approval to every row of
-		// the claim it was given for: an approver agreeing to one argument
-		// covering forty-four places did one piece of work, not forty-four.
+		// the decision it was given for: an approver agreeing to one argument
+		// covering forty-four occurrences did one piece of work, not forty-four.
 		q := s.db.NewSelect().TableExpr(`"decision_approval" AS "da"`).
 			Join(`JOIN "decision_occurrence" AS "de" ON "de"."decision_id" = "da"."decision_id"`).
 			ColumnExpr(`"da"."approved_by" AS "person"`).

@@ -9,7 +9,7 @@ import (
 )
 
 // The rule under another alias is the same rule: every reference to the
-// decision and the outcome is renamed, and nothing else changes.
+// decision occurrence and the outcome is renamed, and nothing else changes.
 func TestTheVersionMatchUnderAnotherAliasIsTheSameRule(t *testing.T) {
 	if got := keyMatchesOn("de", `"cl"."outcome"`); got != KeyMatches {
 		t.Fatalf("under its own aliases the rule reads %q, want %q", got, KeyMatches)

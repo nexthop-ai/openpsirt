@@ -14,12 +14,12 @@ import (
 
 func TestHowLongTriageIsTakingIsAddedUpSomewhere(t *testing.T) {
 	// Every one of these was in the record and none was added up: how long
-	// a finding sits before anybody says anything, how long a claim waits
+	// a finding sits before anybody says anything, how long a decision waits
 	// for a second person, and what each person got through. A queue of
 	// the same size is a different place depending on whether things sit
 	// in it for a day or a quarter, and nothing here could tell you which.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 
 		// Read as a client reads it, off the published shape rather than
 		// through the package's own type: what is being checked is that the
@@ -54,10 +54,10 @@ func TestHowLongTriageIsTakingIsAddedUpSomewhere(t *testing.T) {
 			t.Errorf("a deployment nobody has triaged measures %+v", got)
 		}
 
-		_, claim := r.DecidedAt(t, place)
+		_, decision := r.DecidedAt(t, occurrence)
 		got := measured(t, "triager")
 		if got.Sampled != 1 {
-			t.Fatalf("one claim measures %d observations", got.Sampled)
+			t.Fatalf("one decision measures %d observations", got.Sampled)
 		}
 		// Proposed and not agreed to: there is a wait before the decision and
 		// none before an agreement that has not happened.
@@ -65,7 +65,7 @@ func TestHowLongTriageIsTakingIsAddedUpSomewhere(t *testing.T) {
 			t.Errorf("time to decide is %+v, want the one band", got.ToDecide)
 		}
 		if len(got.ToAgree) != 0 {
-			t.Errorf("a claim nobody agreed to has an agreement wait: %+v", got.ToAgree)
+			t.Errorf("a decision nobody agreed to has an agreement wait: %+v", got.ToAgree)
 		}
 		var proposed int
 		for _, each := range got.Worked {
@@ -80,10 +80,10 @@ func TestHowLongTriageIsTakingIsAddedUpSomewhere(t *testing.T) {
 		// Agreeing to it gives the second wait a value, and counts against the
 		// approver rather than the proposer: an approver's week is the week
 		// they approved in.
-		r.Agreed(t, claim)
+		r.Agreed(t, decision)
 		after := measured(t, "triager")
 		if len(after.ToAgree) != 1 {
-			t.Errorf("an agreed claim has no agreement wait: %+v", after.ToAgree)
+			t.Errorf("an agreed decision has no agreement wait: %+v", after.ToAgree)
 		}
 		var approved int
 		for _, each := range after.Worked {
@@ -114,8 +114,8 @@ func TestWhatIsStillThereSaysWhetherAnybodyDecidedIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		// One of the two argued away and agreed to; the other untouched.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 
 		var out struct {
 			Still []struct {
@@ -162,41 +162,41 @@ func TestWhatIsStillThereSaysWhetherAnybodyDecidedIt(t *testing.T) {
 
 // The sign-off sheet's agreement rule, from both sides.
 //
-// A component argued away at one place and deferred at another is two claims,
-// and stating either over the row would be a claim nobody made — the rule the
-// VEX document already publishes under, asked here of the same rows. Two
-// claims that reach the same outcome in different words are not that: they
-// agree, and what the row cannot state is which wording.
+// A component argued away at one occurrence and deferred at another is two
+// decisions, and stating either over the row would be a decision nobody made —
+// the rule the VEX document already publishes under, asked here of the same
+// rows. Two decisions that reach the same outcome in different words are not
+// that: they agree, and what the row cannot state is which wording.
 //
-// Two tests because a place answered once cannot be answered again: a
+// Two tests because an occurrence answered once cannot be answered again: a
 // decision already stands there, which is the refusal working.
 func TestARowDecidedTwoWaysStatesNeither(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		places := r.TwoPlacesOf(t, "CVE-2026-9999")
-		r.AgreedAt(t, places[0], httpapitest.Dismissal)
-		r.AgreedAt(t, places[1], `{"outcome":"deferred","deferred_until":"2030-01-01",`+
+		occurrences := r.TwoOccurrencesOf(t, "CVE-2026-9999")
+		r.AgreedAt(t, occurrences[0], httpapitest.Dismissal)
+		r.AgreedAt(t, occurrences[1], `{"outcome":"deferred","deferred_until":"2030-01-01",`+
 			`"reasoning":"Held until the next point release."}`)
 
 		if outcome, why := r.StandsOn(t, "CVE-2026-9999"); outcome != "" || why != "" {
-			t.Errorf("a row argued away at one place and deferred at another states "+
+			t.Errorf("a row argued away at one occurrence and deferred at another states "+
 				"%q with reason %q", outcome, why)
 		}
 	})
 }
 
-// A place standing on a claim that needed nobody counts as agreed, so its
-// outcome is read with the others. Read only from approved claims, the row said
-// agreed and stated the other place's outcome and reason over both.
-func TestARowAgreedPartlyByAClaimNeedingNobodyStatesNeitherOutcome(t *testing.T) {
+// An occurrence standing on a decision that needed nobody counts as agreed, so
+// its outcome is read with the others. Read only from approved decisions, the
+// row said agreed and stated the other occurrence's outcome and reason over both.
+func TestARowAgreedPartlyByADecisionNeedingNobodyStatesNeitherOutcome(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		places := r.TwoPlacesOf(t, "CVE-2026-9999")
-		r.AgreedAt(t, places[0], httpapitest.Dismissal)
+		occurrences := r.TwoOccurrencesOf(t, "CVE-2026-9999")
+		r.AgreedAt(t, occurrences[0], httpapitest.Dismissal)
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/occurrences/"+places[1]+"/decision",
+				"/findings/CVE-2026-9999/occurrences/"+occurrences[1]+"/decision",
 			`{"outcome":"affected","reasoning":"We ship the vulnerable parser."}`)
 		if made.Code != http.StatusCreated {
-			t.Fatalf("deciding a place answered %d: %s", made.Code, made.Body.String())
+			t.Fatalf("deciding an occurrence answered %d: %s", made.Code, made.Body.String())
 		}
 
 		var out struct {
@@ -210,11 +210,11 @@ func TestARowAgreedPartlyByAClaimNeedingNobodyStatesNeitherOutcome(t *testing.T)
 				"&to=master&to_variant=broadcom&include_undisclosed=true", &out)
 		for _, row := range out.Still {
 			if row.Vulnerability == "CVE-2026-9999" && row.State != "agreed" {
-				t.Fatalf("a row whose every place stands reads as %s, so this proves nothing", row.State)
+				t.Fatalf("a row whose every occurrence stands reads as %s, so this proves nothing", row.State)
 			}
 		}
 		if outcome, why := r.StandsOn(t, "CVE-2026-9999"); outcome != "" || why != "" {
-			t.Errorf("a row argued away at one place and affected at another states "+
+			t.Errorf("a row argued away at one occurrence and affected at another states "+
 				"%q with reason %q", outcome, why)
 		}
 	})
@@ -228,8 +228,8 @@ func TestTheComparisonFileSaysWhatTheScreenSays(t *testing.T) {
 	// alike.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 
 		file := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
 			"/v1/products/mine/comparison.csv?from=master&from_variant=broadcom"+
@@ -274,25 +274,25 @@ func TestTheComparisonFileSaysWhatTheScreenSays(t *testing.T) {
 	})
 }
 
-func TestTwoClaimsAgreeingOnTheOutcomeStateItAndNoReason(t *testing.T) {
+func TestTwoDecisionsAgreeingOnTheOutcomeStateItAndNoReason(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		places := r.TwoPlacesOf(t, "CVE-2026-9999")
-		r.AgreedAt(t, places[0], httpapitest.Dismissal)
+		occurrences := r.TwoOccurrencesOf(t, "CVE-2026-9999")
+		r.AgreedAt(t, occurrences[0], httpapitest.Dismissal)
 		// The same outcome for a different recognized reason. Counted as
-		// disagreement, the sign-off column went blank on a row every place
+		// disagreement, the sign-off column went blank on a row every occurrence
 		// of which had been argued away — which is the opposite of what the
 		// column is read for.
-		r.AgreedAt(t, places[1],
+		r.AgreedAt(t, occurrences[1],
 			`{"outcome":"not-applicable","justification":"component_not_present",`+
 				`"reasoning":"The module is not shipped in this image at all."}`)
 
 		outcome, why := r.StandsOn(t, "CVE-2026-9999")
 		if outcome != "not-applicable" {
-			t.Errorf("two claims agreeing on the outcome state %q", outcome)
+			t.Errorf("two decisions agreeing on the outcome state %q", outcome)
 		}
 		// And no reason, because the row cannot say which of the two.
 		if why != "" {
-			t.Errorf("a row answered by two claims states one of their reasons: %q", why)
+			t.Errorf("a row answered by two decisions states one of their reasons: %q", why)
 		}
 	})
 }

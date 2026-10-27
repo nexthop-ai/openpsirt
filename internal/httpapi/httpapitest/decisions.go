@@ -23,7 +23,7 @@ import (
 
 // ScannedTwoIssues is a build whose one component carries two issues that
 // look nothing alike: one exploited, high and fixable, one low with no fix and
-// a driver in its description. The shape a bulk claim's outliers are read from.
+// a driver in its description. The shape a bulk decision's outliers are read from.
 func (r *Reach) ScannedTwoIssues(t *testing.T) {
 	t.Helper()
 	r.ScannedTwoIssuesArguing(t, "two-issues", nil)
@@ -31,7 +31,7 @@ func (r *Reach) ScannedTwoIssues(t *testing.T) {
 
 // ScannedTwoIssuesArguing is the same build on a scan of its own, carrying
 // what the build argues about what it ships.
-func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom.Suppression) {
+func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, decisions []sbom.Suppression) {
 	t.Helper()
 	kernel := graph.Described{
 		Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10",
@@ -41,7 +41,7 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 		Components:   []graph.Described{kernel},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: kernel}},
 	})
-	r.Argued(t, target, scan, claims)
+	r.Argued(t, target, scan, decisions)
 	r.Ran(t, target, []finding.Reported{
 		{
 			Issue: finding.Named{
@@ -62,9 +62,9 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 	})
 }
 
-// Claimed records one judgment about a finding through the API and returns
-// the claim it made.
-func (r *Reach) Claimed(t *testing.T, who, vulnerability, component, body string) (claim int64, ids []int64) {
+// Claimed records one decision about a finding through the API and returns
+// it with the rows it wrote.
+func (r *Reach) Claimed(t *testing.T, who, vulnerability, component, body string) (decision int64, ids []int64) {
 	t.Helper()
 	path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 		"/findings/%s/components/%s/decision", vulnerability, component)
@@ -73,28 +73,28 @@ func (r *Reach) Claimed(t *testing.T, who, vulnerability, component, body string
 		t.Fatalf("deciding answered %d: %s", got.Code, got.Body.String())
 	}
 	var out struct {
-		ClaimID int64   `json:"claim_id"`
-		IDs     []int64 `json:"ids"`
+		DecisionID int64   `json:"decision_id"`
+		IDs        []int64 `json:"ids"`
 	}
 	if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v (%s)", err, got.Body.String())
 	}
-	if out.ClaimID == 0 {
-		t.Fatalf("a judgment came back without the claim it made: %s", got.Body.String())
+	if out.DecisionID == 0 {
+		t.Fatalf("a decision came back without its identifier: %s", got.Body.String())
 	}
-	return out.ClaimID, out.IDs
+	return out.DecisionID, out.IDs
 }
 
 const Dismissal = `{"outcome":"not-applicable","justification":"vulnerable_code_not_present",` +
 	`"reasoning":"The driver is not built for this image."}`
 
-// AgreedThenLapsed claims one issue across the whole curl fold, has it agreed
+// AgreedThenLapsed decides one issue across the whole curl fold, has it agreed
 // to, then moves the code under it — which is what makes a decision lapse. It
-// answers with the claim whose rows are now lapsed.
+// answers with the decision whose rows are now lapsed.
 func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 	t.Helper()
 	ctx := t.Context()
-	// One judgment over the fold: two packages, two places, one claim.
+	// One decision over the fold: two packages, two occurrences, one decision.
 	decided := AsPerson(t, r, "triager", http.MethodPost,
 		"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/components/libcurl4t64/bulk-decision",
@@ -103,33 +103,33 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 			`"selected_by":"the transfer path",`+
 			`"reasoning":"Nothing an attacker sends reaches the transfer path."}`)
 	if decided.Code != http.StatusCreated {
-		t.Fatalf("deciding together answered %d: %s", decided.Code, decided.Body.String())
+		t.Fatalf("the bulk decision answered %d: %s", decided.Code, decided.Body.String())
 	}
 	var made struct {
-		ClaimID int64   `json:"claim_id"`
-		IDs     []int64 `json:"ids"`
+		DecisionID int64   `json:"decision_id"`
+		IDs        []int64 `json:"ids"`
 	}
 	if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
 		t.Fatal(err)
 	}
 	if len(made.IDs) != 2 {
-		t.Fatalf("the claim covers %d places, want the two of the fold", len(made.IDs))
+		t.Fatalf("the decision covers %d occurrences, want the two of the fold", len(made.IDs))
 	}
-	r.Agreed(t, made.ClaimID)
+	r.Agreed(t, made.DecisionID)
 
 	// The code moves under them, which is what a lapse is.
 	r.CurlMovedTo(t, "8.6.0")
 	lapsed, err := r.DB.DB.NewSelect().Table("decision_occurrence").
-		Where(`"decision_id" = ?`, made.ClaimID).Where(`"state" = ?`, "lapsed").Count(ctx)
+		Where(`"decision_id" = ?`, made.DecisionID).Where(`"state" = ?`, "lapsed").Count(ctx)
 	if err != nil || lapsed != 2 {
-		t.Fatalf("%d rows of the claim lapsed (err %v), want both", lapsed, err)
+		t.Fatalf("%d rows of the decision lapsed (err %v), want both", lapsed, err)
 	}
 
-	return made.ClaimID
+	return made.DecisionID
 }
 
-// AgreedAcrossTheFold claims one issue over the curl fold with the reason
-// given, has it agreed to, and answers with the claim.
+// AgreedAcrossTheFold decides one issue over the curl fold with the reason
+// given, has it agreed to, and answers with the decision.
 func (r *Reach) AgreedAcrossTheFold(t *testing.T, issue, justification string) int64 {
 	t.Helper()
 	decided := AsPerson(t, r, "triager", http.MethodPost,
@@ -141,27 +141,27 @@ func (r *Reach) AgreedAcrossTheFold(t *testing.T, issue, justification string) i
 		t.Fatalf("deciding answered %d: %s", decided.Code, decided.Body.String())
 	}
 	var made struct {
-		ClaimID int64 `json:"claim_id"`
+		DecisionID int64 `json:"decision_id"`
 	}
 	if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
 		t.Fatal(err)
 	}
-	r.Agreed(t, made.ClaimID)
-	return made.ClaimID
+	r.Agreed(t, made.DecisionID)
+	return made.DecisionID
 }
 
-// Agreed has the reviewer agree to a claim.
-func (r *Reach) Agreed(t *testing.T, claim int64) {
+// Agreed has the reviewer agree to a decision.
+func (r *Reach) Agreed(t *testing.T, decision int64) {
 	t.Helper()
-	r.AgreedBy(t, "reviewer", claim)
+	r.AgreedBy(t, "reviewer", decision)
 }
 
-// AgreedBy is one person agreeing to a claim, failing the test where the
+// AgreedBy is one person agreeing to a decision, failing the test where the
 // approval is refused.
-func (r *Reach) AgreedBy(t *testing.T, who string, claim int64) {
+func (r *Reach) AgreedBy(t *testing.T, who string, decision int64) {
 	t.Helper()
 	if ok := AsPerson(t, r, who, http.MethodPost,
-		fmt.Sprintf("/v1/decisions/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
+		fmt.Sprintf("/v1/decisions/%d/approval", decision), `{}`); ok.Code != http.StatusOK {
 		t.Fatalf("%s approving answered %d: %s", who, ok.Code, ok.Body.String())
 	}
 }
@@ -199,28 +199,28 @@ func (r *Reach) Rated(t *testing.T, severity string) int64 {
 	if made.Code != http.StatusCreated {
 		t.Fatalf("rating answered %d: %s", made.Code, made.Body.String())
 	}
-	var claim struct {
+	var decision struct {
 		ID            int64 `json:"id"`
 		NeedsApproval bool  `json:"needs_approval"`
 	}
-	if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+	if err := json.Unmarshal(made.Body.Bytes(), &decision); err != nil {
 		t.Fatal(err)
 	}
-	if claim.NeedsApproval {
+	if decision.NeedsApproval {
 		if ok := AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/assessments/%d/agreement", claim.ID), ""); ok.Code >= 300 {
+			fmt.Sprintf("/v1/assessments/%d/agreement", decision.ID), ""); ok.Code >= 300 {
 			t.Fatalf("agreeing to the rating answered %d: %s", ok.Code, ok.Body.String())
 		}
 	}
-	return claim.ID
+	return decision.ID
 }
 
-// StateOfClaim reads the state of one row of a claim.
-func (r *Reach) StateOfClaim(t *testing.T, claim int64) string {
+// StateOfDecision reads the state of one row of a decision.
+func (r *Reach) StateOfDecision(t *testing.T, decision int64) string {
 	t.Helper()
 	var state string
 	if err := r.DB.DB.NewSelect().Table("decision_occurrence").Column("state").
-		Where(`"decision_id" = ?`, claim).Limit(1).Scan(t.Context(), &state); err != nil {
+		Where(`"decision_id" = ?`, decision).Limit(1).Scan(t.Context(), &state); err != nil {
 		t.Fatal(err)
 	}
 	return state
@@ -239,43 +239,43 @@ func (r *Reach) LimitsOf(t *testing.T, review, agreed string) {
 	}
 }
 
-// TwoPlacesOf is the places one issue sits at in the seeded build.
-func (r *Reach) TwoPlacesOf(t *testing.T, vulnerability string) []string {
+// TwoOccurrencesOf is the occurrences one issue sits at in the seeded build.
+func (r *Reach) TwoOccurrencesOf(t *testing.T, vulnerability string) []string {
 	t.Helper()
-	r.ScannedAtTwoPlaces(t)
+	r.ScannedAtTwoOccurrences(t)
 	var found struct {
-		Places []struct {
-			Place string `json:"place"`
-		} `json:"places"`
+		Occurrences []struct {
+			Occurrence string `json:"occurrence"`
+		} `json:"occurrences"`
 	}
 	Read(t, r, "triager", FindingAt(vulnerability), &found)
-	if len(found.Places) < 2 {
-		t.Fatalf("the fixture holds this issue at %d places, so there is nothing to prove",
-			len(found.Places))
+	if len(found.Occurrences) < 2 {
+		t.Fatalf("the fixture holds this issue at %d occurrences, so there is nothing to prove",
+			len(found.Occurrences))
 	}
-	out := make([]string, 0, len(found.Places))
-	for _, one := range found.Places {
-		out = append(out, one.Place)
+	out := make([]string, 0, len(found.Occurrences))
+	for _, one := range found.Occurrences {
+		out = append(out, one.Occurrence)
 	}
 	return out
 }
 
-// AgreedAt records a judgment about one place and has a second person agree.
-func (r *Reach) AgreedAt(t *testing.T, place, body string) {
+// AgreedAt records a decision about one occurrence and has a second person agree.
+func (r *Reach) AgreedAt(t *testing.T, occurrence, body string) {
 	t.Helper()
 	made := AsPerson(t, r, "triager", http.MethodPost,
 		"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/"+place+"/decision", body)
+			"/findings/CVE-2026-9999/occurrences/"+occurrence+"/decision", body)
 	if made.Code != http.StatusCreated {
-		t.Fatalf("deciding a place answered %d: %s", made.Code, made.Body.String())
+		t.Fatalf("deciding an occurrence answered %d: %s", made.Code, made.Body.String())
 	}
-	var claim struct {
-		ClaimID int64 `json:"claim_id"`
+	var decision struct {
+		DecisionID int64 `json:"decision_id"`
 	}
-	if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+	if err := json.Unmarshal(made.Body.Bytes(), &decision); err != nil {
 		t.Fatal(err)
 	}
-	r.Agreed(t, claim.ClaimID)
+	r.Agreed(t, decision.DecisionID)
 }
 
 // StandsOn is what the comparison says stands about one still-present row.
@@ -304,13 +304,13 @@ func (r *Reach) StandsOn(t *testing.T, vulnerability string) (string, string) {
 // one thing no message driven by an event can report — so each is derived by
 // the sweep and each clears by the thing finally happening.
 
-// Aged moves a claim's rows back in time, which is how a threshold measured in
+// Aged moves a decision's rows back in time, which is how a threshold measured in
 // days is tested without waiting days.
-func (r *Reach) Aged(t *testing.T, claim int64, column string, when time.Time) {
+func (r *Reach) Aged(t *testing.T, decision int64, column string, when time.Time) {
 	t.Helper()
 	if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 		Set(column+" = ?", when).
-		Where(`"decision_id" = ?`, claim).Exec(t.Context()); err != nil {
+		Where(`"decision_id" = ?`, decision).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -349,9 +349,9 @@ func (r *Reach) Became(t *testing.T, who string) []becameRow {
 }
 
 type becameRow struct {
-	Claim struct {
+	Decision struct {
 		ID int64 `json:"id"`
-	} `json:"claim"`
+	} `json:"decision"`
 	Happened string `json:"happened"`
 	When     string `json:"when"`
 	By       string `json:"by"`

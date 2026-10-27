@@ -14,7 +14,7 @@ import (
 
 func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
 	// One column for a party: moving a package is work a queue tracks
-	// rather than a judgment one person makes, so a team is a perfectly
+	// rather than a decision one person makes, so a team is a perfectly
 	// good holder of an upgrade — often the right one.
 	//
 	// Recorded in the same act as the promise, because a promise nobody is
@@ -50,8 +50,8 @@ func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
 			t.Fatalf("handing the upgrade to a team answered %d: %s", got.Code, got.Body.String())
 		}
 		var done struct {
-			Decisions int `json:"decisions"`
-			Held      int `json:"held"`
+			Occurrences int `json:"occurrences"`
+			Held        int `json:"held"`
 		}
 		if err := json.Unmarshal(got.Body.Bytes(), &done); err != nil {
 			t.Fatal(err)

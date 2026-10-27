@@ -18,8 +18,8 @@ import (
 )
 
 // leadAt is where the seeded lead is addressed on the seeded build.
-func leadAt(place string) string {
-	return "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+func leadAt(occurrence string) string {
+	return "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
 }
 
 // granted gives one of the cast another role on the seeded product.
@@ -47,18 +47,18 @@ type heldLead struct {
 
 // holderOf is who the lead page says is dealing with the lead, and who the
 // queue's row for it says, as one reader reads both.
-func holderOf(t *testing.T, r *httpapitest.Reach, who, place string) (page, queue heldLead) {
+func holderOf(t *testing.T, r *httpapitest.Reach, who, occurrence string) (page, queue heldLead) {
 	t.Helper()
-	httpapitest.Read(t, r, who, leadAt(place), &page)
+	httpapitest.Read(t, r, who, leadAt(occurrence), &page)
 	var listed struct {
 		Items []struct {
-			Place string `json:"place"`
+			Occurrence string `json:"occurrence"`
 			heldLead
 		} `json:"items"`
 	}
 	httpapitest.Read(t, r, who, "/v1/products/mine/code-findings?state=open", &listed)
 	for _, row := range listed.Items {
-		if row.Place == place {
+		if row.Occurrence == occurrence {
 			queue = row.heldLead
 		}
 	}
@@ -71,8 +71,8 @@ func holderOf(t *testing.T, r *httpapitest.Reach, who, place string) (page, queu
 // for the assigner right as a finding's assignment does.
 func TestALeadIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		at := leadAt(place) + "/assignment"
+		occurrence := httpapitest.SeededLead(t, r)
+		at := leadAt(occurrence) + "/assignment"
 		// Reading the lead, and triaging disclosed work alone.
 		granted(t, r, "internal-reviewer", access.PublicTriage)
 		for _, c := range []struct {
@@ -93,14 +93,14 @@ func TestALeadIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
 				t.Errorf("%s sending %s answered %d, want %d: %s", c.who, c.body, got.Code, c.want, got.Body)
 			}
 		}
-		page, queue := holderOf(t, r, "internal-reader", place)
+		page, queue := holderOf(t, r, "internal-reader", occurrence)
 		if page.AssignedTo != "internal-triager" || queue.AssignedTo != "internal-triager" {
 			t.Errorf("the lead page names %+v and the queue %+v; want the triager who took it", page, queue)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{}`); got.Code != http.StatusNoContent {
 			t.Fatalf("handing it back answered %d: %s", got.Code, got.Body)
 		}
-		if page, queue := holderOf(t, r, "internal-reader", place); page.AssignedTo != "" || queue.AssignedTo != "" {
+		if page, queue := holderOf(t, r, "internal-reader", occurrence); page.AssignedTo != "" || queue.AssignedTo != "" {
 			t.Errorf("a lead handed back is named as held by %+v and %+v", page, queue)
 		}
 	})
@@ -113,8 +113,8 @@ func TestALeadIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
 // work.
 func TestALeadAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		at := leadAt(place) + "/assignment"
+		occurrence := httpapitest.SeededLead(t, r)
+		at := leadAt(occurrence) + "/assignment"
 		granted(t, r, "internal-triager", access.Assigner)
 		granted(t, r, "internal-reader", access.PrivateRead)
 
@@ -157,8 +157,8 @@ func TestALeadAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
 // hands back every finding.
 func TestLosingTheLastRoleHandsBackTheLeadsItCarried(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+		occurrence := httpapitest.SeededLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
 		}
@@ -176,7 +176,7 @@ func TestLosingTheLastRoleHandsBackTheLeadsItCarried(t *testing.T) {
 		if withdrawn.Released == 0 {
 			t.Error("the last role went and the lead it carried was not handed back")
 		}
-		if page, _ := holderOf(t, r, "internal-reader", place); page.AssignedTo != "" {
+		if page, _ := holderOf(t, r, "internal-reader", occurrence); page.AssignedTo != "" {
 			t.Errorf("the lead is still held by %q", page.AssignedTo)
 		}
 	})
@@ -186,8 +186,8 @@ func TestLosingTheLastRoleHandsBackTheLeadsItCarried(t *testing.T) {
 // named on the lead.
 func TestATeamHoldsALeadOneOfItsMembersReads(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		at := leadAt(place) + "/assignment"
+		occurrence := httpapitest.SeededLead(t, r)
+		at := leadAt(occurrence) + "/assignment"
 		granted(t, r, "internal-triager", access.Assigner)
 		for _, team := range []string{
 			`{"name":"private-desk","members":["private"]}`,
@@ -205,7 +205,7 @@ func TestATeamHoldsALeadOneOfItsMembersReads(t *testing.T) {
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("a team with a reader of internal work answered %d: %s", got.Code, got.Body)
 		}
-		page, queue := holderOf(t, r, "internal-reader", place)
+		page, queue := holderOf(t, r, "internal-reader", occurrence)
 		if page.AssignedTo != "analysis-desk" || !page.AssignedTeam || !queue.AssignedTeam {
 			t.Errorf("the lead page names %+v and the queue %+v; want the team's queue", page, queue)
 		}
@@ -217,13 +217,13 @@ func TestATeamHoldsALeadOneOfItsMembersReads(t *testing.T) {
 // may share a name.
 func TestTheLeadFileNamesAHolderAsTheListDoes(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		granted(t, r, "internal-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
 			`{"name":"analysis-desk","members":["internal-reader"]}`); made.Code != http.StatusCreated {
 			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("queueing the lead with the team answered %d: %s", got.Code, got.Body)
 		}
@@ -244,7 +244,7 @@ func TestTheLeadFileNamesAHolderAsTheListDoes(t *testing.T) {
 				for i, column := range header {
 					named[column] = record[i]
 				}
-				if named["place"] != place {
+				if named["occurrence"] != occurrence {
 					continue
 				}
 				rows++
@@ -266,13 +266,13 @@ func TestTheLeadFileNamesAHolderAsTheListDoes(t *testing.T) {
 // A lead every release of which is past its end of life is kept as it stands.
 func TestALeadPastItsEndOfLifeIsNotAssigned(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
 		if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
 			Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"person":"internal-triager"}`); got.Code != http.StatusConflict {
 			t.Errorf("taking a lead past its end of life answered %d: %s", got.Code, got.Body)
 		}
@@ -284,8 +284,8 @@ func TestALeadPastItsEndOfLifeIsNotAssigned(t *testing.T) {
 // nobody does.
 func TestTheUnassignedListLeavesOutALeadPastItsEndOfLife(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
+		occurrence := httpapitest.SeededLead(t, r)
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != occurrence {
 			t.Fatalf("the unassigned list holds leads %v; want the seeded lead, or this checks nothing", got)
 		}
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
@@ -303,8 +303,8 @@ func TestTheUnassignedListLeavesOutALeadPastItsEndOfLife(t *testing.T) {
 // and is refused where the recipient may not read internal work.
 func TestHandingOverSomebodysWorkMovesTheirLeadsToAReaderOfThem(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+		occurrence := httpapitest.SeededLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
 		}
@@ -315,29 +315,29 @@ func TestHandingOverSomebodysWorkMovesTheirLeadsToAReaderOfThem(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, at, `{"to":"internal-reader"}`); got.Code != http.StatusOK {
 			t.Fatalf("handing a lead to a reader of internal work answered %d: %s", got.Code, got.Body)
 		}
-		if page, _ := holderOf(t, r, "internal-reader", place); page.AssignedTo != "internal-reader" {
+		if page, _ := holderOf(t, r, "internal-reader", occurrence); page.AssignedTo != "internal-reader" {
 			t.Errorf("the lead is held by %q; want the reader it was handed to", page.AssignedTo)
 		}
 	})
 }
 
-// heldItems is the places of the leads a list of held work answers one reader,
+// heldItems is the occurrences of the leads a list of held work answers one reader,
 // and how many items it holds in all.
-func heldItems(t *testing.T, r *httpapitest.Reach, who, path string) (places []string, items int) {
+func heldItems(t *testing.T, r *httpapitest.Reach, who, path string) (occurrences []string, items int) {
 	t.Helper()
 	var got struct {
 		Items []struct {
 			Vulnerability string `json:"vulnerability"`
-			Place         string `json:"place"`
+			Occurrence    string `json:"occurrence"`
 		} `json:"items"`
 	}
 	httpapitest.Read(t, r, who, path, &got)
 	for _, item := range got.Items {
-		if item.Place != "" {
-			places = append(places, item.Place)
+		if item.Occurrence != "" {
+			occurrences = append(occurrences, item.Occurrence)
 		}
 	}
-	return places, len(got.Items)
+	return occurrences, len(got.Items)
 }
 
 // The unassigned list, one person's work and the totals behind them list a
@@ -345,14 +345,14 @@ func heldItems(t *testing.T, r *httpapitest.Reach, who, path string) (places []s
 // else.
 func TestTheListsOfHeldWorkListALeadToItsReadersAlone(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
+		occurrence := httpapitest.SeededLead(t, r)
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != occurrence {
 			t.Errorf("the unassigned list holds leads %v; want the seeded lead", got)
 		}
 		if got, _ := heldItems(t, r, "reader", "/v1/unassigned"); len(got) != 0 {
 			t.Errorf("a reader of disclosed work was listed leads %v", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
 		}
@@ -360,7 +360,7 @@ func TestTheListsOfHeldWorkListALeadToItsReadersAlone(t *testing.T) {
 			t.Errorf("the unassigned list holds the lead taken: %v", got)
 		}
 		const theirs = "/v1/people/internal-triager/assignments"
-		if got, n := heldItems(t, r, "internal-reader", theirs); len(got) != 1 || got[0] != place || n != 1 {
+		if got, n := heldItems(t, r, "internal-reader", theirs); len(got) != 1 || got[0] != occurrence || n != 1 {
 			t.Errorf("their work holds leads %v of %d items; want the seeded lead alone", got, n)
 		}
 		if got, _ := heldItems(t, r, "internal-triager", "/v1/people/me/assignments"); len(got) != 1 {
@@ -396,18 +396,18 @@ func TestTheListsOfHeldWorkListALeadToItsReadersAlone(t *testing.T) {
 // A team's queue lists a lead it holds to whoever reads internal work.
 func TestATeamsQueueListsALeadItHolds(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
+		occurrence := httpapitest.SeededLead(t, r)
 		granted(t, r, "internal-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
 			`{"name":"analysis-desk","members":["internal-reader"]}`); made.Code != http.StatusCreated {
 			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
 		}
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("queueing the lead with the team answered %d: %s", got.Code, got.Body)
 		}
 		const queue = "/v1/teams/analysis-desk/assignments"
-		if got, _ := heldItems(t, r, "internal-reader", queue); len(got) != 1 || got[0] != place {
+		if got, _ := heldItems(t, r, "internal-reader", queue); len(got) != 1 || got[0] != occurrence {
 			t.Errorf("the team's queue holds leads %v; want the seeded lead", got)
 		}
 		if got, n := heldItems(t, r, "reader", queue); len(got) != 0 || n != 0 {
@@ -430,7 +430,7 @@ func TestAMovedHandedOffLeadLeavesTheListsOfHeldWork(t *testing.T) {
 // reader of it is listed it as unassigned work, while its flaw is.
 func handedOffUnlisted(t *testing.T, r *httpapitest.Reach, move bool) {
 	t.Helper()
-	place, flaw := httpapitest.HandedOffLead(t, r, move)
+	occurrence, flaw := httpapitest.HandedOffLead(t, r, move)
 	for _, who := range []string{"internal-reader", "embargo-reader", "lead-handler"} {
 		if got, _ := heldItems(t, r, who, "/v1/unassigned"); len(got) != 0 {
 			t.Errorf("%s is listed the handed-off lead %v", who, got)
@@ -447,7 +447,7 @@ func handedOffUnlisted(t *testing.T, r *httpapitest.Reach, move bool) {
 		found = found || item.Vulnerability == flaw
 	}
 	if !found {
-		t.Errorf("the unassigned list holds %+v; want the flaw %s in place of lead %s", listed.Items, flaw, place)
+		t.Errorf("the unassigned list holds %+v; want the flaw %s in place of lead %s", listed.Items, flaw, occurrence)
 	}
 }
 
@@ -461,7 +461,7 @@ func TestAMovedHandedOffLeadLeavesItsHoldersWork(t *testing.T) { handedOffHeld(t
 // handedOffHeld hands off a lead its holder took first, kept or moved.
 func handedOffHeld(t *testing.T, move bool) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place, _ := httpapitest.HandedOffLeadHeldBy(t, r, move, "lead-handler")
+		occurrence, _ := httpapitest.HandedOffLeadHeldBy(t, r, move, "lead-handler")
 		for _, path := range []string{"/v1/people/lead-handler/assignments", "/v1/people/me/assignments"} {
 			if got, n := heldItems(t, r, "lead-handler", path); len(got) != 0 || n != 0 {
 				t.Errorf("%s holds %d items, leads %v; want the handed-off lead gone", path, n, got)
@@ -479,7 +479,7 @@ func handedOffHeld(t *testing.T, move bool) {
 				t.Errorf("the totals count %d pieces held by the lead's holder; want none", row.Open)
 			}
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/assignment",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(occurrence)+"/assignment",
 			`{"person":""}`); got.Code != http.StatusConflict {
 			t.Errorf("handing back a handed-off lead answered %d: %s", got.Code, got.Body)
 		}
@@ -488,7 +488,7 @@ func handedOffHeld(t *testing.T, move bool) {
 				AssignedTo *int64 `bun:"assigned_to"`
 			}
 			if err := r.DB.DB.NewSelect().TableExpr(`"finding"`).Column("assigned_to").
-				Where(`"occurrence_identity" = ?`, place).Limit(1).Scan(t.Context(), &held); err != nil {
+				Where(`"occurrence_identity" = ?`, occurrence).Limit(1).Scan(t.Context(), &held); err != nil {
 				t.Fatal(err)
 			}
 			return held.AssignedTo
@@ -508,7 +508,7 @@ func handedOffHeld(t *testing.T, move bool) {
 }
 
 // Two leads of one rule in one component are two pieces of work: a lead is
-// judged at its place, and grouping them would hide the second behind the
+// judged at its occurrence, and grouping them would hide the second behind the
 // first.
 func TestEachLeadIsOnePieceOfHeldWork(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -526,11 +526,11 @@ func TestEachLeadIsOnePieceOfHeldWork(t *testing.T) {
 // handed back it returns to both.
 func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		at := leadAt(place) + "/assignment"
+		occurrence := httpapitest.SeededLead(t, r)
+		at := leadAt(occurrence) + "/assignment"
 		type narrowed struct {
 			Items []struct {
-				Place string `json:"place"`
+				Occurrence string `json:"occurrence"`
 			} `json:"items"`
 			Total  int            `json:"total"`
 			States map[string]int `json:"states"`
@@ -540,7 +540,7 @@ func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
 			httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings?assigned=nobody", &got)
 			return got
 		}
-		if got := unheld(); len(got.Items) != 1 || got.Items[0].Place != place || got.Total != 1 || got.States["open"] != 1 {
+		if got := unheld(); len(got.Items) != 1 || got.Items[0].Occurrence != occurrence || got.Total != 1 || got.States["open"] != 1 {
 			t.Fatalf("the unheld leads are %+v; want the seeded lead, listed and counted", got)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{"person":"internal-triager"}`); got.Code != http.StatusNoContent {

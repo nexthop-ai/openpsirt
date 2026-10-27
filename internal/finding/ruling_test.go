@@ -345,7 +345,7 @@ func TestADuplicateIsReadFromTheIssueItPointsAt(t *testing.T) {
 func TestTheBulkCapCountsReportsWrittenRatherThanNamesGiven(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		if err := f.setting(t, setting.TogetherCap, "2"); err != nil {
+		if err := f.setting(t, setting.BulkDecisionCap, "2"); err != nil {
 			t.Fatal(err)
 		}
 		named := f.claims(t, who, 3)
@@ -544,7 +544,7 @@ func TestADuplicateOfAnIssueDismissedOrSuppressedEverywhereIsRefused(t *testing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := world.RecordClaims(ctx, f.db, f.target, f.lastScan,
+		if _, err := world.RecordDecisions(ctx, f.db, f.target, f.lastScan,
 			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)},
 			everyOrigin); err != nil {
 			t.Fatal(err)
@@ -561,16 +561,16 @@ func TestADuplicateOfAnIssueDismissedOrSuppressedEverywhereIsRefused(t *testing.
 			return err
 		}
 
-		// Suppressed at both places by what the build said.
+		// Suppressed at both occurrences by what the build said.
 		if err := duplicate(named[0], "CVE-2026-1"); !errors.Is(err, finding.ErrDuplicateOfClosed) {
 			t.Errorf("a duplicate of an issue suppressed everywhere was answered %v", err)
 		}
 
-		// Dismissed at its one place by a decision in force.
-		place := finding.PlaceIdentity(swss.Name, "")
+		// Dismissed at its one occurrence by a decision in force.
+		occurrence := finding.OccurrenceIdentity(swss.Name, "")
 		f.decision(t, decisionRow{
-			By: who.ID, Claim: claimSaying(t, f.db, who.ID, "not-applicable"),
-			Issue: f.issueID(t, "CVE-2026-2"), Place: place, State: "approved",
+			By: who.ID, Decision: decisionSaying(t, f.db, who.ID, "not-applicable"),
+			Issue: f.issueID(t, "CVE-2026-2"), Occurrence: occurrence, State: "approved",
 			Component: ptr(swss.Version), Key: "dismissed-key",
 		})
 		if err := duplicate(named[1], "CVE-2026-2"); !errors.Is(err, finding.ErrDuplicateOfClosed) {
@@ -579,8 +579,8 @@ func TestADuplicateOfAnIssueDismissedOrSuppressedEverywhereIsRefused(t *testing.
 
 		// Deferred is work that comes back, so it is still open.
 		f.decision(t, decisionRow{
-			By: who.ID, Claim: claimSaying(t, f.db, who.ID, "deferred"),
-			Issue: f.issueID(t, "CVE-2026-3"), Place: place, State: "approved",
+			By: who.ID, Decision: decisionSaying(t, f.db, who.ID, "deferred"),
+			Issue: f.issueID(t, "CVE-2026-3"), Occurrence: occurrence, State: "approved",
 			Component: ptr(swss.Version), Key: "deferred-key",
 		})
 		if err := duplicate(named[2], "CVE-2026-3"); err != nil {

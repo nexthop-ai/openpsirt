@@ -11,30 +11,32 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
-// The decision state of a group, counted per place.
+// The decision state of a group, counted per occurrence.
 //
-// Four counts over our decisions in one product, at each place and at the
-// versions that place holds now. A place with two decisions is one place, and
-// the number of places is exactly what the state words compare against, so a
-// count never joins the decisions straight into the rows it counts.
+// Four counts over our decision occurrences in one product, at each
+// occurrence and at the versions that occurrence holds now. An occurrence
+// with two decisions is one occurrence, and the number of occurrences is
+// exactly what the state words compare against, so a count never joins the
+// decision occurrences straight into the rows it counts.
 //
 // Two shapes ask it, and the conditions are the same in both:
 //
-//   - decidedAs, a correlated EXISTS per place, for a page of groups, which
-//     reads a few hundred places.
-//   - decisionsAtPlaces, one row per decided place built once from the decision
-//     side and joined on the finding, for a count over every open place in a
-//     product. The match from a decision to its places is decisionsOutward,
-//     which the state filter's table is built on too.
+//   - decidedAs, a correlated EXISTS per occurrence, for a page of groups,
+//     which reads a few hundred occurrences.
+//   - decisionsAtOccurrences, one row per decided occurrence built once from
+//     the decision side and joined on the finding, for a count over every
+//     open occurrence in a product. The match from a decision occurrence to
+//     the findings it covers is decisionsOutward, which the state filter's
+//     table is built on too.
 //
-// The EXISTS runs once per place it is asked of, which is nothing on a page and
-// 367,000 probes for a product's totals: 2.1 s a statement on PostgreSQL,
-// against 0.2 s for the joined table, which starts from the decisions rather
-// than from the findings.
+// The EXISTS runs once per occurrence it is asked of, which is nothing on a
+// page and 367,000 probes for a product's totals: 2.1 s a statement on
+// PostgreSQL, against 0.2 s for the joined table, which starts from the
+// decision occurrences rather than from the findings.
 //
 // Written once, because spelled again at every site the conditions drift: a
 // row requiring a live key for "waiting" where the filter does not puts a
-// claim proposed and then withdrawn in the filter's waiting bucket, with no
+// decision proposed and then withdrawn in the filter's waiting bucket, with no
 // state word on the row that comes back.
 
 // decisionState is one of those counts: the column it lands in, the condition
@@ -49,23 +51,23 @@ type decisionState struct {
 }
 
 // The four states a row is counted in. Lapsed is counted whether or not the
-// claim still stands, because a lapse is what happened to it; the other three
-// require the live key, because a claim that no longer stands is not waiting,
+// decision still stands, because a lapse is what happened to it; the other three
+// require the live key, because a decision that no longer stands is not waiting,
 // is not agreed, and is not with its author.
 //
 // Waiting is a proposal that needs a second person. A proposal that needs
 // nobody is in force, and counts with the agreed ones.
 var (
-	claimWaiting = decisionState{"waiting_here",
+	decisionWaiting = decisionState{"waiting_here",
 		` AND "de"."state" = ? AND "de"."needs_approval" = ? AND "de"."live_key" IS NOT NULL`,
 		[]any{"proposed", true}}
-	claimApproved = func() decisionState {
+	decisionApproved = func() decisionState {
 		inForce, args := InForce()
 		return decisionState{"approved_here", " AND " + inForce + ` AND "de"."live_key" IS NOT NULL`, args}
 	}()
-	claimLapsed = decisionState{"lapsed_here",
+	decisionLapsed = decisionState{"lapsed_here",
 		` AND "de"."state" = ?`, []any{"lapsed"}}
-	claimSentBack = decisionState{"sent_back_here",
+	decisionSentBack = decisionState{"sent_back_here",
 		` AND "de"."state" = ? AND "de"."live_key" IS NOT NULL AND "de"."sent_back_at" IS NOT NULL`,
 		[]any{"proposed"}}
 )
@@ -83,13 +85,13 @@ func decisionCounts(q *bun.SelectQuery, product string, args []any, states ...de
 	return q
 }
 
-// standsAs is the same question asked of one place rather than counted over a
-// group: does a decision in this state cover this finding.
+// standsAs is the same question asked of one occurrence rather than counted
+// over a group: does a decision in this state cover this finding.
 //
 // The row's count and the filter that selects on it have to be the same
 // question, and the sent-back filter had written its own — without the
-// product and without the version match — so it matched a claim sent back in
-// another product, or one keyed on a version the place no longer holds, and
+// product and without the version match — so it matched a decision sent back in
+// another product, or one keyed on a version the occurrence no longer holds, and
 // returned groups whose own sent-back count was zero.
 func standsAs(product string, state decisionState) string {
 	// The finding is joined again inside rather than read from the outer
@@ -101,7 +103,7 @@ func standsAs(product string, state decisionState) string {
 	return `EXISTS (SELECT 1 FROM "finding" AS "f2"
 			JOIN "component" AS "c" ON "c"."id" = "f2"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f2"."consumer_id"
-			JOIN (` + Decisions + `) ON ` + DecisionAtPlace("f2") + `
+			JOIN (` + Decisions + `) ON ` + DecisionAtOccurrence("f2") + `
 			JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"
 			WHERE "f2"."id" = "f"."id"
 			  AND "de"."product_id" = ` + product + `
@@ -123,18 +125,19 @@ func decidedAs(product string, state decisionState) string {
 			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`
 }
 
-// decisionsAtPlaces is one row per open finding in a product that a decision of
-// ours there covers, with a column per state saying whether one of the
-// decisions covering it is in that state. Joined to a query over finding AS f
-// as `LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id` and read through
-// placesDecided.
+// decisionsAtOccurrences is one row per open finding in a product that a
+// decision of ours there covers, with a column per state saying whether one of
+// the decision occurrences covering it is in that state. Joined to a query
+// over finding AS f as `LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id` and
+// read through occurrencesDecided.
 //
 // Built on decisionsOutward, the table the state filter is built on. The
-// findings it reaches are not held to the product's builds: the decision is,
-// and the join on the finding's identifier drops a place in another product
-// that shares the issue and the place identity. Holding them as well was
-// measured slower, 1.5 s against 1.1 s with 133,000 decisions on PostgreSQL.
-func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionState) *bun.SelectQuery {
+// findings it reaches are not held to the product's builds: the decision
+// occurrence is, and the join on the finding's identifier drops an occurrence
+// in another product that shares the issue and the occurrence identity.
+// Holding them as well was measured slower, 1.5 s against 1.1 s with 133,000
+// decision occurrences on PostgreSQL.
+func decisionsAtOccurrences(q *bun.SelectQuery, productID int64, states ...decisionState) *bun.SelectQuery {
 	decided := decisionsOutward(q)
 	for _, state := range states {
 		decided = decided.ColumnExpr(`MAX(CASE WHEN `+strings.TrimPrefix(state.condition, " AND ")+
@@ -144,19 +147,20 @@ func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionSt
 }
 
 // decisionsOutward is every open finding a decision covers, one row per
-// finding, reached from the decision side: the decision is matched to a place
-// by its issue and place identity, held to the versions the place holds now,
-// and joined to its claim. Callers add a column per thing they ask of the
-// decisions and say which product a decision has to belong to.
+// finding, reached from the decision side: the decision occurrence is matched
+// to a finding by its issue and occurrence identity, held to the versions the
+// occurrence holds now, and joined to its decision. Callers add a column per
+// thing they ask of the decision occurrences and say which product one has to
+// belong to.
 //
-// The one spelling of how a decision reaches the places it covers, shared by
-// the overview's counts and the state filter, so a change to the match is made
-// once and reaches both.
+// The one spelling of how a decision reaches the occurrences it covers, shared
+// by the overview's counts and the state filter, so a change to the match is
+// made once and reaches both.
 //
-// The decision is outermost through CROSS JOIN ... WHERE. It is an inner join
-// on every engine, and on SQLite it also fixes the order: left to choose,
-// SQLite starts from every open finding and reads every decision of its
-// product once per row.
+// The decision occurrence is outermost through CROSS JOIN ... WHERE. It is an
+// inner join on every engine, and on SQLite it also fixes the order: left to
+// choose, SQLite starts from every open finding and reads every decision
+// occurrence of its product once per row.
 func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
 	kinds, kindArgs := kind.Triage.Where(`"f2"."kind"`)
 	return decisionsOver(q, `"finding" AS "f2"`).
@@ -166,17 +170,17 @@ func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
 		GroupExpr(`"f2"."id"`)
 }
 
-// decisionsOver is every decision reaching a place read from source as "f2",
-// one row per decision and place: the finding table itself, or a population of
-// places that already carries its own conditions, with the identifier, the
-// issue, the place identity, the component and the consumer under their own
-// names. The caller groups it.
+// decisionsOver is every decision occurrence reaching a finding read from
+// source as "f2", one row per decision occurrence and finding: the finding
+// table itself, or a population of findings that already carries its own
+// conditions, with the identifier, the issue, the occurrence identity, the
+// component and the consumer under their own names. The caller groups it.
 func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQuery {
 	return q.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(DecisionIssue).
 		Join(`CROSS JOIN `+source, args...).
-		Where(DecisionAtPlace("f2")).
+		Where(DecisionAtOccurrence("f2")).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(coversAsked)
 }
@@ -185,20 +189,21 @@ func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQu
 // the component's key, rather than read from a component joined beside the
 // match.
 //
-// A planner estimates the match between a decision and a place as the product
-// of two equalities that are not independent, and where the places are
-// narrowed to the decided issues PostgreSQL estimates it at one row. Against
-// that estimate a scan of a small component table costs the same as a lookup
-// by key, so a joined component is scanned whole once per decided place:
-// 1,570,516 rows read and discarded for 4,081 decided places, 290 ms of a
-// 433 ms list with 3,673 decisions and 737 components. An EXISTS has no join
-// order. PostgreSQL asks it through the component's key where it expects few
-// decided places, and hashes the components once where it expects many and
-// they fit in memory; the other engines look the component up by its key.
+// A planner estimates the match between a decision occurrence and a finding as
+// the product of two equalities that are not independent, and where the
+// findings are narrowed to the decided issues PostgreSQL estimates it at one
+// row. Against that estimate a scan of a small component table costs the same
+// as a lookup by key, so a joined component is scanned whole once per decided
+// occurrence: 1,570,516 rows read and discarded for 4,081 decided occurrences,
+// 290 ms of a 433 ms list with 3,673 decision occurrences and 737 components.
+// An EXISTS has no join order. PostgreSQL asks it through the component's key
+// where it expects few decided occurrences, and hashes the components once
+// where it expects many and they fit in memory; the other engines look the
+// component up by its key.
 //
-// The comparisons are KeyMatches' own, moved inside the EXISTS. A place with no
-// consumer holds the empty version, which is what ConsumerUpstreamExpr makes
-// of a consumer that is not there, so it is compared as such rather than
+// The comparisons are KeyMatches' own, moved inside the EXISTS. An occurrence
+// with no consumer holds the empty version, which is what ConsumerUpstreamExpr
+// makes of a consumer that is not there, so it is compared as such rather than
 // looked up.
 var coversAsked = func() string {
 	component, consumer := componentMatches, consumerMatches
@@ -215,9 +220,10 @@ var coversAsked = func() string {
 	return covers
 }()
 
-// placesDecided is how many of a group's places decisionsAtPlaces marks in one
-// state, under the state's own alias. A place no decision covers has no row
+// occurrencesDecided is how many of a group's occurrences
+// decisionsAtOccurrences marks in one state, under the state's own alias. An
+// occurrence no decision covers has no row
 // in the joined table and counts as none.
-func placesDecided(state decisionState) string {
+func occurrencesDecided(state decisionState) string {
 	return `SUM(COALESCE("dd"."` + state.alias + `", 0)) AS "` + state.alias + `"`
 }

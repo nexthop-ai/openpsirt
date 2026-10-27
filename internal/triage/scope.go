@@ -5,7 +5,7 @@ package triage
 
 import "github.com/nexthop-ai/openpsirt/internal/refusal"
 
-// Scope is whom a published statement made from a claim holds for.
+// Scope is whom a published statement made from a decision holds for.
 //
 // A statement about a component either holds for anybody shipping that
 // component at that version, or holds only for this product's own build of it.
@@ -24,13 +24,13 @@ const (
 	BuildSpecific Scope = "build"
 )
 
-// Scopes is every scope a claim may state, in the order they are offered.
+// Scopes is every scope a decision may state, in the order they are offered.
 func Scopes() []Scope { return []Scope{Portable, BuildSpecific} }
 
-// Valid reports whether s is a scope a claim may state.
+// Valid reports whether s is a scope a decision may state.
 func (s Scope) Valid() bool { return s == Portable || s == BuildSpecific }
 
-// ScopeOf is whom a statement made from a claim holds for: what the claim
+// ScopeOf is whom a statement made from a decision holds for: what the decision
 // states where it states one, and what its outcome and reason say otherwise.
 //
 // The reason decides because it is what the statement rests on. That the
@@ -52,9 +52,9 @@ func ScopeOf(outcome Outcome, justification Justification, stated Scope) Scope {
 	return BuildSpecific
 }
 
-// scoped refuses a scope a claim cannot state.
+// scoped refuses a scope a decision cannot state.
 //
-// Empty states none, which is what nearly every claim does. A deferral
+// Empty states none, which is what nearly every decision does. A deferral
 // publishes nothing, so a scope on one would be a value nothing reads.
 func scoped(outcome Outcome, stated Scope) error {
 	switch {

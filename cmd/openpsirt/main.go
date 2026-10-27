@@ -566,7 +566,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// somebody about it are separate concerns.
 	reader := ingest.NewReader(db, work, cfg.Limits(), logger, name).
 		Telling(notify.Movements(db.DB, logger))
-	// A scan that moves the code out from under somebody's judgment hands
+	// A scan that moves the code out from under somebody's decision hands
 	// them work back that they did nothing to cause, so they are told.
 	// Wired here rather than inside the scanner: what a scan does and how
 	// anybody hears about it are separate concerns, and the notification

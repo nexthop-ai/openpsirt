@@ -17,7 +17,7 @@ import (
 type LeadSeriesBody struct {
 	Series  string         `json:"series" doc:"The series' name, as its producer first sent it"`
 	States  map[string]int `json:"states" doc:"The series' leads by where they stand, every state named. A lead on two builds in two states counts in both"`
-	Waiting int            `json:"waiting" doc:"Open leads a claim waiting for a second person leaves out of the queue, counted among the open in states"`
+	Waiting int            `json:"waiting" doc:"Open leads a decision waiting for a second person leaves out of the queue, counted among the open in states"`
 	Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
 }
 

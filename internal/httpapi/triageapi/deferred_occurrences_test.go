@@ -11,41 +11,41 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-func TestAFindingSaysHowLongEachPlaceWasPutOff(t *testing.T) {
+func TestAFindingSaysHowLongEachOccurrenceWasPutOff(t *testing.T) {
 	// The decision form says whether a deferral stands on its own before it is
-	// sent, and the server measures one against everything the place was put
+	// sent, and the server measures one against everything the occurrence was put
 	// off for before. Without the total the form promises a repeat deferral
 	// that it stands alone, and it is then gated.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		const finding = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999"
 
-		type places struct {
-			Places []struct {
-				Place        string  `json:"place"`
+		type occurrences struct {
+			Occurrences []struct {
+				Occurrence   string  `json:"occurrence"`
 				DeferredDays float64 `json:"deferred_days"`
-			} `json:"places"`
+			} `json:"occurrences"`
 		}
 		putOff := func(t *testing.T) float64 {
 			t.Helper()
-			var got places
+			var got occurrences
 			httpapitest.Read(t, r, "triager", finding+"/components/libnl-3-200", &got)
-			for _, each := range got.Places {
-				if each.Place == place {
+			for _, each := range got.Occurrences {
+				if each.Occurrence == occurrence {
 					return each.DeferredDays
 				}
 			}
-			t.Fatalf("the finding does not list the place it was scanned at: %+v", got.Places)
+			t.Fatalf("the finding does not list the occurrence it was scanned at: %+v", got.Occurrences)
 			return 0
 		}
 
 		if days := putOff(t); days != 0 {
-			t.Fatalf("a place nobody deferred reads %g days put off", days)
+			t.Fatalf("an occurrence nobody deferred reads %g days put off", days)
 		}
 		until := time.Now().UTC().AddDate(0, 0, 10).Format(time.DateOnly)
 		if made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			finding+"/occurrences/"+place+"/decision",
+			finding+"/occurrences/"+occurrence+"/decision",
 			`{"outcome":"deferred","deferred_until":"`+until+
 				`","reasoning":"Not this sprint."}`); made.Code != http.StatusCreated {
 			t.Fatalf("deferring answered %d: %s", made.Code, made.Body.String())
@@ -55,7 +55,7 @@ func TestAFindingSaysHowLongEachPlaceWasPutOff(t *testing.T) {
 		// midnight, is short of ten days by the part of today already gone.
 		days := putOff(t)
 		if days <= 9 || days >= 10 {
-			t.Errorf("a place deferred to a date ten days out reads %g days put off", days)
+			t.Errorf("an occurrence deferred to a date ten days out reads %g days put off", days)
 		}
 	})
 }

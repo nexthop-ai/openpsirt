@@ -50,20 +50,20 @@ type PerBuild struct {
 	Upgrades []Candidate
 	// Issues is how many distinct vulnerabilities are open across the fold in
 	// this build, Consumers how many things outside it pull it in there, and
-	// Places how many times those sit somewhere in it.
+	// Occurrences how many times those sit somewhere in it.
 	//
-	// Consumers is the unit somebody acts in: a judgment covers the whole
-	// fold, and what varies underneath is what pulls the package in. Places
+	// Consumers is the unit somebody acts in: a decision covers the whole
+	// fold, and what varies underneath is what pulls the package in. Occurrences
 	// is kept as the figure the bulk cap is measured against.
-	Issues    int
-	Consumers int
-	Places    int
+	Issues      int
+	Consumers   int
+	Occurrences int
 	// DueAt is the earliest deadline among them, which is what a commitment
 	// about this build is gated against.
 	DueAt *time.Time
 	// CommittedTo is what somebody has already promised for this build: the
-	// version and the date. Read from the decisions rather than a record
-	// beside them.
+	// version and the date. Read from the decision occurrences rather than a
+	// record beside them.
 	CommittedTo *time.Time
 	UpgradeTo   string
 }
@@ -178,7 +178,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 				Consumers: max(pullers[key], 1),
 			}
 			if counted, ok := open.counted[key]; ok {
-				row.Issues, row.Places, row.DueAt = counted.Issues, counted.Places, counted.DueAt
+				row.Issues, row.Occurrences, row.DueAt = counted.Issues, counted.Occurrences, counted.DueAt
 				row.Exploited, row.ExploitedHere = counted.Exploited > 0, counted.ExploitedHere > 0
 				row.Fixable = counted.Fixable
 			}
@@ -246,12 +246,12 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 // would reach all of them.
 //
 // Read on its own, and what it names reaches each statement over the findings
-// as a list of values. As a subquery, how many findings it matches is the planner's
-// estimate, and on statistics that lag the table PostgreSQL estimates one and
-// runs the subquery once per finding, reading every graph node of the build
-// each time: the kernel's 204,000 findings in a build of 737 graph nodes take
-// 22 s that way and 1.9 s as values. Statistics lag after every large scan,
-// until the server's own refresh reaches the table.
+// as a list of values. As a subquery, how many findings it matches is the
+// planner's estimate, and on statistics that lag the table PostgreSQL estimates
+// one and runs the subquery once per finding, reading every graph node of the
+// build each time: the kernel's 204,000 findings in a build of 737 graph nodes
+// take 22 s that way and 1.9 s as values. Statistics lag after every large
+// scan, until the server's own refresh reaches the table.
 func FoldsNamed(ctx context.Context, db bun.IDB, targets []int64, name, version string) ([]string, error) {
 	q := foldsNamed(db, targets, name).ColumnExpr(`"cn"."fold_key"`).Distinct()
 	if version = strings.TrimSpace(version); version != "" {
@@ -361,10 +361,10 @@ func (h heldBy) ids() []int64 {
 // over a column holding a component's identifier that answers the fold's
 // position among them, with the values it binds.
 //
-// A position rather than the fold key, so the places are grouped on an integer
-// worked out from the row: joined to the component table for its key, the
-// grouping sorts 17,866 rows of 64-character keys for the bench kernel, 204 ms
-// against 175 ms.
+// A position rather than the fold key, so the occurrences are grouped on an
+// integer worked out from the row: joined to the component table for its key,
+// the grouping sorts 17,866 rows of 64-character keys for the bench kernel, 204
+// ms against 175 ms.
 func (h heldBy) folds(column string) ([]string, string, []any) {
 	ids := h.ids()
 	var folds []string
@@ -400,10 +400,10 @@ func (h heldBy) scheme(fold string) vercmp.Scheme {
 // Read on its own and handed to each statement over the findings as a list of
 // values, for the reason FoldsNamed is. Restricted through a join on the fold
 // key, the findings a fold holds are the planner's estimate for an average
-// component: PostgreSQL estimates the bench kernel's 322,616 open places at
-// 106, sorts them on disk, and probes an index once per place. Named as
+// component: PostgreSQL estimates the bench kernel's 322,616 open occurrences at
+// 106, sorts them on disk, and probes an index once per occurrence. Named as
 // values, the estimate comes from the statistics on those components, and the
-// same places are grouped in memory.
+// same occurrences are grouped in memory.
 func (s *Store) componentsOf(ctx context.Context, folds []string) (heldBy, error) {
 	var rows []struct {
 		ID      int64  `bun:"id"`
@@ -515,7 +515,7 @@ func (s *Store) packagesAcross(ctx context.Context, targets []int64, held heldBy
 // counted is what is open across one fold in one build.
 type counted struct {
 	Issues        int
-	Places        int
+	Occurrences   int
 	DueAt         *time.Time
 	Exploited     int
 	ExploitedHere int
@@ -541,13 +541,14 @@ type binaryIn struct {
 }
 
 // promiseSpan separates the two parts of a promise's key: how the promise
-// ranks, above it, and the claim, below it. Claim identifiers stay below it.
+// ranks, above it, and the decision, below it. Decision identifiers stay below
+// it.
 const promiseSpan = int64(1) << 40
 
 // promiseRank orders the promises: one naming a version over one naming none,
 // which says nothing about where to; then one with a date over one without;
 // then the latest date, since a replanned date is the one that stands. Ranked
-// densely, two promises alike in all three share a rank, and the later claim
+// densely, two promises alike in all three share a rank, and the later decision
 // stands.
 const promiseRank = `DENSE_RANK() OVER (ORDER BY` +
 	` CASE WHEN COALESCE("cl"."upgrade_to", '') <> '' THEN 1 ELSE 0 END,` +
@@ -558,15 +559,15 @@ const promiseRank = `DENSE_RANK() OVER (ORDER BY` +
 //
 // Counted over the fold rather than summed from its packages: one issue on
 // three binaries is one issue. The rating bands count distinct issues too, so
-// the parts sum to the whole rather than to the number of places.
+// the parts sum to the whole rather than to the number of occurrences.
 //
-// One pass over the places, grouped three times. The places are grouped first
-// to one row per fix an issue names on each component, on identifiers and the
-// fix alone; then to one row per issue in each fold; then to one row per fix,
-// rating band and fold, which is what is returned. An issue is rated one way in
-// a product, so it lands in one band, and the counts per band sum to the counts
-// per fold. On the bench kernel, 322,616 places are 17,866 issues on a
-// component and 174 rows returned.
+// One pass over the occurrences, grouped three times. The occurrences are
+// grouped first to one row per fix an issue names on each component, on
+// identifiers and the fix alone; then to one row per issue in each fold; then
+// to one row per fix, rating band and fold, which is what is returned. An issue
+// is rated one way in a product, so it lands in one band, and the counts per
+// band sum to the counts per fold. On the bench kernel, 322,616 occurrences are
+// 17,866 issues on a component and 174 rows returned.
 //
 // An issue whose binaries name more than one fix is returned on a row of its
 // own, by identifier, and what it names is read after. Every other issue is
@@ -574,12 +575,12 @@ const promiseRank = `DENSE_RANK() OVER (ORDER BY` +
 // what a release fixes and what reaching it closes are counts of issues.
 //
 // What has been promised rides on the same pass, as the greatest key of the
-// promises on a fold's places: the promise's rank above the claim's
-// identifier, so the greatest is the one that stands and names its claim.
-// A decision is keyed on a place and a build is what a place sits in, so a
-// promise is reached through the places. Read in a statement of its own, it
-// read the bench kernel's 322,616 places a second time, 152 ms; joined here
-// it adds 64 ms.
+// promises on a fold's occurrences: the promise's rank above the decision's
+// identifier, so the greatest is the one that stands and names its decision. A
+// decision occurrence is keyed on an occurrence and a build is what an
+// occurrence sits in, so a promise is reached through the occurrences. Read in
+// a statement of its own, it read the bench kernel's 322,616 occurrences a
+// second time, 152 ms; joined here it adds 64 ms.
 func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64,
 	visible []access.Visibility, held heldBy) (openFolds, error) {
 
@@ -592,8 +593,9 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(promiseRank+` * ? + "cl"."id" AS "promise"`, promiseSpan).
 		Where(`"cl"."outcome" = ?`, OutcomeUpgradeNeeded)
 	// Every build here is in one product — the scope names it — so one bound
-	// identifier is the product a decision is correlated by. One row per
-	// issue and place, so a place under two promises is still one place.
+	// identifier is the product a decision occurrence is correlated by. One row
+	// per issue and occurrence, so an occurrence under two promises is still
+	// one.
 	promises := s.db.NewSelect().
 		TableExpr(Decisions).
 		Join(`JOIN (?) AS "rk" ON "rk"."id" = "de"."decision_id"`, ranked).
@@ -616,7 +618,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX("pd"."promise") AS "promise"`).
-		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd"."issue_id"`, `"pd"."occurrence_identity"`, "f"), promises).
+		Join(`LEFT JOIN (?) AS "pd" ON `+decidedOccurrenceIn(`"pd"."issue_id"`, `"pd"."occurrence_identity"`, "f"), promises).
 		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -641,7 +643,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		GroupExpr(`"pf"."target_id", `+foldOf+`, "pf"."vulnerability_id"`, foldArgs...)
 	// Whether the issue is on each binary, one column per binary, so each
 	// binary's own count rides the same pass. Read in a statement of its own
-	// it read the places again: 47 ms on PostgreSQL and 219 ms on SQLite for
+	// it read the occurrences again: 47 ms on PostgreSQL and 219 ms on SQLite for
 	// the kernel. Past binaryColumns the statement would carry more columns
 	// than an engine takes, and the count is read on its own.
 	columns, bound := ids, binaryColumns
@@ -669,14 +671,14 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		severalOn     []sql.NullInt64
 		band          []string
 		issues        []int
-		places        []int
+		occurrences   []int
 		dueAt         []bun.NullTime
 		exploited     []int
 		exploitedHere []int
 		promised      []sql.NullInt64
 		onBinary      = make([][]int, len(columns))
 	)
-	into := []any{&targetOf, &foldAt, &fixedIn, &severalOn, &band, &issues, &places, &dueAt,
+	into := []any{&targetOf, &foldAt, &fixedIn, &severalOn, &band, &issues, &occurrences, &dueAt,
 		&exploited, &exploitedHere, &promised}
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "pi"`, perIssue).
@@ -720,7 +722,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		}
 		sum := open[key]
 		sum.Issues += issues[i]
-		sum.Places += places[i]
+		sum.Occurrences += occurrences[i]
 		sum.Exploited = max(sum.Exploited, exploited[i])
 		sum.ExploitedHere = max(sum.ExploitedHere, exploitedHere[i])
 		if due := dueAt[i].Time; !due.IsZero() && (sum.DueAt == nil || due.Before(*sum.DueAt)) {
@@ -792,7 +794,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 }
 
 // binaryColumns is the most binaries whose counts ride the pass over the
-// places as columns of their own. PostgreSQL refuses a statement selecting
+// occurrences as columns of their own. PostgreSQL refuses a statement selecting
 // more than 1,664 columns, and MariaDB and SQLite fail not far above that; a
 // source package's binaries in one image number a handful.
 const binaryColumns = 512
@@ -803,7 +805,7 @@ func (s *Store) issuesOnEach(ctx context.Context, targets []int64, visible []acc
 	ids []int64) (map[binaryIn]int, error) {
 
 	// Grouped to one row per issue before counting, which groups in memory
-	// where a distinct count over the places sorts them.
+	// where a distinct count over the occurrences sorts them.
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	perIssue := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -842,11 +844,11 @@ func (s *Store) promisesNamed(ctx context.Context, standing map[foldIn]int64) (m
 	if len(standing) == 0 {
 		return nil, nil
 	}
-	claims := make([]int64, 0, len(standing))
+	decisions := make([]int64, 0, len(standing))
 	for _, key := range standing {
-		claims = append(claims, key%promiseSpan)
+		decisions = append(decisions, key%promiseSpan)
 	}
-	sort.Slice(claims, func(i, j int) bool { return claims[i] < claims[j] })
+	sort.Slice(decisions, func(i, j int) bool { return decisions[i] < decisions[j] })
 	var rows []struct {
 		ID          int64      `bun:"id"`
 		CommittedTo *time.Time `bun:"committed_to"`
@@ -857,7 +859,7 @@ func (s *Store) promisesNamed(ctx context.Context, standing map[foldIn]int64) (m
 		ColumnExpr(`"cl"."id" AS "id"`).
 		ColumnExpr(`"cl"."committed_to" AS "committed_to"`).
 		ColumnExpr(`COALESCE("cl"."upgrade_to", '') AS "upgrade_to"`).
-		Where(`"cl"."id" IN (?)`, bun.List(claims)).
+		Where(`"cl"."id" IN (?)`, bun.List(decisions)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already promised: %w", err)
@@ -868,8 +870,8 @@ func (s *Store) promisesNamed(ctx context.Context, standing map[foldIn]int64) (m
 	}
 	out := make(map[foldIn]promise, len(standing))
 	for key, one := range standing {
-		if claim, ok := said[one%promiseSpan]; ok {
-			out[key] = claim
+		if decision, ok := said[one%promiseSpan]; ok {
+			out[key] = decision
 		}
 	}
 	return out, nil

@@ -555,11 +555,11 @@ func TestAnIssueTakenOffBeforeAnIssuanceIsNotNamedByIt(t *testing.T) {
 	})
 }
 
-// An issue disclosed at one place and undisclosed at another is embargoed in
-// the product, whichever place was recorded first. The label is decided from
-// every place, and a reader who may see only the disclosed half is refused the
+// An issue disclosed at one occurrence and undisclosed at another is embargoed in
+// the product, whichever occurrence was recorded first. The label is decided from
+// every occurrence, and a reader who may see only the disclosed half is refused the
 // document rather than told a label that says the other half exists.
-func TestAnIssueWithAnUndisclosedPlaceIsLabelledByIt(t *testing.T) {
+func TestAnIssueWithAnUndisclosedOccurrenceIsLabelledByIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		identifier := f.disclosed(t, f.master)
@@ -584,7 +584,7 @@ func TestAnIssueWithAnUndisclosedPlaceIsLabelledByIt(t *testing.T) {
 			t.Fatal(err)
 		}
 		if label := doc.Document.Distribution.TLP.Label; label != "RED" {
-			t.Errorf("an issue with an undisclosed place is labelled %q", label)
+			t.Errorf("an issue with an undisclosed occurrence is labelled %q", label)
 		}
 
 		disclosedOnly := access.NewPerson(f.second.ID, f.second.Identity, false,
@@ -593,7 +593,7 @@ func TestAnIssueWithAnUndisclosedPlaceIsLabelledByIt(t *testing.T) {
 			t.Errorf("a reader of the disclosed half alone generated the document: %v", err)
 		}
 		// Listed or opened by name and then refused its document, the pair
-		// would say an undisclosed place exists, so all three refuse together.
+		// would say an undisclosed occurrence exists, so all three refuse together.
 		if _, _, err := f.store.Covers(ctx, disclosedOnly, named); !errors.Is(err, advisory.ErrNoSuchAdvisory) {
 			t.Errorf("a reader of the disclosed half alone opened the advisory by name: %v", err)
 		}

@@ -16,7 +16,7 @@ import (
 type listedRow struct {
 	Vulnerability string `json:"vulnerability"`
 	Component     string `json:"component"`
-	Places        int    `json:"places"`
+	Occurrences   int    `json:"occurrences"`
 	Builds        int    `json:"builds"`
 	Stream        string `json:"stream"`
 	Variant       string `json:"variant"`
@@ -44,9 +44,9 @@ func TestTheFindingsListAnswersForEveryBuildWithTheBranchAndVariantLeftOut(t *te
 		if oneBuild.Total != 1 || len(oneBuild.Items) != 1 {
 			t.Fatalf("one build lists %d rows of %d, want one", len(oneBuild.Items), oneBuild.Total)
 		}
-		if row := oneBuild.Items[0]; row.Places != 1 || row.Builds != 0 {
-			t.Errorf("a build's own row counts %d places and names %d builds,"+
-				" want its own place and no build count: %+v", row.Places, row.Builds, row)
+		if row := oneBuild.Items[0]; row.Occurrences != 1 || row.Builds != 0 {
+			t.Errorf("a build's own row counts %d occurrences and names %d builds,"+
+				" want its own occurrence and no build count: %+v", row.Occurrences, row.Builds, row)
 		}
 		if row := oneBuild.Items[0]; row.Parent == "" {
 			t.Errorf("a build's own row lost its way down: %+v", row)
@@ -59,9 +59,9 @@ func TestTheFindingsListAnswersForEveryBuildWithTheBranchAndVariantLeftOut(t *te
 				len(whole.Items), whole.Total)
 		}
 		row := whole.Items[0]
-		if row.Places != 2 || row.Builds != 2 {
-			t.Errorf("the row counts %d places in %d builds, want one place in each of two: %+v",
-				row.Places, row.Builds, row)
+		if row.Occurrences != 2 || row.Builds != 2 {
+			t.Errorf("the row counts %d occurrences in %d builds, want one occurrence in each of two: %+v",
+				row.Occurrences, row.Builds, row)
 		}
 		if row.Stream == "" || row.Variant == "" {
 			t.Errorf("the row names no build to link to: %+v", row)

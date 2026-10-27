@@ -82,9 +82,9 @@ func (f *runFixture) triagers(t *testing.T) (proposer, approver access.Subject) 
 	return people[0], people[1]
 }
 
-// placeOf is where one issue sits on one component under swss, as the
+// occurrenceOf is where one issue sits on one component under swss, as the
 // finding reads it now.
-func (f *runFixture) placeOf(t *testing.T, who access.Subject, issueName, component string) triage.Place {
+func (f *runFixture) occurrenceOf(t *testing.T, who access.Subject, issueName, component string) triage.Occurrence {
 	t.Helper()
 	ctx := t.Context()
 	issue, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, issueName)
@@ -95,28 +95,28 @@ func (f *runFixture) placeOf(t *testing.T, who access.Subject, issueName, compon
 	if component == "libswsscommon" {
 		consumer = ""
 	}
-	where, err := finding.NewStore(f.db.DB).PlaceFor(ctx, who, f.target, issue,
-		finding.PlaceIdentity(component, consumer))
+	where, err := finding.NewStore(f.db.DB).OccurrenceFor(ctx, who, f.target, issue,
+		finding.OccurrenceIdentity(component, consumer))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return triage.Place{
+	return triage.Occurrence{
 		ProductID: where.ProductID, VulnerabilityID: where.VulnerabilityID,
-		PlaceIdentity: where.PlaceIdentity, Visibility: where.Visibility,
+		OccurrenceIdentity: where.OccurrenceIdentity, Visibility: where.Visibility,
 		ComponentUpstream: where.ComponentUpstream, ConsumerUpstream: where.ConsumerUpstream,
 	}
 }
 
-// claims records one judgment at a place, agreed to by the approver where
+// decisions records one decision at an occurrence, agreed to by the approver where
 // agreed is set.
-func (f *runFixture) claims(t *testing.T, proposer, approver access.Subject, at triage.Place,
-	outcome triage.Outcome, agreed bool) *triage.Decision {
+func (f *runFixture) decisions(t *testing.T, proposer, approver access.Subject, at triage.Occurrence,
+	outcome triage.Outcome, agreed bool) *triage.DecisionOccurrence {
 
 	t.Helper()
 	ctx := t.Context()
 	store := triage.NewStore(f.db.DB)
 	proposal := triage.Proposal{
-		Place: at, Outcome: outcome,
+		Occurrence: at, Outcome: outcome,
 		Reasoning: "Read against the code this build ships.",
 		By:        proposer.ID, NeedsApproval: agreed,
 	}
@@ -128,22 +128,22 @@ func (f *runFixture) claims(t *testing.T, proposer, approver access.Subject, at 
 		t.Fatal(err)
 	}
 	if agreed {
-		if _, err := store.ApproveClaim(ctx, approver, made.ClaimID, "", nil, ""); err != nil {
+		if _, err := store.ApproveDecision(ctx, approver, made.DecisionID, "", nil, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
 	return made
 }
 
-// recorded is what a decision says about itself, read back as stored.
+// recorded is what a decision occurrence says about itself, read back as stored.
 type recorded struct {
-	ID              int64     `bun:"id"`
-	ClaimID         int64     `bun:"decision_id"`
-	VulnerabilityID int64     `bun:"vulnerability_id"`
-	PlaceIdentity   string    `bun:"occurrence_identity"`
-	State           string    `bun:"state"`
-	ProposedBy      int64     `bun:"proposed_by"`
-	ProposedAt      time.Time `bun:"proposed_at"`
+	ID                 int64     `bun:"id"`
+	DecisionID         int64     `bun:"decision_id"`
+	VulnerabilityID    int64     `bun:"vulnerability_id"`
+	OccurrenceIdentity string    `bun:"occurrence_identity"`
+	State              string    `bun:"state"`
+	ProposedBy         int64     `bun:"proposed_by"`
+	ProposedAt         time.Time `bun:"proposed_at"`
 }
 
 func (f *runFixture) decisionRows(t *testing.T) map[int64]recorded {
@@ -172,9 +172,9 @@ func TestAReportJoiningTwoIssuesHeldApartMergesThemAndApplies(t *testing.T) {
 		ctx := t.Context()
 		f.reporting(t, named(national, libnl), named(advisory, swss))
 		proposer, approver := f.triagers(t)
-		onLibnl := f.claims(t, proposer, approver, f.placeOf(t, proposer, national, "libnl-3-200"),
+		onLibnl := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, national, "libnl-3-200"),
 			triage.Affected, false)
-		onSwss := f.claims(t, proposer, approver, f.placeOf(t, proposer, advisory, "libswsscommon"),
+		onSwss := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, advisory, "libswsscommon"),
 			triage.NotApplicable, true)
 		before := f.decisionRows(t)
 
@@ -215,9 +215,9 @@ func TestAReportJoiningTwoIssuesHeldApartMergesThemAndApplies(t *testing.T) {
 
 		// What was decided under either name applies to the one issue.
 		store := triage.NewStore(f.db.DB)
-		for name, at := range map[string]triage.Place{
-			"the national name's": f.placeOf(t, proposer, national, "libnl-3-200"),
-			"the advisory name's": f.placeOf(t, proposer, advisory, "libswsscommon"),
+		for name, at := range map[string]triage.Occurrence{
+			"the national name's": f.occurrenceOf(t, proposer, national, "libnl-3-200"),
+			"the advisory name's": f.occurrenceOf(t, proposer, advisory, "libswsscommon"),
 		} {
 			standing, err := store.Applying(ctx, at)
 			if err != nil {
@@ -234,25 +234,25 @@ func TestAReportJoiningTwoIssuesHeldApartMergesThemAndApplies(t *testing.T) {
 			t.Errorf("the row agreed under the advisory name reads %q after the merge", got)
 		}
 
-		// And what was recorded is what it was: the issue each decision was
-		// filed under, its claim, its place, its state, who made it and when.
+		// And what was recorded is what it was: the issue each occurrence was
+		// filed under, its decision, its occurrence identity, its state, who made it and when.
 		after := f.decisionRows(t)
 		for id, was := range before {
 			if now := after[id]; now != was {
-				t.Errorf("decision %d was %+v and is %+v", id, was, now)
+				t.Errorf("occurrence %d was %+v and is %+v", id, was, now)
 			}
 		}
 		if len(after) != len(before) {
-			t.Errorf("the merge wrote %d decisions beside %d", len(after), len(before))
+			t.Errorf("the merge wrote %d occurrences beside %d", len(after), len(before))
 		}
 
-		// A claim about the same place under the issue that stands meets the
+		// A decision about the same occurrence under the issue that stands meets the
 		// one filed under the other name.
 		if _, err := store.Propose(ctx, proposer, triage.Proposal{
-			Place: f.placeOf(t, proposer, national, "libswsscommon"), Outcome: triage.Affected,
+			Occurrence: f.occurrenceOf(t, proposer, national, "libswsscommon"), Outcome: triage.Affected,
 			Reasoning: "Read again.", By: proposer.ID,
 		}); !errors.Is(err, triage.ErrAlreadyDecided) {
-			t.Errorf("a second claim at a place decided under the merged name answered %v", err)
+			t.Errorf("a second decision at an occurrence decided under the merged name answered %v", err)
 		}
 
 		// The next report finds one issue and merges nothing.
@@ -266,23 +266,23 @@ func TestAReportJoiningTwoIssuesHeldApartMergesThemAndApplies(t *testing.T) {
 
 func TestAMergeMeetingTwoDecisionsThatDisagreeKeepsTheApprovedOneAndTellsTheTriagers(t *testing.T) {
 	// One feed and another both matched the library before either knew the
-	// other's name, so one place held a finding under each and somebody
-	// decided each. Merged, the place holds one finding and has to hold one
+	// other's name, so one occurrence held a finding under each and somebody
+	// decided each. Merged, the occurrence holds one finding and has to hold one
 	// live decision. The approved one is the older, so only standing keeps
 	// it.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
 		f.reporting(t, named(national, libnl), named(advisory, libnl))
 		proposer, approver := f.triagers(t)
-		agreed := f.claims(t, proposer, approver, f.placeOf(t, proposer, advisory, "libnl-3-200"),
+		agreed := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, advisory, "libnl-3-200"),
 			triage.NotApplicable, true)
-		waiting := f.claims(t, proposer, approver, f.placeOf(t, proposer, national, "libnl-3-200"),
+		waiting := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, national, "libnl-3-200"),
 			triage.Affected, false)
 
 		f.reporting(t, named(advisory, libnl, national))
 
 		if open := f.openFindings(t); len(open) != 1 {
-			t.Errorf("one place is held by %d open findings after the merge", len(open))
+			t.Errorf("one occurrence is held by %d open findings after the merge", len(open))
 		}
 		after := f.decisionRows(t)
 		if after[agreed.ID].State != string(triage.Approved) {
@@ -301,12 +301,12 @@ func TestAMergeMeetingTwoDecisionsThatDisagreeKeepsTheApprovedOneAndTellsTheTria
 			t.Errorf("the lapse is recorded as %+v", why)
 		}
 		standing, err := triage.NewStore(f.db.DB).Applying(ctx,
-			f.placeOf(t, proposer, national, "libnl-3-200"))
+			f.occurrenceOf(t, proposer, national, "libnl-3-200"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if standing == nil || standing.ID != agreed.ID {
-			t.Errorf("the place is answered by %+v, want decision %d", standing, agreed.ID)
+			t.Errorf("the occurrence is answered by %+v, want decision %d", standing, agreed.ID)
 		}
 
 		// Everybody who triages the product is told, because nobody chose
@@ -321,14 +321,14 @@ func TestAMergeMeetingTwoDecisionsThatDisagreeKeepsTheApprovedOneAndTellsTheTria
 }
 
 func TestAMergeMeetingTwoDecisionsThatAgreeKeepsOneAndTellsNobody(t *testing.T) {
-	// Two people reached the same answer under the two names. The place keeps
+	// Two people reached the same answer under the two names. The occurrence keeps
 	// one live decision, the newer, and nothing about it is news.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		f.reporting(t, named(national, libnl), named(advisory, libnl))
 		proposer, approver := f.triagers(t)
-		older := f.claims(t, proposer, approver, f.placeOf(t, proposer, national, "libnl-3-200"),
+		older := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, national, "libnl-3-200"),
 			triage.NotApplicable, true)
-		newer := f.claims(t, proposer, approver, f.placeOf(t, proposer, advisory, "libnl-3-200"),
+		newer := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, advisory, "libnl-3-200"),
 			triage.NotApplicable, true)
 
 		f.reporting(t, named(advisory, libnl, national))
@@ -367,12 +367,12 @@ func TestARatingInForceUnderTheAbsorbedNameRatesTheMergedIssue(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := finding.NewStore(f.db.DB)
-		claim, err := store.Assess(ctx, proposer, product.ID, filed, "low",
+		decision, err := store.Assess(ctx, proposer, product.ID, filed, "low",
 			"Reachable only from the management network.")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := store.Agree(ctx, approver, claim.ID); err != nil {
+		if _, err := store.Agree(ctx, approver, decision.ID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -392,7 +392,7 @@ func TestARatingInForceUnderTheAbsorbedNameRatesTheMergedIssue(t *testing.T) {
 
 		// And taking the claim back puts the published word back for the one
 		// issue, not for a row nothing reads.
-		if _, err := store.Withdraw(ctx, proposer, claim.ID); err != nil {
+		if _, err := store.Withdraw(ctx, proposer, decision.ID); err != nil {
 			t.Fatal(err)
 		}
 		rated, err = finding.RatingIn(ctx, f.db.DB, product.ID, kept)
@@ -427,20 +427,20 @@ func TestAMergeMeetingTwoRatingsThatDisagreeKeepsTheOneInForceAndTellsTheTriager
 
 		f.reporting(t, named(national, libnl), named(advisory, swss, national))
 
-		claims := map[int64]finding.Assessment{}
+		decisions := map[int64]finding.Assessment{}
 		var rows []finding.Assessment
 		if err := f.db.DB.NewSelect().Model(&rows).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, row := range rows {
-			claims[row.ID] = row
+			decisions[row.ID] = row
 		}
-		if got := claims[worse.ID]; got.State != finding.AssessmentLive ||
+		if got := decisions[worse.ID]; got.State != finding.AssessmentLive ||
 			got.LiveVulnerabilityID == nil || *got.LiveVulnerabilityID != underNational {
 			t.Errorf("the claim in force is %s and held under %v, want live under %d",
 				got.State, got.LiveVulnerabilityID, underNational)
 		}
-		gone := claims[milder.ID]
+		gone := decisions[milder.ID]
 		want := "Superseded when " + strings.ToUpper(advisory) + " merged into " + national + "."
 		if gone.State != finding.AssessmentWithdrawn || gone.LiveVulnerabilityID != nil ||
 			gone.DecidedBy != nil || gone.WithdrawnBecause == nil || *gone.WithdrawnBecause != want {
@@ -622,7 +622,7 @@ func (f *runFixture) undecided(t *testing.T, who access.Subject) int {
 	}
 	scope := finding.Scope{ProductID: &product.ID}
 	_, total, err := finding.NewStore(f.db.DB).Groups(t.Context(), who, scope, 50, 0,
-		finding.Filter{States: []finding.ClaimStanding{"undecided"}})
+		finding.Filter{States: []finding.DecisionStanding{"undecided"}})
 	if err != nil {
 		t.Fatal(err)
 	}

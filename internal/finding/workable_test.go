@@ -57,7 +57,7 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 		}
 
 		who := f.holding(t, access.PublicRead)
-		places := func(only finding.Workable) int {
+		occurrences := func(only finding.Workable) int {
 			t.Helper()
 			rows, _, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0,
 				finding.Filter{Workable: only})
@@ -67,7 +67,7 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 			if len(rows) == 0 {
 				return 0
 			}
-			return rows[0].Places
+			return rows[0].Occurrences
 		}
 
 		both := []string{finding.OnBranch, finding.OnTag}
@@ -91,8 +91,8 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 			// asked answers about all of it.
 			{"nobody asked", finding.Workable{}, 3},
 		} {
-			if got := places(each.only); got != each.want {
-				t.Errorf("%s counts %d places, want %d", each.what, got, each.want)
+			if got := occurrences(each.only); got != each.want {
+				t.Errorf("%s counts %d occurrences, want %d", each.what, got, each.want)
 			}
 		}
 	})

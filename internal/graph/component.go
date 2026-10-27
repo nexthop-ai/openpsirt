@@ -670,7 +670,7 @@ func PartsOfPurl(purl string) Parts {
 // The grouping it makes. A distribution cuts many binary packages from one
 // source package and they move together: curl, libcurl4t64 and libcurl3t64 are
 // one bump, and treating them as three is three acts that can disagree with
-// each other. The key is what makes them one row, one judgment and one
+// each other. The key is what makes them one row, one decision and one
 // upgrade.
 //
 // Four parts, because the source package name alone is not enough. Measured
@@ -696,16 +696,16 @@ func PartsOfPurl(purl string) Parts {
 // version separates one source shipped twice.
 //
 // It groups, and it does not identify. A component's identity stays derived
-// from its own content, a finding stays keyed on its place, and a decision
-// stays keyed on that place and expires on its own version — so when a producer
+// from its own content, a finding stays keyed on its occurrence, and a decision
+// stays keyed on that occurrence and expires on its own version — so when a producer
 // starts stating a source package for something it did not, the grouping moves
 // and no record does. That is the whole reason this can be recomputed and
 // folding at ingest cannot.
 //
 // Hashed rather than spelled out. A readable composite would have to be
 // bounded to carry an index, and two keys agreeing to that bound would merge
-// two source packages into one row — which under one judgment for the whole
-// fold writes decisions across both. A name is not a candidate either: the
+// two source packages into one row — which under one decision for the whole
+// fold writes occurrences across both. A name is not a candidate either: the
 // protobuf and busybox rows above are two packages with one name.
 func (d Described) FoldKey() string {
 	parts := PartsOfPurl(d.Purl)

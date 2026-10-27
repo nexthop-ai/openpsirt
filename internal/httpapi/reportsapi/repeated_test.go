@@ -15,15 +15,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// A place put off twice is listed with how many times, how long the
+// An occurrence put off twice is listed with how many times, how long the
 // deferrals held it in whole days to the nearest, and the furthest date any
 // reached, in the list and in the file alike.
-func TestAPlacePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
+func TestAnOccurrencePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
-		place := r.Scanned(t)
+		occurrence := r.Scanned(t)
 		path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
+			"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
 		deferred := func() int64 {
 			t.Helper()
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
@@ -33,16 +33,16 @@ func TestAPlacePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
 				t.Fatalf("deferring answered %d: %s", got.Code, got.Body.String())
 			}
 			var made struct {
-				ClaimID int64 `json:"claim_id"`
+				DecisionID int64 `json:"decision_id"`
 			}
 			if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil {
 				t.Fatal(err)
 			}
-			return made.ClaimID
+			return made.DecisionID
 		}
 
 		// The first held four days and was taken back; the second was
-		// proposed 3.6 days before the date it runs to, so the place was put
+		// proposed 3.6 days before the date it runs to, so the occurrence was put
 		// off 7.6 days, which is 8 to the nearest day and 7 truncated. A
 		// date is stored as a day, so the stretches are moved rather than it.
 		now := time.Now().UTC().Truncate(time.Second)
@@ -57,14 +57,14 @@ func TestAPlacePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
 		}
 		second := deferred()
 		for _, set := range []struct {
-			claim          int64
+			decision       int64
 			proposed, ends time.Time
 		}{
 			{first, now.AddDate(0, 0, -10), now.AddDate(0, 0, -6)},
 			{second, lastUntil.Add(-time.Duration(3.6 * 24 * float64(time.Hour))), time.Time{}},
 		} {
 			q := r.DB.DB.NewUpdate().Table("decision_occurrence").
-				Set(`"proposed_at" = ?`, set.proposed).Where(`"decision_id" = ?`, set.claim)
+				Set(`"proposed_at" = ?`, set.proposed).Where(`"decision_id" = ?`, set.decision)
 			if !set.ends.IsZero() {
 				q = q.Set(`"ended_at" = ?`, set.ends)
 			}
@@ -89,7 +89,7 @@ func TestAPlacePutOffTwiceIsListedWithHowLongItWasHeld(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "triager", "/v1/deferrals/repeated", &listed)
 		if len(listed.Items) != 1 {
-			t.Fatalf("%d places are listed as put off repeatedly, want 1: %+v",
+			t.Fatalf("%d occurrences are listed as put off repeatedly, want 1: %+v",
 				len(listed.Items), listed.Items)
 		}
 		one := listed.Items[0]

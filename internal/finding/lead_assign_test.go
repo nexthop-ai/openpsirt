@@ -29,7 +29,7 @@ func TestALeadOfTwoVisibilitiesAsksItsRecipientAboutBoth(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(ids) < 2 {
-			t.Fatalf("the build holds %d findings; want one at each of two places", len(ids))
+			t.Fatalf("the build holds %d findings; want one at each of two occurrences", len(ids))
 		}
 		for i, id := range ids {
 			visibility := access.Internal

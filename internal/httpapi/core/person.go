@@ -48,7 +48,7 @@ func (s signedAs) Label(id int64) string {
 }
 
 // Writing is one piece of text somebody wrote here and may have edited since:
-// a note on an issue, a comment on a claim.
+// a note on an issue, a comment on a decision.
 type Writing struct {
 	ID        int64
 	Body      string

@@ -327,8 +327,8 @@ func TestOneFlawIsRecordedAgainstEveryBuildThatShipsIt(t *testing.T) {
 		for _, group := range groups {
 			if group.Vulnerability == identifier {
 				found = true
-				if group.Places != 2 {
-					t.Errorf("it reads as %d places, want one in each build", group.Places)
+				if group.Occurrences != 2 {
+					t.Errorf("it reads as %d occurrences, want one in each build", group.Occurrences)
 				}
 				if group.Builds != 2 {
 					t.Errorf("it says %d builds hold it, want 2", group.Builds)
@@ -342,7 +342,7 @@ func TestOneFlawIsRecordedAgainstEveryBuildThatShipsIt(t *testing.T) {
 }
 
 // A build named twice is one build. Recording a flaw writes one finding at each
-// place it holds, and a fix declared against the build is not refused as
+// occurrence it holds, and a fix declared against the build is not refused as
 // though the repeat were a build of another product.
 func TestABuildNamedTwiceIsOneBuild(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
@@ -358,7 +358,7 @@ func TestABuildNamedTwiceIsOneBuild(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
-			t.Errorf("a build named twice holds %d findings at its one place", len(rows))
+			t.Errorf("a build named twice holds %d findings at its one occurrence", len(rows))
 		}
 		builds, err := f.store.BuildsForWithin(ctx, f.db.DB, f.productID, []int64{f.target, f.target})
 		if err != nil {
@@ -631,14 +631,15 @@ func answered(t *testing.T, f *fixture, reportID int64) bool {
 }
 
 func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
-	// A decision is keyed on the place. The entry path recorded every finding
-	// as sitting directly under the product, whatever the graph said, so a
-	// flaw recorded by hand against a nested component and the same flaw
-	// found there by a scan were two places and two decisions — one flaw
-	// triaged twice, and triaging either did nothing for the other.
+	// A decision occurrence is keyed on the occurrence. The entry path recorded
+	// every finding as sitting directly under the product, whatever the graph
+	// said, so a flaw recorded by hand against a nested component and the same
+	// flaw found there by a scan were two occurrences and two decision
+	// occurrences — one flaw triaged twice, and triaging either did nothing for
+	// the other.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		// libnl sits under two consumers, which is what a place is for.
+		// libnl sits under two consumers, which is what an occurrence is for.
 		f.shipped(t, twoConsumers())
 
 		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
@@ -649,13 +650,13 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// One finding per place, as a scan of the same component opens.
+		// One finding per occurrence, as a scan of the same component opens.
 		if len(rows) != 2 {
-			t.Fatalf("recorded %d findings, want one per place the component sits in", len(rows))
+			t.Fatalf("recorded %d findings, want one per occurrence the component has", len(rows))
 		}
 		recorded := map[string]bool{}
 		for _, row := range rows {
-			recorded[row.PlaceIdentity] = true
+			recorded[row.OccurrenceIdentity] = true
 		}
 
 		// A scan of the same build writes the same component again.
@@ -669,21 +670,22 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(scanned) != 2 {
-			t.Fatalf("the scan opened %d findings, want one per place", len(scanned))
+			t.Fatalf("the scan opened %d findings, want one per occurrence", len(scanned))
 		}
-		for _, place := range scanned {
-			if !recorded[place] {
-				t.Errorf("a scan keys a place the hand-recorded flaw does not: %s", place)
+		for _, occurrence := range scanned {
+			if !recorded[occurrence] {
+				t.Errorf("a scan keys an occurrence the hand-recorded flaw does not: %s", occurrence)
 			}
 		}
 	})
 }
 
-func TestAFlawRecordedAgainstTheBuildIsOnePlaceInEveryVariant(t *testing.T) {
-	// The product's name differs per variant, so a place keyed on it is a
-	// different place in each of them: one flaw across three variants was
-	// three places and three decisions. The build's root has no name of its
-	// own, which is what the scan path already does with a root parent.
+func TestAFlawRecordedAgainstTheBuildIsOneOccurrenceInEveryVariant(t *testing.T) {
+	// The product's name differs per variant, so an occurrence keyed on it is a
+	// different occurrence in each of them: one flaw across three variants was
+	// three occurrences and three decision occurrences. The build's root has no
+	// name of its own, which is what the scan path already does with a root
+	// parent.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
@@ -707,16 +709,16 @@ func TestAFlawRecordedAgainstTheBuildIsOnePlaceInEveryVariant(t *testing.T) {
 		if len(rows) != 2 {
 			t.Fatalf("recorded %d findings, want one per build", len(rows))
 		}
-		if rows[0].PlaceIdentity != rows[1].PlaceIdentity {
-			t.Errorf("two variants of one flaw sit at two places: %s and %s",
-				rows[0].PlaceIdentity, rows[1].PlaceIdentity)
+		if rows[0].OccurrenceIdentity != rows[1].OccurrenceIdentity {
+			t.Errorf("two variants of one flaw sit at two occurrences: %s and %s",
+				rows[0].OccurrenceIdentity, rows[1].OccurrenceIdentity)
 		}
 
 		// And the same where somebody names the build's own component rather
 		// than leaving it out — which is the arm that has to ask whether what
 		// was named is what the build is. Each variant's root is called
-		// something different, so a place keyed on the name is a different
-		// place in each of them.
+		// something different, so an occurrence keyed on the name is a
+		// different occurrence in each of them.
 		named := func(target int64, component string) string {
 			t.Helper()
 			rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
@@ -730,26 +732,26 @@ func TestAFlawRecordedAgainstTheBuildIsOnePlaceInEveryVariant(t *testing.T) {
 			if len(rows) != 1 {
 				t.Fatalf("recorded %d findings against the build itself, want one", len(rows))
 			}
-			return rows[0].PlaceIdentity
+			return rows[0].OccurrenceIdentity
 		}
 		here := named(f.target, root.Name)
 		there := named(other, "sonic-mellanox")
 		if here != there {
-			t.Errorf("naming each build's own component gives two places: %s and %s", here, there)
+			t.Errorf("naming each build's own component gives two occurrences: %s and %s", here, there)
 		}
-		// The same place as leaving the component out, because it is the same
-		// place: the build itself.
-		if here != rows[0].PlaceIdentity {
-			t.Errorf("naming the build and leaving it out are two places: %s and %s",
-				here, rows[0].PlaceIdentity)
+		// The same occurrence as leaving the component out, because it is the
+		// same occurrence: the build itself.
+		if here != rows[0].OccurrenceIdentity {
+			t.Errorf("naming the build and leaving it out are two occurrences: %s and %s",
+				here, rows[0].OccurrenceIdentity)
 		}
 	})
 }
 
 func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) {
 	// One build was one row, so the bound on how many builds a request may
-	// name was also the bound on the write. A component sits at as many
-	// places as things pull it in, so a widely vendored one across a list of
+	// name was also the bound on the write. A component has as many
+	// occurrences as things pull it in, so a widely vendored one across a list of
 	// builds is a large write from a small request — which is the shape the
 	// cap on one action exists for.
 	each(t, func(t *testing.T, f *fixture) {
@@ -759,13 +761,13 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 			t.Fatal(err)
 		}
 
-		// libnl sits at two places, and one action here writes one.
+		// libnl sits at two occurrences, and one action here writes one.
 		_, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
 			TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
 			Summary: "The parser accepts a message it should refuse.",
 		})
-		if !errors.Is(err, finding.ErrTooManyPlaces) {
-			t.Fatalf("recording %d places under a cap of one: %v", 2, err)
+		if !errors.Is(err, finding.ErrTooManyOccurrences) {
+			t.Fatalf("recording %d occurrences under a cap of one: %v", 2, err)
 		}
 		// Nothing landed: the count is taken before anything is written, and
 		// the whole recording is one transaction either way.
@@ -778,13 +780,13 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 			t.Errorf("%d findings were written by a refused recording", open)
 		}
 
-		// A component at one place is inside it, so the bound is on what
+		// A component at one occurrence is inside it, so the bound is on what
 		// would be written rather than on what was named.
 		if _, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		}); err != nil {
-			t.Errorf("recording one place under a cap of one was refused: %v", err)
+			t.Errorf("recording one occurrence under a cap of one was refused: %v", err)
 		}
 	})
 }

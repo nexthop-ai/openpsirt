@@ -17,31 +17,32 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// The upstream version a decision is keyed on, as SQL, so that everything
-// asking the question asks it the same way.
+// The upstream version a decision occurrence is keyed on, as SQL, so that
+// everything asking the question asks it the same way.
 //
 // The stated upstream version where there is one, and the component's own
 // where there is not. Most packages are not forks and state no upstream at all
 // — measured on a real image, 88% of them — so reading only the stated one
 // leaves the version half of the key empty for almost everything, and a key
-// that never changes is a decision that never lapses.
+// that never changes is a decision occurrence that never lapses.
 //
-// Exported because a decision is written against these versions in one place
-// and compared against them in another. Two spellings of the same expression
-// is how a decision starts lapsing on one path and standing on the other.
+// Exported because a decision occurrence is written against these versions in
+// one place and compared against them in another. Two spellings of the same
+// expression is how a decision occurrence starts lapsing on one path and
+// standing on the other.
 const (
 	ComponentUpstreamExpr = `COALESCE(NULLIF("c"."upstream_version", ''), "c"."version", '')`
 	ConsumerUpstreamExpr  = `COALESCE(NULLIF("uc"."upstream_version", ''), "uc"."version", '')`
 )
 
-// inFoldOf narrows a read of findings `f` to the places one judgment about an
-// issue at a component in a build covers: every decidable place of the issue
-// in the component's fold, at the visibilities given.
+// inFoldOf narrows a read of findings `f` to the occurrences one decision about
+// an issue at a component in a build covers: every decidable occurrence of the
+// issue in the component's fold, at the visibilities given.
 //
-// The fold rather than the one component named. One judgment covers the whole
+// The fold rather than the one component named. One decision covers the whole
 // fold, with no narrowing within it: curl and libcurl4t64 are one source
 // package, so a decision about the issue in one of them is a decision about it
-// in both, and offering the places of one binary alone would let somebody
+// in both, and offering the occurrences of one binary alone would let somebody
 // answer a third of the work and read as having answered it.
 func inFoldOf(targetID, vulnerabilityID, componentID int64,
 	visible []access.Visibility) func(*bun.SelectQuery) *bun.SelectQuery {
@@ -58,7 +59,7 @@ func inFoldOf(targetID, vulnerabilityID, componentID int64,
 	}
 }
 
-// ErrNoOpenFinding is a place, or a component in a build, where nothing is
+// ErrNoOpenFinding is an occurrence, or a component in a build, where nothing is
 // open against the issue asked about. A sentinel, so a caller can tell it from
 // a read that could not be made.
 var ErrNoOpenFinding = refusal.New("no open finding is recorded there")
@@ -66,23 +67,23 @@ var ErrNoOpenFinding = refusal.New("no open finding is recorded there")
 // Deciding carries everything a decision needs about where it is being
 // made, read from the findings rather than from whoever is making it.
 //
-// A caller naming a place freely would be choosing which decisions apply
+// A caller naming an occurrence freely would be choosing which decisions apply
 // where, and the versions are what expiry compares — so they come from the
 // rows. What a person supplies is which finding they are looking at.
 type Deciding struct {
-	ProductID       int64
-	VulnerabilityID int64
-	PlaceIdentity   string
-	Visibility      access.Visibility
-	// The upstream versions, which are what a decision is keyed on. A shipped
-	// version moves whenever something is rebuilt, and a rebuild is not
-	// somebody's reasoning becoming wrong.
+	ProductID          int64
+	VulnerabilityID    int64
+	OccurrenceIdentity string
+	Visibility         access.Visibility
+	// The upstream versions, which are what a decision occurrence is keyed on.
+	// A shipped version moves whenever something is rebuilt, and a rebuild is
+	// not somebody's reasoning becoming wrong.
 	ComponentUpstream string
 	ConsumerUpstream  string
 	// SeverityCenti is how bad this is judged to be now, recorded with the
-	// claim so a later re-affirmation can ask whether it has risen since.
+	// decision so a later re-affirmation can ask whether it has risen since.
 	SeverityCenti int
-	// DueAt is this place's deadline, where it has one. Carried because a
+	// DueAt is this occurrence's deadline, where it has one. Carried because a
 	// promise to act is gated against the earliest deadline among what the
 	// act covers, and that is a fact about the set being resolved rather
 	// than one the caller can supply.
@@ -104,17 +105,17 @@ type Deciding struct {
 	// through the issue. A bulk act that sets such an issue aside is refused,
 	// so the screen building one says which they are before it is sent.
 	ExploitedHere bool
-	// Consumer is what pulls the component in here, for naming the place to
-	// somebody choosing which of them a judgment covers. Empty where that is
+	// Consumer is what pulls the component in here, for naming the occurrence to
+	// somebody choosing which of them a decision covers. Empty where that is
 	// the product itself.
 	Consumer string
 	// distinctVersions is how many versions of this component sit at this
-	// place. More than one means a decision cannot cover all of them.
+	// occurrence. More than one means a decision cannot cover all of them.
 	distinctVersions int
-	// Places is how many findings this decision would cover. One judgment
+	// Occurrences is how many findings this decision would cover. One decision
 	// about one issue in one component applies everywhere that pair sits, and
-	// somebody deciding should know whether that is one place or sixty.
-	Places int
+	// somebody deciding should know whether that is one occurrence or sixty.
+	Occurrences int
 	// OnTag says this sits in a release that was built once and cannot change.
 	//
 	// A tag is what somebody received. Nothing about it will be different
@@ -124,12 +125,12 @@ type Deciding struct {
 	OnTag bool
 }
 
-// PlaceFor resolves what somebody is deciding about.
+// OccurrenceFor resolves what somebody is deciding about.
 //
-// Authorized here, not by the caller: reaching a finding is what makes it
-// yours to argue about, so a place is only returned where the subject can see
+// Authorized here, not by the caller: reaching a finding is what makes it yours
+// to argue about, so an occurrence is only returned where the subject can see
 // findings of that visibility on that product.
-func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID int64, vulnerabilityID int64, placeIdentity string) (*Deciding, error) {
+func (s *Store) OccurrenceFor(ctx context.Context, subject access.Subject, targetID int64, vulnerabilityID int64, occurrenceIdentity string) (*Deciding, error) {
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
 		return nil, err
@@ -143,49 +144,49 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 	}
 
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	var rows []placeRow
-	err = placeColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
+	var rows []occurrenceRow
+	err = occurrenceColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
-		Where(`"f"."occurrence_identity" = ?`, placeIdentity).
+		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(Decidable).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
 		OrderExpr("component_upstream, consumer_upstream").
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what is open at that place: %w", err)
+		return nil, fmt.Errorf("read what is open at that occurrence: %w", err)
 	}
 	if len(rows) == 0 {
 		return nil, ErrNoOpenFinding
 	}
 
-	// A place is a pair of names, so one place can hold the same package at
-	// two versions — a build shipping both is unusual and not impossible. The
-	// rows are ordered so that which version a decision is keyed on is the
-	// same on every engine and every run, rather than whichever the database
-	// happened to return first.
+	// An occurrence is a pair of names, so one occurrence can hold the same
+	// package at two versions — a build shipping both is unusual and not
+	// impossible. The rows are ordered so that which version a decision
+	// occurrence is keyed on is the same on every engine and every run, rather
+	// than whichever the database happened to return first.
 	return &Deciding{
-		ProductID: productID, VulnerabilityID: vulnerabilityID, PlaceIdentity: placeIdentity,
+		ProductID: productID, VulnerabilityID: vulnerabilityID, OccurrenceIdentity: occurrenceIdentity,
 		Visibility:        access.AsVisibility(rows[0].Visibility),
 		ComponentUpstream: rows[0].ComponentUpstream,
 		ConsumerUpstream:  rows[0].ConsumerUpstream,
 		SeverityCenti:     rows[0].score(),
 		DueAt:             earliestDue(rows),
 		OnTag:             rows[0].OnTag == 1,
-		Places:            len(rows),
+		Occurrences:       len(rows),
 		distinctVersions:  distinctVersions(rows),
 	}, nil
 }
 
-// earliestDue is the deadline a place is gated against: the earliest among the
-// findings sitting there, and nil where none of them has one.
+// earliestDue is the deadline an occurrence is gated against: the earliest
+// among the findings sitting there, and nil where none of them has one.
 //
 // The earliest rather than the first row's, for the reason one act covering a
-// critical and a medium is gated by the critical — a place holding the same
+// critical and a medium is gated by the critical — an occurrence holding the same
 // package under two consumers is one thing to decide about, and the strictest
 // deadline among them is what the decision is measured against.
-func earliestDue(rows []placeRow) *time.Time {
+func earliestDue(rows []occurrenceRow) *time.Time {
 	var earliest *time.Time
 	for _, row := range rows {
 		if row.DueAt == nil {
@@ -199,15 +200,15 @@ func earliestDue(rows []placeRow) *time.Time {
 	return earliest
 }
 
-// At names one place a decision was made about, for asking what is open there
-// now.
+// At names one occurrence a decision was made about, for asking what is open
+// there now.
 type At struct {
-	VulnerabilityID int64
-	PlaceIdentity   string
+	VulnerabilityID    int64
+	OccurrenceIdentity string
 }
 
-// DeadlineAt is the earliest deadline among the open findings at these places,
-// in these builds.
+// DeadlineAt is the earliest deadline among the open findings at these
+// occurrences, in these builds.
 //
 // The gate a promise already recorded is measured against, asked again rather
 // than remembered: the deadline moves when the policy or the rating moves, so
@@ -218,36 +219,36 @@ type At struct {
 // a handle because the caller opens the transaction: resolved beforehand, a
 // retry recomputes a gate from findings somebody closed in between.
 func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subject,
-	productID int64, targets []int64, places []At) (*time.Time, error) {
+	productID int64, targets []int64, occurrences []At) (*time.Time, error) {
 
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
 		return nil, err
 	}
-	if len(targets) == 0 || len(places) == 0 {
+	if len(targets) == 0 || len(occurrences) == 0 {
 		return nil, nil
 	}
 
 	// The pair of lists matches more combinations than were asked for, so what
 	// was not asked for is dropped after the read. Naming each pair in the
-	// statement would be one OR group per place, and a claim reaches as many
-	// places as the issue sits at.
-	issues := make([]int64, 0, len(places))
-	identities := make([]string, 0, len(places))
-	wanted := make(map[At]bool, len(places))
-	for _, place := range places {
-		if wanted[place] {
+	// statement would be one OR group per occurrence, and a decision reaches as
+	// many occurrences as the issue sits at.
+	issues := make([]int64, 0, len(occurrences))
+	identities := make([]string, 0, len(occurrences))
+	wanted := make(map[At]bool, len(occurrences))
+	for _, occurrence := range occurrences {
+		if wanted[occurrence] {
 			continue
 		}
-		wanted[place] = true
-		issues = append(issues, place.VulnerabilityID)
-		identities = append(identities, place.PlaceIdentity)
+		wanted[occurrence] = true
+		issues = append(issues, occurrence.VulnerabilityID)
+		identities = append(identities, occurrence.OccurrenceIdentity)
 	}
 
 	var rows []struct {
-		VulnerabilityID int64      `bun:"vulnerability_id"`
-		PlaceIdentity   string     `bun:"occurrence_identity"`
-		DueAt           *time.Time `bun:"due_at"`
+		VulnerabilityID    int64      `bun:"vulnerability_id"`
+		OccurrenceIdentity string     `bun:"occurrence_identity"`
+		DueAt              *time.Time `bun:"due_at"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := db.NewSelect().
@@ -269,7 +270,7 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 
 	var earliest *time.Time
 	for _, row := range rows {
-		if row.DueAt == nil || !wanted[At{row.VulnerabilityID, row.PlaceIdentity}] {
+		if row.DueAt == nil || !wanted[At{row.VulnerabilityID, row.OccurrenceIdentity}] {
 			continue
 		}
 		if earliest == nil || row.DueAt.Before(*earliest) {
@@ -280,26 +281,26 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 	return earliest, nil
 }
 
-// score is how bad this place's issue is judged to be now, by the one rule for
-// the number: the rating somebody made here where there is one, the published
-// score where there is not, and the published word scored where there is
-// neither.
-func (r placeRow) score() int {
+// score is how bad this occurrence's issue is judged to be now, by the one rule
+// for the number: the rating somebody made here where there is one, the
+// published score where there is not, and the published word scored where there
+// is neither.
+func (r occurrenceRow) score() int {
 	return Rating{
 		Published: r.Published, Assessed: r.Assessed, ScoreCenti: r.ScoreCenti,
 	}.Score()
 }
 
-// placeRow is one open finding at the place being decided about.
-type placeRow struct {
+// occurrenceRow is one open finding at the occurrence being decided about.
+type occurrenceRow struct {
 	Visibility        string     `bun:"visibility"`
 	DueAt             *time.Time `bun:"due_at"`
 	ComponentUpstream string     `bun:"component_upstream"`
 	ConsumerUpstream  string     `bun:"consumer_upstream"`
 	Published         string     `bun:"published_severity"`
-	// Assessed is what this place's own product rates the issue, empty where
+	// Assessed is what this occurrence's own product rates the issue, empty where
 	// it rates it nothing. Another product's rating is not read here: the
-	// judgment being made is this product's.
+	// decision being made is this product's.
 	Assessed   string `bun:"rated_here"`
 	ScoreCenti int    `bun:"score_centi"`
 	// OnTag as an integer rather than a boolean: the four engines spell a
@@ -308,16 +309,16 @@ type placeRow struct {
 	OnTag int `bun:"on_tag"`
 }
 
-// Versions reports how many distinct versions this place holds.
+// Versions reports how many distinct versions this occurrence holds.
 //
 // One is the ordinary answer. More than one means a build ships the same
 // package twice at different versions under the same consumer, and a single
 // decision cannot honestly cover both — so whoever is deciding is told rather
-// than being given a judgment about one version silently applied to another.
+// than being given a decision about one version silently applied to another.
 func (d Deciding) Versions() int { return d.distinctVersions }
 
-// distinctVersions counts the version pairs a place holds.
-func distinctVersions(rows []placeRow) int {
+// distinctVersions counts the version pairs an occurrence holds.
+func distinctVersions(rows []occurrenceRow) int {
 	seen := map[[2]string]bool{}
 	for _, row := range rows {
 		seen[[2]string{row.ComponentUpstream, row.ConsumerUpstream}] = true
@@ -325,7 +326,7 @@ func distinctVersions(rows []placeRow) int {
 	return len(seen)
 }
 
-// InBundle is one component of a fix bundle, with the places the bundle
+// InBundle is one component of a fix bundle, with the occurrences the bundle
 // reaches in it.
 //
 // Grouped by component and issue because that is the grain a decision and a
@@ -335,10 +336,10 @@ type InBundle struct {
 	VulnerabilityID int64
 	ComponentID     int64
 	TargetID        int64
-	Places          []Deciding
+	Occurrences     []Deciding
 }
 
-// PlacesOnComponentWithin is everywhere a component is open, across a
+// OccurrencesOnComponentWithin is everywhere a component is open, across a
 // product's builds, read through a handle the caller chooses.
 //
 // The read half of planning an upgrade. Coverage is the component rather than
@@ -347,13 +348,13 @@ type InBundle struct {
 // fixed in 3.5.0 would need an ordering per ecosystem this does not have. A
 // person claims it, and the next scan says which of it was true.
 //
-// Narrowed by what the subject may see, like every other read here. A place
+// Narrowed by what the subject may see, like every other read here. An occurrence
 // they cannot see is not one they can declare a bump for.
 //
 // It takes the handle because the caller opens the transaction itself and
-// resolves the places it writes about from inside it: resolved beforehand, a
+// resolves the occurrences it writes about from inside it: resolved beforehand, a
 // retry can propose about a finding somebody closed in between.
-func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
+func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 	subject access.Subject, productID int64, targets []int64,
 	component, version string) ([]InBundle, error) {
 
@@ -373,16 +374,16 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		return nil, nil
 	}
 	var rows []struct {
-		placeRow
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		ComponentID     int64  `bun:"component_id"`
-		TargetID        int64  `bun:"target_id"`
-		PlaceIdentity   string `bun:"occurrence_identity"`
-		Consumer        string `bun:"consumer"`
-		FixedIn         string `bun:"fixed_in"`
+		occurrenceRow
+		VulnerabilityID    int64  `bun:"vulnerability_id"`
+		ComponentID        int64  `bun:"component_id"`
+		TargetID           int64  `bun:"target_id"`
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+		Consumer           string `bun:"consumer"`
+		FixedIn            string `bun:"fixed_in"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	query := placeColumns(db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
+	query := occurrenceColumns(db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
@@ -431,25 +432,26 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 			grouped[at] = one
 			order = append(order, at)
 		}
-		// One entry per place, however many rows a place has: a place with two
-		// consumers is one thing to decide about, and counting it twice would
-		// write two claims about the same code.
-		if seen[at+"\x00"+row.PlaceIdentity] {
+		// One entry per occurrence, however many rows an occurrence has: an
+		// occurrence with two consumers is one thing to decide about, and
+		// counting it twice would write two decision occurrences about the same
+		// code.
+		if seen[at+"\x00"+row.OccurrenceIdentity] {
 			continue
 		}
-		seen[at+"\x00"+row.PlaceIdentity] = true
-		one.Places = append(one.Places, Deciding{
+		seen[at+"\x00"+row.OccurrenceIdentity] = true
+		one.Occurrences = append(one.Occurrences, Deciding{
 			ProductID: productID, VulnerabilityID: row.VulnerabilityID,
-			PlaceIdentity:     row.PlaceIdentity,
-			Visibility:        access.AsVisibility(row.Visibility),
-			ComponentUpstream: row.ComponentUpstream,
-			ConsumerUpstream:  row.ConsumerUpstream,
-			SeverityCenti:     row.score(),
-			DueAt:             row.DueAt,
-			FixedIn:           row.FixedIn,
-			Consumer:          row.Consumer,
-			OnTag:             row.OnTag == 1,
-			Places:            1,
+			OccurrenceIdentity: row.OccurrenceIdentity,
+			Visibility:         access.AsVisibility(row.Visibility),
+			ComponentUpstream:  row.ComponentUpstream,
+			ConsumerUpstream:   row.ConsumerUpstream,
+			SeverityCenti:      row.score(),
+			DueAt:              row.DueAt,
+			FixedIn:            row.FixedIn,
+			Consumer:           row.Consumer,
+			OnTag:              row.OnTag == 1,
+			Occurrences:        1,
 		})
 	}
 	bundled := make([]InBundle, 0, len(order))
@@ -459,37 +461,37 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 	return bundled, nil
 }
 
-// PlacesFor resolves every place one issue occupies in one component.
+// OccurrencesFor resolves every occurrence one issue occupies in one component.
 //
-// This is what a judgment made on the finding covers: all of them by default,
-// with a narrower set chosen deliberately. Deciding one place at a time was
-// the only thing on offer, and a finding sitting at thirty places then meant
-// thirty judgments — which is how somebody stops reading.
+// This is what a decision made on the finding covers: all of them by default,
+// with a narrower set chosen deliberately. Deciding one occurrence at a time was
+// the only thing on offer, and a finding sitting at thirty occurrences then meant
+// thirty decisions — which is how somebody stops reading.
 //
-// Read in one statement and grouped here rather than asked per place. A place
-// is a pair of names and the rows under one are ordered the same way PlaceFor
-// orders them, so which version a decision is keyed on does not depend on what
-// the database happened to return first.
-func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID int64,
+// Read in one statement and grouped here rather than asked per occurrence. An
+// occurrence is a pair of names and the rows under one are ordered the same way
+// OccurrenceFor orders them, so which version a decision occurrence is keyed on
+// does not depend on what the database happened to return first.
+func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, targetID int64,
 	vulnerabilityID, componentID int64) ([]Deciding, error) {
 
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
 		return nil, err
 	}
-	// Asked about the issue, for the reason PlaceFor is.
+	// Asked about the issue, for the reason OccurrenceFor is.
 	visible, err := access.ReadableOn(subject, productID, vulnerabilityID)
 	if err != nil {
 		return nil, err
 	}
 
 	var rows []struct {
-		placeRow
-		PlaceIdentity string `bun:"occurrence_identity"`
-		Consumer      string `bun:"consumer"`
-		FixedIn       string `bun:"fixed_in"`
+		occurrenceRow
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+		Consumer           string `bun:"consumer"`
+		FixedIn            string `bun:"fixed_in"`
 	}
-	err = placeColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
+	err = occurrenceColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
 		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
@@ -501,23 +503,23 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 	}
 
 	order := []string{}
-	grouped := map[string][]placeRow{}
+	grouped := map[string][]occurrenceRow{}
 	consumers := map[string]string{}
 	fixes := map[string]string{}
 	for _, row := range rows {
-		if _, seen := grouped[row.PlaceIdentity]; !seen {
-			order = append(order, row.PlaceIdentity)
-			consumers[row.PlaceIdentity] = row.Consumer
-			fixes[row.PlaceIdentity] = row.FixedIn
+		if _, seen := grouped[row.OccurrenceIdentity]; !seen {
+			order = append(order, row.OccurrenceIdentity)
+			consumers[row.OccurrenceIdentity] = row.Consumer
+			fixes[row.OccurrenceIdentity] = row.FixedIn
 		}
-		grouped[row.PlaceIdentity] = append(grouped[row.PlaceIdentity], row.placeRow)
+		grouped[row.OccurrenceIdentity] = append(grouped[row.OccurrenceIdentity], row.occurrenceRow)
 	}
 
-	places := make([]Deciding, 0, len(order))
+	occurrences := make([]Deciding, 0, len(order))
 	for _, identity := range order {
 		at := grouped[identity]
-		places = append(places, Deciding{
-			ProductID: productID, VulnerabilityID: vulnerabilityID, PlaceIdentity: identity,
+		occurrences = append(occurrences, Deciding{
+			ProductID: productID, VulnerabilityID: vulnerabilityID, OccurrenceIdentity: identity,
 			Visibility:        access.AsVisibility(at[0].Visibility),
 			ComponentUpstream: at[0].ComponentUpstream,
 			ConsumerUpstream:  at[0].ConsumerUpstream,
@@ -526,26 +528,26 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 			FixedIn:           fixes[identity],
 			Consumer:          consumers[identity],
 			OnTag:             at[0].OnTag == 1,
-			Places:            len(at),
+			Occurrences:       len(at),
 			distinctVersions:  distinctVersions(at),
 		})
 	}
-	return places, nil
+	return occurrences, nil
 }
 
-// placeColumns adds the joins and the column expressions a place row is read
-// from, to a query over finding AS "f".
+// occurrenceColumns adds the joins and the column expressions an occurrence row
+// is read from, to a query over finding AS "f".
 //
-// One spelling for every query that reads a place. A copy still compiles and
-// still returns rows when another gains a column, so nothing would notice a
-// site left behind — and what these feed is the key a decision expires on,
-// which must not differ between the read that writes it and the read that
-// matches it.
+// One spelling for every query that reads an occurrence. A copy still compiles
+// and still returns rows when another gains a column, so nothing would notice a
+// site left behind — and what these feed is the key a decision occurrence
+// expires on, which must not differ between the read that writes it and the
+// read that matches it.
 //
 // It does not take the ordering with it: each reader orders its own way, and
-// what a decision is keyed on must not depend on what the database returned
-// first.
-func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
+// what a decision occurrence is keyed on must not depend on what the database
+// returned first.
+func occurrenceColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 	return q.
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
@@ -558,9 +560,9 @@ func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 		// where none is. Most packages are not forks and state no upstream at
 		// all — measured on a real image, 88% of them — so reading only the
 		// stated one left the version half of the key empty for almost
-		// everything, and a key that never changes is a decision that never
-		// lapses. A dismissal written about one version would suppress the
-		// same issue in every later one, forever.
+		// everything, and a key that never changes is a decision occurrence
+		// that never lapses. A dismissal written about one version would
+		// suppress the same issue in every later one, forever.
 		//
 		// Falling back to the shipped version asks again on a packaging
 		// revision that changed no code, which only the upstream version
@@ -582,7 +584,7 @@ func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 		// The deadline, because a promise to act is gated against the earliest
 		// one among what the act covers. Read from the rows rather than
 		// supplied, like the versions and the visibility: it is a fact about
-		// the place, and a caller free to state it would be choosing whether
+		// the occurrence, and a caller free to state it would be choosing whether
 		// their own commitment needed a second person.
 		ColumnExpr(`"f"."due_at" AS "due_at"`).
 		// A release built once. A tag cannot change, so what may

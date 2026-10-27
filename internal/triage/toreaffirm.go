@@ -16,43 +16,43 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
-// ToReaffirm is one claim of somebody's that lapsed and that nothing has
+// ToReaffirm is one decision of somebody's that lapsed and that nothing has
 // replaced: work handed back to them.
 type ToReaffirm struct {
-	Claim Claim
-	// Decision is a representative lapsed row — the earliest — and Reasoning
-	// is what the claim rested on.
-	Decision  Decision
-	Reasoning string
-	// Rows, Issues and Places count the lapsed rows, in the three units a
+	Decision Decision
+	// DecisionOccurrence is a representative lapsed row — the earliest — and Reasoning
+	// is what the decision rested on.
+	DecisionOccurrence DecisionOccurrence
+	Reasoning          string
+	// Rows, Issues and Occurrences count the lapsed rows, in the three units a
 	// queue card uses.
-	Rows, Issues, Places int
-	LapsedAt             *time.Time
+	Rows, Issues, Occurrences int
+	LapsedAt                  *time.Time
 	// CodeMoved says a version moved under at least one row. RatedWorse says
-	// the issue now sits in a higher band than it did when the claim was made,
-	// on a claim a severity bears on. Both can hold.
+	// the issue now sits in a higher band than it did when the decision was made,
+	// on a decision a severity bears on. Both can hold.
 	CodeMoved  bool
 	RatedWorse bool
-	// Was and Now are how bad the issue was judged to be when the claim was
+	// Was and Now are how bad the issue was judged to be when the decision was
 	// made and how bad it is judged to be here now: for the first row rated
 	// worse where one was, and for the representative row otherwise.
 	Was, Now int
 }
 
-// decidableBy narrows a query to the decisions a subject may argue about,
+// decidableBy narrows a query to the rows a subject may argue about,
 // including the cases they were brought into.
 func decidableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
 	return narrowedBy(query, subject, column, mayDecide, onCases)
 }
 
-// ToReaffirm lists the claims this person made that lapsed and that nothing
+// ToReaffirm lists the decisions this person made that lapsed and that nothing
 // has replaced, the most recently written first, in one product where one is
 // named.
 //
-// Only what they may still re-affirm: their own claims, whose rows they may
+// Only what they may still re-affirm: their own decisions, whose rows they may
 // still argue about. Why each lapsed is worked out from what is there now
 // rather than stored: a version that no longer matches anything open, and a
-// rating in a higher band than the claim was made against, are both facts
+// rating in a higher band than the decision was made against, are both facts
 // about the present that anybody can check.
 func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productID int64,
 	limit, offset int) ([]ToReaffirm, int, error) {
@@ -72,7 +72,7 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 		}
 		return q
 	}
-	page, err := s.pageClaims(ctx, subject, mine, limit, offset, "what is yours to re-affirm")
+	page, err := s.pageDecisions(ctx, subject, mine, limit, offset, "what is yours to re-affirm")
 	if err != nil {
 		return nil, 0, err
 	}
@@ -84,7 +84,7 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 	// not counted.
 	inSupport, supportArgs := finding.LeadInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
 	var latest []int64
-	if err := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
+	if err := stillLatest(s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 		ColumnExpr(`"de"."id"`).
 		Where(`"de"."decision_id" IN (?)`, bun.List(page.Order)).
 		Where(`"de"."state" = ?`, LapsedState)).
@@ -99,23 +99,23 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 
 	gathered := map[int64]*ToReaffirm{}
 	issues := map[int64]map[int64]bool{}
-	places := map[int64]map[string]bool{}
-	var lapsedRows []Decision
+	occurrences := map[int64]map[string]bool{}
+	var lapsedRows []DecisionOccurrence
 	for _, row := range page.Rows {
 		if !wanted[row.ID] {
 			continue
 		}
 		lapsedRows = append(lapsedRows, row)
-		entry, seen := gathered[row.ClaimID]
+		entry, seen := gathered[row.DecisionID]
 		if !seen {
-			entry = &ToReaffirm{Claim: page.Claims[row.ClaimID], Decision: row}
-			gathered[row.ClaimID] = entry
-			issues[row.ClaimID] = map[int64]bool{}
-			places[row.ClaimID] = map[string]bool{}
+			entry = &ToReaffirm{Decision: page.Decisions[row.DecisionID], DecisionOccurrence: row}
+			gathered[row.DecisionID] = entry
+			issues[row.DecisionID] = map[int64]bool{}
+			occurrences[row.DecisionID] = map[string]bool{}
 		}
 		entry.Rows++
-		issues[row.ClaimID][row.VulnerabilityID] = true
-		places[row.ClaimID][row.PlaceIdentity] = true
+		issues[row.DecisionID][row.VulnerabilityID] = true
+		occurrences[row.DecisionID][row.OccurrenceIdentity] = true
 		if row.EndedAt != nil && (entry.LapsedAt == nil || row.EndedAt.After(*entry.LapsedAt)) {
 			entry.LapsedAt = row.EndedAt
 		}
@@ -127,7 +127,7 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 	}
 	severity := map[[2]int64]int{}
 	for _, row := range lapsedRows {
-		entry := gathered[row.ClaimID]
+		entry := gathered[row.DecisionID]
 		if moved[row.ID] {
 			entry.CodeMoved = true
 		}
@@ -139,17 +139,17 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 			}
 			severity[key] = now
 		}
-		if !entry.RatedWorse && turnsOnSeverity(entry.Claim) &&
+		if !entry.RatedWorse && turnsOnSeverity(entry.Decision) &&
 			ratedWorse(row.SeverityCenti, severity[key]) {
 			entry.RatedWorse = true
 			entry.Was, entry.Now = orZeroCenti(row.SeverityCenti), severity[key]
 		}
 	}
 
-	representatives := make([]Decision, 0, len(gathered))
+	representatives := make([]DecisionOccurrence, 0, len(gathered))
 	for _, id := range page.Order {
 		if entry, ok := gathered[id]; ok {
-			representatives = append(representatives, entry.Decision)
+			representatives = append(representatives, entry.DecisionOccurrence)
 		}
 	}
 	reasoning, err := s.currentReasoning(ctx, representatives)
@@ -164,11 +164,11 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 			continue
 		}
 		entry.Issues = len(issues[id])
-		entry.Places = len(places[id])
-		entry.Reasoning = reasoning[entry.Decision.ID]
+		entry.Occurrences = len(occurrences[id])
+		entry.Reasoning = reasoning[entry.DecisionOccurrence.ID]
 		if !entry.RatedWorse {
-			entry.Was = orZeroCenti(entry.Decision.SeverityCenti)
-			entry.Now = severity[[2]int64{entry.Decision.ProductID, entry.Decision.VulnerabilityID}]
+			entry.Was = orZeroCenti(entry.DecisionOccurrence.SeverityCenti)
+			entry.Now = severity[[2]int64{entry.DecisionOccurrence.ProductID, entry.DecisionOccurrence.VulnerabilityID}]
 		}
 		out = append(out, *entry)
 	}
@@ -176,25 +176,25 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 }
 
 // yoursToReaffirm selects the lapsed rows, nothing having replaced them, of
-// the claims this subject made and may re-affirm, over decision AS "de".
+// the decisions this subject made and may re-affirm, over decision_occurrence AS "de".
 //
-// A row at a lead past its end of life is left off, and so is a claim holding
-// no other: re-affirming re-makes a claim at its other places, and refuses one
+// A row at a lead past its end of life is left off, and so is a decision holding
+// no other: re-affirming re-makes a decision at its other occurrences, and refuses one
 // with none.
 func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
 	inSupport, args := finding.LeadInSupport(`"de"."product_id"`, `"de"."occurrence_identity"`, s.now())
 	return s.lapsedOfYours(subject).Where(inSupport, args...)
 }
 
-// lapsedOfYours is yoursToReaffirm wherever the places are.
+// lapsedOfYours is yoursToReaffirm wherever the occurrences are.
 //
-// A claim with any lapsed row out of the subject's reach is left off:
-// re-affirming acts on the whole claim, and would refuse it. So is a claim
+// A decision with any lapsed row out of the subject's reach is left off:
+// re-affirming acts on the whole decision, and would refuse it. So is a decision
 // with a withdrawn row: its author took it back, and a withdrawal leaves a
 // row that had already lapsed as it was.
 func (s *Store) lapsedOfYours(subject access.Subject) *bun.SelectQuery {
 	outOfReach, reachArgs := notDecidableWhere(subject, "dn")
-	q := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
+	q := stillLatest(s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(`"cl"."proposed_by" = ?`, subject.ID).
 		Where(`"de"."state" = ?`, LapsedState)).
@@ -206,13 +206,13 @@ func (s *Store) lapsedOfYours(subject access.Subject) *bun.SelectQuery {
 	return decidableBy(q, subject, "de")
 }
 
-// Reaffirmable reports whether this subject may re-affirm the claim now: it is
+// Reaffirmable reports whether this subject may re-affirm the decision now: it is
 // theirs, it lapsed, and nothing has replaced it.
-func (s *Store) Reaffirmable(ctx context.Context, subject access.Subject, claimID int64) (bool, error) {
+func (s *Store) Reaffirmable(ctx context.Context, subject access.Subject, decisionID int64) (bool, error) {
 	if subject.Kind != access.Person {
 		return false, nil
 	}
-	found, err := s.yoursToReaffirm(subject).Where(`"de"."decision_id" = ?`, claimID).Exists(ctx)
+	found, err := s.yoursToReaffirm(subject).Where(`"de"."decision_id" = ?`, decisionID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether this is yours to re-affirm: %w", err)
 	}
@@ -221,7 +221,7 @@ func (s *Store) Reaffirmable(ctx context.Context, subject access.Subject, claimI
 
 // movedUnder reports which lapsed rows no open finding in their product still
 // matches at the versions they were made against: the code moved.
-func (s *Store) movedUnder(ctx context.Context, rows []Decision) (map[int64]bool, error) {
+func (s *Store) movedUnder(ctx context.Context, rows []DecisionOccurrence) (map[int64]bool, error) {
 	moved := map[int64]bool{}
 	if len(rows) == 0 {
 		return moved, nil
@@ -232,7 +232,7 @@ func (s *Store) movedUnder(ctx context.Context, rows []Decision) (map[int64]bool
 	}
 	kinds, args := kindsOf(kind.VersionCarry, "f")
 	var still []int64
-	if err := s.db.NewSelect().Model((*Decision)(nil)).
+	if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 		ColumnExpr(`"de"."id"`).
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "f"`+

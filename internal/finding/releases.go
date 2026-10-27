@@ -22,10 +22,10 @@ type Release struct {
 	Kind    string
 	Variant string
 	// Open is what the findings list would show for this build, before any
-	// triage line: one per issue at a component, however many places it sits
+	// triage line: one per issue at a component, however many occurrences it sits
 	// at there.
 	//
-	// Not a row count. Rows are places, and a component reached twenty
+	// Not a row count. Rows are occurrences, and a component reached twenty
 	// ways carries the same issue twenty times — counting them reported
 	// 241,161 for a build every other screen reports at 7,546. The trend chart
 	// made exactly this mistake and its comment records the fix; this is the
@@ -76,7 +76,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// Reduced on the finding alone, one row per build, issue and component,
 	// and the names and the rating joined to what is left. Inside one product
 	// an issue has one band, so the band does not need to be in the key, and
-	// joining first reads the issue's row once per place only to fold the
+	// joining first reads the issue's row once per occurrence only to fold the
 	// copies away.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
@@ -153,7 +153,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// after everything that has something.
 	var releases []Release
 	at := map[string]int{}
-	place := func(stream, kind, variant string) int {
+	occurrence := func(stream, kind, variant string) int {
 		key := stream + "\x00" + variant
 		index, seen := at[key]
 		if !seen {
@@ -167,10 +167,10 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		return index
 	}
 	for _, build := range scanned {
-		place(build.Stream, build.Kind, build.Variant)
+		occurrence(build.Stream, build.Kind, build.Variant)
 	}
 	for _, row := range rows {
-		index := place(row.Stream, row.Kind, row.Variant)
+		index := occurrence(row.Stream, row.Kind, row.Variant)
 		releases[index].Open += row.Open
 		releases[index].BySeverity[row.Band] += row.Open
 	}

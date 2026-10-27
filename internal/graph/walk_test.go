@@ -89,7 +89,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		// Two containers each pull in the same library, which has two issues.
 		// Each container is asked separately and answers with two; the root
-		// answers with two as well, not four, and not eight for the places.
+		// answers with two as well, not four, and not eight for the occurrences.
 		a, b, lib := at("container-a", "1"), at("container-b", "1"), at("libshared", "1.0")
 		snap := graph.Snapshot{
 			Root:       root,

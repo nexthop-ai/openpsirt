@@ -24,7 +24,7 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 		ctx := t.Context()
 		r.ScannedTwoIssues(t)
 
-		// Two people argue one claim each, and only one of them is on the
+		// Two people argue one decision each, and only one of them is on the
 		// team. Two, because a narrowing that keeps everybody is
 		// indistinguishable from one that works.
 		r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
@@ -86,7 +86,7 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 			t.Errorf("somebody who is not an administrator learned the team's members: %v", named)
 		}
 
-		// A product the judgments were made in, and one nobody made any in.
+		// A product the decisions were made in, and one nobody made any in.
 		if mine := worked(t, "?product=mine"); len(mine) != 2 {
 			t.Errorf("the product the work happened in reports %v", mine)
 		}

@@ -73,8 +73,8 @@ func registerTags(api huma.API, in core.Deps) {
 			"universal is a signal that it should be promoted to a real concept — \"waiting on " +
 			"vendor\" is a state the tool would want to reason about rather than a string " +
 			"somebody typed.\n\n" +
-			"One issue in one component of one product, not one place and not one build: " +
-			"a kernel flaw at sixty places is one thing somebody is labeling, and a label is " +
+			"One issue in one component of one product, not one occurrence and not one build: " +
+			"a kernel flaw at sixty occurrences is one thing somebody is labeling, and a label is " +
 			"about the work rather than about a release.\n\n" +
 			"Matched without regard to capitals and shown back as it was typed. Labeling what " +
 			"already carries the label succeeds and keeps the first spelling.\n\n" +

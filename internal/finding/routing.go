@@ -346,9 +346,10 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 // work travels with the assignment. The rule a hand assignment to the team
 // asks.
 //
-// Asked of each place rather than of a group, so an undisclosed place nobody
-// on the team reads is left with nobody while the disclosed places beside it
-// are placed. A person who reads it picks it up from the unassigned list.
+// Asked of each occurrence rather than of a group, so an undisclosed occurrence
+// nobody on the team reads is left with nobody while the disclosed occurrences
+// beside it are placed. A person who reads it picks it up from the unassigned
+// list.
 func (s *Store) holdableBy(ctx context.Context, teamID, productID int64) ([]access.Visibility, error) {
 	rights := access.NewStore(s.db)
 	var out []access.Visibility
@@ -439,9 +440,10 @@ type Catches struct {
 	Components []string
 	Total      int
 	// Work is how many pieces of work sit at those components — one issue in
-	// one component, whatever it sits at, or one lead — and Unheld is how
-	// many of those nobody holds. Only the second is what a rule would place, and they are
-	// both shown because the gap between them is the thing worth knowing.
+	// one component, whatever it sits at, or one lead — and Unheld is how many
+	// of those nobody holds. Only the second is what a rule would place, and
+	// they are both shown because the gap between them is the thing worth
+	// knowing.
 	Work, Unheld int
 }
 
@@ -570,8 +572,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 }
 
 // leadPiece is what tells one lead from another at one issue and component,
-// over a finding under "f": its place. A piece of work is an issue at a
-// component, and a lead is one place under its analyzer's rule, so two
+// over a finding under "f": its occurrence. A piece of work is an issue at a
+// component, and a lead is one occurrence under its analyzer's rule, so two
 // results of one rule in one component are two pieces of work.
 const leadPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
 

@@ -19,38 +19,38 @@ import (
 // NotArguedAway says a finding `f` is work nobody has argued away: the build made
 // no claim covering it, and no supplier's statement answers it on any route up
 // the tree. A row answered either way stays open, because what it answers is
-// not the whole of the place, and it is not work while it does.
+// not the whole of the occurrence, and it is not work while it does.
 //
 // One spelling, because every reader asking whether a row is somebody's work
 // asks this: the deadline lists, the overdue counts, the review routing, and
 // the notifications.
 const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)`
 
-// LatestAtItsPlace says no row of the same kind and issue has been recorded at
-// the same place in the same build after the finding `f`.
+// LatestAtItsOccurrence says no row of the same kind and issue has been
+// recorded at the same occurrence in the same build after the finding `f`.
 //
-// A run records a new row rather than reopening a closed one, so a place
+// A run records a new row rather than reopening a closed one, so an occurrence
 // closed by a supplier's statement and recorded again later, at another
 // version or closed another way, holds rows the later one stands for. Ordered
 // by identifier rather than by moment: a version moving closes the row before
 // and records the row after at one moment. Held to the kind of `f`, so the
 // later rows are of a kind the outer query already reads.
-const LatestAtItsPlace = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
+const LatestAtItsOccurrence = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 	WHERE "lt"."target_id" = "f"."target_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
 	  AND "lt"."occurrence_identity" = "f"."occurrence_identity" AND "lt"."kind" = "f"."kind"
 	  AND "lt"."id" > "f"."id")`
 
 // Decidable says a finding `f` is one somebody may decide about: open, or
-// closed by a supplier's statement and the latest row at its place. A person
-// who disagrees with a supplier marks the place affected, and the next run
-// opens it again, so the place has to be reachable while the statement has it
-// closed.
+// closed by a supplier's statement and the latest row at its occurrence. A
+// person who disagrees with a supplier marks the occurrence affected, and the
+// next run opens it again, so the occurrence has to be reachable while the
+// statement has it closed.
 const Decidable = `("f"."closed_at" IS NULL OR ("f"."closed_because" = '` + string(Disclaimed) + "' AND " +
-	LatestAtItsPlace + "))"
+	LatestAtItsOccurrence + "))"
 
 // disclaiming is what a run needs to apply suppliers' statements: the
 // statements that can close a finding in this build, the graph they are placed
-// in, and the places a person has said are affected.
+// in, and the occurrences a person has said are affected.
 //
 // A supplier speaking about its own product speaks about what sits inside it
 // (REQ-31). Which statements those are is decided once per run, and where each
@@ -60,7 +60,7 @@ type disclaiming struct {
 	said     []Statement
 	byIssue  map[string][]int
 	affected map[affectedAt]bool
-	// decided is every place a person has decided about, whatever they
+	// decided is every occurrence a person has decided about, whatever they
 	// decided, read only where an upstream's statement could close one. A
 	// local decision stands over an upstream's word either way.
 	decided map[affectedAt]bool
@@ -94,7 +94,7 @@ func placing(ctx context.Context, db bun.IDB, targetID int64, inv inventory,
 	p := &placer{inv: inv, children: map[int64][]int64{}, placed: map[string]*placement{},
 		names: map[string]bool{}}
 	// What each component pulls in, the edges read the other way. Zero is
-	// the build's root, as it is for a place.
+	// the build's root, as it is for an occurrence.
 	for child, above := range places {
 		for _, consumer := range above {
 			p.children[consumer] = append(p.children[consumer], child)
@@ -134,12 +134,12 @@ func (p *placer) asStated(c graph.Component) graph.Component {
 }
 
 // reaches reports whether a build's claim naming the product given reaches a
-// component at the place its consumer is.
+// component at the occurrence its consumer gives.
 //
 // A claim naming no product, or naming one no component of the build is, is
 // about the build: the build's root, or a name the build's producer gave the
 // whole of it. One naming a component of the build applies only where every
-// route to the place runs through that component at the version the claim
+// route to the occurrence runs through that component at the version the claim
 // names, and never to the product itself.
 func (p *placer) reaches(product *sbom.Target, component graph.Component, consumerID int64) bool {
 	if product == nil || !p.ships(*product) {
@@ -182,26 +182,26 @@ type placement struct {
 	outside map[int64]bool
 }
 
-// affectedAt is a place a person has said an issue applies at, at the
+// affectedAt is an occurrence a person has said an issue applies at, at the
 // versions the decision was keyed on.
 type affectedAt struct {
-	vulnerabilityID int64
-	placeIdentity   string
-	component       string
-	consumer        string
+	vulnerabilityID    int64
+	occurrenceIdentity string
+	component          string
+	consumer           string
 }
 
-// answer is how a statement stands at one place.
+// answer is how a statement stands at one occurrence.
 type answer int
 
 const (
-	// answersNone is a place the statement says nothing about.
+	// answersNone is an occurrence the statement says nothing about.
 	answersNone answer = iota
-	// answersSome is a place reached through the product and outside it as
+	// answersSome is an occurrence reached through the product and outside it as
 	// well: the statement answers the routes through the product, and nobody
 	// has answered the rest.
 	answersSome
-	// answersAll is a place every route to which runs through the product.
+	// answersAll is an occurrence every route to which runs through the product.
 	answersAll
 )
 
@@ -267,12 +267,12 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 	for i, one := range d.said {
 		d.byIssue[one.Vulnerability] = append(d.byIssue[one.Vulnerability], i)
 	}
-	d.affected, err = standingPlaces(ctx, db, productID, issueIDs, OutcomeAffected)
+	d.affected, err = standingOccurrences(ctx, db, productID, issueIDs, OutcomeAffected)
 	if err != nil {
 		return nil, err
 	}
 	if slices.ContainsFunc(d.said, func(one Statement) bool { return one.Placement == PlacedAnybody }) {
-		if d.decided, err = standingPlaces(ctx, db, productID, issueIDs, ""); err != nil {
+		if d.decided, err = standingOccurrences(ctx, db, productID, issueIDs, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -286,23 +286,23 @@ func upstreamCloses() []string {
 	return []string{string(sbom.NotAffected), string(sbom.AlreadyFixed)}
 }
 
-// standingPlaces is every place in this product a person has decided one of
-// these issues at, by a decision that stands, keyed by the issue a decision is
-// about now, merged issues included. Only decisions of the outcome given,
-// where one is given.
+// standingOccurrences is every occurrence in this product a person has decided
+// one of these issues at, by a decision that stands, keyed by the issue a
+// decision is about now, merged issues included. Only decisions of the outcome
+// given, where one is given.
 //
 // A disagreement with a supplier goes through the ordinary route: somebody
-// marks the place affected, and the statement does not close it there. Any
+// marks the occurrence affected, and the statement does not close it there. Any
 // decision at all stands over an upstream's statement.
-func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
+func standingOccurrences(ctx context.Context, db bun.IDB, productID int64,
 	issueIDs []int64, outcome string) (map[affectedAt]bool, error) {
 
 	var rows []struct {
-		VulnerabilityID int64  `bun:"vulnerability_id"`
-		PlaceIdentity   string `bun:"occurrence_identity"`
-		Component       string `bun:"component"`
-		Consumer        string `bun:"consumer"`
-		Outcome         string `bun:"outcome"`
+		VulnerabilityID    int64  `bun:"vulnerability_id"`
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+		Component          string `bun:"component"`
+		Consumer           string `bun:"consumer"`
+		Outcome            string `bun:"outcome"`
 	}
 	standing, held := InForce()
 	issues, ids := database.InAnyOf(`"dv"."issue_id"`, issueIDs)
@@ -328,17 +328,17 @@ func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
 	out := make(map[affectedAt]bool, len(rows))
 	for _, row := range rows {
 		if row.Outcome == OutcomeMismatched {
-			// A claim that the match is wrong stands at whatever version the
-			// place holds, so it is keyed on the place alone.
-			out[affectedAt{vulnerabilityID: row.VulnerabilityID, placeIdentity: row.PlaceIdentity}] = true
+			// A decision that the match is wrong stands at whatever version the
+			// occurrence holds, so it is keyed on the occurrence alone.
+			out[affectedAt{vulnerabilityID: row.VulnerabilityID, occurrenceIdentity: row.OccurrenceIdentity}] = true
 			continue
 		}
-		out[affectedAt{row.VulnerabilityID, row.PlaceIdentity, row.Component, row.Consumer}] = true
+		out[affectedAt{row.VulnerabilityID, row.OccurrenceIdentity, row.Component, row.Consumer}] = true
 	}
 	return out, nil
 }
 
-// answering is the statement that answers an issue at one place, and whether
+// answering is the statement that answers an issue at one occurrence, and whether
 // it answers every route there.
 //
 // A statement answering every route is preferred over one answering some, and
@@ -362,7 +362,7 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 	// Zero is the build's root, which no supplier's product holds; an
 	// upstream speaks for the component wherever it sits, the root included.
 	consumer := d.inv.byID[consumerID]
-	here := affectedAt{vulnerabilityID, PlaceIdentity(component.Name, consumer.Name),
+	here := affectedAt{vulnerabilityID, OccurrenceIdentity(component.Name, consumer.Name),
 		upstreamOf(component), upstreamOf(consumer)}
 	if d.affected[here] {
 		return nil, answersNone
@@ -376,7 +376,7 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 			// An upstream speaks for the component wherever it ships, at the
 			// version it names and no other, and never where somebody here
 			// decided.
-			anyVersion := affectedAt{vulnerabilityID: here.vulnerabilityID, placeIdentity: here.placeIdentity}
+			anyVersion := affectedAt{vulnerabilityID: here.vulnerabilityID, occurrenceIdentity: here.occurrenceIdentity}
 			if d.decided[here] || d.decided[anyVersion] || !sameComponent(one, d.asStated(component)) {
 				continue
 			}
@@ -532,11 +532,12 @@ func isProduct(product sbom.Target, c graph.Component, atVersion bool) bool {
 	return !atVersion || (version != "" && version == heldVersion)
 }
 
-// at is how the product stands at a place whose consumer is the component
-// given: every route to the place runs through the product, some do, or none.
+// at is how the product stands at an occurrence whose consumer is the component
+// given: every route to the occurrence runs through the product, some do, or
+// none.
 //
-// A place is a component and what directly pulls it in, so every route to it
-// runs through its consumer. The product answers every route where the
+// An occurrence is a component and what directly pulls it in, so every route to
+// it runs through its consumer. The product answers every route where the
 // consumer is the product, or where the consumer is beneath it and the root
 // cannot reach it any other way.
 func (p *placement) at(consumerID int64) answer {

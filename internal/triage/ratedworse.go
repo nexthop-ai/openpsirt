@@ -18,12 +18,12 @@ import (
 )
 
 // ratedWorse reports whether an issue now sits in a higher band than it did
-// when a claim was made about it.
+// when a decision was made about it.
 //
 // A band rather than the score. A rescoring from 7.5 to 7.6 is the same
-// judgment about the same issue; high becoming critical is not.
+// decision about the same issue; high becoming critical is not.
 //
-// An issue nobody had rated when the claim was made is read as a medium, the
+// An issue nobody had rated when the decision was made is read as a medium, the
 // way a deadline reads one: unknown is not harmless, and not the lowest either.
 func ratedWorse(baseline *int, now int) bool {
 	was := finding.SeverityScore("medium")
@@ -42,7 +42,7 @@ func band(centi int) int {
 	return finding.SeverityScore(finding.SeverityWord(centi))
 }
 
-// RatedWorseWhere narrows a sweep for claims a severity rise has outgrown.
+// RatedWorseWhere narrows a sweep for decisions a severity rise has outgrown.
 // Zero values ask about everything.
 type RatedWorseWhere struct {
 	ProductID int64
@@ -53,20 +53,20 @@ type RatedWorseWhere struct {
 	OpenIn int64
 }
 
-// LapseRatedWorse marks the standing claims an issue's severity has risen past
+// LapseRatedWorse marks the standing decisions an issue's severity has risen past
 // (REQ-25).
 //
-// A claim that an issue does not matter much is not a claim about what it has
-// become, where the judgment is one a severity bears on. The claim lapses the
+// A decision that an issue does not matter much is not a decision about what it has
+// become, where the decision is one a severity bears on. The decision lapses the
 // way a version move lapses it: it stops standing, the finding is open again,
 // and the proposer is told, so re-affirming it is the proposer's to do and a
 // second person's to agree to.
 //
-// Proposed claims lapse as well as approved ones. Agreed to afterwards, a
-// claim made against the lower rating would stand on a baseline that is
+// Proposed decisions lapse as well as approved ones. Agreed to afterwards, a
+// decision made against the lower rating would stand on a baseline that is
 // already wrong.
 //
-// Asked of the rating in force in each claim's own product, compared by band
+// Asked of the rating in force in each decision's own product, compared by band
 // in Go, because the rule for the rating in force is written there once.
 func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lapsed, error) {
 	db, err := s.pool()
@@ -83,8 +83,8 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 		}
 		var ids []int64
 		for _, group := range groups {
-			claim := Claim{Outcome: Outcome(group.Outcome), Justification: group.Justification}
-			if !turnsOnSeverity(claim) {
+			decision := Decision{Outcome: Outcome(group.Outcome), Justification: group.Justification}
+			if !turnsOnSeverity(decision) {
 				continue
 			}
 			now := finding.Rating{
@@ -96,7 +96,7 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 			var rows []int64
 			q := tx.NewSelect().TableExpr(finding.Decisions).
 				ColumnExpr(`"de"."id"`).
-				Where(`"de"."decision_id" = ?`, group.ClaimID).
+				Where(`"de"."decision_id" = ?`, group.DecisionID).
 				Where(`"de"."product_id" = ?`, group.ProductID).
 				Where(`"de"."vulnerability_id" = ?`, group.VulnerabilityID).
 				Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
@@ -146,19 +146,19 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 	return out, err
 }
 
-// coversSomething keeps the decisions an open finding in their product still
+// coversSomething keeps the rows an open finding in their product still
 // matches, at the versions they were made against, for a query over
 // finding.Decisions.
 //
-// A decision covering nothing is not a judgment anybody is relying on. Lapsed
+// A row covering nothing is not a decision anybody is relying on. Lapsed
 // for a rating, its proposer would be told the finding is open again when none
 // is, and re-affirming it would find nothing to re-make.
 //
-// The finding's issue is compared with the issue the decision is read as,
+// The finding's issue is compared with the issue the row is read as,
 // which the statement has already joined. SameIssue in its place nests a
 // second EXISTS inside this one, and PostgreSQL then probes every live
-// decision against the product's open findings: 64.3 s for the sweep after a
-// rescan of a build of 324,508 open findings with 133,549 decisions, against
+// row against the product's open findings: 64.3 s for the sweep after a
+// rescan of a build of 324,508 open findings with 133,549 rows, against
 // 1.37 s for the same 2,858 groups compared directly.
 func coversSomething(q *bun.SelectQuery) *bun.SelectQuery {
 	kinds, args := kindsOf(kind.VersionCarry, "fc")
@@ -169,14 +169,14 @@ func coversSomething(q *bun.SelectQuery) *bun.SelectQuery {
 		` JOIN "stream" AS "stc" ON "stc"."id" = "tgc"."stream_id"`+
 		` WHERE "stc"."product_id" = "de"."product_id" AND "fc"."closed_at" IS NULL`+
 		` AND `+kinds+
-		` AND `+finding.DecisionAtPlace("fc")+
+		` AND `+finding.DecisionAtOccurrence("fc")+
 		` AND `+finding.VersionsMatch+`)`, args...)
 }
 
-// ratedWorseGroup is the standing rows of one claim about one issue in one
+// ratedWorseGroup is the standing rows of one decision about one issue in one
 // product that share a baseline, with the rating in force there now.
 type ratedWorseGroup struct {
-	ClaimID         int64   `bun:"decision_id"`
+	DecisionID      int64   `bun:"decision_id"`
 	ProductID       int64   `bun:"product_id"`
 	VulnerabilityID int64   `bun:"vulnerability_id"`
 	Outcome         string  `bun:"outcome"`
@@ -187,14 +187,14 @@ type ratedWorseGroup struct {
 	ScoreCenti      int     `bun:"score_centi"`
 }
 
-// ratedWorseGroups reads the candidates, one row per claim, issue, product
-// and baseline rather than per place: a claim over a kernel issue is a row
-// per place, and the rating it is compared with is the same for all of them.
+// ratedWorseGroups reads the candidates, one row per decision, issue, product
+// and baseline rather than per occurrence: a decision over a kernel issue is a row
+// per occurrence, and the rating it is compared with is the same for all of them.
 func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([]ratedWorseGroup, error) {
 	q := tx.NewSelect().
 		TableExpr(finding.Decisions).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		// Rated as the issue the decision is read as.
+		// Rated as the issue the row is read as.
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		Join(rating.For(rating.OnDecision)).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
@@ -225,7 +225,7 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 	}
 	var groups []ratedWorseGroup
 	if err := q.Scan(ctx, &groups); err != nil {
-		return nil, fmt.Errorf("read the standing claims a rating may have outgrown: %w", err)
+		return nil, fmt.Errorf("read the standing decisions a rating may have outgrown: %w", err)
 	}
 	return groups, nil
 }

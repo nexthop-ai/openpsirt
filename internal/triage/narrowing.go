@@ -41,7 +41,7 @@ func mayDecide(subject access.Subject, productID int64, visibility access.Visibi
 	return subject.Triages(visibility, productID)
 }
 
-// mayApprove reports whether a subject may agree to somebody else's claim.
+// mayApprove reports whether a subject may agree to somebody else's decision.
 //
 // Approving is not deciding, and requiring the triage role for it made the
 // approver capability decorative: somebody granted exactly the right to
@@ -50,7 +50,7 @@ func mayDecide(subject access.Subject, productID int64, visibility access.Visibi
 // otherwise handing somebody the ability to approve hands them everything
 // there is to approve.
 //
-// A triager may also approve, on somebody else's claim. Two triagers agreeing
+// A triager may also approve, on somebody else's decision. Two triagers agreeing
 // to each other's work is the ordinary shape of a small team, and the control
 // that matters is that the two are different people — which is checked
 // separately and has no override.
@@ -103,24 +103,24 @@ func readable(subject access.Subject, productID int64, visibility access.Visibil
 	return subject.Reads(visibility, productID)
 }
 
-// approvableBy narrows a query to the decisions a subject may agree to, which
+// approvableBy narrows a query to the rows a subject may agree to, which
 // is a wider set than the ones they may argue about.
 func approvableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
 	// Deliberately without the cases. A collaborator may argue about the
-	// issue they were brought in on and may not agree to anybody's claim
+	// issue they were brought in on and may not agree to anybody's decision
 	// about it : two of them could otherwise satisfy the two people a
 	// dismissal on an embargoed finding asks for, with nobody accountable
 	// for the product involved.
 	return narrowedBy(query, subject, column, mayApprove, withoutCases)
 }
 
-// readableBy narrows a query to the decisions a subject may see.
+// readableBy narrows a query to the rows a subject may see.
 func readableBy(query *bun.SelectQuery, subject access.Subject, column string) *bun.SelectQuery {
 	where, args := readableWhere(subject, column)
 	return narrowedOn(query, where, args)
 }
 
-// readableWhere is the condition a decision row under the alias named meets
+// readableWhere is the condition a decision occurrence under the alias named meets
 // where the subject may read it: its finding's visibility, the cases they
 // were brought into, and a lead included in its flaw's case.
 func readableWhere(subject access.Subject, column string) (string, []any) {
@@ -135,14 +135,14 @@ func readableWhere(subject access.Subject, column string) (string, []any) {
 // they read that visibility on that product.
 //
 // The same rule as narrowedBy, asked of the finding's visibility and the
-// product it sits in rather than the decision's. A decision somebody may read
+// product it sits in rather than the row's. A decision somebody may read
 // matches findings they may not, and a build name, a fix version or a count
-// read off those is the disclosure — so every read that walks from a decision
+// read off those is the disclosure — so every read that walks from a row
 // to its findings carries this.
 //
 // The finding's visibility is read through the given alias, and the product
 // through the expression given — the stream's product where the read has
-// joined that far, and the decision's where the match already requires the two
+// joined that far, and the row's where the match already requires the two
 // to agree.
 func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, product string) *bun.SelectQuery {
 	where, args := readableFindingsOn(subject, finding, product)
@@ -155,8 +155,8 @@ func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, p
 // readableFindingsOn is the same rule written as a condition rather than
 // applied to a query, for a join whose ON clause is where it has to go.
 //
-// An outer join to the findings a decision matches carries the rule on the ON
-// clause: in WHERE it is asked of the NULL row an unmatched decision produces,
+// An outer join to the findings a row matches carries the rule on the ON
+// clause: in WHERE it is asked of the NULL row an unmatched decision occurrence produces,
 // which is never true, so the outer join quietly becomes an inner one. The
 // empty string means the subject reads everywhere and there is nothing to add.
 func readableFindingsOn(subject access.Subject, finding, product string) (string, []any) {
@@ -168,12 +168,12 @@ func readableFindingsOn(subject access.Subject, finding, product string) (string
 // orIncluded widens a reading narrowing by the leads included in an
 // undisclosed flaw's case, for the flaw's readers: somebody who reads
 // undisclosed work in the product, and somebody on the flaw's case. A lead and
-// the claims at its place stay internal while the flaw is undisclosed, so the
-// widening is the internal rows at an included lead's place and nothing else.
+// the decisions at its occurrence stay internal while the flaw is undisclosed, so the
+// widening is the internal rows at an included lead's occurrence and nothing else.
 //
 // Only where the subject does not read internal work in the product already,
 // for the reason orBrought gives.
-func orIncluded(subject access.Subject, where string, args []any, product, visibility, place string) (string, []any) {
+func orIncluded(subject access.Subject, where string, args []any, product, visibility, occurrence string) (string, []any) {
 	if where == "" || subject.Kind != access.Person {
 		return where, args
 	}
@@ -205,7 +205,7 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 		return where, args
 	}
 	included := "(" + visibility + ` = ? AND EXISTS (SELECT 1 FROM "lead_handoff" AS "ilh"
-		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."occurrence_identity" = ` + place + `
+		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."occurrence_identity" = ` + occurrence + `
 		  AND "ilh"."moved_at" IS NOT NULL AND "ilh"."disclosed_at" IS NULL
 		  AND (` + strings.Join(audience, " OR ") + `)))`
 	args = append(append(append([]any{}, args...), access.Internal), audienceArgs...)
@@ -243,7 +243,7 @@ func orBrought(subject access.Subject, where string, args []any,
 	return "(" + where + " OR " + strings.Join(brought, " OR ") + ")", args
 }
 
-// onlyDecidable narrows a places query to what this subject may argue about.
+// onlyDecidable narrows an occurrences query to what this subject may argue about.
 //
 // Written here rather than through narrowedBy because the product and the
 // visibility sit on different tables in this statement — the product on the
@@ -406,28 +406,28 @@ func unnarrowedMay(subject access.Subject,
 	return true
 }
 
-// partlyHidden is which of these claims hold a row this subject may not read.
+// partlyHidden is which of these decisions hold a row this subject may not read.
 //
-// A claim is one argument over every place it was made at, and its reasoning
+// A decision is one argument over every occurrence it was made at, and its reasoning
 // is written about all of them. A list showing the rows a reader may read
-// leaves that reasoning off a claim they may read only part of: shown half,
+// leaves that reasoning off a decision they may read only part of: shown half,
 // they would read words whose other half is about a finding they may not see,
-// which is the rule claimRows holds for a claim read by its identifier.
+// which is the rule decisionRows holds for a decision read by its identifier.
 func (s *Store) partlyHidden(ctx context.Context, subject access.Subject,
-	claims []int64) (map[int64]bool, error) {
+	decisions []int64) (map[int64]bool, error) {
 
 	hidden := map[int64]bool{}
-	if len(claims) == 0 {
+	if len(decisions) == 0 {
 		return hidden, nil
 	}
 	out, args := notReadableWhere(subject, "dn")
 	var ids []int64
 	if err := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "dn"`).
 		ColumnExpr(`DISTINCT "dn"."decision_id"`).
-		Where(`"dn"."decision_id" IN (?)`, bun.List(claims)).
+		Where(`"dn"."decision_id" IN (?)`, bun.List(decisions)).
 		Where(out, args...).
 		Scan(ctx, &ids); err != nil {
-		return nil, fmt.Errorf("read which claims reach past what you may read: %w", err)
+		return nil, fmt.Errorf("read which decisions reach past what you may read: %w", err)
 	}
 	for _, id := range ids {
 		hidden[id] = true
@@ -435,23 +435,23 @@ func (s *Store) partlyHidden(ctx context.Context, subject access.Subject,
 	return hidden, nil
 }
 
-// notReadableWhere is the condition a decision row meets where the subject may
+// notReadableWhere is the condition a decision occurrence meets where the subject may
 // not read it, cases included — the complement of readableBy.
 func notReadableWhere(subject access.Subject, column string) (string, []any) {
 	return negated(readableWhere(subject, column))
 }
 
-// notApprovableWhere is the condition a decision row meets where the subject
+// notApprovableWhere is the condition a decision occurrence meets where the subject
 // may not agree to it — the complement of approvableBy, for asking whether a
-// claim has any row outside what the reader may act on.
+// decision has any row outside what the reader may act on.
 func notApprovableWhere(subject access.Subject, column string) (string, []any) {
 	return negated(visibleCondition(subject, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
 		`"`+column+`"."vulnerability_id"`, mayApprove, withoutCases))
 }
 
-// notDecidableWhere is the condition a decision row meets where the subject
+// notDecidableWhere is the condition a decision occurrence meets where the subject
 // may not argue about it, cases included — the complement of decidableBy, for
-// asking whether a claim has any row out of the subject's reach.
+// asking whether a decision has any row out of the subject's reach.
 func notDecidableWhere(subject access.Subject, column string) (string, []any) {
 	return negated(visibleCondition(subject, `"`+column+`"."product_id"`, `"`+column+`"."visibility"`,
 		`"`+column+`"."vulnerability_id"`, mayDecide, onCases))

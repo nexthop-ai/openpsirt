@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapitest is the harness the API's tests share: a server over a
-// seeded cast of people, the requests they make, and the builds, claims and
+// seeded cast of people, the requests they make, and the builds, decisions and
 // documents a test sets up.
 package httpapitest
 

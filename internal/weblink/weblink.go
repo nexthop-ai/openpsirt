@@ -31,14 +31,14 @@ import (
 // in place of an address that would name it.
 func Home() string { return "/" }
 
-// ReviewQueue is the list of claims waiting for somebody to agree to them.
+// ReviewQueue is the list of decisions waiting for somebody to agree to them.
 func ReviewQueue() string { return "/review-queue" }
 
-// ReviewQueueMine is the review queue opened on the claims somebody made
-// themselves, which is where a claim sent back to its author is answered.
+// ReviewQueueMine is the review queue opened on the decisions somebody made
+// themselves, which is where a decision sent back to its author is answered.
 func ReviewQueueMine() string { return "/review-queue?mine=1" }
 
-// ReviewQueueReaffirm is the review queue opened on the claims of somebody's
+// ReviewQueueReaffirm is the review queue opened on the decisions of somebody's
 // that lapsed, which is where they are re-affirmed.
 func ReviewQueueReaffirm() string { return "/review-queue?reaffirm=1" }
 
@@ -68,12 +68,12 @@ func System() string { return "/system" }
 // ExploitedHere is the list of what the deployment owes somebody by a date.
 func ExploitedHere() string { return "/exploited-here" }
 
-// Claim is one claim, whole.
-func Claim(id int64) string { return "/claims/" + strconv.FormatInt(id, 10) }
-
-// Decision is one decision, which the screen resolves to the claim it belongs
-// to.
+// Decision is one decision, whole.
 func Decision(id int64) string { return "/decisions/" + strconv.FormatInt(id, 10) }
+
+// DecisionOccurrence is one occurrence of a decision, which the screen resolves
+// to the decision it belongs to.
+func DecisionOccurrence(id int64) string { return "/decision-occurrences/" + strconv.FormatInt(id, 10) }
 
 // Issue is one issue, everywhere it sits.
 func Issue(identifier string) string {
@@ -125,11 +125,11 @@ func Finding(product, stream, variant, vulnerability, component, version string)
 }
 
 // Lead is one static analysis lead's evidence on one build.
-func Lead(product, stream, variant, place string) string {
-	if climbs(product, stream, variant, place) {
+func Lead(product, stream, variant, occurrence string) string {
+	if climbs(product, stream, variant, occurrence) {
 		return Home()
 	}
-	return build(product, stream, variant) + "/leads/" + url.PathEscape(place)
+	return build(product, stream, variant) + "/leads/" + url.PathEscape(occurrence)
 }
 
 // Leads is a product's leads in one state on one build, and of one series

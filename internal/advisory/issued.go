@@ -177,11 +177,11 @@ func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // every issue of which this reader may see, among the coverage rows the
 // condition over "ac" keeps.
 //
-// Seeing an issue is reading a recorded place of it in its product, and every
-// undisclosed place of it there, open or closed. The second half is the one
+// Seeing an issue is reading a recorded occurrence of it in its product, and every
+// undisclosed occurrence of it there, open or closed. The second half is the one
 // the document's distribution label is decided from, so an advisory a reader
 // may list is one whose document they may generate: admitted here and refused
-// there, the pair says an undisclosed place exists.
+// there, the pair says an undisclosed occurrence exists.
 func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun.SelectQuery {
 	products, all := subject.Products()
 	if all {

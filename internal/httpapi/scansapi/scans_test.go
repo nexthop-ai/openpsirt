@@ -140,7 +140,7 @@ const secondSuppression = `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": 
  "statements": [{"vulnerability": {"name": "CVE-2026-2"}, "status": "not_affected",
  "products": [{"@id": "pkg:deb/debian/libc6"}]}]}`
 
-func TestAnUnchangedInventoryWithChangedJudgmentsIsTaken(t *testing.T) {
+func TestAnUnchangedInventoryWithChangedDecisionsIsTaken(t *testing.T) {
 	// A build whose contents have not moved and which has since worked out
 	// that three issues do not apply to it re-sends the same inventory with
 	// different claims beside it. Hashing the inventory alone answers 200 and

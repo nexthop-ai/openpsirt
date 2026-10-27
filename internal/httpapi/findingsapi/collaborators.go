@@ -51,7 +51,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 		Description: "Everybody granted this one issue in this product, oldest first.\n\n" +
 			"Being on a case is not reading the product. A collaborator sees this issue " +
 			"wherever it sits here and nothing else, may argue about it and comment on it, " +
-			"and may not agree to anybody's claim.",
+			"and may not agree to anybody's decision.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Only where you may read undisclosed work.", core.PrivateRights()...),
 		func(ctx context.Context, input *struct {

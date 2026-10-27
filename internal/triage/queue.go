@@ -22,7 +22,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
-// Waiting is one claim somebody has to look at, with what an approver needs in
+// Waiting is one decision somebody has to look at, with what an approver needs in
 // order to judge it.
 //
 // Everything here is carried rather than left to be fetched per row. A
@@ -30,12 +30,12 @@ import (
 // it is a list that gets approved without being read — which is the failure
 // the queue exists to prevent, arriving by a different route.
 //
-// One of these is one claim — one proposer's action — however many decisions
-// it wrote. Decision is a representative row: the earliest, which is the same
+// One of these is one decision — one proposer's action — however many rows
+// it wrote. DecisionOccurrence is a representative row: the earliest, which is the same
 // on every engine and every run.
 type Waiting struct {
-	Claim    Claim
-	Decision Decision
+	Decision           Decision
+	DecisionOccurrence DecisionOccurrence
 	// Reasoning is what the proposer wrote, as it currently stands on the
 	// representative row.
 	Reasoning string
@@ -48,26 +48,26 @@ type Waiting struct {
 	// every deferral. What decides whether a deferral needs agreement is the
 	// cumulative time, not the length of the one being asked about.
 	DeferredSoFar time.Duration
-	// Decisions, Issues and Places are how big the claim is: rows written,
-	// distinct issues, distinct places.
-	Decisions, Issues, Places int
-	// Builds names every build the claim's rows currently cover, as the
+	// Rows, Issues and Occurrences are how big the decision is: rows written,
+	// distinct issues, distinct occurrences.
+	Rows, Issues, Occurrences int
+	// Builds names every build the decision's rows currently cover, as the
 	// stream and variant display names joined with a middle dot.
 	Builds []string
 	// Outliers is what in a bulk set does not look like the rest. Only for a
-	// claim over many issues; nil otherwise.
+	// decision over many issues; nil otherwise.
 	Outliers *Outliers
 	// Counter is what would argue against agreeing: what has been decided
-	// about the same issue elsewhere, and how much else at the same place
+	// about the same issue elsewhere, and how much else at the same occurrence
 	// nobody has answered.
 	Counter Counter
 }
 
-// Outliers is what an approver of a bulk claim checks instead of reading every
-// row: the handful that contradict the shape of the claim.
+// Outliers is what an approver of a bulk decision checks instead of reading every
+// row: the handful that contradict the shape of the decision.
 type Outliers struct {
 	// ExploitedHere, Exploited, Severe, Fixable and Unmatched count the
-	// distinct issues in the claim with that property. ExploitedHere is this
+	// distinct issues in the decision with that property. ExploitedHere is this
 	// product's own standing record of being attacked through the issue;
 	// Severe is critical or high; Unmatched is an issue whose description
 	// does not contain the term the set was narrowed by, where that term is
@@ -75,24 +75,24 @@ type Outliers struct {
 	ExploitedHere, Exploited, Severe, Fixable, Unmatched int
 	// Rows are the issues that stood out, attacked here first, then
 	// exploited, then by severity. Capped, except that no issue this product
-	// was attacked through is ever left off: agreeing to the claim is refused
+	// was attacked through is ever left off: agreeing to the decision is refused
 	// while one is in it, so it is the row an approver has to set aside.
 	Rows []Outlier
 }
 
-// Outlier is one issue in a bulk claim that does not look like the rest.
+// Outlier is one issue in a bulk decision that does not look like the rest.
 type Outlier struct {
-	DecisionID int64
-	// DecisionIDs is every row of the claim about this issue: one per place.
+	DecisionOccurrenceID int64
+	// DecisionOccurrenceIDs is every row of the decision about this issue: one per occurrence.
 	// Setting the issue aside sets aside all of them, because agreeing to any
-	// one of its places is agreeing to the issue.
-	DecisionIDs   []int64
-	Vulnerability string
-	Severity      string
-	ExploitedHere bool
-	Exploited     bool
-	FixedIn       string
-	Description   string
+	// one of its occurrences is agreeing to the issue.
+	DecisionOccurrenceIDs []int64
+	Vulnerability         string
+	Severity              string
+	ExploitedHere         bool
+	Exploited             bool
+	FixedIn               string
+	Description           string
 	// Why names which of the things made it stand out.
 	Why []string
 }
@@ -101,7 +101,7 @@ type Outlier struct {
 // the counts say how many there are.
 const outlierRows = 20
 
-// WaitingIn counts the claims about one product waiting for a second person.
+// WaitingIn counts the decisions about one product waiting for a second person.
 //
 // The same population the queue lists, narrowed to one product: a number
 // beside a product that counted something else from the screen it links to is
@@ -111,7 +111,7 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	productID int64) (int, error) {
 
 	// The queue's own statement, so the two cannot count different things.
-	q := s.waitingClaims(subject, QueueFilter{ProductID: productID})
+	q := s.waitingDecisions(subject, QueueFilter{ProductID: productID})
 	total, err := s.db.NewSelect().TableExpr(`(?) AS "waiting_here"`, q).Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what is waiting here: %w", err)
@@ -119,19 +119,19 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	return int(total), nil
 }
 
-// waitingClaims is the claims with a row waiting for the reason the filter
-// names, one row per claim with the newest of its rows. Grouped in the
-// statement rather than afterwards, so a page is a page of claims and a count
-// counts claims.
+// waitingDecisions is the decisions with a row waiting for the reason the filter
+// names, one row per decision with the newest of its rows. Grouped in the
+// statement rather than afterwards, so a page is a page of decisions and a count
+// counts decisions.
 //
 // Who is shown what depends on the reason. An approval is somebody else's
-// claim the reader may agree to, and never their own: approving your own is
+// decision the reader may agree to, and never their own: approving your own is
 // refused. An expired deferral or a missed fix date asks for a new decision,
 // which anybody who may decide in the product can make, the proposer
-// included. In each case a claim is shown only where the reader may act on
-// every row of it, because acting on a claim acts on the whole argument.
-func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.SelectQuery {
-	q := s.db.NewSelect().Model((*Decision)(nil)).
+// included. In each case a decision is shown only where the reader may act on
+// every row of it, because acting on a decision acts on the whole argument.
+func (s *Store) waitingDecisions(subject access.Subject, filter QueueFilter) *bun.SelectQuery {
+	q := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`MAX("de"."id") AS "newest"`).
 		GroupExpr(`"de"."decision_id"`)
@@ -139,11 +139,11 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 	if filter.Reason == FixDateMissed {
 		// A promise is missed only while a finding it covers is still open
 		// where the reader may see it. A kept promise closes its findings and
-		// leaves its date and its decision as they were.
+		// leaves its date and its rows as they were.
 		q = q.Where("EXISTS (?)", readableFindings(openUnder(q), subject, "f", `"st"."product_id"`))
 	}
 	// One product where the caller named one, and whatever else the reader
-	// narrowed by. A claim is decided in a product, so this narrows the same
+	// narrowed by. A decision is decided in a product, so this narrows the same
 	// way every other list does — and zero is every product, which is what the
 	// queue screen asks for.
 	q = filter.narrow(q, subject)
@@ -152,14 +152,14 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 			q = q.Where(`"de"."proposed_by" = ?`, subject.ID)
 		}
 		outOfReach, args := notDecidableWhere(subject, "other")
-		return s.reachableClaims(decidableBy(q, subject, "de"), outOfReach, args)
+		return s.reachableDecisions(decidableBy(q, subject, "de"), outOfReach, args)
 	}
 	q = approvableBy(q, subject, "de")
-	// Mine asks for the reader's own claims waiting on somebody else, in the
+	// Mine asks for the reader's own decisions waiting on somebody else, in the
 	// same statement, so the count and the page cannot disagree about which
 	// question was asked.
 	//
-	// Otherwise the claims the second-person rule lets the reader agree to:
+	// Otherwise the decisions the second-person rule lets the reader agree to:
 	// none of whose rows they proposed and none of whose reasoning they wrote.
 	// Offered one they may not agree to, Approve refuses it for a reason the
 	// list never showed.
@@ -172,25 +172,25 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 			WHERE "wrote"."decision_id" = "de"."decision_id" AND "wrote"."written_by" = ?)`, subject.ID)
 	}
 	outOfReach, args := notApprovableWhere(subject, "other")
-	return s.reachableClaims(q, outOfReach, args)
+	return s.reachableDecisions(q, outOfReach, args)
 }
 
-// reachableClaims keeps the claims of the grouped statement with no row
-// meeting outOfReach, a condition on decision AS "other", and reads the
+// reachableDecisions keeps the decisions of the grouped statement with no row
+// meeting outOfReach, a condition on decision_occurrence AS "other", and reads the
 // grouped statement's two columns.
 //
-// Whether any row of a claim is out of the reader's reach is a question about
-// the claim, so it is asked of each claim once the rows are grouped: a claim
-// covering three hundred places would otherwise ask it three hundred times and
+// Whether any row of a decision is out of the reader's reach is a question about
+// the decision, so it is asked of each decision once the rows are grouped: a decision
+// covering three hundred occurrences would otherwise ask it three hundred times and
 // get the same answer.
 //
 // It is asked by the statement over the grouping, as a join that finds no row.
 // PostgreSQL prices a correlated condition in a HAVING once per group at the
 // cost of running it alone, which puts a 30 ms statement past the price at
 // which it compiles the plan before running it. A NOT EXISTS over the grouping
-// MySQL answers by reading every decision to build the set of claims with a
+// MySQL answers by reading every row to build the set of decisions with a
 // row out of reach; the join it answers from an index.
-func (s *Store) reachableClaims(grouped *bun.SelectQuery, outOfReach string, args []any) *bun.SelectQuery {
+func (s *Store) reachableDecisions(grouped *bun.SelectQuery, outOfReach string, args []any) *bun.SelectQuery {
 	return s.db.NewSelect().TableExpr(`(?) AS "waiting"`, grouped).
 		ColumnExpr(`"waiting"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"waiting"."newest" AS "newest"`).
@@ -199,12 +199,12 @@ func (s *Store) reachableClaims(grouped *bun.SelectQuery, outOfReach string, arg
 		Where(`"other"."id" IS NULL`)
 }
 
-// QueueReason is why a claim waits in the review queue. Each reason is its own
+// QueueReason is why a decision waits in the review queue. Each reason is its own
 // list, with its own audience and its own acts.
 type QueueReason string
 
 const (
-	// ForApproval is a claim waiting for a second person to agree to it.
+	// ForApproval is a decision waiting for a second person to agree to it.
 	ForApproval QueueReason = "approval"
 	// DeferralExpired is a deferral whose date has passed.
 	DeferralExpired QueueReason = "expired-deferral"
@@ -220,37 +220,37 @@ func QueueReasons() []QueueReason { return []QueueReason{ForApproval, DeferralEx
 // agreement.
 func (r QueueReason) decides() bool { return r == DeferralExpired || r == FixDateMissed }
 
-// QueueFilter narrows the review queue. The zero value is every claim waiting
+// QueueFilter narrows the review queue. The zero value is every decision waiting
 // on the reader, in every product they may approve in.
 type QueueFilter struct {
-	// Reason is which list: the zero value is claims waiting for approval.
+	// Reason is which list: the zero value is decisions waiting for approval.
 	Reason QueueReason
 	// Mine asks for what the reader proposed instead of what waits on them.
 	Mine bool
 	// ProductID is one product, or zero for every one.
 	ProductID int64
-	// ProposedBy keeps the claims these people made. Nil asks nothing; an
+	// ProposedBy keeps the decisions these people made. Nil asks nothing; an
 	// empty, non-nil list is a name that resolved to nobody and keeps
 	// nothing, so a filter that could not be applied never widens the list.
 	ProposedBy []int64
-	// ProposedBefore keeps claims older than this moment, on the clock the
+	// ProposedBefore keeps decisions older than this moment, on the clock the
 	// age beside each entry is read from.
 	ProposedBefore *time.Time
-	// Severities keeps claims covering an issue rated one of these words in
+	// Severities keeps decisions covering an issue rated one of these words in
 	// its own product, which is the rating in force there.
 	Severities []string
-	// Outcomes keeps claims of these kinds.
+	// Outcomes keeps decisions of these kinds.
 	Outcomes []Outcome
-	// Release keeps claims that currently cover an open finding in a branch
+	// Release keeps decisions that currently cover an open finding in a branch
 	// or tag of this name, matched the way a build's own names are.
 	Release string
 }
 
-// narrow applies the filter to a grouped query over decision AS de.
+// narrow applies the filter to a grouped query over decision_occurrence AS de.
 //
-// Every condition is on a row, so a claim is kept where one of its waiting
-// rows satisfies all of them. The rows a claim is shown with are read
-// afterwards and whole, so narrowing never shows part of a claim.
+// Every condition is on a row, so a decision is kept where one of its waiting
+// rows satisfies all of them. The rows a decision is shown with are read
+// afterwards and whole, so narrowing never shows part of a decision.
 func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	if f.ProductID != 0 {
 		q = q.Where(`"de"."product_id" = ?`, f.ProductID)
@@ -266,7 +266,7 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 	}
 	if len(f.Severities) > 0 {
 		// The product's own rating where it has stated one, as the findings
-		// list reads it, joined on the decision's product so a claim is judged
+		// list reads it, joined on the row's product so a decision is judged
 		// by the rating in force where it was made.
 		// Asked of the issue each row is read as, which is where a rating
 		// stands once one issue has merged into another.
@@ -290,8 +290,8 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 	return q
 }
 
-// openUnder selects the open findings a row of decision AS de covers: at the
-// row's place, at the versions the row was written against, in the row's
+// openUnder selects the open findings a row of decision_occurrence AS de covers: at the
+// row's occurrence, at the versions the row was written against, in the row's
 // product. The match buildsCovered makes, asked as a condition.
 func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr("1").
@@ -308,49 +308,49 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 }
 
 // Queue returns what is waiting for somebody, newest first, one entry per
-// claim.
+// decision.
 //
 // Narrowed to what the asker may act on, in the query. A reviewer who cannot
-// triage a product should not be shown its claims at all — a queue is a work
+// triage a product should not be shown its decisions at all — a queue is a work
 // list, and one containing work somebody cannot do teaches them to skip rows.
 //
-// A claim is shown only where the reader may act on every row in it. Acting on
-// a claim is acting on the argument, which does not come in halves: shown the
+// A decision is shown only where the reader may act on every row in it. Acting on
+// a decision is acting on the argument, which does not come in halves: shown the
 // part they may approve, a reader would agree to words whose other half stays
 // waiting on somebody else, and the count beside the card would be wrong.
 //
-// The filter's reason picks the list, and waitingClaims says who is shown
-// each. `mine` keeps the reader's own claims: for approvals, what they
+// The filter's reason picks the list, and waitingDecisions says who is shown
+// each. `mine` keeps the reader's own decisions: for approvals, what they
 // proposed and nobody has agreed to yet, which is a different question from
 // what is waiting on them.
 func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueFilter,
 	limit, offset int) ([]Waiting, int, error) {
 
-	waitingClaims := func() *bun.SelectQuery { return s.waitingClaims(subject, filter) }
+	waitingDecisions := func() *bun.SelectQuery { return s.waitingDecisions(subject, filter) }
 	// A limit of zero asks how much is waiting and nothing else, which is
 	// what a badge polled once a minute needs.
 	if limit == 0 {
-		total, err := s.countClaims(ctx, waitingClaims, "what is waiting")
+		total, err := s.countDecisions(ctx, waitingDecisions, "what is waiting")
 		return nil, total, err
 	}
 	limit = database.AList.Of(limit)
 
-	page, err := s.claimsOn(ctx, waitingClaims, limit, offset, "what is waiting")
+	page, err := s.decisionsOn(ctx, waitingDecisions, limit, offset, "what is waiting")
 	if err != nil {
 		return nil, 0, err
 	}
 	if len(page.Order) == 0 {
 		return nil, page.Total, nil
 	}
-	total, ids, byID := page.Total, page.Order, page.Claims
+	total, ids, byID := page.Total, page.Order, page.Decisions
 
 	// The representative is the earliest row; the sizes are counted over all
 	// of them.
-	sizes, err := s.claimSizes(ctx, subject, ids, "what is waiting")
+	sizes, err := s.decisionSizes(ctx, subject, ids, "what is waiting")
 	if err != nil {
 		return nil, 0, err
 	}
-	representatives := make([]Decision, 0, len(ids))
+	representatives := make([]DecisionOccurrence, 0, len(ids))
 	for _, id := range ids {
 		representatives = append(representatives, sizes[id].First)
 	}
@@ -371,18 +371,18 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueF
 	if err != nil {
 		return nil, 0, err
 	}
-	// Every claim that is an act over many issues, including rows set aside
+	// Every decision that is an act over many issues, including rows set aside
 	// from one and one re-made after it lapsed: each is refused over an
 	// attacked issue the same way, so each needs the table to set it aside.
-	var bulk []Claim
+	var bulk []Decision
 	for _, id := range ids {
-		claim := byID[id]
-		many, err := s.overMany(ctx, claim)
+		decision := byID[id]
+		many, err := s.overMany(ctx, decision)
 		if err != nil {
 			return nil, 0, err
 		}
 		if many {
-			bulk = append(bulk, claim)
+			bulk = append(bulk, decision)
 		}
 	}
 	outliers, err := s.outliersFor(ctx, subject, bulk)
@@ -399,52 +399,52 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, filter QueueF
 
 	out := make([]Waiting, 0, len(ids))
 	for _, id := range ids {
-		claim := byID[id]
+		decision := byID[id]
 		representative := sizes[id].First
 		// Agreed to before and back in the queue: an approver meeting it again
-		// should know they are re-reading something. Asked of the claim, which
+		// should know they are re-reading something. Asked of the decision, which
 		// is what an agreement is given for.
 		before := seenBefore[id]
 		one := Waiting{
-			Claim: claim, Decision: representative,
+			Decision: decision, DecisionOccurrence: representative,
 			Reasoning:          reasoning[representative.ID],
 			PreviouslyApproved: before,
 			DeferredSoFar:      deferred[representative.ID],
-			Decisions:          sizes[id].Decisions,
+			Rows:               sizes[id].Rows,
 			Issues:             sizes[id].Issues,
-			Places:             sizes[id].Places,
+			Occurrences:        sizes[id].Occurrences,
 			Builds:             builds[id],
 			Counter:            against[representative.ID],
 		}
-		// Present for every claim read as an act over many issues above,
+		// Present for every decision read as an act over many issues above,
 		// and absent otherwise.
-		one.Outliers = outliers[claim.ID]
+		one.Outliers = outliers[decision.ID]
 		out = append(out, one)
 	}
 	return out, total, nil
 }
 
-// buildsCovered names the builds each claim's rows currently cover: every
-// open finding at the row's place, at the versions the row was written
+// buildsCovered names the builds each decision's rows currently cover: every
+// open finding at the row's occurrence, at the versions the row was written
 // against — the same match a finding makes when it asks whether a decision
 // applies to it.
 //
 // Narrowed to the findings the reader may see. A build named here is a
 // statement that the build holds the issue, and a decision somebody may read
 // can match findings they may not.
-func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claims []int64) (map[int64][]string, error) {
+func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, decisions []int64) (map[int64][]string, error) {
 	var rows []struct {
-		ClaimID int64  `bun:"decision_id"`
-		Stream  string `bun:"stream"`
-		Variant string `bun:"variant"`
+		DecisionID int64  `bun:"decision_id"`
+		Stream     string `bun:"stream"`
+		Variant    string `bun:"variant"`
 	}
 	query := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		// The decision on the outside of the join, for the reason Describe
+		// The decision occurrence on the outside of the join, for the reason Describe
 		// gives: SQLite otherwise starts from every open finding.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtPlace("f")).
+		Where(finding.DecisionAtOccurrence("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
@@ -457,8 +457,8 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		// however it was spelled.
 		ColumnExpr(`MIN(`+catalog.ShownExpr("st")+`) AS "stream"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("va")+`) AS "variant"`).
-		Where(`"de"."decision_id" IN (?)`, bun.List(claims)).
-		// Live rows only, as a claim's reach is counted.
+		Where(`"de"."decision_id" IN (?)`, bun.List(decisions)).
+		// Live rows only, as a decision's reach is counted.
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
@@ -473,30 +473,30 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 	}
 	builds := map[int64][]string{}
 	for _, row := range rows {
-		builds[row.ClaimID] = append(builds[row.ClaimID], row.Stream+" \u00b7 "+row.Variant)
+		builds[row.DecisionID] = append(builds[row.DecisionID], row.Stream+" \u00b7 "+row.Variant)
 	}
 	return builds, nil
 }
 
-// outliersFor reads the outliers of every bulk claim on a page, in three
-// statements for the page rather than three per claim: which issues each
-// claim covers, what those issues are, and where a fix is known.
-func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims []Claim) (map[int64]*Outliers, error) {
-	out := make(map[int64]*Outliers, len(claims))
-	if len(claims) == 0 {
+// outliersFor reads the outliers of every bulk decision on a page, in three
+// statements for the page rather than three per decision: which issues each
+// decision covers, what those issues are, and where a fix is known.
+func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisions []Decision) (map[int64]*Outliers, error) {
+	out := make(map[int64]*Outliers, len(decisions))
+	if len(decisions) == 0 {
 		return out, nil
 	}
-	claimIDs := make([]int64, 0, len(claims))
-	for _, claim := range claims {
-		claimIDs = append(claimIDs, claim.ID)
-		out[claim.ID] = &Outliers{Rows: []Outlier{}}
+	decisionIDs := make([]int64, 0, len(decisions))
+	for _, decision := range decisions {
+		decisionIDs = append(decisionIDs, decision.ID)
+		out[decision.ID] = &Outliers{Rows: []Outlier{}}
 	}
 
 	var heads []struct {
-		ClaimID         int64 `bun:"decision_id"`
-		VulnerabilityID int64 `bun:"vulnerability_id"`
-		DecisionID      int64 `bun:"decision_occurrence_id"`
-		// ProductID is which product the claim was made in. A rating
+		DecisionID           int64 `bun:"decision_id"`
+		VulnerabilityID      int64 `bun:"vulnerability_id"`
+		DecisionOccurrenceID int64 `bun:"decision_occurrence_id"`
+		// ProductID is which product the decision was made in. A rating
 		// belongs to a product, so an outlier is picked out against
 		// what *this* product rates these issues rather than against a
 		// word somebody in another one chose.
@@ -509,17 +509,17 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
-		Where(`"de"."decision_id" IN (?)`, bun.List(claimIDs)).
+		Where(`"de"."decision_id" IN (?)`, bun.List(decisionIDs)).
 		OrderExpr(`"de"."decision_id", "dv"."issue_id", "de"."id"`).
 		Scan(ctx, &heads); err != nil {
-		return nil, fmt.Errorf("read what a bulk claim covers: %w", err)
+		return nil, fmt.Errorf("read what a bulk decision covers: %w", err)
 	}
 	if len(heads) == 0 {
 		return out, nil
 	}
 	// One identifier per issue and per product, never one per row. A bulk
-	// claim covering one kernel issue holds a decision at each of its
-	// places, which is a hundred thousand rows, and a list carrying each of
+	// decision covering one kernel issue holds a row at each of its
+	// occurrences, which is a hundred thousand rows, and a list carrying each of
 	// them is a statement past the size one engine accepts.
 	var issueIDs, productIDs []int64
 	seenIssue, seenProduct := map[int64]bool{}, map[int64]bool{}
@@ -539,16 +539,16 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 			productIDs = append(productIDs, head.ProductID)
 			inProduct[head.ProductID] = map[int64]bool{}
 		}
-		within[head.ClaimID] = head.ProductID
+		within[head.DecisionID] = head.ProductID
 		if !inProduct[head.ProductID][head.VulnerabilityID] {
 			inProduct[head.ProductID][head.VulnerabilityID] = true
 			byProduct[head.ProductID] = append(byProduct[head.ProductID], head.VulnerabilityID)
 		}
-		if covers[head.ClaimID] == nil {
-			covers[head.ClaimID] = map[int64][]int64{}
+		if covers[head.DecisionID] == nil {
+			covers[head.DecisionID] = map[int64][]int64{}
 		}
-		covers[head.ClaimID][head.VulnerabilityID] = append(
-			covers[head.ClaimID][head.VulnerabilityID], head.DecisionID)
+		covers[head.DecisionID][head.VulnerabilityID] = append(
+			covers[head.DecisionID][head.VulnerabilityID], head.DecisionOccurrenceID)
 	}
 	// Which of these issues each product records being attacked through.
 	attacked := map[int64]map[int64]bool{}
@@ -563,7 +563,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	var issues []finding.Vulnerability
 	if err := s.db.NewSelect().Model(&issues).
 		Where(`"id" IN (?)`, bun.List(issueIDs)).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read the issues a bulk claim covers: %w", err)
+		return nil, fmt.Errorf("read the issues a bulk decision covers: %w", err)
 	}
 	// A flaw recorded where this reader may not read it wrote its summary
 	// onto the issue row every product shares.
@@ -583,24 +583,24 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		return nil, err
 	}
 
-	// fixes is where a fix is known, from the open findings the claim's
+	// fixes is where a fix is known, from the open findings the decision's
 	// rows are about: the same match a row makes when a finding asks
-	// whether it applies — the product, the place and both versions — and
+	// whether it applies — the product, the occurrence and both versions — and
 	// only the findings the reader may see, since a fix version is read
-	// off the finding. A claim covers one component, so one answer per
+	// off the finding. A decision covers one component, so one answer per
 	// issue is the ordinary case and the smallest stated version stands in
 	// otherwise.
 	var fixes []struct {
-		ClaimID         int64  `bun:"decision_id"`
+		DecisionID      int64  `bun:"decision_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		FixedIn         string `bun:"fixed_in"`
 	}
 	known := s.db.NewSelect().
 		TableExpr(`"decision_occurrence" AS "de"`).
-		// The decision on the outside, as buildsCovered has it.
+		// The decision occurrence on the outside, as buildsCovered has it.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where(finding.DecisionAtPlace("f")).
+		Where(finding.DecisionAtOccurrence("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
@@ -609,7 +609,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
-		Where(`"de"."decision_id" IN (?)`, bun.List(claimIDs)).
+		Where(`"de"."decision_id" IN (?)`, bun.List(decisionIDs)).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
@@ -622,42 +622,42 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	}
 	fixedIn := map[int64]map[int64]string{}
 	for _, fix := range fixes {
-		if fixedIn[fix.ClaimID] == nil {
-			fixedIn[fix.ClaimID] = map[int64]string{}
+		if fixedIn[fix.DecisionID] == nil {
+			fixedIn[fix.DecisionID] = map[int64]string{}
 		}
-		fixedIn[fix.ClaimID][fix.VulnerabilityID] = fix.FixedIn
+		fixedIn[fix.DecisionID][fix.VulnerabilityID] = fix.FixedIn
 	}
 
-	for _, claim := range claims {
-		out[claim.ID] = outliersOf(claim, within[claim.ID], covers[claim.ID], byIssue,
-			rated, fixedIn[claim.ID], attacked[within[claim.ID]])
+	for _, decision := range decisions {
+		out[decision.ID] = outliersOf(decision, within[decision.ID], covers[decision.ID], byIssue,
+			rated, fixedIn[decision.ID], attacked[within[decision.ID]])
 	}
 	return out, nil
 }
 
-// outliersOf picks, from the issues one bulk claim covers, the rows that do
+// outliersOf picks, from the issues one bulk decision covers, the rows that do
 // not look like the rest.
-func outliersOf(claim Claim, productID int64, decisionsOf map[int64][]int64,
+func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]int64,
 	byIssue map[int64]finding.Vulnerability, rated map[finding.RatedKey]string,
 	fixedIn map[int64]string, attacked map[int64]bool) *Outliers {
 
 	// The term the list was actually narrowed by, where the act recorded one,
-	// and the claimant's prose only where it did not.
+	// and the proposer's prose only where it did not.
 	//
-	// The structured record is the one the check reads. A claimant who
+	// The structured record is the one the check reads. A proposer who
 	// narrowed by one word and wrote a sentence phrasing it differently would
 	// get no "does not mention" flag from the prose, and the field they write
 	// is asked for in their own words, which invites exactly that.
-	term := orEmpty(claim.SelectedWhere)
+	term := orEmpty(decision.SelectedWhere)
 	if term == "" {
-		term = narrowingTerm(orEmpty(claim.SelectedBy))
+		term = narrowingTerm(orEmpty(decision.SelectedBy))
 	}
 	out := &Outliers{Rows: []Outlier{}}
-	candidates := make([]Outlier, 0, len(decisionsOf))
+	candidates := make([]Outlier, 0, len(occurrencesOf))
 	// Walked in issue order so the result is the same on every engine and
 	// every run, whatever order a map hands them out in.
-	issueIDs := make([]int64, 0, len(decisionsOf))
-	for id := range decisionsOf {
+	issueIDs := make([]int64, 0, len(occurrencesOf))
+	for id := range occurrencesOf {
 		issueIDs = append(issueIDs, id)
 	}
 	sort.Slice(issueIDs, func(i, j int) bool { return issueIDs[i] < issueIDs[j] })
@@ -668,14 +668,14 @@ func outliersOf(claim Claim, productID int64, decisionsOf map[int64][]int64,
 		}
 		// This product's rating where it has one, the published word
 		// otherwise — the rule every list follows, asked of the product the
-		// claim was made in.
+		// decision was made in.
 		word := issue.RatedIn(rated[finding.RatedKey{ProductID: productID,
 			VulnerabilityID: issue.ID}]).InForce()
 		if word == "" && issue.ScoreCenti != nil {
 			word = finding.SeverityWord(*issue.ScoreCenti)
 		}
 		one := Outlier{
-			DecisionID: decisionsOf[issue.ID][0], DecisionIDs: decisionsOf[issue.ID],
+			DecisionOccurrenceID: occurrencesOf[issue.ID][0], DecisionOccurrenceIDs: occurrencesOf[issue.ID],
 			Vulnerability: issue.Identifier, Severity: word,
 			ExploitedHere: attacked[issue.ID], Exploited: issue.Exploited,
 			FixedIn: fixedIn[issue.ID], Description: clip(issue.Description, 200),
@@ -750,46 +750,46 @@ func clip(text string, n int) string {
 	return string(runes[:n]) + "\u2026"
 }
 
-// ReasoningFor returns the reasoning each decision currently rests on, keyed
-// by decision, leaving out the reasoning of a claim that holds a row this
+// ReasoningFor returns the reasoning each decision occurrence currently rests on, keyed
+// by row, leaving out the reasoning of a decision that holds a row this
 // subject may not read.
 //
-// Read through the claim, which is where the words are: a row of a claim rests
-// on the claim's argument, and asking per row is asking the same question
-// once per place. The argument is about every place of the claim, so a reader
+// Read through the decision, which is where the words are: a row of a decision rests
+// on the decision's argument, and asking per row is asking the same question
+// once per occurrence. The argument is about every occurrence of the decision, so a reader
 // of only part of it is not given it.
-func (s *Store) ReasoningFor(ctx context.Context, subject access.Subject, decisions []Decision) (map[int64]string, error) {
-	reasoning, err := s.currentReasoning(ctx, decisions)
+func (s *Store) ReasoningFor(ctx context.Context, subject access.Subject, occurrences []DecisionOccurrence) (map[int64]string, error) {
+	reasoning, err := s.currentReasoning(ctx, occurrences)
 	if err != nil {
 		return nil, err
 	}
-	return reasoning, s.withholdPartReasoning(ctx, subject, decisions, reasoning)
+	return reasoning, s.withholdPartReasoning(ctx, subject, occurrences, reasoning)
 }
 
-func (s *Store) currentReasoning(ctx context.Context, decisions []Decision) (map[int64]string, error) {
-	said, err := s.reasoningPerClaim(ctx, claimsOf(decisions))
+func (s *Store) currentReasoning(ctx context.Context, occurrences []DecisionOccurrence) (map[int64]string, error) {
+	said, err := s.reasoningPerDecision(ctx, decisionsOf(occurrences))
 	if err != nil {
 		return nil, err
 	}
-	byDecision := make(map[int64]string, len(decisions))
-	for _, decision := range decisions {
-		if body, held := said[decision.ClaimID]; held {
-			byDecision[decision.ID] = body
+	byOccurrence := make(map[int64]string, len(occurrences))
+	for _, occurrence := range occurrences {
+		if body, held := said[occurrence.DecisionID]; held {
+			byOccurrence[occurrence.ID] = body
 		}
 	}
-	return byDecision, nil
+	return byOccurrence, nil
 }
 
-// reasoningPerClaim is the words each of these claims currently rests on.
-func (s *Store) reasoningPerClaim(ctx context.Context, ids []int64) (map[int64]string, error) {
+// reasoningPerDecision is the words each of these decisions currently rests on.
+func (s *Store) reasoningPerDecision(ctx context.Context, ids []int64) (map[int64]string, error) {
 	if len(ids) == 0 {
 		return map[int64]string{}, nil
 	}
 	var rows []struct {
-		ClaimID int64  `bun:"decision_id"`
-		Body    string `bun:"body"`
+		DecisionID int64  `bun:"decision_id"`
+		Body       string `bun:"body"`
 	}
-	if err := s.db.NewSelect().Model((*Claim)(nil)).
+	if err := s.db.NewSelect().Model((*Decision)(nil)).
 		Join(`JOIN "decision_revision" AS "dr" ON "dr"."id" = "cl"."revision_id"`).
 		ColumnExpr(`"cl"."id" AS "decision_id"`).
 		ColumnExpr(`"dr"."body" AS "body"`).
@@ -798,25 +798,25 @@ func (s *Store) reasoningPerClaim(ctx context.Context, ids []int64) (map[int64]s
 	}
 	said := make(map[int64]string, len(rows))
 	for _, row := range rows {
-		said[row.ClaimID] = row.Body
+		said[row.DecisionID] = row.Body
 	}
 	return said, nil
 }
 
-// claimsOf is the claims a set of decisions belongs to, each once.
-func claimsOf(decisions []Decision) []int64 {
-	seen := make(map[int64]bool, len(decisions))
-	ids := make([]int64, 0, len(decisions))
-	for _, decision := range decisions {
-		if !seen[decision.ClaimID] {
-			seen[decision.ClaimID] = true
-			ids = append(ids, decision.ClaimID)
+// decisionsOf is the decisions a set of rows belongs to, each once.
+func decisionsOf(occurrences []DecisionOccurrence) []int64 {
+	seen := make(map[int64]bool, len(occurrences))
+	ids := make([]int64, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		if !seen[occurrence.DecisionID] {
+			seen[occurrence.DecisionID] = true
+			ids = append(ids, occurrence.DecisionID)
 		}
 	}
 	return ids
 }
 
-// everApproved reports which of these claims were agreed to at some point.
+// everApproved reports which of these decisions were agreed to at some point.
 func (s *Store) everApproved(ctx context.Context, ids []int64) (map[int64]bool, error) {
 	if len(ids) == 0 {
 		return map[int64]bool{}, nil
@@ -828,21 +828,21 @@ func (s *Store) everApproved(ctx context.Context, ids []int64) (map[int64]bool, 
 	}
 	seen := make(map[int64]bool, len(approvals))
 	for _, approval := range approvals {
-		seen[approval.ClaimID] = true
+		seen[approval.DecisionID] = true
 	}
 	return seen, nil
 }
 
 // waiting narrows a query to the rows waiting for one reason.
 //
-// A claim that needed nobody — a short deferral — waits for no approval. A
-// decision the code moved out from under is not here: it is its author's to
+// A decision that needed nobody — a short deferral — waits for no approval. A
+// row the code moved out from under is not here: it is its author's to
 // re-affirm, and that list is its own.
 func waiting(query *bun.SelectQuery, reason QueueReason, now time.Time) *bun.SelectQuery {
 	switch reason {
 	case DeferralExpired:
-		// The date is on the claim. An EXISTS rather than a join, because
-		// this narrows a query that already groups over the decision.
+		// The date is on the decision. An EXISTS rather than a join, because
+		// this narrows a query that already groups over the rows.
 		return query.Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 			Where(`EXISTS (SELECT 1 FROM "decision" AS "wc" WHERE "wc"."id" = "de"."decision_id"
 		AND "wc"."outcome" = ? AND "wc"."deferred_until" IS NOT NULL AND "wc"."deferred_until" <= ?)`,

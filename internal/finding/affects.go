@@ -130,7 +130,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// The number of rows this would open, counted as they are resolved.
 		opened := 0
 		// The builds being taken out, as against the rows that
-		// is: a build holding the component in two places is one build.
+		// is: a build holding the component at two occurrences is one build.
 		out.Closed = 0
 		leaving := map[int64]bool{}
 		for i := range rows {
@@ -158,7 +158,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		}
 
 		// Bounded by what is written, as recording is: a build added to the
-		// set opens one row per place the component sits at there, so a
+		// set opens one row per occurrence the component sits at there, so a
 		// component two things pull in doubles what a request naming a long
 		// list of builds writes.
 		cap, err := setting.NewStore(tx).Count(ctx,
@@ -188,7 +188,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			if err != nil {
 				return err
 			}
-			// One row per place, as recording it did: where the component
+			// One row per occurrence, as recording it did: where the component
 			// sits comes from the build's own graph, so a flaw filed against
 			// another build is keyed the way a scan of that build would key
 			// it.
@@ -198,8 +198,8 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 			}
 			opened += len(sittings)
 			if opened > cap {
-				return fmt.Errorf("%w: those builds hold it at %d places or more, "+
-					"and one action here writes %d", ErrTooManyPlaces, opened, cap)
+				return fmt.Errorf("%w: those builds hold it at %d occurrences or more, "+
+					"and one action here writes %d", ErrTooManyOccurrences, opened, cap)
 			}
 			for _, sitting := range sittings {
 				row := openIn(target, vulnerabilityID, componentID, name,
@@ -208,7 +208,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 					return fmt.Errorf("record it against another build: %w", err)
 				}
 			}
-			// Builds, not rows. A build holding the component in two places
+			// Builds, not rows. A build holding the component at two occurrences
 			// is one build added, and what this reports is the set somebody
 			// just stated.
 			out.Added++
@@ -248,24 +248,25 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 // openIn is the finding this flaw makes in a build that has just been added to
 // its set.
 //
-// Everything but the place is copied from a row that already exists, so a build
-// added later is on the same clock, counted from the same first rating, and at
-// the same rating as the ones recorded first. Working it out again from today's settings would give the newest build
-// a later deadline for the same flaw.
+// Everything but the occurrence is copied from a row that already exists, so a
+// build added later is on the same clock, counted from the same first rating,
+// and at the same rating as the ones recorded first. Working it out again from
+// today's settings would give the newest build a later deadline for the same
+// flaw.
 func openIn(targetID, vulnerabilityID, componentID int64, name string,
 	where sits, like *Finding, now time.Time) *Finding {
 
 	return &Finding{
 		TargetID: targetID, Kind: Entered, Visibility: like.Visibility,
-		VulnerabilityID: vulnerabilityID,
-		ComponentID:     componentID,
-		ConsumerID:      optional(where.consumerID),
-		PlaceIdentity:   PlaceIdentity(name, where.consumer),
-		OpenedAt:        now,
-		Urgency:         like.Urgency,
-		DiscloseAt:      like.DiscloseAt,
-		DueAt:           like.DueAt,
-		RatedAt:         like.RatedAt,
+		VulnerabilityID:    vulnerabilityID,
+		ComponentID:        componentID,
+		ConsumerID:         optional(where.consumerID),
+		OccurrenceIdentity: OccurrenceIdentity(name, where.consumer),
+		OpenedAt:           now,
+		Urgency:            like.Urgency,
+		DiscloseAt:         like.DiscloseAt,
+		DueAt:              like.DueAt,
+		RatedAt:            like.RatedAt,
 	}
 }
 

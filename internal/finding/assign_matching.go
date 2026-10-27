@@ -91,7 +91,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 			return nil
 		}
 		// Inside the attempt, like the builds: the issues are read from the
-		// decisions as they stand when this attempt runs.
+		// decision occurrences as they stand when this attempt runs.
 		if err := inner.decidedIssuesFor(ctx, &narrowed, []int64{productID}, false); err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 
 		// Every visibility among what is being handed over, across the
 		// product rather than the selection: the assignment is product-wide,
-		// so an undisclosed place in another build travels with it. Narrowed
+		// so an undisclosed occurrence in another build travels with it. Narrowed
 		// by what the caller may see, like a single assignment.
 		kinds, kindArgs := kind.Triage.Where(`"kind"`)
 		var withheld []access.Visibility
@@ -182,7 +182,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 	return handed, err
 }
 
-// leftBehind is the pieces at one fold with an open, visible place not held
+// leftBehind is the pieces at one fold with an open, visible occurrence not held
 // where the act sent them.
 func (s *Store) leftBehind(ctx context.Context, productID int64, visible []access.Visibility,
 	issues []int64, fold string, to *int64) ([]Piece, error) {
@@ -190,8 +190,8 @@ func (s *Store) leftBehind(ctx context.Context, productID int64, visible []acces
 	held := "assigned_to IS NULL"
 	var args []any
 	if to != nil {
-		// Null-safe, so its negation holds for a place nobody holds: NOT over
-		// a comparison with NULL is NULL, and the row would be left out.
+		// Null-safe, so its negation holds for an occurrence nobody holds: NOT
+		// over a comparison with NULL is NULL, and the row would be left out.
 		held = "(assigned_to IS NOT NULL AND assigned_to = ?)"
 		args = append(args, *to)
 	}

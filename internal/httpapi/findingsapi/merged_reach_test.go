@@ -45,7 +45,7 @@ func TestAnIssuePageNamesNoMergeOfARecordOutOfReach(t *testing.T) {
 			t.Fatal(err)
 		}
 		row.ID, row.Kind, row.Visibility = 0, finding.Entered, access.Private
-		row.PlaceIdentity = finding.PlaceIdentity("recorded", "by-hand")
+		row.OccurrenceIdentity = finding.OccurrenceIdentity("recorded", "by-hand")
 		if _, err := db.NewInsert().Model(&row).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

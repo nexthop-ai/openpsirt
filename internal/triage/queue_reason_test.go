@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// shipping is a build holding the fixture's issue in libfoo 1.2.3, for a claim
+// shipping is a build holding the fixture's issue in libfoo 1.2.3, for a decision
 // that covers an open finding.
 type shipping struct {
 	in      build
@@ -29,7 +29,7 @@ func (f *fixture) shipping(t *testing.T) *shipping {
 	}
 }
 
-// closes closes the finding opened at a place, which is what a kept promise
+// closes closes the finding opened at an occurrence, which is what a kept promise
 // does to what it covers.
 func (s *shipping) closes(t *testing.T, identity string) {
 	t.Helper()
@@ -40,23 +40,23 @@ func (s *shipping) closes(t *testing.T, identity string) {
 	}
 }
 
-// datedPast proposes a claim with a date still to come at one place, needing
+// datedPast proposes a decision with a date still to come at one occurrence, needing
 // nobody, and then moves its date into the past: a date already gone is
 // refused when written, and the date arriving is what the test is about. The
-// place holds an open finding the claim covers.
+// occurrence holds an open finding the decision covers.
 func (f *fixture) datedPast(t *testing.T, ships *shipping, identity string,
-	outcome triage.Outcome) *triage.Decision {
+	outcome triage.Outcome) *triage.DecisionOccurrence {
 
 	t.Helper()
 	ctx := t.Context()
 	soon := time.Now().UTC().Add(24 * time.Hour)
 	past := time.Now().UTC().Add(-time.Hour)
 	at := f.at()
-	at.PlaceIdentity = identity
-	// The finding has no consumer, so the claim is written against none.
+	at.OccurrenceIdentity = identity
+	// The finding has no consumer, so the decision is written against none.
 	at.ConsumerUpstream = ""
 	ships.opened[identity] = f.finds(t, ships.in, ships.libfoo, identity, access.Public)
-	p := triage.Proposal{Place: at, Outcome: outcome, Reasoning: "Not this sprint.", By: f.proposer}
+	p := triage.Proposal{Occurrence: at, Outcome: outcome, Reasoning: "Not this sprint.", By: f.proposer}
 	column := "deferred_until"
 	if outcome.Commits() {
 		p.CommittedTo = &soon
@@ -75,19 +75,19 @@ func (f *fixture) datedPast(t *testing.T, ships *shipping, identity string,
 	// here carries one, so it waits for a second person. Agreed to, it waits
 	// for nothing but its date.
 	if made.State == triage.Proposed && made.NeedsApproval {
-		if err := agreeTo(ctx, f.store, f.reviewer, made.ClaimID, ""); err != nil {
+		if err := agreeTo(ctx, f.store, f.reviewer, made.DecisionID, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, err := f.db.DB.NewUpdate().Table("decision").
 		Set(column+" = ?", past).
-		Where(`"id" = ?`, made.ClaimID).Exec(ctx); err != nil {
+		Where(`"id" = ?`, made.DecisionID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	return made
 }
 
-// listed is the claims one reason's list holds for somebody.
+// listed is the decisions one reason's list holds for somebody.
 func (f *fixture) listed(t *testing.T, who access.Subject, filter triage.QueueFilter) []int64 {
 	t.Helper()
 	waiting, total, err := f.store.Queue(t.Context(), who, filter, 50, 0)
@@ -99,7 +99,7 @@ func (f *fixture) listed(t *testing.T, who access.Subject, filter triage.QueueFi
 	}
 	ids := make([]int64, 0, len(waiting))
 	for _, one := range waiting {
-		ids = append(ids, one.Claim.ID)
+		ids = append(ids, one.Decision.ID)
 	}
 	return ids
 }
@@ -108,39 +108,39 @@ func TestEachQueueReasonListsOnlyItsOwnKind(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ships := f.shipping(t)
 		approval := f.at()
-		approval.PlaceIdentity = "waiting-for-a-second-person"
-		asked := f.claims(t, approval)
+		approval.OccurrenceIdentity = "waiting-for-a-second-person"
+		asked := f.decisions(t, approval)
 		expired := f.datedPast(t, ships, "deferral-ran-out", triage.Deferred)
 		upgrade := f.datedPast(t, ships, "upgrade-date-passed", triage.UpgradeNeeded)
 		patch := f.datedPast(t, ships, "patch-date-passed", triage.PatchNeeded)
 		// A decision the code moved out from under is its author's to
 		// re-affirm, and is in none of these lists.
 		moved := f.at()
-		moved.PlaceIdentity = "moved-out-from-under"
-		lapsed := f.claims(t, moved)
-		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
+		moved.OccurrenceIdentity = "moved-out-from-under"
+		lapsed := f.decisions(t, moved)
+		if _, err := f.db.DB.NewUpdate().Model((*triage.DecisionOccurrence)(nil)).
 			Set(`"state" = ?`, triage.LapsedState).
 			Where(`"id" = ?`, lapsed.ID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
 		for _, want := range []struct {
-			reason triage.QueueReason
-			claims []int64
+			reason    triage.QueueReason
+			decisions []int64
 		}{
-			{"", []int64{asked.ClaimID}},
-			{triage.ForApproval, []int64{asked.ClaimID}},
-			{triage.DeferralExpired, []int64{expired.ClaimID}},
-			{triage.FixDateMissed, []int64{patch.ClaimID, upgrade.ClaimID}},
+			{"", []int64{asked.DecisionID}},
+			{triage.ForApproval, []int64{asked.DecisionID}},
+			{triage.DeferralExpired, []int64{expired.DecisionID}},
+			{triage.FixDateMissed, []int64{patch.DecisionID, upgrade.DecisionID}},
 		} {
 			got := f.listed(t, f.reviewer, triage.QueueFilter{Reason: want.reason})
-			if len(got) != len(want.claims) {
-				t.Errorf("%q lists claims %v, want %v", want.reason, got, want.claims)
+			if len(got) != len(want.decisions) {
+				t.Errorf("%q lists decisions %v, want %v", want.reason, got, want.decisions)
 				continue
 			}
 			for i := range got {
-				if got[i] != want.claims[i] {
-					t.Errorf("%q lists claims %v, want %v", want.reason, got, want.claims)
+				if got[i] != want.decisions[i] {
+					t.Errorf("%q lists decisions %v, want %v", want.reason, got, want.decisions)
 					break
 				}
 			}
@@ -158,9 +158,9 @@ func TestAPassedDateIsShownToEverybodyWhoMayDecideIncludingItsProposer(t *testin
 		})
 
 		for _, reason := range []triage.QueueReason{triage.DeferralExpired, triage.FixDateMissed} {
-			want := expired.ClaimID
+			want := expired.DecisionID
 			if reason == triage.FixDateMissed {
-				want = missed.ClaimID
+				want = missed.DecisionID
 			}
 			for _, who := range []struct {
 				name    string
@@ -178,7 +178,7 @@ func TestAPassedDateIsShownToEverybodyWhoMayDecideIncludingItsProposer(t *testin
 				got := f.listed(t, who.subject, triage.QueueFilter{Reason: reason, Mine: who.mine})
 				shown := len(got) == 1 && got[0] == want
 				if shown != who.shown || len(got) > 1 {
-					t.Errorf("%q for %s lists %v, want claim %d shown: %v",
+					t.Errorf("%q for %s lists %v, want decision %d shown: %v",
 						reason, who.name, got, want, who.shown)
 				}
 			}
@@ -193,11 +193,11 @@ func TestAPromisedPatchMovesByItsDateAlone(t *testing.T) {
 		patch := f.datedPast(t, ships, "patch-date-passed", triage.PatchNeeded)
 		later := time.Now().UTC().AddDate(0, 0, 30).Truncate(time.Second)
 
-		if _, _, err := f.store.Repromise(ctx, f.triager, patch.ClaimID, "3.0", later,
+		if _, _, err := f.store.Repromise(ctx, f.triager, patch.DecisionID, "3.0", later,
 			"The backport slipped."); err == nil {
 			t.Error("a promised patch was given a version to move to")
 		}
-		if _, _, err := f.store.Repromise(ctx, f.triager, patch.ClaimID, "", later,
+		if _, _, err := f.store.Repromise(ctx, f.triager, patch.DecisionID, "", later,
 			"The backport slipped."); err != nil {
 			t.Fatalf("moving a promised patch's date: %v", err)
 		}
@@ -206,7 +206,7 @@ func TestAPromisedPatchMovesByItsDateAlone(t *testing.T) {
 		}
 
 		upgrade := f.datedPast(t, ships, "upgrade-date-passed", triage.UpgradeNeeded)
-		if _, _, err := f.store.Repromise(ctx, f.triager, upgrade.ClaimID, "", later,
+		if _, _, err := f.store.Repromise(ctx, f.triager, upgrade.DecisionID, "", later,
 			"The release slipped."); err == nil {
 			t.Error("a promised upgrade was left with no version to move to")
 		}
@@ -215,7 +215,7 @@ func TestAPromisedPatchMovesByItsDateAlone(t *testing.T) {
 
 func TestAKeptPromiseIsNotAMissedOne(t *testing.T) {
 	// A kept promise closes the findings it covers and leaves its date and its
-	// decision as they were, so its date passing says nothing about it.
+	// rows as they were, so its date passing says nothing about it.
 	each(t, func(t *testing.T, f *fixture) {
 		ships := f.shipping(t)
 		kept := f.datedPast(t, ships, "patch-landed", triage.PatchNeeded)
@@ -223,9 +223,9 @@ func TestAKeptPromiseIsNotAMissedOne(t *testing.T) {
 		ships.closes(t, "patch-landed")
 
 		got := f.listed(t, f.reviewer, triage.QueueFilter{Reason: triage.FixDateMissed})
-		if len(got) != 1 || got[0] != missed.ClaimID {
-			t.Errorf("missed fix dates list %v, want only claim %d and never the kept %d",
-				got, missed.ClaimID, kept.ClaimID)
+		if len(got) != 1 || got[0] != missed.DecisionID {
+			t.Errorf("missed fix dates list %v, want only decision %d and never the kept %d",
+				got, missed.DecisionID, kept.DecisionID)
 		}
 	})
 }
@@ -245,19 +245,19 @@ func TestMovingAPromisedPatchIsGatedByTheDeadlineOfWhatItCovers(t *testing.T) {
 		}
 		needs := func(t *testing.T) bool {
 			t.Helper()
-			var rows []triage.Decision
+			var rows []triage.DecisionOccurrence
 			if err := f.db.DB.NewSelect().Model(&rows).
-				Where(`"de"."decision_id" = ?`, patch.ClaimID).Scan(ctx); err != nil {
+				Where(`"de"."decision_id" = ?`, patch.DecisionID).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if len(rows) == 0 {
-				t.Fatal("the claim wrote no rows")
+				t.Fatal("the decision wrote no rows")
 			}
 			return rows[0].NeedsApproval
 		}
 
 		inside := due.AddDate(0, 0, -10)
-		if _, _, err := f.store.Repromise(ctx, f.triager, patch.ClaimID, "", inside,
+		if _, _, err := f.store.Repromise(ctx, f.triager, patch.DecisionID, "", inside,
 			"The backport lands sooner."); err != nil {
 			t.Fatal(err)
 		}
@@ -266,7 +266,7 @@ func TestMovingAPromisedPatchIsGatedByTheDeadlineOfWhatItCovers(t *testing.T) {
 		}
 
 		beyond := due.AddDate(0, 0, 30)
-		if _, _, err := f.store.Repromise(ctx, f.triager, patch.ClaimID, "", beyond,
+		if _, _, err := f.store.Repromise(ctx, f.triager, patch.DecisionID, "", beyond,
 			"The backport slipped."); err != nil {
 			t.Fatal(err)
 		}
@@ -274,27 +274,27 @@ func TestMovingAPromisedPatchIsGatedByTheDeadlineOfWhatItCovers(t *testing.T) {
 			t.Error("a patch moved past its deadline stands with nobody agreeing")
 		}
 		got := f.listed(t, f.reviewer, triage.QueueFilter{})
-		if len(got) != 1 || got[0] != patch.ClaimID {
-			t.Errorf("the approval list holds %v, want the moved patch %d", got, patch.ClaimID)
+		if len(got) != 1 || got[0] != patch.DecisionID {
+			t.Errorf("the approval list holds %v, want the moved patch %d", got, patch.DecisionID)
 		}
 	})
 }
 
 func TestAnExpiredDeferralWithARowTheReaderMayNotDecideIsNotOfferedToThem(t *testing.T) {
-	// A new decision is made about the whole claim, so whether any row of it
-	// is out of the reader's reach is asked of the claim. A claim with one
+	// A new decision is made over the whole of the expired one, so whether any row of it
+	// is out of the reader's reach is asked of the decision. A decision with one
 	// undisclosed row is not offered to somebody who may decide about
 	// disclosed work alone, and one wholly disclosed is.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		insider := f.privately(t)
-		defers := func(places ...triage.Place) int64 {
+		defers := func(occurrences ...triage.Occurrence) int64 {
 			t.Helper()
 			soon := time.Now().UTC().Add(24 * time.Hour)
-			proposals := make([]triage.Proposal, 0, len(places))
-			for _, at := range places {
+			proposals := make([]triage.Proposal, 0, len(occurrences))
+			for _, at := range occurrences {
 				proposals = append(proposals, triage.Proposal{
-					Place: at, Outcome: triage.Deferred, DeferredUntil: &soon,
+					Occurrence: at, Outcome: triage.Deferred, DeferredUntil: &soon,
 					Reasoning: "Not this sprint.", By: insider.ID,
 				})
 			}
@@ -306,27 +306,27 @@ func TestAnExpiredDeferralWithARowTheReaderMayNotDecideIsNotOfferedToThem(t *tes
 			// into the past after.
 			if _, err := f.db.DB.NewUpdate().Table("decision").
 				Set(`"deferred_until" = ?`, time.Now().UTC().Add(-time.Hour)).
-				Where(`"id" = ?`, recorded[0].ClaimID).Exec(ctx); err != nil {
+				Where(`"id" = ?`, recorded[0].DecisionID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			return recorded[0].ClaimID
+			return recorded[0].DecisionID
 		}
-		mixed := defers(f.placeIn(f.product, "under-a", access.Private),
-			f.placeIn(f.product, "under-b", access.Public))
-		disclosed := defers(f.placeIn(f.product, "under-c", access.Public))
+		mixed := defers(f.occurrenceIn(f.product, "under-a", access.Private),
+			f.occurrenceIn(f.product, "under-b", access.Public))
+		disclosed := defers(f.occurrenceIn(f.product, "under-c", access.Public))
 
 		outsider := f.holding(t, "public-decider", map[int64][]access.Role{
 			f.product: {access.PublicRead, access.PublicTriage},
 		})
 		expired := triage.QueueFilter{Reason: triage.DeferralExpired}
 		if got := f.listed(t, outsider, expired); len(got) != 1 || got[0] != disclosed {
-			t.Errorf("somebody deciding disclosed work alone is offered claims %v; want only %d"+
-				" (the claim with an undisclosed row is %d)", got, disclosed, mixed)
+			t.Errorf("somebody deciding disclosed work alone is offered decisions %v; want only %d"+
+				" (the decision with an undisclosed row is %d)", got, disclosed, mixed)
 		}
 		// Somebody who may decide both is offered both, so the narrowing
-		// above is the reach and not the claims.
+		// above is the reach and not the decisions.
 		if got := f.listed(t, insider, expired); len(got) != 2 {
-			t.Errorf("somebody deciding at both visibilities is offered %v, want both claims", got)
+			t.Errorf("somebody deciding at both visibilities is offered %v, want both decisions", got)
 		}
 		// The count is the length of the list it stands for.
 		if _, n, err := f.store.Queue(ctx, outsider, expired, 0, 0); err != nil || n != 1 {

@@ -16,37 +16,37 @@ import (
 
 // UnagreedBody is risk standing with nobody's agreement behind it.
 type UnagreedBody struct {
-	Outcome core.OutcomeHidingRisk `json:"outcome"`
-	Claims  int                    `json:"claims" doc:"The number of acts"`
-	Rows    int                    `json:"rows" doc:"The number of decisions those acts wrote"`
+	Outcome   core.OutcomeHidingRisk `json:"outcome"`
+	Decisions int                    `json:"decisions" doc:"The number of acts"`
+	Rows      int                    `json:"rows" doc:"The number of occurrences those acts cover"`
 }
 
-// BulkApprovalBody is one act of agreement covering many claims.
+// BulkApprovalBody is one act of agreement covering many decisions.
 type BulkApprovalBody struct {
 	Batch      string `json:"batch"`
 	ApprovedBy string `json:"approved_by"`
 	ApprovedAt string `json:"approved_at"`
-	Claims     int    `json:"claims"`
+	Decisions  int    `json:"decisions"`
 	Rows       int    `json:"rows"`
 }
 
 // PairingBody is one proposer and one approver.
 type PairingBody struct {
-	Proposer string `json:"proposer"`
-	Approver string `json:"approver"`
-	Claims   int    `json:"claims"`
-	Rows     int    `json:"rows"`
+	Proposer  string `json:"proposer"`
+	Approver  string `json:"approver"`
+	Decisions int    `json:"decisions"`
+	Rows      int    `json:"rows"`
 	// Share is how much of everything agreed to in this period ran between
 	// these two, as a percentage. Concentration is the signal, and a count
 	// alone does not carry it: fifty out of fifty-two and fifty out of nine
 	// hundred are the same number.
-	Share int `json:"share" doc:"The share of everything agreed to here that ran between these two, as a percentage of rows"`
+	Share int `json:"share" doc:"The share of everything agreed to here that ran between these two, as a percentage of occurrences"`
 }
 
 // LapsedApprovalBody is an agreement standing from somebody who has since lost
 // the right to give one.
 type LapsedApprovalBody struct {
-	ClaimID    int64        `json:"claim_id"`
+	DecisionID int64        `json:"decision_id"`
 	ApprovedBy string       `json:"approved_by"`
 	ApprovedAt string       `json:"approved_at"`
 	Product    string       `json:"product"`
@@ -54,13 +54,13 @@ type LapsedApprovalBody struct {
 	Rows       int          `json:"rows"`
 }
 
-// GrownBody is a claim covering more now than when it was agreed to.
+// GrownBody is a decision covering more now than when it was agreed to.
 type GrownBody struct {
-	ClaimID    int64        `json:"claim_id"`
+	DecisionID int64        `json:"decision_id"`
 	ApprovedBy string       `json:"approved_by"`
 	ApprovedAt string       `json:"approved_at"`
 	Outcome    core.Outcome `json:"outcome"`
-	Covered    int          `json:"covered" doc:"The claim's reach when it was agreed to"`
+	Covered    int          `json:"covered" doc:"The decision's reach when it was agreed to"`
 	CoversNow  int          `json:"covers_now" doc:"Its reach now, arrived at by matching rather than by anybody acting"`
 }
 
@@ -77,7 +77,7 @@ type scrutinyOutput struct {
 		Agreed int `json:"agreed" doc:"Decisions a standing agreement covers in this period"`
 		// The period these cover, said back, so a figure is never read apart
 		// from the window it was worked out over.
-		From string `json:"from,omitempty" doc:"The first day of the period, by when a claim was proposed. Absent where it runs from the beginning"`
+		From string `json:"from,omitempty" doc:"The first day of the period, by when a decision was proposed. Absent where it runs from the beginning"`
 		To   string `json:"to" doc:"The day it ends, which is not itself in it"`
 		// Capped says a section reached the ceiling, so what is here is the
 		// worst of it rather than all of it. Said rather than implied: a
@@ -105,12 +105,12 @@ func registerScrutiny(api huma.API, in core.Deps) {
 			"not a failure by itself: a short deferral and an upgrade promised inside the " +
 			"deadline the work already had are both deliberately exempt. A dismissal in this " +
 			"list is a different matter.\n\n" +
-			"`bulk` is agreements given as one act over many claims, `pairs` is who agrees " +
+			"`bulk` is agreements given as one act over many decisions, `pairs` is who agrees " +
 			"with whom and what share of everything ran between them, `lapsed` is agreements " +
 			"standing from somebody who no longer holds the right to give one, and `grew` is " +
-			"what somebody agreed to against what the same claim reaches now — a claim reaches " +
+			"what somebody agreed to against what the same decision reaches now — a decision reaches " +
 			"by matching, so a build appearing afterwards is covered with nobody acting.\n\n" +
-			"Everything is dated by when the claim was proposed, not by when it was agreed to, " +
+			"Everything is dated by when the decision was proposed, not by when it was agreed to, " +
 			"and narrowed by what you may see.\n\n" +
 			"Asked for neither a period nor a window, this is the last 90 days.",
 		Tags: []string{"Reports"},
@@ -150,14 +150,14 @@ func registerScrutiny(api huma.API, in core.Deps) {
 		out.Body.Alone = make([]UnagreedBody, 0, len(got.Alone))
 		for _, row := range got.Alone {
 			out.Body.Alone = append(out.Body.Alone, UnagreedBody{
-				Outcome: core.OutcomeHidingRisk(row.Outcome), Claims: row.Claims, Rows: row.Rows,
+				Outcome: core.OutcomeHidingRisk(row.Outcome), Decisions: row.Decisions, Rows: row.Rows,
 			})
 		}
 		out.Body.Bulk = make([]BulkApprovalBody, 0, len(got.Bulk))
 		for _, row := range got.Bulk {
 			out.Body.Bulk = append(out.Body.Bulk, BulkApprovalBody{
 				Batch: row.Batch, ApprovedBy: row.ApprovedBy,
-				ApprovedAt: core.Stamp(row.ApprovedAt), Claims: row.Claims, Rows: row.Rows,
+				ApprovedAt: core.Stamp(row.ApprovedAt), Decisions: row.Decisions, Rows: row.Rows,
 			})
 		}
 		// The whole a share is taken of: every row a standing agreement
@@ -171,13 +171,13 @@ func registerScrutiny(api huma.API, in core.Deps) {
 			}
 			out.Body.Pairs = append(out.Body.Pairs, PairingBody{
 				Proposer: row.Proposer, Approver: row.Approver,
-				Claims: row.Claims, Rows: row.Rows, Share: share,
+				Decisions: row.Decisions, Rows: row.Rows, Share: share,
 			})
 		}
 		out.Body.Lapsed = make([]LapsedApprovalBody, 0, len(got.Lapsed))
 		for _, row := range got.Lapsed {
 			out.Body.Lapsed = append(out.Body.Lapsed, LapsedApprovalBody{
-				ClaimID: row.ClaimID, ApprovedBy: row.ApprovedBy,
+				DecisionID: row.DecisionID, ApprovedBy: row.ApprovedBy,
 				ApprovedAt: core.Stamp(row.ApprovedAt), Product: row.Product,
 				Outcome: core.Outcome(row.Outcome), Rows: row.Rows,
 			})
@@ -185,7 +185,7 @@ func registerScrutiny(api huma.API, in core.Deps) {
 		out.Body.Grew = make([]GrownBody, 0, len(got.Grew))
 		for _, row := range got.Grew {
 			out.Body.Grew = append(out.Body.Grew, GrownBody{
-				ClaimID: row.ClaimID, ApprovedBy: row.ApprovedBy,
+				DecisionID: row.DecisionID, ApprovedBy: row.ApprovedBy,
 				ApprovedAt: core.Stamp(row.ApprovedAt), Outcome: core.Outcome(row.Outcome),
 				Covered: row.Covered, CoversNow: row.CoversNow,
 			})

@@ -3,19 +3,20 @@
 
 package finding
 
-// The outcomes a claim records, as they are stored. The triage package owns
+// The outcomes a decision records, as they are stored. The triage package owns
 // what each one means and declares its own vocabulary from these, because it
 // imports this package and this package asks about several of them in the
 // statements it builds: one spelling, so neither side can rename a word the
 // other still matches.
 const (
-	// OutcomeAffected says an issue applies. A standing decision of it at a
-	// place keeps a supplier's statement from closing the finding there.
+	// OutcomeAffected says an issue applies. A standing decision of it at an
+	// occurrence keeps a supplier's statement from closing the finding there.
 	OutcomeAffected = "affected"
 	// OutcomeNotApplicable says it does not affect the product here.
 	OutcomeNotApplicable = "not-applicable"
-	// OutcomeMismatched says the scanner matched something that is not here:
-	// a claim about identity, which covers a place whatever versions it holds.
+	// OutcomeMismatched says the scanner matched something that is not here: a
+	// decision about identity, which covers an occurrence whatever versions it
+	// holds.
 	OutcomeMismatched = "mismatched"
 	// OutcomeDeferred says it applies and is not being worked on until a date.
 	OutcomeDeferred = "deferred"
@@ -37,9 +38,10 @@ const (
 	OutcomeConfirmed = "confirmed"
 )
 
-// AnyVersionOutcomes are the outcomes a claim covers its place with whatever
-// versions the place holds: a wrong match, which is about identity, and every
-// outcome about a lead, whose place is the lead itself.
+// AnyVersionOutcomes are the outcomes a decision covers its occurrence with
+// whatever versions the occurrence holds: a wrong match, which is about
+// identity, and every outcome about a lead, whose occurrence is the lead
+// itself.
 func AnyVersionOutcomes() []string {
 	return []string{OutcomeMismatched, OutcomeDismissed, OutcomeNotSecurity, OutcomeConfirmed}
 }

@@ -21,7 +21,7 @@ import (
 
 // The lists that could be read on a screen and not taken away.
 //
-// An export is not a convenience here. The record of judgments is what an
+// An export is not a convenience here. The record of decisions is what an
 // auditor is given, the review queue is what a manager reports a backlog from,
 // and the by-component view is what a release meeting argues over — none of
 // the three a screen somebody should copy out of by hand.
@@ -40,7 +40,7 @@ func registerMoreExports(api huma.API, in core.Deps) {
 	registerChangeExport(api, in)
 	registerTrendExport(api, in)
 	registerQueueExport(api, in)
-	registerMyClaimsExport(api, in)
+	registerMyDecisionsExport(api, in)
 	registerComponentExport(api, in)
 	registerDueExport(api, in)
 	registerComparisonExport(api, in)
@@ -85,7 +85,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
 				"product", "product name", "stream", "stream name", "variant", "variant name",
-				"places", "held by", "held by name", "due", "days left",
+				"occurrences", "held by", "held by name", "due", "days left",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				late, _, err := store.RunningOutPage(ctx, subject, scope,
@@ -108,7 +108,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 						body.Product, body.ProductName,
 						body.Stream, body.StreamName,
 						body.Variant, body.VariantName,
-						strconv.Itoa(body.Places), body.AssignedTo, body.AssignedName,
+						strconv.Itoa(body.Occurrences), body.AssignedTo, body.AssignedName,
 						body.Due, strconv.Itoa(body.DaysLeft),
 					})
 				}
@@ -244,20 +244,20 @@ func asDay(at time.Time) string {
 	return at.UTC().Format(time.DateOnly)
 }
 
-// registerAuditExport writes out the record of judgments.
+// registerAuditExport writes out the record of decisions.
 func registerAuditExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-audit", Method: http.MethodGet, Path: "/v1/audit.{format}",
 		Summary: "Export the audit log of decisions",
-		Description: "The audit list as a file: every judgment the same filters would show, " +
+		Description: "The audit list as a file: every decision the same filters would show, " +
 			"not one page of them.\n\n" +
-			"One row per decision, with the claim it belongs to, who proposed it, who has a " +
-			"standing agreement on it, and whether a second person does. Every decision one " +
-			"act wrote shares a claim, and `GET /v1/audit/decisions` lists them grouped by it. " +
+			"One row per occurrence a decision covers, with the decision it belongs to, who proposed it, who has a " +
+			"standing agreement on it, and whether a second person does. Every occurrence one " +
+			"act covered shares a decision, and `GET /v1/audit/decisions` lists them grouped by it. " +
 			"Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a " +
 			"list; the JSON keeps them as one field of the same shape.\n\n" +
 			"`agreements` is the whole of the record, with dates: who agreed, when, " +
-			"whether the agreement was carried from an earlier claim, and when it was taken " +
+			"whether the agreement was carried from an earlier decision, and when it was taken " +
 			"back. `approved by` stays who agrees *now*, because those are different " +
 			"questions and a column mixing them is the one answer an auditor must not be " +
 			"given.\n\n" +
@@ -279,30 +279,30 @@ func registerAuditExport(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		// What was asked for, printed on the file. A sheet headed "the record
-		// of judgments" over a narrowed population is a sheet nobody can
+		// of decisions" over a narrowed population is a sheet nobody can
 		// check against anything.
 		about := []core.Stated{{Label: "from", Value: asDay(since)}, {Label: "to", Value: asDay(until)}}
 		if filter.InForce {
 			about = append(about, core.Stated{Label: "applies", Value: "still standing"})
 		}
 		out := core.Exporting{
-			What:  "the record of judgments",
+			What:  "the record of decisions",
 			About: about,
 			Header: []string{
-				"id", "claim", "proposed", "product", "product name", "issue", "component", "version",
+				"id", "decision", "proposed", "product", "product name", "issue", "component", "version",
 				"consumer",
 				"outcome", "justification", "reason", "deferred until", "fixed version",
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
 				"agreements", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				judged, _, err := store.Audit(ctx, subject, filter, since, until, limit, offset)
+				audited, _, err := store.Audit(ctx, subject, filter, since, until, limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				rows := make([][]string, 0, len(judged))
-				for _, row := range judged {
-					body := judgedBody(row)
+				rows := make([][]string, 0, len(audited))
+				for _, row := range audited {
+					body := auditedBody(row)
 					// Only the agreements that still stand. One taken back is
 					// in the record and is not somebody who agrees now, and a
 					// column that mixed the two would be the exact answer an
@@ -330,7 +330,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 						every = append(every, said)
 					}
 					rows = append(rows, []string{
-						strconv.FormatInt(body.ID, 10), strconv.FormatInt(body.ClaimID, 10),
+						strconv.FormatInt(body.ID, 10), strconv.FormatInt(body.DecisionID, 10),
 						body.ProposedAt, body.Product,
 						body.ProductName, body.Issue, body.Component, body.Version, body.Consumer,
 						string(body.Outcome), string(body.Justification), string(body.Reason),
@@ -356,16 +356,16 @@ func registerQueueExport(api huma.API, in core.Deps) {
 		OperationID: "export-review-queue", Method: http.MethodGet,
 		Path:    "/v1/review-queue.{format}",
 		Summary: "Export the review queue",
-		Description: "The review queue as a file: every claim, not one page of them.\n\n" +
-			"One row per claim, the way the screen counts them — one proposer's action, " +
-			"however many decisions it wrote — with how much it covers and how old it is.\n\n" +
+		Description: "The review queue as a file: every decision, not one page of them.\n\n" +
+			"One row per decision, the way the screen counts them — one proposer's action, " +
+			"however many occurrences it reaches — with how much it covers and how old it is.\n\n" +
 			"Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, " +
-			"and holds the same claims.",
+			"and holds the same decisions.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format  string `path:"format" enum:"csv,json"`
-		Mine    bool   `query:"mine" doc:"Write out only claims you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you"`
-		Product string `query:"product" doc:"Limit to claims made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
+		Mine    bool   `query:"mine" doc:"Write out only decisions you proposed. For approvals, what you proposed and nobody has agreed to, instead of what is waiting on you"`
+		Product string `query:"product" doc:"Limit to decisions made in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 		core.QueueNarrowing
 	}) (*huma.StreamResponse, error) {
 		subject, store, err := core.Triaging(ctx, in)
@@ -381,10 +381,10 @@ func registerQueueExport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "the review queue",
 			Header: []string{
-				"claim", "proposed", "proposed by", "proposed by name", "age days", "outcome",
+				"decision", "proposed", "proposed by", "proposed by name", "age days", "outcome",
 				"deferred until", "committed to", "upgrade to",
-				"issue", "product", "product name", "component", "decisions", "issues",
-				"places", "builds",
+				"issue", "product", "product name", "component", "rows", "issues",
+				"occurrences", "builds",
 				"previously approved", "deferred days", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -397,19 +397,19 @@ func registerQueueExport(api huma.API, in core.Deps) {
 				}
 				// The names, in one pass over the page rather than per row —
 				// the same call the screen makes, so the file and the screen
-				// say the same thing about the same claim.
-				decisions := make([]triage.Decision, 0, len(waiting))
+				// say the same thing about the same decision.
+				occurrences := make([]triage.DecisionOccurrence, 0, len(waiting))
 				for _, row := range waiting {
-					decisions = append(decisions, row.Decision)
+					occurrences = append(occurrences, row.DecisionOccurrence)
 				}
-				named, err := core.DescribeDecisions(ctx, in, store, decisions, nil)
+				named, err := core.DescribeDecisionOccurrences(ctx, in, store, occurrences, nil)
 				if err != nil {
 					return nil, err
 				}
 				rows := make([][]string, 0, len(waiting))
 				for i, row := range waiting {
 					// The dates and the version as the screen's card reads them.
-					promised := core.ClaimArgument(row.Claim, "")
+					promised := core.DecisionArgument(row.Decision, "")
 					where := named[i].Finding
 					product, productName, component, version := "", "", "", ""
 					if where != nil {
@@ -417,16 +417,16 @@ func registerQueueExport(api huma.API, in core.Deps) {
 						component, version = where.Component, where.Version
 					}
 					rows = append(rows, []string{
-						strconv.FormatInt(row.Claim.ID, 10),
-						core.Stamp(row.Decision.ProposedAt),
+						strconv.FormatInt(row.Decision.ID, 10),
+						core.Stamp(row.DecisionOccurrence.ProposedAt),
 						named[i].ProposedBy, named[i].ProposedByName,
-						strconv.Itoa(int(store.Age(&row.Decision).Hours() / 24)),
-						string(row.Claim.Outcome),
+						strconv.Itoa(int(store.Age(&row.DecisionOccurrence).Hours() / 24)),
+						string(row.Decision.Outcome),
 						promised.DeferredUntil, promised.CommittedTo, promised.UpgradeTo,
-						named[i].Place.Vulnerability,
+						named[i].Occurrence.Vulnerability,
 						product, productName, component + " " + version,
-						strconv.Itoa(row.Decisions), strconv.Itoa(row.Issues),
-						strconv.Itoa(row.Places),
+						strconv.Itoa(row.Rows), strconv.Itoa(row.Issues),
+						strconv.Itoa(row.Occurrences),
 						strings.Join(row.Builds, "; "),
 						strconv.FormatBool(row.PreviouslyApproved),
 						strconv.Itoa(int(row.DeferredSoFar.Hours() / 24)),
@@ -449,7 +449,7 @@ func registerComponentExport(api huma.API, in core.Deps) {
 		Path:    "/v1/products/{product}/findings/components.{format}",
 		Summary: "Export findings by component",
 		Description: "One row per component and version, with how many distinct issues are " +
-			"open against it and how many places those sit at — every row, not one page.\n\n" +
+			"open against it and how many occurrences those sit at — every row, not one page.\n\n" +
 			"This is the shape a release meeting argues over: where the weight is rather " +
 			"than what is wrong. On a switch operating-system image the kernel carried 4,943 " +
 			"of 6,822 findings rows and the next largest contributor carried 58, which is a " +
@@ -479,7 +479,7 @@ func registerComponentExport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What:   "findings by component",
 			About:  []core.Stated{{Label: "triaged at or above", Value: line}},
-			Header: []string{"component", "version", "upstream", "ecosystem", "issues", "places", "exploited"},
+			Header: []string{"component", "version", "upstream", "ecosystem", "issues", "occurrences", "exploited"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				groups, _, err := store.ComponentGroups(ctx, subject, scope, limit, offset, narrowed)
 				if err != nil {
@@ -489,7 +489,7 @@ func registerComponentExport(api huma.API, in core.Deps) {
 				for _, g := range groups {
 					rows = append(rows, []string{
 						g.Component, g.Version, g.Upstream, g.Ecosystem,
-						strconv.Itoa(g.Issues), strconv.Itoa(g.Places),
+						strconv.Itoa(g.Issues), strconv.Itoa(g.Occurrences),
 						strconv.FormatBool(g.Exploited),
 					})
 				}

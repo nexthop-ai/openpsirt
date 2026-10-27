@@ -14,7 +14,7 @@ import (
 )
 
 // What an act of assigning everything that matches could not move is said,
-// including a place nobody holds. A caller who reads undisclosed work and
+// including an occurrence nobody holds. A caller who reads undisclosed work and
 // triages only the disclosed kind moves the disclosed piece and leaves the
 // other, and the answer names the one left.
 func TestAssigningEverythingMatchingNamesAnUnheldPieceItCouldNotMove(t *testing.T) {

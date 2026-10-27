@@ -54,10 +54,10 @@ func ownDeadline(own Windows, severity string, ratedAt *time.Time, state FixStat
 //
 // Row by row rather than grouped into bands the way a scan's findings are.
 // Recorded flaws are counted in single or low double digits a year, one row per
-// place in each build, so the whole population is small enough that a
+// occurrence in each build, so the whole population is small enough that a
 // statement per distinct deadline is the simpler shape.
 //
-// It answers how many places it gave a deadline or took one away.
+// It answers how many occurrences it gave a deadline or took one away.
 func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64,
 	now time.Time) (int, error) {
 

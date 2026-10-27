@@ -25,7 +25,7 @@ import (
 // Assessment is what one product thinks of an issue, as against what was
 // published.
 //
-// Against the issue rather than against a place: a published rating being
+// Against the issue rather than against an occurrence: a published rating being
 // wrong is one statement about the vulnerability wherever it appears in this
 // product, including in builds it has not reached yet, and it does not stop
 // being true because somebody rebuilt something.
@@ -625,8 +625,8 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		if row.Exploited && row.DueAt == nil {
 			due = nil
 		}
-		// A place a supplier answers on some routes is not work, and carries
-		// no deadline however the issue is rated.
+		// An occurrence a supplier answers on some routes is not work, and
+		// carries no deadline however the issue is rated.
 		if row.StatedBy != nil {
 			due = nil
 		}
@@ -643,7 +643,7 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 	}
 	for key, ids := range byClock {
 		// Batched. This is every open finding of one issue across the
-		// deployment — a kernel flaw carries 45 places each across thousands
+		// deployment — a kernel flaw carries 45 occurrences each across thousands
 		// of issues — and one statement binding that many parameters is
 		// refused by two of the four engines, inside the transaction a scan
 		// applies in, so the whole upload fails and retries into the same
@@ -769,7 +769,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 			Where(`"urgency_exploited_here" = ?`, group.ExploitedHere).
 			Where(`"opened_at" = ?`, group.OpenedAt).
 			Where(`"kind" = ?`, Vulnerable).
-			// A place a supplier answers on some routes carries no deadline.
+			// An occurrence a supplier answers on some routes carries no
+			// deadline.
 			Where(`"stated_by" IS NULL`).
 			Where(onClock, onClockArgs...)
 		if group.LearnedAt != nil {
@@ -941,12 +942,12 @@ type Consequence struct {
 // rating reaches.
 //
 // For a reader who is not a person every rating asked has an empty entry.
-// Otherwise a rating that is not there, or not one this reader may be told
-// of, has no entry. The statements are per page: the ratings, which of their issues the
-// reader may be told of and the line, per product the page names, and one
-// grouped read of the findings for every rating at once. A page of fifty
-// asked a rating at a time is 263 statements, which is round trips rather
-// than database time: 20 ms of execution in 0.32 s.
+// Otherwise a rating that is not there, or not one this reader may be told of,
+// has no entry. The statements are per page: the ratings, which of their issues
+// the reader may be told of and the line, per product the page names, and one
+// grouped read of the findings for every rating at once. A page of fifty asked
+// a rating at a time is 263 statements, which is round trips rather than
+// database time: 20 ms of execution in 0.32 s.
 func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	assessmentIDs []int64) (map[int64]Consequence, error) {
 

@@ -20,7 +20,7 @@ import (
 
 // A scan run opens, moves and closes.
 //
-// One reported issue becomes one finding per place it occupies, and the next
+// One reported issue becomes one finding per occurrence, and the next
 // scan is a difference rather than a rewrite: what is still there is left
 // alone, what has gone is closed with the reason it went, and what moved is
 // updated in place.
@@ -54,21 +54,21 @@ func TestOneReportedIssueBecomesOneFindingPerConsumer(t *testing.T) {
 	})
 }
 
-func TestTheSamePlaceInTwoVariantsKeysTheSame(t *testing.T) {
-	// A decision is carried forward by the place, so the key must not contain
-	// anything that differs between variants or moves on a rebuild.
-	first := finding.PlaceIdentity("libnl-3-200", "libswsscommon")
-	again := finding.PlaceIdentity("libnl-3-200", "libswsscommon")
+func TestTheSameOccurrenceInTwoVariantsKeysTheSame(t *testing.T) {
+	// A decision is carried forward by the occurrence, so the key must not
+	// contain anything that differs between variants or moves on a rebuild.
+	first := finding.OccurrenceIdentity("libnl-3-200", "libswsscommon")
+	again := finding.OccurrenceIdentity("libnl-3-200", "libswsscommon")
 	if first != again {
-		t.Error("the same place keyed differently")
+		t.Error("the same occurrence keyed differently")
 	}
-	if finding.PlaceIdentity("libnl-3-200", "teamd") == first {
+	if finding.OccurrenceIdentity("libnl-3-200", "teamd") == first {
 		t.Error("two consumers of one component share a key")
 	}
 	// Under the product itself, the component stands alone: the product's name
-	// differs per variant, so including it would stop the same place being
+	// differs per variant, so including it would stop the same occurrence being
 	// recognized across them.
-	if finding.PlaceIdentity("libnl-3-200", "") == first {
+	if finding.OccurrenceIdentity("libnl-3-200", "") == first {
 		t.Error("a component under the product keys the same as one under a consumer")
 	}
 }
@@ -192,9 +192,9 @@ func TestADisappearanceNothingExplainsIsFlagged(t *testing.T) {
 }
 
 func TestAComponentUnderTheProductSitsUnderNothing(t *testing.T) {
-	// The product's name differs per variant, so a place under it keys on the
-	// component alone — otherwise the same place in two variants would be two
-	// places and a decision would not carry.
+	// The product's name differs per variant, so an occurrence under it keys on
+	// the component alone — otherwise the same occurrence in two variants would
+	// be two occurrences and a decision would not carry.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -208,7 +208,7 @@ func TestAComponentUnderTheProductSitsUnderNothing(t *testing.T) {
 		if rows[0].ConsumerID != nil {
 			t.Error("a component under the product recorded a consumer")
 		}
-		if rows[0].PlaceIdentity != finding.PlaceIdentity("libswsscommon", "") {
+		if rows[0].OccurrenceIdentity != finding.OccurrenceIdentity("libswsscommon", "") {
 			t.Error("a component under the product keyed on something else")
 		}
 	})
@@ -419,10 +419,10 @@ func TestTwoRunsAgainstOneTargetDoNotBothOpenTheSameFinding(t *testing.T) {
 		}
 		seen := map[string]bool{}
 		for _, row := range open {
-			if seen[row.PlaceIdentity] {
-				t.Errorf("two open findings for one place: %s", row.PlaceIdentity)
+			if seen[row.OccurrenceIdentity] {
+				t.Errorf("two open findings for one occurrence: %s", row.OccurrenceIdentity)
 			}
-			seen[row.PlaceIdentity] = true
+			seen[row.OccurrenceIdentity] = true
 		}
 	})
 }

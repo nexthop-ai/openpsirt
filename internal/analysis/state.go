@@ -8,7 +8,7 @@ import (
 )
 
 // State is where a lead stands, worked out when it is read from the finding,
-// its sighting and the claim standing at its place.
+// its sighting and the decision standing at its occurrence.
 type State string
 
 const (
@@ -20,7 +20,7 @@ const (
 	Fixed State = "fixed"
 	// HandedOff is a confirmed lead recorded as a flaw here.
 	HandedOff State = "handed-off"
-	// Dismissed, NotSecurity and Confirmed are a lead a standing claim
+	// Dismissed, NotSecurity and Confirmed are a lead a standing decision
 	// answers.
 	Dismissed   State = finding.OutcomeDismissed
 	NotSecurity State = finding.OutcomeNotSecurity
@@ -32,9 +32,9 @@ func States() []State {
 	return []State{Open, NotReproduced, Fixed, Dismissed, NotSecurity, Confirmed, HandedOff}
 }
 
-// standingOutcome is the outcome of the claim standing at the place of the
+// standingOutcome is the outcome of the decision standing at the occurrence of the
 // finding under "f", in the product bound: one somebody agreed to, or one
-// that waits on nobody and was not sent back. A claim waiting for a second
+// that waits on nobody and was not sent back. A decision waiting for a second
 // person answers nothing yet.
 var standingOutcome = `(SELECT MAX("sc"."outcome") FROM "decision_occurrence" AS "dc"
 	JOIN "decision" AS "sc" ON "sc"."id" = "dc"."decision_id"
@@ -53,7 +53,7 @@ var handedOff = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 // A hand-off comes after a closure and before everything else: the lead is
 // its flaw's now, and whatever is said of the flaw is said there.
 //
-// A standing claim comes before a standing rule, which comes before absence:
+// A standing decision comes before a standing rule, which comes before absence:
 // a dismissed lead a run does not see stays dismissed and records the
 // absence.
 func stateOf(productID int64) (string, []any) {

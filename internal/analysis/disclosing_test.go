@@ -19,13 +19,13 @@ func TestWhatAMoveDisclosesIsReadThroughTheCallersVisibility(t *testing.T) {
 		lead := w.leads(t, w.Target.ID)[0]
 		decided := w.dismissed(t, lead, time.Now().UTC())
 		const said = "the attribute is bounded by its caller"
-		if _, err := w.DB.DB.NewInsert().Model(&triage.Revision{ClaimID: decided.ClaimID, Ordinal: 1, Body: said,
+		if _, err := w.DB.DB.NewInsert().Model(&triage.Revision{DecisionID: decided.DecisionID, Ordinal: 1, Body: said,
 			WrittenBy: decided.ProposedBy, WrittenAt: time.Now().UTC().Truncate(time.Microsecond)}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		places := []string{lead.PlaceIdentity}
+		occurrences := []string{lead.OccurrenceIdentity}
 
-		reads, err := disclosing(ctx, w.DB.DB, w.holding(t, "analyst", access.InternalRead), w.Product.ID, places)
+		reads, err := disclosing(ctx, w.DB.DB, w.holding(t, "analyst", access.InternalRead), w.Product.ID, occurrences)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -38,8 +38,8 @@ func TestWhatAMoveDisclosesIsReadThroughTheCallersVisibility(t *testing.T) {
 				reads.Paths, reads.Said)
 		}
 
-		// The claim is internal, and reading undisclosed work does not read it.
-		other, err := disclosing(ctx, w.DB.DB, w.holding(t, "embargo", access.PrivateRead), w.Product.ID, places)
+		// The decision is internal, and reading undisclosed work does not read it.
+		other, err := disclosing(ctx, w.DB.DB, w.holding(t, "embargo", access.PrivateRead), w.Product.ID, occurrences)
 		if err != nil {
 			t.Fatal(err)
 		}

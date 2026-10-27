@@ -22,7 +22,7 @@ type heldFinding struct {
 	VulnerabilityID    int64      `bun:"vulnerability_id"`
 	ComponentID        int64      `bun:"component_id"`
 	ConsumerID         *int64     `bun:"consumer_id"`
-	PlaceIdentity      string     `bun:"occurrence_identity"`
+	OccurrenceIdentity string     `bun:"occurrence_identity"`
 	FixState           FixState   `bun:"fix_state"`
 	FixedIn            string     `bun:"fixed_in"`
 	FixedAt            *time.Time `bun:"fixed_at"`
@@ -47,8 +47,8 @@ type heldFinding struct {
 // Findings whose updates write the same values are one statement over their
 // identifiers. The order is the exception: it is written from each finding's
 // own value, chosen by identifier inside the statement. An issue's likelihood
-// moving rewrites the order of every place it sits, and the likelihood is
-// close to unique to the issue, so a statement per value of the order is a
+// moving rewrites the order of every occurrence it sits at, and the likelihood
+// is close to unique to the issue, so a statement per value of the order is a
 // statement per issue.
 type moving struct {
 	f Finding

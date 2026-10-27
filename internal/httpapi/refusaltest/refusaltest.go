@@ -56,7 +56,7 @@ var UnclassifiedText = []string{"objects.internal", "AKIAEXAMPLE"}
 
 // Said is a store's own sentence, wrapped the way a store wraps it.
 func Said() error {
-	return fmt.Errorf("record the claim: %w",
+	return fmt.Errorf("record the decision: %w",
 		refusal.Errorf("%q is not a recognized reason for something not applying", "because"))
 }
 

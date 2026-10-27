@@ -22,20 +22,20 @@ func TestWhereTheEffortWentIsAReport(t *testing.T) {
 		r.Claimed(t, "private-triage", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
 
 		spent := func(t *testing.T, query string) []struct {
-			Component string `json:"component"`
-			Claims    int    `json:"claims"`
-			Decisions int    `json:"decisions"`
-			People    int    `json:"people"`
-			Dismissed int    `json:"dismissed"`
+			Component   string `json:"component"`
+			Decisions   int    `json:"decisions"`
+			Occurrences int    `json:"occurrences"`
+			People      int    `json:"people"`
+			Dismissed   int    `json:"dismissed"`
 		} {
 			t.Helper()
 			var out struct {
 				Items []struct {
-					Component string `json:"component"`
-					Claims    int    `json:"claims"`
-					Decisions int    `json:"decisions"`
-					People    int    `json:"people"`
-					Dismissed int    `json:"dismissed"`
+					Component   string `json:"component"`
+					Decisions   int    `json:"decisions"`
+					Occurrences int    `json:"occurrences"`
+					People      int    `json:"people"`
+					Dismissed   int    `json:"dismissed"`
 				} `json:"items"`
 			}
 			httpapitest.Read(t, r, "private-triage", "/v1/effort"+query, &out)
@@ -44,15 +44,15 @@ func TestWhereTheEffortWentIsAReport(t *testing.T) {
 
 		rows := spent(t, "")
 		if len(rows) != 1 {
-			t.Fatalf("two claims about one component report as %d rows: %+v", len(rows), rows)
+			t.Fatalf("two decisions about one component report as %d rows: %+v", len(rows), rows)
 		}
 		one := rows[0]
 		if one.Component != "linux-image" {
 			t.Errorf("the work went into %q", one.Component)
 		}
-		// Claims and places both, because ten claims over ten places and one
-		// claim over a thousand are different afternoons.
-		if one.Claims != 2 || one.Decisions < 2 {
+		// Decisions and occurrences both, because ten decisions over ten
+		// occurrences and one decision over a thousand are different afternoons.
+		if one.Decisions != 2 || one.Occurrences < 2 {
 			t.Errorf("two arguments over the component report as %+v", one)
 		}
 		if one.People != 2 {
@@ -86,33 +86,33 @@ func TestWhereTheEffortWentIsAReport(t *testing.T) {
 
 // TestEffortCountsActsRatherThanRows is the unit the report is in.
 //
-// One claim over sixty places is one afternoon. Counted by its rows, a report
-// about where the time went would measure how far a component fans out through
-// an image, and the component every image vendors would be the answer every
-// quarter.
+// One decision over sixty occurrences is one afternoon. Counted by its rows, a
+// report about where the time went would measure how far a component fans out
+// through an image, and the component every image vendors would be the answer
+// every quarter.
 func TestEffortCountsActsRatherThanRows(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedAtTwoPlaces(t)
+		r.ScannedAtTwoOccurrences(t)
 		r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 
 		var out struct {
 			Items []struct {
-				Claims    int `json:"claims"`
-				Decisions int `json:"decisions"`
+				Decisions   int `json:"decisions"`
+				Occurrences int `json:"occurrences"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "private-triage", "/v1/effort", &out)
 		if len(out.Items) != 1 {
 			t.Fatalf("one argument reports as %d rows", len(out.Items))
 		}
-		if out.Items[0].Claims != 1 {
-			t.Errorf("one argument counts as %d claims", out.Items[0].Claims)
+		if out.Items[0].Decisions != 1 {
+			t.Errorf("one argument counts as %d decisions", out.Items[0].Decisions)
 		}
-		// And the places it reached are beside it, because the two are
+		// And the occurrences it reached are beside it, because the two are
 		// different questions and a report carrying one of them hides the
 		// other.
-		if out.Items[0].Decisions != 2 {
-			t.Errorf("one argument over two places reached %d", out.Items[0].Decisions)
+		if out.Items[0].Occurrences != 2 {
+			t.Errorf("one argument over two occurrences reached %d", out.Items[0].Occurrences)
 		}
 	})
 }
@@ -125,7 +125,7 @@ func TestTheEffortTotalCountsPastThePage(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		r.Claimed(t, "private-triage", "CVE-2026-1000", "linux-image", httpapitest.Dismissal)
-		// A judgment whose place no longer holds anything, which is a row of
+		// A decision whose occurrence no longer holds anything, which is a row of
 		// its own: the time went somewhere, whatever is there now.
 		if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
 			Set(`"occurrence_identity" = ?`, "gone").

@@ -82,15 +82,15 @@ func TestAnUndisclosedFlawsNameIsNotAnAliasInADocumentOfDisclosedWork(t *testing
 			Where(`"closed_at" IS NULL`).Scan(ctx); err != nil || len(open) != 1 {
 			t.Fatalf("the report opened %d disclosed findings: %v", len(open), err)
 		}
-		at, err := findings.PlaceFor(ctx, proposer, w.Target.ID, issue, open[0].PlaceIdentity)
+		at, err := findings.OccurrenceFor(ctx, proposer, w.Target.ID, issue, open[0].OccurrenceIdentity)
 		if err != nil {
 			t.Fatal(err)
 		}
 		decisions := triage.NewStore(db)
-		decision, err := decisions.Propose(ctx, proposer, triage.Proposal{
-			Place: triage.Place{
+		occurrence, err := decisions.Propose(ctx, proposer, triage.Proposal{
+			Occurrence: triage.Occurrence{
 				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
+				OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
 				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 			},
 			Outcome: triage.NotApplicable, Justification: triage.CodeNotPresent,
@@ -99,7 +99,7 @@ func TestAnUndisclosedFlawsNameIsNotAnAliasInADocumentOfDisclosedWork(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := decisions.ApproveClaim(ctx, approver, decision.ClaimID, "", nil, ""); err != nil {
+		if _, err := decisions.ApproveDecision(ctx, approver, occurrence.DecisionID, "", nil, ""); err != nil {
 			t.Fatal(err)
 		}
 
@@ -118,7 +118,7 @@ func TestAnUndisclosedFlawsNameIsNotAnAliasInADocumentOfDisclosedWork(t *testing
 				t.Fatal(err)
 			}
 			if !strings.Contains(string(body), "CVE-2026-3001") {
-				t.Fatalf("the agreed claim is not in the document: %s", body)
+				t.Fatalf("the agreed decision is not in the document: %s", body)
 			}
 			if named := strings.Contains(string(body), flaw); named != tc.names {
 				t.Errorf("with undisclosed work %v, the document names %s %v, want %v",

@@ -3,7 +3,7 @@
 
 // Package cverecord reads what CVE records say about which upstream versions an
 // issue affects, and narrows a scanner's match where a record excludes the
-// version a place holds (REQ-31).
+// version an occurrence holds (REQ-31).
 //
 // The records come from the CVE List, the published body of every CVE record.
 // Only the part this reads is kept: each record whose upstream entries carry

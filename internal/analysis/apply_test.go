@@ -637,7 +637,7 @@ func TestTwoRunsOfOneSeriesAreAppliedOneAfterTheOther(t *testing.T) {
 	})
 }
 
-func TestAResultOnAnotherBuildCarriesThePlaceItWasJudgedAt(t *testing.T) {
+func TestAResultOnAnotherBuildCarriesTheOccurrenceItWasJudgedAt(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
 		tag, err := w.Catalog.TargetFor(t.Context(), w.Tag.ID, w.Customer.ID)
@@ -652,8 +652,8 @@ func TestAResultOnAnotherBuildCarriesThePlaceItWasJudgedAt(t *testing.T) {
 		if len(a) != 1 || len(b) != 1 {
 			t.Fatalf("%d and %d findings; want one on each build", len(a), len(b))
 		}
-		if a[0].PlaceIdentity != b[0].PlaceIdentity {
-			t.Errorf("places %q and %q; want one place, so a decision on it reaches both", a[0].PlaceIdentity, b[0].PlaceIdentity)
+		if a[0].OccurrenceIdentity != b[0].OccurrenceIdentity {
+			t.Errorf("occurrences %q and %q; want one occurrence, so a decision on it reaches both", a[0].OccurrenceIdentity, b[0].OccurrenceIdentity)
 		}
 	})
 }
@@ -736,7 +736,7 @@ func TestAResultMovedWithinItsFunctionIsSeenAgainOnTheFunction(t *testing.T) {
 	})
 }
 
-func TestTheFirstRunOnABranchTakesThePlacesOfTheLineItWasCutFrom(t *testing.T) {
+func TestTheFirstRunOnABranchTakesTheOccurrencesOfTheLineItWasCutFrom(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		tag := w.TargetFor(w.Tag, w.Customer)
 		w.inventory(t, w.Target.ID)
@@ -751,14 +751,14 @@ func TestTheFirstRunOnABranchTakesThePlacesOfTheLineItWasCutFrom(t *testing.T) {
 			t.Errorf("receipt %+v; want one lead opened, carried probably from the branch", r)
 		}
 		branch, cut := w.leads(t, w.Target.ID), w.leads(t, tag.ID)
-		if len(branch) != 1 || len(cut) != 1 || branch[0].PlaceIdentity != cut[0].PlaceIdentity {
-			t.Errorf("branch %+v, tag %+v; want one lead each at one place", branch, cut)
+		if len(branch) != 1 || len(cut) != 1 || branch[0].OccurrenceIdentity != cut[0].OccurrenceIdentity {
+			t.Errorf("branch %+v, tag %+v; want one lead each at one occurrence", branch, cut)
 		}
 	})
 }
 
-// dismissed records an approved dismissal at a lead's place.
-func (w *world) dismissed(t *testing.T, lead finding.Finding, at time.Time) *triage.Decision {
+// dismissed records an approved dismissal at a lead's occurrence.
+func (w *world) dismissed(t *testing.T, lead finding.Finding, at time.Time) *triage.DecisionOccurrence {
 	t.Helper()
 	ctx := t.Context()
 	by, err := access.NewStore(w.DB.DB).Ensure(ctx, "analyst@example.com", "analyst", nil, nil)
@@ -767,15 +767,15 @@ func (w *world) dismissed(t *testing.T, lead finding.Finding, at time.Time) *tri
 	}
 	reason := string(triage.FalsePositive)
 	at = at.Truncate(time.Microsecond)
-	claim := &triage.Claim{Kind: triage.FindingClaim, ProposedBy: by.ID, ProposedAt: at,
+	decision := &triage.Decision{Kind: triage.FindingDecision, ProposedBy: by.ID, ProposedAt: at,
 		Outcome: triage.Dismissed, Justification: &reason}
-	if _, err := w.DB.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+	if _, err := w.DB.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// Any key holding is live; the place identity fits the column.
-	live := lead.PlaceIdentity
-	decided := &triage.Decision{ClaimID: claim.ID, ProductID: w.Product.ID, VulnerabilityID: lead.VulnerabilityID,
-		PlaceIdentity: lead.PlaceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
+	// Any key holding is live; the occurrence identity fits the column.
+	live := lead.OccurrenceIdentity
+	decided := &triage.DecisionOccurrence{DecisionID: decision.ID, ProductID: w.Product.ID, VulnerabilityID: lead.VulnerabilityID,
+		OccurrenceIdentity: lead.OccurrenceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
 		NeedsApproval: true, ProposedBy: by.ID, ProposedAt: at}
 	if _, err := w.DB.DB.NewInsert().Model(decided).Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -783,10 +783,10 @@ func (w *world) dismissed(t *testing.T, lead finding.Finding, at time.Time) *tri
 	return decided
 }
 
-// stateOf is a decision's state now.
+// stateOf is a decision occurrence's state now.
 func (w *world) stateOf(t *testing.T, id int64) triage.State {
 	t.Helper()
-	var after triage.Decision
+	var after triage.DecisionOccurrence
 	if err := w.DB.DB.NewSelect().Model(&after).Where(`"de"."id" = ?`, id).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -807,7 +807,7 @@ func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 		if len(leads) != 3 {
 			t.Fatalf("leads %+v; want three", leads)
 		}
-		decided := map[int64]*triage.Decision{}
+		decided := map[int64]*triage.DecisionOccurrence{}
 		for _, lead := range leads {
 			decided[lead.ID] = w.dismissed(t, lead, start.Add(time.Minute))
 		}
@@ -834,7 +834,7 @@ func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 		}
 		// Its proposer is told once, of both, as internal work.
 		if len(heard) != 1 || heard[0].Rows != 2 || !heard[0].Probable || !heard[0].Internal {
-			t.Errorf("told %+v; want the proposer told once of two lapsed claims on leads", heard)
+			t.Errorf("told %+v; want the proposer told once of two lapsed decisions on leads", heard)
 		}
 	})
 }
@@ -891,20 +891,20 @@ func TestAResultAnotherBuildHoldsTakesThatLeadsPlace(t *testing.T) {
 		w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{moved}, 10))
 
 		// The other variant's first run reports the result where it has moved
-		// to. The lead's place was minted from where it was first seen, so only
+		// to. The lead's occurrence was minted from where it was first seen, so only
 		// the lead's newest key finds it.
 		run, _ := w.send(t, other.ID, start.Add(2*time.Hour), document([]sent{moved}, 10))
 		if r := receiptOf(t, run); r.Opened != 1 || r.Probable != 0 || r.Inherited != 0 {
 			t.Errorf("receipt %+v; want one lead opened, carried strongly", r)
 		}
 		here, there := w.leads(t, w.Target.ID), w.leads(t, other.ID)
-		if len(here) != 1 || len(there) != 1 || here[0].PlaceIdentity != there[0].PlaceIdentity {
-			t.Errorf("leads %+v and %+v; want one place", here, there)
+		if len(here) != 1 || len(there) != 1 || here[0].OccurrenceIdentity != there[0].OccurrenceIdentity {
+			t.Errorf("leads %+v and %+v; want one occurrence", here, there)
 		}
 	})
 }
 
-func TestAClosedLeadFoundAgainOpensAtItsPlace(t *testing.T) {
+func TestAClosedLeadFoundAgainOpensAtItsOccurrence(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
@@ -917,11 +917,11 @@ func TestAClosedLeadFoundAgainOpensAtItsPlace(t *testing.T) {
 		}
 		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
 		if r := receiptOf(t, run); r.Opened != 1 || r.Reopened != 1 {
-			t.Errorf("receipt %+v; want one lead opened at a closed lead's place", r)
+			t.Errorf("receipt %+v; want one lead opened at a closed lead's occurrence", r)
 		}
 		leads := w.leads(t, w.Target.ID)
-		if len(leads) != 2 || leads[1].PlaceIdentity != closed.PlaceIdentity {
-			t.Errorf("leads %+v; want a second at the first's place", leads)
+		if len(leads) != 2 || leads[1].OccurrenceIdentity != closed.OccurrenceIdentity {
+			t.Errorf("leads %+v; want a second at the first's occurrence", leads)
 		}
 	})
 }
@@ -1098,7 +1098,7 @@ func TestALeadsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T) {
 		}
 		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &lead, w.Product.ID)
 		if err != nil || got.At.Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" {
-			t.Errorf("an internal reader was answered %+v, %v; want the lead's place", got.At, err)
+			t.Errorf("an internal reader was answered %+v, %v; want the lead's occurrence", got.At, err)
 		}
 	})
 }

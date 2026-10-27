@@ -11,56 +11,56 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// stampOf is the stamp a claim holds, zero where it has no row.
-func stampOf(t *testing.T, f *fixture, claimID int64) int {
+// stampOf is the stamp a decision holds, zero where it has no row.
+func stampOf(t *testing.T, f *fixture, decisionID int64) int {
 	t.Helper()
 	var stamp int
 	if err := f.db.DB.NewSelect().TableExpr(`"decision_stamp" AS "cs"`).
-		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."decision_id" = ?`, claimID).Scan(t.Context(), &stamp); err != nil {
+		ColumnExpr(`COALESCE(MAX("cs"."stamp"), 0)`).Where(`"cs"."decision_id" = ?`, decisionID).Scan(t.Context(), &stamp); err != nil {
 		t.Fatal(err)
 	}
 	return stamp
 }
 
-// A writer holding the stamp a claim was read with changes it, and a writer
+// A writer holding the stamp a decision was read with changes it, and a writer
 // holding the stamp from before another's change matches nothing and is told
 // it lost a race the retry helper takes again.
-func TestAClaimRestampedFromAStaleStampIsALostRace(t *testing.T) {
+func TestADecisionRestampedFromAStaleStampIsALostRace(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		claimID := f.claims(t, f.at()).ClaimID
-		read := stampOf(t, f, claimID)
-		if err := triage.Restamp(ctx, f.db.DB, claimID, read); err != nil {
+		decisionID := f.decisions(t, f.at()).DecisionID
+		read := stampOf(t, f, decisionID)
+		if err := triage.Restamp(ctx, f.db.DB, decisionID, read); err != nil {
 			t.Fatalf("restamping from the stamp read answered %v", err)
 		}
-		if got := stampOf(t, f, claimID); got == read {
+		if got := stampOf(t, f, decisionID); got == read {
 			t.Fatalf("the stamp is %d after a restamp; want it changed", got)
 		}
-		err := triage.Restamp(ctx, f.db.DB, claimID, read)
+		err := triage.Restamp(ctx, f.db.DB, decisionID, read)
 		if !errors.Is(err, database.ErrGoAgain) || !database.WorthRetrying(err) {
 			t.Fatalf("restamping from a stale stamp answered %v; want a lost race to take again", err)
 		}
 	})
 }
 
-// A claim nobody has stamped reads as zero, and two writers that both read
+// A decision nobody has stamped reads as zero, and two writers that both read
 // that are one first stamp and one lost race: the second finds the row the
 // first made.
-func TestTwoFirstStampsOfAClaimAreOneLostRace(t *testing.T) {
+func TestTwoFirstStampsOfADecisionAreOneLostRace(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		claimID := f.claims(t, f.at()).ClaimID
-		if got := stampOf(t, f, claimID); got != 0 {
-			t.Fatalf("a claim nobody wrote to holds the stamp %d; want zero", got)
+		decisionID := f.decisions(t, f.at()).DecisionID
+		if got := stampOf(t, f, decisionID); got != 0 {
+			t.Fatalf("a decision nobody wrote to holds the stamp %d; want zero", got)
 		}
-		if err := triage.Restamp(ctx, f.db.DB, claimID, 0); err != nil {
+		if err := triage.Restamp(ctx, f.db.DB, decisionID, 0); err != nil {
 			t.Fatalf("the first stamp answered %v", err)
 		}
-		err := triage.Restamp(ctx, f.db.DB, claimID, 0)
+		err := triage.Restamp(ctx, f.db.DB, decisionID, 0)
 		if !errors.Is(err, database.ErrGoAgain) || !database.WorthRetrying(err) {
 			t.Fatalf("a second first stamp answered %v; want a lost race to take again", err)
 		}
-		if got := stampOf(t, f, claimID); got != 1 {
+		if got := stampOf(t, f, decisionID); got != 1 {
 			t.Errorf("the stamp is %d after one first stamp; want 1", got)
 		}
 	})
@@ -70,38 +70,38 @@ func TestTwoFirstStampsOfAClaimAreOneLostRace(t *testing.T) {
 func TestALaterStampFromAStaleValueIsALostRace(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		claimID := f.claims(t, f.at()).ClaimID
-		if err := triage.Restamp(ctx, f.db.DB, claimID, 0); err != nil {
+		decisionID := f.decisions(t, f.at()).DecisionID
+		if err := triage.Restamp(ctx, f.db.DB, decisionID, 0); err != nil {
 			t.Fatalf("the first stamp answered %v", err)
 		}
-		if err := triage.Restamp(ctx, f.db.DB, claimID, 1); err != nil {
+		if err := triage.Restamp(ctx, f.db.DB, decisionID, 1); err != nil {
 			t.Fatalf("restamping from the stamp read answered %v", err)
 		}
-		if got := stampOf(t, f, claimID); got != 2 {
+		if got := stampOf(t, f, decisionID); got != 2 {
 			t.Fatalf("the stamp is %d after two stamps; want 2", got)
 		}
-		err := triage.Restamp(ctx, f.db.DB, claimID, 1)
+		err := triage.Restamp(ctx, f.db.DB, decisionID, 1)
 		if !errors.Is(err, database.ErrGoAgain) || !database.WorthRetrying(err) {
 			t.Fatalf("restamping from a stale stamp answered %v; want a lost race to take again", err)
 		}
 	})
 }
 
-// Every write to a claim that refuses a claim about a lead handed off changes
-// its stamp, so a hand-off resting on the claim cannot commit beside it.
-func TestEveryWriteToAClaimChangesItsStamp(t *testing.T) {
+// Every write to a decision that refuses a decision about a lead handed off changes
+// its stamp, so a hand-off resting on the decision cannot commit beside it.
+func TestEveryWriteToADecisionChangesItsStamp(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		for _, c := range []struct {
 			act   string
-			write func(claimID int64) error
+			write func(decisionID int64) error
 		}{
 			{"revising it", func(id int64) error {
 				_, err := f.store.Revise(ctx, f.triager, id, "The parser is unreachable from every entry point.")
 				return err
 			}},
 			{"sending it back", func(id int64) error {
-				_, err := f.store.SendBackClaim(ctx, f.reviewer, id, "Say which entry points.")
+				_, err := f.store.SendBackDecision(ctx, f.reviewer, id, "Say which entry points.")
 				return err
 			}},
 			{"agreeing to it", func(id int64) error { return agreeTo(ctx, f.store, f.reviewer, id, "") }},
@@ -121,16 +121,16 @@ func TestEveryWriteToAClaimChangesItsStamp(t *testing.T) {
 			}},
 			{"withdrawing it", func(id int64) error { _, err := f.store.Withdraw(ctx, f.triager, id); return err }},
 		} {
-			claimID := f.claims(t, f.at()).ClaimID
-			before := stampOf(t, f, claimID)
-			if err := c.write(claimID); err != nil {
+			decisionID := f.decisions(t, f.at()).DecisionID
+			before := stampOf(t, f, decisionID)
+			if err := c.write(decisionID); err != nil {
 				t.Fatalf("%s answered %v", c.act, err)
 			}
-			if got := stampOf(t, f, claimID); got == before {
+			if got := stampOf(t, f, decisionID); got == before {
 				t.Errorf("%s left the stamp at %d", c.act, got)
 			}
-			if _, err := f.store.Withdraw(ctx, f.triager, claimID); err != nil && c.act != "withdrawing it" {
-				t.Fatalf("clearing the place after %s answered %v", c.act, err)
+			if _, err := f.store.Withdraw(ctx, f.triager, decisionID); err != nil && c.act != "withdrawing it" {
+				t.Fatalf("clearing the occurrence after %s answered %v", c.act, err)
 			}
 		}
 	})

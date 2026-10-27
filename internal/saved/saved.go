@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package saved is a narrowing of a list that somebody kept, and the claim it
+// Package saved is a narrowing of a list that somebody kept, and the decision it
 // prepares.
 //
 // Not access. A saved filter hangs off a person, which is the wrong reason to
@@ -56,13 +56,13 @@ type Filter struct {
 
 	// Outcome, Justification, Reasoning and DeferDays are what this filter
 	// prepares, all absent on an ordinary saved filter — which is most of
-	// them. A rule prepares a claim and a person proposes it: what is kept
+	// them. A rule prepares a decision and a person proposes it: what is kept
 	// here is offered prefilled, and a named person submits it as their own
 	// for a second person to approve.
 	//
-	// The wider form — a rule proposing its own pending claim — leaves the
-	// approver as the only human judgment on the claim, which is what making
-	// the claim the approver's unit prevents, and it puts a configuration
+	// The wider form — a rule proposing its own pending decision — leaves the
+	// approver as the only human judgment on the decision, which is what making
+	// the decision the approver's unit prevents, and it puts a configuration
 	// file where a name belongs in the record.
 	Outcome       string `bun:"outcome"`
 	Justification string `bun:"justification"`
@@ -73,7 +73,7 @@ type Filter struct {
 	DeferDays int `bun:"defer_days"`
 }
 
-// Prepares reports whether this filter carries a claim to prefill.
+// Prepares reports whether this filter carries a decision to prefill.
 func (f Filter) Prepares() bool { return strings.TrimSpace(f.Outcome) != "" }
 
 // Called is the spelling to show, which is the one they typed.
@@ -187,13 +187,13 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 	prepares.Reasoning = strings.TrimSpace(prepares.Reasoning)
 	// The same policy every other typed field goes through, run before the
 	// text is stored rather than when it is read back. What is saved here
-	// prefills a claim, so text the decision store refuses would save cleanly
+	// prefills a decision, so text the decision store refuses would save cleanly
 	// and be refused when somebody pressed the button it filled in.
 	if err := markdown.Check(prepares.Reasoning); err != nil {
 		return nil, err
 	}
 	if prepares.Prepares() && prepares.Reasoning == "" {
-		return nil, refusal.Errorf("a filter that prepares a claim has to carry the reasoning " +
+		return nil, refusal.Errorf("a filter that prepares a decision has to carry the reasoning " +
 			"somebody will be proposing, because they are the one putting their name to it")
 	}
 	if prepares.Prepares() {
@@ -266,7 +266,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
 			Set(`"query" = ?`, kept.Query).
 			Set(`"display_name" = ?`, kept.DisplayName).
-			// The claim it prepares is replaced too, including with nothing:
+			// The decision it prepares is replaced too, including with nothing:
 			// saving over a name is deciding what that name means now, and a
 			// prefill that survived being taken off would fire on a filter
 			// somebody thought they had made ordinary.

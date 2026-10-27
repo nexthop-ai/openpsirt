@@ -423,8 +423,8 @@ func TestANewFindingIsOrderedByItsOwnProductsRating(t *testing.T) {
 	// the applying path is what writes it — so it is the thing most likely to
 	// go stale now that the rating it is worked out from belongs to a product.
 	//
-	// Two halves, and both matter. A place that newly pulls the library in
-	// here has to arrive at the rating this product made, and a place that
+	// Two halves, and both matter. An occurrence that newly pulls the library in
+	// here has to arrive at the rating this product made, and an occurrence that
 	// newly pulls it in next door has to arrive at the published one.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

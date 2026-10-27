@@ -24,17 +24,17 @@ type SavedBody struct {
 	// text because the filters belong to the list: a saved filter is a way
 	// back to one, and the list is what knows how to read it.
 	Query string `json:"query" maxLength:"2000" doc:"The findings list's query string, without a leading ?, and without the branch, the variant or anything naming one build or one run"`
-	// Prepares is the claim this filter offers, where it offers one.
-	Prepares *PreparedBody `json:"prepares,omitempty" doc:"The claim this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them"`
+	// Prepares is the decision this filter offers, where it offers one.
+	Prepares *PreparedBody `json:"prepares,omitempty" doc:"The decision this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them"`
 }
 
-// PreparedBody is the claim a saved filter prepares.
+// PreparedBody is the decision a saved filter prepares.
 //
-// A rule prepares a claim; a person proposes it. These are offered prefilled
-// and a named person submits the claim as their own, for a second person to
-// approve. The wider form — a rule proposing its own pending claim, marked as
+// A rule prepares a decision; a person proposes it. These are offered prefilled
+// and a named person submits the decision as their own, for a second person to
+// approve. The wider form — a rule proposing its own pending decision, marked as
 // proposed by the rule — is refused: it leaves the approver as the only human
-// judgment on the claim, which is what making the claim the approver's unit
+// judgment on the decision, which is what making the decision the approver's unit
 // exists to prevent, and it puts a configuration file where a name belongs in
 // the record. The difference shows up on the day a dismissal turns out to have
 // been wrong and somebody asks who made it.
@@ -113,12 +113,12 @@ func registerSaved(api huma.API, in core.Deps) {
 		Name string `path:"name" maxLength:"120"`
 		Body struct {
 			Query string `json:"query" maxLength:"2000" doc:"The list's query string, without a leading ?. Its scope is left out of what is kept"`
-			// Prepares is what the filter should offer to claim
+			// Prepares is the decision the filter should offer
 			// about what it catches. Left out, it prepares nothing
 			// — and left out on a filter that prepares something
 			// takes that off, because saving over a name is
 			// deciding what the name means now.
-			Prepares *PreparedBody `json:"prepares,omitempty" doc:"The claim this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to"`
+			Prepares *PreparedBody `json:"prepares,omitempty" doc:"The decision this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to"`
 		}
 	}) (*struct{}, error) {
 		who, store, err := keeping(ctx, in)

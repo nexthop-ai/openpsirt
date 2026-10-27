@@ -18,7 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// lapsableReads counts the reads of every decision a sweep might lapse.
+// lapsableReads counts the reads of every row a sweep might lapse.
 type lapsableReads struct{ n atomic.Int64 }
 
 func (c *lapsableReads) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
@@ -31,30 +31,30 @@ func (c *lapsableReads) BeforeQuery(ctx context.Context, e *bun.QueryEvent) cont
 func (c *lapsableReads) AfterQuery(context.Context, *bun.QueryEvent) {}
 
 func TestASweepLapsingLessThanABatchReadsTheDecisionsOnce(t *testing.T) {
-	// The read of what a sweep may lapse asks about every live decision in
+	// The read of what a sweep may lapse asks about every live row in
 	// the product. One that came back short of a batch named everything
 	// lapsable at that moment, so the sweep ends there rather than reading
-	// every decision again to find nothing.
+	// every row again to find nothing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		in := f.build(t, f.product, "2026.03")
 		moved := f.component(t, "libfoo", "1.2.4")
-		made := f.claims(t, f.at())
+		made := f.decisions(t, f.at())
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		const size = 3
 		for i := range size {
-			place := fmt.Sprintf("place-%d", i)
+			occurrence := fmt.Sprintf("place-%d", i)
 			if _, err := f.db.DB.NewInsert().Model(&finding.Finding{
 				TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
-				Visibility: access.Public, ComponentID: moved, PlaceIdentity: place,
+				Visibility: access.Public, ComponentID: moved, OccurrenceIdentity: occurrence,
 				OpenedAt: now, OpenedRunID: &in.run,
 			}).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			key, version := fmt.Sprintf("short-%d", i), "1.2.3"
-			if _, err := f.db.DB.NewInsert().Model(&triage.Decision{
-				ClaimID: made.ClaimID, ProductID: f.product, VulnerabilityID: f.issue,
-				PlaceIdentity: place, Visibility: access.Public,
+			if _, err := f.db.DB.NewInsert().Model(&triage.DecisionOccurrence{
+				DecisionID: made.DecisionID, ProductID: f.product, VulnerabilityID: f.issue,
+				OccurrenceIdentity: occurrence, Visibility: access.Public,
 				ComponentUpstreamVersion: &version, State: triage.Proposed,
 				NeedsApproval: true, ProposedBy: made.ProposedBy, ProposedAt: now, LiveKey: &key,
 			}).Exec(ctx); err != nil {

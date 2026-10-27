@@ -80,8 +80,8 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 
 		// A document that says something different hashes differently, which
 		// is the half that makes the comparison worth making.
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 		moved := httpapitest.RecordedIssuance(t, r, "triager")
 		if moved.Digest == recorded.Digest {
 			t.Errorf("a document carrying a statement it did not carry before hashed the same")
@@ -209,8 +209,8 @@ func TestTheVEXRecordSaysWhetherTheDocumentMovedSinceItWentOut(t *testing.T) {
 			t.Errorf("straight after it went out, changed reads %v", gone.Changed)
 		}
 
-		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
-		r.Agreed(t, claim)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		r.Agreed(t, decision)
 		gone.Changed = nil
 		httpapitest.Read(t, r, "reader", httpapitest.ABuild+"/issuance", &gone)
 		if gone.Changed == nil || !*gone.Changed {
@@ -376,8 +376,8 @@ func TestAVEXDocumentThatWentOutHoldsNothingNobodyHasAnnounced(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		hidden := r.Embargoed(t)
-		claim, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
-		r.AgreedBy(t, "private-dispatcher", claim)
+		decision, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
+		r.AgreedBy(t, "private-dispatcher", decision)
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, httpapitest.ABuild+"/issuance",
 			""); got.Code != http.StatusCreated {
 			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
