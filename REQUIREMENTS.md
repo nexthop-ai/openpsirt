@@ -188,7 +188,7 @@ inputs.
 |---|---|---|
 | REQ-55 | Every screen works on a phone. Small screens are for reading and responding, not bulk work | Approving something from a phone is the case that actually happens |
 | REQ-56 | The dependency tree is browsable both ways: from a finding to where it sits, and from any node to the findings beneath it | "Where does this actually come from" is the first question about any finding |
-| REQ-57 | The findings list is one row per issue at a component, with the places under it, and it is the tool for building a batch | 335,021 rows for one image is not a list anybody reads |
+| REQ-57 | The findings list is one row per issue at a component, with the occurrences under it, and it is the tool for building a batch | 335,021 rows for one image is not a list anybody reads |
 | REQ-58 | One home page assembled from what the person holds, leading with the work, and one scope picker that narrows the whole interface. A screen that cannot answer at the chosen scope says so | Not a different landing page per role, and a narrowed page that claims to be the unnarrowed one is worse than a refusal |
 | REQ-59 | Nothing a person typed is lost — not by a failed submission, a navigation, or an expired session | Losing a forty-line justification is how people stop writing them |
 | REQ-60 | Labels are the conventional word for the thing, every count says what it counts, and every filter in force is visible and removable one at a time | A screen full of invented vocabulary is a screen people misread |
