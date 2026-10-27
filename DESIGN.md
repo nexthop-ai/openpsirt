@@ -26,7 +26,8 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 |---|---|---|
 | [ingest](design-docs/ingest.md) | A scan from arrival to application | upload, arrival decision, document storage, retention, formats read, scanner output, receipts, administrator VEX, supplier advisories, offline scanner database, CVE records |
 | [analysis](design-docs/analysis.md) | Static analyzer runs uploaded as SARIF | run contents, placement, code finding triage, code finding queue, weakness families, flaw records, third-party code, upload client |
-| [upstream](design-docs/upstream.md) | Trusting a forked project's published VEX | trusted upstreams, statements applied, offers for review, declined statements |
+| [upstream](design-docs/upstream.md) | Trusting a forked project's published VEX | trusted upstreams, fingerprint, requests, reading, complete read, statements recorded, statements applied, offers for review, declined statements, failure notices |
+| [upstream-measurements](design-docs/upstream-measurements.md) | Benchmark runs behind the upstream rules | first read, unmoved read, a fork's run |
 
 ## Triage and remediation
 
@@ -40,8 +41,17 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 
 | Document | Covers | Terms |
 |---|---|---|
-| [access](design-docs/access.md) | Who a request is, and what it may see and do | roles, internal visibility, breadth of view, refusals, teams, assignment rules, provider sign-in, trusted-header sign-in, group matching, grant grid, personal tokens, sessions, request forgery |
-| [api](design-docs/api.md) | The HTTP API's shape | document generation, status codes, refusal shape, paging, sorting, path version, former upload addresses, representation |
+| [access](design-docs/access.md) | Who a request is, and the roles and visibilities it reads under | authentication, roles, internal visibility, breadth of view, upward tree, subject kinds, pipeline keys, anybody at all, the deployment itself |
+| [access-enforcement](design-docs/access-enforcement.md) | Where each access check sits, and refusals that disclose nothing | name resolution order, one resolver, enforcement sites, store methods with no subject, visibility questions, rating rights, mentions, notes on an issue |
+| [access-assignment](design-docs/access-assignment.md) | Who holds work and how it moves | assignment rights, assignment by narrowing, teams, team queue, assignment rules, preview, sweep, departure, lost reading, hand-back |
+| [access-grants](design-docs/access-grants.md) | How roles are granted, and an account that ends | role assignment modes, group mappings, administration sources, session lifetime ceiling, group matching, grant grid, role across every product, personal tokens, audit permission, somebody who has left, absent holders |
+| [access-signin](design-docs/access-signin.md) | Sign-in, sessions and the headers every response carries | provider sign-in, outbound client, internal addresses, trusted-header sign-in, identifier binding, provider attribution, redemption window, username claim, mail addresses, request forgery, return addresses, sealing key, browser headers |
+| [access-disclosure](design-docs/access-disclosure.md) | Embargoes and collaborators granted one case | disclosure date, approaching disclosure, issue disclosure, extension, shortening, movement threshold, case collaborators |
+| [access-trail](design-docs/access-trail.md) | The administration trail and secrets kept out of logs | trail actors, recorded writes, revocation that matched nothing, trail export, redaction, connection strings |
+| [api](design-docs/api.md) | The HTTP API's shape | no private half, document generation, vocabularies, unauthenticated surfaces, operation descriptions, declared privileges, gate sweep, path version, former upload addresses, representation, addresses and labels, area packages |
+| [api-refusals](design-docs/api-refusals.md) | Status codes and the shape of a refusal | status codes, not found and not yours, problem+json, published error text, faults, NUL characters |
+| [api-lists](design-docs/api-lists.md) | Paging, sorting and filtering, and reads across products | limit and offset, totals, page ceilings, unknown parameters, package kinds, sort allowlist, issue page, findings across products |
+| [api-measurements](design-docs/api-measurements.md) | Benchmark runs behind the API rules | package kinds timings |
 
 ## Output
 
