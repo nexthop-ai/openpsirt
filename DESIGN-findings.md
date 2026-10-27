@@ -123,7 +123,7 @@ issue that is absorbed stays filed under it, and is read as the issue kept.
 | A merge record names the issue absorbed, the issue kept, the names the report gave, the run and the moment | The issue's page reads it to say where a name came from |
 | Every issue states the issue it is read as: itself, or the one it merged into, one step away however many merges led there | A decision occurrence is related to a finding by equality on that column, which every engine answers from an index. Counting the decision rows over a build of 300,000 findings and 150,000 rows takes 72 ms on PostgreSQL, 0.47 s on MySQL and 2.5 s on MariaDB, the same as the exact match. Related through a subquery, the count runs for more than ten minutes on PostgreSQL; through a null meaning itself, it takes 0.19 s and hashes every row |
 | Two scans merging overlapping sets take the issues in turn | Each takes every issue it names before reading them, and goes again where one is no longer its own issue, so no issue ends two steps from the one that stands |
-| Decisions, their occurrences, approvals and revisions, notes, rating claims, records of being attacked, attachments, case grants, advisories covering the issue, embargo movements and reports stay filed under the absorbed issue | Each is read as the issue kept, through the issue it states. A decision about the absorbed issue suppresses, counts and is listed at the kept issue's findings as it does at its own. The rows below are the whole of what a merge writes to any of them |
+| Decisions, their occurrences, approvals and revisions, notes, rating claims, incidents, attachments, case grants, advisories covering the issue, embargo movements and reports stay filed under the absorbed issue | Each is read as the issue kept, through the issue it states. A decision about the absorbed issue suppresses, counts and is listed at the kept issue's findings as it does at its own. The rows below are the whole of what a merge writes to any of them |
 | A case grant under either name reaches every record filed under either | A collaborator reads, revises and re-affirms what they made under the absorbed name |
 | An advisory covering either name covers the kept issue, once per product | Generating it reads the kept issue's findings. A search by either name finds it |
 | One report stands for an issue across its names | A second report is refused as the record of an issue whose absorbed name already has one |
@@ -137,10 +137,10 @@ issue that is absorbed stays filed under it, and is read as the issue kept.
 | The key is the one column of a standing decision occurrence a merge rewrites, and that is accepted under REQ-22 | The key is an index over what a decision is about, never a field anybody decided. The issue a decision occurrence is filed under, its decision, occurrence, state, author and time are untouched, and a test pins each of them across a merge |
 | Tags move to the issue kept, once per word on each component | A tag is a word kept only while it is on a row. One the kept issue already carries is dropped |
 | The rating in force moves to the issue kept unless the kept issue holds its own in that product, and then the absorbed one's is dropped | It is derived from the rating claims, which the next rows settle |
-| A rating claim and a record of being attacked standing under either name hold their key under the issue kept | One standing per issue and product is a rule the database keeps |
+| A rating claim and an incident standing under either name hold their key under the issue kept | One standing per issue and product is a rule the database keeps |
 | Where a rating claim stands under each name in one product, the one in force stays over the one waiting for a second person, and otherwise the newer | The standing rule two decisions at one occurrence follow |
 | The other rating claim is withdrawn, naming no person, with the reason "Superseded when the absorbed issue merged into the kept one" | A claim nobody withdrew states why it stopped standing. The rating in force is worked out again from the claim that stands, which re-ranks and re-clocks the product's findings |
-| Where a record of being attacked stands under each name in one product, the newer stays | Every standing record has the same standing |
+| Where an incident stands under each name in one product, the newer stays | Every standing record has the same standing |
 | The other record is cleared, naming no person, with the same reason | A clearing names who cleared it and why |
 | Each rating claim withdrawn and record cleared this way is a row in the administration trail, with a merge as its actor | What a product lost is asked about afterwards, and no person acted. `DESIGN-access.md` § The administration trail holds the actors |
 | Two answers that disagree are told to everybody who triages the product: two decisions with different outcomes, two rating claims with different ratings, two records with different dates of attack. Two that agree tell nobody | Nobody chooses which of two answers stands. The date is what every window after an attack counts from, so a different date is a different obligation |
@@ -1600,7 +1600,7 @@ Five signals, in this order:
 
 | Signal | Reason for its position |
 |---|---|
-| This product recorded as exploited through it | A person here saying this product was attacked. Above the signal below it, which is a feed's word about somewhere that may not be here at all. `DESIGN-obligations.md` holds the record itself |
+| An incident in this product through it | A person here saying this product was attacked. Above the signal below it, which is a feed's word about somewhere that may not be here at all. `DESIGN-incidents.md` holds the incident itself |
 | Known to be exploited in the world | The difference between a risk and an incident |
 | Reaches customers | A critical in something only the build system runs matters less than a medium in what people install |
 | Severity | How bad it would be if it happened. Scores from two schemes rank against one another as bands — see § One ladder for every scheme |
@@ -1640,15 +1640,15 @@ statable, and the interface says it from the signals a finding already carries.
 A signal reported out of range is clamped. A source sending something
 impossible otherwise carries into the band above and ranks as exploited.
 
-The record of being exploited here moves no deadline. How long a fix may take
+An incident moves no deadline. How long a fix may take
 is a question about the work and about upstream, and being attacked says
 nothing about either; what it does is admit the finding to the triage line
 whatever the rating says, so a finding that was below the line gains the clock
-its severity earns and one whose record is cleared may lose it again. It also
+its severity earns and one whose incident is cleared may lose it again. It also
 puts an upstream refusal back on that clock, which `DESIGN-remediation.md`
 describes beside the other reasons a finding carries none.
-`DESIGN-obligations.md` § Windows holds why the clock an obligation runs on is
-not this one.
+`DESIGN-incidents.md` § Response windows holds why the clock a response window
+runs on is not this one.
 
 Where a report rates an issue only in words, the word stands in for a number, so
 a finding rated in words does not sort below everything rated at all. A group

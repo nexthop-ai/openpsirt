@@ -1,4 +1,4 @@
-# Obligations
+# Incidents
 
 A regulator's questions after an incident, and the half of them this answers.
 
@@ -11,7 +11,7 @@ Satisfies REQ-32 and REQ-77.
 - [Stored facts](#stored-facts)
 - [The record and the triage record](#the-record-and-the-triage-record)
 - [Order](#order)
-- [Windows](#windows)
+- [Response windows](#response-windows)
 - [Notices outside](#notices-outside)
 - [Fix releases](#fix-releases)
 - [The shelf](#the-shelf)
@@ -46,7 +46,7 @@ Satisfies REQ-32 and REQ-77.
 | Only the third is a reportable event | It is also the one nothing computes |
 | A feed's exploitation flag is evidence that an issue deserves attention | It is a statement about the world, and says nothing about whether this deployment's product was the thing exploited |
 | The first and the third are kept apart in name as well as in meaning | Both are called exploited, both press for action, and one of them arrives automatically. Reading the first as the third is the failure this area exists to prevent |
-| On screen the third is the filled badge, "Exploited here", and the first the outline, "Known exploited" | The rarer, attested fact is the louder one. `DESIGN-interface.md` § The ordering signals holds the rest |
+| On screen the third is the filled badge, "Incident", and the first the outline, "Known exploited" | The rarer, attested fact is the louder one. `DESIGN-interface.md` § The ordering signals holds the rest |
 | Each is a column of its own on a finding | `DESIGN-findings.md` § Urgency has why the stored order cannot tell them apart |
 
 ## Stored facts
@@ -62,7 +62,7 @@ asks, which is why they are stored rather than worked out again.
 | The grounds | What is being asserted and how it is known. Nothing re-checks the record, so this is the whole of what a later reader has |
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out. § Notices outside |
 | The releases that carry the fix | Person-stated, each a tag of the product, added as each is cut and withdrawn where named in error. § Fix releases |
-| Clearing the exploitation record | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `DESIGN-findings.md` § Merged issues holds the rule |
+| Clearing an incident | An explicit human withdrawal, recorded with who cleared it and why. The one other clearing is a report merging two issues that each held a standing record in the product: the newer stands, and the other is cleared with the merge as its reason and no person named. `DESIGN-findings.md` § Merged issues holds the rule |
 
 The record is against an issue and one product, the shape an assessment has. An
 occurrence would be wrong twice over: the attack is a fact about the product rather
@@ -89,7 +89,7 @@ A decision gives way to a fact, and never the other way round. A person who
 watched this product be attacked is not the one to give way to a decision that it
 was never affected.
 
-`DESIGN-triage.md` § Decisions against a recorded attack holds the rules that
+`DESIGN-triage.md` § Decisions against an incident holds the rules that
 asymmetry produces.
 
 ## Order
@@ -103,9 +103,9 @@ deadline.
 |---|---|
 | One product | The record belongs to one, so another product's findings of the same issue keep the order their own signals give them |
 
-## Windows
+## Response windows
 
-A window is a period a deployment says it answers within, counted from one of
+A response window is a period a deployment says it answers within, counted from one of
 three moments: when an attack became known, the first notice naming another
 window, or the release of the fix.
 
@@ -133,7 +133,7 @@ window, or the release of the fix.
 | It counts only from a window in force that applies to every product it does | A notice names a window only on a product the window applies to, so a product outside it would hold a window that never starts. A reader who may read the one may read the other |
 | Not from itself, and not from a window counting back to it | A loop of windows each waiting on another's notice never starts |
 | A window another counts from is neither retired nor narrowed past it | Either would leave the other waiting on a notice nobody can record. Refused, naming the window to change first |
-| The remediation computation is not reused | That deadline stops where nothing upstream would close the finding, which is exactly the population a flaw of our own falls into, so reuse leaves the obligation with no clock at all. `DESIGN-remediation.md` § Deadlines has why that rule is right where it is |
+| The remediation computation is not reused | That deadline stops where nothing upstream would close the finding, which is exactly the population a flaw of our own falls into, so reuse leaves the response window with no clock at all. `DESIGN-remediation.md` § Deadlines has why that rule is right where it is |
 | Declared once for the deployment | What a deployment answers to is a fact about the organization running it. Declared per product, one rule would be restated for every product it covers |
 | Its products are named only to whoever may know they exist | The list of windows is readable by anybody signed in, and the list of products is itself a statement about what an organization ships. A window limited to products the reader may not know exist is left out of what they read |
 
@@ -201,10 +201,10 @@ filter over the overdue list, and never reached by one.
 
 | Rule | Reason |
 |---|---|
-| A missed remediation deadline has no counterparty and one of these does | So they are different surfaces. The failure to design against is an obligation rendering as row 4,782 among four thousand unpenalized hygiene findings |
-| Named Exploited here on screen | The words of the record, the finding's mark and the act that keeps one, so the three read as one thing and apart from a feed's exploitation flag |
+| A missed remediation deadline has no counterparty and one of these does | So they are different surfaces. The failure to design against is an incident rendering as row 4,782 among four thousand unpenalized hygiene findings |
+| Named Incidents on screen | The words of the record, the finding's mark and the act that keeps one, so the three read as one thing and apart from a feed's exploitation flag |
 | Its windows are headed response windows, never deadlines | A deadline on any other screen is the remediation deadline, which a window is not and is not derived from |
-| A record is kept from the shelf as well as from its finding | One act, one request and one form, named Record exploited here in both places. The shelf asks for the product and the issue as well, offers only the products the reader triages, and suggests the issues that product carries as one is typed, including one only in a tag, in a release past its end of support or below the triage line |
+| A record is kept from the shelf as well as from its finding | One act, one request and one form, named Record an incident in both places. The shelf asks for the product and the issue as well, offers only the products the reader triages, and suggests the issues that product carries as one is typed, including one only in a tag, in a release past its end of support or below the triage line |
 | An empty shelf names the act that fills it | Somebody arriving here during an incident is pointed at the control rather than left at an empty list |
 | Each record is narrowed by the question that authorizes one issue in one product | The same question the record's own finding asks. Nothing is counted before the narrowing, so no total says how many records exist to somebody shown fewer |
 | A product named in the address narrows the shelf to that product's records, and the screen says so with the way back to every product | A figure counted over one product opens what it counted. The narrowing is over what the reader was already shown, so it reveals nothing |
@@ -219,17 +219,17 @@ filter over the overdue list, and never reached by one.
 Each window raises a condition from the moment it starts until a notice names
 it, a second once its warning has come where it names one, and a third once its
 end has passed. Each says the time, what the window counts from, and that no
-notice is recorded. `DESIGN-notifications.md` § Obligation notices holds who
+notice is recorded. `DESIGN-notifications.md` § Response window notices holds who
 hears and when each clears.
 
 ## Bulk acts
 
 No act over many issues reaches a standing record. `DESIGN-triage.md` § Decisions
-against a recorded attack holds the rules.
+against an incident holds the rules.
 
 | | |
 |---|---|
-| No bulk dismissal and no bulk deferral | `DESIGN-triage.md` § Decisions against a recorded attack |
+| No bulk dismissal and no bulk deferral | `DESIGN-triage.md` § Decisions against an incident |
 | No vanishing under a triage floor | The record puts its findings in a band above everything a feed can say, and the line admits either exploitation signal. `DESIGN-findings.md` § Urgency |
 | No bulk clearing | A record is cleared one at a time, with a reason and a name |
 | The list a bulk decision is picked from marks an attacked issue | A selection reaching one is refused whole, so the list says which issue that is before anything is sent |
@@ -240,7 +240,7 @@ Nothing here is a compliance feature and none of it should be sold as one. The
 record is a record. Two deployments with identical records can owe entirely
 different things, and the difference lives outside this software.
 
-The exploited-here record cannot be verified by anything. It is somebody's
+An incident cannot be verified by anything. It is somebody's
 statement that an incident happened, which is what makes it append-only and
 what makes clearing it a deliberate act with a name attached. Nothing re-checks
 it, because nothing could.

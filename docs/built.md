@@ -23,7 +23,7 @@ database built by a release candidate or any other earlier build is recreated.
 | Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
 | Advisories | CSAF advisories with editorial states and a second person's agreement, stating a release known not affected where approved decisions cover it and saying no fix is planned where they say it will not be fixed, a CSAF provider directory, and per-build OpenVEX documents with a revision chain, in two kinds: this deployment's own, and that with suppliers' statements beside it |
-| Obligations | Records of exploitation, the windows they may oblige, and the notices given |
+| Incidents | Records that a product was attacked, the response windows counted from each, and the notices given |
 | Reporting | Release comparison, trends, deadlines, release readiness, exception reports, and exports as CSV or JSON |
 | Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, Slack and Zulip channels and direct messages, and operational alerts |
 | Web interface | Every screen above, embedded into the binary and served from it |

@@ -31,7 +31,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Sending back](#sending-back)
 - [The deferral threshold](#the-deferral-threshold)
 - [One live decision per key](#one-live-decision-per-key)
-- [Decisions against a recorded attack](#decisions-against-a-recorded-attack)
+- [Decisions against an incident](#decisions-against-an-incident)
 - [The triage line](#the-triage-line)
 - [Issue assessments](#issue-assessments)
 - [Coverage count](#coverage-count)
@@ -712,15 +712,15 @@ unmarked as contradictory: what applies is chosen by agreed-beats-waiting and
 then newest-wins, so approving both leaves one silently governing while the
 other stands on the record as agreed.
 
-## Decisions against a recorded attack
+## Decisions against an incident
 
-A product may record that it was exploited through an issue.
-`DESIGN-obligations.md` holds the record; what it does to decisions is here.
+A product may record an incident: that it was exploited through an issue.
+`DESIGN-incidents.md` holds the incident; what it does to decisions is here.
 
 | Rule | |
 |---|---|
-| A decision that the issue does not apply is refused while a record stands | The two say opposite things about one product, and the one that arrived from a person who watched it happen is not the one to give way |
-| A bulk act that sets the issue aside or puts it off is refused while a record stands | A standing record is an obligation somebody may be answering to, and one sentence over a selection is not how that leaves anybody's list. Every outcome that hides a finding without promising work counts: not applicable, a wrong match, a deferral, a decision not to fix, already fixed |
+| A decision that the issue does not apply is refused while an incident stands | The two say opposite things about one product, and the one that arrived from a person who watched it happen is not the one to give way |
+| A bulk act that sets the issue aside or puts it off is refused while an incident stands | A standing incident is a deadline somebody may be answering to, and one sentence over a selection is not how that leaves anybody's list. Every outcome that hides a finding without promising work counts: not applicable, a wrong match, a deferral, a decision not to fix, already fixed |
 | A bulk act saying the issues apply, or promising work, is not refused | Neither sets anything aside, and the next scan checks every row a promise names |
 | Rows set aside from a bulk act are still a bulk act | Setting rows aside makes a decision of its own, followed back to where it began. Otherwise the rule ends one step from where it started |
 | An approver may set the attacked issue aside and agree to the rest | The refusal is asked of the rows being agreed to. One attacked issue does not make a selection of hundreds unanswerable, and what is set aside meets the rule again with its author |
@@ -743,7 +743,7 @@ the ones that drown it are the ones nobody was ever going to act on.
 | Nothing is hidden until somebody decides to hide it | A tool that kept findings out of the list on the day it was installed would be deciding something nobody asked it to |
 | The line is compared against our rating where one stands | Being able to say a published rating is wrong is pointless if everything that ranks and filters then ignores us |
 | An unrated issue is judged as a medium | The same folding the deadline uses, spelled once. Briefly two rules read one fact and disagreed: on a real image 91,040 findings rated "unknown" dropped out of the working list *and* off any clock |
-| Exploitation is never below the line | A line states how bad something has to be before it is worth an afternoon, and exploitation is a fact. Either signal admits it: a feed's word about the world, and this product's own record of being attacked |
+| Exploitation is never below the line | A line states how bad something has to be before it is worth an afternoon, and exploitation is a fact. Either signal admits it: a feed's word about the world, and this product's own incident |
 | Below the line nothing is on a clock | A line says "this is not work" and a deadline says "this is work, and it is late". Within a year the overdue figure would be thousands of things nobody intended to look at |
 | Nothing on a release out of support is on a clock either (REQ-15) | Applied separately rather than folded in: it reaches further, because a line never sets aside something known to be exploited while end-of-life says nothing here will be fixed at all |
 

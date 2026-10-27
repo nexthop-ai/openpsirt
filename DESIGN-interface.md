@@ -41,7 +41,7 @@ end rather than left to be found by clicking.
 - [The inbox](#the-inbox)
 - [Static analysis leads](#static-analysis-leads)
 - [Disclosure and advisories](#disclosure-and-advisories)
-- [The Exploited here screen](#the-exploited-here-screen)
+- [The Incidents screen](#the-incidents-screen)
 - [The editor](#the-editor)
 - [Reachable from a keyboard](#reachable-from-a-keyboard)
 - [A read that failed](#a-read-that-failed)
@@ -332,7 +332,7 @@ asked occasionally, and they are also the slowest part of the page.
 
 The reader's own work leads, then the shape of the estate. Assigned to them,
 and decisions of theirs an approver sent back; then open at or above the floor,
-exploited here where anything is, known exploited, pending their approval, and
+incidents where there are any, known exploited, pending their approval, and
 overdue. Led by the estate, home
 answers "how much is there" and never "what do I do next": the largest number
 on the screen is the whole estate's open count, which is the least actionable
@@ -353,7 +353,7 @@ beside it already get.
 | **Release readiness** | The picked branch against the last release cut from it, band by band, with the move shown as a direction rather than a signed number: fewer is better here, so the color follows the meaning and not the arithmetic. Drawn only where the question has an answer — it needs a whole build, because a count across products is not a release, and a branch, because a tag is one frozen point |
 | **Quiet builds** | A build that stops being scanned reports no new findings and fails nothing, so it looks healthier than one still being scanned. Named one at a time rather than counted, because a number is read past and a name is acted on. On the front page and on the scans screen |
 | **Overdue and due soon** | Overdue is a report about something that has already happened; due-soon is the week somebody can still finish. Both come from one read of the deadline list. The overdue tile pointed at the assignments screen, which answers what is *mine*, so the number and the screen it opened disagreed for everybody but the person holding all of it |
-| **Exploited here** | Standing records that a product was attacked through an issue, one per issue and product, counted from the shelf and narrowed to the picked product, and opening the shelf narrowed to that product. A tile of its own beside the known-exploited tile, never folded into it, because the feed's count says nothing about this product. Drawn only where there is a record. A record is against a product and no build, so a branch or variant scope counts the whole product and says so |
+| **Incidents** | Standing incidents, one per issue and product, counted from the shelf and narrowed to the picked product, and opening the shelf narrowed to that product. A tile of its own beside the known-exploited tile, never folded into it, because the feed's count says nothing about this product. Drawn only where there is an incident. An incident is against a product and no build, so a branch or variant scope counts the whole product and says so |
 | **A deadline figure is a floor only where the page says so** | The read is capped, and the list is ordered by deadline, soonest first, so every overdue row comes before any row still due. A cut page holding one row still due holds every overdue row, and overdue is exact. Overdue is a floor only where the whole cut page is overdue; due soon is a floor wherever the page is cut. The all-products figure beside a scoped one follows the same rule over its own read |
 | **One count of the review queue per product** | The rail's badge, the pending figure and the pending panel's figure across products are one question, asked under one key and answered by one request. The rail polls it once a minute, and the figures on Home read the same answer |
 | **Assigned to you** | What the reader and their teams hold, in the findings list's unit, with the open vulnerability reports they hold said beside it. A report belongs to a product and no build, so it is counted beside the findings, never among them |
@@ -933,7 +933,7 @@ owns that rule.
 | A decision's scope names its locations rather than only counting them | "One location" says how large a decision was and not which code it was about. Three at most, then how many more, because a kernel sits at sixty and the list would become the card |
 | An approved decision at the same component and consumer is offered to a new issue (REQ-28) | With its reasoning and "apply decision #N", which fills the form and records the new decision as an extension. It still needs a second person |
 | A comment can be rewritten by whoever wrote it, in place | The control is offered only to the author so nobody is invited into a refusal the server would give them anyway. The box opens on the text as stored rather than as a draft: a copy of something already stored would come back later as an unsent draft of somebody's own comment |
-| What belongs to one finding goes when the screen walks to the next | The screen is not remounted when only its address changes, so the confirmation of what was recorded, the decision being extended, the rating form and the exploited-here forms are put back on arriving at another finding |
+| What belongs to one finding goes when the screen walks to the next | The screen is not remounted when only its address changes, so the confirmation of what was recorded, the decision being extended, the rating form and the incident forms are put back on arriving at another finding |
 | The rating form opens on a rating it offers | The four bands. A published "negligible" or "none" opens it on medium, and nothing it offers is milder than either |
 | The references are cut at twelve, and say how many more there are | Patches first, then advisories and reports; the rest are a control away rather than silently gone |
 | A description shortened to fit says it was shortened | Cut at a whole character with a mark after it. Stopped mid-sentence with nothing after it, it reads as the whole |
@@ -1595,10 +1595,10 @@ this product on it, read what it generates, and open it.
 | A flaw in somebody else's component is refused when it is named | The refusal names the issue somebody chose, and is shown rather than swallowed |
 | The panel hands over once there is a draft | Everything after it is the advisory's own, starting with the agreement. Whoever reaches this panel started the advisory a moment ago and is the person agreeing refuses, so a control here for agreeing, or for recording an issuance that needs one, could only ever reach a refusal |
 
-## The Exploited here screen
+## The Incidents screen
 
-One card per standing record that a product was exploited through an issue.
-`DESIGN-obligations.md` holds what the card's parts are.
+One card per standing incident.
+`DESIGN-incidents.md` holds what the card's parts are.
 
 | Rule | |
 |---|---|
@@ -1608,9 +1608,9 @@ One card per standing record that a product was exploited through an issue.
 | A fix release is named by typing a tag, offered from the product's tags in use | A tag declared before any scan of it is among them, which is the usual case. The server refuses a branch or a retired tag in its own sentence |
 | Withdraw sits beside each named tag, and a withdrawn one stays listed, struck through, with who withdrew it | A tag named in error is corrected here, and what was said stays readable |
 | A notice's places are typed one per line | A place's own name may hold a comma. Only a trailing empty line is dropped; a blank between two places goes to the server, which refuses it |
-| A notice is offered for the windows that apply to the record's product | They are the card's own windows. A window limited to another product is one the server refuses to record a notice against |
+| A notice is offered for the windows that apply to the incident's product | They are the card's own windows. A window limited to another product is one the server refuses to record a notice against |
 | Each card's notice form has fields of its own | Several cards may have the form open at once, and a label pairs with the field on its own card |
-| The finding shows the standing record's named tags, with neither form | Naming and withdrawing happen on this screen, beside the notices |
+| The finding shows the standing incident's named tags, with neither form | Naming and withdrawing happen on this screen, beside the notices |
 
 ## The editor
 
@@ -2003,7 +2003,7 @@ said so.
 | **The band a row is drawn in and the word it says are two answers** | They differ for exactly the two words a scanner reports below low. Both rank inside the low band everywhere that sorts and filters, so that is the color; what the row says is what was rated. Folded together, "rated negligible" read as "Unrated" — which tells a reader nobody has looked at a finding somebody looked at and dismissed |
 | Known-exploited is its own badge, not a replacement for the severity word | Replacing it answers one question by destroying another: an exploited medium is still a medium, and the reader needs both facts to see why it sits above an unexploited high |
 | The feed's flag reads "Known exploited", on the badge and on every caption, column and tile that counts it | The same words the findings filter uses. A bare "Exploited" reads as an attack on this product |
-| A record of being exploited here is a badge of its own, filled; the feed's flag is an outline of the same color | The record is the rarer fact and the one a person attested. The feed's flag arrives on its own on many rows, so the louder form on it reads as "we are under attack" across a whole list. `DESIGN-obligations.md` § Three conflated facts holds the distinction |
+| An incident is a badge of its own, filled; the feed's flag is an outline of the same color | The record is the rarer fact and the one a person attested. The feed's flag arrives on its own on many rows, so the louder form on it reads as "we are under attack" across a whole list. `DESIGN-incidents.md` § Three conflated facts holds the distinction |
 | The feed's badge says on hover that it is not, on its own, a sign this product was attacked | The one misreading the outline does not prevent by itself |
 | Where both apply, the record's badge comes first | Read left to right, the fact about this product leads |
 | Every row the server marks with the record draws its badge, and every caption counting the feed's flag counts the record beside it where there is one | A row showing the feed's flag alone, where the record is in hand, says less about this product than the server did |

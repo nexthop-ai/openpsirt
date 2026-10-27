@@ -35,7 +35,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Chat delivery](#chat-delivery)
 - [Chat markup](#chat-markup)
 - [Embargo notices](#embargo-notices)
-- [Obligation notices](#obligation-notices)
+- [Response window notices](#response-window-notices)
 - [Ownership of a notification](#ownership-of-a-notification)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -73,7 +73,7 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody named you | event | A name after an `@`, resolved when the text is saved |
 | An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue returning a decision that sets it aside to the queue. The second reaches somebody who was not in the exchange at all, so without it the decision simply reappears in their queue with no explanation |
 | A decision the code moved under | event | It hands work back to somebody who did nothing to cause it |
-| A merge meeting two answers that disagree in one product | event | Two decisions at one occurrence, two rating claims, or two records of being attacked dated differently. To everybody who triages the product. The merge keeps one and ends the other, and nobody chooses which. Below |
+| A merge meeting two answers that disagree in one product | event | Two decisions at one occurrence, two rating claims, or two incidents dated differently. To everybody who triages the product. The merge keeps one and ends the other, and nobody chooses which. Below |
 | An approval an edit withdrew | event | To everybody whose standing agreement a revision of the reasoning or a moved promise took back, once each, and never to whoever made the edit. Without it an approver goes on relying on an agreement the record no longer holds (REQ-24, REQ-28) |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |
 | An embargo whose date arrived | condition | Reaching the date discloses nothing (REQ-37). Clears when the date moves or the finding is disclosed |
@@ -98,9 +98,9 @@ true is cleared, and running the same pass twice changes nothing.
 | An analyzer series gone quiet on a build | condition | Below, under analyzer alerts |
 | A lead assigned, handed off, moved into or out of its flaw's case, or put back in the queue by a withdrawn dismissal | event | Below, under lead notices |
 | A standing rule on leads outgrowing its approval | condition | Below, under lead notices |
-| A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
-| The same window near its end, where it names a warning | condition | Described under obligation notices below |
-| The same window passed | condition | Described under obligation notices below |
+| A response window running, with nobody outside recorded as told | condition | Described under response window notices below |
+| The same window near its end, where it names a warning | condition | Described under response window notices below |
+| The same window passed | condition | Described under response window notices below |
 
 A new build notifies nobody. A build arriving is the ordinary state of a tool
 scanned nightly. What a build changed is on the receipts and in the trend, and
@@ -480,7 +480,7 @@ holds the rules.
 | Merge message | |
 |---|---|
 | Sent only where the two say different things: another outcome, another rating, another date of attack | Two that agree collapse to one, and nothing the product reads changes |
-| To everybody who triages the product: at private visibility where either decision is private, and for a rating claim or a record of being attacked, unless a finding of the issue in the product is disclosed | The tool chooses between two people's answers by standing, so the choice is the product's to look at. The message names both issues and links to the one that stands, so it is as private as the more private of the two. An answer about the whole issue has no visibility of its own |
+| To everybody who triages the product: at private visibility where either decision is private, and for a rating claim or an incident, unless a finding of the issue in the product is disclosed | The tool chooses between two people's answers by standing, so the choice is the product's to look at. The message names both issues and links to the one that stands, so it is as private as the more private of the two. An answer about the whole issue has no visibility of its own |
 | Names both issues and the product, and links to the decision that stands, or for the other two to the issue | That is where the one that ends can be compared with the one that stands |
 | Sent by the scan that merges the issues, once the scan has applied, to each person in turn | What a scan does and how anybody hears about it are wired together at the deployment, as the lapse message is. One person not told leaves the rest told |
 
@@ -556,7 +556,7 @@ these hold for the notification area, mail and chat alike.
 | Rule | |
 |---|---|
 | A day is the UTC day a moment falls on | One moment is one day to every reader, whatever zone the server's clock is in, and it is the day the interface shows for it (`DESIGN-interface.md`) |
-| A time within a day is to the minute in UTC, and says UTC | An obligation window ends at an hour, and a time with no zone reads as the reader's own |
+| A time within a day is to the minute in UTC, and says UTC | A response window ends at an hour, and a time with no zone reads as the reader's own |
 
 ## The notification list
 
@@ -711,7 +711,7 @@ which, and a test holds the table against the list of kinds.
 |---|---|---|
 | Somebody's own | Assigned, named in a note, a decision sent back or waiting on them, an approval withdrawn or undone, a decision that lapsed, brought into a case, an issue they hold disclosed, a deferral running out | To them directly. Never to a channel |
 | Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, an answer a merge of two issues superseded, the vulnerability data stale, a supplier silent, an upstream failing or read again | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
-| Shared, undisclosed | An embargo approaching or due, an obligation window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
+| Shared, undisclosed | An embargo approaching or due, a response window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
 
 | Person's setting | Default | Effect |
 |---|---|---|
@@ -841,11 +841,11 @@ statement carries which statement that was. Inferring it from the issue and the
 component would raise an alert about every decision at an occurrence a publisher
 happens to have spoken about.
 
-## Obligation notices
+## Response window notices
 
-A window a deployment declares runs from the moment a record says its product
-was attacked, from the first notice for the window it counts from, or from the
-release of a fix the record names (REQ-77). `DESIGN-obligations.md` holds the windows and the
+A response window a deployment declares runs from the moment an incident says
+its product was attacked, from the first notice for the window it counts from, or from the
+release of a fix the record names (REQ-77). `DESIGN-incidents.md` holds the windows and the
 notices; what is said about them is here.
 
 | Rule | Reason |
@@ -857,10 +857,10 @@ notices; what is said about them is here.
 | A window counting from the fix raises nothing until a stated release date of a tag named on the record has come | The same reason. A release date still to come is a start that has not arrived |
 | Near is raised at the warning the window names, and not at all where it names none | Beside the running one rather than instead of it. The first says an attack is being counted; the second says the count is nearly out |
 | Only for a product the window applies to | A window limited to other products raises nothing for this one |
-| One per record and window | Each window is answered separately, so each is said separately |
-| Cleared by a notice naming the window, by clearing the record, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
+| One per incident and window | Each window is answered separately, so each is said separately |
+| Cleared by a notice naming the window, by clearing the incident, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
 | To whoever may triage the product, at the issue's visibility | The people who may record the notice. An undisclosed issue reaches nobody who may not read undisclosed work there, and what leaves the deployment about it is a link |
-| No window declared, nothing said | None ships. A deployment under no obligation hears nothing |
+| No window declared, nothing said | None ships. A deployment under no response window hears nothing |
 | The sentence says the time, what the window counts from, and that nothing is recorded | All three are facts. Whether anybody owed anything is not the tool's answer to give |
 
 ## Ownership of a notification

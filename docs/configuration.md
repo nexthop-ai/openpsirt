@@ -1431,7 +1431,12 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | A bulk decision's `kind` is `bulk`, which v0.10.2 answered as `together` | A client matching on the kind matches `bulk`. The upgrade rewrites every stored one |
 | The notification kinds `claim-waiting` and `claim-lapsed` are `decision-waiting` and `decision-lapsed`, in the notifications, a webhook's body and a chat message | A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for either kind |
 | A notification v0.10.2 stored linking a decision's row at `/decisions/{id}` links `/decision-occurrences/{id}`, because `/decisions/{id}` is the decision itself | Nothing for a notification read in the application: the upgrade rewrites the link. A `/decisions/{id}` link already sent by mail or chat opens the decision with that identifier, which is a different record. Open the notification in the application instead |
-| The setting `triage.bulk-decision-cap` is the bulk action limit, which v0.10.2 named `triage.together-cap` | Nothing. The upgrade moves the value to the new name, and `/v1/settings/triage.together-cap` answers 404. A value written under the former name afterwards, by a v0.10.2 still running, is read while the new name is unset, and each start logs `a setting is held under its former name and is read from there: set it under its new name`. With both set, the new one is read, and the start logs `a setting is held under its former name and its new one: the new one is read`. Changing the setting under its new name removes the former one and ends the warning |
+| The setting `triage.bulk-decision-cap` is the bulk action limit, which v0.10.2 named `triage.together-cap` | Nothing. The upgrade moves the value to the new name, and `/v1/settings/triage.together-cap` answers 404. A value written under the former name afterwards, by a v0.10.2 still running, is read while the new name is unset, and each start logs `a setting is held under its former name and is read from there: set it under its new name`. With both set, the new one is read, and the start logs `a setting is held under its former name and its new one: the new one is read` |
+| Response fields name an incident: `exploited_here` is `incident` where it says whether one stands, and `incidents` on a finding's evidence and on a bulk decision's outliers | Rename the fields a client reads, as [Renamed API fields](#renamed-api-fields) lists |
+| The notification kinds `obligation-open`, `obligation-near` and `obligation-passed` are `response-window-open`, `response-window-near` and `response-window-passed`, in the notifications, a webhook's body and a chat message | A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for any of them |
+| A change on the administrative trail recording or clearing an incident, or naming its fix, has the kind `incident`, which v0.10.2 answered as `exploited-here`. The trail's `kind` filter takes `incident` | Ask for `kind=incident`. The upgrade rewrites every stored change. A change to a window v0.10.2 recorded keeps saying `Obligation window` in what it was about; one recorded after says `Response window` |
+| The planned upgrades download names its `exploited here` column `incident` | Rename the column a script reads |
+| The interface's address for incidents and response windows is `/incidents`. `/exploited-here` and `/obligations` forward to it | Nothing |
 | The upgrade renames the triage tables and columns, then rewrites the stored values above. Each rename waits up to three seconds for a table another session holds, then waits again, logging `a rename is waiting for a table something else holds` with what holds it | Stop v0.10.2 before the upgrade, as Every upgrade says. A wait logged again and again names the session to end |
 
 #### Renamed API fields
@@ -1451,6 +1456,8 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | `place` | `occurrence` |
 | `places` | `occurrences` |
 | `place_limit` | `occurrence_limit` |
+| `exploited_here`, whether an incident stands | `incident` |
+| `exploited_here`, a finding's incidents or a count of issues with one | `incidents` |
 
 A notice's `places`, the places it named, keeps its name.
 
