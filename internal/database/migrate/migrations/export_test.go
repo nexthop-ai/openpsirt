@@ -165,3 +165,23 @@ func StopV0110RenamingAfter(ctx context.Context, db *database.DB, name string) (
 	}
 	return false, err
 }
+
+// StopV0110RewritingAfter runs the v0.11.0 renames and the stored words after
+// them, and stops once the named step of the words has run: a start that
+// stopped there. It reports whether it stopped.
+func StopV0110RewritingAfter(ctx context.Context, db *database.DB, step string) (bool, error) {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	err := inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		if err := renameV0110(ctx, tx); err != nil {
+			return err
+		}
+		return valuesV0110Stopping(ctx, tx, step)
+	})
+	if errors.Is(err, errValuesStopped) {
+		return true, nil
+	}
+	return false, err
+}
+
+// SavedQueryV0110 is a kept filter's query string in v0.11.0's words.
+func SavedQueryV0110(query string) string { return savedQueryV0110(query) }

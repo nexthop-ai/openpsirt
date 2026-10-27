@@ -23,13 +23,13 @@ func TestADecisionNobodyApprovesIsSaidToWhoeverCouldApproveIt(t *testing.T) {
 		// A decision proposed a moment ago is not waiting, it is new. Without
 		// this the condition would fire on every decision the instant it is made,
 		// which is the review queue said twice.
-		if told := r.Alerts(t, "reviewer", "claim-waiting"); len(told) != 0 {
+		if told := r.Alerts(t, "reviewer", "decision-waiting"); len(told) != 0 {
 			t.Fatalf("a decision proposed a moment ago is reported as stale: %v", told)
 		}
 
 		r.Aged(t, decision, "proposed_at", time.Now().UTC().Add(-10*24*time.Hour))
 
-		waiting := r.Alerts(t, "reviewer", "claim-waiting")
+		waiting := r.Alerts(t, "reviewer", "decision-waiting")
 		if len(waiting) != 1 {
 			t.Fatalf("a decision waiting ten days raised %d notices: %v", len(waiting), waiting)
 		}
@@ -40,22 +40,22 @@ func TestADecisionNobodyApprovesIsSaidToWhoeverCouldApproveIt(t *testing.T) {
 		// Never its proposer. Approving your own decision is refused, so
 		// telling them it is waiting is telling them about work they
 		// are not allowed to do.
-		if told := r.Alerts(t, "triager", "claim-waiting"); len(told) != 0 {
+		if told := r.Alerts(t, "triager", "decision-waiting"); len(told) != 0 {
 			t.Errorf("the proposer was told their own decision is waiting on them: %v", told)
 		}
 		// And never somebody who may read the product but cannot approve.
-		if told := r.Alerts(t, "reader", "claim-waiting"); len(told) != 0 {
+		if told := r.Alerts(t, "reader", "decision-waiting"); len(told) != 0 {
 			t.Errorf("somebody who cannot approve was told: %v", told)
 		}
 		// Nor somebody who may approve and may read nothing here — the
 		// capability is bounded by what they may read.
-		if told := r.Alerts(t, "approver", "claim-waiting"); len(told) != 0 {
+		if told := r.Alerts(t, "approver", "decision-waiting"); len(told) != 0 {
 			t.Errorf("an approver who reaches nothing was told about it: %v", told)
 		}
 
 		// It clears by the thing happening, which nobody dismisses.
 		r.Agreed(t, decision)
-		if told := r.Alerts(t, "reviewer", "claim-waiting"); len(told) != 0 {
+		if told := r.Alerts(t, "reviewer", "decision-waiting"); len(told) != 0 {
 			t.Errorf("after approval the decision is still reported as waiting: %v", told)
 		}
 	})
@@ -87,7 +87,7 @@ func TestADecisionSentBackAndLeftIsSaidToItsAuthor(t *testing.T) {
 			t.Errorf("the notice does not say what leaving it costs: %q", told[0])
 		}
 		// It is not also reported as waiting on an approver: it is not.
-		if waiting := r.Alerts(t, "reviewer", "claim-waiting"); len(waiting) != 0 {
+		if waiting := r.Alerts(t, "reviewer", "decision-waiting"); len(waiting) != 0 {
 			t.Errorf("a sent-back decision is reported as waiting on the approver: %v", waiting)
 		}
 

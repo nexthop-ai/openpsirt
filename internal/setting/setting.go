@@ -14,6 +14,7 @@ package setting
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -121,7 +122,7 @@ const (
 	// either. The distinction is reversibility rather than size: nothing
 	// re-checks a dismissal, while the next scan re-checks every row a
 	// promise names.
-	BulkDecisionCap = "triage.together-cap"
+	BulkDecisionCap = "triage.bulk-decision-cap"
 	// ReviewIssues is how many issues one act may answer where a second
 	// person has to agree to it: a new answer about many issues at once, or
 	// one carried or re-confirmed that goes back to an approver. It counts
@@ -656,7 +657,22 @@ func NewStore(db bun.IDB) *Store {
 // deciding which deferrals need a second person. A policy that quietly becomes
 // a different policy under load is the kind of failure nobody finds, because
 // nothing anywhere reports it.
+//
+// A setting with a former name answers from a row under that name where none
+// is under its own, so a value written there still holds.
 func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
+	value, set, err := s.read(ctx, name)
+	if err != nil || set {
+		return value, set, err
+	}
+	if former, ok := formerNames[name]; ok {
+		return s.read(ctx, former)
+	}
+	return "", false, nil
+}
+
+// read reads the row under one name.
+func (s *Store) read(ctx context.Context, name string) (string, bool, error) {
 	row := new(Setting)
 	switch err := s.db.NewSelect().Model(row).Where(`"name" = ?`, name).Scan(ctx); {
 	case database.IsNoRows(err):
@@ -665,6 +681,48 @@ func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
 		return "", false, fmt.Errorf("read the %q setting: %w", name, err)
 	}
 	return row.Value, true, nil
+}
+
+// formerNames is the name each renamed setting had, by its name now. The
+// upgrade that renamed it moves the row; a row under the former name is one a
+// binary of the earlier release wrote afterwards.
+var formerNames = map[string]string{
+	BulkDecisionCap: "triage.together-cap",
+}
+
+// FormerName is a row held under a setting's former name.
+type FormerName struct {
+	// Former is the name the row is under, and Name the one the setting has.
+	Former, Name string
+	// Shadowed says a row under Name is set too, which is the one read.
+	Shadowed bool
+}
+
+// FormerNames is every row held under a setting's former name, in the order
+// of the names they stand for.
+func (s *Store) FormerNames(ctx context.Context) ([]FormerName, error) {
+	names := make([]string, 0, len(formerNames))
+	for name := range formerNames {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	var out []FormerName
+	for _, name := range names {
+		former := formerNames[name]
+		_, held, err := s.read(ctx, former)
+		if err != nil {
+			return nil, err
+		}
+		if !held {
+			continue
+		}
+		_, shadowed, err := s.read(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, FormerName{Former: former, Name: name, Shadowed: shadowed})
+	}
+	return out, nil
 }
 
 // Change records a setting and answers what it replaced.

@@ -223,7 +223,7 @@ func TestASettingThatWouldReadAsUnsetIsRefused(t *testing.T) {
 
 		// The one setting that is a count rather than a duration is checked as
 		// a count. A duration there would be stored and then ignored.
-		cap := "/v1/settings/triage.together-cap"
+		cap := "/v1/settings/triage.bulk-decision-cap"
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, cap,
 			`{"value":"48h"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a duration was accepted as a count: %d %s", got.Code, got.Body.String())

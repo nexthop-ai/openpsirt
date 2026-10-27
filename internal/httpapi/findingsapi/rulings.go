@@ -76,7 +76,7 @@ func registerRulings(api huma.API, in core.Deps) {
 			"date first.\n\n" +
 			"Every report named has to be in this product, not accepted as an issue, and " +
 			"under no ruling, or nothing is " +
-			"written. The number of reports is bounded by `triage.together-cap`.",
+			"written. The number of reports is bounded by `triage.bulk-decision-cap`.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`

@@ -604,7 +604,7 @@ func TestAPromiseCarriesNoBoundAndADecisionKeepsItsOwn(t *testing.T) {
 		r.ScannedSiblings(t)
 		// One, so anything covering more than a single occurrence is past it.
 		// The fold here is five occurrences.
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.bulk-decision-cap",
 			`{"value":"1"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
 		}

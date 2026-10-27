@@ -487,6 +487,21 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 			"mapping", mapping.String(), "grants", mapping.Grants)
 	}
 	settings := setting.NewStore(db.DB)
+	// A row under a setting's former name is one an earlier release wrote
+	// after the upgrade renamed it, and is read only while the new name is unset.
+	formers, err := settings.FormerNames(ctx)
+	if err != nil {
+		return nil, passes{}, startupFailed(err, "reading settings held under a former name", cfg)
+	}
+	for _, f := range formers {
+		if f.Shadowed {
+			logger.Warn("a setting is held under its former name and its new one: the new one is read",
+				"former", f.Former, "setting", f.Name)
+			continue
+		}
+		logger.Warn("a setting is held under its former name and is read from there: set it under its new name",
+			"former", f.Former, "setting", f.Name)
+	}
 	rights := httpapi.Rights(db.DB)
 	logger.Info("roles are assigned", "mode", mode)
 

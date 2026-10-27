@@ -97,6 +97,8 @@ func (w *sweep) waitingDecisions(ctx context.Context) (map[int64][]Holds, error)
 		private, internal := split.told()
 		days := int(now.Sub(row.ProposedAt).Hours() / 24)
 		holds := Holds{
+			// The words v0.10.0 hashed, kept: an open condition is matched by
+			// this hash, and a new one would tell everybody again.
 			About: identify(fmt.Sprintf("claim-waiting %d", row.DecisionID)),
 			Body: fmt.Sprintf("A decision in %s has been waiting %s for a second person. "+
 				"It covers %s and takes effect only once somebody agrees to it.",

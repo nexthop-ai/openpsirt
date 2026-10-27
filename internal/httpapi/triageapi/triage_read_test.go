@@ -750,7 +750,7 @@ func TestTheBulkBoundIsChargedAsEachBuildResolves(t *testing.T) {
 		if _, err := r.DB.DB.NewInsert().Model(&second).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.together-cap",
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.bulk-decision-cap",
 			`{"value":"1"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
 		}

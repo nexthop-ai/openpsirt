@@ -154,7 +154,7 @@ func TestABulkDecisionCarriesItsOutliersAndTheyCanBeSetAside(t *testing.T) {
 			t.Fatalf("the queue reads as %s (%v)", got.Body.String(), err)
 		}
 		one := out.Items[0]
-		if one.Decision.Kind != "together" || one.Issues != 2 || one.Outliers == nil {
+		if one.Decision.Kind != "bulk" || one.Issues != 2 || one.Outliers == nil {
 			t.Fatalf("a bulk decision reads as %+v", one)
 		}
 		o := one.Outliers

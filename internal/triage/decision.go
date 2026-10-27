@@ -175,7 +175,7 @@ const (
 	// covering the occurrences it sits at. A re-affirmation is one too.
 	FindingDecision DecisionKind = "finding"
 	// BulkDecision is one decision about many issues at one component.
-	BulkDecision DecisionKind = "together"
+	BulkDecision DecisionKind = "bulk"
 	// ExtensionDecision carries an approved decision to a new issue at the same
 	// component under the same consumer, with the same justification.
 	ExtensionDecision DecisionKind = "extension"

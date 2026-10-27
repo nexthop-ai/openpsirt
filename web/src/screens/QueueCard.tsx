@@ -227,7 +227,7 @@ export function Card({
   // occurrence, and one issue can sit at many.
   const rejecting = issuesIn(decision.outliers?.rows ?? [], aside);
   const draftKey = `send-back:${decision.key}`;
-  const bulk = decision.kind === "together";
+  const bulk = decision.kind === "bulk";
   const extension = decision.kind === "extension";
   const busy = approveDecision.isPending || rejectDecision.isPending;
   const error = approveDecision.error ?? rejectDecision.error;

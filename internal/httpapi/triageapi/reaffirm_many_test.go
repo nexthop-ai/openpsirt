@@ -316,7 +316,7 @@ func TestADecisionLapsesWhenItsIssueIsRatedWorseHere(t *testing.T) {
 			t.Errorf("the listing says %+v, want rated worse to critical and the code unmoved",
 				listed[0])
 		}
-		if told := r.Alerts(t, "triager", "claim-lapsed"); len(told) == 0 {
+		if told := r.Alerts(t, "triager", "decision-lapsed"); len(told) == 0 {
 			t.Error("the proposer was not told their decision lapsed")
 		}
 

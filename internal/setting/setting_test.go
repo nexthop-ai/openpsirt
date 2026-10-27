@@ -158,3 +158,51 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 		}
 	})
 }
+
+// A setting renamed by an upgrade answers from a row under its former name
+// while its own name is unset, and its own name outranks the former once set.
+// Each state is reported, for the warning at startup.
+func TestARenamedSettingReadsItsFormerNameUntilItsOwnIsSet(t *testing.T) {
+	eachSetting(t, func(t *testing.T, s *setting.Store) {
+		ctx := t.Context()
+		formers := func() []setting.FormerName {
+			t.Helper()
+			got, err := s.FormerNames(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		limit := func() int {
+			t.Helper()
+			got, err := s.Count(ctx, setting.BulkDecisionCap, 2000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		if got := formers(); len(got) != 0 {
+			t.Errorf("nothing under a former name reported as %v", got)
+		}
+		if _, _, err := s.Change(ctx, "triage.together-cap", "300"); err != nil {
+			t.Fatal(err)
+		}
+		if got := limit(); got != 300 {
+			t.Errorf("the limit reads %d with only its former name set, want 300", got)
+		}
+		want := setting.FormerName{Former: "triage.together-cap", Name: setting.BulkDecisionCap}
+		if got := formers(); len(got) != 1 || got[0] != want {
+			t.Errorf("the former name reported as %v, want %v", got, want)
+		}
+		if _, _, err := s.Change(ctx, setting.BulkDecisionCap, "40"); err != nil {
+			t.Fatal(err)
+		}
+		if got := limit(); got != 40 {
+			t.Errorf("the limit reads %d with both names set, want its own 40", got)
+		}
+		want.Shadowed = true
+		if got := formers(); len(got) != 1 || got[0] != want {
+			t.Errorf("both names reported as %v, want %v", got, want)
+		}
+	})
+}

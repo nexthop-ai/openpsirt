@@ -33,7 +33,7 @@ const WORDS: Record<Kind, string> = {
   // The four things that are wrong because nothing has happened. Each says
   // what has stopped rather than what took place, which is what makes a row
   // of them read as a list of things to pick up.
-  "claim-waiting": "waiting for a second person",
+  "decision-waiting": "waiting for a second person",
   "sent-back-waiting": "sent back and not revised",
   "deferral-ending": "deferral running out",
   "queue-untaken": "sitting in a team queue",
@@ -43,7 +43,7 @@ const WORDS: Record<Kind, string> = {
   // Told to an approver: what they agreed to was changed, so their
   // agreement stopped counting.
   "approval-withdrawn": "agreed decision changed",
-  "claim-lapsed": "stopped applying",
+  "decision-lapsed": "stopped applying",
   // Two decisions that disagreed met when two issues merged; one stands.
   "merge-superseded": "superseded by a merge",
   "brought-in": "brought into a case",

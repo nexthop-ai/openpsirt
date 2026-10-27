@@ -172,7 +172,7 @@ const (
 	//
 	// DecisionWaiting is a decision that has been waiting on a second person for
 	// longer than this deployment allows.
-	DecisionWaiting Kind = "claim-waiting"
+	DecisionWaiting Kind = "decision-waiting"
 	// SentBackWaiting is a decision an approver asked more of and nobody has
 	// touched since. The queue shows it to neither of them: it is not waiting
 	// on the approver, and the proposer's tab lists what is pending.
@@ -206,7 +206,7 @@ const (
 	// DecisionLapsed is a decision the code moved out from under. It hands work
 	// back to somebody who did nothing to cause it, and the alternative is the
 	// finding reappearing as though nobody had ever looked at it.
-	DecisionLapsed Kind = "claim-lapsed"
+	DecisionLapsed Kind = "decision-lapsed"
 	// MergeSuperseded is two decisions that disagreed meeting when a report
 	// merged the issues they were filed under: two decisions about one occurrence,
 	// two rating claims, or two records of being attacked, in one product.

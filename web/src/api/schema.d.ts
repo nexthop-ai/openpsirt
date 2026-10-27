@@ -5115,7 +5115,7 @@ export interface paths {
          *
          *     A duplicate of a flaw recorded here, covering a report from outside, gives the flaw's undisclosed occurrences in this product a disclosure date, or brings theirs earlier: when the earliest such report arrived, plus `disclosure.after`. Bringing a date earlier past the movement threshold waits for a second person, as a shortening does. Withdrawing the ruling puts the date back where it set it. `GET /v1/products/{product}/issues/{issue}/duplicate-disclosure` says the date first.
          *
-         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`.
+         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.bulk-decision-cap`.
          *
          *     Requires: private-triage on the product
          */
@@ -8766,7 +8766,7 @@ export interface components {
              * @description The sort of action: one decision about a finding, one about many issues at a component, an approved decision carried to a new issue, or occurrences set aside from a larger decision — by an approver agreeing to the rest, or by the author holding them back
              * @enum {string}
              */
-            kind: "finding" | "together" | "extension" | "returned";
+            kind: "finding" | "bulk" | "extension" | "returned";
             /** @description The moment the action was taken */
             proposed_at: string;
             /** @description The person who took it, by sign-in identity */
@@ -11889,7 +11889,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -12046,7 +12046,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "decision-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "decision-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "report-message" | "report-sent" | "report-noted" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "lead-reopened" | "rule-outgrown" | "rule-waiting" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -14306,7 +14306,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            kind: "finding" | "together" | "extension" | "returned";
+            kind: "finding" | "bulk" | "extension" | "returned";
             needs_approval?: boolean;
             /**
              * Format: int64

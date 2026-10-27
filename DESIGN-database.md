@@ -569,6 +569,30 @@ declared under the new names, `decision_stamp` among them.
 | SQLite keeps the constraint names v0.10.0 wrote | A constraint's name is part of a SQLite table's text, which only a rebuild rewrites, and SQLite reports none of them |
 | PostgreSQL names each renamed table's sequence after it | The sequence keeps its table's old name otherwise |
 
+The stored values the renames reach then take the new words, in a step of
+its own after the renames.
+
+| Stored value | v0.10.0 | v0.11.0 |
+|---|---|---|
+| A bulk decision's `kind` on `decision` | `together` | `bulk` |
+| `kind` on `notification` and `outbound` | `claim-waiting`, `claim-lapsed` | `decision-waiting`, `decision-lapsed` |
+| A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
+| The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
+
+| Rule | Why |
+|---|---|
+| Each step writes only rows still holding a v0.10.0 value | A second start changes what the first did not reach, and nothing twice. On MySQL and MariaDB the renames committed the upgrade's transaction, so each statement here commits as it runs |
+| PostgreSQL and SQLite rewrite inside the upgrade's one transaction | A failure leaves every value as it was |
+| A kept filter is rewritten in Go, one part of its query string at a time | A word matched in SQL also matches inside a value. Every other part stays byte for byte, because the list recognizes a kept filter as open by comparing addresses |
+| The setting's row moves only where none is under the new name | A row under the new name outranks the former one |
+| The setting is read under its former name while the new one is unset, and each start logs a warning naming both | A v0.10.0 binary still running after the upgrade writes the former name |
+| A waiting condition's identity keeps the words v0.10.0 hashed | An open condition is matched by that hash, and a new one would notify everybody again |
+| The trail of administrative changes keeps the former setting name | It records a change under the name the setting had |
+| A decision's record of how its set was chosen is kept as written | It records what somebody asked for |
+
+The rewrite's time grows with the notifications of the two kinds, and is not
+measured.
+
 | Table | Change | Every engine |
 |---|---|---|
 | `flaw_report` | Gains a title, who holds it and since when. Loses the acknowledged moment and who acknowledged | Each acknowledgement is first written as a message sent, dated the day it was recorded, by whoever recorded it, with no text. A report already holding a sent message is stepped over, so a start after one that stopped part way writes none twice. The index serving the unanswered list is dropped, then the foreign key naming who acknowledged on the server engines, then the columns. The holder's foreign key is added where the table does not hold it, whatever the columns say, since a stopped upgrade can leave the columns changed and the key not added |
@@ -584,6 +608,8 @@ declared under the new names, `decision_stamp` among them.
 | A v0.10.0 database holding a decision with a row at an occurrence, a revision, an approval, a comment and its earlier wording, a build and a commitment | Upgraded, each row read back under its v0.11.0 name pointing where it did, and each renamed table's declaration describing the table built |
 | The same, stopped after one rename: at a table, a column and an index, and on the three servers at a unique constraint and a foreign key | On MySQL and MariaDB what was renamed stays renamed, and on PostgreSQL and SQLite nothing does. Started again, the upgrade leaves what one that did not stop leaves |
 | A rename whose table another session holds, on the three servers | It waits, logs the session holding the table, and runs once the session lets go |
+| A v0.10.0 database holding a bulk decision, a notification and a destination of each renamed kind, a kept filter naming the renamed words and the bulk action limit | Upgraded, each value read back in its v0.11.0 spelling and every value beside it unchanged |
+| The same, stopped after a step rewriting values: a decision's kind, a notification's, a destination's, the kept filters and the setting | Started again, the upgrade leaves what one that did not stop leaves |
 
 ### Release records
 
