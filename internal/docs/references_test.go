@@ -18,10 +18,13 @@ import (
 )
 
 var (
-	// A design document named by path, with the section it points at where
-	// one follows. The heading is taken as the rest of the text and matched
-	// by prefix, because nothing marks where a heading written in prose ends.
-	designReference = regexp.MustCompile("design-docs/([a-z0-9-]+)\\.md`?\\]?(?:[ \t]*(?:\n[ \t]*(?://+|#+|\\*|--|;+)?[ \t]*)?§[ \t]*([^\n]*))?")
+	// A design document named by path.
+	designReference = regexp.MustCompile(`design-docs/([a-z0-9-]+)\.md`)
+	// The section mark that may follow one. The heading is the text after it,
+	// matched by prefix, because nothing marks where a heading written in
+	// prose ends; the text is read from the mark onward rather than matched,
+	// so a second reference on the same line is found by its own match.
+	sectionMark = regexp.MustCompile("^`?\\]?(?:[ \t]*(?:\n[ \t]*(?://+|#+|\\*|--|;+)?[ \t]*)?)§[ \t]*")
 	// A comment's marker at the start of a continued line, removed so a
 	// heading wrapped across two comment lines reads as one.
 	continuation = regexp.MustCompile(`\n[ \t]*(?://+|#+|\*|--|;+)?[ \t]*`)
@@ -48,13 +51,15 @@ func referenceProblems(files map[string]string, headings map[string][]string) (p
 				problems = append(problems, fmt.Sprintf("%s:%d: design-docs/%s is not there", name, line, doc))
 				continue
 			}
-			if m[4] < 0 {
+			mark := sectionMark.FindStringIndex(body[m[1]:])
+			if mark == nil {
 				continue
 			}
 			// The section text, with the lines after it joined on, so a
 			// heading wrapped onto the next line is still read whole.
-			end := min(len(body), m[4]+200)
-			text := strings.Join(strings.Fields(continuation.ReplaceAllString(body[m[4]:end], " ")), " ")
+			from := m[1] + mark[1]
+			end := min(len(body), from+200)
+			text := strings.Join(strings.Fields(continuation.ReplaceAllString(body[from:end], " ")), " ")
 			if !slices.ContainsFunc(held, func(h string) bool { return beginsWith(text, h) }) {
 				problems = append(problems, fmt.Sprintf("%s:%d: design-docs/%s has no heading beginning %q",
 					name, line, doc, firstWords(text, 6)))
@@ -146,6 +151,7 @@ func TestAReferenceThatReachesNothingIsReported(t *testing.T) {
 		"a heading cut short":       dd + "a.md § Reads a write",
 		"a heading run into a word": dd + "a.md § Limitsless",
 		"a section mark wrapped":    "`" + dd + "a.md`\n// § Writes",
+		"a second on the same line": dd + "a.md § Limits, and " + dd + "a.md § Writes",
 	} {
 		if problems, _ := referenceProblems(map[string]string{"x.go": body}, headings); len(problems) == 0 {
 			t.Errorf("%s was not reported", what)
