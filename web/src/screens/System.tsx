@@ -14,17 +14,18 @@ import { WebhookDelivery } from "./Webhooks";
 
 // The deployment's own state, rather than what it has found.
 //
-// Work the queue gave up on, with its retry; what is waiting and the bound
-// that refuses more of it; and whether what this deployment sends is arriving.
+// The background jobs waiting and the bound that refuses more of them; the
+// jobs that failed, with their retry; and whether what this deployment sends is
+// arriving.
 //
 // An operator's screen rather than an auditor's: what a worker reported can
 // quote what the job was about. That is
 // not one of the deployment's own records.
 //
 // They are one screen because they are one question — is this deployment
-// working — and because each of them fails silently. A queue that has given up
-// looks exactly like a quiet one, and a webhook that has been refusing for a
-// week looks exactly like one nothing has been sent to.
+// working — and because each of them fails silently. Background jobs that have
+// failed look exactly like a quiet queue, and a webhook that has been refusing
+// for a week looks exactly like one nothing has been sent to.
 //
 // Configuring a webhook is not here. Adding one is administration and sits
 // under Settings with the rest of what a deployment is set to; what is here is
@@ -38,7 +39,7 @@ export function System() {
         <p>The deployment&rsquo;s own state, and whether what it posts is arriving</p>
       </div>
       <VulnerabilityData />
-      <TheQueue />
+      <BackgroundJobs />
       <UpstreamUnanswered />
       <PatchBranches />
       <WebhookDelivery />
@@ -256,8 +257,8 @@ function because(why?: string) {
   }
 }
 
-// The work waiting, and the work that stopped being retried.
-function TheQueue() {
+// The background jobs waiting, and the jobs that failed.
+function BackgroundJobs() {
   const queries = useQueryClient();
   const work = useQuery({
     queryKey: ["set-aside"],
@@ -271,7 +272,7 @@ function TheQueue() {
 
   if (work.isPending) return <Loading />;
   if (work.isError) {
-    return <Failed error={work.error} what="The queue's own state could not be read." />;
+    return <Failed error={work.error} what="The background jobs could not be read." />;
   }
   const waiting = work.data?.waiting ?? [];
   const rows = work.data?.items ?? [];
@@ -279,7 +280,7 @@ function TheQueue() {
   return (
     <>
       <section className="panel">
-        <h3>Queue</h3>
+        <h3>Background jobs</h3>
         <p className="hint" style={{ marginTop: 0 }}>
           Per kind, against its limit.
         </p>
