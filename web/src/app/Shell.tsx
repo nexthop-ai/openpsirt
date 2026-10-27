@@ -50,7 +50,7 @@ import { useClickAway } from "../ui/away";
 // total counted without them is a number that disagrees with the list it
 // opens. Built from the entry's own address for that reason.
 const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"));
-// The Findings entry's badge, for the same reason: the list it opens writes the
+// The Dependency findings entry's badge, for the same reason: the list it opens writes the
 // same narrowings, so the count is asked with them.
 const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 
@@ -244,7 +244,8 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             <Rail
               to={findingsPath({ product, branch_or_tag: branchOrTag, variant })}
               icon="bug"
-              label="Findings"
+              label="Dependency findings"
+              hint="SCA"
               count={open.data?.total}
               unread={open.isError}
               unit="findings — an issue at a component, counted once per build"
@@ -436,6 +437,7 @@ function Rail({
   mark,
   icon,
   label,
+  hint,
   count,
   unread,
   unit,
@@ -452,6 +454,8 @@ function Rail({
   mark?: string;
   icon: string;
   label: string;
+  // What the entry is, on hover, where the label alone leaves it unclear.
+  hint?: string;
   count?: number;
   // An unreadable count. A badge is gated on being above zero,
   // so a failed or refused count draws exactly like "nothing waiting" — which
@@ -516,13 +520,19 @@ function Rail({
       pathname === to.split("?")[0] &&
       [...new URLSearchParams(mark)].every(([key, value]) => asked.getAll(key).includes(value));
     return (
-      <Link to={to} state={TO_THE_TOP} className="nav" aria-current={here ? "page" : undefined}>
+      <Link
+        to={to}
+        state={TO_THE_TOP}
+        className="nav"
+        title={hint}
+        aria-current={here ? "page" : undefined}
+      >
         {body}
       </Link>
     );
   }
   return (
-    <NavLink to={to} state={TO_THE_TOP} end={end} className="nav">
+    <NavLink to={to} state={TO_THE_TOP} end={end} className="nav" title={hint}>
       {body}
     </NavLink>
   );

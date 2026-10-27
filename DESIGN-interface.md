@@ -236,13 +236,16 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the audit log. The audit log is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed under Analytics with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the published advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
+| **The named build** | The dependency findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed under Analytics with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, the disclosure deadlines, the published advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
+
+The findings entry is labeled Dependency findings, with SCA on hover, because
+it lists what a scan of the inventory matched; security testing holds the rest.
 
 A build-only entry declines rather than opening on a scope that means nothing.
 With a product, branch or variant unpicked, the tree and Uploads entries are
-disabled and say why. Findings is not one of them: it takes whatever is
-selected, and the count beside it is of what the list it opens will show. It is
+disabled and say why. Dependency findings is not one of them: it takes whatever
+is selected, and the count beside it is of what the list it opens will show. It is
 asked with the narrowings the list writes into its own address when the address
 is silent, as the Unassigned entry's is.
 
@@ -1485,7 +1488,7 @@ the screens draw them.
 | Rule | |
 |---|---|
 | The link appears only for somebody who reads internal material in the product | A code finding is internal, and every read of one asks that |
-| The rail carries it under the scope as Security testing, beside Findings and Vulnerability reports, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
+| The rail carries it under the scope as Security testing, beside Dependency findings and Vulnerability reports, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
 | The Security testing screen opens on the queue, with one tab per state | The queue is open code findings with nothing waiting. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
 | What the queue leaves out is counted above it | How many wait for approval, how many a suppression rule dismisses, the second opening the dismissed tab, and how many are past end of life |
 | A row opens the code finding on the build it is on | Evidence is per build, so the row names one build and how many others hold the code finding in the state listed. The build and the date it opened do not wrap |

@@ -104,3 +104,10 @@ describe("the code findings entry", () => {
     expect(entry("Security testing")?.getAttribute("href")).toBe("/products/sonic/code-findings");
   });
 });
+
+describe("the dependency findings entry", () => {
+  it("names what it lists, and says SCA on hover", async () => {
+    await railAt("/products/sonic", [{ product: "sonic", reads_private: true }]);
+    expect(entry("Dependency findings")?.title).toBe("SCA");
+  });
+});
