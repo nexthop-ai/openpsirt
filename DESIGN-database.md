@@ -423,7 +423,7 @@ which reads as no attempt in flight.
 | The image version table is made | By v0.9.0's declaration. On MySQL and MariaDB in a transaction of its own, as is every step after it: both commit a data-definition statement as it runs, so steps sharing a transaction would run a statement at a time and a merge stopped part way would stay part done. The next start steps over the table, and each later step steps over what a stopped attempt finished |
 | Every build's row is taken | The lock a scan's apply and a run's apply take, so on a server a replica of v0.8.0 still running waits rather than writing a graph part way through the upgrade |
 | Images are found by their package identifier | A component whose identifier is of type `oci` or `docker`. v0.8.0 kept nothing saying the format called a component a container, so one with no identifier is not found, and its next upload stores it by name |
-| On PostgreSQL, the columns pointing at what the merge removes are indexed while it runs | Where v0.8.0 held an image: the component a finding is against and what pulls it in, a tag's component, a node's component, and an edge's parent. PostgreSQL checks the references to a removed row by reading each table holding them, and a column no index code findings with makes that read the whole table, once per row removed. Each index has a name of its own and is made only where none of that name exists, so an index an operator made on the same column is left alone. All are removed once the findings have moved, so the schema the upgrade builds is v0.9.0's. MySQL and MariaDB index every column a foreign key names, and SQLite checks no reference while an upgrade runs, so neither needs them |
+| On PostgreSQL, the columns pointing at what the merge removes are indexed while it runs | Where v0.8.0 held an image: the component a finding is against and what pulls it in, a label's component, a node's component, and an edge's parent. PostgreSQL checks the references to a removed row by reading each table holding them, and a column no index code findings with makes that read the whole table, once per row removed. Each index has a name of its own and is made only where none of that name exists, so an index an operator made on the same column is left alone. All are removed once the findings have moved, so the schema the upgrade builds is v0.9.0's. MySQL and MariaDB index every column a foreign key names, and SQLite checks no reference while an upgrade runs, so neither needs them |
 | Each image's components are grouped by name | The identifier with no version, reduced the way identity reduces it |
 | A name some build held at two versions at once is left as it is, in every build | Two of its nodes in one build with intervals that overlap. v0.9.0 keeps such images apart by version too. A build holding that name once moves to the name on its next upload, once, as a version moving would |
 | One component is kept per name | The one already identified by the name where there is one, and otherwise the earliest. It takes the name's identity, no version, the identifier with no version, and the fold key that follows; a supplier, license or platform enumeration it lacks is taken from the others |
@@ -433,7 +433,7 @@ which reads as no attempt in flight.
 | Nodes are pointed at the kept component, and joined | A build's nodes whose intervals meet, one closing at the scan the next opened, are one node across both: the first is kept, its interval reaches the last one's end, and its identifier is the last one's with no version. A gap stays two nodes |
 | Each old node is a version the build stated | One image version row per node, on the node kept: the old component's version and the node's identifier, across the old node's interval |
 | Edges are pointed at the kept nodes, and joined | After every image is merged, an edge whose pair and scope match one that closed at the scan it opened is joined into that one |
-| Findings and tags are pointed at the kept component | Both the component a finding is against and what pulls it in. A tag the merged image carried twice for one issue in one product keeps the first added |
+| Findings and labels are pointed at the kept component | Both the component a finding is against and what pulls it in. A label the merged image carried twice for one issue in one product keeps the first added |
 | The findings are read and moved once for every image | Read for the occurrences decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
 | The other components are removed | Nothing points at them any more |
 | Each destination's name is folded | The name becomes its lower-case key and the spelling typed is kept beside it (`DESIGN-notifications.md` § Outbound HTTP). Two names one kind held that fold to one key stay two. One still in use keeps the key before a retired one, then the one already spelled as the key, then the earliest. The other takes the key followed by its own number, and that numbered key is also the name it is listed under, so retiring it by the name shown reaches it. On MySQL and MariaDB in a transaction of its own between the image version table and the merge, which asks whether the column is there before adding it, so a start after one stopped part way folds rather than failing on the column |
@@ -451,7 +451,7 @@ as v0.9.0 stores the same image.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decision occurrences beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one tag on it, one commitment on its fold, the occurrence proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the occurrence about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
+| A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decision occurrences beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one label on it, one commitment on its fold, the occurrence proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the occurrence about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
 | The same on PostgreSQL, a trigger on every table refusing a removal while a column pointing at the table leads no index, and an index made by hand on one such column | Migrations 42, 43 and 44 remove nothing the trigger refuses, components and nodes are removed under it, the index made by hand is still there, and none of the merge's own remains |
 | The same on MySQL and MariaDB, the merge stopped at its last step | No version is recorded, no image version written and every stamp is still its own component. The next start steps over the table and leaves what an upgrade that did not stop leaves |
 | The nodes of that build, one component carrying a source package | Upgraded, that component's node holds its source package and version, and every other node holds none |
@@ -551,6 +551,7 @@ names.
 | `obligation_window`, `obligation_window_product` | `response_window`, `response_window_product` |
 | `routing_rule` | `assignment_rule` |
 | `advisory_source` | `supplier_advisory_feed` |
+| `finding_tag` | `finding_label` |
 
 | Column | v0.11.0 name |
 |---|---|
@@ -561,6 +562,7 @@ names.
 | `urgency_exploited_here`, on `finding` | `urgency_incident` |
 | `triage_floor`, on `product` | `minimum_severity` |
 | `routed_by`, on `finding` | `assigned_by_rule` |
+| `tag`, on `finding_label` | `label` |
 
 Every index and constraint named after a renamed table or column is renamed
 with it: `claim_approval_claim_idx` is `decision_approval_decision_idx`,
@@ -592,7 +594,7 @@ its own after the renames.
 | A notification's `link` to a decision's row at one occurrence | `/decisions/{id}` | `/decision-occurrences/{id}` |
 | A change's `kind` on `admin_change` | `exploited-here` | `incident` |
 | A failed job's `state` on `job` | `dead` | `failed` |
-| A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `sort=places` | `decision`, `decision_state`, `sort=occurrences` |
+| A kept filter's `query` on `saved_filter` | `claim`, `claim_state`, `tag`, `sort=places` | `decision`, `decision_state`, `label`, `sort=occurrences` |
 | The bulk action limit's `name` on `application_setting` | `triage.together-cap` | `triage.bulk-decision-cap` |
 | The minimum severity's `name` on `application_setting` | `triage.floor` | `triage.minimum-severity` |
 | The assignment batch's `name` on `application_setting` | `routing.batch` | `assignment.batch` |

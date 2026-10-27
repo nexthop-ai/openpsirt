@@ -408,7 +408,7 @@ name is not enough.
 | A name matching none is not found, and is looked up only once the request is authorized | A refusal that differs between a held name and a missing one, for a build the caller may not read, says what the build holds |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
 | Findings rows, tree nodes, the rows of the tree of one's own work, the steps of a way down, component packages, and the unassigned, late, disposed, blocking and decision lists carry the ecosystem and namespace | A screen can send back only what it was given |
-| The finding and its reach, decision, assignment and tags, a component's neighbors, trend, open issues and decision about them, and a list narrowed beneath one, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
+| The finding and its reach, decision, assignment and labels, a component's neighbors, trend, open issues and decision about them, and a list narrowed beneath one, take all four and narrow the same way | A route taking fewer resolves a name the others refuse |
 
 ## Upstream name and version
 

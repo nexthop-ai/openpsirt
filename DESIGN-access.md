@@ -607,7 +607,7 @@ ordering taken over a visibility column anywhere in the source.
 
 | Question | Asked at |
 |---|---|
-| An act on one finding — a decision, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |
+| An act on one finding — a decision, a label, giving work to somebody else or taking what they hold | The finding's own visibility |
 | Approving somebody else's decision | Reading at the decision's visibility, with the approver capability or triage there, and the capability alone at internal visibility. The session answer says which visibilities, so a screen offers it only where it succeeds |
 | An act about the product rather than one finding — an assignment rule, a rating, a scan sent by hand, an incident, taking unowned work | Triage at any visibility. The finding-level question narrows further wherever there is a finding to ask it of |
 | Taking unowned work, handing back your own | Rows at a visibility they read, and a disclosed row of their own whatever they read, because the assignment carried it to them |
@@ -1167,7 +1167,7 @@ question widened by a case the subject was brought into.
 
 | Read | Answer to a subject that reads nothing there |
 |---|---|
-| Findings, occurrences, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the tags in use | Refused |
+| Findings, occurrences, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the labels in use | Refused |
 | What each run opened and closed | Refused, for an empty list of runs as well |
 | The receipts list | The receipts, with no counts of what each run changed. The receipts are about what the pipeline sends; the counts are a report on findings |
 

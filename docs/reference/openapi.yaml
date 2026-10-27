@@ -4159,6 +4159,13 @@ components:
         found_by:
           $ref: "#/components/schemas/MeasuredBody"
           description: "The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"
+        labels:
+          description: The labels somebody put on this. Free text, no fixed vocabulary
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         latest_released_at:
           description: The date that version shipped
           type: string
@@ -4273,13 +4280,6 @@ components:
           description: Live decisions covering any of this finding's occurrences, newest first. A proposed one needing approval is waiting for a second person, and one needing nobody is in force
           items:
             $ref: "#/components/schemas/StandingDecisionBody"
-          type:
-            - array
-            - "null"
-        tags:
-          description: Words somebody put on this. Free text, no fixed vocabulary
-          items:
-            type: string
           type:
             - array
             - "null"
@@ -4486,6 +4486,13 @@ components:
         fold:
           description: "The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from"
           type: string
+        labels:
+          description: The labels somebody put on this. Free text, no fixed vocabulary
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         likelihood:
           description: Published estimate that this will be exploited, 0 to 1
           format: double
@@ -4567,13 +4574,6 @@ components:
         summary:
           description: The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding
           type: string
-        tags:
-          description: Words somebody put on this. Free text, no fixed vocabulary
-          items:
-            type: string
-          type:
-            - array
-            - "null"
         undisclosed:
           description: Nothing here has been announced. Anything said about it outside this deployment discloses it
           type: boolean
@@ -22426,7 +22426,7 @@ paths:
         Removes a label. Taking off one that is not there succeeds and changes nothing.
 
         Requires: public-triage or private-triage or internal-triage on the product
-      operationId: untag-finding
+      operationId: unlabel-finding
       parameters:
         - in: path
           name: product
@@ -22513,7 +22513,7 @@ paths:
         Labeling is triage, so it asks for the triage right: a label changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
 
         Requires: public-triage or private-triage or internal-triage on the product
-      operationId: tag-finding
+      operationId: label-finding
       parameters:
         - in: path
           name: product
@@ -29071,7 +29071,7 @@ paths:
         Only the words on findings you may read. A label row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
 
         Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Answers only the words on findings you may see.
-      operationId: list-tags
+      operationId: list-labels
       parameters:
         - in: path
           name: product

@@ -535,7 +535,7 @@ route, sign-in and the served interface, and registers each area in turn.
 |---|---|
 | Uploads arriving | Uploads, their receipts, the documents a build sent, one scanner run |
 | Findings | The findings lists, one finding, entered findings, disclosure, issue notes, one issue, the component graph, collaborators, reports from outside and rulings on them |
-| Handing work out | Assignment, assignment rules, teams, tags, bulk acts, planned upgrades, one component |
+| Handing work out | Assignment, assignment rules, teams, labels, bulk acts, planned upgrades, one component |
 | Decisions | The review queue, proposing, approving, re-affirmation, comments, incidents, response windows, assessments, scrutiny, readiness |
 | Analytics | Trends, comparisons, the compliance register, coverage, measures, effort, the audit, and the exports of each list |
 | Advisories | Advisories, VEX, supplier imports, the suppliers read on a schedule, outbound destinations |

@@ -7,7 +7,7 @@ import { notACredential } from "./noautofill";
 // A filter somebody types into, holding as many words as they type.
 //
 // Several words, so a family of packages is one read of the list and two of
-// somebody's own tags can be asked for together. It holds chips, because a box
+// somebody's own labels can be asked for together. It holds chips, because a box
 // that shows one value while narrowing by three is the thing the summary above
 // the list exists to prevent.
 //
@@ -21,7 +21,7 @@ export function Words({
   placeholder,
   words,
   onChange,
-  // Words already in use here, offered while typing. A tag is free text and
+  // Words already in use here, offered while typing. A label is free text and
   // the ones somebody used before are the ones they mean.
   offered,
   listId,

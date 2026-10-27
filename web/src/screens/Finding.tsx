@@ -460,7 +460,7 @@ export function Finding() {
             in is the person who put the mark here. */}
         <Marks
           at={located}
-          tags={it.tags ?? []}
+          labels={it.labels ?? []}
           mayMark={mayTriage}
           onChanged={() => void finding.refetch()}
         />

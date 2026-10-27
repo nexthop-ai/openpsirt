@@ -40,6 +40,7 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A standing rule that hands unheld work to a team is an assignment
 //     rule, and a finding names the rule that assigned it under that name.
 //   - A supplier whose advisories are read is a supplier advisory feed.
+//   - The free-text words people put on findings are labels.
 //   - The stored words those renames reach follow them, in a step of their
 //     own after the renames: a bulk decision's kind, the kinds of
 //     notification a decision waiting or lapsed and a response window

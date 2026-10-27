@@ -142,8 +142,8 @@ type Evidence struct {
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
 	AssignedByRule string
-	// Tags are the words somebody put on this, as they were typed.
-	Tags []string
+	// Labels are the words somebody put on this, as they were typed.
+	Labels []string
 	// DueAt is the earliest deadline among these occurrences, which is the one
 	// that makes the whole finding late — and NoDeadline says why there is
 	// none where there is none. Blank, the screen would read as missing
@@ -830,11 +830,11 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 	evidence.AssignedByRule = placed
 	// The words somebody put on it.
-	marks, err := s.TagsOn(ctx, productID, vulnerabilityID, componentID, visible)
+	marks, err := s.LabelsOn(ctx, productID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}
-	evidence.Tags = marks
+	evidence.Labels = marks
 	return evidence, nil
 }
 

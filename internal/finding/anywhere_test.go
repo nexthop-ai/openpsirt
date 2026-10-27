@@ -300,7 +300,7 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		// sees — and the filter here already takes them, which is the half
 		// that made the other half's absence hard to notice.
 		marker := f.someoneElse(t, access.PublicTriage)
-		if err := f.store.TagIt(t.Context(), marker, f.productID,
+		if err := f.store.LabelIt(t.Context(), marker, f.productID,
 			f.issueID(t, "CVE-2026-9"), f.componentID(t, binary.Name),
 			"Waiting On Vendor"); err != nil {
 			t.Fatal(err)
@@ -309,10 +309,10 @@ func TestBothListsSayWhatTheIssueIs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(marked) != 1 || len(marked[0].Tags) != 1 ||
-			marked[0].Tags[0] != "Waiting On Vendor" {
+		if len(marked) != 1 || len(marked[0].Labels) != 1 ||
+			marked[0].Labels[0] != "Waiting On Vendor" {
 			t.Errorf("across products the row is marked %q, wanted the word that was put on it",
-				marked[0].Tags)
+				marked[0].Labels)
 		}
 
 		// And the rating in force, which is what reassessing an issue is for.

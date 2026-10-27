@@ -74,10 +74,10 @@ type FindingBody struct {
 	Variant     string `json:"variant,omitempty" doc:"The variant of that build"`
 	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 
-	// Tags are the words people put on this, as they were typed. On the
+	// Labels are the words people put on this, as they were typed. On the
 	// row because the point of marking work is finding it again in a list,
 	// and a mark only the detail screen shows is one nobody sees.
-	Tags []string `json:"tags,omitempty" doc:"Words somebody put on this. Free text, no fixed vocabulary"`
+	Labels []string `json:"labels,omitempty" doc:"The labels somebody put on this. Free text, no fixed vocabulary"`
 
 	// Fold is the row's subject: the source package at the version it was
 	// built at. Two binaries of one source are one row, because deciding about
@@ -272,7 +272,7 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Builds: group.Builds, Stream: group.Stream, Variant: group.Variant,
 		StreamName:  group.StreamName,
 		VariantName: group.VariantName,
-		Tags:        group.Tags,
+		Labels:      group.Labels,
 		Fold:        group.Fold, Packages: group.Packages, Consumers: group.Consumers,
 		Occurrences: group.Occurrences, Answered: group.Answered,
 		State: core.Standing(group.State), SentBack: group.SentBack,
@@ -555,8 +555,8 @@ type EvidenceBody struct {
 	// rather than whoever triages.
 	ArrivedFrom string `json:"arrived_from,omitempty" doc:"The version this was upgraded from, where the upgrade did not resolve it"`
 
-	// Tags are the words people put on this, as they were typed.
-	Tags []string `json:"tags,omitempty" doc:"Words somebody put on this. Free text, no fixed vocabulary"`
+	// Labels are the words people put on this, as they were typed.
+	Labels []string `json:"labels,omitempty" doc:"The labels somebody put on this. Free text, no fixed vocabulary"`
 
 	// Opened and FoundBy are when this first appeared here and what
 	// produced it. The run that answered is not the run that answers now,
@@ -785,7 +785,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		MatchedIn: e.MatchedIn, MatchedRange: e.MatchedRange, Recorded: e.Recorded,
 		LatestVersion: e.LatestVersion, NothingSince: e.NothingSince,
 		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, AssignedByRule: e.AssignedByRule,
-		Tags:        e.Tags,
+		Labels:      e.Labels,
 		Occurrences: make([]SittingBody, 0, len(e.Occurrences)),
 		Claimed:     make([]BuildClaimBody, 0, len(e.Claimed)),
 		Standing:    []core.StandingDecisionBody{}, Previous: []core.EarlierBody{}, Similar: []core.SimilarBody{},

@@ -18,8 +18,8 @@ import (
 // word v0.11.0 renames beside words it keeps, and savedV0110 the same address
 // in v0.11.0's words.
 const (
-	savedV0100 = "claim=7&claim_state=waiting&claim_state=lapsed&sort=places&asc=true&fix_state=none"
-	savedV0110 = "decision=7&decision_state=waiting&decision_state=lapsed&sort=occurrences&asc=true&fix_state=none"
+	savedV0100 = "claim=7&claim_state=waiting&claim_state=lapsed&sort=places&asc=true&fix_state=none&tag=vendor"
+	savedV0110 = "decision=7&decision_state=waiting&decision_state=lapsed&sort=occurrences&asc=true&fix_state=none&label=vendor"
 )
 
 // seedWordsV0100 writes, in a v0.10.0 database, a row holding each stored
@@ -237,6 +237,7 @@ func TestAKeptFilterRenamesOnlyTheWordsOfItsAddress(t *testing.T) {
 		{"claim_state&sort=urgency", "decision_state&sort=urgency"},
 		{"sort=places", "sort=occurrences"},
 		{"under=claim%5Fstate", "under=claim%5Fstate"},
+		{"tag=tag&tag=waiting", "label=tag&label=waiting"},
 	} {
 		if got := migrations.SavedQueryV0110(c.from); got != c.to {
 			t.Errorf("%q became %q, want %q", c.from, got, c.to)

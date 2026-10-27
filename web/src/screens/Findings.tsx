@@ -310,12 +310,12 @@ export function Findings() {
   }, [kept.data, params, declined]);
 
   const queries = useQueryClient();
-  // The tags people have marked findings with here, for the filter to offer.
+  // The labels people have put on findings here, for the filter to offer.
   // Read only while the panel that uses it is open: it is a per-product list
   // nobody needs unless they are narrowing by one.
   const inUse = useQuery({
     enabled: more && !spanning,
-    queryKey: ["tags", product],
+    queryKey: ["labels", product],
     queryFn: async () =>
       unwrap(await api.GET("/v1/products/{product}/labels", { params: { path: { product } } })),
     retry: false,
@@ -714,7 +714,7 @@ export function Findings() {
           set={set}
           setMany={setMany}
           // silent-read: choices offered in the panel; an unread list offers fewer.
-          tags={inUse.data?.items ?? []}
+          labels={inUse.data?.items ?? []}
           // silent-read: handed whole to the panel, which says a failure beside the picker.
           kinds={kindsHere.data?.items ?? []}
           kindsRead={kindsHere}

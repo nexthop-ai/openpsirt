@@ -373,20 +373,20 @@ export function FindingsTable({
                           {row.summary}
                         </div>
                       )}
-                      {(row.tags ?? []).length > 0 && (
+                      {(row.labels ?? []).length > 0 && (
                         <span className="marks">
-                          {(row.tags ?? []).map((tag) => (
+                          {(row.labels ?? []).map((label) => (
                             <button
-                              key={tag}
+                              key={label}
                               type="button"
                               className="mark"
-                              title={`Everything tagged ${tag}`}
+                              title={`Everything labeled ${label}`}
                               onClick={(event) => {
                                 event.stopPropagation();
-                                set("tag", tag);
+                                set("label", label);
                               }}
                             >
-                              {tag}
+                              {label}
                             </button>
                           ))}
                         </span>

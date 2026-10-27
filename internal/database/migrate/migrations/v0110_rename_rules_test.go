@@ -15,8 +15,8 @@ import (
 )
 
 // rulesV0100 is, in a v0.10.0 database, a standing rule handing work to a
-// team and a supplier whose advisories are read.
-type rulesV0100 struct{ rule, feed int64 }
+// team, a supplier whose advisories are read, and a word put on a finding.
+type rulesV0100 struct{ rule, feed, label int64 }
 
 func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV0100 {
 	t.Helper()
@@ -53,6 +53,16 @@ func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV01
 		VALUES (?, ?, ?, ?, ?, ?)`, product, "examplelinux", "ExampleLinux",
 		"https://example.com/.well-known/csaf/provider-metadata.json", person, at)
 	out.feed = id(`SELECT MAX("id") FROM "advisory_source"`)
+	exec(`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "exploited", "first_seen_at", "issue_id")
+		VALUES (?, ?, ?, ?, ?)`, "CVE-2026-1102", "cve-2026-1102", false, at, 0)
+	issue := id(`SELECT "id" FROM "vulnerability" WHERE "identifier" = ?`, "CVE-2026-1102")
+	exec(`UPDATE "vulnerability" SET "issue_id" = "id" WHERE "id" = ?`, issue)
+	exec(`INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key", "first_seen_at")
+		VALUES (?, ?, ?, ?, ?, ?)`, "libbar", "libbar", "1.0", "libbar", "libbar", at)
+	component := id(`SELECT "id" FROM "component" WHERE "identity" = ?`, "libbar")
+	exec(`INSERT INTO "finding_tag" ("product_id", "vulnerability_id", "component_id", "tag", "typed",
+		"added_by", "added_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, product, issue, component, "waiting", "Waiting", person, at)
+	out.label = id(`SELECT MAX("id") FROM "finding_tag"`)
 	return out
 }
 
@@ -68,6 +78,8 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 			WHERE "id" = ? AND "name" = 'curl to the curlers' AND NOT "reports"`, w.rule},
 		{"the supplier advisory feed", `SELECT COUNT(*) FROM "supplier_advisory_feed"
 			WHERE "id" = ? AND "display_name" = 'ExampleLinux'`, w.feed},
+		{"the label", `SELECT COUNT(*) FROM "finding_label"
+			WHERE "id" = ? AND "label" = 'waiting' AND "typed" = 'Waiting'`, w.label},
 	} {
 		var n int
 		if err := db.DB.NewRaw(c.query, c.id).Scan(ctx, &n); err != nil {
@@ -79,7 +91,7 @@ func (w rulesV0100) renamedAs(t *testing.T, ctx context.Context, db *database.DB
 	}
 }
 
-// A v0.10.0 database holding a standing rule and a supplier is upgraded, and every row reads
+// A v0.10.0 database holding a standing rule, a supplier and a label is upgraded, and every row reads
 // back under v0.11.0's names in the shape the release declares.
 func TestAV0100DatabaseTakesTheV0110RuleNames(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -109,6 +121,10 @@ func TestAnUpgradeStoppedPartWayThroughTheRuleRenamesResumes(t *testing.T) {
 		{after: "advisory_source"},
 		{after: "advisory_source_named_once", servers: true},
 		{after: "advisory_source_due_idx"},
+		{after: "finding_tag"},
+		{after: "tag"},
+		{after: "finding_tag_once", servers: true},
+		{after: "finding_tag_named_idx"},
 	} {
 		t.Run(stop.after, func(t *testing.T) {
 			dbtest.Each(t, func(t *testing.T, db *database.DB) {

@@ -524,7 +524,7 @@ decision state, the decision outcome, what upstream did, and the kind of
 package. Each was one word, so "undecided or pending approval" had to be asked
 twice and read side by side. More take a set: who is dealing with it,
 what a VEX document says, what the build's own claims say, and, among the typed
-boxes, the component, the tag, the VEX publisher and the weakness. The typed ones are chip fields, because a
+boxes, the component, the label, the VEX publisher and the weakness. The typed ones are chip fields, because a
 box showing one value while narrowing by three is what the summary above the
 list exists to prevent.
 

@@ -3226,7 +3226,7 @@ export interface paths {
          *
          *     Requires: public-triage or private-triage or internal-triage on the product
          */
-        put: operations["tag-finding"];
+        put: operations["label-finding"];
         post?: never;
         /**
          * Take a label off a finding
@@ -3234,7 +3234,7 @@ export interface paths {
          *
          *     Requires: public-triage or private-triage or internal-triage on the product
          */
-        delete: operations["untag-finding"];
+        delete: operations["unlabel-finding"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4845,7 +4845,7 @@ export interface paths {
          *
          *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Answers only the words on findings you may see.
          */
-        get: operations["list-tags"];
+        get: operations["list-labels"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9458,6 +9458,8 @@ export interface components {
             fixed_in?: string;
             /** @description The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found */
             found_by?: components["schemas"]["MeasuredBody"];
+            /** @description The labels somebody put on this. Free text, no fixed vocabulary */
+            labels?: string[] | null;
             /** @description The date that version shipped */
             latest_released_at?: string;
             /** @description The newest version the ecosystem's own index knows of */
@@ -9519,8 +9521,6 @@ export interface components {
             similar: components["schemas"]["SimilarBody"][] | null;
             /** @description Live decisions covering any of this finding's occurrences, newest first. A proposed one needing approval is waiting for a second person, and one needing nobody is in force */
             standing: components["schemas"]["StandingDecisionBody"][] | null;
-            /** @description Words somebody put on this. Free text, no fixed vocabulary */
-            tags?: string[] | null;
             /** @description This has not been announced. Anything said about it outside this deployment discloses it */
             undisclosed?: boolean;
             /** @description The upstream a fork was made from, where it is one */
@@ -9650,6 +9650,8 @@ export interface components {
             fixed_in?: string;
             /** @description The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
+            /** @description The labels somebody put on this. Free text, no fixed vocabulary */
+            labels?: string[] | null;
             /**
              * Format: double
              * @description Published estimate that this will be exploited, 0 to 1
@@ -9716,8 +9718,6 @@ export interface components {
             stream_name?: string;
             /** @description The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding */
             summary?: string;
-            /** @description Words somebody put on this. Free text, no fixed vocabulary */
-            tags?: string[] | null;
             /** @description Nothing here has been announced. Anything said about it outside this deployment discloses it */
             undisclosed?: boolean;
             /** @description The upstream a fork was made from, where it is one */
@@ -20147,7 +20147,7 @@ export interface operations {
             };
         };
     };
-    "tag-finding": {
+    "label-finding": {
         parameters: {
             query?: {
                 /** @description The version, where the build ships that name at more than one */
@@ -20189,7 +20189,7 @@ export interface operations {
             };
         };
     };
-    "untag-finding": {
+    "unlabel-finding": {
         parameters: {
             query?: {
                 /** @description The version, where the build ships that name at more than one */
@@ -23026,7 +23026,7 @@ export interface operations {
             };
         };
     };
-    "list-tags": {
+    "list-labels": {
         parameters: {
             query?: never;
             header?: never;

@@ -15,23 +15,23 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
-// registerTags is the words people put on findings.
+// registerLabels is the words people put on findings.
 //
-// People tag work regardless. With nowhere to put it they do it inside the
+// People label work regardless. With nowhere to put it they do it inside the
 // reasoning text, where nothing can filter on it and an approver reads it as
 // part of the argument.
-func registerTags(api huma.API, in core.Deps) {
+func registerLabels(api huma.API, in core.Deps) {
 	const at = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 		"/findings/{issue}/components/{component}/labels/{label}"
 
-	tagging := func(add bool) func(ctx context.Context, input *struct {
+	labeling := func(add bool) func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"issue"`
 		Component     string `path:"component"`
 		core.ComponentQuery
-		Tag string `path:"label" maxLength:"191" doc:"The word, matched without regard to capitals"`
+		Label string `path:"label" maxLength:"191" doc:"The word, matched without regard to capitals"`
 	}) (*struct{}, error) {
 		return func(ctx context.Context, input *struct {
 			Product       string `path:"product"`
@@ -40,7 +40,7 @@ func registerTags(api huma.API, in core.Deps) {
 			Vulnerability string `path:"issue"`
 			Component     string `path:"component"`
 			core.ComponentQuery
-			Tag string `path:"label" maxLength:"191" doc:"The word, matched without regard to capitals"`
+			Label string `path:"label" maxLength:"191" doc:"The word, matched without regard to capitals"`
 		}) (*struct{}, error) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
@@ -54,9 +54,9 @@ func registerTags(api huma.API, in core.Deps) {
 			}
 			store := finding.NewStore(in.DB.DB)
 			if add {
-				err = store.TagIt(ctx, subject, product, issue, component, input.Tag)
+				err = store.LabelIt(ctx, subject, product, issue, component, input.Label)
 			} else {
-				err = store.Untag(ctx, subject, product, issue, component, input.Tag)
+				err = store.Unlabel(ctx, subject, product, issue, component, input.Label)
 			}
 			if err != nil {
 				return nil, core.RefusedFinding(in, err)
@@ -66,7 +66,7 @@ func registerTags(api huma.API, in core.Deps) {
 	}
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "tag-finding", Method: http.MethodPut, Path: at,
+		OperationID: "label-finding", Method: http.MethodPut, Path: at,
 		Summary: "Label a finding",
 		Description: "Puts a free-text label on one issue in one component of this product.\n\n" +
 			"No fixed vocabulary, because none has been earned yet. A label that becomes " +
@@ -82,18 +82,18 @@ func registerTags(api huma.API, in core.Deps) {
 			"filtered list answers, and somebody who may only read should not move work into " +
 			"or out of a saved filter.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "", core.TriageRights()...), tagging(true))
+	}, core.PerProduct, "", core.TriageRights()...), labeling(true))
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "untag-finding", Method: http.MethodDelete, Path: at,
+		OperationID: "unlabel-finding", Method: http.MethodDelete, Path: at,
 		Summary: "Take a label off a finding",
 		Description: "Removes a label. Taking off one that is not there succeeds and changes " +
 			"nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "", core.TriageRights()...), tagging(false))
+	}, core.PerProduct, "", core.TriageRights()...), labeling(false))
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-tags", Method: http.MethodGet, Path: "/v1/products/{product}/labels",
+		OperationID: "list-labels", Method: http.MethodGet, Path: "/v1/products/{product}/labels",
 		Summary: "List a product's labels",
 		Description: "Every label anybody has used here, most-used first.\n\n" +
 			"What a filter offers rather than a vocabulary: the list is what people have " +
@@ -115,12 +115,12 @@ func registerTags(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		rows, err := finding.NewStore(in.DB.DB).TagsInUse(ctx, subject, named.ID)
+		rows, err := finding.NewStore(in.DB.DB).LabelsInUse(ctx, subject, named.ID)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			return nil, core.NoSuchProduct()
 		case err != nil:
-			return nil, core.WentWrong(in.Log(), "the tags could not be read", err)
+			return nil, core.WentWrong(in.Log(), "the labels could not be read", err)
 		}
 		out := &core.ListOutput[string]{}
 		out.Body.Items = rows

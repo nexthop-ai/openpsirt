@@ -117,7 +117,7 @@ describe("the filters as the server takes them", () => {
   it("asks for every word typed into a filter that holds words", () => {
     const asked = listQuery(
       new URLSearchParams(
-        "component=openssl&component=libssl3&tag=waiting&tag=escalated" +
+        "component=openssl&component=libssl3&label=waiting&label=escalated" +
           "&weakness=CWE-787&weakness=CWE-125&vex_publisher=debian&assigned=me&assigned=nobody",
       ),
     );
@@ -135,7 +135,7 @@ describe("the filters as the server takes them", () => {
     // nothing is ever in — left in, it would narrow the list to nothing.
     const asked = listQuery(
       new URLSearchParams(
-        "state=&outcome=&fix_state=&ecosystem=&component=&tag=&weakness=&vex_publisher=&assigned=",
+        "state=&outcome=&fix_state=&ecosystem=&component=&label=&weakness=&vex_publisher=&assigned=",
       ),
     );
     expect(asked).toEqual({ limit: 50, offset: 0 });

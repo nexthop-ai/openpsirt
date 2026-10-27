@@ -50,7 +50,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
 - [Mitigations](#mitigations)
 - [Outcomes on a tag](#outcomes-on-a-tag)
-- [Tags](#tags)
+- [Labels](#labels)
 - [Rule-prepared decisions](#rule-prepared-decisions)
 - [Decisions on a new branch](#decisions-on-a-new-branch)
 - [Statement scope](#statement-scope)
@@ -1020,11 +1020,11 @@ on the server before the run and `ALTER SYSTEM RESET autovacuum` after it. The
 
 What it covers is derived, never marked. A covered finding is one a standing
 promise reaches, which the decision already records, so the mark is a join
-rather than a tag across every row.
+rather than a label across every row.
 
 | | |
 |---|---|
-| The argument is grain, not cost | A tag here is per product, and could not say "planned on master, not on the 2.4 branch", which is the case the per-build target exists for. Derived, the answer is per build |
+| The argument is grain, not cost | A label is per product, and could not say "planned on master, not on the 2.4 branch", which is the case the per-build target exists for. Derived, the answer is per build |
 | Withdrawing a promise puts what it covered back | Nothing to clean up: there was never a second record to keep in step |
 | It is offered as a filter and its negation | Asking for what is *not* covered is the working list once planned work is out of view, and a flag could not ask it |
 | It is what the by-issue list asks unless told otherwise | Deciding covered work again one finding at a time is what the promise was made instead of. The by-component view is untouched, because that is where the upgrade is managed |
@@ -1516,15 +1516,15 @@ fact about the occurrence. Every route that decides at an occurrence, re-affirma
 included, builds the occurrence from the finding in one spelling, so the refusal
 holds on each of them.
 
-## Tags
+## Labels
 
-A finding takes free-text tags (REQ-57), filterable, with no fixed vocabulary.
+A finding takes free-text labels (REQ-57), filterable, with no fixed vocabulary.
 At a dozen products and thousands of findings people mark work regardless —
 customer-escalated, release-blocker, waiting on a vendor — and with nowhere to
 put it they put it in the reasoning, where nothing can filter on it and where an
 approver reads it as part of the argument for the decision.
 
-No vocabulary is fixed, because none has been earned. A tag that becomes
+No vocabulary is fixed, because none has been earned. A label that becomes
 universal is a signal rather than a success: "waiting on vendor" has a subject,
 an expected reply and a staleness of its own, and leaving it as a string is how
 it stays unreasonable-about forever. What is in use in a product is offered back,
@@ -1533,14 +1533,14 @@ promoting one.
 
 | Rule | |
 |---|---|
-| What is in use is narrowed to findings the asker may read | A tag carries no visibility of its own, and free text typed while triaging an embargo says what the embargo is about: "waiting on the reporter" beside an undisclosed issue is the disclosure |
-| At the grain somebody looks at | One issue, in one fold, in one product: the unit a decision covers and the finding screen shows. Not per occurrence — a kernel flaw at sixty occurrences is one thing somebody is tagging — and not per build, because a tag is about the work rather than a release |
+| What is in use is narrowed to findings the asker may read | A label carries no visibility of its own, and free text typed while triaging an embargo says what the embargo is about: "waiting on the reporter" beside an undisclosed issue is the disclosure |
+| At the grain somebody looks at | One issue, in one fold, in one product: the unit a decision covers and the finding screen shows. Not per occurrence — a kernel flaw at sixty occurrences is one thing somebody is labeling — and not per build, because a label is about the work rather than a release |
 | Put on, read and taken off across the fold | Putting one on writes it on every package of the fold the product holds the issue at. The finding screen, a list row and the filter read the words on any package of the fold, once each, so a package that joins the fold later carries them. Taking one off through any package takes it off them all |
 | Each package's word at that package's visibility | Putting one on and taking one off reach the packages whose findings of the issue the caller may triage. A word is read where its own package carries a finding of the issue in the product that the reader may see; the filter asks for one at the row's visibility. A word typed on an undisclosed package is not shown through a disclosed one |
-| Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Tagging what already carries the tag succeeds and keeps the first spelling |
-| Tagging is triage | A tag changes what a filtered list answers. Somebody who may only read sees the tags and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
-| On the row, not only on the finding | The tags come back with each group, read for the whole page in one statement, and each is itself a filter |
-| Called a tag everywhere, in every register | The screens, the filter, the API descriptions and this document. It was a tag in the filter and on the route while the finding screen, the API summaries and the rows above this one said "mark" — one thing under two names, which makes neither searchable |
+| Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Labeling what already carries the label succeeds and keeps the first spelling |
+| Labeling is triage | A label changes what a filtered list answers. Somebody who may only read sees the labels and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
+| On the row, not only on the finding | The labels come back with each group, read for the whole page in one statement, and each is itself a filter |
+| Called a label everywhere, in every register | The screens, the filter, the API descriptions and this document. One thing under two names makes neither searchable |
 
 ## Rule-prepared decisions
 

@@ -236,10 +236,10 @@ func (v *Vulnerabilities) supersede(ctx context.Context, set []liveDecision, mer
 }
 
 // settleRecords holds what a product said about the absorbed issue under the
-// issue it is read as: its rating in force, its tags, and the rating claim and
+// issue it is read as: its rating in force, its labels, and the rating claim and
 // the incident that stand there.
 //
-// Where the kept issue already holds its own rating in force or tag in that
+// Where the kept issue already holds its own rating in force or label in that
 // product, its own stays and the absorbed issue's goes: both are derived or
 // current state, and one issue carries one of each.
 func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbed Vulnerability,
@@ -317,33 +317,33 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		}
 	}
 
-	// A tag is a product's word on a row, kept only while it is on it, so it
+	// A label is a product's word on a row, kept only while it is on it, so it
 	// moves with the findings it marks. One already on the kept issue's row is
 	// the same word said once.
-	var tags []Tag
-	if err := v.db.NewSelect().Model(&tags).
+	var labels []Label
+	if err := v.db.NewSelect().Model(&labels).
 		Where(`"ft"."vulnerability_id" IN (?, ?)`, kept, gone).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what the merged issues are marked with: %w", err)
 	}
 	type marked struct {
 		product, component int64
-		tag                string
+		label              string
 	}
 	on := map[marked]bool{}
-	for _, t := range tags {
+	for _, t := range labels {
 		if t.VulnerabilityID == kept {
-			on[marked{t.ProductID, t.ComponentID, t.Tag}] = true
+			on[marked{t.ProductID, t.ComponentID, t.Label}] = true
 		}
 	}
-	for _, t := range tags {
+	for _, t := range labels {
 		if t.VulnerabilityID != gone {
 			continue
 		}
-		key := marked{t.ProductID, t.ComponentID, t.Tag}
-		q := v.db.NewUpdate().Model((*Tag)(nil)).Set(`"vulnerability_id" = ?`, kept)
+		key := marked{t.ProductID, t.ComponentID, t.Label}
+		q := v.db.NewUpdate().Model((*Label)(nil)).Set(`"vulnerability_id" = ?`, kept)
 		if on[key] {
-			if _, err := v.db.NewDelete().Model((*Tag)(nil)).
+			if _, err := v.db.NewDelete().Model((*Label)(nil)).
 				Where(`"id" = ?`, t.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("take off a mark the kept issue already has: %w", err)
 			}

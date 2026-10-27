@@ -49,7 +49,7 @@ var settingsRenamedV0110 = []struct{ from, to string }{
 // savedWordsV0110 is each word of the findings list's address v0.11.0
 // renames, and savedSortsV0110 each order it renames.
 var (
-	savedWordsV0110 = map[string]string{"claim": "decision", "claim_state": "decision_state"}
+	savedWordsV0110 = map[string]string{"claim": "decision", "claim_state": "decision_state", "tag": "label"}
 	savedSortsV0110 = map[string]string{"places": "occurrences"}
 )
 
@@ -142,7 +142,8 @@ func savedFiltersV0110(ctx context.Context, tx bun.Tx) error {
 		Query string `bun:"query"`
 	}
 	if err := tx.NewRaw(`SELECT "id", "query" FROM "saved_filter"
-		WHERE "query" LIKE '%claim%' OR "query" LIKE '%places%' ORDER BY "id"`).Scan(ctx, &rows); err != nil {
+		WHERE "query" LIKE '%claim%' OR "query" LIKE '%places%' OR "query" LIKE '%tag%'
+		ORDER BY "id"`).Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read the kept filters: %w", err)
 	}
 	for _, row := range rows {

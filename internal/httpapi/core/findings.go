@@ -91,7 +91,7 @@ func (n Narrowing) Filter(floor finding.MinimumSeverity) (finding.Filter, error)
 		Exploited:            n.Exploited,
 		HasFix:               n.Fixable,
 		Components:           n.Component,
-		Tags:                 n.Tag,
+		Labels:               n.Label,
 		Search:               n.Search,
 		Ecosystems:           n.Ecosystem,
 		Under:                n.Under,
@@ -190,7 +190,7 @@ type Narrowing struct {
 	Fixable              bool     `query:"fixable" doc:"Keep only issues where an upstream fixed version is known"`
 	BelowMinimumSeverity bool     `query:"below_minimum_severity" doc:"Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list"`
 	Component            []string `query:"component,explode" maxItems:"200" maxLength:"191" doc:"Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either"`
-	Tag                  []string `query:"label,explode" maxItems:"200" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels"`
+	Label                []string `query:"label,explode" maxItems:"200" maxLength:"191" doc:"Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels"`
 	Search               string   `query:"q" maxLength:"200" doc:"Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name"`
 	Ecosystem            []string `query:"ecosystem,explode" maxItems:"200" maxLength:"64" doc:"Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi"`
 	// The two questions about the release itself, kept apart because a tag

@@ -110,8 +110,8 @@ type Group struct {
 	// recorded flaw rendered identically to any other row.
 	Undisclosed bool
 	DiscloseAt  *time.Time
-	// Tags are the words somebody put on this, as they were typed.
-	Tags []string
+	// Labels are the words somebody put on this, as they were typed.
+	Labels []string
 	// OpenedAt is when the earliest of these occurrences opened here, which is
 	// the age a deadline relates to. Not the year in the identifier: an
 	// issue assigned in 2019 that first appeared in this product last week
@@ -443,9 +443,9 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	}
 
 	// The words somebody put on the page's rows, read in one statement
-	// rather than per row: a tag is worth showing where the filter that
+	// rather than per row: a label is worth showing where the filter that
 	// finds it lives, and a query per row is fifty queries for a page.
-	marks, err := s.tagsFor(ctx, filter.ProductID, rows, visible)
+	marks, err := s.labelsFor(ctx, filter.ProductID, rows, visible)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -453,7 +453,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	groups := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		group := groupFrom(row, named, rated, shipped, filter.MinimumSeverity)
-		group.Tags = marks[markKey{row.VulnerabilityID, row.Fold}]
+		group.Labels = marks[markKey{row.VulnerabilityID, row.Fold}]
 		if oneBuild {
 			// The number of distinct ways down: the consumers this
 			// component has here, plus one for the build pulling it in

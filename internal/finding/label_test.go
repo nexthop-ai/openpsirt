@@ -31,13 +31,13 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 		issue := f.issueID(t, "CVE-2026-1")
 		component := f.componentID(t, libnl.Name)
 
-		if err := f.store.TagIt(t.Context(), who, f.productID, issue, component,
+		if err := f.store.LabelIt(t.Context(), who, f.productID, issue, component,
 			"  Waiting On Vendor "); err != nil {
 			t.Fatal(err)
 		}
 		// The spelling somebody used is what comes back, because a mark shown
 		// folded reads as the tool having changed what they wrote.
-		on, err := f.store.TagsOn(t.Context(), f.productID, issue, component, access.Visibilities())
+		on, err := f.store.LabelsOn(t.Context(), f.productID, issue, component, access.Visibilities())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -46,13 +46,13 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 		}
 
 		// Marking again in another capitalization is the same mark rather than
-		// a second one, and the first spelling stands: a tag that re-spelled
+		// a second one, and the first spelling stands: a label that re-spelled
 		// itself on every use would make the list of what exists unstable.
-		if err := f.store.TagIt(t.Context(), who, f.productID, issue, component,
+		if err := f.store.LabelIt(t.Context(), who, f.productID, issue, component,
 			"waiting on vendor"); err != nil {
 			t.Fatal(err)
 		}
-		if on, err = f.store.TagsOn(t.Context(), f.productID, issue, component, access.Visibilities()); err != nil {
+		if on, err = f.store.LabelsOn(t.Context(), f.productID, issue, component, access.Visibilities()); err != nil {
 			t.Fatal(err)
 		}
 		if len(on) != 1 || on[0] != "Waiting On Vendor" {
@@ -60,19 +60,19 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 		}
 
 		// A word says nothing on its own.
-		if err := f.store.TagIt(t.Context(), who, f.productID, issue, component,
+		if err := f.store.LabelIt(t.Context(), who, f.productID, issue, component,
 			"   "); err == nil {
-			t.Error("an empty tag was accepted")
+			t.Error("an empty label was accepted")
 		}
 
-		// Somebody who may only read may not mark: a tag changes what a
+		// Somebody who may only read may not mark: a label changes what a
 		// filtered list answers, so marking is triage.
 		reader := f.holding(t, access.PublicRead)
-		if err := f.store.TagIt(t.Context(), reader, f.productID, issue, component,
+		if err := f.store.LabelIt(t.Context(), reader, f.productID, issue, component,
 			"mine"); err == nil {
 			t.Error("somebody who may only read marked a finding")
 		}
-		if err := f.store.Untag(t.Context(), reader, f.productID, issue, component,
+		if err := f.store.Unlabel(t.Context(), reader, f.productID, issue, component,
 			"waiting on vendor"); err == nil {
 			t.Error("somebody who may only read took a mark off")
 		}
@@ -89,7 +89,7 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 		kept, keptTotal, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
 			// Asked in a capitalization nobody typed, which is the point of
 			// the fold.
-			finding.Filter{Tags: []string{"WAITING ON VENDOR"}})
+			finding.Filter{Labels: []string{"WAITING ON VENDOR"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,25 +97,25 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 			t.Fatalf("the marked finding narrowed to %d rows and counted %d, wanted one of each",
 				len(kept), keptTotal)
 		}
-		if kept[0].Vulnerability != "CVE-2026-1" || len(kept[0].Tags) != 1 ||
-			kept[0].Tags[0] != "Waiting On Vendor" {
-			t.Errorf("kept %s marked %q", kept[0].Vulnerability, kept[0].Tags)
+		if kept[0].Vulnerability != "CVE-2026-1" || len(kept[0].Labels) != 1 ||
+			kept[0].Labels[0] != "Waiting On Vendor" {
+			t.Errorf("kept %s marked %q", kept[0].Vulnerability, kept[0].Labels)
 		}
 		// A row nobody marked carries no marks, so the page's single read is
-		// keyed on the right row rather than smearing one row's tags over the
+		// keyed on the right row rather than smearing one row's labels over the
 		// page.
 		for _, row := range all {
-			if row.Vulnerability == "CVE-2026-2" && len(row.Tags) != 0 {
-				t.Errorf("an unmarked finding came back marked %q", row.Tags)
+			if row.Vulnerability == "CVE-2026-2" && len(row.Labels) != 0 {
+				t.Errorf("an unmarked finding came back marked %q", row.Labels)
 			}
 		}
 		// Two words are either pile, not both marks on one row. A
-		// person's tags are their own filing, and asking for two of
+		// person's labels are their own filing, and asking for two of
 		// them means "either of these" — asked as "both", a word
 		// nobody used would empty the list rather than adding nothing
 		// to it.
 		either, eitherTotal, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{Tags: []string{"waiting on vendor", "nobody wrote this"}})
+			finding.Filter{Labels: []string{"waiting on vendor", "nobody wrote this"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,7 +125,7 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 		}
 
 		none, noneTotal, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
-			finding.Filter{Tags: []string{"nobody wrote this"}})
+			finding.Filter{Labels: []string{"nobody wrote this"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,9 +133,9 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 			t.Errorf("a word nobody used kept %d rows and counted %d", len(none), noneTotal)
 		}
 
-		// The tags in use are the ones people wrote, which is what a filter
+		// The labels in use are the ones people wrote, which is what a filter
 		// offers.
-		inUse, err := f.store.TagsInUse(t.Context(), who, f.productID)
+		inUse, err := f.store.LabelsInUse(t.Context(), who, f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,15 +145,15 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 
 		// Taking off what is not there changes nothing, and taking off what is
 		// there in another capitalization takes off the mark.
-		if err := f.store.Untag(t.Context(), who, f.productID, issue, component,
+		if err := f.store.Unlabel(t.Context(), who, f.productID, issue, component,
 			"never applied"); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Untag(t.Context(), who, f.productID, issue, component,
+		if err := f.store.Unlabel(t.Context(), who, f.productID, issue, component,
 			"WAITING on vendor"); err != nil {
 			t.Fatal(err)
 		}
-		if on, err = f.store.TagsOn(t.Context(), f.productID, issue, component, access.Visibilities()); err != nil {
+		if on, err = f.store.LabelsOn(t.Context(), f.productID, issue, component, access.Visibilities()); err != nil {
 			t.Fatal(err)
 		}
 		if len(on) != 0 {
@@ -162,10 +162,10 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 	})
 }
 
-// A tag belongs to the fold. Put on through one package of a source, it is read
+// A label belongs to the fold. Put on through one package of a source, it is read
 // through every package of it, each list row carries it, and taking it off
 // through any package takes it off them all.
-func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
+func TestALabelIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib, tool := f.curlFold(t)
@@ -173,10 +173,10 @@ func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
 		issue := f.issueID(t, "CVE-2026-CURL")
 		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
 
-		if err := f.store.TagIt(ctx, who, f.productID, issue, viaTool, "Vendor"); err != nil {
+		if err := f.store.LabelIt(ctx, who, f.productID, issue, viaTool, "Vendor"); err != nil {
 			t.Fatal(err)
 		}
-		on, err := f.store.TagsOn(ctx, f.productID, issue, viaLib, access.Visibilities())
+		on, err := f.store.LabelsOn(ctx, f.productID, issue, viaLib, access.Visibilities())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
 				continue
 			}
 			ofTheFold++
-			if len(row.Tags) == 1 && row.Tags[0] == "Vendor" {
+			if len(row.Labels) == 1 && row.Labels[0] == "Vendor" {
 				marked++
 			}
 		}
@@ -201,11 +201,11 @@ func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
 			t.Errorf("%d of %d rows of the fold carry the mark, want every one", marked, ofTheFold)
 		}
 
-		if err := f.store.Untag(ctx, who, f.productID, issue, viaLib, "vendor"); err != nil {
+		if err := f.store.Unlabel(ctx, who, f.productID, issue, viaLib, "vendor"); err != nil {
 			t.Fatal(err)
 		}
 		for _, component := range []int64{viaLib, viaTool} {
-			on, err := f.store.TagsOn(ctx, f.productID, issue, component, access.Visibilities())
+			on, err := f.store.LabelsOn(ctx, f.productID, issue, component, access.Visibilities())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -216,10 +216,10 @@ func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
 	})
 }
 
-// A tag is an act on a finding, at the finding's own visibility. Read and
+// A label is an act on a finding, at the finding's own visibility. Read and
 // taken off through the fold, it reaches only the packages whose findings the
 // caller may see or triage.
-func TestATagIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
+func TestALabelIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib, tool := f.curlFold(t)
@@ -227,16 +227,16 @@ func TestATagIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
 		issue := f.issueID(t, "CVE-2026-CURL")
 		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
 
-		if err := f.store.TagIt(ctx, f.someoneElse(t, access.PrivateTriage), f.productID,
+		if err := f.store.LabelIt(ctx, f.someoneElse(t, access.PrivateTriage), f.productID,
 			issue, viaTool, "embargo"); err != nil {
 			t.Fatal(err)
 		}
 		public := f.someoneElse(t, access.PublicTriage)
-		if err := f.store.TagIt(ctx, public, f.productID, issue, viaLib, "vendor"); err != nil {
+		if err := f.store.LabelIt(ctx, public, f.productID, issue, viaLib, "vendor"); err != nil {
 			t.Fatal(err)
 		}
 
-		on, err := f.store.TagsOn(ctx, f.productID, issue, viaLib, []access.Visibility{access.Public})
+		on, err := f.store.LabelsOn(ctx, f.productID, issue, viaLib, []access.Visibility{access.Public})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -248,11 +248,11 @@ func TestATagIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, row := range rows {
-			if row.Vulnerability == "CVE-2026-CURL" && (len(row.Tags) != 1 || row.Tags[0] != "vendor") {
-				t.Errorf("a reader of disclosed work sees the row marked %q, want only the disclosed mark", row.Tags)
+			if row.Vulnerability == "CVE-2026-CURL" && (len(row.Labels) != 1 || row.Labels[0] != "vendor") {
+				t.Errorf("a reader of disclosed work sees the row marked %q, want only the disclosed mark", row.Labels)
 			}
 		}
-		marked, _, err := f.store.Groups(ctx, public, f.scope, 50, 0, finding.Filter{Tags: []string{"embargo"}})
+		marked, _, err := f.store.Groups(ctx, public, f.scope, 50, 0, finding.Filter{Labels: []string{"embargo"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,10 +260,10 @@ func TestATagIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
 			t.Errorf("filtering on the undisclosed mark found %d rows a reader of disclosed work sees", len(marked))
 		}
 
-		if err := f.store.Untag(ctx, public, f.productID, issue, viaLib, "embargo"); err != nil {
+		if err := f.store.Unlabel(ctx, public, f.productID, issue, viaLib, "embargo"); err != nil {
 			t.Fatal(err)
 		}
-		on, err = f.store.TagsOn(ctx, f.productID, issue, viaTool, access.Visibilities())
+		on, err = f.store.LabelsOn(ctx, f.productID, issue, viaTool, access.Visibilities())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,13 +275,13 @@ func TestATagIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
 
 // A package that joins a fold after a word was put on it carries the word on
 // the list, as it does on the finding screen.
-func TestAPackageJoiningAFoldLaterCarriesItsTag(t *testing.T) {
+func TestAPackageJoiningAFoldLaterCarriesItsLabel(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib, _ := f.curlFold(t)
 		who := f.someoneElse(t, access.PublicTriage)
 		issue := f.issueID(t, "CVE-2026-CURL")
-		if err := f.store.TagIt(ctx, who, f.productID, issue, f.componentID(t, lib.Name), "vendor"); err != nil {
+		if err := f.store.LabelIt(ctx, who, f.productID, issue, f.componentID(t, lib.Name), "vendor"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -298,15 +298,15 @@ func TestAPackageJoiningAFoldLaterCarriesItsTag(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rows, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Tags: []string{"vendor"}})
+		rows, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Labels: []string{"vendor"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(rows) != 1 {
 			t.Fatalf("filtering on the fold's mark found %d rows, want the package that joined it", len(rows))
 		}
-		if len(rows[0].Tags) != 1 || rows[0].Tags[0] != "vendor" {
-			t.Errorf("the package that joined the fold is listed as marked %q", rows[0].Tags)
+		if len(rows[0].Labels) != 1 || rows[0].Labels[0] != "vendor" {
+			t.Errorf("the package that joined the fold is listed as marked %q", rows[0].Labels)
 		}
 	})
 }

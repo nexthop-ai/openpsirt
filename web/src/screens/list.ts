@@ -379,7 +379,7 @@ export function listQuery(params: URLSearchParams) {
   // two publishers, the memory-safety weaknesses. Any of them rather than all
   // of them — one row has one component name, so "both" would be nothing.
   const components = params.getAll("component").filter(Boolean);
-  const tags = params.getAll("tag").filter(Boolean);
+  const labels = params.getAll("label").filter(Boolean);
   const publishers = params.getAll("vex_publisher").filter(Boolean);
   const weaknesses = params.getAll("weakness").filter(Boolean);
   const likelihood = Number(params.get("epss_at_least") ?? "");
@@ -456,7 +456,7 @@ export function listQuery(params: URLSearchParams) {
     ...(buildSays.length > 0 ? { build_says: buildSays } : {}),
     ...(hiding.length > 0 ? { exclude: hiding } : {}),
     ...(components.length > 0 ? { component: components } : {}),
-    ...(tags.length > 0 ? { label: tags } : {}),
+    ...(labels.length > 0 ? { label: labels } : {}),
     ...(origin ? { origin } : {}),
     ...(planned && planned !== "either" ? { planned } : {}),
     ...(params.get("below") === "yes" ? { below_minimum_severity: true } : {}),

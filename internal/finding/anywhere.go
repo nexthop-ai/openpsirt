@@ -388,7 +388,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	for _, head := range heads {
 		wanted[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}] = true
 	}
-	marks, err := s.tagsAcross(ctx, subject, products, all, wanted)
+	marks, err := s.labelsAcross(ctx, subject, products, all, wanted)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -417,7 +417,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		// an action has a build to name. What says there are others is the
 		// count beside it.
 		group.Builds, group.Stream, group.Variant = row.Builds, row.Stream, row.Variant
-		group.Tags = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}]
+		group.Labels = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}]
 		groups = append(groups, group)
 	}
 	return groups, total, nil

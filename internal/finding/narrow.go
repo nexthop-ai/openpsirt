@@ -272,8 +272,8 @@ type Filter struct {
 	//
 	// Derived, never stored. A finding is covered when a standing
 	// `upgrade-needed` decision reaches it, which the decision already
-	// records — so the mark is a join rather than a tag written across every
-	// row an upgrade touches. A tag would be per product and could not say
+	// records — so the mark is a join rather than a label written across every
+	// row an upgrade touches. A label would be per product and could not say
 	// "planned on master, not on 2.4", which is the case the whole per-build
 	// target exists for.
 	//
@@ -281,12 +281,12 @@ type Filter struct {
 	// is the working list once planning suppresses, and a bool cannot ask
 	// it.
 	Planned PlannedFilter
-	// Tags keeps only what somebody marked with one of these words.
+	// Labels keeps only what somebody marked with one of these words.
 	// Matched folded, the way every other name people type is, so
-	// "Waiting" and "waiting" are one tag rather than half an answer each.
+	// "Waiting" and "waiting" are one label rather than half an answer each.
 	// Any of them rather than all of them: the words are a person's own
 	// filing, and asking for two of somebody's labels means "either pile".
-	Tags []string
+	Labels []string
 	// SentBack keeps groups where a live decision is with its author, which is
 	// the row a proposer is looking for and cannot ask for today.
 	SentBack bool
@@ -707,8 +707,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 			WHERE "vw"."vulnerability_id" = "f"."vulnerability_id"
 			  AND "vw"."cwe" IN (?))`, bun.List(upper))
 	}
-	if words := foldedTags(f.Tags); len(words) > 0 {
-		// A tag belongs to the fold, so a row carries a word put on any
+	if words := foldedLabels(f.Labels); len(words) > 0 {
+		// A label belongs to the fold, so a row carries a word put on any
 		// package of its fold, including one put on before the row's own
 		// package joined it. The word counts where its own package carries a
 		// finding of the issue in the product at the row's visibility: a word
@@ -716,13 +716,13 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// finding is about.
 		where, args := f.product()
 		kinds, kindArgs := kind.Triage.Where(`"fv"."kind"`)
-		q = q.Where(`EXISTS (SELECT 1 FROM "finding_tag" AS "ft"
+		q = q.Where(`EXISTS (SELECT 1 FROM "finding_label" AS "ft"
 			JOIN "component" AS "ct" ON "ct"."id" = "ft"."component_id"
 			WHERE "ft"."product_id" = `+where+`
 			  AND "ft"."vulnerability_id" = "f"."vulnerability_id"
 			  AND "ct"."fold_key" = (SELECT "c1"."fold_key" FROM "component" AS "c1"
 				WHERE "c1"."id" = "f"."component_id")
-			  AND "ft"."tag" IN (?)
+			  AND "ft"."label" IN (?)
 			  AND EXISTS (SELECT 1 FROM "finding" AS "fv"
 				JOIN "target" AS "tv" ON "tv"."id" = "fv"."target_id"
 				JOIN "stream" AS "sv" ON "sv"."id" = "tv"."stream_id"
@@ -1191,15 +1191,15 @@ func containsTerm(term string) string {
 	return database.LikeEscaped(strings.ToLower(term))
 }
 
-// foldedTags is a set of tags as they are stored, without the ones that fold
-// to nothing. Folded rather than trimmed, because a tag is matched on the
+// foldedLabels is a set of labels as they are stored, without the ones that fold
+// to nothing. Folded rather than trimmed, because a label is matched on the
 // folded form everywhere else and a filter that skipped the folding would
 // answer nothing for a word somebody typed with a capital.
-func foldedTags(words []string) []string {
+func foldedLabels(words []string) []string {
 	kept := make([]string, 0, len(words))
 	for _, word := range words {
-		if tag := TagAs(word); tag != "" {
-			kept = append(kept, tag)
+		if label := LabelAs(word); label != "" {
+			kept = append(kept, label)
 		}
 	}
 	return kept

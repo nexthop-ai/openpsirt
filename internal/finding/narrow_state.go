@@ -274,7 +274,7 @@ func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 		// the decision that currently stands, like "approved" above: a promise
 		// that was withdrawn is not one, and a finding it covered is unplanned
 		// again with nothing to clean up. That is the whole argument for
-		// deriving this rather than writing a tag.
+		// deriving this rather than writing a label.
 		ColumnExpr(`MAX(CASE WHEN "de"."live_key" IS NOT NULL AND `+standingHere+
 			` AND "cl"."outcome" = ? THEN 1 ELSE 0 END) AS "planned"`,
 			append(append([]any{}, inForce...), OutcomeUpgradeNeeded)...).

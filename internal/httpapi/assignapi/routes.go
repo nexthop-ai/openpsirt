@@ -34,5 +34,5 @@ func Register(api huma.API, in core.Deps) {
 		},
 	})
 	// The words people put on findings.
-	registerTags(api, in)
+	registerLabels(api, in)
 }

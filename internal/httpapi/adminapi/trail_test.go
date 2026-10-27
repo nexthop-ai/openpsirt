@@ -681,9 +681,9 @@ var outsideTheTrail = map[string]string{
 	"start-advisory":               "the decision record",
 	"set-affected-builds":          "the decision record",
 	"split-decision":               "the decision record",
-	"tag-finding":                  "the decision record",
+	"label-finding":                "the decision record",
 	"undo-batch":                   "the decision record",
-	"untag-finding":                "the decision record",
+	"unlabel-finding":              "the decision record",
 	"withdraw-assessment":          "the decision record",
 	"withdraw-decision":            "the decision record",
 

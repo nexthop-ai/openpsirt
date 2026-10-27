@@ -220,7 +220,7 @@ func TestDispatchReachesOnlyTheVisibilitiesTheCallerTriages(t *testing.T) {
 }
 
 func TestMarkingIsAskedAtTheFindingsOwnVisibility(t *testing.T) {
-	// A tag names one issue at one component. The same issue undisclosed at
+	// A label names one issue at one component. The same issue undisclosed at
 	// another component of the product does not make the disclosed one
 	// markable by somebody triaging undisclosed work alone.
 	each(t, func(t *testing.T, f *fixture) {
@@ -233,27 +233,27 @@ func TestMarkingIsAskedAtTheFindingsOwnVisibility(t *testing.T) {
 
 		// A mark already on the disclosed finding, so taking it off has
 		// something to take.
-		if err := f.store.TagIt(ctx, f.someoneElse(t, access.PublicTriage), f.productID,
+		if err := f.store.LabelIt(ctx, f.someoneElse(t, access.PublicTriage), f.productID,
 			issue, disclosed, "vendor"); err != nil {
 			t.Fatal(err)
 		}
 
 		who := f.someoneElse(t, access.PrivateTriage)
-		if err := f.store.TagIt(ctx, who, f.productID, issue, disclosed,
+		if err := f.store.LabelIt(ctx, who, f.productID, issue, disclosed,
 			"mine"); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a private-only triager marked a disclosed finding: %v", err)
 		}
-		if err := f.store.Untag(ctx, who, f.productID, issue, disclosed,
+		if err := f.store.Unlabel(ctx, who, f.productID, issue, disclosed,
 			"vendor"); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a private-only triager took a mark off a disclosed finding: %v", err)
 		}
-		if on, err := f.store.TagsOn(ctx, f.productID, issue, disclosed, access.Visibilities()); err != nil {
+		if on, err := f.store.LabelsOn(ctx, f.productID, issue, disclosed, access.Visibilities()); err != nil {
 			t.Fatal(err)
 		} else if len(on) != 1 || on[0] != "vendor" {
 			t.Errorf("the disclosed finding is marked %q, want the one mark put there", on)
 		}
 
-		if err := f.store.TagIt(ctx, who, f.productID, issue, undisclosed, "mine"); err != nil {
+		if err := f.store.LabelIt(ctx, who, f.productID, issue, undisclosed, "mine"); err != nil {
 			t.Errorf("a private triager could not mark an undisclosed finding: %v", err)
 		}
 	})

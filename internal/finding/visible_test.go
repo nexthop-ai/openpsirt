@@ -274,8 +274,8 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 					_, err := f.store.Releases(ctx, s, f.productID)
 					return err
 				}},
-				{"the tags in use", func(s access.Subject) error {
-					_, err := f.store.TagsInUse(ctx, s, f.productID)
+				{"the labels in use", func(s access.Subject) error {
+					_, err := f.store.LabelsInUse(ctx, s, f.productID)
 					return err
 				}},
 				{"how a release is trending", func(s access.Subject) error {

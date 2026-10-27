@@ -1430,6 +1430,7 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | What a build holds that the scanner cannot match downloads as `unmatched-components-…`, and the last upload per build as `last-uploads`, which v0.10.2 named `match-coverage-…` and `scanning`. The report is at `/analytics/last-upload-per-build`, and `/reports/scan-coverage` forwards there | Look for the new name where a script picks the file up by its name |
 | A product's planned upgrades and one build's download as `planned-upgrades-…`, which v0.10.2 named `fix-bundles-…` and `pending-upgrades-…` | Look for the new name where a script picks the file up by its name |
 | The findings lists and the planned upgrades sort by `occurrences` in place of `places` | Ask for `sort=occurrences`. The upgrade rewrites a saved filter's `sort=places`, `claim` and `claim_state` to `sort=occurrences`, `decision` and `decision_state` |
+| A finding's labels are `labels` in its response, which v0.10.2 named `tags`. The findings screen's address narrows by `label`, and a kept link narrowing by `tag` opens the list without that narrowing | Read `labels`. The upgrade rewrites a saved filter's `tag` to `label` |
 | The interface's addresses for a decision are `/decisions/{id}`, for a decision occurrence `/decision-occurrences/{id}`, and for a bulk decision `…/components/{component}/bulk-decision`. `/claims/{id}` and `…/components/{component}/decide` forward to them, with the query and fragment they arrived with | Nothing |
 | A bulk decision's `kind` is `bulk`, which v0.10.2 answered as `together` | A client matching on the kind matches `bulk`. The upgrade rewrites every stored one |
 | The notification kinds `claim-waiting` and `claim-lapsed` are `decision-waiting` and `decision-lapsed`, in the notifications, a webhook's body and a chat message | A receiver matching on the kind matches the new one. The upgrade rewrites every stored notification and every destination configured for either kind |
@@ -1470,6 +1471,7 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | `triage_floor`, a product's own | `minimum_severity` |
 | `floor`, setting a product's minimum severity, on the findings list and on a build's readiness | `minimum_severity` |
 | `routed_by`, the rule that placed a finding | `assigned_by_rule` |
+| `tags`, the labels on a finding | `labels` |
 
 A notice's `places`, the places it named, keeps its name.
 

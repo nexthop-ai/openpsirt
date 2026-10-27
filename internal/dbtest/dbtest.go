@@ -895,7 +895,7 @@ var tables = []string{
 	"disclosure_movement",
 	// Before product, vulnerability, component and person, all of which it
 	// points at.
-	"finding_tag",
+	"finding_label",
 	// Before person and product, both of which it points at.
 	"saved_filter",
 	// Before the comment it belongs to.

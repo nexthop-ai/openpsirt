@@ -131,8 +131,8 @@ func TestAComponentIsAnsweredPerBuildBecauseTheAnswerDiffers(t *testing.T) {
 }
 
 func TestWhatAPromisedUpgradeCoversIsDerivedRatherThanMarked(t *testing.T) {
-	// The mark on a covered finding is a join, not a tag written across every
-	// row an upgrade touches. A tag is per product and could not say "planned
+	// The mark on a covered finding is a join, not a label written across every
+	// row an upgrade touches. A label is per product and could not say "planned
 	// on master, not on 2.4", which is the case the per-build target exists
 	// for — and it would go stale the moment the promise was withdrawn.
 	each(t, func(t *testing.T, f *fixture) {

@@ -47,6 +47,7 @@ var tablesRenamedV0110 = []tableRename{
 	{"obligation_window_product", "response_window_product"},
 	{"routing_rule", "assignment_rule"},
 	{"advisory_source", "supplier_advisory_feed"},
+	{"finding_tag", "finding_label"},
 }
 
 // columnRename is a column's name before and after, on its table as v0.11.0
@@ -71,6 +72,7 @@ var columnsRenamedV0110 = []columnRename{
 	{"finding", "urgency_exploited_here", "urgency_incident"},
 	{"product", "triage_floor", "minimum_severity"},
 	{"finding", "routed_by", "assigned_by_rule"},
+	{"finding_label", "tag", "label"},
 }
 
 // nameKind is what a renamed name belongs to, which decides how each engine
@@ -199,11 +201,21 @@ var namesRenamedV0110 = []nameRename{
 	{aForeignKey, "supplier_advisory_feed", "advisory_source_product_fk", "supplier_advisory_feed_product_fk"},
 	{aForeignKey, "supplier_advisory_feed", "advisory_source_by_fk", "supplier_advisory_feed_by_fk"},
 	{anIndex, "supplier_advisory_feed", "advisory_source_due_idx", "supplier_advisory_feed_due_idx"},
+
+	{aPrimaryKey, "finding_label", "finding_tag_pkey", "finding_label_pkey"},
+	{aUnique, "finding_label", "finding_tag_once", "finding_label_once"},
+	{aForeignKey, "finding_label", "finding_tag_product_fk", "finding_label_product_fk"},
+	{aForeignKey, "finding_label", "finding_tag_issue_fk", "finding_label_issue_fk"},
+	{aForeignKey, "finding_label", "finding_tag_component_fk", "finding_label_component_fk"},
+	{aForeignKey, "finding_label", "finding_tag_by_fk", "finding_label_by_fk"},
+	{anIndex, "finding_label", "finding_tag_named_idx", "finding_label_named_idx"},
 }
 
 // renamesV0110 is every name above, from its v0.10.0 spelling to its v0.11.0
 // one. Each name changes once whichever list holds it, so one map serves a
-// table, a column and a constraint alike.
+// table, a column and a constraint alike. A column's name is renamed in every
+// declaration the map rewrites, so a column is listed only where no other
+// renamed table holds one of the same name: tag is finding_label's alone.
 var renamesV0110 = func() map[string]string {
 	out := map[string]string{}
 	add := func(from, to string) {
@@ -279,6 +291,8 @@ func declaredV0110(t *columnTypes, table string) []string {
 		statements = routingBaseline(t)
 	case "advisory_source":
 		statements = advisorySourceBaseline(t)
+	case "finding_tag":
+		statements = tagBaseline(t)
 	case "":
 		kept, ok := keptV0110[table]
 		if !ok {

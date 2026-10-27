@@ -392,7 +392,7 @@ export function activeFilters(
       ...(named?.name ? { title: named.name } : {}),
     });
   }
-  each("tag", "Tag", []);
+  each("label", "Label", []);
   if (at("differs") === "1") add("differs", "Differs between builds", "only");
   add(
     "variants",
@@ -519,12 +519,12 @@ function Group({ legend, children }: { legend: string; children: React.ReactNode
 // depends on where it is: a subtree and
 // "differs between builds" are statements about one build's edges and one
 // selection, so they are absent rather than dead where there is no build to
-// walk, and a VEX publisher or a tag is a per-product list.
+// walk, and a VEX publisher or a label is a per-product list.
 export function Filters({
   params,
   set,
   setMany,
-  tags,
+  labels,
   kinds,
   kindsRead,
   oneBuild,
@@ -538,7 +538,7 @@ export function Filters({
   // parameter and replacing one word is not the same act as replacing all of
   // them.
   setMany: (key: string, values: string[]) => void;
-  tags: string[];
+  labels: string[];
   // The package kinds the server reports present in the scope on screen.
   kinds: readonly KindPresent[];
   // The read the kinds come from. The picker offers nothing else, so a
@@ -794,12 +794,12 @@ export function Filters({
           onTyping={setWeaknessTyped}
         />
         <Words
-          label="Tag"
-          hint="Words somebody tagged findings with here. Any of them"
-          words={all("tag")}
-          onChange={(words) => setMany("tag", words)}
-          offered={tags}
-          listId="findings-tags"
+          label="Label"
+          hint="Labels somebody put on findings here. Any of them"
+          words={all("label")}
+          onChange={(words) => setMany("label", words)}
+          offered={labels}
+          listId="findings-labels"
         />
         {!spanning && !oneBuild && (
           <Flag
