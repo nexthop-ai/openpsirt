@@ -446,7 +446,7 @@ seed-status = builds=""; for entry in $(DEMO_BUILDS); do \
 	    "$(1)/v1/products/$$build/sboms?limit=1" \
 	    | sed -e 's/.*"state":"\([a-z]*\)".*/\1/' -e 's/^{.*/no scans yet/' | tr -d '\n'; \
 	  printf " · open "; curl -sS --noproxy '*' $(2) \
-	    "$(1)/v1/products/$$product/findings?stream=$$stream&variant=$$variant&limit=1" \
+	    "$(1)/v1/products/$$product/findings?branch_or_tag=$$stream&variant=$$variant&limit=1" \
 	    | sed -e 's/.*"total":\([0-9]*\).*/\1 findings/' -e 's/^{.*/unreadable/'; \
 	done
 
@@ -616,7 +616,7 @@ demo-triage:
 	at="http://$(DEMO_HOST):$$proposer"; \
 	agrees="http://$(DEMO_HOST):$$approver"; \
 	rows=$$(curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=fixed&stream=$$stream&variant=$$variant" \
+	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=fixed&branch_or_tag=$$stream&variant=$$variant" \
 	  | awk '$(DEMO_CSV_CELLS)' | awk -F'|' '$(DEMO_CSV) \
 	    { part = $$at["component"]; \
 	      if ($$1 !~ /^CVE-/ || part == "" || part ~ /\//) next; \
@@ -663,7 +663,7 @@ demo-triage:
 	if [ -n "$$component" ] && [ -n "$$to" ]; then \
 	  curl -sS --noproxy '*' -o /dev/null -w "  upgrade $$component to $$to %{http_code}\n" \
 	    -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	    -d '{"version":"'"$$from"'","to":"'"$$to"'","by":"'"$$(date -u -d '+3 days' +%Y-%m-%d)"'","team":"platform","reasoning":"Taking the kernel bump in the next build; the team is tracking it.","builds":[{"stream":"'"$$stream"'","variant":"'"$$variant"'"}]}' \
+	    -d '{"version":"'"$$from"'","to":"'"$$to"'","by":"'"$$(date -u -d '+3 days' +%Y-%m-%d)"'","team":"platform","reasoning":"Taking the kernel bump in the next build; the team is tracking it.","builds":[{"branch_or_tag":"'"$$stream"'","variant":"'"$$variant"'"}]}' \
 	    "$(DEMO_URL)/v1/products/$$product/components/$$component/upgrade"; \
 	fi; \
 	echo "  seeded. A 422 or 409 above is this having been run before: a"; \
@@ -682,7 +682,7 @@ demo-triage:
 	  -d '{"identity":"holly","display_name":"Holly","holds":[{"product":"'"$$product"'","role":"approver"}]}' \
 	  "$(DEMO_URL)/v1/people"; \
 	rows=$$(curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/$$product/findings.csv?stream=$$stream&variant=$$variant" \
+	    "$(DEMO_URL)/v1/products/$$product/findings.csv?branch_or_tag=$$stream&variant=$$variant" \
 	  | awk '$(DEMO_CSV_CELLS)' | awk -F'|' '$(DEMO_CSV) \
 	    { part = $$at["component"]; \
 	      if ($$1 ~ /^CVE-/ && part != "" && part !~ /\//) print $$1 "|" part }'); \
@@ -726,7 +726,7 @@ demo-flaw:
 	fi; \
 	filed=$$(curl -sS --noproxy '*' \
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	  -d '{"builds":[{"stream":"main","variant":"container"},{"stream":"v1.0","variant":"container"}],"summary":"The inventory upload accepts a document nobody authenticated and files it against whichever build the document names.","severity":"high","vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N","weaknesses":["CWE-306"],"reported_by":"A. Researcher","contact":"researcher@example.invalid","credit":"anonymous"}' \
+	  -d '{"builds":[{"branch_or_tag":"main","variant":"container"},{"branch_or_tag":"v1.0","variant":"container"}],"summary":"The inventory upload accepts a document nobody authenticated and files it against whichever build the document names.","severity":"high","vector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N","weaknesses":["CWE-306"],"reported_by":"A. Researcher","contact":"researcher@example.invalid","credit":"anonymous"}' \
 	  "$(DEMO_URL)/v1/products/openpsirt/findings"); \
 	if echo "$$filed" | grep -q '"identifier"'; then \
 	  echo "$$filed" | sed -e 's/.*"identifier":"\([^"]*\)".*/  filed as \1, undisclosed/'; \
