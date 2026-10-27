@@ -1,955 +1,157 @@
 # Remediation
 
-Declared fix intent, how the tool determines whether it arrived, and the
-documents generated from what was decided.
+Declared fix intent, the commitments it writes, and how the next scan of each
+build answers them.
 
-Satisfies REQ-15, REQ-19, REQ-24, REQ-28, REQ-33, REQ-34, REQ-35, REQ-36, REQ-39.
+Satisfies REQ-19, REQ-28, REQ-34, REQ-35, REQ-36.
 
-Neighboring pieces: the escalation view, per-item time remaining and the SLA
-compliance rate are in `design-docs/analytics.md`; the assignment model is in
-`design-docs/access.md`, which defines the party a thing is assigned to.
+Deadlines, upstream currency, version ordering, advisories, the CSAF document,
+the VEX document and the provider directory each have a document of their own
+(`DESIGN.md`). The escalation view, time remaining and the compliance rate are
+in `design-docs/analytics.md`; the party work is assigned to is in
+`design-docs/access.md`.
 
 ## Contents
 
 - [Declaration, not completion](#declaration-not-completion)
 - [The unit](#the-unit)
-- [Resolution](#resolution)
-- [Deadlines](#deadlines)
-- [Planned upgrades of a build](#planned-upgrades-of-a-build)
-- [Upstream currency](#upstream-currency)
-- [Version ordering](#version-ordering)
 - [Promise states](#promise-states)
+- [Planned upgrades of a build](#planned-upgrades-of-a-build)
 - [Build-declared suppressions](#build-declared-suppressions)
 - [External links](#external-links)
-- [Publication](#publication)
-- [The advisory](#the-advisory)
-- [Editorial state](#editorial-state)
-- [The CSAF document](#the-csaf-document)
-- [The VEX document](#the-vex-document)
-- [Issuance records](#issuance-records)
-- [The provider directory](#the-provider-directory)
-- [Publisher identity](#publisher-identity)
 - [Not built](#not-built)
 - [Limits](#limits)
 
 ## Declaration, not completion
 
-A fix is declared and never completed. A decision promising work states which
-releases it is for; whether the fix arrived is answered by the next scan of each
-of those releases (REQ-35).
+A fix is declared and never completed (REQ-35). A decision promising work
+names the releases it is for, and the next scan of each answers whether the fix
+arrived.
 
-The stored row is the declaration and nothing else: which build, which fold, who
-said so, and when. There is no state column, no completed-at, and nothing to
-move along.
-
-A declaration arrives with the decision that argued for it, from the two
-outcomes that promise work — a bump, recorded against the component, and a
-backport, recorded against the issue. There is no way to record where a fix
-will land without saying what was decided. Bare intent carries no version, no
-date and no reasoning, so nothing can lapse and nobody is asked to agree to it:
-a promise in the shape of a record and not in its effect.
-
-The alternative — planned, in progress, done, moved by a person — is how every
-tracker works, and is wrong here because independent evidence already exists. A
-scan of the release either finds the issue or does not. A second record of the
-same fact is one somebody has to keep true, and the way that fails is the tool
-reporting a fix that shipped in nobody's release.
-
-A flaw recorded by hand is the exception (REQ-19). No scan reports one, so there
-is no second opinion to check a declaration against, and refusing the
-declaration leaves the finding open forever. That class is closed by a person,
-with who, when and why on the record. `design-docs/findings-closure.md` § Closure by a person carries the shape.
+| Rule | Reason |
+|---|---|
+| The stored row is the declaration alone: build, fold, who and when. No state, no completed-at, nothing to move along | A scan already finds the issue or does not. A second record of that fact is one somebody keeps true, and it fails by reporting a fix that shipped in nobody's release |
+| A declaration arrives only with the decision that argued for it: a bump, recorded against the component, or a backport, recorded against the issue | Bare intent carries no version, date or reasoning, so nothing lapses and nobody agrees to it |
+| A flaw recorded by hand is closed by a person, with who, when and why on the record (REQ-19) | No scan reports one, so a declaration has nothing to be checked against and the finding stays open forever (`design-docs/findings-closure.md` § Closure by a person) |
 
 ## The unit
 
-A commitment is one build moving one fold: a source package, at the version it
-was built at, going to another version. That is the piece of work somebody
-actually does, and it is one row.
+A commitment is one build moving one fold, a source package at the version it
+was built at, to another version. It is one row.
 
-A release is named by its branch or tag and its variant together, never by one of them:
-the same branch built two ways is two builds, and a plan naming only the branch
-would claim a fix for hardware nobody built for.
-
-Acting on the plan acts on the product, not on the build in the path. A route
-names a finding so a screen has somewhere to link to; what is planned belongs to
-the work that finding is part of.
+| Rule | Reason |
+|---|---|
+| A release is named by its branch or tag and its variant together | One branch built two ways is two builds, and naming the branch alone claims a fix for hardware nobody built for |
+| Acting on a plan acts on the product, never on the build in the route's path | A route names a finding so a screen has somewhere to link; the plan belongs to the work |
+| One commitment per build per fold, enforced by the database | A release moves a package to one version, and two rows is a plan a coordinator cannot read |
+| The proposals a declaration makes are made distinct before they are written | A decision's live key at an occurrence names the occurrence and not the build, so the same component in two builds yields identical proposals that collide on the unique index and roll back the declaration |
 
 ### Coverage by matching
 
 A finding is covered when its component folds to the commitment's key in the
 commitment's build. Nothing is written onto findings.
 
-| Consequence | |
+| Consequence | Detail |
 |---|---|
-| Changing the version a release is moving to is one row | Keyed per issue and per component and per target version, a change means rewriting every row of it |
-| An issue published tonight is covered by this morning's commitment | With nobody acting. Keyed per issue it is not covered until somebody declares it too |
-| A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump, so a commitment recorded against one covers all of them |
-| No version comparison decides coverage | An upgrade covers everything open on the fold rather than only what records this version as its fix. What an ordering is used for is reading a set of candidates, never deciding what a commitment reaches |
-
-A build has one commitment per fold, enforced by the database rather than by a
-check somebody remembers. A release moves a package to one version; two rows
-saying otherwise is a plan a coordinator cannot read.
+| Changing a target version is one row | Keyed per issue, component and target version, it would rewrite every row |
+| An issue published tonight is covered by this morning's commitment, with nobody acting | |
+| A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump |
+| No version comparison decides coverage | An upgrade covers everything open on the fold, not only what names this version as its fix. An ordering reads candidates, never what a commitment reaches |
 
 ### Commitment changes
 
-| Where it came from | How it changes |
+| Source | Change |
 |---|---|
-| A decision somebody agreed to | Through the act that revises it, which withdraws every agreement on it and returns its rows to the queue. A reason is required, and the revisions are where what was promised in October survives being changed in November |
+| A decision somebody agreed to | Through the act that revises it, which withdraws every agreement on it and returns its rows to the queue. A reason is required, and the revisions keep what was promised before |
 | Intent nobody argued for | The row is edited |
 
-Changing the version or the date under a standing agreement is refused, naming
-the decision to revise. An approver agreed to a version by a date; rewriting either
-half quietly would leave the agreement standing over a promise nobody read,
-which is the failure REQ-28 exists to prevent.
-
-| Rule | |
-|---|---|
-| **The gate is worked out again** | Moving the date moves the thing the gate is about. Withdrawing the agreements and leaving the rows recorded as needing nobody put a promise first made inside the deadline back in force at any later date somebody chose — in force, suppressing what it covered, and listed in no queue |
-| It is measured over what the decision covers now | The builds come from the commitments the decision wrote and the occurrences from its own rows, read inside the transaction that writes. A deadline moves when the policy or the rating moves, so the one it was made against is not the one it is judged by |
-| A promised patch moves by its date alone | It has no version. It writes no commitments, so its builds are the ones holding an open finding the decision covers now |
-| A date already past is refused | It says the work will have happened before now |
-| The reasoning goes through the text policy | Every path that stores typed text runs it before storing, and this one reached the write through an inner act that did not |
-
-## Resolution
-
-A commitment is answered by the next scan of the build it was made for, never by
-anybody marking it done (REQ-35). Each stands at landed, lapsed or planned, and
-those three are worked out on every read — nothing stores them, nothing refreshes
-them, and nothing has to be invalidated when a scan closes a finding.
-
-A roll-up of one promise across the builds it names is not built. "Landed in
-two of three releases, planned in the third, due on the first" is the reading,
-and its source is the promise itself: the releases it names, the version and
-the date, each release's part resolved by that release's next scan. What is
-built answers per build, the grain a commitment is made at, and where an issue
-stands across several is read from the findings list, which has a row per
-build.
-
-## Deadlines
-
-There are no per-item due dates. A deadline comes from how urgent the finding is
-(REQ-33). Moving one is a deferral, which carries a reason and an approval
-threshold, and the deferral date becomes the effective target. Deferred items are
-reported apart from plainly overdue ones. A plan says where, not when.
-
-The clock starts at the latest of three moments, never the earliest and never
-now: when the finding was first seen here, when exploitation was learned, and
-when the fix became available. All three have passed, so recounting reaches the
-same answer every time — which is what keeps a deadline from restarting nightly
-and never arriving.
-
-| Case | Counted from |
-|---|---|
-| The fix already existed when the finding opened | The sighting. The ordinary case, and the response time genuinely is from when it was learned |
-| The flaw was seen before upstream released anything | **The fix.** Counting from the sighting sets a deadline against a version that did not exist, which is the common case for an inventory made of distribution packages |
-| The issue became exploited later | The learning. Counted from the opening, an issue exploited after six months lands three days before anybody knew |
-
-Exploitation is learned on the date the known-exploited catalog added the
-issue, bounded by the moment of the scan, the same bound a fix's date takes.
-The days before a scan sees a listing are the pipeline's lag, and they do not
-extend the window. A finding opened after the listing still counts from its
-opening, because the latest moment wins. A finding may be overdue the moment
-it opens, and there is no floor for a slow pipeline.
-
-| Rule | |
-|---|---|
-| The listing day is read from the scanner's output | From the catalog entries on the matched record and on every record related to it. The earliest readable day stands, as midnight UTC. An entry whose day cannot be read still marks the issue exploited, from no day |
-| The issue keeps the earliest day any report states | Stored on the issue, and only ever moved earlier, by a statement of its own. Two reports stating different days leave the earlier whichever arrives first |
-| A scan with no listing day learns exploitation at its own start | The moment every issue a database held before the day was read counts from |
-| A listing day filled or moved earlier re-clocks the issue | Every open exploited finding of the issue counting from a later moment is moved onto the day, in every build, and its deadline worked out again. Once per issue: after it, nothing counts from later |
-| A severity word filled in re-clocks the issue in every product holding it | The deadline of each open finding is worked out again from when it opened, by the product's rating in force with the new word as its fallback (`design-docs/findings-issues.md` § Report merging) |
-| A finding with no deadline keeps none when re-clocked | A tag, a release past end of life and a missing fix are off the clock whatever the moment is. A rating moving, a word filled in, an incident and an issue becoming exploited each re-clock only what sits on a release that moves and is in support |
-| A recount reasons at the store's clock | One moment per recount, read from the clock every other write reads, so a fix date is weighed the same way by a recount and by the scan beside it |
-
-The same rule governs every writer. A scan counts it per finding, and an edited
-window rewrites every open deadline as three passes, one per moment, each over
-the rows for which that moment is the latest. A fix dated later than the
-moment it is weighed at has not arrived: a scan weighs it at the run's start
-and the rewrite at the time of the edit.
-
-The rewrite writes a deadline only where one belongs: a release that moves and
-is in support, a band the minimum severity admits or an issue this product was attacked
-through, and a fix to take. A rewrite stopped part way, by an error or a
-shutdown, leaves every row it reached right and every other row as it was. The
-sweeps that follow take the clock off what was written before a release went out
-of support, a minimum severity moved or upstream answered.
-
-A finding with no deadline states which reason applies:
-
-| Reason | Reported as | Precedence |
-|---|---|---|
-| A flaw recorded here that nobody has rated | `not-rated` | The narrowest: it is about what this finding lacks rather than anything around it |
-| Below its product's minimum severity | `below-minimum-severity` | The narrowest statement about how this finding is rated |
-| **Upstream has released no fix, or has declined to on an issue nobody is exploiting** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
-| **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
-| Its release is past end-of-life (REQ-15) | `out-of-support` | |
-
-Five reasons share four words. A tag reports as out of support, which is not
-what it is — a supported tag carries no deadline for a more fundamental reason
-than a retired one does. Stated here rather than left as a difference between
-this table and the wire, and a word of its own is worth adding the day somebody
-needs to tell the two apart.
-
-There is no further reason, because a deadline is worked out at ingest for
-everything else. Left blank, the column reads as missing data on the one screen
-whose purpose is noticing what is running out.
-
-A deadline nobody can meet is not a deadline, which is the one statement the
-four after `not-rated` make. Where upstream has released nothing there is no version to take, and
-the only act that stops the clock is a person recording a decision — which is
-the act the deadline exists to ask for and cannot be the answer to. An overdue
-list carrying rows no upgrade would answer is one people stop reading, and what
-they stop reading is the rest of it.
-
-Measured on the demo deployment's two SONiC images, seeded 2026-09-23:
-95,497 of 335,491 open findings have no fix released (28.5%), and 14,196 more
-are an upstream refusal (4.2%).
-
-An upstream refusal of an **exploited** issue keeps its deadline. Exploited is
-either signal: the feed's, or a record that this product was attacked. The
-refusal will never be reversed, so what remains is work only this deployment can
-do — patching the package itself, replacing it, or recording what stands in the
-way — and on an issue somebody is using that work has a date. A missing fix does
-not get the same exception: one may arrive, and a deadline set against it could
-only be met by waiting.
-
-| Writer | Where the exception is asked |
-|---|---|
-| A scan opening a finding, or answering one already open | The one deadline rule, with either exploitation signal |
-| A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
-| A scan moving the listing day earlier, for every build of the issue | The one deadline rule, over findings that already carry a deadline |
-| A record of this product being attacked, set or cleared | The recount, with either signal |
-| An edited window | The sweep that removes clocks passes over an exploited refusal, and the sweep that takes clocks off what is below the minimum severity passes over either signal |
-
-A scanner that did not answer is not upstream saying no. Reading silence as
-"no fix exists" is a claim about the world made out of a gap in a report, and it
-is the direction that loses a deadline somebody could have met. So an unstated
-fix state stays on the clock.
-
-This cuts overdue counts, and that is a correction rather than an
-improvement. Anyone tracking the figure should be told why it moved. What it
-does not do is flatter a response time: if a two-year-old issue was genuinely
-learned of today, the response time is from today, and the accusation hiding in
-the objection — that we should have known sooner — is a question about scanning
-coverage rather than about where a clock starts.
-
-What has no deadline is absent from every figure built on one, which is the
-point and also the gap: nothing overdue, nothing due soon, and nothing in the
-compliance rate. Three of the reasons already have somewhere to be seen — the
-line is stated wherever a list hides something, a tag's findings are read at the
-release, and what upstream has done is a column of the findings list and a
-filter over it. End-of-life does not, so releases out of support are a report of
-their own; `design-docs/analytics.md` holds it.
-
-A tag was built once and is what somebody received. No work will land in it
-whatever a date says, so a deadline on one is unmeetable the moment it is
-written. Measured on the demo without this rule: all 26 open findings on its
-one tag carry a deadline, every one of them unmeetable by construction. Real
-deployments accumulate tags while branches do not, so that side grows — and it
-inflates every overdue count, the compliance rate among them.
-
-The reason is derived rather than stored, and derived where the minimum severity is
-applied, so the two cannot disagree. The deadline itself is stored, because
-deriving it costs a pass over every open finding per urgency band — and it is
-rewritten whenever the answer moves rather than only when the ranking does, so
-a fix appearing upstream starts a clock that was not running and a fix withdrawn
-stops one.
-
-### Recorded flaws
-
-A flaw recorded in our own product is held to a separate set of windows, and
-its clock starts when it is first given a severity (REQ-33).
-
-| Rule | |
-|---|---|
-| The windows are the product's own | The fix has to be written rather than taken from upstream. Shipped at 7 days exploited, 30 critical, 90 high, 180 medium and 365 low, against 3, 7, 30, 90 and 180 for a scanned finding. Both sets are settings, and changing either rewrites every open deadline |
-| The clock starts at the first severity | A flaw recorded with one starts at the recording. One recorded without one carries no deadline, and starts when a rating is first put in force for it in that product |
-| The start is stored on the finding | A rating withdrawn and made again moves the window and keeps the start. Restarted, a flaw near its date is given a fresh window by being re-rated, which is a deferral nobody agreed to |
-| Everything else is the rule above | Exploitation learned later and a fix arriving move it the way they move a scanned finding |
-| A recorded flaw is recounted on its own | Recorded flaws are few, one row per occurrence in each build, so they are rewritten row by row rather than in the bands a scan's findings are |
-
-## Planned upgrades of a build
-
-The product's planned upgrades inverted (REQ-35). A triager reads an upgrade and the
-issues it closes, in the findings list's by-upgrade view; a coordinator reads a
-build and the upgrades it is waiting on, here. One query read from either end,
-and both ends are drawn.
-
-Both ends key their rows on the fold, so an upgrade reads the same from either
-direction.
-
-| Ordering | |
-|---|---|
-| The planned upgrades list breaks its last tie on the fold | The fold is the last column a planned upgrade is grouped on, so two equal on every other key keep one order across pages |
-| One source at two versions in one build lists the earlier version first | By the ecosystem's version ordering where the fold has one, and by text where it has none |
-
-The version in hand and the version being moved to are both stored with the
-commitment. They are read off the findings that are still open, and landing the
-upgrade closes them — so a plan deriving them went blank on an upgrade exactly
-as the upgrade succeeded.
-
-What each row reports is what is still open under it, counted from the findings
-rather than from anything written down: the distinct issues the upgrade would
-close here, and how many occurrences those sit at. Nothing is declared done by hand — a
-build is clear when it stops holding them.
-
-## Upstream currency
-
-What the public index for an ecosystem says the newest version is, for the
-components this deployment builds rather than the ones a distribution
-maintains. Off unless an administrator turns it on: it sends a component's
-name to a public index.
-
 | Rule | Reason |
 |---|---|
-| One replica asks, settled by a lease | These are free services somebody else runs, and the politeness the pass is built around — two hundred at a time, a quarter of a second apart — is a rate per deployment rather than per replica |
-| The lease is taken again as the pass runs | Sized from the interval between cycles it is a guess at how long a pass takes, and the arithmetic says so: two hundred components of one or more requests each, with a timeout each, is far past several intervals. A slow index then hands the pass to a second replica mid-flight and both ask |
-| Taken again every twenty-five components or once half the lease has gone, whichever comes first | A component is one request to most indexes, two to Maven Central and up to five to nuget.org, so a count alone lets a slow index outlast the lease between renewals |
-| An index that fails is asked once a pass | Its components stay due, and the window is read again without that ecosystem for the rest of the pass. A deployment whose egress does not reach one index would otherwise fill every window with that index's never-asked components, and no other ecosystem would be asked again |
-| A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
-| The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
-| A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
-| The candidates are components some build still carries, and a component no build carries keeps its last answer | A name that was in a build last year and is not now is not one to send to an index tonight. The report of names with no upstream answer reads the same set, so the two describe the same candidates |
-
-| Ecosystem | Index | The newest version is |
-|---|---|---|
-| Go | The module proxy | What it answers as the latest, with its time |
-| npm | The npm registry | The `latest` tag, dated from the full document where it comes back |
-| PyPI | pypi.org | The version it names, dated by its earliest file |
-| Cargo | crates.io | The newest stable version, or the newest of any where there is none |
-| Maven | Maven Central's repository | The furthest along of the versions its metadata lists that is a release, by the Maven ordering, or the furthest pre-release where there is no release. Dated by when the repository last modified that version's project document |
-| NuGet | nuget.org's registration | The furthest along listed release, by the NuGet ordering, or the furthest listed pre-release where there is none. Dated by when it was published |
-
-| Rule | Reason |
-|---|---|
-| An index that lists every version is read with the ecosystem's own ordering | Maven Central's metadata names a "release" and it is whatever was published last: measured on log4j-core, 3.0.0-beta3 while 2.26.1 was the newest release. An ordering is what says 2.25.1 is after 2.9.1 |
-| A pre-release is not what somebody is behind | Telling somebody they are behind a release candidate is not a claim to act on. It is offered only where a package has published nothing else |
-| A Maven version marked preview, pre, ea, eap or dev is a pre-release | Maven orders those words above the release as words it does not know, and publishers use them for versions ahead of one. The ordering is left as Maven has it; only the question of whether a version is a release reads them |
-| An unlisted NuGet version is passed over | Its owner withdrew it from what anybody choosing a version is offered, and nuget.org dates it to 1900 |
-| A paged NuGet registration is read from its newest page back, at most four pages | Pages run oldest to newest, so the answer is usually on the last. The bound is for a package whose newest pages hold only pre-releases, which would otherwise cost a request per page back to its first release |
-| Where the bound stops the walk with no release found, there is no answer | A release may sit on a page that was not read, so the newest pre-release is not offered. The package is recorded as asked with no version |
-| A page is read only from the registration it came from | Its address is what the answer says it is. An index naming a page anywhere else, or an address carrying a dot segment, is not followed |
-| A Maven name that would move the request is not asked | A group or an artifact that is empty, `.` or `..` names a different place in the repository rather than a package. Refused as unaskable, which records it |
-
-What comes back is classified, because the classes want opposite treatment.
-
-| Answer | Recorded | Reason |
-|---|---|---|
-| A version | Yes | The thing being asked for |
-| The index has never heard of it | Asked, with no version | A private module and a vendored fork both look like this, and neither is a fault. Recorded so the question is not asked again tomorrow |
-| A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read, a status other than a bad day's, a redirect the client refuses. An answer we will never get is still an answer about this component |
-| A bad day — too many requests, the index itself unwell, or no answer at all | Nothing | The one class worth coming back to: it stays due and the next pass asks again. A Maven project document that fails this way fails the whole answer, so its date is asked for again too. Where npm's full document is refused and the abbreviated one falls back into a bad day, the answer is the bad day |
-
-Everything that is not a bad day is recorded. Read as one, a refusal the index
-repeats every time leaves the component unrecorded, and the window takes the
-never-asked first — so it holds the head of every pass afterwards for ever,
-with the components behind it never reached.
-
-A previous answer is never overwritten by an empty one. An index returns
-not-found for a renamed package and for some transient conditions, and letting
-one of those destroy a version already in hand would sit on the hole for a
-month. A version answered with no date keeps the date held for it while the
-version has not moved: npm's abbreviated document and a Maven project document
-that did not come back both answer the version alone.
-
-| Rule | Reason |
-|---|---|
-| A package is asked about once a pass, however many of its versions are stored | A component is one version and the question is about the package, so every version in the pass's window takes the one answer |
-| A PyPI name is asked for as PyPI spells it | Lower case, each run of hyphens, underscores and dots one hyphen. Asked any other way the index redirects, and the client follows no redirect |
-| A name the Maven or NuGet asker refuses before sending is reported as unreadable | It was never sent, so "not known, or refused" would put a name nobody asked about on the list somebody holds back from |
-
-### Names held back
-
-What a request carries is a component's name. One per component, the name
-and nothing else — no version, no build, no product. For an open-source
-dependency that is public knowledge. For something built here it is the name of
-a project, a team, or a product nobody has announced, and a public index
-records every request made of it.
-
-So a name this deployment calls its own is never sent. Three sources, unioned:
-
-| Source | What it yields |
-|---|---|
-| The namespace this deployment publishes under | The organization in the three spellings the ecosystems use: the host, the host reversed, which is what a Maven group and a Java package are, and each label short of the top-level domain. Already required for CSAF and VEX and already meaning "who we are", so a deployment that publishes anything has said this once |
-| What each build declared itself to be | The account, scope or group that identifier is published under: the segment beside the name, and for a Go module path the account after its host, whatever major-version suffix, module subdirectory or forge group follows it. A root is the product this deployment builds, so who publishes it is this deployment by construction. Taken from the scan record rather than from the stored component, because the component standing for the product is stored by its name alone — a version on it would give the product a new identity every night |
-| What the deployment stated | Whatever else an operator named, for what the other two cannot reach |
-
-| Rule | Reason |
-|---|---|
-| A name is matched a part at a time, either exactly or followed by a separator | Matched anywhere in the string, one organization's name holds back every package containing those letters; matched only exactly, it misses the family of names the organization actually publishes, which is most of what it is for |
-| A name without a dot is matched against each dotted part as well | A Maven group starts with a top-level domain, so `com.skunkworks` never begins with `skunkworks`. Matched only at the start, a stated name was held back from npm and NuGet and sent to Maven Central |
-| The segment beside the package's name, never the whole namespace | A forge host is shared by everybody. Taking it would hold back most of an ecosystem while reporting that it was protecting one organization, which is the failure that makes an operator turn the feature off rather than tune it |
-| Nothing is derived from the root's own name | A product called "core" would hold back every package whose name starts that way. A default that wrong is one nobody tunes |
-| A label that names a kind of registration rather than an organization is dropped | Where a deployment publishes under a second-level registration, the generic part is nobody's name. It is a closed handful rather than a list of where each country's registrations begin, which is a file this does not have |
-| It is a better default, not a control | A deployment needing certainty about what leaves it leaves the whole feature off, which is where it ships. This is what stops an ordinary deployment leaking its own names by turning on something that reads as harmless |
-| Biased toward holding back, and it says what it held | Over-excluding loses an answer, which is visible on the screen that would have shown it and in the report beside it. Under-excluding sends a name to somebody else's service, which is visible nowhere and cannot be taken back |
-| A held-back component is recorded as though it had been asked about | The window takes the never-asked first. Left unrecorded it holds the head of every pass afterwards for ever, with the components behind it never reached — the same failure the classification above exists for |
-| Anything an index said about a held-back name is dropped | All of it was obtained by sending that name. Kept, the version stands on a screen with nothing that will refresh it, the component never reaches the report of what was held back, and the row goes stale in a day rather than in thirty — one of the pass's slots every day, sending nothing |
-| A name a reader may not be told is not in the list the report carries | A label derived from a root is the name a product is published under, so the whole list states the scope of a product nobody announced to that reader (REQ-42). The classification still runs against every root, because a name the pass never sent must not read as sent |
-| Identifiers are taken newest first | What a build declares itself to be carries its version, so a product built nightly states a new one every night and the bound falls on builds rather than products. Unordered, two callers deriving this separately get different sets and a name held back yesterday goes out today |
-| The roots are read per pass, the rest at startup | A product declared this morning is one whose name should not leave this afternoon. The other two come from configuration and change on a redeploy |
-
-### Unanswered components
-
-Two questions that are one report, because they are asked together: what was
-held back says what the default is costing, and what no public index knew or
-answered is the list an operator reads to decide what else should be held back. A
-name promoted from the second appears in the first afterwards, which is how
-somebody knows the promotion worked.
-
-| Why there is no answer | |
-|---|---|
-| It is ours | Never sent. The names it was matched against travel with the report, so a row can be checked rather than taken on trust |
-| Not known, or refused | Sent, and no version came back: the index had not heard of it, or refused it in a way it will repeat. A private module and a vendored fork both look like this, and neither is a fault. A refusal is recorded exactly as an unknown name is, so the two are one row |
-| The identifier cannot be read | Nothing can turn it into a request. Kept apart from the one above because it is a fault in a document this deployment accepted rather than a fact about the world, and reading it as "no index knows this" would put it on the list of names somebody is about to hold back, where it means nothing |
-
-The classification is derived rather than stored. A held-back name and one no
-index knows are recorded identically, because the pass must record both. What tells them apart
-is the same list applied again at read time, which also means the report
-follows a change to the list immediately instead of waiting for a month of
-backoff to expire.
-
-A component the pass has not reached is not on it. It is waiting rather
-than unanswered, and reporting a first day's backlog as though the indexes had
-failed would make the list useless on the day somebody reads it.
-
-Narrowed to the products the reader may read. A package identifier says what a
-build is made of, so a list of them across the estate is an answer about
-products rather than about the deployment (REQ-42).
-
-## Version ordering
-
-Where a component could go is every version the findings open against it name as
-their fix. Two counts are answered for each, because they are two questions.
-
-| Count | |
-|---|---|
-| What that release fixed | How many of what is open name that exact version. This is the release's own security content, and it is what the scanner said without any comparison |
-| What reaching it closes | That, plus everything fixed at or before it. This is the question somebody choosing between two versions asks, and it is the one that needs an ordering |
-
-Sorted on the first, the version worth taking sinks. Measured on the demo's
-kernel: of 168 open, 158 have a fix across 13 named releases, the 6.12.100-1
-release fixed 49, and the newest named, 6.12.107-1, fixed 2 while carrying every
-fix before it. A list ranked on what each release fixed puts the version that
-closes everything near the bottom.
-
-| Rule | Reason |
-|---|---|
-| An ordering is per ecosystem, and only where its algorithm is written down | Debian's, RPM's, Alpine's, PEP 440's, Maven's, NuGet's and dotted numeric releases are written here. Everything else is left unordered rather than approximated, because an ordering claimed before its algorithm exists is the confident wrong answer |
-| The ecosystems with no ordering stay that way | Coverage can never be complete for a product whose deployers' ecosystems are unknowable, so an unranked list is the answer for the long tail rather than a gap waiting to be filled |
-| An algorithm is transcribed from the project that defines it | The tilde and caret rules, a numeric run outranking an alphabetic one, a leading zero turning a version part into text: each is a decision somebody made rather than something to reason out from a description |
-| A published suite is taken where its license permits | PEP 440's, Maven's and NuGet's are permissive and are taken whole. What that buys is that somebody else chose the cases: three of Maven's tables are a bug report each, and nobody reading a description of the format arrives at any of them |
-| A taken case that asserts nothing is left out, and says so | One of NuGet's "not equal" tables compares the two strings rather than two versions, so it passes for any comparer, and one of its pairs is one version under NuGet's own. What the suite asks of its strict parser and its formatting has no counterpart here and is left out too |
-| NuGet is not Semantic Versioning | A fourth number is permitted and compared, a missing number is zero, labels compare without regard to case, and a label is a number only where it fits a 32-bit integer — so a longer run of digits is a word and sorts above every number. Whitespace around a number is allowed and inside one is not |
-| A suite whose license forbids it is replaced by cases written here | Debian's, RPM's and Alpine's are GPL-licensed and this tree is Apache-2.0, so their files are not taken — the same answer the SBOM fixtures already give about the sample source beside the documents they do take. What is kept is the knowledge: a case per rule, with the ones that reverse the obvious answer marked as such. What is lost is that nobody else chose them, so a pair nobody here thought of is not covered, and each case says which rule it pins in exchange |
-| What a taken suite does not carry is written here | A reference implementation is asked about versions and raises on anything else, so none of them has a case for what a security feed writes where a version belongs. Every scheme is given those, and the candidate set that one unreadable version leaves unranked |
-| A scheme is added by adding its algorithm, never by mapping it onto one already here | Every scheme here is unlike the others in some detail that only shows on a pair nobody thought to try. Sharing a scheme is right where an ecosystem genuinely uses it — the language ecosystems do — and elsewhere it is the confident wrong answer wearing a familiar name |
-| The spelling decides, not the ecosystem | A runtime published through a language index and naming itself after its own toolchain has the scheme and not the spelling. One version a comparison refuses leaves the whole set unranked: a list ordered except for the entry nobody could place is not ordered |
-| Every scheme can refuse, including the ones whose comparison answers for any two strings | Debian's, RPM's and Maven's walk a string and always produce an ordering, so they read as schemes that never fail. What an advisory wrote where a version belongs — "unfixed", a sentence — then outranked every real release, because a letter sorts above a digit, and was presented as the upgrade closing the most. Each scheme decides what a version of it looks like before comparing |
-| Where an ecosystem states what a version is, that is the rule | PEP 440 is a grammar, and a string it does not match is not a version. Nothing further is needed to turn a word away, and the refusals cost nothing to state because the format already states them |
-| A Debian upstream version may hold a hyphen where a revision follows it, and a colon where an epoch precedes it | Debian policy's own rule. The revision is cut at the last hyphen and holds neither |
-| A dotted numeric pre-release is identifiers, none empty, drawn from letters, digits and the hyphen | The rule Semantic Versioning states. An empty pre-release, an empty identifier or a space is text somebody wrote after a hyphen, and ordering it is a guess. A Go pseudo-version passes |
-| An empty part is not a zero, in any scheme but Maven's | An empty dotted part, epoch or label is refused. Maven's own comparison reads a separator with nothing before it as a zero, and that is transcribed |
-| Where an ecosystem states no rule, this one applies: a leading digit, and only the characters a version may hold | Debian's policy states it and RPM follows the same shape. Maven states nothing at all — its comparison is defined over any string, and the words it takes in place of a version, `RELEASE` and `LATEST`, are not versions either |
-| Where a scheme's own tool falls back, this refuses | Alpine compares what it can read and sorts the rest as text; RPM orders any two strings at all. Both are reasonable for a package manager resolving a dependency it has to resolve somehow, and neither is right here, where the answer is a recommendation rather than a resolution. So a version that does not read leaves the pair unordered, and a published suite's own "invalid" list is what says which those are |
-| Unranked means the two counts are equal and say so | An exact match still counts. What is never done is inferring that one version reaches another, so nothing overstates what an upgrade would close |
-| Which ecosystems are ordered and which have an index are separate lists | An index answers what the newest version upstream is, and an ordering answers which of two versions is further along. A distribution has an ordering and no index, because the distribution is the maintainer and the date it released says nothing about the software inside; an ecosystem may have an index and no ordering for as long as nobody has written its algorithm down |
-| Which scheme applies is read from the package identifier | Two ecosystems spell some versions identically and order them differently, so reading the shape of the string would order a package by whichever scheme its version happened to resemble |
-| The scanner already compared versions to match the finding | So refusing to compare does not make the tool comparison-free — it leaves it unable to rank what it has already been told. What is new here is saying which of the answers is furthest along, not deciding which findings apply |
-
-A wrong order is worse than none, which is why the refusal is part of the
-mechanism rather than a gap in it: the answer arrives as a recommendation
-somebody schedules a release around, and the scan that would catch it runs after
-the release.
+| Changing the version or the date under a standing agreement is refused, naming the decision to revise | Rewriting either half leaves the agreement over a promise nobody read (REQ-28) |
+| A revised promise's need for a second person is worked out again | Moving the date moves what the approval threshold is about. Left as needing nobody, a promise first made inside the deadline returns in force at any later date, suppressing what it covers and in no queue |
+| That need is measured over what the decision covers now: its builds from the commitments it wrote, its occurrences from its own rows, read inside the writing transaction | A deadline moves when the policy or the rating moves |
+| A promised patch moves by its date alone, and its builds are those holding an open finding the decision covers now | It has no version and writes no commitments |
+| A date already past is refused | It says the work happened before now |
+| The reasoning passes the text policy (`design-docs/text.md`) | Every path storing typed text runs it |
 
 ## Promise states
 
-Three states, derived on every read and set by nobody.
+A commitment is answered by the next scan of its build, never by anybody
+marking it done (REQ-35). Its state is worked out on every read; nothing
+stores, refreshes or invalidates it.
 
 | State | Condition |
 |---|---|
-| Landed | Nothing left open under it here, which the scans say |
-| Lapsed | The date past with work outstanding |
-| Planned | Everything else |
+| Landed | Nothing left open under it in that build, as the scans say |
+| Lapsed | The date past, with work outstanding |
+| Planned | Anything else |
 
 | Rule | Reason |
 |---|---|
-| The date is on the commitment, and the decision that argued for it is a citation | What somebody decided and what a release is waiting on are one fact. Changing it goes through the decision, so the two cannot come to disagree |
-| Only the decision that made a commitment withdraws it | A promise naming fewer builds withdraws its own commitments on the rest and keeps those another decision made, whose occurrences still stand on them. A second decision promising a build already committed is refused, naming the decision that stands, even where it states the same version and date: its occurrences would rest on a date only the first decision moves |
-| There is no "replanned" | Re-promising writes a new date and the standing promise is the one read. A state nothing can distinguish from another is a word rather than a fact |
-| Where several promises stand over one component in one build, one of them is reported whole | A promise naming a version before one naming none, then the latest date, then the later decision. Its date and its version are read together: the latest date beside the lowest version string pairs two promises nobody made |
-| A lapsed promise returns the upgrade, not its findings | One item, to whoever is carrying it — reported as a party only where one party holds all of what is still open under it, addressed by its identity or team name with its display name beside it, as `design-docs/api.md` § Addresses and labels sets out. Answering the findings again one at a time is what the bulk promise was made instead of |
-| A finding returns on its own only when the package moved and it did not close | The decision at an occurrence is keyed on the upstream version it was made against, so the existing key distinguishes "the plan was wrong about specifics" from "the plan did not happen" |
+| States are derived, never stored | Stored, they are a third opinion able to disagree with the scans and the calendar |
+| The date is on the commitment, and the decision that argued for it is a citation | They are one fact, and changing it goes through the decision |
+| Only the decision that made a commitment withdraws it. A promise naming fewer builds withdraws its own commitments on the rest and keeps those another decision made | That decision's occurrences still stand on them |
+| A second decision promising a build already committed is refused, naming the standing decision, even with the same version and date | Its occurrences would rest on a date only the first decision moves |
+| No "replanned" state | Re-promising writes a new date, and a state indistinguishable from another is a word |
+| Where several promises stand over one component in one build, one is reported whole: one naming a version before one naming none, then the latest date, then the later decision | Its date and version are read together; the latest date beside the lowest version pairs two promises nobody made |
+| A lapsed promise returns the upgrade as one item, never its findings | Answering the findings one at a time is what the bulk promise replaced |
+| A lapsed upgrade is reported as a party's only where one party holds all of what is still open under it, addressed by identity or team name with the display name beside it (`design-docs/api.md` § Addresses and labels) | |
+| A finding returns on its own only when the package moved and it did not close | A decision at an occurrence is keyed on the upstream version it was made against, which tells "the plan was wrong about specifics" from "the plan did not happen" |
 
-Stored rather than derived, these would be a third opinion capable of being wrong
-about both the scans and the calendar.
+## Planned upgrades of a build
+
+The product's planned upgrades inverted (REQ-35). A triager reads an upgrade
+and the issues it closes in the findings list's by-upgrade view; a coordinator
+reads a build and the upgrades it waits on, here. One query, both ends drawn,
+both keyed on the fold.
+
+| Rule | Reason |
+|---|---|
+| The version in hand and the target are stored with the commitment | Read off the open findings, they go blank as the upgrade lands and closes them |
+| Each row reports what is still open under it, counted from the findings: the distinct issues it closes here and the occurrences they sit at | Nothing is declared done; a build is clear when it stops holding them |
+| A bump is keyed on its target as well as its source | Grouped on the first two alone, upgrades to 5.9.0 and 5.9.2 read as one row saying 5.9.0. On a real image 42 of 127 pairs carry more than one target |
+| The list breaks its last tie on the fold | The last grouped column, so two rows equal on every other key keep one order across pages |
+| One source at two versions in one build lists the earlier first | By the ecosystem's ordering where the fold has one (`design-docs/remediation-versions.md`), by text where it has none |
 
 ## Build-declared suppressions
 
-What a build says it deals with itself is readable as a history rather than a
-list of what is true tonight. A carried patch is the only way a backport is
-visible here — the fix is in the package, the version has not moved, and no
-comparison of versions finds one — so the build declaring it is the sole
-evidence.
+A carried patch is the only way a backport is visible here: the version has not
+moved and no comparison finds one, so the build declaring it is the sole
+evidence. What a build says it handles itself reads as a history over its
+scans.
 
 | Rule | Reason |
 |---|---|
-| The stretch of scans is what makes it a history | The interesting row is the claim that *stopped*: somebody dropped a patch and the finding it answered is back. A list of what stands would not contain that row |
-| Narrowed on what the claim says it is about, not on a package the build still carries | A claim naming something that has gone is what somebody asking why a patch stopped working wants |
-| The two kinds are distinguished on the row | A claim attached to a component is a patch declaring what it fixes; a claim in a document of its own names something to be matched. A claim that suppresses nothing says so |
+| The stretch of scans is what makes it a history | The interesting row is the claim that stopped: a dropped patch and the finding it answered back. A list of what stands would not hold it |
+| Narrowed on what a claim says it is about, never on a package the build still carries | A claim naming something gone is what somebody asking why a patch stopped working wants |
+| The two kinds are distinguished on the row | A claim on a component is a patch declaring what it fixes; a claim in a document of its own names something to match. A claim suppressing nothing says so |
 | A claim names the product it places its subject inside, where it names one | "zlib inside curl" and "zlib inside openssl" are two claims |
-| A claim taken from a document uploaded on its own is not listed | It is held over no stretch of the build's own scans. The finding it covers shows it |
+| A claim from a document uploaded on its own is not listed | It spans no stretch of the build's own scans; the finding it covers shows it |
 
 ## External links
 
-A decision carries a link to work happening elsewhere, and nothing is sent to
-it (REQ-36): the link is stored and read by people. One link per decision rather
-than one per release, because the conversation about a promise is one
-conversation. What is not built is the tracker hand-off — opening or updating an
-item in whatever system that link points at.
-
-The signed outbound request (REQ-46) is a different thing and it is built;
-`design-docs/notifications.md` owns it, including the egress controls and the one
-place a private address is deliberately permitted. Recorded here as unbuilt, it
-read as there being no egress path at all, so the most review-worthy egress in
-the deployment sat behind a document saying it did not exist.
+A decision carries one link to work happening elsewhere, stored and read by
+people; nothing is sent to it (REQ-36). The signed outbound request (REQ-46) is
+built, and `design-docs/notifications.md` owns it, including its egress
+controls and the one place a private address is permitted.
 
 | Rule | Reason |
 |---|---|
-| Nothing fetches what a link points at | A tool that fetched an address a person typed is a request-forgery primitive. Stored as text, shown as a link, encoded on the way out |
-| Sent empty, it is cleared | A stale link sends somebody to a ticket that closed for a different reason |
-| Anybody who may argue about a decision may point it somewhere | A link is a note about where the conversation is rather than a decision |
-
-Assigning notifies; planning does not (REQ-34). Somebody is told when work is put
-on them. Saying which releases the work is meant to reach is done to the work.
-
-## Publication
-
-Two destinations are built. The documents that have gone out are written as a
-static directory somebody else's web server serves, which `The provider
-directory` below describes; and where the deployment publishes, it serves them
-itself, beside a VEX document per issue and per branch or tag, which
-`design-docs/publishing.md` describes. Nothing is sent anywhere, and no adapter to
-anybody's platform exists. The rules below are what those adapters would be,
-kept here because the document they are about exists and the shape it would be
-published in is what makes its content right.
-
-Publication covers a vulnerability in this deployment's own product. A known CVE
-in a shipped third-party component is dependency hygiene a consumer reads out of
-the inventory.
-
-| Rule | Reason |
-|---|---|
-| A pluggable output with several adapters, not one integration | Publishing routes differ completely by product: an open-source project uses its forge's advisory system, an appliance vendor publishes on its own site. One integration would be one of those wearing the name of the general case |
-| The triage record is ours; the published advisory is the platform's | Neither is a copy of the other and neither syncs |
-| CSAF is the adapter that matters for commercial products | Nearly free from what is already held, because VEX is a CSAF profile and the dismissal vocabulary was aligned to it from the start |
-| A forge's advisory system is one adapter | Draft privately, request an identifier, publish, and use its temporary private fork for fix work under embargo. Applies to nothing hosted elsewhere |
-| Publishing aggregates | One advisory covers a product and a version range, not a path. A reader is asking "am I affected", and the answer is a version |
-| Optional and configured per deployment | Nobody should need an account anywhere to use this |
-
-## The advisory
-
-An advisory is a record of its own, under an identifier this deployment mints.
-It names the issues it covers and the products each of those is covered in.
-
-| Rule | |
-|---|---|
-| An advisory is keyed on itself | Not on the product and the issue. The standard carries vulnerabilities as an array and means the document's tracking identifier to be the publisher's own name for the document, so a key made of one product and one issue cannot express a document about two and hands out somebody else's name for one of them |
-| The identifier is minted here | A year and a number under a prefix the deployment configures. It is the name a reader cites the document by and the name a revision of it keeps, so it belongs to the document rather than to whichever issue was first. An advisory issued before v0.2.0 keeps the name it went out under, numbered in year zero, which no advisory minted from the prefix reaches |
-| An advisory names many issues, across many products | Several embargoed flaws released together is one document on one date, which is what coordinated release is. One issue in two products is two entries, because the releases that carry it differ |
-| An issue is named once per product | The pair is what a status is stated about. Named twice, a reader gets two answers about one release and the document is refused |
-| Only a flaw recorded here | An issue a scanner reported against a third-party component is dependency hygiene a consumer reads out of the inventory. Refused when it is added rather than when the document is generated, so the refusal names the issue somebody chose |
-| An advisory with no issues generates nothing | The standard requires at least one, and a document about nothing is not a draft of anything |
-| An advisory is read whole or not at all | Somebody who may not see every issue it covers is told it does not exist, which is the answer a name nobody minted gets. A document with one of its products left out reads as a complete statement about a product it says nothing about, and a row saying one went out is as much a disclosure as the document |
-| One covering nothing is its minter's alone | Covering nothing it satisfies every narrowing there is, and its title is prose somebody typed that goes on to be the document's. The same holds for one whose issues were all taken off |
-| What went out is read at what it named | An issuance names the flaws the advisory covered when it went out. The report of what went out, the documents a directory serves, the list of one advisory's issuances, whether it changed since, its editorial status and the revision history of a document generated now are all shown only to a reader who may see what every issuance named and every flaw the advisory covers now. A reader who may not is told the advisory does not exist, so emptying or re-pointing an advisory after it went out discloses nothing |
-| An issue taken off leaves its record | Who removed a flaw from a document is a question a deleted row does not answer. Naming it again revives that record rather than writing a second, which is also what keeps the pair unique |
-| A flaw recorded from a code finding is fixed in a build where a person closed it there, and the flaw's page offers each build its code finding is no longer detected on, from the first run that did not see it | The code finding's absence is the evidence and the closure is the statement (`design-docs/analysis.md` § Fixed in) |
-| The flaws offered for a product are every one recorded there, open or fixed | An advisory is usually written after the fix lands, so a list of what is still open offers nothing for the flaw it is about. The list is the rows naming one accepts — recorded by a person, at a visibility the reader may see, in a product they triage — with how many of each are still open |
-
-An advisory is the rare, deliberate document. A vendor does not notify a
-customer per inherited issue: those reach the release note and the disposition
-register, and a customer reads them at upgrade time. What an advisory is
-written for is a flaw recorded here, an embargo reaching its date, or an
-inherited issue severe enough to say something about before the next release
-cut — single or low double digits a year. The trigger is a non-public issue
-becoming public.
-
-## Editorial state
-
-Where a document is in its life, read from what people did about it. A document
-a second person agrees to is the publisher's settled word; one that has gone out
-with nobody agreeing to what it says now is published and still being worked on;
-anything else is being written.
-
-| Status | Reached by |
-|---|---|
-| `final` | An agreement stands on what it says now, whether or not it has gone out |
-| `interim` | It has gone out, and no agreement stands on what it says now |
-| `draft` | Neither |
-
-The agreement is asked before the issuance. A document is generated before it
-is published, so the bytes an operator sends have to say what they are — and
-asked in the other order the one file that actually goes out says it is a
-draft.
-
-The embargo answers a different question and is answered elsewhere. A document
-about disclosed flaws can be unfinished, and one about an embargoed flaw can be
-ready to go — so how far a document may travel is its distribution label, read
-from whether anything it covers is still held back, and the editorial state
-says whether this is the publisher's settled word.
-
-### Editions and agreement
-
-An edition is what an advisory says at a point. It carries the title, which is
-the prose this deployment chose; what it covered at that moment is recoverable
-from when each flaw was named on it and taken off.
-
-| Rule | |
-|---|---|
-| An agreement names an edition | A second pair of eyes reads particular words. One naming the advisory would still be standing after somebody rewrote them, and nothing would report that (REQ-24 and REQ-28) |
-| Retitling, naming a flaw, taking one off, and marking a release affected or clearing the mark each open a new edition | All of them change what the document says. An approver read a document covering three flaws, and a fourth added under their agreement is one nobody read. Asking for a mark that already stands changes nothing and opens nothing |
-| An agreement records what each release stood at when it was given | A decision approved or lapsing afterwards moves a release's status and the agreement stands, because the decision had a second person of its own. The advisory screen says "changed since approval" against every agreement standing, and whether the document differs from what last went out is asked of the settled digest as before |
-| Opening an edition takes back every agreement standing on the one it replaced | The record says a second person did once agree, and to which edition |
-| Changing what an advisory says needs a triage role on every product it covers | An advisory is read whole or not at all, so what it says about one product is part of the same document as what it says about another. Retitling, agreeing, taking an agreement back, naming or removing a flaw, and recording that it went out all ask for it |
-| The roles that may agree are the triage pair rather than the approver role a decision takes | Agreeing to an advisory is agreeing to a statement about every product it covers, which is what the triage roles are held per product for |
-| Neither the person who started the advisory nor the author of the edition standing may agree to it | Whoever started it chose the name a reader cites it by and, in the ordinary case, the flaws it covers. There is no override, so a deployment with one person publishes no advisory — the control working rather than a gap in it |
-| The author of the edition standing is everybody who wrote an edition back to the one that set its title | A change to what the advisory covers opens an edition that carries the title forward and is written by whoever made the change. Asked of that edition alone, the title's own author could agree to words they wrote |
-| Taking an agreement back is an act of anybody who may change what the advisory says, and takes back every agreement standing | What it stops is the document going out rather than one person's opinion of it, so it needs no agreement of its own |
-| An advisory goes out once an agreement stands on what it says | The text is the company speaking. Whether the flaws behind it are public is not asked: an advisory about an embargoed flaw sent to a coordinating body is what coordinated disclosure is made of, and the distribution label is what keeps it safe |
-| An issuance names the edition that went out | The advisory moves on and what was published does not, so a record of March's document read through the advisory answers with June's title |
-| Who agrees to the edition standing is named, by sign-in identity | A count says whether the document may go out and not who vouched for it, which is what somebody about to publish checks |
-
-## The CSAF document
-
-A CSAF 2.0 document generated for one advisory, from what is already held.
-Nothing is sent anywhere.
-
-| Rule | Reason |
-|---|---|
-| Written as CSAF 2.0 | It is the published OASIS standard and ISO/IEC 20153, and the version the consumers' validators check against. CSAF 2.1 is a committee draft, and a document claiming a draft version risks refusal by exactly those consumers. The document moves to 2.1 once 2.1 is an OASIS standard |
-| A version 4 score with no version 3 rating beside it is stated in a note | CSAF 2.0's score object has fields for versions 2 and 3 only. The note gives the version, the base score, the severity and the vector, so a person reading the document sees the score. Tooling does not read a score from prose. Not built: such a flaw is published with no score |
-| Only for a flaw in what this deployment ships | An issue a scanner reported against a third-party component is refused by name rather than answered with a document that looks the same and means something else |
-| The document's identity is the advisory's minted identifier | A document naming an issue's identifier as its own tracking identifier claims to be the authority on that issue, which a coordinator is and this deployment is not |
-| One entry per issue, and one branch per product | The tree carries a vendor branch holding one product branch for each product the advisory covers, and every status names releases of the product the issue was covered in |
-| The publisher is deployment configuration, not an administrator's setting | It is the identity of the organization running this. Both a name and a namespace are required, because a document naming no publisher is not a CSAF document |
-| Generating or recording a document with no publisher configured answers 409; any other failure is a fault | The missing publisher is the store's own refusal, matched by identity. Reading what has gone out needs no publisher, so its failures are faults wherever none is configured |
-| A document about an undisclosed flaw travels no further, whatever its editorial state | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either. The distribution label is what carries this; the tracking status says where the document is in its life |
-| The label is decided from every occurrence of each issue in its product | One undisclosed occurrence makes the issue embargoed there, whichever occurrence was recorded first or which the reader sees. A reader who may not read undisclosed work in that product is not shown the advisory at all: listing it, opening it by name and generating its document refuse together, because a listing that admits it beside a document that refuses says undisclosed work exists |
-| Releases are named by branch or tag and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
-| A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
-| A release whose every open occurrence stands under approved, live decisions with one outcome states what they say | The rule the VEX document of a build reads, through the one query both documents use. Not applicable or a wrong match, with its reason, is known not affected; already fixed is fixed; will not fix stays known affected, and says no fix is planned. A release partly covered stays known affected, because the document has no finer grain than the release |
-| Where the decisions at a release differ, the earliest speaks | The decision that has stood longest, as in the VEX document. Its reason and its mitigation are read off that one decision |
-| A decision is read at the visibilities the findings are | A decision carries the visibility of the finding it was made about, and the document is read at what its reader may see |
-| A finding taken back as invalid is left out | Narrowing the builds a flaw is filed against closes a build's finding that way, and that build never shipped the flaw. Named as fixed, it reads as a release somebody upgrades to |
-| A superseded closure is never a fix | The version moved and the flaw came with it, so the row that superseded it speaks for the occurrence. A release whose only closures are superseded, with nothing open, is stated as known affected: nothing after that closure says the flaw left |
-| A release can be marked affected whatever its decisions say | A decision reaches every build whose versions match (REQ-25), so one made about a variant where the code is compiled out also covers a variant where it is compiled in. The person preparing the advisory sees the builds the decision was made on beside each release, and a release of a variant none of them is, reached only by lookup, is flagged. Another branch or tag of a variant it was made on is the same configuration and is not flagged, or nearly every release would carry the warning. A decision recording no build is shown as not recorded and flags nothing |
-| Every date the document states is a date and a time | The standard defines each of them that way, and a validator run with format assertions refuses a bare day — which is a document a customer's tooling drops, the failure that looks like nothing happening. A schema check run without them passes it, so the two disagree about a document nobody would accept. A settled digest taken while a date was spelled as a bare day does not match again, which REQ-76 is what covers |
-| Every object's keys are written in alphabetical order | The standard's optional sorting test reads every key at every depth. The order is imposed on the bytes, as generated and as kept, rather than on how the fields are declared, and the framework's schema link is left off the one route that answers with the document, since it is a key the standard does not define. A settled digest taken before the keys were sorted does not match again, which REQ-76 is what covers |
-| The document's version is the last number its own revision history states | Counted separately the two disagree the moment an advisory has been issued once, and a validator compares them. They agree by accident for a document nobody has published, which is where the disagreement hides |
-| The publisher's category is one of the six the standard names, refused at startup otherwise | The value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them — which is the one use a generated advisory has |
-| The document declares the profile it satisfies, worked out from what it turned out to carry | Declared unconditionally, a document missing a profile-mandatory element fails that profile's own tests and is dropped by the tooling that reads it |
-| An advisory is always a security advisory, never the VEX profile, whatever it states | An advisory and a VEX document are different documents: one switching category between editions by its contents drops out of every reader that filters on the category, this deployment's own supplier reader included, and VEX output is the separate per-build document. A release known not affected, its flag and its impact are information the security-advisory profile allows, and a document whose only status is known not affected still states one for every release it names |
-| The security-advisory profile is the product tree, the vulnerabilities, and notes and a status on each | The standard's own list. Notes and references on the *document* belong to the informational advisory — the profile for a document carrying no vulnerabilities at all — and gating on those declared a base document for every flaw of ours that nobody outside had written up yet, which a customer's tooling filtering for security advisories skips |
-
-### Document contents
-
-Everything below is already held. Nothing is derived, and a field the standard
-defines and the record cannot answer is left out — an advisory is read by
-somebody deciding whether to act.
-
-| Element | What fills it | |
-|---|---|---|
-| References | The issue's write-up and everywhere else a report points, each address once, and last the address this document is published at | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's. Its own address is stated only where the deployment has said where its documents are reachable, because a reader's tooling follows a self reference and one pointing at nothing is worse than none — and it is built from the same rule the directory writes the file under, so the two cannot name different files |
-| Scores | The version 3 rating, scored here from its vector, stated for every release the flaw is or was in. A release known not affected carries none | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. The standard's score object has a field for version 2 and version 3, and version 4 arrives with the standard's next version — so an issue rated under both states its version 3 rating, and one rated under version 4 alone states none rather than a number in the wrong place. The ratings a report stated are asked newest first, then the vector a flaw assessed here was given. The vector stated is the base vector inside the one held: metrics outside the base set are accepted and not checked, and a validator refuses a metric name or value the specification does not define |
-| Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
-| Remediations | Stated for the releases that still carry the flaw, and the details name the releases that are fixed. A release known not affected is named in neither. A release every open occurrence of which stands under approved decisions that it will not be fixed takes `no_fix_planned` instead, and a `mitigation` carrying what stops the flaw where the decision named it, never the reasoning. It is not offered the fixed releases: beside "no fix is planned" for the same release, a vendor fix reads as the two contradicting each other, and moving to another line is the reader's decision rather than a remediation of this one | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
-| Flags | The reason of the decision a release known not affected stands under, one flag per reason naming its releases | The five reasons a decision records are the standard's five flag labels, so nothing is translated |
-| Impact | What stops the flaw, from the same decision, one statement per mitigation naming its releases, and absent where the decision named none | The mitigation is the half somebody holding the release can act on. The decision's reasoning is never read into a document: it is the argument a triager put to a second person here |
-| Distribution | Whether anything it covers is still held back — RED while anything is, WHITE otherwise | Handing a document about a flaw nobody outside has been told about to somebody who may pass it on is the disclosure the embargo exists to hold, and that is true of a document at any point in its editorial life. The labels are the standard's four, which is why a disclosed document is WHITE rather than the word the protocol renamed it to |
-
-An address a report supplied goes through the rule an address stored beside a
-decision goes through, and a custom application scheme is dropped rather than
-published. It is leaving the deployment, into tooling that follows it.
-
-The weakness is stated in the catalog's own words. The standard carries a
-weakness as the identifier and the name assigned to it, and a consumer's
-validator compares the pair — so the name is read from the authority that
-assigns it, never from anything held here.
-
-| Rule | Reason |
-|---|---|
-| The names come from the published catalog, fetched and committed | A thousand names nobody can check by eye is a file that goes wrong quietly: one transcription error is a document refused at a customer, months later, over a weakness nobody was looking at. The same reason the reserved-word list is asked rather than typed |
-| Not the names a screen uses | A screen names a common weakness in a few words somebody scans — "Buffer overflow" — and the catalog calls that one "Improper Restriction of Operations within the Bounds of a Memory Buffer". Both are held on the server and only one passes a validator, so a document states the catalog's alone |
-| One weakness, the one the data calls the root cause | The standard carries one and an issue is commonly classified as several. Taking whichever sorts first is an answer with nothing behind it. A feed says which it calls primary and a person recording a flaw names theirs first, so the answer is carried from where it was stated |
-| An identifier the catalog does not assign states nothing | Categories and views carry identifiers of the same shape and are not what a vulnerability is classified as, and a newer catalog assigns numbers an older one predates. The name is the half that cannot be invented |
-| The catalog version is recorded and is not gated against what it publishes today | The engines the reserved-word list asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes, for a reason no change here caused |
-
-Each release is named by what its own inventory called it. The product
-identification helper carries the package identifier the build declared for the
-component the document is about, where it declared one.
-
-| Rule | Reason |
-|---|---|
-| The identifier the build declared, never one minted here | An identifier only helps if it appears on both sides of the comparison. A reader holding the image has whatever the build wrote into its inventory, which is this exact string if they ingested that document. A plausible identifier nothing outside this deployment has seen is worse than none, because a reader matches on it and misses |
-| Read from the scan rather than from the root component | The root is stored by name alone, deliberately: a package identifier carries the version, the root's version moves every build, and the root's identity moving takes every edge hanging off it. What the document declared is a fact about that document, so it is kept beside the serial and what the inventory was made of |
-| Absent where the document named no component of its own | The tracked unit stands in for the root there, and what stands in is ours rather than the producer's. A release with a declared root carrying no package identifier is the same answer for the same reason |
-
-## The VEX document
-
-Assembled from approved `not-applicable`, `mismatched` and `already-fixed`
-decisions (REQ-39), from `wont-fix` decisions that say what a holder can do
-instead, and from the patches the build declares, for one product, branch or tag, and
-variant.
-
-Two documents describe a build, chosen when one is generated.
-
-| Kind | Carries |
-|---|---|
-| Ours | What this deployment agreed to, and the patches the build declares. The default |
-| With suppliers | Ours, and beside it what a supplier states about its own product, in the supplier's name, where the statement closed every occurrence of a component in the build |
-
-A customer running their own scanner against a shipped image asks "which of these
-are you not affected by" more often than they ask for an advisory. Generating it
-puts this deployment's dismissals in writing, machine-readable, in front of every
-customer — which is the reason the two-person approval on those decisions exists.
-
-| Rule | Reason |
-|---|---|
-| OpenVEX rather than the CSAF profile | It is the format this deployment already reads. One document shape to get right, and one deployment's output can be another's input |
-| Approved decisions only, besides the build's own patches and, in the document carrying them, suppliers' statements | A proposal is one person's opinion and this document is the deployment's word to a customer |
-| A patch the build declares is said as `fixed` | The build's word on its own patches is applied without a decision here (REQ-11). The finding it covers is closed as patched, and a customer's scanner still matches the upstream version, so without the statement the scanner reports it as affected |
-| A patch is said only while it stands | The component still ships in the build, no occurrence of a component of that name and package identifier is open against the issue, and the build still declares the patch. A build that drops the patch has the statement drop with it, before any scan reopens the finding |
-| The impact statement carries what stops the flaw, never the reasoning | The reasoning is the argument a triager put to a second person here, addressed to a reader who can see the record it argues against. Published it is this deployment's review of itself, machine-readable, in front of every customer running a scanner. The mitigation is the half somebody holding the build can act on |
-| Where no mitigation was named the field is absent | Only one recognized reason asks for a mitigation, so most statements carry none. The justification beside it is what the format asks for, and silence says less wrongly than the wrong text |
-| An outcome with no status of its own fails the document | Each outcome a document states maps to one status by name, and the outcomes a covering read selects are one list that a test holds to the statuses. An outcome reaching the document unlisted is a fault, answered as one, rather than published under a default, because the only safe default on a published document is silence |
-| A deferral is absent rather than exported as anything | Publishing it as not-affected would assert we assessed something as harmless when we had only postponed it. Silence already reads as affected in this format |
-| A decision that will not be fixed is published as affected, and only where it names what to do instead | It is the truth about such a flaw: it is there and it is staying. Nothing else says so about a third-party component — no scan closes a standing property of a shipped feature, and an advisory states "no fix planned" only for a flaw recorded here — so under silence it reaches a customer never. The format requires an action on an affected statement, so a decision with nothing to offer has nothing to publish, and left out it falls through to the silence that already reads as affected |
-| The mitigation goes in a different field depending on the status | On a decision that something does not apply it is why, beside the category a machine reads. On one that will not be fixed it is what to do instead. An affected statement carrying a not-affected justification says both things at once |
-| Public findings only | Asking for the undisclosed ones is a preview for somebody who may read them, and refused for anybody who may not |
-| The statement is about the build, with the component underneath, or about the consumer where it is stated occurrence by occurrence | A VEX statement is about a thing somebody has, and what they have is the image |
-| The build is named by the package identifier its inventory gave its root | A scanner reading the inventory and the document together matches the product against the root, and a deployment loading both reads a statement about the root as the build's own claim. The build's names stand in where the inventory gave its root no package identifier |
-| A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |
-| Every statement carries the other names its issue answers to (REQ-18) | A customer holds identifiers their own scanner produced, matched under the name *its* database uses. The primary is not repeated among the aliases |
-| An issue that is also a flaw of ours undisclosed anywhere carries no other names in a document of disclosed work | One of them is the name minted for the flaw, and that name is the flaw (REQ-37). A preview including undisclosed work keeps them |
-| Ordered here rather than by the engine | Two documents generated from the same state are byte-for-byte identical |
-| Each kind is a document of its own, with its own identifier and its own revisions | A toggle on one document would have a reader watch statements vanish and return as whoever generated it chose, which reads as a retraction nobody made |
-| Ours is the default | Putting a supplier's word under this deployment's name is a choice somebody makes on purpose, and configuring a supplier is not that choice |
-| A supplier's statement is said only while it stands, under the guard a patch stands under | The component still ships, no occurrence of a component of that name and package identifier is open against the issue, the statement that closed it has not been set aside, and nothing has been recorded at the occurrence since: an occurrence the build later patched is said as fixed |
-| A supplier's statement is said as `not_affected`, with the supplier's justification where the format defines it, and an impact statement naming the publisher, the document and the product | A customer sees whose judgment it is, and this deployment passes on the supplier's word rather than asserting it as its own analysis. A justification the format does not define is left out rather than published under this deployment's name, and the impact statement satisfies the format without one |
-| Only a statement that said not affected is passed on | An upstream's statement that a component is fixed closes occurrences too (`design-docs/upstream.md`), and is not a statement that it is unaffected |
-| A component two suppliers' statements closed occurrences of is said by neither | Each spoke for their own product, and the format names the component once |
-| An agreed decision and a supplier's statement never speak about one issue in one component | A decision is said only of a component with an occurrence open, and a statement only of one with none |
-| A build with more statements than one document carries is refused, not truncated | There is no second request for the rest, so a document that stopped at a ceiling would say "nothing is claimed about this" by omission about everything past it — to every customer running a scanner, which is the one thing a document of dismissals must never say. The ceiling is well above anything real, and reaching it names the build and the number |
-
-A statement about the build is made only where every open occurrence agrees, and
-agrees the same way. An advisory asks the same of each release, through the same
-query. A component commonly sits at several occurrences, so a dismissal agreed at
-one of them is not a statement about the component: published as one it is a
-machine-readable "not affected" about something that is affected, sent to every
-customer running a scanner against the image.
-
-Where several occurrences were decided in separate sittings the document states the
-earliest: the decision that has stood longest and the one a reader can check
-against the record. Grouping on the words and the moment would emit the same decision
-twice.
-
-The earliest decision is picked first, and then read. A minimum per column with
-nothing tying the columns to one row composes a statement from two decisions: with
-"component_not_present" and "inline_mitigations_already_exist / bound to the
-management VLAN" both standing at a component, the machine-readable category
-comes from one and the impact statement from the other, and the published
-statement says the component is not present while describing the network
-control that protects it. That is a composite no record ever held, going to
-every customer running a scanner. The group answers with the earliest
-decision's identifier, and its words are read by that identifier.
-
-### Statements about one occurrence
-
-Where a component's occurrences disagree, each occurrence a decision covers is stated on
-its own: the consumer that pulls the component in is the product, and the
-component is beneath it. "libnl inside libswsscommon 1.0.0: not affected".
-
-| Rule | |
-|---|---|
-| An occurrence is stated only where every open occurrence of the component beneath its consumer, at any depth, is decided the same way | A reader applies a statement about a product beneath that product, a supplier's statement included (REQ-31). Stated while an occurrence deeper under the consumer is open, it answers that occurrence too |
-| The earliest decision among those occurrences speaks | As it does for a whole component |
-| A consumer whose package identifier names no version names no product | A statement naming a product at no version is about every release of it, and a reader applies it nowhere |
-| An occurrence the build holds directly is never stated alone | It has no consumer, and the only product it could name is the build, which a reader applies across the whole build |
-| One statement per consumer, however many occurrences beneath it agree | An occurrence deeper under the consumer is stated about its own consumer as well, where the rule holds there |
-| An occurrence is stated on its own from an agreed decision, never from a patch the build declares | A patch is said about a whole component. A fix the build states beneath one of its products closes only the occurrences beneath it, so where another occurrence of the component is open the fix is not published at all |
-
-Occurrences dismissed for different reasons — one not applicable, one already fixed —
-are no statement about the component. Each is stated about its own occurrence, where
-the rule above holds there.
-
-### Identity and revisions
-
-| Rule | |
-|---|---|
-| The document carrying suppliers' statements is named for the build and its kind | It is a second document, so it is called something else: ours keeps the name it has always had |
-| The identifier names the build and nothing that moves | A reader keeps documents by it and tells a revision of one document from a second document by whether it matches. Anything in it that moves between generations makes every fetch a document in its own right |
-| The build is named by the stored names | A name people type is matched without regard to capitals, so one build asked for two ways carries one name |
-| The version is one past what has gone out | A document nobody has published is the first revision, and the next one generated after an issuance is the second. It says so before it goes out, because the bytes an operator sends carry the number they will be known by |
-| The document to send is the one recording answers with | Recording numbers and dates the document inside the write that takes the ordinal, keeps it, and hands it back. A document generated before recording carries whatever the count said then, and somebody else recording in between leaves it numbered one behind its own record |
-| Each revision that went out is readable by its version | The kept bytes are what a customer holds, and a question about what they were told is answered from them rather than from what the record would say today |
-| Two generations with nothing published in between are one revision | The document is assembled from what stands now, and a change nobody has published is a revision no reader can hold |
-| The moment the document was assembled sits in its own field | The format carries it there, and an identifier is an identity |
-
-## Issuance records
-
-An issuance records when a document went out, by whom, and a digest of what
-went out. An advisory's is keyed on the advisory, which is what makes a
-revision of a document covering two issues one record rather than two; a VEX
-document's is keyed on the build it describes and the kind of document, which
-is what its identifier names, so each kind numbers its own revisions.
-Without it a second document for the same advisory could carry no revision history
-and could not increment its version, both of which CSAF validators check.
-
-| Rule | Reason |
-|---|---|
-| It is a fact about a moment | What was published on a date cannot be worked out again once a release is added, a decision is revised or a fix lands |
-| The document that went out is kept, as the bytes that went out | It is the only copy of that moment. A directory that regenerated it would serve a different document under a date saying it had not moved, and the edit that made it different is one nobody agreed to — an edit withdraws the agreement that let the document go out |
-| Everything volatile in those bytes is dated at the moment it left | The document was assembled a little earlier and is dated when it was published, so a file written again by a later pass is the same file. A reader decides what to fetch again by what moved |
-| The version and the history are read inside the write that records the issuance | Assembled outside it, they count what had gone out when the document was built, and a second issuance committing in between leaves a number missing from the middle of the history, which a validator reports |
-| The moment it went out is read inside that write too | An attempt that is run again keeps the moment the attempt before it started, so the revision that landed second is dated before the one it follows — and every document generated afterwards lists a history whose dates run backwards. The same holds for a VEX document's issuance |
-| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance, and the tracking status follows the agreement rather than the words. What is hashed is the title, the product tree and the vulnerabilities |
-| The address the document states for itself is outside the digest | It is where the file sits rather than what the document says. Inside it, a deployment that started writing a directory would report every issuance it already had as differing from what would be generated now, which reads as an instruction to re-issue all of them |
-| The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
-| The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
-| A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
-| Recording that a VEX document went out asks for the triage role on the product | The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the decision was approved, so no further agreement is asked for |
-| The public document is what is recorded, never the preview | The preview carries work nobody has announced, and a record of it going out would say this deployment published that work |
-| Whether a document moved since it last went out is answered beside it | The settled digest of what would be generated now against the one kept with the last issuance, for an advisory and for a VEX document alike. No answer where nothing has gone out, or where no publisher is configured and nothing can be generated to compare |
-
-### The two hashes
-
-A published document has two, and they answer different questions.
-
-| Hash | Over | Answers |
-|---|---|---|
-| The settled digest | What the document says, with the moment it was assembled, the software that assembled it, the version, the revision history and the tracking status left out | Is what is published still what this would generate |
-| The delivered checksum | The bytes as published, every volatile field included | Did the file a reader fetched arrive intact |
-
-The settled digest is taken as an issuance is recorded. The delivered checksum
-is taken by the writer of the provider directory, over the file it writes.
-
-## The provider directory
-
-Every advisory that has gone out, written as the static directory the standard
-defines for a CSAF provider. This deployment writes files into a store an
-operator configured; their web server serves them. Nothing here answers a
-request for one, and nothing in the application can reach the package that
-writes them. The documents this deployment serves itself are a surface of
-their own (`design-docs/publishing.md`), and a deployment may have both: an advisory
-then states the address this deployment serves it at, and the directory is a
-copy.
-
-| Rule | |
-|---|---|
-| What is written is the bytes that went out | The document is kept as an issuance is recorded, so the file a reader fetches is the file that was published rather than what the record would produce today |
-| Issuing is what publishes | Editing an advisory afterwards changes nothing in the directory until the next revision is recorded as having gone out. The edit withdrew the agreement that let the last one go, so publishing it would put out words nobody agreed to |
-| Only a document that may travel | The directory is the freely accessible half of the standard's distribution. A document held back while anything it covers is undisclosed carries the label that says so, and is not written |
-| Asked of the bytes rather than of the record | The record moves and the file does not. A document that said it may be passed on says so for ever, and one that says nothing at all is not read as permission |
-| The newest revision that may travel, per advisory | An advisory whose newest revision went to a coordinating body under embargo has a revision before it that is already public. Dropping the advisory instead would take it out of every list a reader holds |
-| Everything is written every pass, unless nothing has moved | A file written again is the same file, because the bytes are the ones that went out — but writing it is not free to a reader: a versioned store keeps a version per pass, and a file rewritten on disk gets a new modified time, which is what a web server answers "has this moved" from. So a pass that would write what this process last wrote writes nothing, and a process that has just started writes once |
-| The documents first, the lists that name them last | A list naming a file that is not there is a reader fetching nothing. A file nothing names yet is a reader who has not heard of it, and the next line fixes that |
-| Nothing is dated from the clock | The feed and the provider description date themselves from the newest document in them. Dated when the pass ran, every file moves every hour and every reader fetches the whole directory again |
-| Nothing is deleted | A document that went out is out. The writer adds and replaces, and the set it writes only grows, because both what may be published and where it goes are properties of bytes that do not change |
-| A document's first release is frozen when it first goes out | The year folder is that date's year, and until publication the date is the earliest moment any flaw the advisory covers was recorded here. Naming an older flaw afterwards would move a published document into a second folder and leave the one a reader already found named by no list |
-| Held back is counted per advisory | An advisory with two revisions that may not travel over one that may is in the directory. Counted per revision, the line reports two missing from a directory that is missing none |
-| A pass with nothing that may travel says how many it held back, once each time the count moves | A deployment whose every advisory is still under embargo otherwise has an empty directory and nothing in its log saying why |
-| A document that no longer reads back is skipped, counted and logged on every pass | Issued bytes are kept for ever and the shape they are read into may change below 1.0. Stopping the pass on one keeps every advisory issued after it out of the directory for good. Its advisory leaves the directory and no older revision is carried in its place: every revision has the same path, and the one before would be written over a revision that may already have gone out. A pass fails only where nothing it was given could be read |
-| The files are readable by whoever serves them | Another process serves them, running as somebody else. Written the way an authorized download is, a web server is refused every one and the directory reads as a deployment that has published nothing |
-| A directory with nothing in it is not written | It would have to state when it was last updated, and nothing has been published for it to say |
-| A store of its own | Every file here is served to anybody, and every attachment is authorized before it is handed over (REQ-70). One destination would have to be both |
-| The store is a type of the package that writes the directory | Nothing in the application reaches that package, which a test checks. Handed the storage underneath instead, a handler could serve the files without reaching the package, and the check would pass it |
-| The address is configuration and is required | Every address the directory states about itself is built from it, and an aggregator follows those. It must be an `https` address, which the standard requires of the documents and is refused at startup otherwise |
-
-### The files
-
-| File | |
-|---|---|
-| `provider-metadata.json` | Who this publisher is, where the documents are, and whether aggregators may list and mirror them. The publisher is the object every listed document carries, built by the same rule. The supplier reader follows this directory, which a test checks. It reads only the fields it uses, under the names this directory writes, so a publisher's misshaped field it does not use leaves the listing readable |
-| `<year>/<name>.json` | One document per advisory. The year is the one the document states the flaw was recorded in, so a document revised in January does not move; the name is the tracking identifier under the standard's rule, lower-cased first and then every sequence outside letters, digits, a plus and a hyphen replaced by one underscore |
-| `<year>/<name>.json.sha256` | The hash of the delivered bytes, the value first and the filename after it, which is both what the standard asks for and what the ordinary command-line checker reads |
-| `index.txt` | Every document's path, one per line |
-| `changes.csv` | Every document and when its revision was released, newest first, so a reader who fetched yesterday can stop reading |
-| `feed-tlp-white.json` | The same documents as a ROLIE feed, each entry naming the document, the hash file beside it, and when it was first recorded and last released |
-
-The list of changes and the feed are how somebody outside follows what this
-deployment publishes. There is no subscriber list, no per-CVE notification and
-nothing to keep in sync: a reader fetches the list, reads until the dates stop
-being new to them, and that is the whole of it. The destinations an
-administrator configures are a different thing and are for this deployment's
-own notifications, which `design-docs/notifications.md` describes.
-
-A document states the address it is published at, and the directory writes it
-under that address. Both come from one rule, applied to what the document
-states: the tracking identifier gives the name and the initial release date
-gives the folder. Spelled separately, a document would cite a file the
-directory does not serve.
-
-A hash file sits beside each document and beside nothing else. The standard
-asks for one per CSAF document, and the feed names it in the entry for the
-document it answers for — a hash beside a list has no entry to be named in and
-nothing that reads it.
-
-Three things are the operator's, because they are their web server's: the
-transport, one of the three ways a reader finds the provider description — the
-well-known path, a `CSAF` field in `security.txt`, or the DNS record — and
-directory listings.
-
-The feed calls itself by a token rather than by its own address, which is the
-obvious unique name and is refused: the shape a reader validates a feed against
-allows letters, digits, a plus, a hyphen, an underscore and a dot.
-
-Two optional files are not written. A ROLIE service document lists the feeds
-that the provider description already lists, and a category document needs a
-categorization of the documents that nobody here has asked for. Both are
-optional in the standard, and a checker reports each absence as a warning.
-
-## Publisher identity
-
-One record, not one per format. A VEX document and an advisory both name their
-publisher and read it from the same configuration. Each carried its own copy of
-the same two fields with a byte-identical method asking whether they were set,
-and the handler between them converted one to the other.
-
-The CSAF category rides along and VEX ignores it: a deployment publishing about
-its own product is a vendor, which is what the format wants to be told.
+| One link per decision, never per release | The conversation about a promise is one conversation |
+| Nothing fetches what a link points at | Fetching a typed address is a request-forgery primitive. It is stored as text, shown as a link, and encoded on output |
+| Sent empty, it is cleared | A stale link sends somebody to a ticket closed for a different reason |
+| Anybody who may argue about a decision may set it | A link is a note about where the conversation is, never a decision |
+| Assigning notifies; planning does not (REQ-34) | Somebody is told when work is put on them; naming the releases it reaches is done to the work |
 
 ## Not built
 
-The tracker hand-off (REQ-36). What exists is the link somebody typed, stored
-and never fetched; what is missing is opening or updating an item in the system
-it points at. The signed outbound request is built and is described in
-`design-docs/notifications.md`.
-
-Every adapter that would send an advisory to somebody's platform, which is the
-whole of Publication above. What exists is `The provider directory`: files
-written where an operator pointed, for their own web server; and the documents
-this deployment serves itself (`design-docs/publishing.md`).
-
-Signatures in the static directory. The documents this deployment serves
-itself are signed where an operator configured a key; the directory writer
-writes none, and its provider description claims the provider role alone.
-
-A version 4 score in the document. CSAF 2.1 gains a field for one, and the
-document is written as CSAF 2.0 until 2.1 is an OASIS standard. The note that
-states the score until then is not built either, so a flaw rated under version
-4 alone is published with no score.
-
-Document-level notes of the deployment's own. An edition carries the title and
-each issuance carries a typed revision summary; the rest of what a reader acts
-on is assembled from the flaws the advisory covers.
+| Not built | What exists |
+|---|---|
+| The tracker hand-off (REQ-36): opening or updating an item in the system a link points at | The link somebody typed, stored and never fetched |
+| A roll-up of one promise across its builds: "landed in two of three releases, planned in the third, due on the first" | Its source is the promise: the releases it names, the version and the date, each resolved by that release's next scan. What is built answers per build, and where an issue stands across builds is read from the findings list, a row per build |
 
 ## Limits
 
-| | |
+| Rule | Reason |
 |---|---|
-| A bump is keyed on where it is going as well as where it comes from | Grouped on the first two fields alone, two upgrades at 5.9.0 and 5.9.2 read as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
-| A fix declared for a product covers its builds without being written per build | A decision occurrence's live key names the occurrence and not the build, so a product shipping the same component in two builds produced two identical proposals and the second collided with the unique index, rolling back the whole declaration. The proposals are made distinct before they are written |
-| A statement about a group speaks for the group | The outbound format has no occurrence granularity, so a dismissal covering some of a group is not published as covering all of it |
-| Only a decision made where a build was in hand records one | A decision from before the builds were kept, and one made where no build was on screen, records none. The advisory says so and flags nothing, because a guess from where the occurrence sat names every variant holding the same code, which is the case the flag exists for |
-| The provider directory is read whole on every pass | Every document that has gone out is read, and the ones that may be published are written again. An advisory is the rare, deliberate document — single or low double digits a year — so the pass is a read that finds nothing new nearly every time it runs, and a record of what the store already holds would be a second copy of what the store is |
+| A commitment is as current as its build's last scan | Landed is what the last scan holds; a build not scanned again stays planned, or lapses at its date |

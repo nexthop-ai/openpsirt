@@ -1,7 +1,7 @@
 # Text people write
 
-Justifications, deferral reasons, comments and descriptions, and the point at
-which typed text becomes markup.
+Justifications, deferral reasons, comments and descriptions: the policy typed
+text passes at submission, and where it is rendered.
 
 Satisfies REQ-65, REQ-66, REQ-67, REQ-69.
 
@@ -21,156 +21,113 @@ Satisfies REQ-65, REQ-66, REQ-67, REQ-69.
 
 ## Policy and sanitizing
 
-Two controls, kept apart, and they run in two different places.
+Two controls, kept apart, running in two places (REQ-67).
 
-| | Runs | Covers |
+| Control | Runs | Covers |
 |---|---|---|
 | Policy | Once, on the server, at submission, before storage | What is permitted, which links survive, what each reference resolves to |
-| Sanitizing | Wherever the text is rendered, which is not here | Text stored before a rule existed |
-
-Policy needs data and authorization checks no client holds, so it is the
-server's. Sanitizing travels with rendering, and nothing on the server renders:
-the API returns the source as its only representation, and mail is sent as
-plain text. The interface sanitizes what it renders, and an integrator
-rendering this markdown sanitizes what they render.
-
-Text stored under an older submission policy is served as source, so a rule
-written after it was stored is applied by whoever renders it and by nobody
-else. For the interface that is the interface's own sanitizer, which is
-current. For an integrator it is theirs, which is why the API says so.
-
-The source is stored; rendered markup never is. The same text reaches a
-browser, an email and an export.
-
-## Raw markup
-
-Raw markup is **refused at submission**, naming the line it is on. Not dropped,
-not escaped: a person told while they are still writing can fix it, and a tag
-silently escaped is somebody who typed one thing and was shown another.
+| Sanitizing | Wherever the text is rendered, which is never this server | Text stored before a rule existed |
 
 | Rule | Reason |
 |---|---|
-| Refused rather than allowlisted | An allowlist of permitted tags is a thing that can be wrong, and every interesting attack lives in the gap between what such a list permits and what a browser does. Nothing triage needs requires markup, so the category goes rather than being bounded |
-| Refused rather than turned off at the parser | A parser producing no markup nodes leaves nothing to report, and the point is to report it. The option that reads as parser configuration is a renderer option, and nothing here renders |
+| Policy is the server's | It needs data and authorization checks no client holds |
+| Sanitizing travels with rendering, and nothing on the server renders | The API returns the source as its only representation, and mail is plain text. The interface sanitizes what it renders; an integrator sanitizes what they render |
+| Text stored under an older policy is served as source | A rule written after it was stored is applied by whoever renders it: the interface's current sanitizer, or an integrator's, which is why the API says so |
+| The source is stored, never rendered markup | One text reaches a browser, an email and an export |
+| Submission and sanitizing agree on what survives | A link accepted at submission and dropped by the sanitizer is a link when written and plain text when read, with nothing reporting it |
 
-There is no second pass. What stands between a payload and a reader is the
-check at submission, which is the half the server owns. What renders is
-somebody else's, and each renderer has its own tests over the same corpus.
+## Raw markup
+
+Raw markup is refused at submission, naming the line it is on. It is never
+dropped and never escaped: a person told while writing can fix it, and a tag
+silently escaped shows them something other than what they typed.
+
+| Rule | Reason |
+|---|---|
+| The category is refused, never allowlisted | An allowlist can be wrong, and attacks live in the gap between what it permits and what a browser does. Nothing triage needs requires markup |
+| The parser reports it; it is not turned off at the parser | A parser producing no markup nodes leaves nothing to report. The option that reads as parser configuration is a renderer option, and nothing here renders |
+| There is no second pass | The submission check is the server's half; each renderer is somebody else's and has its own tests over the same corpus |
 
 ## Link schemes
 
-`http`, `https` and `mailto` survive, and two schemes of this deployment's own:
-`attachment:` for a file held here and `issue:` for one vulnerability. Every
-other scheme is dropped.
-
-One file in the repository's test data holds both lists: what a link in
-submitted text may use, and what a link leaving the deployment may name once
-the two of this deployment's own are rewritten into paths. The submission
-check and the interface's renderer each keep their own copy, and a test on
-each side compares it with the file, so a scheme accepted at submission and
-dropped on screen fails on the side that was not changed. The refusal
-sentence and the operation description that name the schemes are built from
-the submission check's list.
+`http`, `https` and `mailto` survive, with two schemes of this deployment's
+own: `attachment:` for a file held here and `issue:` for one vulnerability.
+Every other scheme is dropped.
 
 | Refused | Reason |
 |---|---|
 | `javascript:` | Script execution from a link |
-| `data:` | Lets a link become a page this deployment appears to have served |
+| `data:` | A link becomes a page this deployment appears to have served |
 | A custom application scheme | Hands a privileged reader's click to a program on their machine |
 
-Outbound links carry no referrer and no live opener.
-
-A destination is judged as a browser reads it, in every form a link takes:
-inline, a reference definition, and an autolink in angle brackets.
-
-| Step | Reason |
+| Rule | Reason |
 |---|---|
-| Character references are decoded | `&#106;avascript:` is `javascript:` to a browser |
+| One file of test data holds both lists: what submitted text may link to, and what a link leaving the deployment may name once the two local schemes are rewritten into paths | The submission check and the interface's renderer each keep a copy, and a test on each side compares it with the file, so a scheme accepted at submission and dropped on screen fails on the side not changed |
+| The refusal sentence and the operation description naming the schemes are built from the submission check's list | |
+| Outbound links carry no referrer and no live opener | |
+| A destination is judged as a browser reads it, in every link form: inline, a reference definition, and an autolink in angle brackets | |
+| Character references are decoded first | `&#106;avascript:` is `javascript:` to a browser |
 | Leading and trailing control characters and spaces are removed, and every tab and newline wherever it sits | A browser's address parser does the same, so `/`, a tab, `/evil.example` is two separators |
 | The scheme runs to the first colon, with any control character inside it ignored | `java&#9;script:` is `javascript:` to a browser |
-| `attachment:` and `issue:` are refused unless written exactly so, in lower case | A renderer resolves them as written, so `Attachment:` is a link to nothing. The refusal names the spelling, because the identifier after it may be well formed |
-| An `attachment:` reference is the minted identifier, 32 lower-case hexadecimal characters, and an `issue:` reference is a letter then 2 to 63 letters, digits, dots, dashes or underscores | The corpus holds references on both sides of each edge. The submission check accepts exactly the ones the interface's renderer links, so accepted text is never a dead link |
+| `attachment:` and `issue:` are refused unless written exactly so, in lower case, and the refusal names the spelling | A renderer resolves them as written, so `Attachment:` links to nothing, and the identifier after it may be well formed |
+| An `attachment:` reference is the minted identifier, 32 lower-case hexadecimal characters; an `issue:` reference is a letter then 2 to 63 letters, digits, dots, dashes or underscores | The submission check accepts exactly what the interface's renderer links, so accepted text is never a dead link. The corpus holds references on both sides of each edge |
+| A link to this deployment survives; the sanitizer decides by resolving the destination against the page, never by pattern | `//somewhere.else/x` carries no scheme and is not relative: a browser fetches it from another origin |
 
-A link to somewhere in this deployment survives. The browser's sanitizer decides
-by **resolving** the destination against the page rather than matching it
-against a pattern: `//somewhere.else/x` carries no scheme and is not relative, so
-a browser resolves it against the page's protocol and fetches it from another
-origin.
+### Fields under the policy
 
-Every field a person types passes the submission policy, whether or not
-anything renders it: an assessment's reasoning, the reason an embargo is
-extended, the note on a closure by hand, the note on a build declared
-unaffected, and the summary recorded with an issuance. So does an address
-stored on its own — where work on a decision is happening, the address beside a
-fix target — and the summary of a recorded flaw. A field that skips the policy
-loses all three of its parts at once: the scheme check, the refusal of raw
-markup, and the length bound.
+Every field a person types passes the policy, whether or not anything renders
+it.
 
-The check runs in the store, at the point the value is trimmed, rather than
-in the handler that happens to be the first caller. That is what makes the
-policy hold for every path into the column, and a column written by two paths
-is only as bounded as the laxer of the two.
+| Field | Examples |
+|---|---|
+| Text | A decision's reasoning, an assessment's reasoning, the reason an embargo is extended, the note on a closure by hand, the note on a build declared unaffected, the summary recorded with an issuance, a recorded flaw's summary |
+| An address stored alone | Where work on a decision is happening, the address beside a fix target |
 
-Every route answering a refusal of the policy answers 422 with a detail per
-fault, each naming the line it is on. A route that falls through to its fault
-arm answers 500 for the caller's own writing, which tells them nothing to fix.
-
-Submission and sanitizing must agree on what survives. A link accepted at
-submission and deleted by the sanitizer is a link when it is written and plain
-text when it is read, with nothing reporting the difference.
+| Rule | Reason |
+|---|---|
+| A field that skips the policy loses the scheme check, the refusal of raw markup and the length bound at once | |
+| The check runs in the store, where the value is trimmed, never in the first handler that calls it | A column written by two paths is only as bounded as the laxer |
+| Every route answering a refusal of the policy answers 422, with a detail per fault naming its line | A route falling through to its fault arm answers 500 for the caller's own writing, which tells them nothing to fix |
 
 ## Issue references
 
 `issue:CVE-2026-1234` is one vulnerability, wherever this deployment has it
-(REQ-65). An identifier and never an address, for the reason an attachment is
-one: what a finding's address names — a product, a build, a component — is not
-what somebody writing "the same root cause as CVE-2026-1234" means. They mean
-the issue, and the issue has an address of its own.
+(REQ-65). It is an identifier, never an address: somebody writing "the same
+root cause as CVE-2026-1234" means the issue, which has an address of its own,
+and never a finding's product, build or component.
 
 | Rule | Reason |
 |---|---|
-| Written, never detected | A bare identifier in a sentence is text somebody wrote. Rewriting it into a link edits their prose, quotations and lists-of-examples included |
-| A bare identifier keeps meaning what it already meant | It links to the record that defines it — the world's answer — and `issue:` links to ours. Two citations, both right, and taking the first over would silently retarget every identifier anybody has ever typed |
-| The shape is checked, the existence is not | Whether we hold that issue is a question with a subject attached, and this policy has none. Somebody writing about a flaw nothing has scanned yet is writing something true, and refusing it would make the text argue with the scan schedule |
-| A shape rather than a list of prefixes | CVE, GHSA and every vendor identifier a scan file carries are all a letter followed by letters, digits and separators. A list of the ones we have heard of would refuse a reference to an issue we already hold |
-| Judged at submission, not only at render | The half that lists what a text refers to recognizes only an identifier, so a destination the scheme accepted and that half ignores is a dead link nothing reports — the same disagreement `attachment:../../secret` produces |
-| Nothing resolves it server-side, and nothing needs to | An identifier **is** the address: our record of an issue is reached from the identifier alone, by anybody, with no lookup. That is what makes it unlike a mention, which needs the person table, or an attachment, which needs a token resolved to a file — the two REQ-65 is about, and the reason it says so. A reference to an issue nothing has scanned yet points at a page that says so, and becomes right when a scan arrives |
-| Nothing lists what a text refers to, either | Reading the list back is how a resolver would be fed, and there is no resolver. An exported function producing one reads as a mechanism somebody can rely on. Whoever renders the text finds the references in it, because they are in the text |
+| Written, never detected | Rewriting a bare identifier into a link edits somebody's prose, quotations and lists of examples included |
+| A bare identifier keeps linking to the record that defines it; `issue:` links to ours | Two citations, both right. Taking the first over would retarget every identifier anybody has typed |
+| The shape is checked; existence is not | Whether we hold the issue is a question with a subject, and this policy has none. A flaw nothing has scanned yet is still true to write about |
+| A shape, never a list of prefixes | CVE, GHSA and every vendor identifier a scan carries are a letter then letters, digits and separators; a list of known prefixes refuses issues already held |
+| Judged at submission as well as at render | The half that lists what a text refers to recognizes only an identifier, so a destination the scheme accepted and that half ignores is a dead link nothing reports, as `attachment:../../secret` would be |
+| Nothing resolves it on the server | The identifier is the address, reached by anybody with no lookup, unlike a mention, which needs the person table, or an attachment, which needs a token resolved to a file; those two are what REQ-65 resolves. A reference to an issue nothing has scanned points at a page saying so, and becomes right when a scan arrives |
+| Nothing lists what a text refers to | There is no resolver to feed. Whoever renders the text finds the references in it |
 
 ## Images and attachments
 
-An image may reference a file attached here and nothing else. The restriction is
-by scheme, not by address.
+An image may reference a file attached here and nothing else, by scheme.
 
-| Rule | |
+| Rule | Reason |
 |---|---|
-| The only permitted image scheme is `attachment:` | A submission pointing anywhere else is told to attach the file |
-| What follows the scheme must be a 32-hexadecimal-character identifier this deployment minted | Otherwise `attachment:../../secret` is accepted when written and resolves to nothing when read |
-| Every link form the check accepts a reference in is a form that keeps the file: a link, an image, a reference definition and an autolink | The list of what a text refers to marks a file attached, and an unmarked file is deleted by the sweep while the text still points at it |
-| The sanitizer permits the scheme | It cannot become a page or a script: no browser resolves it, and the interface turns it into a path against a file this deployment holds |
+| The only image scheme is `attachment:` | A submission pointing anywhere else is told to attach the file |
+| What follows it is a 32-hexadecimal-character identifier this deployment minted | Otherwise `attachment:../../secret` is accepted when written and resolves to nothing when read |
+| Every form the check accepts a reference in keeps the file: a link, an image, a reference definition and an autolink | The list of what a text refers to marks a file attached, and an unmarked file is deleted by the reaper while the text still points at it |
+| The sanitizer permits the scheme | No browser resolves it, so it cannot become a page or a script; the interface turns it into a path to a file this deployment holds |
+| A remote image is never allowed | It fires from every reader's browser, inside the network, telling its author who read which finding and when: a disclosure channel on an undisclosed finding |
 
-A remote image fires from the browser of everybody who reads the text, from
-inside the network, reporting to whoever wrote it who is reading which finding
-and when. On an undisclosed finding that is a disclosure channel. A file attached
-here is fetched through a path that authorizes the reader — see
-`design-docs/attachments.md`.
+A file attached here is fetched through a path that authorizes the reader
+(`design-docs/attachments.md` § Fetch authorization).
 
 ## Representation
 
-The API returns markdown, as the sole representation. There is no markup
-representation and no parameter requesting one.
-
-Markdown is what an integrating application can most easily lay out, and it reads
-as plain text as it stands. HTML assumes a browser, which most callers of an
-API-first tool are not.
-
-Mail is plain text, so nothing renders there either. Mail carries no typed
-text, only sentences the server composes, so an HTML part needs no renderer.
-It is not built.
-
-Sanitizing travels with rendering, and every renderer is somebody else's: the
-interface for a browser, an integrator for their own application. A rendering
-that fails is the renderer's problem, since the source is authoritative.
+| Rule | Reason |
+|---|---|
+| The API returns markdown as its sole representation, with no parameter requesting markup | An integrating application lays markdown out easily and it reads as plain text; HTML assumes a browser, which most callers are not |
+| Mail is plain text. An HTML part is not built | Mail carries only sentences the server composes and no typed text, so an HTML part would need no renderer |
+| Every renderer is somebody else's: the interface for a browser, an integrator for their application | The source is authoritative, so a failed rendering is the renderer's |
 
 ## Rendered and escaped text
 
@@ -179,19 +136,12 @@ that fails is the renderer's problem, since the source is authoritative.
 | Typed into this tool | Passes the submission policy and is rendered as markdown |
 | Supplied by a scan file | Shown as written, never rendered (REQ-66) |
 
-Both live in the same column, so the origin decides. Rendering the column would
-hand whoever wrote the scan file a formatting language aimed at the browsers of
-the people holding the most access in this deployment.
-
-Escaping, like sanitizing, happens where the text is put into a document. The
-interface escapes what it shows, and the two origins stay distinguishable so a
-renderer can tell which it is holding.
-
-The server puts third-party text into two documents of its own: the release
-note and the issue document, both served as markdown (`design-docs/analytics.md`).
-Each value there that did not pass the submission policy is escaped as it is
-written, so a renderer shows it as the text it is. A webhook's subject and
-text are escaped by the same rule, line by line (`design-docs/notifications.md`).
+| Rule | Reason |
+|---|---|
+| The origin decides, since both share a column | Rendering the column hands a scan file's author a formatting language aimed at the browsers of the people holding the most access |
+| Escaping happens where text is put into a document, and the two origins stay distinguishable | The interface escapes what it shows, and a renderer can tell which it holds |
+| The release note and the issue document, both served as markdown, escape every value that did not pass the policy as it is written (`design-docs/analytics.md`) | A renderer shows it as the text it is |
+| A webhook's subject and text are escaped by the same rule, line by line (`design-docs/notifications.md`) | |
 
 | Escaped | Where | Opens |
 |---|---|---|
@@ -209,58 +159,46 @@ text are escaped by the same rule, line by line (`design-docs/notifications.md`)
 
 A character is escaped where it can open syntax where it sits, and in the few
 places it only might: `--rc1` is written `\--rc1`, because a line of three is a
-rule. Both documents are also read as source, where `1\.2\.3` for every
-version is noise.
+rule. Nothing else is escaped, because both documents are also read as source,
+where `1\.2\.3` for every version is noise.
 
 ## Refusals
 
-A refusal carries the line, the offending text, and the reason. Every fault in
-the submission is reported at once rather than one at a time.
+A refusal carries the line, the offending text and the reason, and every fault
+in a submission is reported at once.
 
-The line is where the refused link is written, found from the link's own
-text onward. A destination written twice is named on both lines, and one
-shown in a fenced block above or earlier in the same paragraph is not the one
-named. A destination supplied by a reference definition is named on the
-definition's line, and one that does not appear literally — spelled with a
-character reference — on the first line of its block. A link with no text and
-an autolink are searched from the start of their block, so for those an
-earlier copy in the same paragraph is the one named.
+| Case | Line named |
+|---|---|
+| A refused link | Where it is written, found from the link's own text onward |
+| A destination written twice | Both lines. One shown in a fenced block above, or earlier in the same paragraph, is not the one named |
+| A destination from a reference definition | The definition's line |
+| A destination not appearing literally, spelled with a character reference | The first line of its block |
+| A link with no text, and an autolink | Searched from the start of the block, so an earlier copy in the same paragraph is the one named |
 
 ## Code block language tags
 
-The language tag after three backticks is input and lands in a class attribute.
-It is allowlisted. An unrecognized language keeps the block and loses the label
-rather than failing.
+The tag after three backticks lands in a class attribute, so it is allowlisted
+(REQ-67). An unrecognized language keeps the block and loses the label.
 
-The allowlist belongs to whoever renders. This server emits no markup, so the
-list goes with the renderer, and each reader keeps its own. What is asserted
-over one is the rendered output: asking an allowlist directly proves only that
-it agrees with itself.
+| Rule | Reason |
+|---|---|
+| The allowlist belongs to whoever renders, and each reader keeps its own | This server emits no markup |
+| A test asserts over the rendered output | Asking an allowlist directly proves only that it agrees with itself |
 
 ## Bounds
 
-Every field is capped at 64 KB. Nothing here renders, so the cap is the whole
-of the bound.
+Every field is capped at 64 KB (REQ-69). Nothing here renders, so the cap is
+the whole bound.
 
-The column holds what the cap admits, on every engine. Two of the four spell
-plain text as a type topping out at 65,535 bytes, one byte short of the cap, so
-a field of exactly the admitted size passes submission and then fails the write
-on those two, or is truncated without a word outside strict mode — which leaves
-an approver agreeing to text that is not the text somebody wrote. A loop over
-one engine does not reach it, because the engine it runs on stores it happily.
-
-The one parse is the submission check's, over text already inside that cap, so
-the cap is applied before any parsing starts and is what bounds the work. A
-time bound beside it would bound the wait rather than the work, which is worth
-keeping in mind if rendering ever comes back: a parse cannot be interrupted, so
-what such a bound buys is that the request answers and releases its resources
-while the work runs on.
+| Rule | Reason |
+|---|---|
+| The column holds what the cap admits, on every engine | Two engines spell plain text as a type topping out at 65,535 bytes, one short of the cap: a field of exactly the admitted size passes submission, then fails the write or, outside strict mode, is truncated without a word, leaving an approver agreeing to text nobody wrote. A test on one engine does not reach it |
+| The cap is applied before any parsing | The one parse is the submission check's, so the cap bounds the work |
+| No time bound | A parse cannot be interrupted, so a time bound limits the wait and never the work |
 
 ## Limits
 
 | Rule | Reason |
 |---|---|
-| A code block is not highlighted | Grammar coverage costs bundle size, which is weighed against a real screen |
-| A bare `scheme://` is an address; a bare `word:` is not | The second matches `parser.go:112` in a stack trace and `TODO: check this` in a sentence. Schemes that act rather than navigate are matched separately, since they carry no `//` |
-| A tag in the text is reported rather than silently dropped | Raw markup is refused at submission either way, so this changes nothing about safety. It tells the author why their tag will not appear |
-| Raw markup is refused outright rather than allowlisted | Such a list is a thing that can be wrong, and the gap between what it permits and what a browser does is where the attacks live |
+| A code block is not highlighted | Grammar coverage costs bundle size, weighed against a real screen |
+| A bare `scheme://` is an address; a bare `word:` is not | The second matches `parser.go:112` in a stack trace and `TODO: check this` in a sentence. Schemes that act rather than navigate carry no `//`, and are matched separately |
