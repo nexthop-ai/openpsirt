@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -270,5 +271,22 @@ func TestAWorkingDirectoryReachedThroughALinkIsInTheCheckout(t *testing.T) {
 	}
 	if !bytes.Contains(doc, []byte(`"uri":"file.c","uriBaseId":"SRCROOT"`)) || bytes.Contains(doc, []byte("file://")) {
 		t.Errorf("the result is not placed in the checkout: %s", doc)
+	}
+}
+
+func TestEveryFlagTheUsageNamesIsDefined(t *testing.T) {
+	named := regexp.MustCompile(`--([a-z][a-z-]*)`).FindAllStringSubmatch(usage, -1)
+	if len(named) == 0 {
+		t.Fatal("the usage names no flags, so this checked nothing")
+	}
+	var defined bytes.Buffer
+	for _, command := range []string{"upload", "write"} {
+		_ = run(context.Background(), []string{command, "-h"}, &defined, &defined)
+	}
+	for _, flag := range named {
+		if !strings.Contains(defined.String(), "  -"+flag[1]+" ") &&
+			!strings.Contains(defined.String(), "  -"+flag[1]+"\n") {
+			t.Errorf("the usage names --%s, which neither command defines", flag[1])
+		}
 	}
 }
