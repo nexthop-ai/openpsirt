@@ -261,8 +261,8 @@ export const recordFlawAt = (product: string, from?: string, source?: "outside")
 export const incidentsAt = (product?: string) =>
   at("incidents", {}, { product: product || undefined });
 
-// The record of decisions, asked a question.
-export const recordAt = (query?: Query) => at("record", {}, query);
+// The audit log, asked a question.
+export const auditLogAt = (query?: Query) => at("auditLog", {}, query);
 
 // An address built here, with its query replaced, for a list moved to another
 // scope with the filters it carried.

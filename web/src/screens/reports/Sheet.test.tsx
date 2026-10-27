@@ -58,7 +58,7 @@ describe("a printed sheet's header", () => {
 });
 
 describe("the approval quality figure", () => {
-  it("counts from the day its links open the record from", async () => {
+  it("counts from the day its links open the audit log from", async () => {
     const reads = serve(() => ({ data: { items: [], alone: [] } }));
     mount.render(screen(<Scrutiny />, "/reports/approval-quality?days=30"));
     await settle();
@@ -72,7 +72,7 @@ describe("the approval quality figure", () => {
 });
 
 describe("the program overview's figures", () => {
-  it("count from the day their links open the record from", async () => {
+  it("count from the day their links open the audit log from", async () => {
     const reads = serve(() => ({ data: { items: [] } }));
     mount.render(screen(<Overview />, "/reports/program-overview?days=30"));
     await settle();

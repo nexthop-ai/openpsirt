@@ -135,11 +135,11 @@ describe("every address a report leads to", () => {
 });
 
 describe("what a catalog row carries with it", () => {
-  // The record reads its narrowing from the address rather than from the
+  // The audit log reads its narrowing from the address rather than from the
   // picker, so an entry that drops the selection opens every product the
   // reader can see from a page scoped to one — a different population under
   // the same name.
-  it("carries the product into the record", () => {
+  it("carries the product into the audit log", () => {
     const exception = CATALOG.find((report) => report.name === "The exception report")!;
     const wide = leadsTo(exception, {}, GATED).to!;
     expect(wide).toContain("alone=true");
@@ -155,14 +155,14 @@ describe("what a catalog row carries with it", () => {
   // An outcome typed here and not the server's would go uncounted while the
   // record said no dismissal stands alone. A lead's dismissal needs a second
   // person as a vulnerability's does, so the exception report asks for both.
-  it("asks the record about every outcome that always needs a second person, a lead's included", () => {
+  it("asks the audit log about every outcome that always needs a second person, a lead's included", () => {
     const exception = CATALOG.find((report) => report.name === "The exception report")!;
     const asked = new URL(leadsTo(exception, {}, GATED).to!, "http://x").searchParams;
     expect(GATED.length).toBeGreaterThan(0);
     expect(asked.getAll("outcome")).toEqual(GATED);
     expect(asked.getAll("outcome")).toEqual(expect.arrayContaining(["dismissed", "not-security"]));
     expect(asked.getAll("outcome")).not.toContain("confirmed");
-    expect(leadsTo(exception, {}, ["wont-fix"]).to).toBe("/record?alone=true&outcome=wont-fix");
+    expect(leadsTo(exception, {}, ["wont-fix"]).to).toBe("/audit-log?alone=true&outcome=wont-fix");
   });
 
   it("leads nowhere before the server has said which outcomes need a second person", () => {
@@ -172,7 +172,7 @@ describe("what a catalog row carries with it", () => {
 
   it("carries it into an address that has no query of its own yet", () => {
     const changes = CATALOG.find((report) => report.name === "Administrative changes")!;
-    expect(leadsTo(changes, { product: "sonic" }, GATED).to).toBe("/record?product=sonic");
-    expect(leadsTo(changes, {}, GATED).to).toBe("/record");
+    expect(leadsTo(changes, { product: "sonic" }, GATED).to).toBe("/audit-log?product=sonic");
+    expect(leadsTo(changes, {}, GATED).to).toBe("/audit-log");
   });
 });

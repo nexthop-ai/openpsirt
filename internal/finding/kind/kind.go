@@ -110,7 +110,7 @@ const (
 	Assignment Consumer = "assignment"
 	// Decisions is the decisions people make about findings: their occurrences,
 	// the reasoning and its revisions, approvals, comments on a decision, the
-	// review queue, every read of one decision, and the record of decisions and
+	// review queue, every read of one decision, and the audit log and
 	// its file.
 	Decisions Consumer = "decisions"
 	// Inventory is the screens about what a build contains: its tree, a

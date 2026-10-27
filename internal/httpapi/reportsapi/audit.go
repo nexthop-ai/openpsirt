@@ -76,7 +76,7 @@ type StatesBody struct {
 	Lapsed    int `json:"lapsed"`
 }
 
-// AuditedDecisionBody is one decision as the record lists it. Every count is
+// AuditedDecisionBody is one decision as the audit log lists it. Every count is
 // of the occurrences the filters matched and the caller may read.
 type AuditedDecisionBody struct {
 	Decision int64 `json:"decision" doc:"The decision's identifier"`
@@ -112,7 +112,7 @@ type AuditedDecisionBody struct {
 	TwoPeople  bool         `json:"two_people" doc:"Whether somebody other than the proposer has a standing agreement on it"`
 }
 
-// Auditing is the narrowing the record takes, for the screen and for the
+// Auditing is the narrowing the audit log takes, for the screen and for the
 // file.
 //
 // One struct because they are one question. An export that took a smaller set
@@ -120,7 +120,7 @@ type AuditedDecisionBody struct {
 // else, which is the failure an export is easiest to make.
 type Auditing struct {
 	// Repeatable, because "dismissed or deferred" and "waiting or sent back"
-	// are the questions somebody reading the record has, and one value cannot
+	// are the questions somebody reading the audit log has, and one value cannot
 	// ask either. Repeat the parameter; any of what is named matches.
 	Product   []string             `query:"product,explode" maxItems:"200" maxLength:"191" doc:"Limit to these products, by name. Repeatable; any of them matches"`
 	Outcome   []core.Outcome       `query:"outcome,explode" uniqueItems:"true" doc:"Limit to these kinds of decision. Repeatable; any of them matches"`
@@ -259,7 +259,7 @@ func registerAudit(api huma.API, in core.Deps) {
 
 		rows, total, err := store.Audit(ctx, subject, filter, since, until, input.Limit, input.Offset)
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "the record could not be read", err)
+			return nil, core.WentWrong(in.Logger, "the audit log could not be read", err)
 		}
 		out := &core.CountedListOutput[AuditedBody]{}
 		out.Body.Items = make([]AuditedBody, 0, len(rows))
@@ -291,7 +291,7 @@ func auditedBody(row triage.AuditedOccurrence) AuditedBody {
 	return body
 }
 
-// argued is what a decision says beyond its outcome, as the record writes it.
+// argued is what a decision says beyond its outcome, as the audit log writes it.
 // A decision about a lead holds its reason where a vulnerability's decision
 // holds its justification, and the two are drawn from different vocabularies.
 func argued(decision *triage.Decision) (justification core.Justification, reason core.LeadReason,
@@ -332,9 +332,9 @@ func registerAuditDecisions(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-audit-decisions", Method: http.MethodGet, Path: "/v1/audit/decisions",
 		Summary: "List the audit log by decision",
-		Description: "The record one decision at a time, newest first: every decision with an " +
+		Description: "The audit log one decision at a time, newest first: every decision with an " +
 			"occurrence the filters match, once, however many occurrences it covers.\n\n" +
-			"Takes every filter the per-occurrence record takes, with the same meaning. A decision is " +
+			"Takes every filter the per-occurrence list takes, with the same meaning. A decision is " +
 			"listed where any of its occurrences match, and every count on it is of the occurrences " +
 			"that match and that you may read. Asked for `state=lapsed`, a decision that lapsed " +
 			"at one occurrence of forty reads as one occurrence, lapsed. `total` counts decisions.\n\n" +
@@ -358,7 +358,7 @@ func registerAuditDecisions(api huma.API, in core.Deps) {
 		}
 		rows, total, err := store.AuditDecisions(ctx, subject, filter, since, until, input.Limit, input.Offset)
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "the record could not be read", err)
+			return nil, core.WentWrong(in.Logger, "the audit log could not be read", err)
 		}
 		out := &core.CountedListOutput[AuditedDecisionBody]{}
 		out.Body.Items = make([]AuditedDecisionBody, 0, len(rows))
@@ -370,7 +370,7 @@ func registerAuditDecisions(api huma.API, in core.Deps) {
 	})
 }
 
-// auditedDecisionBody is one decision as the record lists it.
+// auditedDecisionBody is one decision as the audit log lists it.
 func auditedDecisionBody(row triage.AuditedDecision) AuditedDecisionBody {
 	body := AuditedDecisionBody{
 		Decision: row.Decision.ID, Issue: row.Issue, Issues: row.Issues,

@@ -86,9 +86,9 @@ export function Overview() {
   // The window every figure on this sheet covers, and the one the lists it
   // links to have to be narrowed by. One value, because a heading saying one
   // stretch over a list showing another is the failure this sheet is easiest to
-  // ship. A rolling window is sent as the date its links open the record
-  // from: a count of days the server counts from this minute, and the record
-  // reads a date from midnight.
+  // ship. A rolling window is sent as the date its links open the audit
+  // log from: a count of days the server counts from this minute, and the
+  // audit log reads a date from midnight.
   const { days, period } = useSheetWindow(30);
   const when = stated(period) ? asked(period, days) : { from: windowStart(days) };
   // A period naming only its end still runs from the beginning, so there is
@@ -110,8 +110,8 @@ export function Overview() {
   // program that dismisses everything as "will not fix" reads as a program
   // that has argued nothing away.
   //
-  // Read from the record rather than from the decisions list, because the
-  // record is the one that takes an outcome repeated and names the occurrence each
+  // Read from the audit log rather than from the decisions list, because the
+  // audit log is the one that takes an outcome repeated and names the occurrence each
   // decision sits at.
   const { known, dismissing } = useOutcomes();
   const argued = useQuery({
@@ -130,8 +130,8 @@ export function Overview() {
               state: ["approved" as const],
               // The window this report states, so the sheet does not carry a
               // header saying ninety days over a list that ignores it. Dated
-              // by when the decision was argued, which is what the record
-              // dates by.
+              // by when the decision was argued, which is what the audit
+              // log dates by.
               ...(began ? { from: began } : {}),
               ...(period.to ? { to: endExclusive(period.to) } : {}),
               limit: NEWEST,
@@ -482,7 +482,7 @@ export function Overview() {
         <h3>Dismissals</h3>
         <p className="hint">
           Approved in this window, newest first. {byProduct(at.product)}, one row per occurrence.{" "}
-          <Link to="/record">The record</Link> groups them by decision.
+          <Link to="/audit-log">The audit log</Link> groups them by decision.
         </p>
         {argued.isPending ? (
           <Loading />
@@ -547,7 +547,7 @@ export function Overview() {
             </table>
           </Wide>
         )}
-        {/* The record says how many there are; the sheet shows the newest
+        {/* The audit log says how many there are; the sheet shows the newest
             page of them. Without this the heading "approved dismissals in this
             window" stands over twenty rows of ninety. */}
         <Paged

@@ -93,7 +93,7 @@ export function useRulings(
 }
 
 // Rulings in every product the reader may work reports in, narrowed the way
-// the review queue and the record narrow what they list.
+// the review queue and the audit log narrow what they list.
 export function useRulingsAcross(asked: {
   waiting?: boolean;
   approvable?: boolean;

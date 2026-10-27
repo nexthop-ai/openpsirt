@@ -149,8 +149,8 @@
   "person": { "path": "/access/:identity" },
   "teams": { "path": "/teams" },
   "assignments": { "path": "/assignments", "query": ["person", "tab", "team"] },
-  "record": {
-    "path": "/record",
+  "auditLog": {
+    "path": "/audit-log",
     "query": ["alone", "from", "in_force", "outcome", "product", "to"]
   },
   "reports": { "path": "/reports" },
@@ -169,7 +169,8 @@
   "formerAssignments": { "path": "/work" },
   "formerExploitedHere": { "path": "/exploited-here" },
   "formerObligations": { "path": "/obligations" },
-  "formerRecord": { "path": "/audit" },
+  "formerAudit": { "path": "/audit" },
+  "formerRecord": { "path": "/record" },
   "formerDisclosureDeadlines": { "path": "/disclosing" },
   "formerRecordFlaw": { "path": "/report-a-flaw" },
   "formerDependencies": {

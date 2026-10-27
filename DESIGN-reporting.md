@@ -130,8 +130,8 @@ one report to another carries the same two parameters.
 |---|---|
 | A period is two dates; a rolling window is a number of days | A window ending today cannot say "last financial year", which is the number an auditor asks for, and dates alone make "how are we doing lately" a date somebody has to work out |
 | Only one of the two may be sent, and sending both is refused | A caller who sent both meant one of them, and answering about the other is a figure quoted for the wrong period — the failure a period control exists to fix |
-| The end is the day it stops, not a day inside it | The same rule the record of decisions already used, so the two cannot come to mean different things |
-| A screen's "To" is the last day in the period, and what it sends the server is the day after | A person picking March 31 for the end of a quarter means March 31 is in it. The report sheets and the record of decisions read "To" the same way, so a link between them carries the day the person picked, and each screen translates once where it reads the period from the address. Its files, its sections and its heading follow the same period |
+| The end is the day it stops, not a day inside it | The same rule the audit log already used, so the two cannot come to mean different things |
+| A screen's "To" is the last day in the period, and what it sends the server is the day after | A person picking March 31 for the end of a quarter means March 31 is in it. The report sheets and the audit log read "To" the same way, so a link between them carries the day the person picked, and each screen translates once where it reads the period from the address. Its files, its sections and its heading follow the same period |
 | A day that is not on the calendar is not a period's end | A parser rolls February 30 into March, and the day after that is a different period under a heading that names February |
 | A period that ends before it starts is refused, and so is one that holds no days | A report answering zero for either is indistinguishable from a quarter in which nothing happened. Two refusals, because the end is not itself in the period: naming one day twice asks for no days rather than for a day |
 | Every report says back the period it covered, with the end resolved | A figure read apart from its window is a number nobody can check, and a start with no end answered with nothing over figures that ran to now. An unstated *start* is the beginning and says so by being absent |
@@ -393,7 +393,7 @@ a manager has to answer without any of the others.
 | What came out of them is part of the answer | Forty arguments that dismissed forty and forty that promised forty upgrades are different quarters, and a report carrying only the volume says they are the same |
 | What a decision was about is reached through the findings at its occurrences | Each of a decision's rows names an occurrence rather than a component. A decision about something since removed still names what it was about, which is what a report about where the time went has to keep |
 | Those findings are the decision's own product's, and ones the reader may read | An occurrence is a pair of names with no product in it, so it matches the same pair in every product, and a component name read off a finding the reader may not read is the disclosure |
-| Dated by when a decision was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the record dates by |
+| Dated by when a decision was proposed | The work happened when it was argued; dating it by its agreement moves it out of the period whenever an approval came late, which is the ordinary case. The same rule the audit log dates by |
 | It takes the same period and the same scope the other reports do | One product or one team, so a manager reads their own quarter rather than the deployment's. The team is picked on the sheet, from the teams that exist |
 | It pages, and its total counts every row before the limit | A total taken off the page reads a list cut at the limit as complete, and with no offset the rows past the largest page could not be read at all |
 
@@ -422,7 +422,7 @@ had.
 | The waits and the send-backs count decisions too | One wait per decision and severity band, from the earliest finding its occurrences opened at and the moment it was first proposed. A send-back is one decision coming back, however many occurrences it covers |
 | Send-backs are counted for the deployment, not per person | The record holds that a decision came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |
 | It narrows to one product, or to one team's people | Without a scope there are no per-team figures, so a manager asking how their own people are doing reads the deployment's numbers with their name on them |
-| A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A decision belongs to whoever argued it, which is the rule the record of decisions dates by — narrowed by the approver, a team's time to agree would be about decisions its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
+| A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A decision belongs to whoever argued it, which is the rule the audit log dates by — narrowed by the approver, a team's time to agree would be about decisions its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
 | A team with nobody on it measures nothing | A narrowing that silently widens to the deployment is the one mistake a narrowing must not make |
 | Asked about a team, only an administrator is given the per-person rows | Rows narrowed to a team name its members, and membership is an administrator's to know (DESIGN-access § Teams). Anybody else is given the team's totals |
 
@@ -580,10 +580,10 @@ report that exists to find it.
 | Rule | Reason |
 |---|---|
 | Asked of the record, never of a flag | The condition is that no agreement stands from somebody other than the proposer, which is the same question the row's own answer is computed from. The test writes a self-approval straight to the table: the report has to answer correctly about a row the write path should have prevented, and one that trusted the write path would be reporting on itself |
-| The product, the outcome and the state each take several answers | "Dismissed or deferred" and "waiting or sent back" are the questions somebody reading the record has, and one value cannot ask either; the parameter repeats and any of what is named matches. A product named that the reader may not see refuses the whole request rather than being dropped, because a report answering about two products when three were asked for reads as covering three |
+| The product, the outcome and the state each take several answers | "Dismissed or deferred" and "waiting or sent back" are the questions somebody reading the audit log has, and one value cannot ask either; the parameter repeats and any of what is named matches. A product named that the reader may not see refuses the whole request rather than being dropped, because a report answering about two products when three were asked for reads as covering three |
 | It says "this should be empty" only where every outcome asked for is a dismissal, of a vulnerability or a lead | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
 | What was asked for is printed with every value | A sheet headed "dismissed — not applicable" over rows that also hold deferrals is a sheet nobody can check against anything |
-| The record narrows to one build, reached through the findings at each occurrence | A decision names no build, deliberately — it is keyed on the product, the issue and the occurrence, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the decision, because an occurrence identity carries none |
+| The audit log narrows to one build, reached through the findings at each occurrence | A decision names no build, deliberately — it is keyed on the product, the issue and the occurrence, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the decision, because an occurrence identity carries none |
 | A build is a product, a stream and a variant together, or none of them | Named alone, a stream would narrow to a stream of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
 | The file carries every agreement with its dates, beside who agrees now | What somebody agreed to and then stopped agreeing to is what an audit is looking for, and the file carried neither it nor any date. The two are different questions and a column mixing them is the one answer an auditor must not be given |
 
@@ -591,7 +591,7 @@ report that exists to find it.
 
 Dismissals are a reportable dataset in their own right. Answered two ways: the
 findings list filters on outcome and on whether a rating was changed, and the
-record screen lists every decision with its reasoning, its approvals, the dates
+audit log lists every decision with its reasoning, its approvals, the dates
 and how much it covers. Which of the five reasons applied is on the entry
 rather than a filter, because it is what an auditor reads on the entry they
 stopped at.
@@ -610,7 +610,7 @@ What they have in common is that nothing was changed, which is why they are the
 four that need a second person. Asked of one, a program that dismisses
 everything as "will not fix" reads as a program that has argued nothing away.
 
-The record lists one entry per decision. Its file is one row per occurrence.
+The audit log lists one entry per decision. Its file is one row per occurrence.
 
 | Rule | |
 |---|---|
@@ -622,7 +622,7 @@ The record lists one entry per decision. Its file is one row per occurrence.
 | What an entry is about is named from its earliest matching occurrence | Beside how many issues, products, component names and occurrences the matching ones reach. Component names are counted through the findings the reader may read |
 | An entry's state is one word | The state its matching occurrences share, or mixed, with the count in each state beside it |
 | An entry stands where every matching occurrence applies now | Otherwise it says how many do |
-| An entry links to its occurrences on the findings list | Narrowed to the decision and the states the record asked for, across every release, planned or not. The decision page's own link asks the same |
+| An entry links to its occurrences on the findings list | Narrowed to the decision and the states the audit log asked for, across every release, planned or not. The decision page's own link asks the same |
 | The file is one row per occurrence, naming the occurrence and the decision | An auditor reconciles a file against occurrences, and the decision column groups the rows in a spreadsheet |
 | The per-occurrence list stays | The reports overview reads the newest dismissals from it, and an issue's document lists the decision occurrences about that issue |
 
@@ -713,9 +713,9 @@ holds the files that are reachable nowhere else.
 | A section counted by product alone says so | The triage times, the repeated deferrals and the dismissals are read for a product and never for a branch or a variant, so the heading's scope is not theirs. Each names the product, every branch and variant, or every product where none is picked |
 | A sheet counted by product alone says so in its header | Effort, advisories issued, approval quality and leads by analyzer are read for a product and never for a branch or a variant. Their header, on screen and printed, names the product, every branch and variant, in place of the picker's scope |
 | Every narrowing the sheet's controls apply is in the printed header | The controls do not print. Effort names its team, the register its states and closure reasons, and the support sheet how far ahead it warns |
-| A rolling window is asked for as the date it began | The record a figure links to reads a date from midnight, and a window counted from this minute holds rows the figure does not count. The program overview and approval quality ask from the same date their links carry |
-| A link out of a report carries the period and the product the figure was computed with | The record reads its narrowing from the address rather than from the picker, so an entry that dropped the selection opened every product the reader can see from a page scoped to one — a different population under the same name, which is worse than no link |
-| No PDF is generated | Printing is the browser's, and the stylesheet is the record's. Rendering on the server needs a browser engine in the image to do what the reader's browser already does |
+| A rolling window is asked for as the date it began | The audit log a figure links to reads a date from midnight, and a window counted from this minute holds rows the figure does not count. The program overview and approval quality ask from the same date their links carry |
+| A link out of a report carries the period and the product the figure was computed with | The audit log reads its narrowing from the address rather than from the picker, so an entry that dropped the selection opened every product the reader can see from a page scoped to one — a different population under the same name, which is worse than no link |
+| No PDF is generated | Printing is the browser's, and the stylesheet is the audit log's. Rendering on the server needs a browser engine in the image to do what the reader's browser already does |
 | A printed record is drawn in the light look | Paper is white whatever the screen was, and the dark look's text on a white page is pale gray on white. The dark look applies to the screen alone |
 | The frame does not print | The rail, the tab bar, the floating action and the menu go, and the grid that places them is flattened, so a page carries no empty column where the rail was. The narrow-screen shape applies to a screen and not to a sheet of paper narrower than it |
 | What is about to go out of support is asked for, and comes back as its own list | The day a release crosses, the deadline comes off every open finding on it and that work leaves every overdue count at once, with nobody having decided anything. A warning and an exposure are two things: one is a date somebody can still act before. Asked for, because a second population appearing unasked changes what every figure on the report counts |
@@ -766,18 +766,18 @@ narrowed the same way. Reading one as public because it has
 no visibility column would announce an undisclosed flaw in the report about
 announcements, and the row names the identifier.
 
-The exception report is the record with its filters set — dismissals no second
-person has a standing agreement on. REQ-53 names it as the report that should
-come back empty, and the record's own empty state is already written as that
-answer rather than as an absence.
+The exception report is the audit log with its filters set — dismissals no
+second person has a standing agreement on. REQ-53 names it as the report that
+should come back empty, and the audit log's own empty state is already written
+as that answer rather than as an absence.
 
 | Rule | |
 |---|---|
 | It asks for every outcome that hides risk and stores no date, over every kind | The four dismissals of a vulnerability or a flaw, and a lead dismissed or called no security issue. Each always needs a second person |
 | The outcomes are the ones the server publishes as that class | A list typed in the interface would leave out an outcome the server adds, while the report said none stood alone |
-| A decision about a lead is listed and counted only for somebody who reads internal material in its product | It is internal, and the record narrows every row and count by the reader (REQ-42, REQ-43) |
+| A decision about a lead is listed and counted only for somebody who reads internal material in its product | It is internal, and the audit log narrows every row and count by the reader (REQ-42, REQ-43) |
 
-The standing corrections are the record with its other filters set: the wrong
+The standing corrections are the audit log with its other filters set: the wrong
 matches that apply now. Every other decision lapses when the code moves, so
 each comes back round to somebody; a correction does not, and the only way to
 read the set is to ask for it. `DESIGN-triage.md` § Corrections holds what one
@@ -845,7 +845,7 @@ engine.
 ## Exports
 
 Any list that can be read can be exported, as CSV or JSON. What exports: the
-findings list, the cross-product findings list, the record of decisions, the
+findings list, the cross-product findings list, the audit log, the
 review queue, what became of the reader's own decisions, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, a comparison of two
 builds' inventories, the fix bundles, the upgrades one build is waiting on, the lead queue,
@@ -883,8 +883,8 @@ stops is one somebody reads as whole.
 | The inventory comparison is read whole, like the findings comparison | It is one answer computed from two builds at once. A name held at several versions has them joined in one cell per side, so a row is still one name |
 | A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own decisions; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
-| An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
-| The record's file includes decisions about leads | It writes what the record shows, under the same visibility (REQ-50) |
+| An agreement taken back is not somebody who agrees | The audit log's file lists only agreements that still stand, and states separately whether a second person has one |
+| The audit log's file includes decisions about leads | It writes what the audit log shows, under the same visibility (REQ-50) |
 | The lead queue's file is the queue, under the queue's visibility | A row is a lead the reader reads whole, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
 | A findings list's file holds, below its findings, every open lead of the same selection, in the queue's order and under the queue's visibility (REQ-50) | The finding exports include every kind the reader reads (`DESIGN-kinds.md` § Consumers). Readers of disclosed or undisclosed work alone read no lead, and their files hold none |
 | The open leads a decision waits on are held, and the leads open only in releases past their end of life are not | The file's findings rows hold a finding a decision waits on, and the list leaves releases past their end of life out unless asked, which narrows the leads out |

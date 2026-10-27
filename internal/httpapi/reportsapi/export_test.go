@@ -204,7 +204,7 @@ func TestAnUnscoredFindingExportsWithNoScoreRatherThanAZero(t *testing.T) {
 
 // The three lists that could be read on a screen and not taken away.
 //
-// The record of decisions is what an auditor is given, the review queue is
+// The audit log is what an auditor is given, the review queue is
 // what a manager reports a backlog from, and the by-component view is what a
 // release meeting argues over — all three were copied out by hand.
 //
@@ -263,7 +263,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 			t.Errorf("the by-component export does not state the line: %v", states(open))
 		}
 
-		// The record of decisions. Nothing has been decided in this fixture, so
+		// The audit log. Nothing has been decided in this fixture, so
 		// what it must produce is a header and no rows — an empty answer is an
 		// answer, and a file that failed to open is not.
 		record := httpapitest.RowsUnder(lines(t, "private-triage", "/v1/audit.csv"))

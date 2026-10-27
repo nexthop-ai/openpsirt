@@ -78,7 +78,7 @@ and a kind it does not name never reaches it.
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
 | Triage | The findings lists and their counts, one finding's page, notes on an issue, and disclosure | Vulnerability, entered |
 | Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, routing by a team's rules and its preview, and the lists of who holds what: unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Lead assignment) | Vulnerability, entered, analysis |
-| Decisions | Decisions and their occurrences, the reasoning and its revisions, approvals, comments on a decision, the review queue, every read of one decision, the record of decisions and its file, and the notices about decisions: waiting, sent back, lapsed and an agreement withdrawn | Vulnerability, entered, analysis |
+| Decisions | Decisions and their occurrences, the reasoning and its revisions, approvals, comments on a decision, the review queue, every read of one decision, the audit log and its file, and the notices about decisions: waiting, sent back, lapsed and an agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the occurrences it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |
 | Exports | The findings lists written out as files (REQ-50): the list's rows, then the leads of the same selection as the Leads consumer reads them | Vulnerability, entered, analysis |
@@ -93,8 +93,8 @@ Analysis findings are included by Evidence, Leads, Decisions, Assignment and
 Exports alone: a lead is read through the lead queue, its evidence and the
 decisions about it (`DESIGN-analysis.md` § Lead triage), held the way a finding
 is, and a findings list's file writes out the open leads of its selection
-beside the list's rows. The record's file follows Decisions and includes decisions about
-leads, because it writes what the record shows, under the same visibility
+beside the list's rows. The audit log's file follows Decisions and includes decisions about
+leads, because it writes what the audit log shows, under the same visibility
 (REQ-50). `DESIGN-interface.md` § Static analysis leads holds the screens.
 
 | Rule | |

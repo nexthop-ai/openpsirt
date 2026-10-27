@@ -43,7 +43,7 @@ export function daysAsked(params: URLSearchParams, fallback: number): number {
   return boundedAsked(params.get("days"), LONGEST, fallback);
 }
 
-// windowStart is when a window began, as the date the lists and the record
+// windowStart is when a window began, as the date the lists and the audit log
 // take. Beside the reader of the number rather than in each sheet, so a figure
 // and the list it opens ask the same question.
 export function windowStart(days: number): string {

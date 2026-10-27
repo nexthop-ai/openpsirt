@@ -21,7 +21,7 @@ import (
 
 // The lists that could be read on a screen and not taken away.
 //
-// An export is not a convenience here. The record of decisions is what an
+// An export is not a convenience here. The audit log is what an
 // auditor is given, the review queue is what a manager reports a backlog from,
 // and the by-component view is what a release meeting argues over — none of
 // the three a screen somebody should copy out of by hand.
@@ -244,7 +244,7 @@ func asDay(at time.Time) string {
 	return at.UTC().Format(time.DateOnly)
 }
 
-// registerAuditExport writes out the record of decisions.
+// registerAuditExport writes out the audit log.
 func registerAuditExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-audit", Method: http.MethodGet, Path: "/v1/audit.{format}",
@@ -286,7 +286,7 @@ func registerAuditExport(api huma.API, in core.Deps) {
 			about = append(about, core.Stated{Label: "applies", Value: "still standing"})
 		}
 		out := core.Exporting{
-			What:  "the record of decisions",
+			What:  "the audit log",
 			About: about,
 			Header: []string{
 				"id", "decision", "proposed", "product", "product name", "issue", "component", "version",

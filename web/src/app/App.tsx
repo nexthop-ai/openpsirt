@@ -79,7 +79,7 @@ const MatchCoverage = retrying(() =>
 const Uploads = retrying(() => import("../screens/Uploads").then((m) => m.Uploads));
 const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
 const System = retrying(() => import("../screens/System").then((m) => m.System));
-const TheRecord = retrying(() => import("../screens/TheRecord").then((m) => m.TheRecord));
+const AuditLog = retrying(() => import("../screens/AuditLog").then((m) => m.AuditLog));
 const Reports = retrying(() => import("../screens/reports/Catalog").then((m) => m.Catalog));
 const Report = retrying(() => import("../screens/reports/Report").then((m) => m.Report));
 const RecordFlaw = retrying(() => import("../screens/RecordFlaw").then((m) => m.RecordFlaw));
@@ -212,7 +212,7 @@ export function App() {
               <Route path={ROUTES.person} element={<Person />} />
               <Route path={ROUTES.teams} element={<Teams />} />
               <Route path={ROUTES.assignments} element={<Assignments />} />
-              <Route path={ROUTES.record} element={<TheRecord />} />
+              <Route path={ROUTES.auditLog} element={<AuditLog />} />
               <Route path={ROUTES.reports} element={<Reports />} />
               <Route path={ROUTES.report} element={<Report />} />
               <Route path={ROUTES.recordFlaw} element={<RecordFlaw />} />
@@ -227,8 +227,7 @@ export function App() {
               {/* The addresses these screens had before each was named after
                 its rail entry. A notice in somebody's bell keeps the link it
                 was sent with, so the old address forwards rather than opening
-                the catch-all. The old address of The record is not here: the
-                record now lives there. */}
+                the catch-all. */}
               <Route path={ROUTES.formerAccess} element={<Moved to={() => "/access"} />} />
               <Route
                 path={ROUTES.formerPerson}
@@ -243,7 +242,8 @@ export function App() {
                 element={<Moved to={() => incidentsAt()} />}
               />
               <Route path={ROUTES.formerObligations} element={<Moved to={() => incidentsAt()} />} />
-              <Route path={ROUTES.formerRecord} element={<Moved to={() => "/record"} />} />
+              <Route path={ROUTES.formerAudit} element={<Moved to={() => "/audit-log"} />} />
+              <Route path={ROUTES.formerRecord} element={<Moved to={() => "/audit-log"} />} />
               <Route
                 path={ROUTES.formerDisclosureDeadlines}
                 element={<Moved to={() => "/disclosure-deadlines"} />}

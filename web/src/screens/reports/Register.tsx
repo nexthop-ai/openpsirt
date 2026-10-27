@@ -26,8 +26,9 @@ const PAGE = 200;
 
 // Every known vulnerability in one build, and what became of it.
 //
-// The complement of the record, not a variant of it. The record says what
-// was decided; an auditor's first question is what was *known*, decided or not.
+// The complement of the audit log, not a variant of it. The audit log says
+// what was decided; an auditor's first question is what was *known*, decided
+// or not.
 // So a row nobody has said anything about is in here, and so is a closed one —
 // a register of what is still open answers a different question from the one it
 // would appear to answer.

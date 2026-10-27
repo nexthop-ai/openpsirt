@@ -222,9 +222,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               quiet
             />
             <Rail to="/assignments" icon="people" label="Assignments" />
-            {/* The record of what was decided. Across products because that is how
-              it is asked for — an auditor asks about a period, not a build. */}
-            <Rail to="/record" icon="ledger" label="The record" />
+            {/* The audit log of what was decided. Across products because that
+              is how it is asked for — an auditor asks about a period, not a
+              build. */}
+            <Rail to="/audit-log" icon="ledger" label="Audit log" />
             {/* The catalog of named reports, and the one place a report is
               built by hand. Here rather than under a build because a report
               spans whatever the picker has selected, up to every product a

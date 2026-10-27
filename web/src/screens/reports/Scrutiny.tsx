@@ -25,7 +25,7 @@ import {
 } from "./Window";
 import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
-import { recordAt, decisionAt } from "../../app/routes";
+import { auditLogAt, decisionAt } from "../../app/routes";
 
 // The window back. Ninety days is a quarter, which is the period an
 // audit asks about; the others are here because a control question is
@@ -55,9 +55,9 @@ export function Scrutiny() {
   const at = useScope();
   const opener = useRowOpener();
   const { days, period } = useSheetWindow(90);
-  // A rolling window is sent as the date its links open the record from. Sent
-  // as a count of days the server counts from this minute, and the record's
-  // list from midnight, so the list held rows the figure did not count.
+  // A rolling window is sent as the date its links open the audit log from.
+  // Sent as a count of days the server counts from this minute, and the audit
+  // log's list from midnight, so the list held rows the figure did not count.
   const when = stated(period) ? askedFor(period, days) : { from: windowStart(days) };
   const product = at.product ?? "";
 
@@ -71,7 +71,7 @@ export function Scrutiny() {
       ),
   });
 
-  // The record, narrowed to the set the figure was computed over: the outcome,
+  // The audit log, narrowed to the set the figure was computed over: the outcome,
   // the sheet's window and its product. The whole record is a different
   // population, and a number and the list it opens have to agree.
   const overTheSame = (outcome: string) => {
@@ -81,10 +81,10 @@ export function Scrutiny() {
     // reading a period opens a list the number was never about.
     const began = stated(period) ? period.from : windowStart(days);
     if (began) asked.set("from", began);
-    // The record reads "to" as the last day in the period, as this sheet does.
+    // The audit log reads "to" as the last day in the period, as this sheet does.
     if (period.to) asked.set("to", period.to);
     if (product) asked.set("product", product);
-    return recordAt(asked);
+    return auditLogAt(asked);
   };
 
   const alone = got.data?.alone ?? [];
@@ -177,7 +177,7 @@ export function Scrutiny() {
             ) : (
               <Empty
                 title="No dismissal stands on one person's say-so."
-                detail="Every dismissal requires a second person. This checks the record."
+                detail="Every dismissal requires a second person. This checks the audit log."
               />
             )}
 

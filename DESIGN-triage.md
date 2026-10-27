@@ -170,9 +170,9 @@ recurs at every point release.
 
 ### The standing set
 
-Corrections in force are read from the record with its filters set: the
-outcome, and what applies now. `DESIGN-reporting.md` holds the record and the
-one other question it is asked this way.
+Corrections in force are read from the audit log with its filters set: the
+outcome, and what applies now. `DESIGN-reporting.md` holds the audit log and
+the one other question it is asked this way.
 
 Asking for what applies now is not asking for what was approved. A decision is
 approved and lapses later when the code moves out from under it, so a list of
@@ -294,7 +294,7 @@ what became of it, what it wrote, and what it covers now.
 | The state on it is the decision's, never a representative row's | A row's state standing in for the decision's is how one row approved beside forty-three sent back read as approved |
 | What it covers is worked out when it is asked for | A decision reaches by matching, so a build appearing afterwards is covered with nobody acting. What somebody consented to covering is stored with their approval, and is the different question |
 | Refused whole or answered whole | Shown half, a reader would be told about words whose other half is about a finding they may not see |
-| A list showing the rows a reader may read leaves off the reasoning of a decision they may read only part of | The record of decisions, the list of decision occurrences, one occurrence read alone, and the earlier, similar and elsewhere decisions beside a finding each show a row its reader may read. The reasoning on it is about every occurrence of the decision, so it is shown only where they may read them all |
+| A list showing the rows a reader may read leaves off the reasoning of a decision they may read only part of | The audit log, the list of decision occurrences, one occurrence read alone, and the earlier, similar and elsewhere decisions beside a finding each show a row its reader may read. The reasoning on it is about every occurrence of the decision, so it is shown only where they may read them all |
 | A case grant reaches it | Somebody brought into one issue is offered its decisions by every list they can reach, and a decision offered and then refused reads as a fault rather than as a rule |
 | The flaw's readers reach a decision at a moved lead's occurrence while the flaw is undisclosed | The readers of the flaw's undisclosed work and the people on its case read the lead, and the same narrowing adds its decisions (`DESIGN-analysis.md` § Keep or move) |
 | The counts are narrowed to findings the reader may see | A decision somebody may read can match findings they may not, and a count is the leak even where no row is shown |

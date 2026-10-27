@@ -87,7 +87,7 @@ const SAMPLES: Record<string, () => string[]> = {
     routes.recordFlawAt(odd, undefined, "outside"),
   ],
   incidentsAt: () => [routes.incidentsAt(), routes.incidentsAt(odd)],
-  recordAt: () => [routes.recordAt({ alone: "true", outcome: odd })],
+  auditLogAt: () => [routes.auditLogAt({ alone: "true", outcome: odd })],
   requeried: () => [
     routes.requeried(
       routes.productFindingsAt(odd, { q: odd }),

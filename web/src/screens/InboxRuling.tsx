@@ -158,7 +158,7 @@ export function RuleForm({
 // One ruling: what it says, about which reports, and where it stands.
 //
 // Named by its product wherever it is read outside that product's inbox, and
-// without its controls in the record, which is read and printed rather than
+// without its controls in the audit log, which is read and printed rather than
 // worked.
 export function RulingCard({
   ruling,

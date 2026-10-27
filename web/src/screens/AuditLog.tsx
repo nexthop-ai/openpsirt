@@ -26,7 +26,7 @@ import { allFindingsAt, decisionAt } from "../app/routes";
 import { fileAt as linkedFile } from "../api/links";
 import { reasonSaid } from "./leads";
 
-// The share of the record one page holds. The server's own ceiling is two
+// The share of the audit log one page holds. The server's own ceiling is two
 // hundred; a page is what somebody reads, and the rest is a click away rather
 // than behind a narrower search.
 const PAGE = 100;
@@ -69,7 +69,7 @@ const STATES = [
   ["withdrawn", "withdrawn"],
 ] as const;
 
-// The record of what was decided, for somebody auditing it.
+// The audit log: what was decided, for somebody auditing it.
 //
 // Its own screen rather than a filter on the findings list, because the unit
 // differs: a finding is a thing that might be wrong, and this is a decision
@@ -78,10 +78,10 @@ const STATES = [
 // you decide, and on whose say-so".
 //
 // Built to be printed. An auditor takes a copy away, so the page prints as
-// the record rather than as a screenshot of an application: the shell, the
+// the audit log rather than as a screenshot of an application: the shell, the
 // controls and the links go, a header states what was asked for and when it was
 // taken, and a decision does not break across a page.
-export function TheRecord() {
+export function AuditLog() {
   const [params, setParams] = useSearchParams();
   // Repeated in the address rather than one value each, because "dismissed or
   // deferred" and "waiting or sent back" are questions a single value cannot
@@ -101,7 +101,7 @@ export function TheRecord() {
   // of history. It is what the standing-corrections view is built on, where
   // the whole point is that nothing expires them.
   const inForce = params.get("in_force") === "true";
-  // A page of the record rather than a cap on it: an auditor reading a year
+  // A page of the audit log rather than a cap on it: an auditor reading a year
   // cannot narrow to something they have not read yet, so every row is
   // reachable a page at a time.
 
@@ -125,7 +125,7 @@ export function TheRecord() {
     setParams(next);
   }
 
-  // The shared handler, with the record's own addition: this list is long
+  // The shared handler, with the audit log's own addition: this list is long
   // and paging it from the foot leaves the reader at the foot of the next
   // page, looking at rows they have to scroll up to reach.
   const { offset, go: paged } = usePaging();
@@ -201,7 +201,7 @@ export function TheRecord() {
     <>
       <div className="screen-head">
         <h2>
-          The record <span className="n">{total.toLocaleString()}</span>
+          Audit log <span className="n">{total.toLocaleString()}</span>
         </h2>
         <p>Every decision made, with who made it, who agreed, and when.</p>
         <span style={{ marginLeft: "auto" }} className="noprint">
@@ -287,7 +287,7 @@ export function TheRecord() {
       {/* Only on paper. A printed record has to say what it is a record of and
           when it was taken, or nobody reading it later can check it. */}
       <div className="printhead">
-        <h1>OpenPSIRT — record of decisions</h1>
+        <h1>OpenPSIRT — audit log</h1>
         <p>
           {asked} · {total.toLocaleString()} {total === 1 ? "decision" : "decisions"} · taken{" "}
           {at(new Date().toISOString())}
@@ -306,7 +306,7 @@ export function TheRecord() {
       {record.isPending ? (
         <Loading />
       ) : record.isError ? (
-        <Failed error={record.error} what="The record could not be read." />
+        <Failed error={record.error} what="The audit log could not be read." />
       ) : rows.length === 0 ? (
         <Empty
           title={
@@ -316,7 +316,7 @@ export function TheRecord() {
           }
           detail={
             alone && onlyDismissals
-              ? "Every dismissal requires a second person. This checks the record."
+              ? "Every dismissal requires a second person. This checks the audit log."
               : "Widen the dates, or clear the filters."
           }
         />
@@ -360,7 +360,7 @@ export function TheRecord() {
 
 // What reports were ruled to be, over the same products and period.
 //
-// Beside the record rather than in it: a ruling is about claims somebody sent
+// Beside the decisions rather than among them: a ruling is about claims somebody sent
 // rather than findings, and shares none of the filters the decisions above
 // take. Read under the report rule, so a reader who may work reports nowhere
 // has no section.
@@ -415,9 +415,9 @@ function Ruled() {
 
 // The changes somebody made to how this deployment works.
 //
-// Beside the record rather than on a screen of its own, because it is the same
+// Beside the decisions rather than on a screen of its own, because it is the same
 // question one layer up: the deadline windows, the triage floor and a support
-// date each silently rewrite what the record above says, and reading the
+// date each silently rewrite what the decisions above say, and reading the
 // decisions without being able to see who moved the ground under them is
 // reading half of it.
 function Administered() {
@@ -646,7 +646,7 @@ const CHANGE_SAID: Record<ChangeKind, string> = {
 };
 const CHANGE_KINDS = Object.entries(CHANGE_SAID) as [ChangeKind, string][];
 
-// The kind the address narrows the change history to. The record's own
+// The kind the address narrows the change history to. The audit log's own
 // filters are named for the decisions, so this one has a name of its own.
 // One the server does not take is left out rather than sent to be refused.
 export function changeKind(params: URLSearchParams): ChangeKind | "" {
@@ -655,7 +655,7 @@ export function changeKind(params: URLSearchParams): ChangeKind | "" {
 }
 
 // The address the change history comes from as a file, built the way the
-// record's own link is: the screen's period straight from the address, so the
+// audit log's own link is: the screen's period straight from the address, so the
 // file and the section it was taken from cannot disagree about the stretch.
 function changesAt(params: URLSearchParams, format: "csv" | "json"): string {
   const asked = new URLSearchParams();
@@ -677,7 +677,7 @@ function statesSaid(row: Audited): string {
 }
 
 // Where a decision's occurrences sit, as the findings list shows it: every release,
-// planned or not, and only the states the record is narrowed to.
+// planned or not, and only the states the audit log is narrowed to.
 function occurrencesAt(row: Audited, states: string[]): string {
   const query = new URLSearchParams([
     ["decision", String(row.decision)],
@@ -848,7 +848,7 @@ function Decision({ row, states }: { row: Audited; states: string[] }) {
   );
 }
 
-// The address the record comes from as a file. Built here rather than by the
+// The address the audit log comes from as a file. Built here rather than by the
 // generated client because it is a link somebody follows, not a request this
 // page makes: the browser fetches it with the session it already has.
 //
@@ -858,7 +858,7 @@ function Decision({ row, states }: { row: Audited; states: string[] }) {
 function fileAt(params: URLSearchParams, format: "csv" | "json"): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
-  // The change history's own filter, which the record's route does not take
+  // The change history's own filter, which the audit log's route does not take
   // and refuses.
   asked.delete("change");
   const sent = periodSent(params);

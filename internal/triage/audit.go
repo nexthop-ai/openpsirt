@@ -107,7 +107,7 @@ func bySomebodyElse(approvals []Agreed, proposer string) bool {
 // releases that share the code. A decision about something since removed
 // still names what it was about, which is what an audit asks for.
 //
-// Written once because the record's page and its file both narrow this way,
+// Written once because the audit log's page and its file both narrow this way,
 // and a filter applied by one of them and not the other is a list somebody
 // reads as narrowed.
 func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filter) *bun.SelectQuery {
@@ -155,7 +155,7 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 	return q
 }
 
-// auditedBy is the narrowing the record takes, written once for the page of
+// auditedBy is the narrowing the audit log takes, written once for the page of
 // decision occurrences, the page of decisions and the file, so none of them answers a
 // question the others do not.
 func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.SelectQuery) *bun.SelectQuery {

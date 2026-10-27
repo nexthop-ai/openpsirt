@@ -3,7 +3,7 @@
 
 import { type Scoped } from "../../app/scope";
 import {
-  recordAt,
+  auditLogAt,
   comparisonAt,
   uploadsAt,
   matchCoverageAt,
@@ -55,16 +55,16 @@ type Group = { name: string; reports: Report[] };
 // withProduct carries the selection into an address that reads its narrowing
 // from the address rather than from the picker.
 //
-// The record is the one screen that does: it is read as a document and sent as
+// The audit log is the one screen that does: it is read as a document and sent as
 // a link, so what it answers has to be in the address it was sent as.
 function withProduct(asked: string, scope: Scoped): string {
   const query = new URLSearchParams(asked);
   if (scope.product) query.set("product", scope.product);
-  return recordAt(query);
+  return auditLogAt(query);
 }
 
 // The reports, by the question they answer. An entry leading to a filter on
-// the record sits with the reports asking the same question, because the
+// the audit log sits with the reports asking the same question, because the
 // question is what somebody looks for it by.
 export const GROUPS: Group[] = [
   {
@@ -108,22 +108,22 @@ export const GROUPS: Group[] = [
           "How much the second person did: risk on one person, approver pairs, bulk agreements, grown coverage.",
       },
       {
-        // The record answering the one question it was built to answer, with
+        // The audit log answering the one question it was built to answer, with
         // the filters already set. REQ-53 names it as the report that should
-        // come back empty, and the record's own empty state is written as that
+        // come back empty, and the audit log's own empty state is written as that
         // answer.
         name: "The exception report",
         answers:
           "Dismissals of vulnerabilities, flaws and leads with no standing agreement from a second person. Should be empty.",
-        // The product the catalog is being read for, carried into the record.
-        // The record reads its narrowing from the address alone, and without
+        // The product the catalog is being read for, carried into the audit log.
+        // The audit log reads its narrowing from the address alone, and without
         // the product it answers for every product the reader can see.
         // Every outcome that always needs a second person, as the server
         // publishes them: a lead's dismissal is one, beside the dismissals of
         // a vulnerability. Asked of a list typed here, an outcome the server
-        // adds would go uncounted while the record said none stood alone.
+        // adds would go uncounted while the audit log said none stood alone.
         // Before the server has said, there is nothing to ask. A decision about
-        // a lead is internal, and the record lists it only to somebody who
+        // a lead is internal, and the audit log lists it only to somebody who
         // reads internal material in its product.
         to: (at, gated) =>
           gated.length === 0
@@ -137,7 +137,7 @@ export const GROUPS: Group[] = [
               ),
       },
       {
-        // The record again, asked the other question it was built to answer.
+        // The audit log again, asked the other question it was built to answer.
         // Every other decision lapses when the code moves; these do not, so
         // nothing brings them back round to anybody and the only way to read
         // them is to ask for them.
@@ -148,7 +148,7 @@ export const GROUPS: Group[] = [
       {
         name: "Administrative changes",
         answers:
-          "Changes to roles, support dates and thresholds. In the record, for administrators.",
+          "Changes to roles, support dates and thresholds. In the audit log, for administrators.",
         to: (at) => withProduct("", at),
       },
     ],

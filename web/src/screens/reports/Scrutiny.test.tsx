@@ -45,7 +45,7 @@ describe("risk standing on one person", () => {
     });
     mount.render(screen(<Scrutiny />, "/reports/scrutiny"));
     await settle();
-    // The failed half links each outcome to the record; the exceptions do not.
+    // The failed half links each outcome to the audit log; the exceptions do not.
     const failed = Array.from(mount.host().querySelectorAll("a"))
       .filter((each) => each.textContent === "Decisions →")
       .map((each) =>

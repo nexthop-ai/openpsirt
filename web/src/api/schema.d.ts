@@ -637,9 +637,9 @@ export interface paths {
         };
         /**
          * List the audit log by decision
-         * @description The record one decision at a time, newest first: every decision with an occurrence the filters match, once, however many occurrences it covers.
+         * @description The audit log one decision at a time, newest first: every decision with an occurrence the filters match, once, however many occurrences it covers.
          *
-         *     Takes every filter the per-occurrence record takes, with the same meaning. A decision is listed where any of its occurrences match, and every count on it is of the occurrences that match and that you may read. Asked for `state=lapsed`, a decision that lapsed at one occurrence of forty reads as one occurrence, lapsed. `total` counts decisions.
+         *     Takes every filter the per-occurrence list takes, with the same meaning. A decision is listed where any of its occurrences match, and every count on it is of the occurrences that match and that you may read. Asked for `state=lapsed`, a decision that lapsed at one occurrence of forty reads as one occurrence, lapsed. `total` counts decisions.
          *
          *     What the decision is about is named from its earliest matching occurrence, beside how many issues, products, components and occurrences the matches reach.
          *

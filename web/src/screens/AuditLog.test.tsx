@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TheRecord, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./TheRecord";
+import { AuditLog, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./AuditLog";
 import { classesOf } from "../ui/outcomes";
 import { PUBLISHED } from "../test/outcomes";
 import { screen, serve, settle, mounted } from "../test/mount";
@@ -12,7 +12,7 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("the change history on the record", () => {
+describe("the change history on the audit log", () => {
   it("never asks for more rows than the route answers", async () => {
     const asked: number[] = [];
     serve((path, init) => {
@@ -34,7 +34,7 @@ describe("the change history on the record", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<TheRecord />, "/record"));
+    mount.render(screen(<AuditLog />, "/audit-log"));
     await settle();
     const more = () =>
       Array.from(mount.host().querySelectorAll("button")).find(
@@ -62,14 +62,14 @@ describe("the change history's kind", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<TheRecord />, "/record?change=role"));
+    mount.render(screen(<AuditLog />, "/audit-log?change=role"));
     await settle();
     expect(kinds).toContain("role");
     const file = Array.from(mount.host().querySelectorAll("a"))
       .map((each) => each.getAttribute("href") ?? "")
       .find((href) => href.startsWith("/v1/administration/changes.csv"));
     expect(file).toContain("kind=role");
-    // The record's own file takes no kind of change, and refuses one.
+    // The audit log's own file takes no kind of change, and refuses one.
     const record = Array.from(mount.host().querySelectorAll("a"))
       .map((each) => each.getAttribute("href") ?? "")
       .filter((href) => href.startsWith("/v1/audit."));
@@ -84,7 +84,7 @@ describe("the change history's kind", () => {
   });
 });
 
-describe("the period on the record", () => {
+describe("the period on the audit log", () => {
   it("includes the day named as its end in everything it asks for", async () => {
     const ends: Record<string, unknown> = {};
     serve((path, init) => {
@@ -95,7 +95,7 @@ describe("the period on the record", () => {
       if (query && "to" in query) ends[path] = query.to;
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<TheRecord />, "/record?from=2026-01-01&to=2026-03-31"));
+    mount.render(screen(<AuditLog />, "/audit-log?from=2026-01-01&to=2026-03-31"));
     await settle();
     expect(ends["/v1/audit/decisions"]).toBe("2026-04-01");
     expect(ends["/v1/administration/changes"]).toBe("2026-04-01");
@@ -114,7 +114,7 @@ describe("the period on the record", () => {
   });
 });
 
-describe("the outcomes the record is filtered by", () => {
+describe("the outcomes the audit log is filtered by", () => {
   it("name a dismissal as one where the server says it is", () => {
     const said = new Map(outcomesSaid(classesOf(PUBLISHED).dismisses));
     expect(said.get("wont-fix")).toBe("dismissed — will not fix");
@@ -126,7 +126,7 @@ describe("the outcomes the record is filtered by", () => {
   });
 });
 
-describe("the record's list", () => {
+describe("the audit log's list", () => {
   it("draws one card per decision and links to where its decisions sit", async () => {
     serve((path) => {
       if (path === "/v1/session/me") {
@@ -164,7 +164,7 @@ describe("the record's list", () => {
       }
       return { data: { items: [], total: 0 } };
     });
-    mount.render(screen(<TheRecord />, "/record?state=approved&state=lapsed"));
+    mount.render(screen(<AuditLog />, "/audit-log?state=approved&state=lapsed"));
     await settle();
     const cards = mount.host().querySelectorAll(".audited");
     expect(cards.length).toBe(1);
@@ -202,7 +202,7 @@ describe("the exception report", () => {
       return { data: { items: [], total: 0 } };
     });
     mount.render(
-      screen(<TheRecord />, "/record?outcome=dismissed&outcome=not-security&alone=true"),
+      screen(<AuditLog />, "/audit-log?outcome=dismissed&outcome=not-security&alone=true"),
     );
     await settle();
     expect(mount.host().textContent).toContain("No dismissal stands on one person's say-so.");
