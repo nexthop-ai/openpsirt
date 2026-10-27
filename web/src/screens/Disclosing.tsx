@@ -229,7 +229,12 @@ export function Disclosing() {
                 <th>Issue</th>
                 <th>Where</th>
                 <th>Discloses</th>
-                <th className="num">Locations</th>
+                <th
+                  className="num"
+                  title="Each way this component enters the build, judged on its own"
+                >
+                  Occurrences
+                </th>
                 <th />
               </tr>
             </thead>

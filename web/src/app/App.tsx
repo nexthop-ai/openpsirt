@@ -11,7 +11,15 @@ import { snapshot, subscribe } from "./ended";
 import { Boundary } from "./Boundary";
 import { Moved, built } from "./moved";
 import { retrying } from "./retrying";
-import { ROUTES, dependenciesAt, uploadsAt, inventoryChangesAt, personAt } from "./routes";
+import {
+  ROUTES,
+  bulkDecisionAt,
+  decisionAt,
+  dependenciesAt,
+  uploadsAt,
+  inventoryChangesAt,
+  personAt,
+} from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
@@ -153,7 +161,7 @@ export function App() {
                 being swallowed by the catch-all below. */}
               <Route path={ROUTES.unassigned} element={<Navigate to={UNOWNED_LIST} replace />} />
               <Route path={ROUTES.findings} element={<Findings />} />
-              {/* One decision, whole, and every act at that grain. An
+              {/* One decision, whole, and every act at that grain. A decision
                 occurrence's address resolves to it: what a decision says
                 belongs to the action that made it, not to any one of its rows. */}
               <Route path={ROUTES.decision} element={<Decision who={who.data} />} />
@@ -251,6 +259,14 @@ export function App() {
               <Route
                 path={ROUTES.formerUploadChanges}
                 element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
+              />
+              <Route
+                path={ROUTES.formerDecision}
+                element={<Moved to={(at) => decisionAt(Number(at.id))} />}
+              />
+              <Route
+                path={ROUTES.formerBulkDecision}
+                element={<Moved to={(at) => bulkDecisionAt(built(at), at.component ?? "")} />}
               />
               {/* An address this application does not answer. It says so, and
                 keeps the address in the bar: redirecting home threw away the

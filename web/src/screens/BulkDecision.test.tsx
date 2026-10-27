@@ -4,6 +4,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BulkDecision } from "./BulkDecision";
+import { ROUTES, bulkDecisionAt } from "../app/routes";
 import { mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
@@ -19,8 +20,8 @@ describe("narrowing a bulk decision", () => {
     mount.render(
       screen(
         <BulkDecision />,
-        "/products/sonic/streams/master/variants/x/components/openssl/decide?version=1.1.1w&ecosystem=deb",
-        "/products/:product/streams/:stream/variants/:variant/components/:component/decide",
+        bulkDecisionAt(AT_BUILD, "openssl", { version: "1.1.1w", ecosystem: "deb" }),
+        ROUTES.bulkDecision,
       ),
     );
     await settle();
@@ -47,8 +48,9 @@ describe("narrowing a bulk decision", () => {
   });
 });
 
-const AT = "/products/sonic/streams/master/variants/x/components/openssl/decide";
-const PATTERN = "/products/:product/streams/:stream/variants/:variant/components/:component/decide";
+const AT_BUILD = { product: "sonic", stream: "master", variant: "x" };
+const AT = bulkDecisionAt(AT_BUILD, "openssl");
+const PATTERN = ROUTES.bulkDecision;
 
 // The issues at the component, as the server pages them, split over two
 // pages. The total is what makes a second page exist at all.

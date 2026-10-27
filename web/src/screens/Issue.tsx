@@ -135,7 +135,12 @@ export function Issue() {
                 <th>Product</th>
                 <th>Build</th>
                 <th>Component</th>
-                <th className="num">Locations</th>
+                <th
+                  className="num"
+                  title="Each way this component enters the build, judged on its own"
+                >
+                  Occurrences
+                </th>
                 <th>State</th>
                 <th>Due</th>
               </tr>

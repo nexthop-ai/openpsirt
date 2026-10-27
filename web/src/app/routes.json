@@ -181,5 +181,9 @@
   },
   "formerInventoryChanges": {
     "path": "/products/:product/streams/:stream/variants/:variant/scans/:scan/changes"
+  },
+  "formerDecision": { "path": "/claims/:id" },
+  "formerBulkDecision": {
+    "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide"
   }
 }
