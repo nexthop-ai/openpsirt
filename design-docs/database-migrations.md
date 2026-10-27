@@ -28,12 +28,12 @@ upgrade is deploying it.
 | Automatic application can be turned off, and `openpsirt migrate up\|status` runs migrations separately | An operator may use other credentials at a time they choose |
 | The command refuses an unknown action before contacting anything | |
 | It connects within the startup timeout; the migration itself is unbounded | A schema change on a large table takes longer than a start |
-| With automatic application off, the schema version is compared before anything is served | Uncompared, a build with a new migration passes the readiness probe, a ping, and fails every request touching the new table. In a rolling deployment that retires the last working replica |
+| With automatic application off, the schema version is compared before anything is served | Uncompared, a build with a new migration passes the readiness probe, a ping, fails every request touching the new table, and in a rolling deployment retires the last working replica |
 | The version a binary carries is the highest among its embedded migrations, read from their file names | The migration library applies the same rule |
 | Migrations are written in Go | They branch on the engine. A timestamp has no portable spelling: PostgreSQL has no `DATETIME`, and MySQL's `TIMESTAMP` is 32-bit and can acquire an implicit default and on-update clause from server configuration |
 | Only the migrations registered in the binary are applied, and no directory is read | The library otherwise globs the working directory: a stray `.sql` refuses every start, a numbered one runs under the migration credential, and a numbered `.go` file narrows what is applied |
-| What every migration does around its statements is one place: asking the engine, refusing one with no spellings, running each statement, naming the one that failed by its first line | Copies drift into a spelling per migration |
-| Dropping an index is one place | Two engines name an index's table and two refuse to, and a copy can miss an arm |
+| What every migration does around its statements is one place: asking the engine, refusing one with no spellings, running each statement, naming the one that failed by its first line | |
+| Dropping an index is one place | Two engines name an index's table and two refuse to |
 
 | Applied version | At start |
 |---|---|
@@ -41,11 +41,9 @@ upgrade is deploying it.
 | Equal | Served, both versions logged |
 | Ahead | Refused, and by `openpsirt migrate up`, naming both versions (§ Forward only) |
 
-Version zero means nothing is applied, and nothing else. The bookkeeping table
-is looked for in the catalog before the version is read, so a read-only
-inspection creates nothing. Selecting from the table cannot tell an absent table
-from an unreadable one or an unreachable database, and would answer version
-zero for a populated database whose credential omits that table.
+Version zero means nothing is applied. The bookkeeping table is looked for in
+the catalog before the version is read, so an inspection creates nothing, and a
+credential that cannot read the table is never answered version zero.
 
 | Engine | Asked | Tells an absent table from an unreadable one |
 |---|---|---|
@@ -66,8 +64,8 @@ the right to use the schema and nothing on the table.
 | On PostgreSQL or SQLite | A database an unreleased build made is recreated. Data definition is transactional, so nothing is part changed |
 | Stopped by its caller, on any engine | It stopped part way, and the next start applies the schema again (§ Migrations that stop half way) |
 
-The version cannot say whether a release or an unreleased build made a
-database, so both recoveries are named.
+Both recoveries are named because the version cannot say whether a release or
+an unreleased build made the database.
 
 The chain is the baseline, then one migration per release.
 
@@ -104,7 +102,7 @@ what follows. A fresh install applies it and every migration after it.
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
 | A release's declaration may derive from a baseline declaration | v0.8.0's finding, decision occurrence and notification tables are the baseline's with indexes added; most of v0.9.0's add columns to the baseline's or v0.8.0's |
 | A baseline declaration a tagged migration reads keeps its name and its statements | Migration 42 reads the finding table's declaration by the name v0.7.0 gave it, and gets v0.7.0's statements byte for byte |
-| A database at versions 1 to 40 is refused | A release before v0.7.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline. v0.8.0 upgrades from version 39; below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
+| A database at versions 1 to 40 is refused | A release before v0.7.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.8.0 upgrades from version 39; below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
 
 ## Forward only
 
@@ -116,7 +114,7 @@ taken before the upgrade, which is exact on every engine.
 | No migration is applied downward | There is no `openpsirt migrate down`, and no migration registers a way back |
 | A database ahead of the binary is refused, at start and by `openpsirt migrate up`, naming both versions and the backup | Its schema may hold what this binary cannot read |
 | The upgrade note says to take a backup first | `docs/configuration.md` § Every upgrade |
-| An upgrade test reaches an earlier schema by emptying the database and migrating up to that release's last | Never by walking down |
+| An upgrade test reaches an earlier schema by emptying the database and migrating up to that release's last | |
 
 ## Migrations that stop half way
 
@@ -127,7 +125,7 @@ later start fails on a name already taken.
 
 | Rule | Reason |
 |---|---|
-| On MySQL and MariaDB a statement is preceded by a probe: does what it creates exist? If so it is stepped over and the step logged | The migration then reaches its end and records its version. PostgreSQL and SQLite have transactional data definition and are not asked |
+| On MySQL and MariaDB a statement is preceded by a probe: does what it creates exist? If so it is stepped over and the step logged | The migration reaches its end and records its version. PostgreSQL and SQLite have transactional data definition |
 | A probe, not `IF NOT EXISTS` | MariaDB accepts it on a table and an index; MySQL on a table only |
 | Only the exact object the statement names is stepped over | One that cannot be identified runs and fails; a skip on any collision could hide a real one |
 | A collision with an object made earlier in the same run is stepped over too | The probe cannot tell the two apart; the log surfaces it |
@@ -144,7 +142,7 @@ schema they build on each of the four engines, captured from the tag.
 |---|---|
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | An edit changes a schema deployments hold without changing their version |
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files read column spellings and widths from helpers a later change may edit. On SQLite the description includes whether each key is `AUTOINCREMENT` and each index partial, which its listings omit |
-| The migration library's bookkeeping table is left out of the compared schema | The library chooses its column types, and its releases change them |
+| The migration library's bookkeeping table is left out of the compared schema, and a record listing it is compared without it | The library chooses its column types, and its releases change them |
 | A release the baseline replaced lists no file | Its files are gone. v0.7.0's schema on each engine holds the baseline |
 
 A file a release owns is a migration numbered after the previous release's last
@@ -165,7 +163,7 @@ refuses a tag whose release is not frozen, before building anything.
 
 | The check refuses | Reason |
 |---|---|
-| A release with no record | Nothing would hold what it shipped |
+| A release with no record | |
 | An owned file the record omits or lists with another digest | The tree moved after the freeze |
 | A migration numbered past the release's last | It would ship unheld |
 | Declarations named for a release nothing froze | The same, for tables a migration reads |
@@ -204,17 +202,17 @@ the demo's inventories, so it runs locally, outside the gate.
 | Table, from a release before v0.9.0 | Reconciles against |
 |---|---|
 | `statement_text` | One row per distinct reasoning, word for word, across the build claims and supplier statements the release held |
-| `recorded_rating` | One row per issue and product holding a recorded flaw rated by a word or an unpublished score. An issue that absorbed another in a merge may add one |
+| `recorded_rating` | One row per issue and product holding a recorded flaw rated by a word or by a score naming no publisher. An issue that absorbed another in a merge may add one |
 | `issue_rating` | Gains exactly the recorded words whose issue and product held no word in force, and keeps every word that was |
-| `vulnerability_rating` | Loses exactly the unsourced ratings of issues now holding a recorded rating; nothing else moves |
+| `vulnerability_rating` | Loses exactly the unsourced ratings of issues now holding a recorded rating. No other issue's unsourced ratings move, none is gained, and no rating naming a publisher moves |
 
 | Rule | Reason |
 |---|---|
 | The release seeds itself | A fixture written today records what this tree thinks the release wrote |
 | Only the docker command is wrapped | Containers, network and ports are renamed so a running demo is untouched, and the application points at the rehearsal's database |
-| Counts are taken with nothing running | A server's passes write rows, so a changed count between migrations is the migration's |
+| Counts are taken with nothing running | A server's passes write rows |
 | This tree is served with the release's configuration | The environment the release's server started with, less its image's own and the database URL, reaches every container of this tree |
-| An engine `make engines-up` made joins the rehearsal's network | It publishes on loopback, which no container reaches. The container publishing the URL's port joins and is addressed by name, on Docker Desktop, rootless Docker and Podman alike. A failing docker command refuses with docker's words, as do two containers publishing the port. An engine on another host, or a port no container publishes, is reached through `host.docker.internal` |
+| An engine `make engines-up` made joins the rehearsal's network | It publishes on loopback, which no container reaches. The container publishing the URL's port joins and is addressed by name, on Docker Desktop, rootless Docker and Podman. A failing docker command, or two containers publishing the port, refuses with docker's words. Another host, or a port no container publishes, is reached through `host.docker.internal` |
 | Everything it made is removed on pass, fail or interrupt | Its containers, network and database. The worktree, both images, the run's logs and the scanner's database are kept. `-keep` keeps everything. A second interrupt stops the removal |
 
 ## Migration locks
@@ -229,10 +227,10 @@ One instance migrates at a time (REQ-72).
 | Rule | Reason |
 |---|---|
 | SQLite's lock is taken outside the database | It cannot take one inside, and it migrates on its one connection |
-| The file lock is the operating system's advisory lock, never a lock file written by hand | The kernel drops it however a process ends. A platform without it refuses rather than locking nothing |
-| SQLite's pool is narrowed to one connection while migrating, and restored after | A migration changing a table turns foreign keys off on a connection before opening its transaction, which on a wider pool lands elsewhere. A release's upgrade holds one connection for the setting, the transaction and the restore, because a pool of one still closes a connection past its lifetime. Every reference is checked before commit, and a row pointing at nothing refuses the upgrade |
+| The file lock is the operating system's advisory lock, never a lock file written by hand | The kernel drops it however a process ends. A platform without it refuses |
+| SQLite's pool is narrowed to one connection while migrating, and restored after | Foreign keys are turned off on a connection before the transaction opens, which on a wider pool lands elsewhere. A release's upgrade holds one connection throughout, because a pool of one still recycles one past its lifetime. A dangling reference at commit refuses the upgrade |
 | The advisory lock is taken on a pinned connection | A session lock released through the pool can land on another connection, and fails to release silently |
-| The release result is read | Both engines report "you did not hold this" as a value |
+| The release result is read | PostgreSQL and the MySQL-protocol servers report "you did not hold this" as a value |
 | A lock not held at its release fails the migration | The session was lost part way and another instance may have migrated alongside |
 | A waiter waits as long as the lock is held, on every engine, in attempts of five seconds, checking between them whether to stop | Migration 43 took 873 s on a production-shaped PostgreSQL database, and a five-minute bound gave up at 300 s |
 | A waiting process answers its health check | A replica started beside a long migration waits it out |
