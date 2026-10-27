@@ -1,14 +1,13 @@
 # Remediation
 
-Declared fix intent, the commitments it writes, and how the next scan of each
-build answers them.
+Declared fix intent, the commitments it writes, and how scans answer them.
 
 Satisfies REQ-19, REQ-28, REQ-34, REQ-35, REQ-36.
 
 Deadlines, upstream currency, version ordering, advisories, the CSAF document,
-the VEX document and the provider directory each have a document of their own
+the VEX document and the provider directory have documents of their own
 (`DESIGN.md`). The escalation view, time remaining and the compliance rate are
-in `design-docs/analytics.md`; the party work is assigned to is in
+in `design-docs/analytics.md`; the party work is assigned to, in
 `design-docs/access.md`.
 
 ## Contents
@@ -24,27 +23,26 @@ in `design-docs/analytics.md`; the party work is assigned to is in
 
 ## Declaration, not completion
 
-A fix is declared and never completed (REQ-35). A decision promising work
-names the releases it is for, and the next scan of each answers whether the fix
-arrived.
+A fix is declared and never completed (REQ-35). A decision promising work names
+the releases it is for, and the next scan of each answers whether it arrived.
 
 | Rule | Reason |
 |---|---|
-| The stored row is the declaration alone: build, fold, who and when. No state, no completed-at, nothing to move along | A scan already finds the issue or does not. A second record of that fact is one somebody keeps true, and it fails by reporting a fix that shipped in nobody's release |
-| A declaration arrives only with the decision that argued for it: a bump, recorded against the component, or a backport, recorded against the issue | Bare intent carries no version, date or reasoning, so nothing lapses and nobody agrees to it |
-| A flaw recorded by hand is closed by a person, with who, when and why on the record (REQ-19) | No scan reports one, so a declaration has nothing to be checked against and the finding stays open forever (`design-docs/findings-closure.md` § Closure by a person) |
+| The stored row is the declaration alone: build, fold, who and when. No state, no completed-at | A scan already says whether the issue is there; a second record of it drifts into a fix shipped in nobody's release |
+| A declaration arrives only with the decision arguing for it: a bump, against the component, or a backport, against the issue | Bare intent carries no version, date or reasoning, so nothing lapses and nobody agrees to it |
+| A flaw recorded by hand is closed by a person, with who, when and why (REQ-19; `design-docs/findings-closure.md` § Closure by a person) | No scan reports one, so the finding would stay open forever |
 
 ## The unit
 
 A commitment is one build moving one fold, a source package at the version it
-was built at, to another version. It is one row.
+was built at, to another version: one row.
 
 | Rule | Reason |
 |---|---|
-| A release is named by its branch or tag and its variant together | One branch built two ways is two builds, and naming the branch alone claims a fix for hardware nobody built for |
-| Acting on a plan acts on the product, never on the build in the route's path | A route names a finding so a screen has somewhere to link; the plan belongs to the work |
-| One commitment per build per fold, enforced by the database | A release moves a package to one version, and two rows is a plan a coordinator cannot read |
-| The proposals a declaration makes are made distinct before they are written | A decision's live key at an occurrence names the occurrence and not the build, so the same component in two builds yields identical proposals that collide on the unique index and roll back the declaration |
+| A release is named by branch or tag and variant together | One branch built two ways is two builds |
+| Acting on a plan acts on the product, never on the build in the route's path | The route names a finding so a screen can link to it |
+| One commitment per build per fold, enforced by the database | A release moves a package to one version |
+| A fix declared for a product covers its builds without being written per build, and its proposals are made distinct before they are written | A decision's live key names the occurrence, not the build, so one component in two builds yields identical proposals that collide on the unique index and roll back the declaration |
 
 ### Coverage by matching
 
@@ -53,105 +51,105 @@ commitment's build. Nothing is written onto findings.
 
 | Consequence | Detail |
 |---|---|
-| Changing a target version is one row | Keyed per issue, component and target version, it would rewrite every row |
-| An issue published tonight is covered by this morning's commitment, with nobody acting | |
-| A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump |
-| No version comparison decides coverage | An upgrade covers everything open on the fold, not only what names this version as its fix. An ordering reads candidates, never what a commitment reaches |
+| Changing a target version is one row | |
+| An issue published tonight is covered by this morning's commitment | Keyed per issue, it is not covered until somebody declares it too |
+| A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump, so a commitment recorded against one covers all of them |
+| No version comparison decides coverage | An upgrade covers everything open on the fold |
 
 ### Commitment changes
 
 | Source | Change |
 |---|---|
-| A decision somebody agreed to | Through the act that revises it, which withdraws every agreement on it and returns its rows to the queue. A reason is required, and the revisions keep what was promised before |
+| A decision somebody agreed to | Through the act revising it, with a reason; it withdraws every agreement and returns the rows to the queue, and the revisions keep what was promised before |
 | Intent nobody argued for | The row is edited |
+
+A promise needs a second person when its date falls after the earliest
+deadline among what the decision covers. A promise with no date, or over
+nothing that carries a deadline, always needs one.
 
 | Rule | Reason |
 |---|---|
-| Changing the version or the date under a standing agreement is refused, naming the decision to revise | Rewriting either half leaves the agreement over a promise nobody read (REQ-28) |
-| A revised promise's need for a second person is worked out again | Moving the date moves what the approval threshold is about. Left as needing nobody, a promise first made inside the deadline returns in force at any later date, suppressing what it covers and in no queue |
-| That need is measured over what the decision covers now: its builds from the commitments it wrote, its occurrences from its own rows, read inside the writing transaction | A deadline moves when the policy or the rating moves |
-| A promised patch moves by its date alone, and its builds are those holding an open finding the decision covers now | It has no version and writes no commitments |
-| A date already past is refused | It says the work happened before now |
-| The reasoning passes the text policy (`design-docs/text.md`) | Every path storing typed text runs it |
+| Changing the version or the date under a standing agreement is refused, naming the decision to revise | The agreement would stand over a promise nobody read (REQ-28) |
+| A revised promise is gated again | A later date can pass the earliest deadline; left ungated, it is in force, suppressing what it covers, and in no queue |
+| The gate reads what the decision covers now, inside the writing transaction: builds from its commitments, occurrences from its own rows | Deadlines move with the policy and the rating |
+| A promised patch moves by its date alone, its builds those holding an open finding it covers | It has no version and writes no commitments |
+| A date already past is refused | |
+| The reasoning passes the text policy (`design-docs/text.md`) | |
 
 ## Promise states
 
-A commitment is answered by the next scan of its build, never by anybody
-marking it done (REQ-35). Its state is worked out on every read; nothing
-stores, refreshes or invalidates it.
+A commitment is answered by the scans of its build, never by somebody marking
+it done (REQ-35). Its state is worked out on every read and stored nowhere.
 
 | State | Condition |
 |---|---|
-| Landed | Nothing left open under it in that build, as the scans say |
+| Landed | Nothing left open under it in that build |
 | Lapsed | The date past, with work outstanding |
 | Planned | Anything else |
 
 | Rule | Reason |
 |---|---|
-| States are derived, never stored | Stored, they are a third opinion able to disagree with the scans and the calendar |
-| The date is on the commitment, and the decision that argued for it is a citation | They are one fact, and changing it goes through the decision |
-| Only the decision that made a commitment withdraws it. A promise naming fewer builds withdraws its own commitments on the rest and keeps those another decision made | That decision's occurrences still stand on them |
-| A second decision promising a build already committed is refused, naming the standing decision, even with the same version and date | Its occurrences would rest on a date only the first decision moves |
-| No "replanned" state | Re-promising writes a new date, and a state indistinguishable from another is a word |
-| Where several promises stand over one component in one build, one is reported whole: one naming a version before one naming none, then the latest date, then the later decision | Its date and version are read together; the latest date beside the lowest version pairs two promises nobody made |
-| A lapsed promise returns the upgrade as one item, never its findings | Answering the findings one at a time is what the bulk promise replaced |
-| A lapsed upgrade is reported as a party's only where one party holds all of what is still open under it, addressed by identity or team name with the display name beside it (`design-docs/api.md` § Addresses and labels) | |
-| A finding returns on its own only when the package moved and it did not close | A decision at an occurrence is keyed on the upstream version it was made against, which tells "the plan was wrong about specifics" from "the plan did not happen" |
+| The date is on the commitment; the decision is a citation | One fact, changed through the decision |
+| Only the decision that made a commitment withdraws it; a promise narrowed to fewer builds keeps those another decision made | That decision's occurrences stand on them |
+| A second decision promising a build already committed is refused, naming the standing one, even with the same version and date | Its occurrences would rest on a date only the first moves |
+| No "replanned" state | Re-promising writes a new date |
+| Several promises over one component in one build report one whole: a version before none, then the latest date, then the later decision | The latest date beside the lowest version pairs two promises nobody made |
+| A lapsed promise returns the upgrade as one item, never its findings | The bulk promise replaced answering them one at a time |
+| A lapsed upgrade names a party only where one holds all of what is open under it, by identity or team name with the display name beside (`design-docs/api.md` § Addresses and labels) | |
+| A finding returns on its own only when the package moved and it did not close | A decision is keyed on the upstream version it was made against |
 
 ## Planned upgrades of a build
 
-The product's planned upgrades inverted (REQ-35). A triager reads an upgrade
-and the issues it closes in the findings list's by-upgrade view; a coordinator
-reads a build and the upgrades it waits on, here. One query, both ends drawn,
-both keyed on the fold.
+The product's planned upgrades inverted (REQ-35): a triager reads an upgrade
+and what it closes in the findings list's by-upgrade view, a coordinator a build
+and the upgrades it waits on, here. One query, keyed on the fold at both ends.
 
 | Rule | Reason |
 |---|---|
-| The version in hand and the target are stored with the commitment | Read off the open findings, they go blank as the upgrade lands and closes them |
-| Each row reports what is still open under it, counted from the findings: the distinct issues it closes here and the occurrences they sit at | Nothing is declared done; a build is clear when it stops holding them |
-| A bump is keyed on its target as well as its source | Grouped on the first two alone, upgrades to 5.9.0 and 5.9.2 read as one row saying 5.9.0. On a real image 42 of 127 pairs carry more than one target |
-| The list breaks its last tie on the fold | The last grouped column, so two rows equal on every other key keep one order across pages |
-| One source at two versions in one build lists the earlier first | By the ecosystem's ordering where the fold has one (`design-docs/remediation-versions.md`), by text where it has none |
+| The version in hand and the target are stored with the commitment | Read off the open findings, they go blank as the upgrade lands |
+| Each row counts what is still open under it: distinct issues and their occurrences | A build is clear when it stops holding them |
+| A bump is keyed on its target as well as its source | Grouped on source alone, upgrades to 5.9.0 and 5.9.2 read as one row; on a real image 42 of 127 pairs carry more than one target |
+| The last tie breaks on the fold | Rows keep one order across pages |
+| One source at two versions in one build lists the earlier first, by the ecosystem's ordering (`design-docs/remediation-versions.md`), else by text | |
 
 ## Build-declared suppressions
 
-A carried patch is the only way a backport is visible here: the version has not
-moved and no comparison finds one, so the build declaring it is the sole
-evidence. What a build says it handles itself reads as a history over its
-scans.
+A carried patch is the only evidence of a backport: the version has not moved
+and no comparison finds one. What a build says it handles itself reads as a
+history over its scans.
 
 | Rule | Reason |
 |---|---|
-| The stretch of scans is what makes it a history | The interesting row is the claim that stopped: a dropped patch and the finding it answered back. A list of what stands would not hold it |
-| Narrowed on what a claim says it is about, never on a package the build still carries | A claim naming something gone is what somebody asking why a patch stopped working wants |
-| The two kinds are distinguished on the row | A claim on a component is a patch declaring what it fixes; a claim in a document of its own names something to match. A claim suppressing nothing says so |
-| A claim names the product it places its subject inside, where it names one | "zlib inside curl" and "zlib inside openssl" are two claims |
-| A claim from a document uploaded on its own is not listed | It spans no stretch of the build's own scans; the finding it covers shows it |
+| The stretch of scans makes it a history | The interesting row is the claim that stopped, whose finding is back |
+| Narrowed on what a claim is about, never on a package the build still carries | A claim naming something gone is what somebody asking why a patch stopped working wants |
+| The row distinguishes a patch on a component declaring what it fixes from a claim in a document of its own naming something to match; a claim suppressing nothing says so | |
+| A claim names the product it places its subject inside | "zlib inside curl" and "zlib inside openssl" are two claims |
+| A claim from a document uploaded on its own is not listed | It spans none of the build's scans; the finding shows it |
 
 ## External links
 
-A decision carries one link to work happening elsewhere, stored and read by
-people; nothing is sent to it (REQ-36). The signed outbound request (REQ-46) is
-built, and `design-docs/notifications.md` owns it, including its egress
-controls and the one place a private address is permitted.
+A decision carries one link to work elsewhere, stored and read by people;
+nothing is sent to it (REQ-36). The signed outbound request (REQ-46) is
+`design-docs/notifications.md`'s, with its egress controls and the one place a
+private address is permitted.
 
 | Rule | Reason |
 |---|---|
-| One link per decision, never per release | The conversation about a promise is one conversation |
-| Nothing fetches what a link points at | Fetching a typed address is a request-forgery primitive. It is stored as text, shown as a link, and encoded on output |
-| Sent empty, it is cleared | A stale link sends somebody to a ticket closed for a different reason |
-| Anybody who may argue about a decision may set it | A link is a note about where the conversation is, never a decision |
-| Assigning notifies; planning does not (REQ-34) | Somebody is told when work is put on them; naming the releases it reaches is done to the work |
+| One link per decision, never per release | The conversation about a promise is one |
+| Nothing fetches what a link points at; it is stored as text and encoded on output | A fetched typed address is a request-forgery primitive |
+| Sent empty, it is cleared | |
+| Anybody who may argue about a decision may set it | A link is a note, not a decision |
+| Assigning notifies; planning does not (REQ-34) | Planning is done to the work |
 
 ## Not built
 
 | Not built | What exists |
 |---|---|
-| The tracker hand-off (REQ-36): opening or updating an item in the system a link points at | The link somebody typed, stored and never fetched |
-| A roll-up of one promise across its builds: "landed in two of three releases, planned in the third, due on the first" | Its source is the promise: the releases it names, the version and the date, each resolved by that release's next scan. What is built answers per build, and where an issue stands across builds is read from the findings list, a row per build |
+| The tracker hand-off (REQ-36): opening or updating an item where a link points | The link, stored and never fetched |
+| A roll-up of one promise across its builds: "landed in two of three, planned in the third" | Per-build state, and the findings list, a row per build |
 
 ## Limits
 
 | Rule | Reason |
 |---|---|
-| A commitment is as current as its build's last scan | Landed is what the last scan holds; a build not scanned again stays planned, or lapses at its date |
+| A commitment is as current as the findings open under it, read at what the reader may see | Landed means nothing open remains, whatever closed it |
