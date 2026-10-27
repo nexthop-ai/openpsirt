@@ -41,7 +41,9 @@ const (
 // A phase under half a second on a million rows a table is not a stall
 // whatever its ratio: SQLite's renames take milliseconds, which a scheduler
 // pause doubles, and a decision's kind is read from its table, which is under
-// half a second on a million decisions on every engine.
+// half a second on a million decisions on every engine. A notification's link
+// is matched by its prefix, which no index serves: 734 ms on a million
+// notifications on MySQL, inside twice the floor.
 const (
 	growthV0110 = 2
 	floorV0110  = 500 * time.Millisecond

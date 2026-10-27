@@ -628,7 +628,7 @@ stored values, and the changes after them.
 | Rule | Why |
 |---|---|
 | Neither the renames nor the stored values grow with the rows a table holds | A measurement under the `measure` tag upgrades a v0.10.0 database holding 1,000 rows in each table it fills and one holding 1,000,000, each with the same 1,000 rows holding a value the upgrade rewrites, and fails a phase taking more than twice as long on the larger, each time taken as at least half a second. Row work on a thousand times the rows is far past twice; noise on a shared host is well under it |
-| The stored values grow with the rows holding them | Each is found through an index leading with the column holding it, apart from a decision's kind and a kept filter's address, which are read from their tables. A table of a million decisions is read in under half a second on every engine |
+| The stored values grow with the rows holding them | Each is found through an index leading with the column holding it, apart from a decision's kind, a kept filter's address and a notification's link, which are read from their tables. A table of a million decisions is read in under half a second on every engine. A link is matched by its prefix, `/decisions/`, which no index serves: on a million notifications that took 734 ms on MySQL, 575 ms on MariaDB and 114 ms on PostgreSQL, timed on its own, inside the twice half a second the phase is allowed |
 | SQLite's renames are logged, not held | It builds a renamed index again, so they grow with the rows by design |
 | The changes are logged, not held | They build indexes, which grow with the rows by their nature |
 
@@ -636,10 +636,10 @@ The measurement, at 1,000 and at 1,000,000 rows a table:
 
 | Engine | Renames | Stored values | Changes | Whole upgrade |
 |---|---|---|---|---|
-| PostgreSQL | 111 ms, 156 ms | 18 ms, 67 ms | 0.22 s, 2.2 s | 0.35 s, 2.5 s |
-| MySQL | 817 ms, 847 ms | 19 ms, 447 ms | 0.43 s, 4.8 s | 1.3 s, 6.1 s |
-| MariaDB | 162 ms, 221 ms | 15 ms, 349 ms | 0.09 s, 5.1 s | 0.27 s, 5.7 s |
-| SQLite | 202 ms, 3.3 s | 4 ms, 72 ms | 0.02 s, 3.6 s | 0.23 s, 7.8 s |
+| PostgreSQL | 138 ms, 153 ms | 21 ms, 131 ms | 0.23 s, 2.3 s | 0.40 s, 2.6 s |
+| MySQL | 765 ms, 823 ms | 18 ms, 687 ms | 0.39 s, 4.9 s | 1.2 s, 6.4 s |
+| MariaDB | 141 ms, 263 ms | 14 ms, 566 ms | 0.08 s, 5.4 s | 0.24 s, 6.2 s |
+| SQLite | 214 ms, 3.5 s | 5 ms, 179 ms | 0.03 s, 3.8 s | 0.25 s, 8.4 s |
 
 | Table | Change | Every engine |
 |---|---|---|
